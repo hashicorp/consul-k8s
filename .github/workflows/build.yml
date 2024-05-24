@@ -91,21 +91,12 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402", "skip_packaging": "true"  }
 
           # consul-cni
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe", "skip_packaging": "true"  }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe", "skip_packaging": "true"  }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: "+fips1402", pkg_suffix: "-fips" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: "+fips1402", pkg_suffix: "-fips" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402", "skip_packaging": "true" }
-
 
       fail-fast: true
 
@@ -199,6 +190,8 @@ jobs:
           deb_depends: "openssl"
           rpm_depends: "openssl"
           config_dir: ".release/linux/package/"
+          postinstall: ".release/linux/postinst"
+          postremove: ".release/linux/postrm"
 
       - name: Set package names
         if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
