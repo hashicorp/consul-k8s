@@ -199,6 +199,8 @@ jobs:
           deb_depends: "openssl"
           rpm_depends: "openssl"
           config_dir: ".release/linux/package/"
+          postinstall: ".release/linux/postinst"
+          postremove: ".release/linux/postrm"
 
       - name: Set package names
         if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
