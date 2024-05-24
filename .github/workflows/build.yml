@@ -74,38 +74,29 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402" }
 
           # control-plane
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
           # solaris is only built for the control plane
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: "+fips1402", pkg_suffix: "-fips" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: "+fips1402", pkg_suffix: "-fips" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402"  }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: "+fips1402", pkg_suffix: "-fips", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: "+fips1402", pkg_suffix: "-fips", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402", "skip_packaging": "true"  }
 
           # consul-cni
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: "+fips1402", pkg_suffix: "-fips" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: "+fips1402", pkg_suffix: "-fips" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402" }
-
 
       fail-fast: true
 
@@ -168,7 +159,7 @@ jobs:
           mkdir -p "$LICENSE_DIR"
           cp $GITHUB_WORKSPACE/LICENSE "$LICENSE_DIR/LICENSE.txt"
 
-      - name: Package rpm and deb files
+      - name: Package rpm and deb files for consul-k8s CLI
         if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
         with:
@@ -179,25 +170,43 @@ jobs:
           maintainer: "HashiCorp"
           homepage: "https://github.com/hashicorp/consul-k8s"
           license: "MPL-2.0"
-          binary: "${{ matrix.component }}/dist/${{ matrix.pkg_name }}"
+          binary: "${{ matrix.component }}/dist/${{ matrix.bin_name }}"
           deb_depends: "openssl"
           rpm_depends: "openssl"
           config_dir: ".release/linux/package/"
 
+      - name: Package rpm and deb files for consul-cni plugin
+        if: matrix.goos == 'linux' && matrix.component == 'control-plane/cni' && matrix.skip_packaging != 'true'
+        uses: hashicorp/actions-packaging-linux@v1
+        with:
+          name: consul-cni${{ matrix.pkg_suffix }}
+          description: "consul-cni provides a CNI plugin for use with Consul Service Mesh."
+          arch: ${{ matrix.goarch }}
+          version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
+          maintainer: "HashiCorp"
+          homepage: "https://github.com/hashicorp/consul-k8s/control-plane/cni"
+          license: "MPL-2.0"
+          binary: "${{ matrix.component }}/dist/${{ matrix.bin_name }}"
+          deb_depends: "openssl"
+          rpm_depends: "openssl"
+          config_dir: ".release/linux/package/"
+          postinstall: ".release/linux/postinst"
+          postremove: ".release/linux/postrm"
+
       - name: Set package names
-        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
         run: |
           echo "RPM_PACKAGE=$(basename out/*.rpm)" >> $GITHUB_ENV
           echo "DEB_PACKAGE=$(basename out/*.deb)" >> $GITHUB_ENV
 
       - name: Enable docker runtime emulation for testing packages
-        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true' && matrix.goarch != 'amd64'
+        if: matrix.goos == 'linux' && matrix.skip_packaging != 'true' && matrix.component == 'cli' && matrix.goarch != 'amd64'
         run: |
           docker run --privileged \
                      --rm \
                      docker.mirror.hashicorp.services/tonistiigi/binfmt@sha256:5540f38542290735d17da57d7084f684c62336105d018c605058daf03e4c8256 --install ${{ matrix.goarch }}
 
-      - name: Test rpm package on platforms on UBI
+      - name: Test consul-k8s CLI rpm package on platforms on UBI
         if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
         uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
@@ -213,15 +222,15 @@ jobs:
             fi
             echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
 
-      - name: Upload rpm package
+      - name: Upload rpm packages
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
-        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
         with:
           name: ${{ env.RPM_PACKAGE }}
           path: out/${{ env.RPM_PACKAGE }}
 
-      - name: Test debian package
-        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
+      - name: Test consul-k8s CLI debian package
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true' 
         uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
         with:
           image: ubuntu:latest
@@ -237,9 +246,9 @@ jobs:
             fi
             echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
 
-      - name: Upload debian packages
+      - name: Upload debian packages 
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
-        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
+        if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
         with:
           name: ${{ env.DEB_PACKAGE }}
           path: out/${{ env.DEB_PACKAGE }}
