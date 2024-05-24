@@ -179,7 +179,7 @@ jobs:
         if: matrix.goos == 'linux' && matrix.component == 'control-plane/cni' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
         with:
-          name: consul-cni{{ matrix.pkg_suffix }}
+          name: consul-cni${{ matrix.pkg_suffix }}
           description: "consul-cni provides a CNI plugin for use with Consul Service Mesh."
           arch: ${{ matrix.goarch }}
           version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
@@ -246,7 +246,7 @@ jobs:
             fi
             echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
 
-      - name: Upload debian packages
+      - name: Upload debian packages 
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
         if: matrix.goos == 'linux' && matrix.skip_packaging != 'true'
         with:
