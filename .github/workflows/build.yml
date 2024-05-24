@@ -186,7 +186,7 @@ jobs:
         if: matrix.goos == 'linux' && matrix.component == 'control-plane/cni' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
         with:
-          name: consul-cni{{ matrix.pkg_suffix }}
+          name: consul-cni${{ matrix.pkg_suffix }}
           description: "consul-cni provides a CNI plugin for use with Consul Service Mesh."
           arch: ${{ matrix.goarch }}
           version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
