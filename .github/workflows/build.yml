@@ -184,7 +184,7 @@ jobs:
           rpm_depends: "openssl"
           config_dir: ".release/linux/package/"
 
-      - name: Package rpm and deb files for CNI
+      - name: Package rpm and deb files for consul-cni plugin
         if: matrix.goos == 'linux' && matrix.component == 'control-plane/cni' && matrix.skip_packaging != 'true'
         uses: hashicorp/actions-packaging-linux@v1
         with:
