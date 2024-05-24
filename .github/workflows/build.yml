@@ -91,7 +91,6 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402", "skip_packaging": "true"  }
 
           # consul-cni
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" }
