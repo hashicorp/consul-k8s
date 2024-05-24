@@ -1,3 +1,32 @@
+## 1.4.3 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+## 1.3.6 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+## 1.2.9 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+## 1.1.13 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+
 ## 1.4.2 (May 20, 2024)
 
 SECURITY:
@@ -36,6 +65,7 @@ BUG FIXES:
 * api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4000](https://github.com/hashicorp/consul-k8s/issues/4000)]
 * consul-cni: Fixed a bug where the output of `-version` did not include the version of the binary [[GH-3829](https://github.com/hashicorp/consul-k8s/issues/3829)]
 * control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
 
 ## 1.3.5 (May 20, 2024)
 
@@ -73,6 +103,7 @@ BUG FIXES:
 * api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
 * api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4001](https://github.com/hashicorp/consul-k8s/issues/4001)]
 * control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
 
 ## 1.2.8 (May 20, 2024)
 
@@ -102,6 +133,7 @@ BUG FIXES:
 
 * api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
 * api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4002](https://github.com/hashicorp/consul-k8s/issues/4002)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
 
 ## 1.1.12 (May 20, 2024)
 
