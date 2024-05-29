@@ -243,6 +243,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Error(err, "error deregistering services")
 			return ctrl.Result{}, err
 		}
+
+		err = r.cache.RemoveRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace)
+		if err != nil {
+			log.Error(err, "error removing acl role bindings")
+			return ctrl.Result{}, err
+		}
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
