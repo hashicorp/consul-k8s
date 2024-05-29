@@ -10,7 +10,7 @@ require (
 	github.com/fatih/color v1.16.0
 	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
-	github.com/hashicorp/consul/troubleshoot v0.5.2
+	github.com/hashicorp/consul/troubleshoot v0.6.1
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/hcp-sdk-go v0.62.1-0.20230913154003-cf69c0370c54
 	github.com/kr/text v0.2.0
@@ -60,7 +60,7 @@ require (
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
-	github.com/envoyproxy/go-control-plane v0.11.1 // indirect
+	github.com/envoyproxy/go-control-plane v0.12.0 // indirect
 	github.com/envoyproxy/go-control-plane/xdsmatcher v0.0.0-20230524161521-aaaacbfbe53e // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
 	github.com/evanphx/json-patch v5.7.0+incompatible // indirect
@@ -93,8 +93,8 @@ require (
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
-	github.com/hashicorp/consul/api v1.28.2 // indirect
-	github.com/hashicorp/consul/envoyextensions v0.5.2 // indirect
+	github.com/hashicorp/consul/api v1.29.1 // indirect
+	github.com/hashicorp/consul/envoyextensions v0.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
@@ -140,7 +140,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
-	github.com/prometheus/client_model v0.4.0 // indirect
+	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/rubenv/sql-migrate v1.5.2 // indirect
