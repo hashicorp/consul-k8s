@@ -1047,6 +1047,13 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		return 0, fmt.Errorf("failed to get terminating pod %s/%s: %w", k8sNamespace, podName, err)
 	}
 
+	// In a statefulset rollout, pods can go down and a new pod will come back up with the same name but a different
+	// address. In that case, it's not the old pod that is gracefully shutting down; the old pod is gone and we
+	// should deregister that old instance from Consul.
+	if string(pod.UID) != svc.ServiceMeta[constants.MetaKeyPodUID] {
+		return 0, nil
+	}
+
 	shutdownSeconds, err := r.getGracefulShutdownPeriodSecondsForPod(pod)
 	if err != nil {
 		r.Log.Error(err, "failed to get graceful shutdown period for pod", "name", pod, "k8sNamespace", k8sNamespace)
