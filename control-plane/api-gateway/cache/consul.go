@@ -89,6 +89,9 @@ type Cache struct {
 	gatewayNameToRole map[string]*api.ACLRole
 	aclRoleMutex      *sync.Mutex
 
+	gatewayNameToACLBindingRule map[string]*api.ACLBindingRule
+	bindingRuleMutex            *sync.Mutex
+
 	namespacesEnabled       bool
 	crossNamespaceACLPolicy string
 
@@ -107,22 +110,24 @@ func New(config Config) *Cache {
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
-		config:                  config.ConsulClientConfig,
-		serverMgr:               config.ConsulServerConnMgr,
-		namespacesEnabled:       config.NamespacesEnabled,
-		cache:                   cache,
-		cacheMutex:              &sync.Mutex{},
-		subscribers:             make(map[string][]*Subscription),
-		subscriberMutex:         &sync.Mutex{},
-		gatewayNameToPolicy:     make(map[string]*api.ACLPolicy),
-		policyMutex:             &sync.Mutex{},
-		gatewayNameToRole:       make(map[string]*api.ACLRole),
-		aclRoleMutex:            &sync.Mutex{},
-		kinds:                   Kinds,
-		synced:                  make(chan struct{}, len(Kinds)),
-		logger:                  config.Logger,
-		crossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
-		datacenter:              config.Datacenter,
+		config:                      config.ConsulClientConfig,
+		serverMgr:                   config.ConsulServerConnMgr,
+		namespacesEnabled:           config.NamespacesEnabled,
+		cache:                       cache,
+		cacheMutex:                  &sync.Mutex{},
+		subscribers:                 make(map[string][]*Subscription),
+		subscriberMutex:             &sync.Mutex{},
+		gatewayNameToPolicy:         make(map[string]*api.ACLPolicy),
+		policyMutex:                 &sync.Mutex{},
+		gatewayNameToRole:           make(map[string]*api.ACLRole),
+		aclRoleMutex:                &sync.Mutex{},
+		gatewayNameToACLBindingRule: make(map[string]*api.ACLBindingRule),
+		bindingRuleMutex:            &sync.Mutex{},
+		kinds:                       Kinds,
+		synced:                      make(chan struct{}, len(Kinds)),
+		logger:                      config.Logger,
+		crossNamespaceACLPolicy:     config.CrossNamespaceACLPolicy,
+		datacenter:                  config.Datacenter,
 	}
 }
 
@@ -566,10 +571,87 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 
 	if bindingRule.ID == "" {
 		_, _, err := client.ACL().BindingRuleCreate(bindingRule, &api.WriteOptions{})
-		return err
+		if err != nil {
+			return err
+		}
+
+		c.bindingRuleMutex.Lock()
+		defer c.bindingRuleMutex.Unlock()
+		c.gatewayNameToACLBindingRule[service] = bindingRule
+
+		return nil
 	}
 	_, _, err = client.ACL().BindingRuleUpdate(bindingRule, &api.WriteOptions{})
-	return err
+	if err != nil {
+		return err
+	}
+
+	c.bindingRuleMutex.Lock()
+	defer c.bindingRuleMutex.Unlock()
+	c.gatewayNameToACLBindingRule[service] = bindingRule
+
+	return nil
+}
+
+func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
+	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
+	if err != nil {
+		return err
+	}
+
+	c.bindingRuleMutex.Lock()
+	defer c.bindingRuleMutex.Unlock()
+	rule, ok := c.gatewayNameToACLBindingRule[service]
+	if !ok {
+		return nil
+	}
+
+	_, err = client.ACL().BindingRuleDelete(rule.ID, &api.WriteOptions{})
+	if err != nil {
+		if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
+			delete(c.gatewayNameToACLBindingRule, service)
+			return nil
+		}
+		return err
+	}
+
+	delete(c.gatewayNameToACLBindingRule, service)
+
+	c.aclRoleMutex.Lock()
+	defer c.aclRoleMutex.Unlock()
+	role, ok := c.gatewayNameToRole[service]
+	if !ok {
+		return nil
+	}
+
+	_, err = client.ACL().RoleDelete(role.ID, &api.WriteOptions{})
+	if err != nil {
+		if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
+			delete(c.gatewayNameToRole, service)
+			return nil
+		}
+		return err
+	}
+	delete(c.gatewayNameToRole, service)
+
+	c.policyMutex.Lock()
+	defer c.policyMutex.Unlock()
+	policy, ok := c.gatewayNameToPolicy[service]
+	if !ok {
+		return nil
+	}
+
+	_, err = client.ACL().PolicyDelete(policy.ID, &api.WriteOptions{})
+	if err != nil {
+		if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
+			delete(c.gatewayNameToPolicy, service)
+			return nil
+		}
+		return err
+	}
+	delete(c.gatewayNameToPolicy, service)
+
+	return nil
 }
 
 // Register registers a service in Consul.
