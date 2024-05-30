@@ -6,6 +6,7 @@ package cache
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -594,9 +595,10 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 }
 
 var (
-	ErrFailedToDeleteBindingRule = fmt.Errorf("failed to delete ACLBindingRule")
-	ErrFailedToDeleteRole        = fmt.Errorf("failed to delete ACLRole")
-	ErrFailedToDeletePolicy      = fmt.Errorf("failed to delete ACLPolicy")
+	ErrFailedToDeleteBindingRule = errors.New("failed to delete ACLBindingRule")
+	ErrFailedToDeleteRole        = errors.New("failed to delete ACLRole")
+	ErrFailedToDeletePolicy      = errors.New("failed to delete ACLPolicy")
+	ErrACLSDisabled              = errors.New("ACLs are disabled")
 )
 
 func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
@@ -605,59 +607,105 @@ func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 		return err
 	}
 
+	// acquire locks
 	c.bindingRuleMutex.Lock()
 	defer c.bindingRuleMutex.Unlock()
-	rule, ok := c.gatewayNameToACLBindingRule[service]
-	if !ok {
-		return nil
-	}
-
-	_, err = client.ACL().BindingRuleDelete(rule.ID, &api.WriteOptions{})
-	if err != nil {
-		if ignoreNotFoundOrACLsDisabled(err) == nil {
-			delete(c.gatewayNameToACLBindingRule, service)
-			return nil
-		}
-		return fmt.Errorf("%w: %s", ErrFailedToDeleteBindingRule, err)
-	}
-
-	delete(c.gatewayNameToACLBindingRule, service)
 
 	c.aclRoleMutex.Lock()
 	defer c.aclRoleMutex.Unlock()
-	role, ok := c.gatewayNameToACLRole[service]
-	if !ok {
-		return nil
-	}
-
-	_, err = client.ACL().RoleDelete(role.ID, &api.WriteOptions{})
-	if err != nil {
-		if ignoreNotFoundOrACLsDisabled(err) == nil {
-			delete(c.gatewayNameToACLRole, service)
-			return nil
-		}
-		return fmt.Errorf("%w: %s", ErrFailedToDeleteRole, err)
-	}
-	delete(c.gatewayNameToACLRole, service)
 
 	c.policyMutex.Lock()
 	defer c.policyMutex.Unlock()
-	policy, ok := c.gatewayNameToACLPolicy[service]
-	if !ok {
-		return nil
+
+	deleteFns := make([]func() error, 0, 3)
+
+	if rule, ok := c.gatewayNameToACLBindingRule[service]; ok {
+		deleteFns = append(deleteFns, c.bindingRuleDelete(client, rule, service))
 	}
 
-	_, err = client.ACL().PolicyDelete(policy.ID, &api.WriteOptions{})
-	if err != nil {
-		if ignoreNotFoundOrACLsDisabled(err) == nil {
-			delete(c.gatewayNameToACLPolicy, service)
+	if role, ok := c.gatewayNameToACLRole[service]; ok {
+		deleteFns = append(deleteFns, c.roleDelete(client, role, service))
+	}
+
+	if policy, ok := c.gatewayNameToACLPolicy[service]; ok {
+		deleteFns = append(deleteFns, c.policyDelete(client, policy, service))
+	}
+
+	for _, fn := range deleteFns {
+		err := fn()
+		if errors.Is(err, ErrACLSDisabled) {
 			return nil
 		}
-		return fmt.Errorf("%w: %s", ErrFailedToDeletePolicy, err)
+		if err != nil {
+			return err
+		}
 	}
-	delete(c.gatewayNameToACLPolicy, service)
 
 	return nil
+}
+
+func (c *Cache) bindingRuleDelete(client *api.Client, rule *api.ACLBindingRule, service string) func() error {
+	return func() error {
+		_, err := client.ACL().BindingRuleDelete(rule.ID, &api.WriteOptions{})
+		if err != nil {
+			if ignoreNotFound(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return nil
+			}
+
+			if ignoreACLsDisabled(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return ErrACLSDisabled
+			}
+			return fmt.Errorf("%w: %s", ErrFailedToDeleteBindingRule, err)
+		}
+
+		delete(c.gatewayNameToACLBindingRule, service)
+
+		return nil
+	}
+}
+
+func (c *Cache) roleDelete(client *api.Client, role *api.ACLRole, service string) func() error {
+	return func() error {
+		_, err := client.ACL().RoleDelete(role.ID, &api.WriteOptions{})
+		if err != nil {
+			if ignoreNotFound(err) == nil {
+				delete(c.gatewayNameToACLRole, service)
+				return nil
+			}
+
+			if ignoreACLsDisabled(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return ErrACLSDisabled
+			}
+			return fmt.Errorf("%w: %s", ErrFailedToDeleteRole, err)
+		}
+		delete(c.gatewayNameToACLRole, service)
+
+		return nil
+	}
+}
+
+func (c *Cache) policyDelete(client *api.Client, policy *api.ACLPolicy, service string) func() error {
+	return func() error {
+		_, err := client.ACL().PolicyDelete(policy.ID, &api.WriteOptions{})
+		if err != nil {
+			if ignoreNotFound(err) == nil {
+				delete(c.gatewayNameToACLPolicy, service)
+				return nil
+			}
+
+			if ignoreACLsDisabled(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return ErrACLSDisabled
+			}
+			return fmt.Errorf("%w: %s", ErrFailedToDeletePolicy, err)
+		}
+		delete(c.gatewayNameToACLPolicy, service)
+
+		return nil
+	}
 }
 
 // Register registers a service in Consul.
@@ -686,11 +734,11 @@ func (c *Cache) Deregister(ctx context.Context, deregistration api.CatalogDeregi
 	return err
 }
 
-func ignoreNotFoundOrACLsDisabled(err error) error {
+func ignoreNotFound(err error) error {
 	if err == nil {
 		return nil
 	}
-	if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
+	if strings.Contains(err.Error(), "Unexpected response code: 404") {
 		return nil
 	}
 
