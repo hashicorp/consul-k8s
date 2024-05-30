@@ -83,11 +83,11 @@ type Cache struct {
 	subscribers     map[string][]*Subscription
 	subscriberMutex *sync.Mutex
 
-	gatewayNameToPolicy map[string]*api.ACLPolicy
-	policyMutex         *sync.Mutex
+	gatewayNameToACLPolicy map[string]*api.ACLPolicy
+	policyMutex            *sync.Mutex
 
-	gatewayNameToRole map[string]*api.ACLRole
-	aclRoleMutex      *sync.Mutex
+	gatewayNameToACLRole map[string]*api.ACLRole
+	aclRoleMutex         *sync.Mutex
 
 	gatewayNameToACLBindingRule map[string]*api.ACLBindingRule
 	bindingRuleMutex            *sync.Mutex
@@ -118,9 +118,9 @@ func New(config Config) *Cache {
 		cacheMutex:                  &sync.Mutex{},
 		subscribers:                 make(map[string][]*Subscription),
 		subscriberMutex:             &sync.Mutex{},
-		gatewayNameToPolicy:         make(map[string]*api.ACLPolicy),
+		gatewayNameToACLPolicy:      make(map[string]*api.ACLPolicy),
 		policyMutex:                 &sync.Mutex{},
-		gatewayNameToRole:           make(map[string]*api.ACLRole),
+		gatewayNameToACLRole:        make(map[string]*api.ACLRole),
 		aclRoleMutex:                &sync.Mutex{},
 		gatewayNameToACLBindingRule: make(map[string]*api.ACLBindingRule),
 		bindingRuleMutex:            &sync.Mutex{},
@@ -369,7 +369,7 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			}
 
 			// on an upgrade the cache will be empty so we need to write the policy to the cache
-			c.gatewayNameToPolicy[gatewayName] = existing
+			c.gatewayNameToACLPolicy[gatewayName] = existing
 			return existing.ID, nil
 		}
 
@@ -377,11 +377,11 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			return "", err
 		}
 
-		c.gatewayNameToPolicy[gatewayName] = created
+		c.gatewayNameToACLPolicy[gatewayName] = created
 		return created.ID, nil
 	}
 
-	cachedPolicy, found := c.gatewayNameToPolicy[gatewayName]
+	cachedPolicy, found := c.gatewayNameToACLPolicy[gatewayName]
 
 	if !found {
 		return createPolicy()
@@ -398,7 +398,7 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	}
 
 	// update cache with existing policy
-	c.gatewayNameToPolicy[gatewayName] = existing
+	c.gatewayNameToACLPolicy[gatewayName] = existing
 	return existing.ID, nil
 }
 
@@ -441,15 +441,15 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 				return "", err
 			}
 
-			c.gatewayNameToRole[gatewayName] = role
+			c.gatewayNameToACLRole[gatewayName] = role
 			return aclRoleName, err
 		}
 
-		c.gatewayNameToRole[gatewayName] = role
+		c.gatewayNameToACLRole[gatewayName] = role
 		return aclRoleName, nil
 	}
 
-	cachedRole, found := c.gatewayNameToRole[gatewayName]
+	cachedRole, found := c.gatewayNameToACLRole[gatewayName]
 
 	if !found {
 		return createRole()
@@ -461,7 +461,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	}
 
 	if aclRole != nil {
-		c.gatewayNameToRole[gatewayName] = aclRole
+		c.gatewayNameToACLRole[gatewayName] = aclRole
 		return aclRole.Name, nil
 	}
 
@@ -596,6 +596,12 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 	return nil
 }
 
+var (
+	ErrFailedToDeleteBindingRule = fmt.Errorf("failed to delete ACLBindingRule")
+	ErrFailedToDeleteRole        = fmt.Errorf("failed to delete ACLRole")
+	ErrFailedToDeletePolicy      = fmt.Errorf("failed to delete ACLPolicy")
+)
+
 func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
 	if err != nil {
@@ -611,48 +617,48 @@ func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 
 	_, err = client.ACL().BindingRuleDelete(rule.ID, &api.WriteOptions{})
 	if err != nil {
-		if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
+		if ignoreNotFoundOrACLsDisabled(err) == nil {
 			delete(c.gatewayNameToACLBindingRule, service)
 			return nil
 		}
-		return err
+		return fmt.Errorf("%w: %s", ErrFailedToDeleteBindingRule, err)
 	}
 
 	delete(c.gatewayNameToACLBindingRule, service)
 
 	c.aclRoleMutex.Lock()
 	defer c.aclRoleMutex.Unlock()
-	role, ok := c.gatewayNameToRole[service]
+	role, ok := c.gatewayNameToACLRole[service]
 	if !ok {
 		return nil
 	}
 
 	_, err = client.ACL().RoleDelete(role.ID, &api.WriteOptions{})
 	if err != nil {
-		if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
-			delete(c.gatewayNameToRole, service)
+		if ignoreNotFoundOrACLsDisabled(err) == nil {
+			delete(c.gatewayNameToACLRole, service)
 			return nil
 		}
-		return err
+		return fmt.Errorf("%w: %s", ErrFailedToDeleteRole, err)
 	}
-	delete(c.gatewayNameToRole, service)
+	delete(c.gatewayNameToACLRole, service)
 
 	c.policyMutex.Lock()
 	defer c.policyMutex.Unlock()
-	policy, ok := c.gatewayNameToPolicy[service]
+	policy, ok := c.gatewayNameToACLPolicy[service]
 	if !ok {
 		return nil
 	}
 
 	_, err = client.ACL().PolicyDelete(policy.ID, &api.WriteOptions{})
 	if err != nil {
-		if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
-			delete(c.gatewayNameToPolicy, service)
+		if ignoreNotFoundOrACLsDisabled(err) == nil {
+			delete(c.gatewayNameToACLPolicy, service)
 			return nil
 		}
-		return err
+		return fmt.Errorf("%w: %s", ErrFailedToDeletePolicy, err)
 	}
-	delete(c.gatewayNameToPolicy, service)
+	delete(c.gatewayNameToACLPolicy, service)
 
 	return nil
 }
@@ -680,6 +686,17 @@ func (c *Cache) Deregister(ctx context.Context, deregistration api.CatalogDeregi
 	options := &api.WriteOptions{}
 
 	_, err = client.Catalog().Deregister(&deregistration, options.WithContext(ctx))
+	return err
+}
+
+func ignoreNotFoundOrACLsDisabled(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "Unexpected response code: 404") || ignoreACLsDisabled(err) == nil {
+		return nil
+	}
+
 	return err
 }
 
