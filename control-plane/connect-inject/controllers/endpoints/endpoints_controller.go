@@ -192,7 +192,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
-				r.Log.Info("attempting to get pod for endpoint address", "endpoint-address", address)
+				r.Log.Info("** attempting to get pod for endpoint address", "endpoint-address", address)
 				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
 					// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
 					if k8serrors.IsNotFound(err) {
@@ -209,6 +209,8 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					}
 					continue
 				}
+
+				r.Log.Info("** got pod for registration", "pod", pod)
 
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
 				if ok && serviceEndpoints.Name != svcName {
