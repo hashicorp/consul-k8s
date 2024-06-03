@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix issue where API Gateway specific acl roles/policy were not being cleaned up on deletion of an api-gateway
+```
