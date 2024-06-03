@@ -5,9 +5,9 @@ package environment
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -18,7 +18,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -194,7 +193,7 @@ func (k kubernetesContext) ControllerRuntimeClient(t *testing.T) client.Client {
 
 	client, err := client.New(config, client.Options{Scheme: s})
 	require.NoError(t, err)
-	logf.SetLogger(zap.New(zap.WriteTo(os.Stdout), zap.UseDevMode(true)))
+	logf.SetLogger(logr.New(nil))
 
 	k.runtimeClient = client
 
