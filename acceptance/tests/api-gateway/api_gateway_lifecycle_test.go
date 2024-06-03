@@ -30,7 +30,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 		"global.logLevel":              "trace",
 		"connectInject.enabled":        "true",
 		"global.acls.manageSystemACLs": "true",
-		"globals.tls.enabled":          "true",
+		"global.tls.enabled":           "true",
 	}
 
 	releaseName := helpers.RandomName()
