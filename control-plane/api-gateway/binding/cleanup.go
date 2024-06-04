@@ -28,7 +28,7 @@ type Cleaner struct {
 }
 
 // Run periodically cleans up old ACL roles and policies as well as orphaned inline certs
-// when it detects that there are no more inline certs and the old ACL role and policy are not in use then it exits
+// when it detects that there are no more inline certs and the old ACL role and policy are not in use then it exits.
 func (c Cleaner) Run(ctx context.Context) {
 	for {
 		select {
@@ -59,7 +59,7 @@ func (c Cleaner) Run(ctx context.Context) {
 	}
 }
 
-// cleanupACLRoleAndPolicy deletes the old shared gateway ACL role and policy if they exist
+// cleanupACLRoleAndPolicy deletes the old shared gateway ACL role and policy if they exist.
 func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 	existingRules, _, err := client.ACL().BindingRuleList(c.AuthMethod, &api.QueryOptions{})
 	if err != nil {
@@ -127,7 +127,7 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 	return deletedRuleCount == len(oldBindingRules), nil
 }
 
-// cleanupInlineCerts deletes all inline certs that are not used by any gateway
+// cleanupInlineCerts deletes all inline certs that are not used by any gateway.
 func cleanupInlineCerts(client *api.Client) (bool, error) {
 	certs, _, err := client.ConfigEntries().List(api.InlineCertificate, &api.QueryOptions{})
 	if err != nil {
@@ -187,15 +187,5 @@ func ignoreNotFoundError(err error) error {
 		return nil
 	}
 
-	return err
-}
-
-func ignoreACLsDisabled(err error) error {
-	if err == nil {
-		return nil
-	}
-	if err.Error() == "Unexpected response code: 401 (ACL support disabled)" {
-		return nil
-	}
 	return err
 }
