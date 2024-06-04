@@ -1,11 +1,10 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.10.1-0.20240422130714-057ad7e95280
-
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.2
 	github.com/deckarep/golang-set v1.7.1
+	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.4
@@ -13,9 +12,9 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
-	github.com/hashicorp/consul/api v1.10.1-0.20240422130714-057ad7e95280
-	github.com/hashicorp/consul/proto-public v0.6.0
-	github.com/hashicorp/consul/sdk v0.16.0
+	github.com/hashicorp/consul/api v1.29.1
+	github.com/hashicorp/consul/proto-public v0.6.1
+	github.com/hashicorp/consul/sdk v0.16.1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
 	github.com/hashicorp/go-hclog v1.5.0
@@ -127,7 +126,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/posener/complete v1.2.3 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
-	github.com/prometheus/client_model v0.4.0 // indirect
+	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/renier/xmlrpc v0.0.0-20170708154548-ce4a1a486c03 // indirect
@@ -162,4 +161,4 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
 
-go 1.21
+go 1.20

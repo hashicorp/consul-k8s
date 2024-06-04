@@ -51,6 +51,7 @@ spec:
             -deployment-name={{ template "consul.fullname" . }}-webhook-cert-manager \
             -deployment-namespace={{ .Release.Namespace }}
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         name: webhook-cert-manager
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
         resources:

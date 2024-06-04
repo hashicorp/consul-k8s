@@ -69,8 +69,9 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 
 	initContainerName := injectInitContainerName
 	container := corev1.Container{
-		Name:  initContainerName,
-		Image: config.ImageConsulK8S,
+		Name:            initContainerName,
+		Image:           config.ImageConsulK8S,
+		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
 
 		Env: []corev1.EnvVar{
 			{

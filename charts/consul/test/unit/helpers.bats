@@ -454,3 +454,59 @@ load _helpers
   [ "$status" -eq 1 ]
   [[ "$output" =~ "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported." ]]
 }
+
+
+
+
+
+#--------------------------------------------------------------------
+# consul.imagePullPolicy
+# These tests use test-runner.yaml to "unit test" the imagePullPolicy function
+
+@test "helper/consul.imagePullPolicy: bad input" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'global.imagePullPolicy=Garbage' .
+ [ "$status" -eq 1 ]
+ [[ "$output" =~ "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" ]]
+}
+
+@test "helper/consul.imagePullPolicy: empty input" {
+  cd `chart_dir`
+  local output=$(helm template \
+      -s templates/tests/test-runner.yaml \
+      . | tee /dev/stderr |
+      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
+  [ "${output}" = null ]
+}
+
+@test "helper/consul.imagePullPolicy: IfNotPresent" {
+  cd `chart_dir`
+  local output=$(helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'global.imagePullPolicy=IfNotPresent' \
+      . | tee /dev/stderr |
+      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
+  [ "${output}" = "IfNotPresent" ]
+}
+
+@test "helper/consul.imagePullPolicy: Always" {
+  cd `chart_dir`
+  local output=$(helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'global.imagePullPolicy=Always' \
+      . | tee /dev/stderr |
+      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
+  [ "${output}" = "Always" ]
+}
+
+@test "helper/consul.imagePullPolicy: Never" {
+  cd `chart_dir`
+  local output=$(helm template \
+      -s templates/tests/test-runner.yaml \
+      --set 'global.imagePullPolicy=Never' \
+      . | tee /dev/stderr |
+      yq -r '.spec.containers[0].imagePullPolicy' | tee /dev/stderr)
+  [ "${output}" = "Never" ]
+}

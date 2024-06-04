@@ -1,7 +1,13 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package gatekeeper
 
 import (
 	"fmt"
+	"slices"
+	"strings"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
@@ -57,5 +63,15 @@ func volumesAndMounts(gateway v1beta1.Gateway) ([]corev1.Volume, []corev1.Volume
 		}
 	}
 
-	return maps.Values(volumes), maps.Values(mounts)
+	vols := maps.Values(volumes)
+	slices.SortFunc(vols, func(a, b corev1.Volume) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	mts := maps.Values(mounts)
+	slices.SortFunc(mts, func(a, b corev1.VolumeMount) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	return vols, mts
 }
