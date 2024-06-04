@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	logrtest "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/require"
 
@@ -24,32 +25,37 @@ func TestCleaner_Run(t *testing.T) {
 	cases := map[string]struct {
 		bindingRules                []*api.ACLBindingRule
 		aclRole                     *api.ACLRole
-		expectedDeletedACLRoleIDs   []string
+		expectedDeletedACLRoleIDs   mapset.Set[string]
 		aclPolicy                   *api.ACLPolicy
-		expectedDeletedACLPolicyIDs []string
+		expectedDeletedACLPolicyIDs mapset.Set[string]
 		inlineCerts                 []*api.InlineCertificateConfigEntry
-		expxectedDeletedCertsName   []string
+		expxectedDeletedCertsName   mapset.Set[string]
 		apiGateways                 []*api.APIGatewayConfigEntry
 	}{
 		"everything gets cleaned up": {
-			bindingRules: []*api.ACLBindingRule{},
+			bindingRules: []*api.ACLBindingRule{
+				{
+					ID:       "1223445",
+					BindName: "totally-valid-name",
+				},
+			},
 			aclRole: &api.ACLRole{
 				ID:   "abcd",
 				Name: oldACLRoleName,
 			},
-			expectedDeletedACLRoleIDs: []string{"abcd"},
+			expectedDeletedACLRoleIDs: mapset.NewSet("abcd"),
 			aclPolicy: &api.ACLPolicy{
 				ID:   "defg",
 				Name: oldACLPolicyName,
 			},
-			expectedDeletedACLPolicyIDs: []string{"defg"},
+			expectedDeletedACLPolicyIDs: mapset.NewSet("defg"),
 			inlineCerts: []*api.InlineCertificateConfigEntry{
 				{
 					Kind: api.InlineCertificate,
 					Name: "my-inline-cert",
 				},
 			},
-			expxectedDeletedCertsName: []string{"my-inline-cert"},
+			expxectedDeletedCertsName: mapset.NewSet("my-inline-cert"),
 			apiGateways: []*api.APIGatewayConfigEntry{
 				{
 					Kind: api.APIGateway,
@@ -70,13 +76,122 @@ func TestCleaner_Run(t *testing.T) {
 				},
 			},
 		},
+		"acl roles do not get cleaned up because they are still being referenced": {
+			bindingRules: []*api.ACLBindingRule{
+				{
+					ID:       "1234",
+					BindName: oldACLRoleName,
+				},
+				{
+					ID:       "1223445",
+					BindName: "totally-valid-name",
+				},
+			},
+			aclRole: &api.ACLRole{
+				ID:   "abcd",
+				Name: oldACLRoleName,
+			},
+			expectedDeletedACLRoleIDs: mapset.NewSet[string](),
+			aclPolicy: &api.ACLPolicy{
+				ID:   "defg",
+				Name: oldACLPolicyName,
+			},
+			expectedDeletedACLPolicyIDs: mapset.NewSet[string](),
+			inlineCerts: []*api.InlineCertificateConfigEntry{
+				{
+					Kind: api.InlineCertificate,
+					Name: "my-inline-cert",
+				},
+			},
+			expxectedDeletedCertsName: mapset.NewSet("my-inline-cert"),
+			apiGateways: []*api.APIGatewayConfigEntry{
+				{
+					Kind: api.APIGateway,
+					Name: "my-api-gateway",
+					Listeners: []api.APIGatewayListener{
+						{
+							Name: "listener",
+							TLS: api.APIGatewayTLSConfiguration{
+								Certificates: []api.ResourceReference{
+									{
+										Kind: api.FileSystemCertificate,
+										Name: "cert",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"inline cert does not get cleaned up because it is still being referenced": {
+			bindingRules: []*api.ACLBindingRule{
+				{
+					ID:       "1223445",
+					BindName: "totally-valid-name",
+				},
+			},
+			aclRole: &api.ACLRole{
+				ID:   "abcd",
+				Name: oldACLRoleName,
+			},
+			expectedDeletedACLRoleIDs: mapset.NewSet("abcd"),
+			aclPolicy: &api.ACLPolicy{
+				ID:   "defg",
+				Name: oldACLPolicyName,
+			},
+			expectedDeletedACLPolicyIDs: mapset.NewSet("defg"),
+			inlineCerts: []*api.InlineCertificateConfigEntry{
+				{
+					Kind: api.InlineCertificate,
+					Name: "my-inline-cert",
+				},
+			},
+			expxectedDeletedCertsName: mapset.NewSet[string](),
+			apiGateways: []*api.APIGatewayConfigEntry{
+				{
+					Kind: api.APIGateway,
+					Name: "my-api-gateway",
+					Listeners: []api.APIGatewayListener{
+						{
+							Name: "listener",
+							TLS: api.APIGatewayTLSConfiguration{
+								Certificates: []api.ResourceReference{
+									{
+										Kind: api.FileSystemCertificate,
+										Name: "cert",
+									},
+								},
+							},
+						},
+					},
+				},
+				{
+					Kind: api.APIGateway,
+					Name: "my-api-gateway-2",
+					Listeners: []api.APIGatewayListener{
+						{
+							Name: "listener",
+							TLS: api.APIGatewayTLSConfiguration{
+								Certificates: []api.ResourceReference{
+									{
+										Kind: api.InlineCertificate,
+										Name: "my-inline-cert",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			deletedCertsName := make([]string, 0)
-			deletedACLPolicyIDs := make([]string, 0)
-			deletedACLRoleIDs := make([]string, 0)
+			deletedCertsName := mapset.NewSet[string]()
+			deletedACLPolicyIDs := mapset.NewSet[string]()
+			deletedACLRoleIDs := mapset.NewSet[string]()
 
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				path := r.URL.Path
@@ -91,13 +206,13 @@ func TestCleaner_Run(t *testing.T) {
 					require.NoError(t, err)
 					fmt.Fprintln(w, string(val))
 				case strings.HasPrefix(path, "/v1/acl/role/") && method == "DELETE":
-					deletedACLRoleIDs = append(deletedACLRoleIDs, strings.TrimPrefix(path, "/v1/acl/role/"))
+					deletedACLRoleIDs.Add(strings.TrimPrefix(path, "/v1/acl/role/"))
 				case strings.HasPrefix(path, "/v1/acl/policy/name/"):
 					val, err := json.Marshal(tc.aclPolicy)
 					require.NoError(t, err)
 					fmt.Fprintln(w, string(val))
 				case strings.HasPrefix(path, "/v1/acl/policy/") && method == "DELETE":
-					deletedACLPolicyIDs = append(deletedACLPolicyIDs, strings.TrimPrefix(path, "/v1/acl/policy/"))
+					deletedACLPolicyIDs.Add(strings.TrimPrefix(path, "/v1/acl/policy/"))
 				case path == "/v1/config/inline-certificate" && method == "GET":
 					val, err := json.Marshal(tc.inlineCerts)
 					require.NoError(t, err)
@@ -107,7 +222,7 @@ func TestCleaner_Run(t *testing.T) {
 					require.NoError(t, err)
 					fmt.Fprintln(w, string(val))
 				case strings.HasPrefix(path, "/v1/config/inline-certificate/") && method == "DELETE":
-					deletedCertsName = append(deletedCertsName, strings.TrimPrefix(path, "/v1/config/inline-certificate/"))
+					deletedCertsName.Add(strings.TrimPrefix(path, "/v1/config/inline-certificate/"))
 				default:
 					w.WriteHeader(500)
 					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
@@ -134,15 +249,12 @@ func TestCleaner_Run(t *testing.T) {
 			}
 
 			sleepTime = 1 * time.Second
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			go func() {
-				time.Sleep(5 * time.Second)
-				cancel()
-			}()
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			c.Run(ctx)
-
-			require.ElementsMatch(t, tc.expectedDeletedACLRoleIDs, deletedACLRoleIDs)
-			require.ElementsMatch(t, tc.expectedDeletedACLPolicyIDs, deletedACLPolicyIDs)
+			cancel()
+			require.True(t, tc.expectedDeletedACLRoleIDs.Equal(deletedACLRoleIDs))
+			require.True(t, tc.expectedDeletedACLPolicyIDs.Equal(deletedACLPolicyIDs))
+			require.True(t, tc.expxectedDeletedCertsName.Equal(deletedCertsName))
 		})
 	}
 }
