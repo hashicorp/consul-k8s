@@ -175,17 +175,16 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 		container.Resources = *config.InitContainerResources
 	}
 
-	// Openshift Assigns the security context for us, do not enable if it is enabled.
-	if !config.EnableOpenShift {
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-			RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-			RunAsNonRoot: pointer.Bool(true),
-			Privileged:   pointer.Bool(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-		}
+	container.SecurityContext = &corev1.SecurityContext{
+		RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
+		RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
+		RunAsNonRoot: pointer.Bool(true),
+		Privileged:   pointer.Bool(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		AllowPrivilegeEscalation: pointer.Bool(false),
+		ReadOnlyRootFilesystem:   pointer.Bool(true),
 	}
 
 	return container, nil
