@@ -18,6 +18,8 @@ const (
 	oldACLPolicyName = "api-gateway-token-policy"
 )
 
+var sleepTime = 60 * time.Second
+
 type Cleaner struct {
 	Logger       logr.Logger
 	ConsulConfig *consul.Config
@@ -32,7 +34,7 @@ func (c Cleaner) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(60 * time.Second):
+		case <-time.After(sleepTime):
 		}
 
 		client, err := consul.NewClientFromConnMgr(c.ConsulConfig, c.ServerMgr)
