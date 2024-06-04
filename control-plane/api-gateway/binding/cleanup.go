@@ -69,10 +69,35 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 		return false, fmt.Errorf("failed to list binding rules: %w", err)
 	}
 
+	oldBindingRules := make(map[string]*api.ACLBindingRule)
+
 	for _, rule := range existingRules {
 		if rule.BindName == oldACLRoleName {
-			return false, nil
+			oldBindingRules[rule.Selector] = rule
 		}
+	}
+
+	rulesToDelete := mapset.NewSet[string]()
+
+	for _, rule := range existingRules {
+		if ruleToDelete, ok := oldBindingRules[rule.Selector]; ok {
+			rulesToDelete.Add(ruleToDelete.ID)
+		}
+	}
+
+	var mErr error
+	deletedRuleCount := 0
+	for ruleID := range rulesToDelete.Iter() {
+		_, err := client.ACL().BindingRuleDelete(ruleID, &api.WriteOptions{})
+		if ignoreNotFoundError(err) != nil {
+			mErr = errors.Join(mErr, fmt.Errorf("failed to delete binding rule: %w", err))
+		} else {
+			deletedRuleCount++
+		}
+	}
+
+	if mErr != nil {
+		return false, mErr
 	}
 
 	role, _, err := client.ACL().RoleReadByName(oldACLRoleName, &api.QueryOptions{})
@@ -99,7 +124,7 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 		}
 	}
 
-	return true, nil
+	return deletedRuleCount == len(oldBindingRules), nil
 }
 
 // cleanupInlineCerts deletes all inline certs that are not used by any gateway
