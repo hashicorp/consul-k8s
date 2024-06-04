@@ -32,7 +32,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -93,7 +93,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -157,7 +157,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -218,7 +218,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -282,7 +282,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -343,7 +343,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -407,7 +407,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -468,7 +468,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -532,7 +532,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -593,7 +593,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -657,7 +657,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -718,7 +718,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -782,7 +782,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -843,7 +843,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -907,7 +907,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -968,7 +968,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1032,7 +1032,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1093,7 +1093,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1157,7 +1157,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1218,7 +1218,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1282,7 +1282,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert-2",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1343,7 +1343,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1407,7 +1407,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1468,7 +1468,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1532,7 +1532,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1593,7 +1593,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1657,7 +1657,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1718,7 +1718,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1782,7 +1782,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1843,7 +1843,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1907,7 +1907,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -1968,7 +1968,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -2032,7 +2032,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
@@ -2093,7 +2093,7 @@ func TestEntriesEqual(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:        api.InlineCertificate,
+									Kind:        api.FileSystemCertificate,
 									Name:        "cert",
 									SectionName: "section",
 									Partition:   "partition",
