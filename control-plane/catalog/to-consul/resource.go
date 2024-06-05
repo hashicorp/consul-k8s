@@ -790,7 +790,7 @@ func (t *ServiceResource) registerServiceInstance(
 					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
 				}
 
-                var status = consulapi.HealthPassing
+				var status = consulapi.HealthPassing
 				var output = kubernetesSuccessReasonMsg
 				if !*endpoint.Conditions.Ready {
 				    status = consulapi.HealthCritical
