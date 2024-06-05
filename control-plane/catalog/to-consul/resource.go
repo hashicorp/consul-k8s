@@ -44,7 +44,8 @@ const (
 	consulKubernetesCheckType = "kubernetes-readiness"
 	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckName  = "Kubernetes Readiness Check"
-	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
+	kubernetesSuccessReasonMsg = "Kubernetes Endpoint Ready"
+	kubernetesCriticalReasonMsg = "Kubernetes Endpoint Not Ready"
 )
 
 type NodePortSyncType string
@@ -789,14 +790,21 @@ func (t *ServiceResource) registerServiceInstance(
 					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
 				}
 
+                var status = consulapi.HealthPassing
+				var output = kubernetesSuccessReasonMsg
+				if !*endpoint.Conditions.Ready {
+				    status = consulapi.HealthCritical
+					output = kubernetesCriticalReasonMsg
+				}
+
 				r.Check = &consulapi.AgentCheck{
 					CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, addr)),
 					Name:      consulKubernetesCheckName,
 					Namespace: baseService.Namespace,
 					Type:      consulKubernetesCheckType,
-					Status:    consulapi.HealthPassing,
+					Status:    status,
 					ServiceID: serviceID(r.Service.Service, addr),
-					Output:    kubernetesSuccessReasonMsg,
+					Output:    output,
 				}
 
 				t.consulMap[key] = append(t.consulMap[key], &r)
