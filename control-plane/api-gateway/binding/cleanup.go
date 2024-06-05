@@ -71,6 +71,9 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 
 	oldBindingRules := make(map[string]*api.ACLBindingRule)
 
+	// here we need to find binding rules with the old name that have a matching selector to the new gateway specific binding rule
+	// so we first get all the old rules and put them into a map and then ensure we can delete the old rule by finding the new rule that replaces it
+	// by matching the selector
 	for _, rule := range existingRules {
 		if rule.BindName == oldACLRoleName {
 			oldBindingRules[rule.Selector] = rule
@@ -80,7 +83,7 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 	rulesToDelete := mapset.NewSet[string]()
 
 	for _, rule := range existingRules {
-		if ruleToDelete, ok := oldBindingRules[rule.Selector]; ok {
+		if ruleToDelete, ok := oldBindingRules[rule.Selector]; ok && rule.BindName != oldACLRoleName {
 			rulesToDelete.Add(ruleToDelete.ID)
 		}
 	}
@@ -98,6 +101,10 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 
 	if mErr != nil {
 		return false, mErr
+	}
+
+	if deletedRuleCount != len(oldBindingRules) {
+		return false, nil
 	}
 
 	role, _, err := client.ACL().RoleReadByName(oldACLRoleName, &api.QueryOptions{})
@@ -124,7 +131,7 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 		}
 	}
 
-	return deletedRuleCount == len(oldBindingRules), nil
+	return true, nil
 }
 
 // cleanupInlineCerts deletes all inline certs that are not used by any gateway.

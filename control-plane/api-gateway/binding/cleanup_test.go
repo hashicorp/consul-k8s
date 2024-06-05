@@ -23,22 +23,36 @@ import (
 
 func TestCleaner_Run(t *testing.T) {
 	cases := map[string]struct {
-		bindingRules                []*api.ACLBindingRule
-		aclRole                     *api.ACLRole
-		expectedDeletedACLRoleIDs   mapset.Set[string]
-		aclPolicy                   *api.ACLPolicy
-		expectedDeletedACLPolicyIDs mapset.Set[string]
-		inlineCerts                 []*api.InlineCertificateConfigEntry
-		expxectedDeletedCertsName   mapset.Set[string]
-		apiGateways                 []*api.APIGatewayConfigEntry
+		bindingRules                     []*api.ACLBindingRule
+		expectedDeletedACLBindingRuleIDs mapset.Set[string]
+		aclRole                          *api.ACLRole
+		expectedDeletedACLRoleIDs        mapset.Set[string]
+		aclPolicy                        *api.ACLPolicy
+		expectedDeletedACLPolicyIDs      mapset.Set[string]
+		inlineCerts                      []*api.InlineCertificateConfigEntry
+		expxectedDeletedCertsName        mapset.Set[string]
+		apiGateways                      []*api.APIGatewayConfigEntry
 	}{
-		"everything gets cleaned up": {
+		// add binding rules that match on selector and name to be cleaned up
+		"all old roles/policies/bindingrules and inline certs ge cleaned up": {
 			bindingRules: []*api.ACLBindingRule{
 				{
 					ID:       "1223445",
 					BindName: "totally-valid-name",
+					Selector: "non-matching selector",
+				},
+				{
+					ID:       "1234",
+					BindName: oldACLRoleName,
+					Selector: "matching selector",
+				},
+				{
+					ID:       "4567",
+					BindName: "new role",
+					Selector: "matching selector",
 				},
 			},
+			expectedDeletedACLBindingRuleIDs: mapset.NewSet("1234"),
 			aclRole: &api.ACLRole{
 				ID:   "abcd",
 				Name: oldACLRoleName,
@@ -76,17 +90,81 @@ func TestCleaner_Run(t *testing.T) {
 				},
 			},
 		},
-		"acl roles do not get cleaned up because they are still being referenced": {
+		"acl roles/policies/binding-rules do not get cleaned up because they are still being referenced": {
 			bindingRules: []*api.ACLBindingRule{
 				{
 					ID:       "1234",
 					BindName: oldACLRoleName,
+					Selector: "matching selector",
 				},
 				{
 					ID:       "1223445",
 					BindName: "totally-valid-name",
+					Selector: "non-matching selector",
 				},
 			},
+			expectedDeletedACLBindingRuleIDs: mapset.NewSet[string](),
+			aclRole: &api.ACLRole{
+				ID:   "abcd",
+				Name: oldACLRoleName,
+			},
+			expectedDeletedACLRoleIDs: mapset.NewSet[string](),
+			aclPolicy: &api.ACLPolicy{
+				ID:   "defg",
+				Name: oldACLPolicyName,
+			},
+			expectedDeletedACLPolicyIDs: mapset.NewSet[string](),
+			inlineCerts: []*api.InlineCertificateConfigEntry{
+				{
+					Kind: api.InlineCertificate,
+					Name: "my-inline-cert",
+				},
+			},
+			expxectedDeletedCertsName: mapset.NewSet("my-inline-cert"),
+			apiGateways: []*api.APIGatewayConfigEntry{
+				{
+					Kind: api.APIGateway,
+					Name: "my-api-gateway",
+					Listeners: []api.APIGatewayListener{
+						{
+							Name: "listener",
+							TLS: api.APIGatewayTLSConfiguration{
+								Certificates: []api.ResourceReference{
+									{
+										Kind: api.FileSystemCertificate,
+										Name: "cert",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"acl roles/policies aren't deleted because one binding-rule still references them": {
+			bindingRules: []*api.ACLBindingRule{
+				{
+					ID:       "1234",
+					BindName: oldACLRoleName,
+					Selector: "matching selector",
+				},
+				{
+					ID:       "5678",
+					BindName: "new-name",
+					Selector: "matching selector",
+				},
+				{
+					ID:       "101010",
+					BindName: oldACLRoleName,
+					Selector: "selector to another gateway",
+				},
+				{
+					ID:       "1223445",
+					BindName: "totally-valid-name",
+					Selector: "non-matching selector",
+				},
+			},
+			expectedDeletedACLBindingRuleIDs: mapset.NewSet("1234"),
 			aclRole: &api.ACLRole{
 				ID:   "abcd",
 				Name: oldACLRoleName,
@@ -129,8 +207,20 @@ func TestCleaner_Run(t *testing.T) {
 				{
 					ID:       "1223445",
 					BindName: "totally-valid-name",
+					Selector: "non-matching selector",
+				},
+				{
+					ID:       "1234",
+					BindName: oldACLRoleName,
+					Selector: "matching selector",
+				},
+				{
+					ID:       "4567",
+					BindName: "new role",
+					Selector: "matching selector",
 				},
 			},
+			expectedDeletedACLBindingRuleIDs: mapset.NewSet("1234"),
 			aclRole: &api.ACLRole{
 				ID:   "abcd",
 				Name: oldACLRoleName,
@@ -192,6 +282,7 @@ func TestCleaner_Run(t *testing.T) {
 			deletedCertsName := mapset.NewSet[string]()
 			deletedACLPolicyIDs := mapset.NewSet[string]()
 			deletedACLRoleIDs := mapset.NewSet[string]()
+			deletedACLBindingRuleIDs := mapset.NewSet[string]()
 
 			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				path := r.URL.Path
@@ -201,6 +292,8 @@ func TestCleaner_Run(t *testing.T) {
 					val, err := json.Marshal(tc.bindingRules)
 					require.NoError(t, err)
 					fmt.Fprintln(w, string(val))
+				case strings.HasPrefix(path, "/v1/acl/binding-rule/") && method == "DELETE":
+					deletedACLBindingRuleIDs.Add(strings.TrimPrefix(path, "/v1/acl/binding-rule/"))
 				case strings.HasPrefix(path, "/v1/acl/role/name/"):
 					val, err := json.Marshal(tc.aclRole)
 					require.NoError(t, err)
@@ -248,13 +341,15 @@ func TestCleaner_Run(t *testing.T) {
 				AuthMethod: "consul-k8s-auth-method",
 			}
 
-			sleepTime = 1 * time.Second
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			// if these get flakey increase the times here
+			sleepTime = 50 * time.Millisecond
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 			c.Run(ctx)
 			cancel()
-			require.True(t, tc.expectedDeletedACLRoleIDs.Equal(deletedACLRoleIDs))
-			require.True(t, tc.expectedDeletedACLPolicyIDs.Equal(deletedACLPolicyIDs))
-			require.True(t, tc.expxectedDeletedCertsName.Equal(deletedCertsName))
+			require.ElementsMatch(t, mapset.Sorted(tc.expectedDeletedACLBindingRuleIDs), mapset.Sorted(deletedACLBindingRuleIDs))
+			require.ElementsMatch(t, mapset.Sorted(tc.expectedDeletedACLRoleIDs), mapset.Sorted(deletedACLRoleIDs))
+			require.ElementsMatch(t, mapset.Sorted(tc.expectedDeletedACLPolicyIDs), mapset.Sorted(deletedACLPolicyIDs))
+			require.ElementsMatch(t, mapset.Sorted(tc.expxectedDeletedCertsName), mapset.Sorted(deletedCertsName))
 		})
 	}
 }
