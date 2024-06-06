@@ -1047,10 +1047,11 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		return 0, fmt.Errorf("failed to get terminating pod %s/%s: %w", k8sNamespace, podName, err)
 	}
 
-	// In a statefulset rollout, pods can go down and a new pod will come back up with the same name but a different
-	// address. In that case, it's not the old pod that is gracefully shutting down; the old pod is gone and we
-	// should deregister that old instance from Consul.
-	if string(pod.UID) != svc.ServiceMeta[constants.MetaKeyPodUID] {
+	// In a statefulset rollout, pods can go down and a new pod will come back up with the same name but a different uid
+	// or node name. In older consul-k8s patches, the pod uid may not be set, so to account for that we also check if
+	// the node changed, since newer service instances should exist for the new node. In that case, it's not the old pod
+	// that is gracefully shutting down; the old pod is gone and we should deregister that old instance from Consul.
+	if string(pod.UID) != svc.ServiceMeta[constants.MetaKeyPodUID] || common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName) != svc.Node {
 		return 0, nil
 	}
 
@@ -1064,7 +1065,7 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		// Update the health status of the service to critical so that we can drain inbound traffic.
 		// We don't need to handle the proxy service since that will be reconciled looping through all the service instances.
 		serviceRegistration := &api.CatalogRegistration{
-			Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
+			Node:    svc.Node,
 			Address: pod.Status.HostIP,
 			// Service is nil since we are patching the health status
 			Check: &api.AgentCheck{
