@@ -1014,7 +1014,7 @@ func (r *Controller) deregisterService(
 			}
 
 			// If the service address is not in the Endpoints addresses, deregister it.
-			r.Log.Info("deregistering service from consul", "svc", svc.ServiceID)
+			r.Log.Info("deregistering service instance from consul", "csl-svc-id", svc.ServiceID)
 			_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
 				Node:      svc.Node,
 				ServiceID: svc.ServiceID,
@@ -1045,8 +1045,8 @@ func (r *Controller) deregisterService(
 				errs = multierror.Append(errs, err)
 			}
 			if shouldReregister {
+				requeueAfter = 1 * time.Second
 				r.Log.Info("** re-queuing after 1 second for re-registration", "k8s-svc-name", k8sSvcName, "k8sNamespace", k8sSvcNamespace, "requeueAfter", requeueAfter)
-				requeueAfter = 1
 			}
 		}
 	}
