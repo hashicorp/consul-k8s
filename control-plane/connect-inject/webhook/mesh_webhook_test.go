@@ -30,7 +30,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 func TestHandlerHandle(t *testing.T) {

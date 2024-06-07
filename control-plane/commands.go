@@ -27,7 +27,7 @@ import (
 	cmdTLSInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/tls-init"
 	cmdVersion "github.com/hashicorp/consul-k8s/control-plane/subcommand/version"
 	webhookCertManager "github.com/hashicorp/consul-k8s/control-plane/subcommand/webhook-cert-manager"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 // Commands is the mapping of all available consul-k8s commands.
