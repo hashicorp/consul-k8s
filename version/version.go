@@ -4,25 +4,30 @@
 package version
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 )
 
 var (
-	// The git commit that was compiled. These will be filled in by the compiler.
-	GitCommit   string
+	// GitCommit is the git commit that was compiled.
+	// This will be filled in by the compiler.
+	GitCommit string
+	// GitDescribe is a bit of a misnomer. It's really the product version we set during CI builds,
+	// which will match the git tag of that release once it's promoted.
+	// This will be filled in by the compiler.
 	GitDescribe string
 
-	// The main version number that is being run at the moment.
-	//
-	// Version must conform to the format expected by
-	// github.com/hashicorp/go-version for tests to work.
-	Version = "1.6.0"
-
-	// A pre-release marker for the version. If this is "" (empty string)
+	// The next version number that will be released. This will be updated after every release.
+	// Version must conform to the format expected by github.com/hashicorp/go-version
+	// for tests to work.
+	// A pre-release marker for the version can also be specified (e.g -dev). If this is omitted
 	// then it means that it is a final release. Otherwise, this is a pre-release
 	// such as "dev" (in development), "beta", "rc1", etc.
-	VersionPrerelease = "dev"
+	//go:embed VERSION
+	fullVersion string
+
+	Version, versionPrerelease, _ = strings.Cut(strings.TrimSpace(fullVersion), "-")
 )
 
 // GetHumanVersion composes the parts of the version in a way that's suitable
@@ -34,7 +39,7 @@ func GetHumanVersion() string {
 	}
 	version = fmt.Sprintf("v%s", version)
 
-	release := VersionPrerelease
+	release := versionPrerelease
 	if GitDescribe == "" && release == "" {
 		release = "dev"
 	}

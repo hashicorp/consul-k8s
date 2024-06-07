@@ -1,4 +1,3 @@
-VERSION = $(shell ./control-plane/build-support/scripts/version.sh version/version.go)
 GOLANG_VERSION?=$(shell head -n 1 .go-version)
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
 CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
@@ -269,7 +268,7 @@ ci.aws-acceptance-test-cleanup: ## Deletes AWS resources left behind after faile
 
 .PHONY: version
 version: ## print version
-	@echo $(VERSION)
+	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; parse_version $(CURDIR)
 
 .PHONY: consul-version
 consul-version: ## print consul version
