@@ -4,12 +4,15 @@ go 1.21
 
 toolchain go1.21.4
 
+replace github.com/hashicorp/consul-k8s/version => ../version
+
 require (
 	github.com/bgentry/speakeasy v0.1.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fatih/color v1.16.0
 	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
+	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul/troubleshoot v0.6.1
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/hcp-sdk-go v0.62.1-0.20230913154003-cf69c0370c54
