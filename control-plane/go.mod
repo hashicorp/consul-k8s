@@ -1,5 +1,7 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
+replace github.com/hashicorp/consul-k8s/version => ../version
+
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.2
@@ -10,6 +12,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20230511143918-bd16ab83383d
+	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
 	github.com/hashicorp/consul/api v1.21.1
 	github.com/hashicorp/consul/sdk v0.13.1

@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"

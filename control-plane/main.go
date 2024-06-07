@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/mitchellh/cli"
 )
 
