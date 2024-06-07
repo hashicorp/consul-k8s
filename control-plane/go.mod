@@ -1,6 +1,9 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.10.1-0.20240312203720-262f4358003f
+replace (
+	github.com/hashicorp/consul-k8s/version => ../version
+	github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.10.1-0.20240312203720-262f4358003f
+)
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -12,6 +15,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
+	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
 	github.com/hashicorp/consul/api v1.28.2
 	github.com/hashicorp/consul/proto-public v0.6.0
