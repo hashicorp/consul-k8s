@@ -148,7 +148,7 @@ jobs:
 
           export GIT_COMMIT=$(git rev-parse --short HEAD)
           export GIT_DIRTY=$(test -n "$(git status --porcelain)" && echo "+CHANGES")
-          export GIT_IMPORT=github.com/hashicorp/consul-k8s/${{ matrix.component }}/version
+          export GIT_IMPORT=github.com/hashicorp/consul-k8s/version
           export GOLDFLAGS="-X ${GIT_IMPORT}.GitCommit=${GIT_COMMIT}${GIT_DIRTY} -X ${GIT_IMPORT}.GitDescribe=${{ needs.get-product-version.outputs.product-version }}"
 
           ${{ matrix.env }} go build -o dist/${{ matrix.bin_name }} -ldflags "${GOLDFLAGS}" -tags=${{ matrix.gotags }} .
