@@ -1,0 +1,3 @@
+```release-note:bug
+cni: fix incorrect release version due to unstable submodule pinning
+```
