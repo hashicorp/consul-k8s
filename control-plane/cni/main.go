@@ -13,7 +13,8 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
-	"github.com/containernetworking/cni/pkg/version"
+	cniv "github.com/containernetworking/cni/pkg/version"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
@@ -110,7 +111,7 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 
 	// The previous result is passed from the previously run plugin to our plugin. We do not
 	// do anything with the result but instead just pass it on when our plugin is finished.
-	if err := version.ParsePrevResult(&cfg.NetConf); err != nil {
+	if err := cniv.ParsePrevResult(&cfg.NetConf); err != nil {
 		return nil, fmt.Errorf("could not parse prevResult: %w", err)
 	}
 
@@ -246,7 +247,8 @@ func cmdCheck(_ *skel.CmdArgs) error {
 
 func main() {
 	c := &Command{}
-	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
+	bv.BuildVersion = version.GetHumanVersion()
+	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, cniv.All, bv.BuildString("consul-cni"))
 }
 
 // skipTrafficRedirection looks for annotations on the pod and determines if it should skip traffic redirection.
