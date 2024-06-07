@@ -24,6 +24,7 @@ const (
 	consulDataplaneDNSBindPort   = 8600
 	defaultEnvoyProxyConcurrency = 1
 	volumeNameForConnectInject   = "consul-connect-inject-data"
+	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
 )
 
 func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string, mounts []corev1.VolumeMount) (corev1.Container, error) {

@@ -536,8 +536,8 @@ func (t ResourceTranslator) ToFileSystemCertificate(secret corev1.Secret) *api.F
 		Name:        secret.Name,
 		Namespace:   t.Namespace(secret.Namespace),
 		Partition:   t.ConsulPartition,
-		Certificate: fmt.Sprintf("/consul/gateway-certificates/%s/%s/tls.crt", secret.Namespace, secret.Name),
-		PrivateKey:  fmt.Sprintf("/consul/gateway-certificates/%s/%s/tls.key", secret.Namespace, secret.Name),
+		Certificate: fmt.Sprintf("/consul/gateway-certificates/%s_%s_tls.crt", secret.Namespace, secret.Name),
+		PrivateKey:  fmt.Sprintf("/consul/gateway-certificates/%s_%s_tls.key", secret.Namespace, secret.Name),
 		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   secret.Namespace,
 			constants.MetaKeyKubeName: secret.Name,
