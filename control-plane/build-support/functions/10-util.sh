@@ -690,13 +690,8 @@ function set_version {
 	local consul_vers="$6"
 	local consul_dataplane_vers="$8"
 
-	status_stage "==> Updating control-plane version/version.go with version info: ${vers} "$4""
-	if ! update_version "${sdir}/control-plane/version/version.go" "${vers}" "$4"; then
-		return 1
-	fi
-
-	status_stage "==> Updating cli version/version.go with version info: ${vers} "$4""
-	if ! update_version "${sdir}/cli/version/version.go" "${vers}" "$4"; then
+	status_stage "==> Updating version/version.go with version info: ${vers} "$4""
+	if ! update_version "${sdir}/version/version.go" "${vers}" "$4"; then
 		return 1
 	fi
 
