@@ -1,3 +1,10 @@
+## 1.4.3 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
 ## 1.4.2 (May 20, 2024)
 
 SECURITY:
