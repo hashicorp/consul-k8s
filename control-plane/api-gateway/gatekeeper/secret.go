@@ -103,7 +103,11 @@ func (g *Gatekeeper) secret(ctx context.Context, gateway gwv1beta1.Gateway) (*co
 			}
 
 			referencedSecret := &corev1.Secret{}
-			if err := g.Client.Get(ctx, key, referencedSecret); err != nil {
+			if err := g.Client.Get(ctx, key, referencedSecret); err != nil && k8serrors.IsNotFound(err) {
+				// If the referenced Secret is not found, log a message and continue.
+				// The issue will be raised on the Gateway status by the validation process.
+				g.Log.V(1).Info(fmt.Sprintf("Referenced certificate secret %s/%s not found", key.Namespace, key.Name))
+			} else if err != nil {
 				return nil, fmt.Errorf("failed to fetch certificate secret %s/%s: %w", key.Namespace, key.Name, err)
 			}
 
