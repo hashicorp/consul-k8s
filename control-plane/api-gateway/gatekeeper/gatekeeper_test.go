@@ -1118,10 +1118,7 @@ func TestDelete(t *testing.T) {
 
 			gatekeeper := New(log, client)
 
-			err := gatekeeper.Delete(context.Background(), types.NamespacedName{
-				Namespace: tc.gateway.Namespace,
-				Name:      tc.gateway.Name,
-			})
+			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)
 			require.NoError(t, validateResourcesExist(t, client, tc.helmConfig, tc.finalResources, false))
 			require.NoError(t, validateResourcesAreDeleted(t, client, tc.initialResources))
