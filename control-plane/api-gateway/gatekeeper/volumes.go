@@ -13,7 +13,7 @@ import (
 // volumesAndMounts generates the list of volumes for the Deployment and the list of volume
 // mounts for the primary container in the Deployment. There are two volumes that are created:
 // - one empty volume for holding connect-inject data
-// - one volume holding all TLS certificates referenced by the Gateway
+// - one volume holding all TLS certificates referenced by the Gateway.
 func volumesAndMounts(gateway v1beta1.Gateway) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{
 		{
