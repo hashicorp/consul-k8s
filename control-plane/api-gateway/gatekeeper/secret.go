@@ -80,8 +80,10 @@ func (g *Gatekeeper) secret(ctx context.Context, gateway gwv1beta1.Gateway) (*co
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: gateway.Namespace,
 			Name:      gateway.Name,
+			Labels:    common.LabelsForGateway(&gateway),
 		},
 		Data: map[string][]byte{},
+		Type: corev1.SecretTypeOpaque,
 	}
 
 	for _, listener := range gateway.Spec.Listeners {
