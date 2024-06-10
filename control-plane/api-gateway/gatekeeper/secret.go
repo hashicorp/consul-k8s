@@ -28,7 +28,7 @@ func (g *Gatekeeper) upsertSecret(ctx context.Context, gateway gwv1beta1.Gateway
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return fmt.Errorf("failed to fetch existing Secret %s/%s: %w", gateway.Namespace, gateway.Name, err)
 	} else if !k8serrors.IsNotFound(err) {
-		if !IsOwnedByGateway(existingSecret, gateway) {
+		if !isOwnedByGateway(existingSecret, gateway) {
 			return fmt.Errorf("existing Secret %s/%s is not owned by Gateway %s/%s", existingSecret.Namespace, existingSecret.Name, gateway.Namespace, gateway.Name)
 		}
 	}
@@ -61,7 +61,7 @@ func (g *Gatekeeper) deleteSecret(ctx context.Context, gw gwv1beta1.Gateway) err
 		return err
 	}
 
-	if !IsOwnedByGateway(secret, gw) {
+	if !isOwnedByGateway(secret, gw) {
 		return fmt.Errorf("existing Secret %s/%s is not owned by Gateway %s/%s", secret.Namespace, secret.Name, gw.Namespace, gw.Name)
 	}
 

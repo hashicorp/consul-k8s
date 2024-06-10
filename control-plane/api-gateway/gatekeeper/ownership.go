@@ -5,7 +5,7 @@ import (
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
-func IsOwnedByGateway(o client.Object, gateway gwv1beta1.Gateway) bool {
+func isOwnedByGateway(o client.Object, gateway gwv1beta1.Gateway) bool {
 	for _, ref := range o.GetOwnerReferences() {
 		if ref.UID == gateway.GetUID() && ref.Name == gateway.GetName() {
 			// We found our gateway!
