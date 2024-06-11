@@ -2188,7 +2188,7 @@ func TestCache_RemoveRoleBinding(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 				NamespacesEnabled:   false,
 				Logger:              logrtest.NewTestLogger(t),
 			})
