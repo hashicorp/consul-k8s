@@ -621,11 +621,13 @@ function update_version_helm {
 	local version="$2"
 	local prerelease="$3"
 	local full_version="$2"
+	local full_version_k8s_for_chart_version="$2"
 	local full_consul_version="$5"
 	local full_consul_dataplane_version="$7"
 	local consul_dataplane_base_path="$8"
 	if ! test -z "$3" && test "$3" != "dev"; then
 		full_version="$2-$3"
+		full_version_k8s_for_chart_version="$2-$3"
 		full_consul_version="$5-$3"
 		full_consul_dataplane_version="$7-$3"
 	elif test "$3" == "dev"; then
@@ -635,6 +637,24 @@ function update_version_helm {
 		# is produced by Consul every night
 		full_consul_version="${5%.*}-$3"
 		full_consul_dataplane_version="${7%.*}-$3"
+	fi
+
+    # validate script versions
+	if test -z "$full_version"; then
+		err "ERROR: full_version is empty"
+		return 1
+	fi
+	if test -z "$full_version_k8s_for_chart_version"; then
+		err "ERROR: full_version_k8s_for_chart_version is empty"
+		return 1
+	fi
+	if test -z "$full_consul_version"; then
+		err "ERROR: full_consul_version is empty"
+		return 1
+	fi
+	if test -z "$full_consul_dataplane_version"; then
+		err "ERROR: full_consul_dataplane_version is empty"
+		return 1
 	fi
 
 	sed_i ${SED_EXT} -e "s/(imageK8S:.*\/consul-k8s-control-plane:)[^\"]*/imageK8S: $4${full_version}/g" "${vfile}"
@@ -690,13 +710,8 @@ function set_version {
 	local consul_vers="$6"
 	local consul_dataplane_vers="$8"
 
-	status_stage "==> Updating control-plane version/version.go with version info: ${vers} "$4""
-	if ! update_version "${sdir}/control-plane/version/version.go" "${vers}" "$4"; then
-		return 1
-	fi
-
-	status_stage "==> Updating cli version/version.go with version info: ${vers} "$4""
-	if ! update_version "${sdir}/cli/version/version.go" "${vers}" "$4"; then
+	status_stage "==> Updating version/version.go with version info: ${vers} "$4""
+	if ! update_version "${sdir}/version/version.go" "${vers}" "$4"; then
 		return 1
 	fi
 
