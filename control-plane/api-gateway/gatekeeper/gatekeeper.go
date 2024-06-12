@@ -8,11 +8,12 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 // Gatekeeper is used to manage the lifecycle of Gateway deployments and services.
@@ -50,6 +51,10 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 		return err
 	}
 
+	if err := g.upsertSecret(ctx, gateway); err != nil {
+		return err
+	}
+
 	if err := g.upsertDeployment(ctx, gateway, gcc, config); err != nil {
 		return err
 	}
@@ -59,10 +64,15 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 
 // Delete removes the resources for handling routing of network traffic.
 // This is done in the reverse order of Upsert due to dependencies between resources.
-func (g *Gatekeeper) Delete(ctx context.Context, gatewayName types.NamespacedName) error {
+func (g *Gatekeeper) Delete(ctx context.Context, gateway gwv1beta1.Gateway) error {
+	gatewayName := g.namespacedName(gateway)
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
 
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {
+		return err
+	}
+
+	if err := g.deleteSecret(ctx, gateway); err != nil {
 		return err
 	}
 
