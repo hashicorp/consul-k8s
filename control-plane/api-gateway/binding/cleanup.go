@@ -18,7 +18,7 @@ const (
 	oldACLPolicyName = "api-gateway-token-policy"
 )
 
-var sleepTime = 60 * time.Second
+var sleepTime = 10 * time.Minute
 
 type Cleaner struct {
 	Logger       logr.Logger
