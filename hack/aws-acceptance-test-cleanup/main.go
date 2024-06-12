@@ -76,6 +76,11 @@ func realMain(ctx context.Context) error {
 	elbClient := elb.New(clientSession, awsCfg)
 	iamClient := iam.New(clientSession, awsCfg)
 
+	// Find volumes and delete
+	if err := cleanupPersistentVolumes(ctx, ec2Client); err != nil {
+		return err
+	}
+
 	// Find OIDC providers to delete.
 	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
 	if err != nil {
@@ -752,4 +757,53 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 		}
 		return err
 	}, backoff.WithContext(expoBackoff, ctx))
+}
+
+func cleanupPersistentVolumes(ctx context.Context, ec2Client *ec2.EC2) error {
+	var nextToken *string
+	var toDeleteVolumes []*ec2.Volume
+	for {
+		volumesFound, err := ec2Client.DescribeVolumesWithContext(ctx, &ec2.DescribeVolumesInput{
+			NextToken: nextToken,
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("tag:Name"),
+					Values: []*string{aws.String("consul-k8s-*")},
+				},
+			},
+		})
+		if err != nil {
+			fmt.Println("Failed DescribeVolumesWithContext.")
+			return err
+		}
+		toDeleteVolumes = append(toDeleteVolumes, volumesFound.Volumes...)
+		nextToken = volumesFound.NextToken
+		if nextToken == nil {
+			break
+		}
+	}
+	if len(toDeleteVolumes) == 0 {
+		fmt.Println("No test volumes found to clean up.")
+		return nil
+	}
+
+	// Loop through the volumes and delete each one
+	for _, volume := range toDeleteVolumes {
+		if volume.State != nil && *volume.State == ec2.VolumeStateAvailable {
+			fmt.Printf("Deleting volume %s\n", *volume.VolumeId)
+			deleteVolumeInput := &ec2.DeleteVolumeInput{
+				VolumeId: volume.VolumeId,
+			}
+			_, err := ec2Client.DeleteVolume(deleteVolumeInput)
+			if err != nil {
+				fmt.Printf("Failed to delete volume %s: %s", *volume.VolumeId, err)
+			} else {
+				fmt.Printf("Successfully deleted volume %s\n", *volume.VolumeId)
+			}
+		} else {
+			fmt.Printf("Volume %s is not in 'available' state, skipping deletion\n", *volume.VolumeId)
+		}
+	}
+
+	return nil
 }
