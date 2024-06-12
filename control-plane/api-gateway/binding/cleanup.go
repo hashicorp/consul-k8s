@@ -9,8 +9,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 const (
@@ -48,12 +49,13 @@ func (c Cleaner) Run(ctx context.Context) {
 			c.Logger.Error(err, "failed to cleanup old ACL role and policy")
 		}
 
-		inlineCertsAllCleanedUp, err := cleanupInlineCerts(client)
+		inlineCertsAllCleanedUp, err := c.cleanupInlineCerts(client)
 		if err != nil {
 			c.Logger.Error(err, "failed to cleanup inline-certificate configuration entries")
 		}
 
 		if aclsCleanedUp && inlineCertsAllCleanedUp {
+			c.Logger.Info("Cleanup complete")
 			return
 		}
 	}
@@ -95,6 +97,7 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 		if ignoreNotFoundError(err) != nil {
 			mErr = errors.Join(mErr, fmt.Errorf("failed to delete binding rule: %w", err))
 		} else {
+			c.Logger.Info("Deleted unused binding rule", "id", ruleID)
 			deletedRuleCount++
 		}
 	}
@@ -117,6 +120,7 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("failed to delete role: %w", err)
 		}
+		c.Logger.Info("Deleted unused ACL role", "id", role.ID)
 	}
 
 	policy, _, err := client.ACL().PolicyReadByName(oldACLPolicyName, &api.QueryOptions{})
@@ -129,13 +133,14 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 		if err != nil {
 			return false, fmt.Errorf("failed to delete policy: %w", err)
 		}
+		c.Logger.Info("Deleted unused ACL policy", "id", policy.ID)
 	}
 
 	return true, nil
 }
 
 // cleanupInlineCerts deletes all inline certs that are not used by any gateway.
-func cleanupInlineCerts(client *api.Client) (bool, error) {
+func (c Cleaner) cleanupInlineCerts(client *api.Client) (bool, error) {
 	certs, _, err := client.ConfigEntries().List(api.InlineCertificate, &api.QueryOptions{})
 	if err != nil {
 		return false, fmt.Errorf("failed to list the inline certs: %w", err)
@@ -180,6 +185,7 @@ func cleanupInlineCerts(client *api.Client) (bool, error) {
 			mErr = errors.Join(mErr, fmt.Errorf("failed to delete inline-certificate %s: %w", cert, err))
 			continue
 		}
+		c.Logger.Info("Deleted unused inline-certificate", "name", cert)
 		deletedCerts++
 	}
 
