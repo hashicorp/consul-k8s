@@ -34,7 +34,7 @@ func TestCleaner_Run(t *testing.T) {
 		apiGateways                      []*api.APIGatewayConfigEntry
 	}{
 		// add binding rules that match on selector and name to be cleaned up
-		"all old roles/policies/bindingrules and inline certs ge cleaned up": {
+		"all old roles/policies/bindingrules and inline certs get cleaned up": {
 			bindingRules: []*api.ACLBindingRule{
 				{
 					ID:       "1223445",
