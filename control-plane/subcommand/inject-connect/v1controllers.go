@@ -107,7 +107,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
+	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: gatewaycommon.HelmConfig{
 			ConsulConfig: gatewaycommon.ConsulConfig{
 				Address:    c.consul.Addresses,
@@ -147,6 +147,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	go cache.Run(ctx)
+	go cleaner.Run(ctx)
 
 	// wait for the cache to fill
 	setupLog.Info("waiting for Consul cache sync")
