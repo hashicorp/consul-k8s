@@ -365,10 +365,7 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 
 func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
 	gk := gatekeeper.New(log, r.Client)
-	err := gk.Delete(ctx, types.NamespacedName{
-		Namespace: gw.Namespace,
-		Name:      gw.Name,
-	})
+	err := gk.Delete(ctx, *gw)
 	if err != nil {
 		return err
 	}
