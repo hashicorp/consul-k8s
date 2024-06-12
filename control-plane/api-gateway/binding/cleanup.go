@@ -27,8 +27,8 @@ type Cleaner struct {
 	AuthMethod   string
 }
 
-// Run periodically cleans up old ACL roles and policies as well as orphaned inline certs
-// when it detects that there are no more inline certs and the old ACL role and policy are not in use then it exits.
+// Run periodically cleans up old ACL roles and policies as well as orphaned inline certificate config entries.
+// When it detects that there are no more inline-certificates and that the old ACL role and policy are not in use, it exits.
 func (c Cleaner) Run(ctx context.Context) {
 	for {
 		select {
