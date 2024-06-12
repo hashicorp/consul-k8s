@@ -93,6 +93,7 @@ type testCase struct {
 
 type resources struct {
 	deployments     []*appsv1.Deployment
+	namespaces      []*corev1.Namespace
 	roles           []*rbac.Role
 	roleBindings    []*rbac.RoleBinding
 	secrets         []*corev1.Secret
@@ -946,7 +947,7 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 		},
-		"create a new gateway with TLS certificate reference": {
+		"create a new gateway with TLS certificate reference in the same namespace": {
 			gateway: gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -1017,6 +1018,94 @@ func TestUpsert(t *testing.T) {
 					configureSecret(name, namespace, labels, "1", map[string][]byte{
 						"default_tls-cert_tls.crt": []byte("cert"),
 						"default_tls-cert_tls.key": []byte("key"),
+					}),
+				},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
+		"create a new gateway with TLS certificate reference in a different namespace": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "Listener 1",
+							Port:     443,
+							Protocol: "TCP",
+							TLS: &gwv1beta1.GatewayTLSConfig{
+								CertificateRefs: []gwv1beta1.SecretObjectReference{
+									{
+										Namespace: common.PointerTo(gwv1beta1.Namespace("non-default")),
+										Name:      "tls-cert",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations:  v1alpha1.CopyAnnotationsSpec{},
+					OpenshiftSCCName: "test-api-gateway",
+				},
+			},
+			helmConfig: common.HelmConfig{
+				EnableOpenShift: false,
+				ImageDataplane:  "hashicorp/consul-dataplane",
+			},
+			initialResources: resources{
+				namespaces: []*corev1.Namespace{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Namespace",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "non-default",
+						},
+					},
+				},
+				secrets: []*corev1.Secret{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Secret",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "tls-cert",
+							Namespace: "non-default",
+						},
+						Data: map[string][]byte{
+							corev1.TLSCertKey:       []byte("cert"),
+							corev1.TLSPrivateKeyKey: []byte("key"),
+						},
+						Type: corev1.SecretTypeTLS,
+					},
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:        []*rbac.Role{},
+				roleBindings: []*rbac.RoleBinding{},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", map[string][]byte{
+						"non-default_tls-cert_tls.crt": []byte("cert"),
+						"non-default_tls-cert_tls.key": []byte("key"),
 					}),
 				},
 				services:        []*corev1.Service{},
@@ -1307,6 +1396,10 @@ func joinResources(resources resources) (objs []client.Object) {
 		objs = append(objs, deployment)
 	}
 
+	for _, namespace := range resources.namespaces {
+		objs = append(objs, namespace)
+	}
+
 	for _, role := range resources.roles {
 		objs = append(objs, role)
 	}
@@ -1389,6 +1482,19 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 			}
 		}
 		assert.True(t, hasDataplaneContainer)
+	}
+
+	for _, namespace := range resources.namespaces {
+		actual := &corev1.Namespace{}
+		err := client.Get(context.Background(), types.NamespacedName{Name: namespace.Name}, actual)
+		if err != nil {
+			return err
+		}
+
+		// Patch the createdAt label
+		actual.Labels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, namespace, actual)
 	}
 
 	for _, expected := range resources.secrets {
