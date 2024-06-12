@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/cenkalti/backoff/v4"
 )
 
@@ -37,6 +38,11 @@ var (
 	flagAutoApprove bool
 	errNotDestroyed = errors.New("not yet destroyed")
 )
+
+type oidc struct {
+	arn      string
+	buildUrl string
+}
 
 func main() {
 	flag.BoolVar(&flagAutoApprove, "auto-approve", false, "Skip interactive approval before destroying.")
@@ -68,6 +74,111 @@ func realMain(ctx context.Context) error {
 	eksClient := eks.New(clientSession, awsCfg)
 	ec2Client := ec2.New(clientSession, awsCfg)
 	elbClient := elb.New(clientSession, awsCfg)
+	iamClient := iam.New(clientSession, awsCfg)
+
+	// Find volumes and delete
+	if err := cleanupPersistentVolumes(ctx, ec2Client); err != nil {
+		return err
+	}
+
+	// Find OIDC providers to delete.
+	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
+	if err != nil {
+		return err
+	} else if oidcProvidersOutput == nil {
+		return fmt.Errorf("nil output for OIDC Providers")
+	}
+
+	toDeleteOidcArns := []*oidc{}
+	for _, providerEntry := range oidcProvidersOutput.OpenIDConnectProviderList {
+		arnString := ""
+		if providerEntry.Arn != nil {
+			arnString = *providerEntry.Arn
+		}
+		// Check if it's older than 8 hours.
+		older, err := oidcOlderThanEightHours(ctx, iamClient, providerEntry.Arn)
+		if err != nil {
+			return err
+		}
+		// Only add to delete list if it's older than 8 hours and has a buildURL tag.
+		if older {
+			output, err := iamClient.ListOpenIDConnectProviderTags(&iam.ListOpenIDConnectProviderTagsInput{OpenIDConnectProviderArn: providerEntry.Arn})
+			if err != nil {
+				return err
+			}
+			for _, tag := range output.Tags {
+				if tag.Key != nil && *tag.Key == buildURLTag {
+					var buildUrl string
+					if tag.Value != nil {
+						buildUrl = *tag.Value
+					}
+					toDeleteOidcArns = append(toDeleteOidcArns, &oidc{arn: arnString, buildUrl: buildUrl})
+				}
+			}
+		} else {
+			fmt.Printf("Skipping OIDC provider: %s because it's not over 8 hours old\n", arnString)
+		}
+	}
+
+	oidcProvidersExist := true
+	if len(toDeleteOidcArns) == 0 {
+		fmt.Println("Found no OIDC Providers to clean up")
+		oidcProvidersExist = false
+	} else {
+		// Print out the OIDC Provider arns and the build tags.
+		var oidcPrint string
+		for _, oidcProvider := range toDeleteOidcArns {
+			oidcPrint += fmt.Sprintf("- %s (%s)\n", oidcProvider.arn, oidcProvider.buildUrl)
+		}
+
+		fmt.Printf("Found OIDC Providers:\n%s", oidcPrint)
+	}
+
+	// Check for approval.
+	if !flagAutoApprove && oidcProvidersExist {
+		type input struct {
+			text string
+			err  error
+		}
+		inputCh := make(chan input)
+
+		// Read input in a goroutine so we can also exit if we get a Ctrl-C
+		// (see select{} below).
+		go func() {
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Println("\nDo you want to delete these OIDC Providers (y/n)?")
+			inputStr, err := reader.ReadString('\n')
+			if err != nil {
+				inputCh <- input{err: err}
+				return
+			}
+			inputCh <- input{text: inputStr}
+		}()
+
+		select {
+		case in := <-inputCh:
+			if in.err != nil {
+				return in.err
+			}
+			inputTrimmed := strings.TrimSpace(in.text)
+			if inputTrimmed != "y" && inputTrimmed != "yes" {
+				return errors.New("exiting after negative")
+			}
+		case <-ctx.Done():
+			return errors.New("context cancelled")
+		}
+	}
+
+	// Actually delete the OIDC providers.
+	for _, oidcArn := range toDeleteOidcArns {
+		fmt.Printf("Deleting OIDC provider: %s\n", oidcArn.arn)
+		_, err := iamClient.DeleteOpenIDConnectProviderWithContext(ctx, &iam.DeleteOpenIDConnectProviderInput{
+			OpenIDConnectProviderArn: &oidcArn.arn,
+		})
+		if err != nil {
+			return err
+		}
+	}
 
 	// Find VPCs to delete. Most resources we create belong to a VPC, except
 	// for IAM resources, and so if there are no VPCs, that means all leftover resources have been deleted.
@@ -90,7 +201,7 @@ func realMain(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		toDeleteVPCs = append(vpcsOutput.Vpcs)
+		toDeleteVPCs = append(toDeleteVPCs, vpcsOutput.Vpcs...)
 		nextToken = vpcsOutput.NextToken
 		if nextToken == nil {
 			break
@@ -260,6 +371,11 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
+
+		if err != nil {
+			return err
+		}
+
 		vpcPeeringConnectionsToDelete := append(vpcPeeringConnectionsWithAcceptor.VpcPeeringConnections, vpcPeeringConnectionsWithRequester.VpcPeeringConnections...)
 
 		// Delete NAT gateways.
@@ -271,9 +387,11 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
+
 		if err != nil {
 			return err
 		}
+
 		for _, gateway := range natGateways.NatGateways {
 			fmt.Printf("NAT gateway: Destroying... [id=%s]\n", *gateway.NatGatewayId)
 			_, err = ec2Client.DeleteNatGatewayWithContext(ctx, &ec2.DeleteNatGatewayInput{
@@ -378,6 +496,11 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
+
+		if err != nil {
+			return err
+		}
+
 		for _, igw := range igws.InternetGateways {
 			fmt.Printf("Internet gateway: Detaching from VPC... [id=%s]\n", *igw.InternetGatewayId)
 			if err := destroyBackoff(ctx, "Internet Gateway", *igw.InternetGatewayId, func() error {
@@ -405,6 +528,37 @@ func realMain(ctx context.Context) error {
 			fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
 		}
 
+		// Delete network interfaces
+		networkInterfaces, err := ec2Client.DescribeNetworkInterfacesWithContext(ctx, &ec2.DescribeNetworkInterfacesInput{
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("vpc-id"),
+					Values: []*string{vpcID},
+				},
+			},
+		})
+
+		if err != nil {
+			return err
+		}
+
+		for _, networkInterface := range networkInterfaces.NetworkInterfaces {
+			fmt.Printf("Network Interface: Destroying... [id=%s]\n", *networkInterface.NetworkInterfaceId)
+			if err := destroyBackoff(ctx, "Network Interface", *networkInterface.NetworkInterfaceId, func() error {
+				_, err := ec2Client.DeleteNetworkInterfaceWithContext(ctx, &ec2.DeleteNetworkInterfaceInput{
+					NetworkInterfaceId: networkInterface.NetworkInterfaceId,
+				})
+				if err != nil {
+					return err
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+
+			fmt.Printf("Network interface: Destroyed [id=%s]\n", *networkInterface.NetworkInterfaceId)
+		}
+
 		// Delete subnets.
 		subnets, err := ec2Client.DescribeSubnetsWithContext(ctx, &ec2.DescribeSubnetsInput{
 			Filters: []*ec2.Filter{
@@ -414,6 +568,11 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
+
+		if err != nil {
+			return err
+		}
+
 		for _, subnet := range subnets.Subnets {
 			fmt.Printf("Subnet: Destroying... [id=%s]\n", *subnet.SubnetId)
 			if err := destroyBackoff(ctx, "Subnet", *subnet.SubnetId, func() error {
@@ -441,6 +600,11 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
+
+		if err != nil {
+			return err
+		}
+
 		for _, routeTable := range routeTables.RouteTables {
 			// Find out if this is the main route table.
 			var mainRouteTable bool
@@ -474,6 +638,11 @@ func realMain(ctx context.Context) error {
 				},
 			},
 		})
+
+		if err != nil {
+			return err
+		}
+
 		for _, sg := range sgs.SecurityGroups {
 			if len(sg.IpPermissions) > 0 {
 				revokeSGInput := &ec2.RevokeSecurityGroupIngressInput{GroupId: sg.GroupId}
@@ -537,6 +706,25 @@ func realMain(ctx context.Context) error {
 	return nil
 }
 
+// oidcOlderThanEightHours checks if the oidc provider is older than 8 hours.
+func oidcOlderThanEightHours(ctx context.Context, iamClient *iam.IAM, oidcArn *string) (bool, error) {
+	fullOidc, err := iamClient.GetOpenIDConnectProviderWithContext(ctx, &iam.GetOpenIDConnectProviderInput{
+		OpenIDConnectProviderArn: oidcArn,
+	})
+	if err != nil {
+		return false, err
+	}
+	if fullOidc != nil {
+		if fullOidc.CreateDate != nil {
+			d := time.Since(*fullOidc.CreateDate)
+			if d.Hours() > 8 {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
 func vpcNameAndBuildURL(vpc *ec2.Vpc) (string, string) {
 	var vpcName string
 	var buildURL string
@@ -569,4 +757,53 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 		}
 		return err
 	}, backoff.WithContext(expoBackoff, ctx))
+}
+
+func cleanupPersistentVolumes(ctx context.Context, ec2Client *ec2.EC2) error {
+	var nextToken *string
+	var toDeleteVolumes []*ec2.Volume
+	for {
+		volumesFound, err := ec2Client.DescribeVolumesWithContext(ctx, &ec2.DescribeVolumesInput{
+			NextToken: nextToken,
+			Filters: []*ec2.Filter{
+				{
+					Name:   aws.String("tag:Name"),
+					Values: []*string{aws.String("consul-k8s-*")},
+				},
+			},
+		})
+		if err != nil {
+			fmt.Println("Failed DescribeVolumesWithContext.")
+			return err
+		}
+		toDeleteVolumes = append(toDeleteVolumes, volumesFound.Volumes...)
+		nextToken = volumesFound.NextToken
+		if nextToken == nil {
+			break
+		}
+	}
+	if len(toDeleteVolumes) == 0 {
+		fmt.Println("No test volumes found to clean up.")
+		return nil
+	}
+
+	// Loop through the volumes and delete each one
+	for _, volume := range toDeleteVolumes {
+		if volume.State != nil && *volume.State == ec2.VolumeStateAvailable {
+			fmt.Printf("Deleting volume %s\n", *volume.VolumeId)
+			deleteVolumeInput := &ec2.DeleteVolumeInput{
+				VolumeId: volume.VolumeId,
+			}
+			_, err := ec2Client.DeleteVolume(deleteVolumeInput)
+			if err != nil {
+				fmt.Printf("Failed to delete volume %s: %s", *volume.VolumeId, err)
+			} else {
+				fmt.Printf("Successfully deleted volume %s\n", *volume.VolumeId)
+			}
+		} else {
+			fmt.Printf("Volume %s is not in 'available' state, skipping deletion\n", *volume.VolumeId)
+		}
+	}
+
+	return nil
 }
