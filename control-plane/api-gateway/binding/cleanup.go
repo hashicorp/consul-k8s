@@ -50,7 +50,7 @@ func (c Cleaner) Run(ctx context.Context) {
 
 		inlineCertsAllCleanedUp, err := cleanupInlineCerts(client)
 		if err != nil {
-			c.Logger.Error(err, "failed to cleanup inlineCerts")
+			c.Logger.Error(err, "failed to cleanup inline-certificate configuration entries")
 		}
 
 		if aclsCleanedUp && inlineCertsAllCleanedUp {
