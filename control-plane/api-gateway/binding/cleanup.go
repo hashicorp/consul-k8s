@@ -177,7 +177,7 @@ func cleanupInlineCerts(client *api.Client) (bool, error) {
 	for cert := range certsToDelete.Iter() {
 		_, err := client.ConfigEntries().Delete(api.InlineCertificate, cert, &api.WriteOptions{})
 		if err != nil {
-			mErr = errors.Join(mErr, fmt.Errorf("failed to delete the inline cert %s: %w", cert, err))
+			mErr = errors.Join(mErr, fmt.Errorf("failed to delete inline-certificate %s: %w", cert, err))
 			continue
 		}
 		deletedCerts++
