@@ -522,7 +522,7 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
+	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: gatewaycommon.HelmConfig{
 			ConsulConfig: gatewaycommon.ConsulConfig{
 				Address:    c.consul.Addresses,
@@ -556,13 +556,13 @@ func (c *Command) Run(args []string) int {
 		Partition:               c.consul.Partition,
 		Datacenter:              c.consul.Datacenter,
 	})
-
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return 1
 	}
 
 	go cache.Run(ctx)
+	go cleaner.Run(ctx)
 
 	// wait for the cache to fill
 	setupLog.Info("waiting for Consul cache sync")
