@@ -10,8 +10,13 @@ env:
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  conditional-skip:
+    uses: ./.github/workflows/reusable-conditional-skip.yml
+
   test:
     name: test
+    needs: [ conditional-skip ]
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
