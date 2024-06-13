@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -131,4 +132,15 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func ignoreNotFoundError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "Unexpected response code: 404") {
+		return nil
+	}
+
+	return err
 }
