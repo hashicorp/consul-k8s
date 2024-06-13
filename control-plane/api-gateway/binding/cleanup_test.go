@@ -202,7 +202,7 @@ func TestCleaner_Run(t *testing.T) {
 					GRPCPort:        port,
 					APITimeout:      0,
 				},
-				ServerMgr:  test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+				ServerMgr:  test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
 				AuthMethod: "consul-k8s-auth-method",
 			}
 
