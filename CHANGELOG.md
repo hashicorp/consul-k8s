@@ -1,3 +1,32 @@
+## 1.5.0 (June 13, 2024)
+
+> NOTE: Consul K8s 1.5.x is compatible with Consul 1.19.x and Consul Dataplane 1.5.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+BREAKING CHANGES:
+
+* api-gateway: The api-gateway stanza located under .Values.api-gateway was deprecated in
+1.16.0 of Consul and is being removed as of 1.19.0 in favor of connectInject.apiGateway. [[GH-3718](https://github.com/hashicorp/consul-k8s/issues/3718)]
+
+FEATURES:
+
+* control-plane: Add the ability to register services via CRD. [[GH-3943](https://github.com/hashicorp/consul-k8s/issues/3943)]
+* gateways: api-gateway now uses the Consul file-system-certificate by default for TLS [[GH-3767](https://github.com/hashicorp/consul-k8s/issues/3767)]
+* helm: adds ability to set the Image Pull Policy for all Consul images (consul, consul-k8s, consul-dataplane, consul-telemetry-collector) [[GH-3991](https://github.com/hashicorp/consul-k8s/issues/3991)]
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.4. [[GH-4085](https://github.com/hashicorp/consul-k8s/issues/4085)]
+* cni: package `consul-cni` as .deb and .rpm files [[GH-4040](https://github.com/hashicorp/consul-k8s/issues/4040)]
+* helm: Add readOnlyRootFilesystem to the default restricted security context when runnning `consul-k8s` in a restricted namespaces. [[GH-2909](https://github.com/hashicorp/consul-k8s/issues/2909)]
+
+BUG FIXES:
+
+* api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4003](https://github.com/hashicorp/consul-k8s/issues/4003)]
+* cni: fix incorrect release version due to unstable submodule pinning [[GH-4091](https://github.com/hashicorp/consul-k8s/issues/4091)]
+* helm: (datadog integration) updated `server-statefulset.yaml` templating to handle custom Unix Domain Socket paths. [[GH-3635](https://github.com/hashicorp/consul-k8s/issues/3635)]
+* helm: bug fix for `prometheus.io` annotation omission while using datadog integration with openmetrics/prometheus and consul integration checks [[GH-3685](https://github.com/hashicorp/consul-k8s/issues/3685)]
+* helm: corrected datadog openmetrics and consul-checks consul server URLs set during automation to use full consul deployment release name [[GH-3685](https://github.com/hashicorp/consul-k8s/issues/3685)]
+
 ## 1.4.3 (May 24, 2024)
 
 IMPROVEMENTS:
