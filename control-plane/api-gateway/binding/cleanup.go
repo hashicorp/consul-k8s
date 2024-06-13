@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -49,12 +48,7 @@ func (c Cleaner) Run(ctx context.Context) {
 			c.Logger.Error(err, "failed to cleanup old ACL role and policy")
 		}
 
-		inlineCertsAllCleanedUp, err := c.cleanupInlineCerts(client)
-		if err != nil {
-			c.Logger.Error(err, "failed to cleanup inline-certificate configuration entries")
-		}
-
-		if aclsCleanedUp && inlineCertsAllCleanedUp {
+		if aclsCleanedUp {
 			c.Logger.Info("Cleanup complete")
 			return
 		}
@@ -137,68 +131,4 @@ func (c Cleaner) cleanupACLRoleAndPolicy(client *api.Client) (bool, error) {
 	}
 
 	return true, nil
-}
-
-// cleanupInlineCerts deletes all inline certs that are not used by any gateway.
-func (c Cleaner) cleanupInlineCerts(client *api.Client) (bool, error) {
-	certs, _, err := client.ConfigEntries().List(api.InlineCertificate, &api.QueryOptions{})
-	if err != nil {
-		return false, fmt.Errorf("failed to list the inline certs: %w", err)
-	}
-
-	gateways, _, err := client.ConfigEntries().List(api.APIGateway, &api.QueryOptions{})
-	if err != nil {
-		return false, fmt.Errorf("failed to list the gateways: %w", err)
-	}
-
-	if len(certs) == 0 {
-		return true, nil
-	}
-
-	certSet := mapset.NewSet[string]()
-	certsToKeep := mapset.NewSet[string]()
-	for _, cert := range certs {
-		certSet.Add(cert.GetName())
-	}
-
-	for _, gateway := range gateways {
-		gtw := gateway.(*api.APIGatewayConfigEntry)
-		for _, listener := range gtw.Listeners {
-			if len(listener.TLS.Certificates) == 0 {
-				continue
-			}
-
-			for _, cert := range listener.TLS.Certificates {
-				if cert.Kind == api.InlineCertificate && certSet.Contains(cert.Name) {
-					certsToKeep.Add(cert.Name)
-				}
-			}
-		}
-	}
-
-	certsToDelete := certSet.Difference(certsToKeep)
-	var mErr error
-	deletedCerts := 0
-	for cert := range certsToDelete.Iter() {
-		_, err := client.ConfigEntries().Delete(api.InlineCertificate, cert, &api.WriteOptions{})
-		if err != nil {
-			mErr = errors.Join(mErr, fmt.Errorf("failed to delete inline-certificate %s: %w", cert, err))
-			continue
-		}
-		c.Logger.Info("Deleted unused inline-certificate", "name", cert)
-		deletedCerts++
-	}
-
-	return certSet.Cardinality() == deletedCerts, mErr
-}
-
-func ignoreNotFoundError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if strings.Contains(err.Error(), "Unexpected response code: 404") {
-		return nil
-	}
-
-	return err
 }
