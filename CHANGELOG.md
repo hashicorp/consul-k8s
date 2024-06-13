@@ -1,4 +1,4 @@
-## 1.5.0 (June 12, 2024)
+## 1.5.0 (June 13, 2024)
 
 > NOTE: Consul K8s 1.5.x is compatible with Consul 1.19.x and Consul Dataplane 1.5.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
 
