@@ -9,6 +9,7 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.2
 	github.com/deckarep/golang-set v1.7.1
+	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.2.4
