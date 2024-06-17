@@ -110,27 +110,6 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# v2tenancy experiment
-
-@test "partitionInit/Job: -enable-v2tenancy=true is set when global.experiments contains [\"resource-apis\", \"v2tenancy\"]" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/partition-init-job.yaml  \
-      --set 'global.adminPartitions.enabled=true' \
-      --set 'global.enableConsulNamespaces=true' \
-      --set 'server.enabled=false' \
-      --set 'global.adminPartitions.name=bar' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=foo' \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'global.experiments[1]=v2tenancy' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-enable-v2tenancy=true"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
 # global.tls.enabled
 
 @test "partitionInit/Job: sets TLS env vars when global.tls.enabled" {

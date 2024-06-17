@@ -18,11 +18,9 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -30,7 +28,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
 )
 
 const (
@@ -40,11 +37,10 @@ const (
 )
 
 type TestServerClient struct {
-	TestServer     *testutil.TestServer
-	APIClient      *api.Client
-	Cfg            *consul.Config
-	Watcher        consul.ServerConnectionManager
-	ResourceClient pbresource.ResourceServiceClient
+	TestServer *testutil.TestServer
+	APIClient  *api.Client
+	Cfg        *consul.Config
+	Watcher    consul.ServerConnectionManager
 }
 
 func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConfigCallback) *TestServerClient {
@@ -76,21 +72,13 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	requireACLBootstrapped(t, cfg, client)
 	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true)
 
-	// Create a gRPC resource service client when the resource-apis experiment is enabled.
-	var resourceClient pbresource.ResourceServiceClient
-	if slices.Contains(cfg.Experiments, "resource-apis") {
-		resourceClient, err = consul.NewResourceServiceClient(watcher)
-		require.NoError(t, err)
-	}
-
-	requireTenancyBuiltins(t, cfg, client, resourceClient)
+	requireTenancyBuiltins(t, cfg, client)
 
 	return &TestServerClient{
-		TestServer:     consulServer,
-		APIClient:      client,
-		Cfg:            consulConfig,
-		Watcher:        watcher,
-		ResourceClient: resourceClient,
+		TestServer: consulServer,
+		APIClient:  client,
+		Cfg:        consulConfig,
+		Watcher:    watcher,
 	}
 }
 
@@ -320,27 +308,6 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 	require.NoError(t, err)
 }
 
-// ResourceHasPersisted checks that a recently written resource exists in the Consul
-// state store with a valid version. This must be true before a resource is overwritten
-// or deleted.
-func ResourceHasPersisted(t *testing.T, ctx context.Context, client pbresource.ResourceServiceClient, id *pbresource.ID) {
-	req := &pbresource.ReadRequest{Id: id}
-
-	require.Eventually(t, func() bool {
-		res, err := client.Read(ctx, req)
-		if err != nil {
-			return false
-		}
-
-		if res.GetResource().GetVersion() == "" {
-			return false
-		}
-
-		return true
-	}, 5*time.Second,
-		time.Second)
-}
-
 func TokenReviewsResponse(name, ns string) string {
 	return fmt.Sprintf(`{
  "kind": "TokenReview",
@@ -418,53 +385,37 @@ Z23jGuk6rn9DUHC2xPj3wCTmd8SGEJoV31noJV5dVeQ90wusXz3vTG7ficKnvHFS
 xtr5PSwH1DusYfVaGH2O
 -----END CERTIFICATE-----`
 
-func requireTenancyBuiltins(t *testing.T, cfg *testutil.TestServerConfig, client *api.Client, resourceClient pbresource.ResourceServiceClient) {
+func requireTenancyBuiltins(t *testing.T, cfg *testutil.TestServerConfig, client *api.Client) {
 	t.Helper()
 
-	// There is a window of time post-leader election on startup where v2 tenancy builtins
+	// There is a window of time post-leader election on startup where tenancy builtins
 	// (default partition and namespace) have not yet been created.
 	// Wait for them to exist before considering the server "open for business".
+	//
 	// Only check for default namespace existence since it implies the default partition exists.
-	if slices.Contains(cfg.Experiments, "v2tenancy") {
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
-			_, err := resourceClient.Read(context.Background(), &pbresource.ReadRequest{
-				Id: &pbresource.ID{
-					Name:    constants.DefaultConsulNS,
-					Type:    pbtenancy.NamespaceType,
-					Tenancy: &pbresource.Tenancy{Partition: constants.DefaultConsulPartition},
-				},
-			})
-			assert.NoError(c, err)
-		},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read v2 builtin default namespace",
-		)
-	} else {
-		// Do the same for V1 counterparts in ent only to prevent known test flakes.
-		require.Eventually(t,
-			func() bool {
-				self, err := client.Agent().Self()
-				if err != nil {
-					return false
-				}
-				if self["DebugConfig"]["VersionMetadata"] != "ent" {
-					return true
-				}
 
-				// Check for the default partition instead of the default namespace since this is a thing:
-				// error="Namespaces are currently disabled until all servers in the datacenter supports the feature"
-				partition, _, err := client.Partitions().Read(
-					context.Background(),
-					constants.DefaultConsulPartition,
-					nil,
-				)
-				return err == nil && partition != nil
-			},
-			eventuallyWaitFor,
-			eventuallyTickEvery,
-			"failed to eventually read v1 builtin default partition")
-	}
+	require.Eventually(t,
+		func() bool {
+			self, err := client.Agent().Self()
+			if err != nil {
+				return false
+			}
+			if self["DebugConfig"]["VersionMetadata"] != "ent" {
+				return true
+			}
+
+			// Check for the default partition instead of the default namespace since this is a thing:
+			// error="Namespaces are currently disabled until all servers in the datacenter supports the feature"
+			partition, _, err := client.Partitions().Read(
+				context.Background(),
+				constants.DefaultConsulPartition,
+				nil,
+			)
+			return err == nil && partition != nil
+		},
+		eventuallyWaitFor,
+		eventuallyTickEvery,
+		"failed to eventually read builtin default partition")
 }
 
 func requireACLBootstrapped(t *testing.T, cfg *testutil.TestServerConfig, client *api.Client) {
