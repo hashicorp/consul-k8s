@@ -24,15 +24,6 @@ rules:
     verbs:
     - get
     - delete
-  - apiGroups:
-    - mesh.consul.hashicorp.com
-    resources:
-    - gatewayclassconfigs
-    - gatewayclasses
-    - meshgateways
-    verbs:
-    - get
-    - delete
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]

@@ -8,8 +8,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"os"
 	"sync"
 	"time"
 
@@ -21,11 +19,8 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	k8syaml "sigs.k8s.io/yaml"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
@@ -50,8 +45,6 @@ type Command struct {
 
 	once sync.Once
 	help string
-
-	gatewayConfig gateways.GatewayResources
 
 	ctx context.Context
 }
@@ -113,11 +106,6 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		if err := v2beta1.AddMeshToScheme(s); err != nil {
-			c.UI.Error(fmt.Sprintf("Could not add consul-k8s schema: %s", err))
-			return 1
-		}
-
 		c.k8sClient, err = client.New(config, client.Options{Scheme: s})
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("Error initializing Kubernetes client: %s", err))
@@ -127,38 +115,16 @@ func (c *Command) Run(args []string) int {
 
 	// do the cleanup
 
-	//V1 Cleanup
-	err = c.deleteV1GatewayClassAndGatewayClasConfig()
+	err = c.deleteGatewayClassAndGatewayClasConfig()
 	if err != nil {
 		c.UI.Error(err.Error())
-		return 1
-	}
-
-	//V2 Cleanup
-	err = c.loadGatewayConfigs()
-	if err != nil {
-
-		c.UI.Error(err.Error())
-		return 1
-	}
-	err = c.deleteV2GatewayClassAndClassConfigs(c.ctx)
-	if err != nil {
-		c.UI.Error(err.Error())
-
-		return 1
-	}
-
-	err = c.deleteV2MeshGateways(c.ctx)
-	if err != nil {
-		c.UI.Error(err.Error())
-
 		return 1
 	}
 
 	return 0
 }
 
-func (c *Command) deleteV1GatewayClassAndGatewayClasConfig() error {
+func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 	// find the class config and mark it for deletion first so that we
 	// can do an early return if the gateway class isn't found
 	config := &v1alpha1.GatewayClassConfig{}
@@ -249,107 +215,4 @@ func exponentialBackoffWithMaxIntervalAndTime() *backoff.ExponentialBackOff {
 	backoff.MaxInterval = 1 * time.Second
 	backoff.Reset()
 	return backoff
-}
-
-// loadGatewayConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done.
-func (c *Command) loadGatewayConfigs() error {
-	file, err := os.Open(c.flagGatewayConfigLocation)
-	if err != nil {
-		if os.IsNotExist(err) {
-			c.UI.Warn(fmt.Sprintf("gateway configuration file not found, skipping gateway configuration, filename: %s", c.flagGatewayConfigLocation))
-			return nil
-		}
-		c.UI.Error(fmt.Sprintf("Error opening gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
-		return err
-	}
-
-	config, err := io.ReadAll(file)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error reading gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
-		return err
-	}
-
-	err = k8syaml.Unmarshal(config, &c.gatewayConfig)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error decoding gateway config file: %s", err))
-		return err
-	}
-
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *Command) deleteV2GatewayClassAndClassConfigs(ctx context.Context) error {
-	for _, gcc := range c.gatewayConfig.GatewayClassConfigs {
-
-		// find the class config and mark it for deletion first so that we
-		// can do an early return if the gateway class isn't found
-		config := &v2beta1.GatewayClassConfig{}
-		err := c.k8sClient.Get(ctx, types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, config)
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				// no gateway class config, just ignore and continue
-				continue
-			}
-			return err
-		}
-
-		// ignore any returned errors
-		_ = c.k8sClient.Delete(context.Background(), config)
-
-		// find the gateway class
-		gatewayClass := &v2beta1.GatewayClass{}
-		//TODO: NET-6838 To pull the GatewayClassName from the Configmap
-		err = c.k8sClient.Get(ctx, types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, gatewayClass)
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				// no gateway class, just ignore and continue
-				continue
-			}
-			return err
-		}
-
-		// ignore any returned errors
-		_ = c.k8sClient.Delete(context.Background(), gatewayClass)
-
-		// make sure they're gone
-		if err := backoff.Retry(func() error {
-			err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, config)
-			if err == nil || !k8serrors.IsNotFound(err) {
-				return errors.New("gateway class config still exists")
-			}
-
-			err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: gcc.Name, Namespace: gcc.Namespace}, gatewayClass)
-			if err == nil || !k8serrors.IsNotFound(err) {
-				return errors.New("gateway class still exists")
-			}
-
-			return nil
-		}, exponentialBackoffWithMaxIntervalAndTime()); err != nil {
-			c.UI.Error(err.Error())
-			// if we failed, return 0 anyway after logging the error
-			// since we don't want to block someone from uninstallation
-		}
-	}
-
-	return nil
-}
-
-func (c *Command) deleteV2MeshGateways(ctx context.Context) error {
-	for _, meshGw := range c.gatewayConfig.MeshGateways {
-		_ = c.k8sClient.Delete(ctx, meshGw)
-
-		err := c.k8sClient.Get(ctx, types.NamespacedName{Name: meshGw.Name, Namespace: meshGw.Namespace}, meshGw)
-		if err != nil {
-			if k8serrors.IsNotFound(err) {
-				// no gateway, just ignore and continue
-				continue
-			}
-			return err
-		}
-
-	}
-	return nil
 }

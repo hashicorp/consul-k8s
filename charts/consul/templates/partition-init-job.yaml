@@ -119,9 +119,6 @@ spec:
                 {{- if .Values.global.cloud.enabled }}
                 -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
                 {{- end }}
-                {{- if and (mustHas "resource-apis" .Values.global.experiments) (mustHas "v2tenancy" .Values.global.experiments) }}
-                -enable-v2tenancy=true
-                {{- end }}
           resources:
             requests:
               memory: "50Mi"

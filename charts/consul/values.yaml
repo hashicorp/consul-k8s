@@ -907,6 +907,7 @@ global:
 
   # Consul feature flags that will be enabled across components.
   # Supported feature flags:
+  #
   # - `v1dns`:
   #   When this flag is set, Consul agents use the legacy DNS implementation.
   #   This setting exists in the case a DNS bug is found after the refactoring introduced in v1.19.0.
