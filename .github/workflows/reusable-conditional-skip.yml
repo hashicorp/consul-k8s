@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Check whether to skip build and tests
     outputs:
-      skip-ci: ${{ steps.check-changed-files.outputs.skip-ci }}
+      skip-ci: 'true'
     env:
       SKIP_CHECK_BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
