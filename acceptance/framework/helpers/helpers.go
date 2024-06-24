@@ -209,6 +209,12 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 
 	go func() {
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+		for _, v := range command.Args {
+			if strings.Contains(v, "-vvvsSf") {
+				fmt.Printf("%s%s\n", command.Command, command.Args)
+				fmt.Println(string(output))
+			}
+		}
 		resultCh <- &cmdResult{output: string(output), err: err}
 	}()
 
