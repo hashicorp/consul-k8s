@@ -1,0 +1,3 @@
+```release-note:improvement
+api-gateway: Run as non-root user when deploying to Kubernetes
+```
