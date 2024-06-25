@@ -808,6 +808,9 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				RunAsNonRoot:             pointer.Bool(true),
 				ReadOnlyRootFilesystem:   pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+				},
 			},
 		},
 		"tproxy enabled; openshift disabled": {
@@ -819,12 +822,19 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				RunAsNonRoot:             pointer.Bool(true),
 				ReadOnlyRootFilesystem:   pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+				},
 			},
 		},
 		"tproxy disabled; openshift enabled": {
-			tproxyEnabled:      false,
-			openShiftEnabled:   true,
-			expSecurityContext: nil,
+			tproxyEnabled:    false,
+			openShiftEnabled: true,
+			expSecurityContext: &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+				},
+			},
 		},
 		"tproxy enabled; openshift enabled": {
 			tproxyEnabled:    true,
@@ -835,6 +845,9 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				RunAsNonRoot:             pointer.Bool(true),
 				ReadOnlyRootFilesystem:   pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+				},
 			},
 		},
 	}
