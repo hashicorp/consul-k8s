@@ -200,6 +200,9 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		var meta *api.QueryMeta
 		err = backoff.Retry(func() error {
 			services, meta, err = consulClient.Catalog().NodeServiceList(s.ConsulNodeName, opts)
+			if err != nil {
+				s.Log.Warn("error querying services, will retry with backoff", "err", err)
+			}
 			return err
 		}, backoff.WithContext(backoff.NewExponentialBackOff(), ctx))
 
@@ -213,11 +216,11 @@ func (s *ConsulSyncer) watchReapableServices(ctx context.Context) {
 		// Wait our minimum time before continuing or retrying
 		select {
 		case <-minWaitCh:
+			minWaitCh = time.After(minWait)
+
 			if err != nil {
 				continue
 			}
-
-			minWaitCh = time.After(minWait)
 		case <-ctx.Done():
 			return
 		}
