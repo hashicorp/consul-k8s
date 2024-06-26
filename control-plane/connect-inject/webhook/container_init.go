@@ -236,7 +236,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			uid := int64(initContainersUserAndGroupID)
 			group := int64(initContainersUserAndGroupID)
 
-			// For Transparent proxy + CNI set in OpenShift. There is an annotation on the namespace that tells us what
+			// For Openshift with Transparent proxy + CNI, there is an annotation on the namespace that tells us what
 			// the user and group ids should be for the sidecar.
 			if w.EnableOpenShift {
 				var err error

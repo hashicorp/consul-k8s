@@ -219,8 +219,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 	// When transparent proxy is enabled, then consul-dataplane needs to run as our specific user
 	// so that traffic redirection will work.
 	if tproxyEnabled || !w.EnableOpenShift {
+
+		// Default values for non-Openshift environments.
+		uid := int64(sidecarUserAndGroupID)
+		group := int64(sidecarUserAndGroupID)
+
 		if !w.EnableOpenShift {
-			// In non-OpenShift environments we set the User and group ID for the sidecar to our values.
 			if pod.Spec.SecurityContext != nil {
 				// User container and consul-dataplane container cannot have the same UID.
 				if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == sidecarUserAndGroupID {
@@ -230,6 +234,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 					)
 				}
 			}
+			// TODO: Melisa why are we concerned about this
 			// Ensure that none of the user's containers have the same UID as consul-dataplane. At this point in injection the meshWebhook
 			// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
 			for _, c := range pod.Spec.Containers {
@@ -244,41 +249,33 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 					)
 				}
 			}
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
-				// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
-				// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
-				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"NET_BIND_SERVICE"},
-				},
-				ReadOnlyRootFilesystem: pointer.Bool(true),
-			}
-		} else {
+		}
+
+		if w.EnableOpenShift {
 			// Transparent proxy is set in OpenShift. There is an annotation on the namespace that tells us what
 			// the user and group ids should be for the sidecar.
-			uid, err := common.GetOpenShiftUID(&namespace)
+			var err error
+			uid, err = common.GetOpenShiftUID(&namespace)
 			if err != nil {
 				return corev1.Container{}, err
 			}
-			group, err := common.GetOpenShiftGroup(&namespace)
+			group, err = common.GetOpenShiftGroup(&namespace)
 			if err != nil {
 				return corev1.Container{}, err
 			}
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(uid),
-				RunAsGroup:               pointer.Int64(group),
-				RunAsNonRoot:             pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
-				// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
-				// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
-				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"NET_BIND_SERVICE"},
-				},
-				ReadOnlyRootFilesystem: pointer.Bool(true),
-			}
+		}
+
+		container.SecurityContext = &corev1.SecurityContext{
+			RunAsUser:                pointer.Int64(uid),
+			RunAsGroup:               pointer.Int64(group),
+			RunAsNonRoot:             pointer.Bool(true),
+			AllowPrivilegeEscalation: pointer.Bool(false),
+			// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
+			// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{"NET_BIND_SERVICE"},
+			},
+			ReadOnlyRootFilesystem: pointer.Bool(true),
 		}
 	}
 	return container, nil
