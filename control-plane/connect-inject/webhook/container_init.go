@@ -232,42 +232,36 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 
 	if tproxyEnabled {
 		if w.EnableCNI {
+			// For non Openshift, we use the initContainersUserAndGroupID for the user and group id.
+			uid := int64(initContainersUserAndGroupID)
+			group := int64(initContainersUserAndGroupID)
+
+			// For Transparent proxy + CNI set in OpenShift. There is an annotation on the namespace that tells us what
+			// the user and group ids should be for the sidecar.
 			if w.EnableOpenShift {
-				// Transparent proxy + CNI is set in OpenShift. There is an annotation on the namespace that tells us what
-				// the user and group ids should be for the sidecar.
-				uid, err := common.GetOpenShiftUID(&namespace)
-				// TODO: Melisa remove below logging statement
-				w.Log.Info("Melisa ---------------------------------------OpenShift UID", "uid", uid)
+				var err error
+
+				uid, err = common.GetOpenShiftUID(&namespace)
+
 				if err != nil {
 					return corev1.Container{}, err
 				}
-				group, err := common.GetOpenShiftGroup(&namespace)
+				group, err = common.GetOpenShiftGroup(&namespace)
 				if err != nil {
 					return corev1.Container{}, err
 				}
-				container.SecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(uid),
-					RunAsGroup:   pointer.Int64(group),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(false),
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"ALL"},
-					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
-				}
-			} else {
-				container.SecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(privileged),
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"ALL"},
-					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
-				}
+			}
+
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:    pointer.Int64(uid),
+				RunAsGroup:   pointer.Int64(group),
+				RunAsNonRoot: pointer.Bool(true),
+				Privileged:   pointer.Bool(privileged),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				AllowPrivilegeEscalation: pointer.Bool(false),
 			}
 		} else {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
