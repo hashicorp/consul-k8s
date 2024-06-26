@@ -10,7 +10,6 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
-
 	"k8s.io/utils/pointer"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -35,7 +34,7 @@ type initContainerCommandData struct {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
+func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,
@@ -175,9 +174,30 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 		container.Resources = *config.InitContainerResources
 	}
 
+	// TODO: Melisa we will need this if we match the style of what the webhook does
+	//ns := &corev1.Namespace{}
+	// // TODO: contexts
+	//err := g.Client.Get(context.Background(), client.ObjectKey{
+	//	Name: namespace,
+	//}, ns)
+	//if err != nil {
+	//	g.Log.Error(err, "error fetching namespace metadata for deployment")
+	//	return nil, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
+	//}
+
+	uid := pointer.Int64(initContainersUserAndGroupID)
+	groupID := pointer.Int64(initContainersUserAndGroupID)
+
+	// In Openshift we let Openshift set the UID and GID
+	// TODO: Melisa will probably clean this up to match what webhook does
+	if config.EnableOpenShift {
+		uid = nil
+		groupID = nil
+	}
+
 	container.SecurityContext = &corev1.SecurityContext{
-		RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-		RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
+		RunAsUser:    uid,
+		RunAsGroup:   groupID,
 		RunAsNonRoot: pointer.Bool(true),
 		Privileged:   pointer.Bool(false),
 		Capabilities: &corev1.Capabilities{
