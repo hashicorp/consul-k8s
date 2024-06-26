@@ -219,8 +219,8 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 	// When transparent proxy is enabled, then consul-dataplane needs to run as our specific user
 	// so that traffic redirection will work.
 	if tproxyEnabled || !w.EnableOpenShift {
-		// In non-OpenShift environments we set the User and group ID for the sidecar to our values.
 		if !w.EnableOpenShift {
+			// In non-OpenShift environments we set the User and group ID for the sidecar to our values.
 			if pod.Spec.SecurityContext != nil {
 				// User container and consul-dataplane container cannot have the same UID.
 				if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == sidecarUserAndGroupID {
@@ -249,7 +249,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
 				RunAsNonRoot:             pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
+				// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+				},
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			}
 		} else {
 			// Transparent proxy is set in OpenShift. There is an annotation on the namespace that tells us what
@@ -267,7 +272,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(
 				RunAsGroup:               pointer.Int64(group),
 				RunAsNonRoot:             pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
+				// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+				},
+				ReadOnlyRootFilesystem: pointer.Bool(true),
 			}
 		}
 	}
