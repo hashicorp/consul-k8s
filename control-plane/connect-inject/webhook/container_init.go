@@ -296,12 +296,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 // consulDNSEnabled returns true if Consul DNS should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
-func consulDNSEnabled(
-	namespace corev1.Namespace,
-	pod corev1.Pod,
-	globalDNSEnabled bool,
-	globalTProxyEnabled bool,
-) (bool, error) {
+func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalDNSEnabled bool, globalTProxyEnabled bool) (bool, error) {
 	// DNS is only possible when tproxy is also enabled because it relies
 	// on traffic being redirected.
 	tproxy, err := common.TransparentProxyEnabled(namespace, pod, globalTProxyEnabled)
