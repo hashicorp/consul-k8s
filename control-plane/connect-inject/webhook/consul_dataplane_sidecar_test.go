@@ -829,6 +829,11 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
+				RunAsUser:                pointer.Int64(1000700000),
+				RunAsGroup:               pointer.Int64(1000700000),
+				RunAsNonRoot:             pointer.Bool(true),
+				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				AllowPrivilegeEscalation: pointer.Bool(false),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{"NET_BIND_SERVICE"},
 				},
