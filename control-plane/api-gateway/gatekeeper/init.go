@@ -178,21 +178,19 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 		container.Resources = *config.InitContainerResources
 	}
 
-	ns := &corev1.Namespace{}
-	err := g.Client.Get(context.Background(), client.ObjectKey{
-		Name: namespace,
-	}, ns)
-	if err != nil {
-		g.Log.Error(err, "error fetching namespace metadata for deployment")
-		return corev1.Container{}, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
-	}
-
 	uid := int64(initContainersUserAndGroupID)
 	group := int64(initContainersUserAndGroupID)
 
 	// In Openshift we let Openshift set the UID and GID
 	if config.EnableOpenShift {
-		var err error
+		ns := &corev1.Namespace{}
+		err := g.Client.Get(context.Background(), client.ObjectKey{
+			Name: namespace,
+		}, ns)
+		if err != nil {
+			g.Log.Error(err, "error fetching namespace metadata for deployment")
+			return corev1.Container{}, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
+		}
 
 		uid, err = ctrlCommon.GetOpenShiftUID(ns)
 
