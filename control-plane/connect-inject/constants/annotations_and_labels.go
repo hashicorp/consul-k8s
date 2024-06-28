@@ -234,3 +234,9 @@ const (
 	AnnotationPrometheusPath   = "prometheus.io/path"
 	AnnotationPrometheusPort   = "prometheus.io/port"
 )
+
+// Annotations used by OpenShift.
+const (
+	AnnotationOpenShiftGroups   = "openshift.io/sa.scc.supplemental-groups"
+	AnnotationOpenShiftUIDRange = "openshift.io/sa.scc.uid-range"
+)
