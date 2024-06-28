@@ -929,7 +929,23 @@ func TestUpsert(t *testing.T) {
 				EnableOpenShift: true,
 				ImageDataplane:  "hashicorp/consul-dataplane",
 			},
-			initialResources: resources{},
+			initialResources: resources{
+				namespaces: []*corev1.Namespace{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Namespace",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "default",
+							Annotations: map[string]string{
+								constants.AnnotationOpenShiftUIDRange: "1000700000/100000",
+								constants.AnnotationOpenShiftGroups:   "1000700000/100000",
+							},
+						},
+					},
+				},
+			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
