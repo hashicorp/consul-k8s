@@ -226,7 +226,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 					return corev1.Container{}, fmt.Errorf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID)
 				}
 			}
-			// TODO: Melisa why are we concerned about this
+
 			// Ensure that none of the user's containers have the same UID as consul-dataplane. At this point in injection the meshWebhook
 			// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
 			for _, c := range pod.Spec.Containers {

@@ -5,14 +5,18 @@ package gatekeeper
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	ctrlCommon "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
@@ -174,30 +178,36 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 		container.Resources = *config.InitContainerResources
 	}
 
-	// TODO: Melisa we will need this if we match the style of what the webhook does
-	//ns := &corev1.Namespace{}
-	// // TODO: contexts
-	//err := g.Client.Get(context.Background(), client.ObjectKey{
-	//	Name: namespace,
-	//}, ns)
-	//if err != nil {
-	//	g.Log.Error(err, "error fetching namespace metadata for deployment")
-	//	return nil, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
-	//}
+	ns := &corev1.Namespace{}
+	err := g.Client.Get(context.Background(), client.ObjectKey{
+		Name: namespace,
+	}, ns)
+	if err != nil {
+		g.Log.Error(err, "error fetching namespace metadata for deployment")
+		return corev1.Container{}, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
+	}
 
-	uid := pointer.Int64(initContainersUserAndGroupID)
-	groupID := pointer.Int64(initContainersUserAndGroupID)
+	uid := int64(initContainersUserAndGroupID)
+	group := int64(initContainersUserAndGroupID)
 
 	// In Openshift we let Openshift set the UID and GID
-	// TODO: Melisa will probably clean this up to match what webhook does
 	if config.EnableOpenShift {
-		uid = nil
-		groupID = nil
+		var err error
+
+		uid, err = ctrlCommon.GetOpenShiftUID(ns)
+
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		group, err = ctrlCommon.GetOpenShiftGroup(ns)
+		if err != nil {
+			return corev1.Container{}, err
+		}
 	}
 
 	container.SecurityContext = &corev1.SecurityContext{
-		RunAsUser:    uid,
-		RunAsGroup:   groupID,
+		RunAsUser:    pointer.Int64(uid),
+		RunAsGroup:   pointer.Int64(group),
 		RunAsNonRoot: pointer.Bool(true),
 		Privileged:   pointer.Bool(false),
 		Capabilities: &corev1.Capabilities{
