@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -1478,6 +1479,11 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 				if helmConfig.InitContainerResources != nil {
 					assert.Equal(t, helmConfig.InitContainerResources.Limits, container.Resources.Limits)
 					assert.Equal(t, helmConfig.InitContainerResources.Requests, container.Resources.Requests)
+				}
+
+				if helmConfig.EnableOpenShift {
+					assert.Equal(t, container.SecurityContext.RunAsUser, pointer.Int64(1000700000))
+					assert.Equal(t, container.SecurityContext.RunAsGroup, pointer.Int64(1000700000))
 				}
 			}
 		}
