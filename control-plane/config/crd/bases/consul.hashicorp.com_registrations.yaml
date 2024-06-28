@@ -189,7 +189,6 @@ spec:
                     - warning
                     type: object
                 required:
-                - address
                 - name
                 - port
                 type: object
