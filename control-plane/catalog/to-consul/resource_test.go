@@ -2141,7 +2141,7 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 				{
 					Addresses: []string{"1.1.1.1"},
 					Conditions: discoveryv1.EndpointConditions{
-						Ready:       pointer.Bool(true),
+						Ready:       nil,
 						Serving:     pointer.Bool(true),
 						Terminating: pointer.Bool(false),
 					},
@@ -2154,10 +2154,21 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 					Conditions: discoveryv1.EndpointConditions{
 						Ready:       pointer.Bool(true),
 						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Terminating: nil,
 					},
 					NodeName: &node2,
 					Zone:     pointer.String("us-west-2b"),
+				},
+				{
+					Addresses: []string{"3.3.3.3"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready:       pointer.Bool(false),
+						Serving:     pointer.Bool(false),
+						Terminating: pointer.Bool(true),
+					},
+					TargetRef: &targetRef,
+					NodeName:  &node1,
+					Zone:      pointer.String("us-west-2a"),
 				},
 			},
 			Ports: []discoveryv1.EndpointPort{
