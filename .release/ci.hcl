@@ -10,7 +10,7 @@ project "consul-k8s" {
   }
   github {
     organization = "hashicorp"
-    repository = "consul-k8s"
+    repository   = "consul-k8s"
     release_branches = [
       "main",
       "release/**",
@@ -18,18 +18,8 @@ project "consul-k8s" {
   }
 }
 
-event "merge" {
-  // "entrypoint" to use if build is not run automatically
-  // i.e. send "merge" complete signal to orchestrator to trigger build
-}
-
 event "build" {
-  depends = ["merge"]
-  action "build" {
-    organization = "hashicorp"
-    repository = "consul-k8s"
-    workflow = "build"
-  }
+// This event is required by CRT -- do not delete.
 }
 
 event "prepare" {
@@ -58,9 +48,9 @@ event "promote-staging" {
   depends = ["trigger-staging"]
   action "promote-staging" {
     organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-staging"
-    config = "release-metadata.hcl"
+    repository   = "crt-workflows-common"
+    workflow     = "promote-staging"
+    config       = "release-metadata.hcl"
   }
 
   notification {
@@ -72,8 +62,8 @@ event "promote-staging-docker" {
   depends = ["promote-staging"]
   action "promote-staging-docker" {
     organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-staging-docker"
+    repository   = "crt-workflows-common"
+    workflow     = "promote-staging-docker"
   }
 
   notification {
@@ -90,8 +80,8 @@ event "promote-production" {
   depends = ["trigger-production"]
   action "promote-production" {
     organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-production"
+    repository   = "crt-workflows-common"
+    workflow     = "promote-production"
   }
 
   notification {
@@ -103,8 +93,8 @@ event "promote-production-docker" {
   depends = ["promote-production"]
   action "promote-production-docker" {
     organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-production-docker"
+    repository   = "crt-workflows-common"
+    workflow     = "promote-production-docker"
   }
 
   notification {
@@ -116,8 +106,8 @@ event "promote-production-packaging" {
   depends = ["promote-production-docker"]
   action "promote-production-packaging" {
     organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-production-packaging"
+    repository   = "crt-workflows-common"
+    workflow     = "promote-production-packaging"
   }
 
   notification {
@@ -129,8 +119,8 @@ event "promote-production-helm" {
   depends = ["promote-production-packaging"]
   action "promote-production-helm" {
     organization = "hashicorp"
-    repository = "crt-workflows-common"
-    workflow = "promote-production-helm"
+    repository   = "crt-workflows-common"
+    workflow     = "promote-production-helm"
   }
 
   notification {
