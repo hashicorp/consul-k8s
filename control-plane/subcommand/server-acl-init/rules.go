@@ -286,6 +286,41 @@ partition "{{ .PartitionName }}" {
 	return c.renderRules(syncRulesTpl)
 }
 
+// acl = "write" is required when creating namespace with a default policy.
+// Attaching a default ACL policy to a namespace requires acl = "write" in the
+// namespace that the policy is defined in, which in our case is "default".
+func (c *Command) dnsProxyRues() (string, error) {
+	dnsProxyRulesTpl := `
+{{- if .EnableNamespaces }}
+{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+  mesh = "write"
+  acl = "write"
+{{- else }}
+  operator = "write"
+  acl = "write"
+{{- end }}
+{{- if .EnablePartitions }}
+    policy = "write"
+{{- end }}
+{{- end }}
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "write"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
+}
+{{- end }}
+`
+
+	return c.renderRules(dnsProxyRulesTpl)
+}
+
 func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
 	// It must also create/update service health checks via the endpoints controller.

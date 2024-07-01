@@ -1,4 +1,5 @@
 {{- if (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) }}
+{{- if not .Values.dns.proxy.enabled }}
 # Service for Consul DNS.
 apiVersion: v1
 kind: Service
@@ -38,4 +39,5 @@ spec:
   {{- if .Values.dns.additionalSpec }}
   {{ tpl .Values.dns.additionalSpec . | nindent 2 | trim }}
   {{- end }}
+{{- end }}
 {{- end }}

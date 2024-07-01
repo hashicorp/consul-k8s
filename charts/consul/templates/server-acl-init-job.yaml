@@ -289,6 +289,10 @@ spec:
             {{- if .Values.global.federation.enabled }}
             -federation=true \
             {{- end }}
+          
+            {{- if .Values.dns.proxy.enabled }}
+            -dns-proxy=true \
+            {{- end }}
 
             {{- if .Values.global.acls.replicationToken.secretName }}
             {{- if .Values.global.secretsBackend.vault.enabled }}
