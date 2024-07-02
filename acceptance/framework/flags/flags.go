@@ -228,7 +228,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		HelmChartVersion:       t.flagHelmChartVersion,
 		ConsulImage:            t.flagConsulImage,
 		ConsulK8SImage:         t.flagConsulK8sImage,
-		ConsulDataplaneImage:   "jmurrethc/consul-k8s-control-plane-dev", // t.flagConsulDataplaneImage,
+		ConsulDataplaneImage:   "jmurrethc/consul-dataplane-dev", // t.flagConsulDataplaneImage,
 		ConsulVersion:          consulVersion,
 		ConsulDataplaneVersion: consulDataplaneVersion,
 		EnvoyImage:             t.flagEnvoyImage,
