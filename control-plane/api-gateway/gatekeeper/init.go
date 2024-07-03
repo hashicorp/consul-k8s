@@ -192,12 +192,12 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 			return corev1.Container{}, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
 		}
 
-		uid, err = ctrlCommon.GetOpenShiftUID(ns)
+		uid, err = ctrlCommon.GetOpenShiftUID(ns, ctrlCommon.SelectFirstInRange)
 
 		if err != nil {
 			return corev1.Container{}, err
 		}
-		group, err = ctrlCommon.GetOpenShiftGroup(ns)
+		group, err = ctrlCommon.GetOpenShiftGroup(ns, ctrlCommon.SelectFirstInRange)
 		if err != nil {
 			return corev1.Container{}, err
 		}

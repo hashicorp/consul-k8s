@@ -20,12 +20,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 // GetOpenShiftUID gets the user id from the OpenShift annotation 'openshift.io/sa.scc.uid-range'.
-func GetOpenShiftUID(ns *corev1.Namespace) (int64, error) {
+// Select the last in the range so we don't conflict with any ID assigned to application containers.
+func GetOpenShiftUID(ns *corev1.Namespace, selector idSelector) (int64, error) {
 	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftUIDRange]
 	if !ok {
 		return 0, fmt.Errorf("unable to find annotation %s", constants.AnnotationOpenShiftUIDRange)
@@ -34,7 +36,7 @@ func GetOpenShiftUID(ns *corev1.Namespace) (int64, error) {
 		return 0, fmt.Errorf("found annotation %s but it was empty", constants.AnnotationOpenShiftUIDRange)
 	}
 
-	uid, err := parseOpenShiftUID(annotation)
+	uid, err := parseOpenShiftUID(annotation, selector)
 	if err != nil {
 		return 0, err
 	}
@@ -45,15 +47,11 @@ func GetOpenShiftUID(ns *corev1.Namespace) (int64, error) {
 // parseOpenShiftUID parses the UID "range" from the annotation string. The annotation can either have a '/' or '-'
 // as a separator. '-' is the old style of UID from when it used to be an actual range.
 // Example annotation value: "1000700000/100000".
-func parseOpenShiftUID(val string) (int64, error) {
+func parseOpenShiftUID(val string, selector idSelector) (int64, error) {
 	var uid int64
 	var err error
 	if strings.Contains(val, "/") {
-		str := strings.Split(val, "/")
-		uid, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
-		}
+		return selectIDInRange(val, selector)
 	}
 	if strings.Contains(val, "-") {
 		str := strings.Split(val, "-")
@@ -77,7 +75,8 @@ func parseOpenShiftUID(val string) (int64, error) {
 // GetOpenShiftGroup gets the group from OpenShift annotation 'openshift.io/sa.scc.supplemental-groups'
 // Fall back to the UID annotation if the group annotation does not exist. The values should
 // be the same.
-func GetOpenShiftGroup(ns *corev1.Namespace) (int64, error) {
+// Select the last in the range so we don't conflict with any ID assigned randomly to application containers.
+func GetOpenShiftGroup(ns *corev1.Namespace, selector idSelector) (int64, error) {
 	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftGroups]
 	if !ok {
 		// fall back to UID annotation
@@ -94,25 +93,21 @@ func GetOpenShiftGroup(ns *corev1.Namespace) (int64, error) {
 		return 0, fmt.Errorf("found annotation %s but it was empty", constants.AnnotationOpenShiftGroups)
 	}
 
-	uid, err := parseOpenShiftGroup(annotation)
+	gid, err := parseOpenShiftGroup(annotation, selector)
 	if err != nil {
 		return 0, err
 	}
 
-	return uid, nil
+	return gid, nil
 }
 
 // parseOpenShiftGroup parses the group from the annotation string. The annotation can either have a '/' or ','
 // as a separator. ',' is the old style of UID from when it used to be an actual range.
-func parseOpenShiftGroup(val string) (int64, error) {
+func parseOpenShiftGroup(val string, selector idSelector) (int64, error) {
 	var group int64
 	var err error
 	if strings.Contains(val, "/") {
-		str := strings.Split(val, "/")
-		group, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
-		}
+		return selectIDInRange(val, selector)
 	}
 	if strings.Contains(val, ",") {
 		str := strings.Split(val, ",")
@@ -127,4 +122,51 @@ func parseOpenShiftGroup(val string) (int64, error) {
 	}
 
 	return group, nil
+}
+
+type idSelector func(values []int64) (int64, error)
+
+var SelectFirstInRange idSelector = func(values []int64) (int64, error) {
+	if len(values) < 1 {
+		return 0, fmt.Errorf("range must have at least 1 value")
+	}
+	return values[0], nil
+}
+
+var SelectSidecarID idSelector = func(values []int64) (int64, error) {
+	if len(values) < 2 {
+		return 0, fmt.Errorf("range must have at least 2 values")
+	}
+	return values[len(values)-2], nil
+}
+
+var SelectInitContainerID idSelector = func(values []int64) (int64, error) {
+	if len(values) < 1 {
+		return 0, fmt.Errorf("range must have at least 1 value")
+	}
+	return values[len(values)-1], nil
+}
+
+func selectIDInRange(value string, selector idSelector) (int64, error) {
+	parts := strings.Split(value, "/")
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("invalid range format: %s", value)
+	}
+
+	start, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, fmt.Errorf("invalid range format: %s", parts[0])
+	}
+
+	length, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, fmt.Errorf("invalid range format: %s", parts[1])
+	}
+
+	values := make([]int64, length)
+	for i := 0; i < length; i++ {
+		values[i] = int64(start + i)
+	}
+
+	return selector(values)
 }

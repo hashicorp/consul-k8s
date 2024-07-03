@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func TestOpenShiftUID(t *testing.T) {
@@ -110,7 +111,7 @@ func TestOpenShiftUID(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-			actual, err := GetOpenShiftUID(tt.Namespace())
+			actual, err := GetOpenShiftUID(tt.Namespace(), SelectFirstInRange)
 			if tt.Err == "" {
 				require.NoError(err)
 				require.Equal(tt.Expected, actual)
@@ -224,7 +225,7 @@ func TestOpenShiftGroup(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-			actual, err := GetOpenShiftGroup(tt.Namespace())
+			actual, err := GetOpenShiftGroup(tt.Namespace(), SelectFirstInRange)
 			if tt.Err == "" {
 				require.NoError(err)
 				require.Equal(tt.Expected, actual)

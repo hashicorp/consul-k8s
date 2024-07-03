@@ -10,10 +10,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -241,12 +242,12 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			if w.EnableOpenShift {
 				var err error
 
-				uid, err = common.GetOpenShiftUID(&namespace)
-
+				uid, err = common.GetOpenShiftUID(&namespace, common.SelectInitContainerID)
 				if err != nil {
 					return corev1.Container{}, err
 				}
-				group, err = common.GetOpenShiftGroup(&namespace)
+
+				group, err = common.GetOpenShiftGroup(&namespace, common.SelectInitContainerID)
 				if err != nil {
 					return corev1.Container{}, err
 				}
