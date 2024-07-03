@@ -241,14 +241,16 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				var err error
 
 				uid, err = common.GetOpenShiftUID(&namespace)
-
 				if err != nil {
 					return corev1.Container{}, err
 				}
+				uid += 1
+
 				group, err = common.GetOpenShiftGroup(&namespace)
 				if err != nil {
 					return corev1.Container{}, err
 				}
+				group += 1
 			}
 
 			container.SecurityContext = &corev1.SecurityContext{

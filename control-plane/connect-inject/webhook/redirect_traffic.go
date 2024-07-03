@@ -39,6 +39,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		}
 		cfg.ProxyUserID = strconv.FormatInt(uid, 10)
 
+		cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(int(uid+1)))
 	}
 
 	// Set the proxy's inbound port.
@@ -110,6 +111,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeUIDs, pod)
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, excludeUIDs...)
 
+	// TODO: add conditional logic for openshift
 	// Add init container user ID to exclude from traffic redirection.
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
 
