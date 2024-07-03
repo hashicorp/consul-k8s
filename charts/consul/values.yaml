@@ -1914,6 +1914,7 @@ dns:
   # @type: string
   additionalSpec: null
 
+  # TODO
   proxy:
     # @type: boolean
     enabled: false
