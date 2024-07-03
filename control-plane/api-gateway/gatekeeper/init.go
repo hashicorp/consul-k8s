@@ -51,7 +51,7 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
 		{
-			Name:      volumeNameForConnectInject,
+			Name:      volumeName,
 			MountPath: "/consul/connect-inject",
 		},
 	}
@@ -73,9 +73,8 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 
 	initContainerName := injectInitContainerName
 	container := corev1.Container{
-		Name:            initContainerName,
-		Image:           config.ImageConsulK8S,
-		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
+		Name:  initContainerName,
+		Image: config.ImageConsulK8S,
 
 		Env: []corev1.EnvVar{
 			{
