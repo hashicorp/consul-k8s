@@ -92,8 +92,8 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName 
 		}
 	}
 
-	// Collect the list of valid UIDs from the namespace annotation
-	validUIDs, err := GetAllValidUserIDsFromNamespace(namespace.Annotations[annotationName])
+	// Collect the list of valid IDs from the namespace annotation
+	validUIDs, err := GetAllValidIDsFromNamespace(namespace.Annotations[annotationName])
 	if err != nil {
 		return nil, fmt.Errorf("unable to get valid userIDs from namespace annotation: %w", err)
 	}
@@ -137,7 +137,7 @@ var SelectInitContainerID idSelector = func(values []int64) (int64, error) {
 	return values[len(values)-1], nil
 }
 
-func GetAllValidUserIDsFromNamespace(annotation string) ([]int64, error) {
+func GetAllValidIDsFromNamespace(annotation string) ([]int64, error) {
 	parts := strings.Split(annotation, "/")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid range format: %s", annotation)
