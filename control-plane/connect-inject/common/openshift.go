@@ -20,108 +20,98 @@ import (
 	"strconv"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
+	corev1 "k8s.io/api/core/v1"
 )
 
-// GetOpenShiftUID gets the user id from the OpenShift annotation 'openshift.io/sa.scc.uid-range'.
-// Select the last in the range so we don't conflict with any ID assigned to application containers.
-func GetOpenShiftUID(ns *corev1.Namespace, selector idSelector) (int64, error) {
-	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftUIDRange]
-	if !ok {
-		return 0, fmt.Errorf("unable to find annotation %s", constants.AnnotationOpenShiftUIDRange)
-	}
-	if len(annotation) == 0 {
-		return 0, fmt.Errorf("found annotation %s but it was empty", constants.AnnotationOpenShiftUIDRange)
-	}
-
-	uid, err := parseOpenShiftUID(annotation, selector)
+func GetSidecarUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftUIDRange])
 	if err != nil {
 		return 0, err
 	}
 
-	return uid, nil
+	if len(availableUIDs) < 2 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-2], nil
 }
 
-// parseOpenShiftUID parses the UID "range" from the annotation string. The annotation can either have a '/' or '-'
-// as a separator. '-' is the old style of UID from when it used to be an actual range.
-// Example annotation value: "1000700000/100000".
-func parseOpenShiftUID(val string, selector idSelector) (int64, error) {
-	var uid int64
-	var err error
-	if strings.Contains(val, "/") {
-		return selectIDInRange(val, selector)
-	}
-	if strings.Contains(val, "-") {
-		str := strings.Split(val, "-")
-		uid, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	if !strings.Contains(val, "/") && !strings.Contains(val, "-") {
-		return 0, fmt.Errorf(
-			"annotation %s contains an invalid format for value %s",
-			constants.AnnotationOpenShiftUIDRange,
-			val,
-		)
-	}
-
-	return uid, nil
-}
-
-// GetOpenShiftGroup gets the group from OpenShift annotation 'openshift.io/sa.scc.supplemental-groups'
-// Fall back to the UID annotation if the group annotation does not exist. The values should
-// be the same.
-// Select the last in the range so we don't conflict with any ID assigned randomly to application containers.
-func GetOpenShiftGroup(ns *corev1.Namespace, selector idSelector) (int64, error) {
-	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftGroups]
-	if !ok {
-		// fall back to UID annotation
-		annotation, ok = ns.Annotations[constants.AnnotationOpenShiftUIDRange]
-		if !ok {
-			return 0, fmt.Errorf(
-				"unable to find annotation %s or %s",
-				constants.AnnotationOpenShiftGroups,
-				constants.AnnotationOpenShiftUIDRange,
-			)
-		}
-	}
-	if len(annotation) == 0 {
-		return 0, fmt.Errorf("found annotation %s but it was empty", constants.AnnotationOpenShiftGroups)
-	}
-
-	gid, err := parseOpenShiftGroup(annotation, selector)
+func GetSidecarGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftGroups])
 	if err != nil {
 		return 0, err
 	}
 
-	return gid, nil
+	if len(availableUIDs) < 2 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-2], nil
 }
 
-// parseOpenShiftGroup parses the group from the annotation string. The annotation can either have a '/' or ','
-// as a separator. ',' is the old style of UID from when it used to be an actual range.
-func parseOpenShiftGroup(val string, selector idSelector) (int64, error) {
-	var group int64
-	var err error
-	if strings.Contains(val, "/") {
-		return selectIDInRange(val, selector)
+func GetConnectInitUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftUIDRange])
+	if err != nil {
+		return 0, err
 	}
-	if strings.Contains(val, ",") {
-		str := strings.Split(val, ",")
-		group, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
+
+	if len(availableUIDs) < 1 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-1], nil
+}
+
+func GetConnectInitGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftGroups])
+	if err != nil {
+		return 0, err
+	}
+
+	if len(availableUIDs) < 2 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-1], nil
+}
+
+func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName string) ([]int64, error) {
+	// Collect the list of IDs designated in the Pod for application containers
+	appUIDs := make([]int64, 0)
+	if pod.Spec.SecurityContext != nil {
+		if pod.Spec.SecurityContext.RunAsUser != nil {
+			appUIDs = append(appUIDs, *pod.Spec.SecurityContext.RunAsUser)
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil {
+			appUIDs = append(appUIDs, *c.SecurityContext.RunAsUser)
 		}
 	}
 
-	if !strings.Contains(val, "/") && !strings.Contains(val, ",") {
-		return 0, fmt.Errorf("annotation %s contains an invalid format for value %s", constants.AnnotationOpenShiftGroups, val)
+	// Collect the list of valid UIDs from the namespace annotation
+	validUIDs, err := GetAllValidUserIDsFromNamespace(namespace.Annotations[annotationName])
+	if err != nil {
+		return nil, fmt.Errorf("unable to get valid userIDs from namespace annotation: %w", err)
 	}
 
-	return group, nil
+	// Subtract the list of application container UIDs from the list of valid userIDs
+	availableUIDs := make(map[int64]struct{})
+	for _, uid := range validUIDs {
+		availableUIDs[uid] = struct{}{}
+	}
+	for _, uid := range appUIDs {
+		delete(availableUIDs, uid)
+	}
+
+	// Return the second to last (sorted) valid UID from the available UIDs
+	keys := maps.Keys(availableUIDs)
+	slices.Sort(keys)
+
+	return keys, nil
 }
 
 type idSelector func(values []int64) (int64, error)
@@ -147,26 +137,26 @@ var SelectInitContainerID idSelector = func(values []int64) (int64, error) {
 	return values[len(values)-1], nil
 }
 
-func selectIDInRange(value string, selector idSelector) (int64, error) {
-	parts := strings.Split(value, "/")
+func GetAllValidUserIDsFromNamespace(annotation string) ([]int64, error) {
+	parts := strings.Split(annotation, "/")
 	if len(parts) != 2 {
-		return 0, fmt.Errorf("invalid range format: %s", value)
+		return nil, fmt.Errorf("invalid range format: %s", annotation)
 	}
 
 	start, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return 0, fmt.Errorf("invalid range format: %s", parts[0])
+		return nil, fmt.Errorf("invalid range format: %s", parts[0])
 	}
 
 	length, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return 0, fmt.Errorf("invalid range format: %s", parts[1])
+		return nil, fmt.Errorf("invalid range format: %s", parts[1])
 	}
 
-	values := make([]int64, length)
+	userIDs := make([]int64, length)
 	for i := 0; i < length; i++ {
-		values[i] = int64(start + i)
+		userIDs[i] = int64(start + i)
 	}
 
-	return selector(values)
+	return userIDs, nil
 }
