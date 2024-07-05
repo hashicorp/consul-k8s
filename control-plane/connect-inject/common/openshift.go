@@ -1,10 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-// Function copied from:
-// https://github.com/openshift/apiserver-library-go/blob/release-4.17/pkg/securitycontextconstraints/sccmatching/matcher.go
-// Apache 2.0 license: https://github.com/openshift/apiserver-library-go/blob/release-4.17/LICENSE
-
 // A namespace in OpenShift has the following annotations:
 // Annotations:  openshift.io/sa.scc.mcs: s0:c27,c4
 //               openshift.io/sa.scc.uid-range: 1000710000/10000
@@ -102,7 +98,7 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName 
 	}
 
 	// Collect the list of valid IDs from the namespace annotation
-	validUIDs, err := GetAllValidIDsFromNamespace(namespace.Annotations[annotationName])
+	validUIDs, err := getIDsInRange(namespace.Annotations[annotationName])
 	if err != nil {
 		return nil, fmt.Errorf("unable to get valid userIDs from namespace annotation: %w", err)
 	}
@@ -123,30 +119,7 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName 
 	return keys, nil
 }
 
-type idSelector func(values []int64) (int64, error)
-
-var SelectFirstInRange idSelector = func(values []int64) (int64, error) {
-	if len(values) < 1 {
-		return 0, fmt.Errorf("range must have at least 1 value")
-	}
-	return values[0], nil
-}
-
-var SelectSidecarID idSelector = func(values []int64) (int64, error) {
-	if len(values) < 2 {
-		return 0, fmt.Errorf("range must have at least 2 values")
-	}
-	return values[len(values)-2], nil
-}
-
-var SelectInitContainerID idSelector = func(values []int64) (int64, error) {
-	if len(values) < 1 {
-		return 0, fmt.Errorf("range must have at least 1 value")
-	}
-	return values[len(values)-1], nil
-}
-
-func GetAllValidIDsFromNamespace(annotation string) ([]int64, error) {
+func getIDsInRange(annotation string) ([]int64, error) {
 	parts := strings.Split(annotation, "/")
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid range format: %s", annotation)
