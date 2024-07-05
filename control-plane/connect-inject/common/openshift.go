@@ -20,10 +20,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
@@ -87,6 +88,14 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName 
 		}
 	}
 	for _, c := range pod.Spec.Containers {
+		if strings.HasPrefix(c.Name, "consul-dataplane") {
+			continue
+		}
+
+		if strings.HasPrefix(c.Name, "consul-connect-inject-init") {
+			continue
+		}
+
 		if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil {
 			appUIDs = append(appUIDs, *c.SecurityContext.RunAsUser)
 		}
