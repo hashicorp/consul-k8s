@@ -2306,6 +2306,19 @@ syncCatalog:
   # @type: string
   annotations: null
 
+# Configures dns-proxy deployment.
+dnsProxy:
+  # True if you want to enable dns-proxy
+  enabled: true
+
+  # The number of deployment replicas.
+  replicas: 1
+
+  # Image for consul-dataplane that will be used for dns-proxy.
+  # @type: string
+  image: null
+
+
 # Configures the automatic Connect sidecar injector.
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
