@@ -13,6 +13,9 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
+// TODO: Melisa add a test for application taking last UID/GroupID in the range (also second to last)
+// TODO: Melisa also add similar to gateway
+
 func TestOpenShiftUID(t *testing.T) {
 	cases := []struct {
 		Name      string

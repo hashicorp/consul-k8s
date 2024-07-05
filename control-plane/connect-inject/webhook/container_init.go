@@ -242,12 +242,12 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			if w.EnableOpenShift {
 				var err error
 
-				uid, err = common.GetOpenShiftUID(&namespace, common.SelectInitContainerID)
+				uid, err = common.GetConnectInitUID(namespace, pod)
 				if err != nil {
 					return corev1.Container{}, err
 				}
 
-				group, err = common.GetOpenShiftGroup(&namespace, common.SelectInitContainerID)
+				group, err = common.GetConnectInitGroupID(namespace, pod)
 				if err != nil {
 					return corev1.Container{}, err
 				}

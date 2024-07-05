@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func GetSidecarUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
+func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
 	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftUIDRange])
 	if err != nil {
 		return 0, err
@@ -39,7 +39,7 @@ func GetSidecarUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
 	return availableUIDs[len(availableUIDs)-2], nil
 }
 
-func GetSidecarGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
+func GetDataplaneGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
 	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftGroups])
 	if err != nil {
 		return 0, err

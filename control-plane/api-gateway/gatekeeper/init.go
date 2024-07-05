@@ -192,12 +192,14 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 			return corev1.Container{}, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
 		}
 
-		uid, err = ctrlCommon.GetOpenShiftUID(ns, ctrlCommon.SelectFirstInRange)
+		// We need to get the userID for the dataplane, we do not care about what is already defined on the pod
+		// for gateways, as there is no application container that could have taken a UID.
+		uid, err = ctrlCommon.GetDataplaneUID(*ns, corev1.Pod{})
 
 		if err != nil {
 			return corev1.Container{}, err
 		}
-		group, err = ctrlCommon.GetOpenShiftGroup(ns, ctrlCommon.SelectFirstInRange)
+		group, err = ctrlCommon.GetDataplaneGroupID(*ns, corev1.Pod{})
 		if err != nil {
 			return corev1.Container{}, err
 		}
