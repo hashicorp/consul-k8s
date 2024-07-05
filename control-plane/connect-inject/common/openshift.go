@@ -27,7 +27,7 @@ import (
 )
 
 func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftUIDRange])
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange)
 	if err != nil {
 		return 0, err
 	}
@@ -40,7 +40,7 @@ func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) 
 }
 
 func GetDataplaneGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftGroups])
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups)
 	if err != nil {
 		return 0, err
 	}
@@ -53,7 +53,7 @@ func GetDataplaneGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, err
 }
 
 func GetConnectInitUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftUIDRange])
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange)
 	if err != nil {
 		return 0, err
 	}
@@ -66,7 +66,7 @@ func GetConnectInitUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error
 }
 
 func GetConnectInitGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, namespace.Annotations[constants.AnnotationOpenShiftGroups])
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups)
 	if err != nil {
 		return 0, err
 	}
