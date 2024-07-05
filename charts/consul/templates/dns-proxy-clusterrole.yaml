@@ -1,0 +1,13 @@
+{{- if .Values.dnsProxy.enabled }}
+# The ClusterRole to enable the Connect injector to get, list, watch and patch MutatingWebhookConfiguration.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-dns-proxy
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: dns-proxy
+{{- end }}
