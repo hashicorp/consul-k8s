@@ -23,8 +23,11 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
-func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange)
+// GetDataplaneUID returns the UID to use for the Dataplane container in the given namespace.
+// The UID is based on the namespace annotation and avoids conflicting with any application container UIDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange, dataplaneImage, k8sImage)
 	if err != nil {
 		return 0, err
 	}
@@ -36,8 +39,11 @@ func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) 
 	return availableUIDs[len(availableUIDs)-2], nil
 }
 
-func GetDataplaneGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups)
+// GetDataplaneGroupID returns the group ID to use for the Dataplane container in the given namespace.
+// The UID is based on the namespace annotation and avoids conflicting with any application container group IDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetDataplaneGroupID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups, dataplaneImage, k8sImage)
 	if err != nil {
 		return 0, err
 	}
@@ -49,8 +55,11 @@ func GetDataplaneGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, err
 	return availableUIDs[len(availableUIDs)-2], nil
 }
 
-func GetConnectInitUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange)
+// GetConnectInitUID returns the UID to use for the connect init container in the given namespace.
+// The UID is based on the namespace annotation and avoids conflicting with any application container UIDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetConnectInitUID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange, dataplaneImage, k8sImage)
 	if err != nil {
 		return 0, err
 	}
@@ -62,8 +71,11 @@ func GetConnectInitUID(namespace corev1.Namespace, pod corev1.Pod) (int64, error
 	return availableUIDs[len(availableUIDs)-1], nil
 }
 
-func GetConnectInitGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, error) {
-	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups)
+// GetConnectInitGroupID returns the group ID to use for the connect init container in the given namespace.
+// The group ID is based on the namespace annotation and avoids conflicting with any application container group IDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetConnectInitGroupID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups, dataplaneImage, k8sImage)
 	if err != nil {
 		return 0, err
 	}
@@ -75,7 +87,10 @@ func GetConnectInitGroupID(namespace corev1.Namespace, pod corev1.Pod) (int64, e
 	return availableUIDs[len(availableUIDs)-1], nil
 }
 
-func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName string) ([]int64, error) {
+// getAvailableIDs enumerates the entire list of available UIDs in the namespace based on the
+// OpenShift annotationName provided. It then removes the UIDs that are already in use by application
+// containers. Containers with dataplaneImage and k8sImage are not considered application containers.
+func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName, dataplaneImage, k8sImage string) ([]int64, error) {
 	// Collect the list of IDs designated in the Pod for application containers
 	appUIDs := make([]int64, 0)
 	if pod.Spec.SecurityContext != nil {
@@ -84,11 +99,7 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName 
 		}
 	}
 	for _, c := range pod.Spec.Containers {
-		if strings.HasPrefix(c.Name, "consul-dataplane") {
-			continue
-		}
-
-		if strings.HasPrefix(c.Name, "consul-connect-inject-init") {
+		if c.Image == dataplaneImage || c.Image == k8sImage {
 			continue
 		}
 
@@ -119,6 +130,8 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName 
 	return keys, nil
 }
 
+// getIDsInRange enumerates the entire list of available IDs given the value of the
+// OpenShift annotation. This can be the group or user ID range.
 func getIDsInRange(annotation string) ([]int64, error) {
 	parts := strings.Split(annotation, "/")
 	if len(parts) != 2 {

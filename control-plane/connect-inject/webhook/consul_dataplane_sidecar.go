@@ -244,11 +244,11 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		// Transparent proxy is set in OpenShift. There is an annotation on the namespace that tells us what
 		// the user and group ids should be for the sidecar.
 		var err error
-		uid, err = common.GetDataplaneUID(namespace, pod)
+		uid, err = common.GetDataplaneUID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
 		if err != nil {
 			return corev1.Container{}, err
 		}
-		group, err = common.GetDataplaneGroupID(namespace, pod)
+		group, err = common.GetDataplaneGroupID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
 		if err != nil {
 			return corev1.Container{}, err
 		}

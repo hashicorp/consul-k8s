@@ -192,12 +192,12 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 
 		// We need to get the userID for the init container. We do not care about what is already defined on the pod
 		// for gateways, as there is no application container that could have taken a UID.
-		uid, err = ctrlCommon.GetConnectInitUID(*ns, corev1.Pod{})
+		uid, err = ctrlCommon.GetConnectInitUID(*ns, corev1.Pod{}, config.ImageDataplane, config.ImageConsulK8S)
 		if err != nil {
 			return corev1.Container{}, err
 		}
 
-		gid, err = ctrlCommon.GetConnectInitGroupID(*ns, corev1.Pod{})
+		gid, err = ctrlCommon.GetConnectInitGroupID(*ns, corev1.Pod{}, config.ImageDataplane, config.ImageConsulK8S)
 		if err != nil {
 			return corev1.Container{}, err
 		}

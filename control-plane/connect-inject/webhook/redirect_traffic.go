@@ -36,14 +36,14 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
 	} else {
 		// When using OpenShift, the uid and group are saved as an annotation on the namespace
-		uid, err := common.GetDataplaneUID(ns, pod)
+		uid, err := common.GetDataplaneUID(ns, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
 		if err != nil {
 			return "", err
 		}
 		cfg.ProxyUserID = strconv.FormatInt(uid, 10)
 
 		// Exclude the user ID for the init container from traffic redirection.
-		uid, err = common.GetConnectInitUID(ns, pod)
+		uid, err = common.GetConnectInitUID(ns, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
 		if err != nil {
 			return "", err
 		}
