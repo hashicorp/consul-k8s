@@ -131,6 +131,8 @@ import (
 //}
 
 func TestGetDataplaneIDs(t *testing.T) {
+	dataplaneImage := "consul-dataplane"
+	k8sImage := "consul-k8s-control-plane"
 	cases := []struct {
 		Name      string
 		Namespace corev1.Namespace
@@ -219,7 +221,7 @@ func TestGetDataplaneIDs(t *testing.T) {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
 			// Test UID
-			actualUIDs, err := GetDataplaneUID(tt.Namespace, tt.Pod)
+			actualUIDs, err := GetDataplaneUID(tt.Namespace, tt.Pod, dataplaneImage, k8sImage)
 			if tt.Err == "" {
 				require.NoError(err)
 				require.Equal(tt.ExpectedDataplaneUserAndGroupIDs, actualUIDs)
@@ -227,7 +229,7 @@ func TestGetDataplaneIDs(t *testing.T) {
 				require.EqualError(err, tt.Err)
 			}
 			// Test GroupID
-			actualGroupIDs, err := GetDataplaneGroupID(tt.Namespace, tt.Pod)
+			actualGroupIDs, err := GetDataplaneGroupID(tt.Namespace, tt.Pod, dataplaneImage, k8sImage)
 			if tt.Err == "" {
 				require.NoError(err)
 				require.Equal(tt.ExpectedDataplaneUserAndGroupIDs, actualGroupIDs)
@@ -239,6 +241,8 @@ func TestGetDataplaneIDs(t *testing.T) {
 }
 
 func TestGetAvailableIDs(t *testing.T) {
+	dataplaneImage := "consul-dataplane"
+	k8sImage := "consul-k8s-control-plane"
 	cases := []struct {
 		Name                      string
 		Namespace                 corev1.Namespace
@@ -338,14 +342,14 @@ func TestGetAvailableIDs(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
 			require := require.New(t)
-			actualUserIDs, err := getAvailableIDs(tt.Namespace, tt.Pod, constants.AnnotationOpenShiftUIDRange)
+			actualUserIDs, err := getAvailableIDs(tt.Namespace, tt.Pod, constants.AnnotationOpenShiftUIDRange, dataplaneImage, k8sImage)
 			if tt.Err == "" {
 				require.NoError(err)
 				require.Equal(tt.ExpectedAvailableUserIDs, actualUserIDs)
 			} else {
 				require.EqualError(err, tt.Err)
 			}
-			actualGroupIDs, err := getAvailableIDs(tt.Namespace, tt.Pod, constants.AnnotationOpenShiftGroups)
+			actualGroupIDs, err := getAvailableIDs(tt.Namespace, tt.Pod, constants.AnnotationOpenShiftGroups, dataplaneImage, k8sImage)
 			if tt.Err == "" {
 				require.NoError(err)
 				require.Equal(tt.ExpectedAvailableGroupIDs, actualGroupIDs)
