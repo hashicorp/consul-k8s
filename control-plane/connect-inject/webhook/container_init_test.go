@@ -318,8 +318,8 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			} else if c.cniEnabled && c.openShiftEnabled {
 				// When cni + openShift
 				expectedSecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(1000700000),
-					RunAsGroup:   pointer.Int64(1000700000),
+					RunAsUser:    pointer.Int64(1000799999),
+					RunAsGroup:   pointer.Int64(1000799999),
 					RunAsNonRoot: pointer.Bool(true),
 					Privileged:   pointer.Bool(privileged),
 					Capabilities: &corev1.Capabilities{
