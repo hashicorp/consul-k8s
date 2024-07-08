@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -28,6 +27,13 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+)
+
+const (
+	designatedOpenShiftUIDRange       = "1000700000/100000"
+	designatedOpenShiftGIDRange       = "1000700000/100000"
+	expectedOpenShiftInitContainerUID = 1000799999
+	expectedOpenShiftInitContainerGID = 1000799999
 )
 
 var (
@@ -940,8 +946,8 @@ func TestUpsert(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "default",
 							Annotations: map[string]string{
-								constants.AnnotationOpenShiftUIDRange: "1000700000/100000",
-								constants.AnnotationOpenShiftGroups:   "1000700000/100000",
+								constants.AnnotationOpenShiftUIDRange: designatedOpenShiftUIDRange,
+								constants.AnnotationOpenShiftGroups:   designatedOpenShiftGIDRange,
 							},
 						},
 					},
@@ -1481,9 +1487,14 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 					assert.Equal(t, helmConfig.InitContainerResources.Requests, container.Resources.Requests)
 				}
 
+				require.NotNil(t, container.SecurityContext.RunAsUser)
+				require.NotNil(t, container.SecurityContext.RunAsGroup)
 				if helmConfig.EnableOpenShift {
-					assert.Equal(t, container.SecurityContext.RunAsUser, pointer.Int64(1000700000))
-					assert.Equal(t, container.SecurityContext.RunAsGroup, pointer.Int64(1000700000))
+					assert.EqualValues(t, *container.SecurityContext.RunAsUser, expectedOpenShiftInitContainerUID)
+					assert.EqualValues(t, *container.SecurityContext.RunAsGroup, expectedOpenShiftInitContainerGID)
+				} else {
+					assert.EqualValues(t, *container.SecurityContext.RunAsUser, initContainersUserAndGroupID)
+					assert.EqualValues(t, *container.SecurityContext.RunAsGroup, initContainersUserAndGroupID)
 				}
 			}
 		}

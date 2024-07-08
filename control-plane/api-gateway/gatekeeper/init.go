@@ -197,7 +197,7 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 			return corev1.Container{}, err
 		}
 
-		gid, err = ctrlCommon.GetDataplaneGroupID(*ns, corev1.Pod{})
+		gid, err = ctrlCommon.GetConnectInitGroupID(*ns, corev1.Pod{})
 		if err != nil {
 			return corev1.Container{}, err
 		}
