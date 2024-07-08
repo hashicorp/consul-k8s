@@ -108,15 +108,36 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName,
 		}
 	}
 
+	annotationValue := namespace.Annotations[annotationName]
+
+	// Groups can be comma separated ranges, i.e. 100/2,101/2
+	// https://docs.openshift.com/container-platform/4.16/authentication/managing-security-context-constraints.html#security-context-constraints-pre-allocated-values_configuring-internal-oauth
+	ranges := make([]string, 0)
+	validIDs := make([]int64, 0)
 	// Collect the list of valid IDs from the namespace annotation
-	validUIDs, err := getIDsInRange(namespace.Annotations[annotationName])
-	if err != nil {
-		return nil, fmt.Errorf("unable to get valid userIDs from namespace annotation: %w", err)
+	if annotationName == constants.AnnotationOpenShiftGroups {
+		// Fall back to UID range if Group annotation is not present
+		if annotationValue == "" {
+			annotationName = constants.AnnotationOpenShiftUIDRange
+			annotationValue = namespace.Annotations[annotationName]
+		}
+		ranges = strings.Split(annotationValue, ",")
+	} else {
+		ranges = append(ranges, annotationValue)
+	}
+
+	for _, r := range ranges {
+		rangeIDs, err := getIDsInRange(r)
+		// call based on length of ranges and merge for groups
+		if err != nil {
+			return nil, fmt.Errorf("unable to get valid userIDs from namespace annotation: %w", err)
+		}
+		validIDs = append(validIDs, rangeIDs...)
 	}
 
 	// Subtract the list of application container UIDs from the list of valid userIDs
 	availableUIDs := make(map[int64]struct{})
-	for _, uid := range validUIDs {
+	for _, uid := range validIDs {
 		availableUIDs[uid] = struct{}{}
 	}
 	for _, uid := range appUIDs {
@@ -133,9 +154,13 @@ func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName,
 // getIDsInRange enumerates the entire list of available IDs given the value of the
 // OpenShift annotation. This can be the group or user ID range.
 func getIDsInRange(annotation string) ([]int64, error) {
+	// Add comma and group fallback
 	parts := strings.Split(annotation, "/")
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid range format: %s", annotation)
+		parts = strings.Split(annotation, "-")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid range format: %s", annotation)
+		}
 	}
 
 	start, err := strconv.Atoi(parts[0])
