@@ -332,7 +332,7 @@ spec:
         volumeMounts:
           - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
             mountPath: /consul/data
-      {{- endif }}
+      {{- end }}
       - name: locality-init
         image: {{ .Values.global.imageK8S }}
         {{ template "consul.imagePullPolicy" . }}
