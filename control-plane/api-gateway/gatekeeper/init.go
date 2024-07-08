@@ -179,27 +179,25 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 	}
 
 	uid := int64(initContainersUserAndGroupID)
-	group := int64(initContainersUserAndGroupID)
+	gid := int64(initContainersUserAndGroupID)
 
 	// In Openshift we let Openshift set the UID and GID
 	if config.EnableOpenShift {
 		ns := &corev1.Namespace{}
-		err := g.Client.Get(context.Background(), client.ObjectKey{
-			Name: namespace,
-		}, ns)
+		err := g.Client.Get(context.Background(), client.ObjectKey{Name: namespace}, ns)
 		if err != nil {
 			g.Log.Error(err, "error fetching namespace metadata for deployment")
 			return corev1.Container{}, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
 		}
 
-		// We need to get the userID for the dataplane, we do not care about what is already defined on the pod
+		// We need to get the userID for the init container. We do not care about what is already defined on the pod
 		// for gateways, as there is no application container that could have taken a UID.
-		uid, err = ctrlCommon.GetDataplaneUID(*ns, corev1.Pod{})
-
+		uid, err = ctrlCommon.GetConnectInitUID(*ns, corev1.Pod{})
 		if err != nil {
 			return corev1.Container{}, err
 		}
-		group, err = ctrlCommon.GetDataplaneGroupID(*ns, corev1.Pod{})
+
+		gid, err = ctrlCommon.GetDataplaneGroupID(*ns, corev1.Pod{})
 		if err != nil {
 			return corev1.Container{}, err
 		}
@@ -207,7 +205,7 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 
 	container.SecurityContext = &corev1.SecurityContext{
 		RunAsUser:    pointer.Int64(uid),
-		RunAsGroup:   pointer.Int64(group),
+		RunAsGroup:   pointer.Int64(gid),
 		RunAsNonRoot: pointer.Bool(true),
 		Privileged:   pointer.Bool(false),
 		Capabilities: &corev1.Capabilities{
