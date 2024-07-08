@@ -829,8 +829,8 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(1000700000),
-				RunAsGroup:               pointer.Int64(1000700000),
+				RunAsUser:                pointer.Int64(1000799998),
+				RunAsGroup:               pointer.Int64(1000799998),
 				RunAsNonRoot:             pointer.Bool(true),
 				ReadOnlyRootFilesystem:   pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
@@ -843,8 +843,8 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(1000700000),
-				RunAsGroup:               pointer.Int64(1000700000),
+				RunAsUser:                pointer.Int64(1000799998),
+				RunAsGroup:               pointer.Int64(1000799998),
 				RunAsNonRoot:             pointer.Bool(true),
 				ReadOnlyRootFilesystem:   pointer.Bool(true),
 				AllowPrivilegeEscalation: pointer.Bool(false),
