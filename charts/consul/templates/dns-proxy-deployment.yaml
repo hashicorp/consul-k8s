@@ -55,153 +55,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          command:
-            - "/bin/sh"
-            - "-ec"
-            - |
-              exec consul-k8s-control-plane inject-connect \
-                {{- if .Values.global.federation.enabled }}
-                -enable-federation \
-                {{- end }}
-                -log-level={{ default .Values.global.logLevel .Values.dnsProxy.logLevel }} \
-                -log-json={{ .Values.global.logJSON }} \
-                -default-inject={{ .Values.dnsProxy.default }} \
-                -consul-image="{{ default .Values.global.image .Values.dnsProxy.imageConsul }}" \
-                -consul-dataplane-image="{{ .Values.global.imageConsulDataplane }}" \
-                -consul-k8s-image="{{ default .Values.global.imageK8S .Values.dnsProxy.image }}" \
-                -release-name="{{ .Release.Name }}" \
-                -release-namespace="{{ .Release.Namespace }}" \
-                -resource-prefix={{ template "consul.fullname" . }} \
-                -listen=:8080 \
-                {{- range $k, $v := .Values.dnsProxy.consulNode.meta }}
-                -node-meta={{ $k }}={{ $v }} \
-                {{- end }}
-                {{- if .Values.dnsProxy.transparentProxy.defaultEnabled }}
-                -default-enable-transparent-proxy=true \
-                {{- else }}
-                -default-enable-transparent-proxy=false \
-                {{- end }}
-                -enable-cni={{ .Values.dnsProxy.cni.enabled }} \
-                {{- if .Values.global.peering.enabled }}
-                -enable-peering=true \
-                {{- end }}
-                {{- if .Values.global.openshift.enabled }}
-                -enable-openshift \
-                {{- end }}
-                {{- if .Values.dnsProxy.transparentProxy.defaultOverwriteProbes }}
-                -transparent-proxy-default-overwrite-probes=true \
-                {{- else }}
-                -transparent-proxy-default-overwrite-probes=false \
-                {{- end }}
-                {{- if (and $dnsEnabled $dnsRedirectionEnabled) }}
-                -enable-consul-dns=true \
-                {{- end }}
-                {{- if .Values.global.openshift.enabled }}
-                -enable-openshift \
-                {{- end }}
-                {{- if (or (and (ne (.Values.dnsProxy.metrics.defaultEnabled | toString) "-") .Values.dnsProxy.metrics.defaultEnabled) (and (eq (.Values.dnsProxy.metrics.defaultEnabled | toString) "-") .Values.global.metrics.enabled)) }}
-                -default-enable-metrics=true \
-                {{- else }}
-                -default-enable-metrics=false \
-                {{- end }}
-                -enable-gateway-metrics={{ .Values.global.metrics.enableGatewayMetrics }}  \
-                -default-enable-metrics-merging={{ .Values.dnsProxy.metrics.defaultEnableMerging }}  \
-                -default-merged-metrics-port={{ .Values.dnsProxy.metrics.defaultMergedMetricsPort }} \
-                -default-prometheus-scrape-port={{ .Values.dnsProxy.metrics.defaultPrometheusScrapePort }} \
-                -default-prometheus-scrape-path="{{ .Values.dnsProxy.metrics.defaultPrometheusScrapePath }}" \
-                {{- if .Values.dnsProxy.envoyExtraArgs }}
-                -envoy-extra-args="{{ .Values.dnsProxy.envoyExtraArgs }}" \
-                {{- end }}
-                {{- if .Values.dnsProxy.overrideAuthMethodName }}
-                -acl-auth-method="{{ .Values.dnsProxy.overrideAuthMethodName }}" \
-                {{- else if .Values.global.acls.manageSystemACLs }}
-                -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
-                {{- end }}
-                {{- range $value := .Values.dnsProxy.k8sAllowNamespaces }}
-                -allow-k8s-namespace="{{ $value }}" \
-                {{- end }}
-                {{- range $value := .Values.dnsProxy.k8sDenyNamespaces }}
-                -deny-k8s-namespace="{{ $value }}" \
-                {{- end }}
-                {{- if .Values.global.adminPartitions.enabled }}
-                -enable-partitions=true \
-                {{- end }}
-                {{- if .Values.global.enableConsulNamespaces }}
-                -enable-namespaces=true \
-                {{- if .Values.dnsProxy.consulNamespaces.consulDestinationNamespace }}
-                -consul-destination-namespace={{ .Values.dnsProxy.consulNamespaces.consulDestinationNamespace }} \
-                {{- end }}
-                {{- if and .Values.global.enableConsulNamespaces .Values.dnsProxy.consulNamespaces.mirroringK8S }}
-                -enable-k8s-namespace-mirroring=true \
-                {{- if .Values.dnsProxy.consulNamespaces.mirroringK8SPrefix }}
-                -k8s-namespace-mirroring-prefix={{ .Values.dnsProxy.consulNamespaces.mirroringK8SPrefix }} \
-                {{- end }}
-                {{- end }}
-                {{- if .Values.global.acls.manageSystemACLs }}
-                -consul-cross-namespace-acl-policy=cross-namespace-policy \
-                {{- end }}
-                {{- end }}
-                {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.dnsProxy.tlsCert.secretName }}
-                -tls-cert-dir=/vault/secrets/dns-proxy/certs \
-                -enable-webhook-ca-update \
-                {{- else }}
-                -tls-cert-dir=/etc/dns-proxy/certs \
-                {{- end }}
-                {{- $resources := .Values.dnsProxy.sidecarProxy.resources }}
-                {{- /* kindIs is used here to differentiate between null and 0 */}}
-                {{- if not (kindIs "invalid" $resources.limits.memory) }}
-                -default-sidecar-proxy-memory-limit={{ $resources.limits.memory }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $resources.requests.memory) }}
-                -default-sidecar-proxy-memory-request={{ $resources.requests.memory }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $resources.limits.cpu) }}
-                -default-sidecar-proxy-cpu-limit={{ $resources.limits.cpu }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $resources.requests.cpu) }}
-                -default-sidecar-proxy-cpu-request={{ $resources.requests.cpu }} \
-                {{- end }}
-                -default-envoy-proxy-concurrency={{ .Values.dnsProxy.sidecarProxy.concurrency }} \
-                {{- if .Values.dnsProxy.sidecarProxy.lifecycle.defaultEnabled }}
-                -default-enable-sidecar-proxy-lifecycle=true \
-                {{- else }}
-                -default-enable-sidecar-proxy-lifecycle=false \
-                {{- end }}
-                {{- if .Values.dnsProxy.sidecarProxy.lifecycle.defaultEnableShutdownDrainListeners }}
-                -default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=true \
-                {{- else }}
-                -default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=false \
-                {{- end }}
-                -default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds={{ .Values.dnsProxy.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds }} \
-                -default-sidecar-proxy-lifecycle-startup-grace-period-seconds={{ .Values.dnsProxy.sidecarProxy.lifecycle.defaultStartupGracePeriodSeconds }} \
-                -default-sidecar-proxy-lifecycle-graceful-port={{ .Values.dnsProxy.sidecarProxy.lifecycle.defaultGracefulPort }} \
-                -default-sidecar-proxy-lifecycle-graceful-shutdown-path="{{ .Values.dnsProxy.sidecarProxy.lifecycle.defaultGracefulShutdownPath }}" \
-                -default-sidecar-proxy-lifecycle-graceful-startup-path="{{ .Values.dnsProxy.sidecarProxy.lifecycle.defaultGracefulStartupPath }}" \
-                -default-sidecar-proxy-startup-failure-seconds={{ .Values.dnsProxy.sidecarProxy.defaultStartupFailureSeconds }} \
-                -default-sidecar-proxy-liveness-failure-seconds={{ .Values.dnsProxy.sidecarProxy.defaultLivenessFailureSeconds }} \
-                {{- if .Values.dnsProxy.initContainer }}
-                {{- $initResources := .Values.dnsProxy.initContainer.resources }}
-                {{- if not (kindIs "invalid" $initResources.limits.memory) }}
-                -init-container-memory-limit={{ $initResources.limits.memory }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $initResources.requests.memory) }}
-                -init-container-memory-request={{ $initResources.requests.memory }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $initResources.limits.cpu) }}
-                -init-container-cpu-limit={{ $initResources.limits.cpu }} \
-                {{- end }}
-                {{- if not (kindIs "invalid" $initResources.requests.cpu) }}
-                -init-container-cpu-request={{ $initResources.requests.cpu }} \
-                {{- end }}
-                {{- end }}
-
-                {{- if .Values.global.cloud.enabled }}
-                -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
-                {{- end }}
-                {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
-                -enable-auto-encrypt \
-                {{- end }}
-                -enable-telemetry-collector={{ .Values.global.metrics.enableTelemetryCollector}}  \
+          args:
+            - "-mode=dns-proxy"
+            - "-addresses=consul-consul-server.consul.svc"
+            - "-log-level=debug"
+            - "-log-json=false"
+            - "-tls-disabled"
+            - "-startup-grace-period-seconds=0"
+            - "-graceful-startup-path=/graceful_startup"
+            - "-telemetry-prom-scrape-path=/metrics"
+            - "-consul-dns-bind-port=8600"
           startupProbe:
             httpGet:
               path: /readyz/ready
