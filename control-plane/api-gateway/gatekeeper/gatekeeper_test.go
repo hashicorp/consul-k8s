@@ -100,6 +100,7 @@ type testCase struct {
 
 type resources struct {
 	deployments     []*appsv1.Deployment
+	namespaces      []*corev1.Namespace
 	roles           []*rbac.Role
 	roleBindings    []*rbac.RoleBinding
 	services        []*corev1.Service
