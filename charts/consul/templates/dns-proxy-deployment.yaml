@@ -197,8 +197,7 @@ spec:
         {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
         - -server-watch-disabled=true
         {{- end }}
-        - -envoy-enabled=false
-        - -xds-enabled=false
+        - -mode=dns-proxy
         livenessProbe:
           tcpSocket:
             port: 53
