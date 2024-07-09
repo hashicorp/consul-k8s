@@ -88,7 +88,7 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.Namespac
 }
 
 func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
-	initContainer, err := initContainer(config, gateway.Name, gateway.Namespace)
+	initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
