@@ -9,9 +9,12 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"strconv"
+	"testing"
 	"time"
 )
 
@@ -39,12 +42,12 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 		mirrorK8S            bool
 		ACLsEnabled          bool
 	}{
-		//{
-		//	"default destination namespace",
-		//	defaultNamespace,
-		//	false,
-		//	false,
-		//},
+		{
+			"default destination namespace",
+			defaultNamespace,
+			false,
+			false,
+		},
 		{
 			"default destination namespace; ACLs and auto-encrypt enabled",
 			defaultNamespace,
