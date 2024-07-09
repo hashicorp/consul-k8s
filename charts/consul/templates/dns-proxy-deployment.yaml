@@ -65,33 +65,36 @@ spec:
             - "-graceful-startup-path=/graceful_startup"
             - "-telemetry-prom-scrape-path=/metrics"
             - "-consul-dns-bind-port=8600"
-          startupProbe:
-            httpGet:
-              path: /readyz/ready
-              port: 9445
-              scheme: HTTP
-            initialDelaySeconds: 30
-            failureThreshold: 15
-            periodSeconds: 2
-            timeoutSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /readyz/ready
-              port: 9445
-              scheme: HTTP
-            failureThreshold: 2
-            initialDelaySeconds: 1
-            successThreshold: 1
-            timeoutSeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /readyz/ready
-              port: 9445
-              scheme: HTTP
-            failureThreshold: 2
-            initialDelaySeconds: 2
-            successThreshold: 1
-            timeoutSeconds: 5
+
+
+{{/*            TODO: Add probes with the right listener*/}}
+{{/*          startupProbe:*/}}
+{{/*            httpGet:*/}}
+{{/*              path: /readyz/ready*/}}
+{{/*              port: 9445*/}}
+{{/*              scheme: HTTP*/}}
+{{/*            initialDelaySeconds: 30*/}}
+{{/*            failureThreshold: 15*/}}
+{{/*            periodSeconds: 2*/}}
+{{/*            timeoutSeconds: 5*/}}
+{{/*          livenessProbe:*/}}
+{{/*            httpGet:*/}}
+{{/*              path: /readyz/ready*/}}
+{{/*              port: 9445*/}}
+{{/*              scheme: HTTP*/}}
+{{/*            failureThreshold: 2*/}}
+{{/*            initialDelaySeconds: 1*/}}
+{{/*            successThreshold: 1*/}}
+{{/*            timeoutSeconds: 5*/}}
+{{/*          readinessProbe:*/}}
+{{/*            httpGet:*/}}
+{{/*              path: /readyz/ready*/}}
+{{/*              port: 9445*/}}
+{{/*              scheme: HTTP*/}}
+{{/*            failureThreshold: 2*/}}
+{{/*            initialDelaySeconds: 2*/}}
+{{/*            successThreshold: 1*/}}
+{{/*            timeoutSeconds: 5*/}}
           volumeMounts:
           {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.dnsProxy.tlsCert.secretName) }}
             - name: certs
