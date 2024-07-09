@@ -549,7 +549,6 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 					require.NoError(r, err)
 				}
 			})
-
 		}
 	}
 
@@ -701,47 +700,40 @@ func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.T
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
-// allowing access to the anyuid and privileged Security Context Constraints on OpenShift.
+// allowing access to the privileged Security Context Constraints on OpenShift.
 func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	const anyuidClusterRole = "system:openshift:scc:anyuid"
 	const privilegedClusterRole = "system:openshift:scc:privileged"
-	anyuidRoleBinding := "anyuid-test"
 	privilegedRoleBinding := "privileged-test"
 
 	// A role binding to allow default service account in the installation namespace access to the SCCs.
-	{
-		for clusterRoleName, roleBindingName := range map[string]string{anyuidClusterRole: anyuidRoleBinding, privilegedClusterRole: privilegedRoleBinding} {
-			// Check if this cluster role binding already exists.
-			_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), roleBindingName, metav1.GetOptions{})
+	// Check if this cluster role binding already exists.
+	_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), privilegedRoleBinding, metav1.GetOptions{})
 
-			if errors.IsNotFound(err) {
-				roleBinding := &rbacv1.RoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: roleBindingName,
-					},
-					Subjects: []rbacv1.Subject{
-						{
-							Kind:      rbacv1.ServiceAccountKind,
-							Name:      "default",
-							Namespace: namespace,
-						},
-					},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "ClusterRole",
-						Name: clusterRoleName,
-					},
-				}
-
-				_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
-				require.NoError(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+	if errors.IsNotFound(err) {
+		roleBinding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: privilegedRoleBinding,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      "default",
+					Namespace: namespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				Kind: "ClusterRole",
+				Name: privilegedClusterRole,
+			},
 		}
+
+		_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
 	}
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), anyuidRoleBinding, metav1.DeleteOptions{})
 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), privilegedRoleBinding, metav1.DeleteOptions{})
 	})
 }
