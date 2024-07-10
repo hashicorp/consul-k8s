@@ -29,6 +29,13 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
+const (
+	designatedOpenShiftUIDRange       = "1000700000/100000"
+	designatedOpenShiftGIDRange       = "1000700000/100000"
+	expectedOpenShiftInitContainerUID = 1000799999
+	expectedOpenShiftInitContainerGID = 1000799999
+)
+
 var (
 	createdAtLabelKey   = "gateway.consul.hashicorp.com/created"
 	createdAtLabelValue = "101010"
@@ -93,6 +100,7 @@ type testCase struct {
 
 type resources struct {
 	deployments     []*appsv1.Deployment
+	namespaces      []*corev1.Namespace
 	roles           []*rbac.Role
 	roleBindings    []*rbac.RoleBinding
 	services        []*corev1.Service
@@ -897,7 +905,23 @@ func TestUpsert(t *testing.T) {
 				EnableOpenShift: true,
 				ImageDataplane:  "hashicorp/consul-dataplane",
 			},
-			initialResources: resources{},
+			initialResources: resources{
+				namespaces: []*corev1.Namespace{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Namespace",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "default",
+							Annotations: map[string]string{
+								constants.AnnotationOpenShiftUIDRange: designatedOpenShiftUIDRange,
+								constants.AnnotationOpenShiftGroups:   designatedOpenShiftGIDRange,
+							},
+						},
+					},
+				},
+			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -1134,6 +1158,10 @@ func joinResources(resources resources) (objs []client.Object) {
 		objs = append(objs, deployment)
 	}
 
+	for _, namespace := range resources.namespaces {
+		objs = append(objs, namespace)
+	}
+
 	for _, role := range resources.roles {
 		objs = append(objs, role)
 	}
@@ -1193,6 +1221,16 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 					assert.Equal(t, helmConfig.InitContainerResources.Limits, container.Resources.Limits)
 					assert.Equal(t, helmConfig.InitContainerResources.Requests, container.Resources.Requests)
 				}
+
+				require.NotNil(t, container.SecurityContext.RunAsUser)
+				require.NotNil(t, container.SecurityContext.RunAsGroup)
+				if helmConfig.EnableOpenShift {
+					assert.EqualValues(t, *container.SecurityContext.RunAsUser, expectedOpenShiftInitContainerUID)
+					assert.EqualValues(t, *container.SecurityContext.RunAsGroup, expectedOpenShiftInitContainerGID)
+				} else {
+					assert.EqualValues(t, *container.SecurityContext.RunAsUser, initContainersUserAndGroupID)
+					assert.EqualValues(t, *container.SecurityContext.RunAsGroup, initContainersUserAndGroupID)
+				}
 			}
 		}
 		assert.True(t, hasInitContainer)
@@ -1212,6 +1250,19 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 			}
 		}
 		assert.True(t, hasDataplaneContainer)
+	}
+
+	for _, namespace := range resources.namespaces {
+		actual := &corev1.Namespace{}
+		err := client.Get(context.Background(), types.NamespacedName{Name: namespace.Name}, actual)
+		if err != nil {
+			return err
+		}
+
+		// Patch the createdAt label
+		actual.Labels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, namespace, actual)
 	}
 
 	for _, expected := range resources.roles {
