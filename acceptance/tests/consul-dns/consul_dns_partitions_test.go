@@ -345,8 +345,6 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 			// to get the primary partition's version of the service since it is now exported
 			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, primaryClusterContext,
 				podLabelSelector, serviceRequestInDefaultPartition, true, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-
 		})
 	}
 }

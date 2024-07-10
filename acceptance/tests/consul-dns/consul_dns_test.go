@@ -59,15 +59,15 @@ func TestConsulDNS(t *testing.T) {
 			k8sClient := ctx.KubernetesClient(t)
 			contextNamespace := ctx.KubectlOptions(t).Namespace
 
-			consulServerList, err := k8sClient.CoreV1().Pods(contextNamespace).List(context.Background(), metav1.ListOptions{
+			_, err := k8sClient.CoreV1().Pods(contextNamespace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "app=consul,component=server",
 			})
 			require.NoError(t, err)
 
-			serverIPs := make([]string, len(consulServerList.Items))
-			for _, serverPod := range consulServerList.Items {
-				serverIPs = append(serverIPs, serverPod.Status.PodIP)
-			}
+			//serverIPs := make([]string, len(consulServerList.Items))
+			//for _, serverPod := range consulServerList.Items {
+			//	serverIPs = append(serverIPs, serverPod.Status.PodIP)
+			//}
 
 			verifyDNS(t, releaseName, c.enableDNSProxy, contextNamespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
