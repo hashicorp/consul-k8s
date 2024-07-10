@@ -1923,7 +1923,7 @@ dns:
     replicas: 1
 
     # Port number to be used by DNS proxy
-    port: 53
+    port: 8700
 
 # Values that configure the Consul UI.
 ui:
