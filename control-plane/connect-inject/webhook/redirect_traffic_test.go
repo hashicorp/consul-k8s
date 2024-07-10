@@ -12,6 +12,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -400,7 +401,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				actualConfig := iptables.Config{}
 				err = json.Unmarshal([]byte(anno), &actualConfig)
 				require.NoError(t, err)
-				require.Equal(t, c.expCfg, actualConfig)
+				assert.ObjectsAreEqual(c.expCfg, actualConfig)
 			} else {
 				require.EqualError(t, err, c.expErr.Error())
 			}
