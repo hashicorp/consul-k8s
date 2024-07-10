@@ -1158,6 +1158,10 @@ func joinResources(resources resources) (objs []client.Object) {
 		objs = append(objs, deployment)
 	}
 
+	for _, namespace := range resources.namespaces {
+		objs = append(objs, namespace)
+	}
+
 	for _, role := range resources.roles {
 		objs = append(objs, role)
 	}
@@ -1246,6 +1250,19 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 			}
 		}
 		assert.True(t, hasDataplaneContainer)
+	}
+
+	for _, namespace := range resources.namespaces {
+		actual := &corev1.Namespace{}
+		err := client.Get(context.Background(), types.NamespacedName{Name: namespace.Name}, actual)
+		if err != nil {
+			return err
+		}
+
+		// Patch the createdAt label
+		actual.Labels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, namespace, actual)
 	}
 
 	for _, expected := range resources.roles {
