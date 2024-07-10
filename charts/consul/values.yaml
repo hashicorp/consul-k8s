@@ -1914,6 +1914,17 @@ dns:
   # @type: string
   additionalSpec: null
 
+  # Configures dns-proxy deployment.
+  proxy:
+    # True if you want to enable dns-proxy
+    enabled: false
+
+    # The number of deployment replicas.
+    replicas: 1
+
+    # Port number to be used by DNS proxy
+    port: 53
+
 # Values that configure the Consul UI.
 ui:
   # If true, the UI will be enabled. This will
@@ -2306,17 +2317,6 @@ syncCatalog:
   # @type: string
   annotations: null
 
-# Configures dns-proxy deployment.
-dnsProxy:
-  # True if you want to enable dns-proxy
-  enabled: true
-
-  # The number of deployment replicas.
-  replicas: 1
-
-  # Image for consul-dataplane that will be used for dns-proxy.
-  # @type: string
-  image: null
 
 
 # Configures the automatic Connect sidecar injector.
