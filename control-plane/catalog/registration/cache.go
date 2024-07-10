@@ -158,7 +158,7 @@ func (c *RegistrationCache) run(log logr.Logger, namespace string) {
 
 				if err := c.k8sClient.Get(c.ctx, types.NamespacedName{Name: svc, Namespace: namespace}, registration); err != nil {
 					if !k8serrors.IsNotFound(err) {
-						log.Error(err, "unable to get registration", "svcName", svc)
+						log.Error(err, "unable to get registration", "svcName", svc, "namespace", namespace)
 					}
 					continue
 				}
@@ -263,6 +263,7 @@ func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, registration *v
 			return err
 		}
 
+		// we don't need to include the namespace/partition here because all roles and policies are created in the default namespace for consul-k8s managed resources.
 		writeOpts := &capi.WriteOptions{}
 
 		if existingPolicy == nil {
@@ -335,8 +336,8 @@ func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, registration *v
 	var mErr error
 	for _, termGW := range termGWsToUpdate {
 
+		// we don't need to include the namespace/partition here because all roles and policies are created in the default namespace for consul-k8s managed resources.
 		queryOpts := &capi.QueryOptions{}
-
 		writeOpts := &capi.WriteOptions{}
 
 		roles, _, err := client.ACL().RoleList(queryOpts)
