@@ -1,4 +1,4 @@
-{{- if .Values.dnsProxy.enabled }}
+{{- if .Values.dns.proxy.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -14,7 +14,7 @@ roleRef:
   kind: ClusterRole
   name: {{ template "consul.fullname" . }}-dns-proxy
 subjects:
-- kind: ServiceAccount
-  name: {{ template "consul.fullname" . }}-dns-proxy
-  namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: {{ template "consul.fullname" . }}-dns-proxy
+    namespace: {{ .Release.Namespace }}
 {{- end }}

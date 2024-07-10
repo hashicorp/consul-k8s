@@ -1,4 +1,5 @@
-{{- if .Values.dnsProxy.enabled }}# The service for the Connect sidecar injector
+{{- if .Values.dns.proxy.enabled }}
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -10,13 +11,29 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: dns-proxy
+{{- if .Values.dns.annotations }}
+  annotations:
+    {{ tpl .Values.dns.annotations . | nindent 4 | trim }}
+{{- end }}
 spec:
-  ports:
-  - port: 443
-    targetPort: 8080
   selector:
     app: {{ template "consul.name" . }}
     release: "{{ .Release.Name }}"
     component: dns-proxy
+{{- if .Values.dns.type }}
+  type: {{ .Values.dns.type }}
 {{- end }}
-
+{{- if .Values.dns.clusterIP }}
+  clusterIP: {{ .Values.dns.clusterIP }}
+{{- end }}
+  ports:
+    - name: dns-tcp
+      port: {{ .Values.dns.proxy.port }}
+      protocol: "TCP"
+      targetPort: dns-tcp
+    - name: dns-udp
+      port: {{ .Values.dns.proxy.port }}
+      protocol: "UDP"
+      targetPort: dns-udp
+---
+{{- end }}
