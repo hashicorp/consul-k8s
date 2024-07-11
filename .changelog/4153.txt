@@ -1,0 +1,3 @@
+```release-note:bug
+terminating-gateway: Fix generated acl policy for external services to include the namespace and partition block if they are enabled.
+```
