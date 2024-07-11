@@ -1,4 +1,4 @@
-{{- if .Values.dns.proxy.enabled }}
+{{- if (or (and (ne (.Values.dns.proxy.enabled | toString) "-") .Values.dns.proxy.enabled) (and (eq (.Values.dns.proxy.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
@@ -32,7 +32,6 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: dns-proxy
-        consul.hashicorp.com/connect-inject-managed-by: consul-k8s-endpoints-controller
         {{- if .Values.global.extraLabels }}
           {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
