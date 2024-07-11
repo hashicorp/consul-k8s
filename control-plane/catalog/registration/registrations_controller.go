@@ -250,7 +250,7 @@ func (r *RegistrationsController) Logger(name types.NamespacedName) logr.Logger 
 
 func (r *RegistrationsController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	// setup the cache
-	go r.Cache.run(ctx, r.Log)
+	go r.Cache.run(r.Log, "")
 	r.Cache.waitSynced(ctx)
 
 	go r.watchForDeregistrations(ctx)
