@@ -39,6 +39,7 @@ func TestConsulDNS(t *testing.T) {
 		{secure: true, enableDNSProxy: false},
 		{secure: true, enableDNSProxy: true},
 	}
+
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t / enableDNSProxy: %t", c.secure, c.enableDNSProxy)
 		t.Run(name, func(t *testing.T) {
