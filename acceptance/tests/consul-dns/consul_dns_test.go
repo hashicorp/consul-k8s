@@ -34,9 +34,9 @@ func TestConsulDNS(t *testing.T) {
 		secure         bool
 		enableDNSProxy bool
 	}{
-		//{secure: false, enableDNSProxy: false},
+		{secure: false, enableDNSProxy: false},
 		{secure: false, enableDNSProxy: true},
-		//{secure: true, enableDNSProxy: false},
+		{secure: true, enableDNSProxy: false},
 		{secure: true, enableDNSProxy: true},
 	}
 	for _, c := range cases {
