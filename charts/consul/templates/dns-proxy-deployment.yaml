@@ -60,9 +60,7 @@ spec:
         {{- end }}
     spec:
       terminationGracePeriodSeconds: 10
-      # serviceAccountName: {{ template "consul.fullname" . }}-dns-proxy
-      # TODO(jmurret): fix the service account for dns-proxy
-      serviceAccountName: {{ template "consul.fullname" . }}-connect-injector
+      serviceAccountName: {{ template "consul.fullname" . }}-dns-proxy
       volumes:
         - name: consul-service
           emptyDir:
