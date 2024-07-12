@@ -120,8 +120,9 @@ type Command struct {
 
 	state discovery.State
 
-	once sync.Once
-	help string
+	once         sync.Once
+	help         string
+	flagDNSProxy bool
 }
 
 func (c *Command) init() {
@@ -221,6 +222,9 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+
+	c.flags.BoolVar(&c.flagDNSProxy, "dns-proxy", false,
+		"Toggle for configuring ACL login for the DNS proxy.")
 
 	c.k8s = &k8sflags.K8SFlags{}
 	c.consulFlags = &flags.ConsulFlags{}
@@ -663,6 +667,21 @@ func (c *Command) Run(args []string) int {
 		}
 		err = c.createLocalACL(common.DatadogAgentTokenName, rules, consulDC, primary, dynamicClient)
 		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagDNSProxy {
+		serviceAccountName := c.withPrefix("dns-proxy")
+
+		dnsProxyRules, err := c.dnsProxyRules()
+		if err != nil {
+			c.log.Error("Error templating inject rules", "err", err)
+			return 1
+		}
+
+		if err := c.createACLPolicyRoleAndBindingRule("dns-proxy", dnsProxyRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}

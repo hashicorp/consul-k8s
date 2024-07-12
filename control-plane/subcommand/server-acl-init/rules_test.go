@@ -1013,6 +1013,140 @@ partition "part-1" {
 	}
 }
 
+// Test the inject rules with namespaces enabled or disabled.
+func TestDnsProxyRules(t *testing.T) {
+	cases := []struct {
+		EnableNamespaces bool
+		EnablePartitions bool
+		EnablePeering    bool
+		PartitionName    string
+		Expected         string
+	}{
+		{
+			EnableNamespaces: false,
+			EnablePartitions: false,
+			EnablePeering:    false,
+			Expected: `
+				node_prefix "" {
+				  policy = "read"
+				}
+				service_prefix "" {
+				  policy = "write"
+				}
+			`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: false,
+			EnablePeering:    false,
+			Expected: `
+				operator = "write"
+				acl = "write"
+				node_prefix "" {
+				  policy = "read"
+				}
+				service_prefix "" {
+				  policy = "write"
+				}
+			`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: false,
+			EnablePeering:    true,
+			Expected: `
+  mesh = "write"
+  operator = "write"
+  acl = "write"
+  peering = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+  namespace_prefix "" {
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+  }`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: true,
+			EnablePeering:    false,
+			PartitionName:    "part-1",
+			Expected: `
+partition "part-1" {
+  mesh = "write"
+  acl = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+  namespace_prefix "" {
+    policy = "write"
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+  }
+}`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: true,
+			EnablePeering:    true,
+			PartitionName:    "part-1",
+			Expected: `
+partition "part-1" {
+  mesh = "write"
+  acl = "write"
+  peering = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+  namespace_prefix "" {
+    policy = "write"
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+  }
+}`,
+		},
+	}
+
+	for _, tt := range cases {
+		caseName := fmt.Sprintf("ns=%t, partition=%t, peering=%t", tt.EnableNamespaces, tt.EnablePartitions, tt.EnablePeering)
+		t.Run(caseName, func(t *testing.T) {
+
+			cmd := Command{
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
+				flagEnableNamespaces: tt.EnableNamespaces,
+				flagEnablePeering:    tt.EnablePeering,
+			}
+
+			injectorRules, err := cmd.dnsProxyRules()
+
+			require.NoError(t, err)
+			require.Equal(t, tt.Expected, injectorRules)
+		})
+	}
+}
+
 func TestReplicationTokenRules(t *testing.T) {
 	cases := []struct {
 		Name             string

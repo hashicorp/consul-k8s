@@ -444,3 +444,24 @@ func (c *Command) renderRulesGeneric(tmpl string, data interface{}) (string, err
 
 	return buf.String(), nil
 }
+
+// acl = "write" is required when creating namespace with a default policy.
+// Attaching a default ACL policy to a namespace requires acl = "write" in the
+// namespace that the policy is defined in, which in our case is "default".
+func (c *Command) dnsProxyRules() (string, error) {
+	dnsProxyRulesTpl := `
+		{{- if .EnablePartitions }}
+			partition "{{ .PartitionName }}" {
+		{{- end }}
+			node_prefix "" {
+			  policy = "deny"
+			}
+			service_prefix "" {
+			  policy = "deny"
+			}
+		{{- if .EnablePartitions }}
+			}
+		{{- end }}
+	`
+	return c.renderRules(dnsProxyRulesTpl)
+}
