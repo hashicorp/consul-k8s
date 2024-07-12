@@ -1027,52 +1027,36 @@ func TestDnsProxyRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
-				node_prefix "" {
-				  policy = "read"
-				}
-				service_prefix "" {
-				  policy = "write"
-				}
-			`,
+			node_prefix "" {
+			  policy = "deny"
+			}
+			service_prefix "" {
+			  policy = "deny"
+			}`,
 		},
 		{
 			EnableNamespaces: true,
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
-				operator = "write"
-				acl = "write"
-				node_prefix "" {
-				  policy = "read"
-				}
-				service_prefix "" {
-				  policy = "write"
-				}
-			`,
+			node_prefix "" {
+			  policy = "deny"
+			}
+			service_prefix "" {
+			  policy = "deny"
+			}`,
 		},
 		{
 			EnableNamespaces: true,
 			EnablePartitions: false,
 			EnablePeering:    true,
 			Expected: `
-  mesh = "write"
-  operator = "write"
-  acl = "write"
-  peering = "write"
-  node_prefix "" {
-    policy = "write"
-  }
-  namespace_prefix "" {
-    acl = "write"
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-    identity_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }`,
+			node_prefix "" {
+			  policy = "deny"
+			}
+			service_prefix "" {
+			  policy = "deny"
+			}`,
 		},
 		{
 			EnableNamespaces: true,
@@ -1080,25 +1064,14 @@ func TestDnsProxyRules(t *testing.T) {
 			EnablePeering:    false,
 			PartitionName:    "part-1",
 			Expected: `
-partition "part-1" {
-  mesh = "write"
-  acl = "write"
-  node_prefix "" {
-    policy = "write"
-  }
-  namespace_prefix "" {
-    policy = "write"
-    acl = "write"
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-    identity_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }
-}`,
+			partition "part-1" {
+			node_prefix "" {
+			  policy = "deny"
+			}
+			service_prefix "" {
+			  policy = "deny"
+			}
+			}`,
 		},
 		{
 			EnableNamespaces: true,
@@ -1106,26 +1079,14 @@ partition "part-1" {
 			EnablePeering:    true,
 			PartitionName:    "part-1",
 			Expected: `
-partition "part-1" {
-  mesh = "write"
-  acl = "write"
-  peering = "write"
-  node_prefix "" {
-    policy = "write"
-  }
-  namespace_prefix "" {
-    policy = "write"
-    acl = "write"
-    service_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-    identity_prefix "" {
-      policy = "write"
-      intentions = "write"
-    }
-  }
-}`,
+			partition "part-1" {
+			node_prefix "" {
+			  policy = "deny"
+			}
+			service_prefix "" {
+			  policy = "deny"
+			}
+			}`,
 		},
 	}
 
