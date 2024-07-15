@@ -179,7 +179,7 @@ func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, 
 		require.NoError(t, err)
 	}
 
-	logger.Log(t, "registering the external service %s", name)
+	logger.Log(t, fmt.Sprintf("registering the external service %s", name))
 	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
 		Node:     "external",
 		Address:  address,
