@@ -34,6 +34,8 @@ import (
 	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
+const dnsProxyName = "dns-proxy"
+
 type Command struct {
 	UI cli.Ui
 
@@ -126,6 +128,7 @@ type Command struct {
 }
 
 func (c *Command) init() {
+
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Prefix to use for Kubernetes resources.")
@@ -223,7 +226,7 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	c.flags.BoolVar(&c.flagDNSProxy, "dns-proxy", false,
+	c.flags.BoolVar(&c.flagDNSProxy, dnsProxyName, false,
 		"Toggle for configuring ACL login for the DNS proxy.")
 
 	c.k8s = &k8sflags.K8SFlags{}
@@ -673,7 +676,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagDNSProxy {
-		serviceAccountName := c.withPrefix("dns-proxy")
+		serviceAccountName := c.withPrefix(dnsProxyName)
 
 		dnsProxyRules, err := c.dnsProxyRules()
 		if err != nil {
@@ -681,7 +684,7 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 
-		if err := c.createACLPolicyRoleAndBindingRule("dns-proxy", dnsProxyRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
+		if err := c.createACLPolicyRoleAndBindingRule(dnsProxyName, dnsProxyRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}
