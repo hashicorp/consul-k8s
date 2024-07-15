@@ -1028,10 +1028,10 @@ func TestDnsProxyRules(t *testing.T) {
 			EnablePeering:    false,
 			Expected: `
 			node_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			service_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}`,
 		},
 		{
@@ -1040,10 +1040,10 @@ func TestDnsProxyRules(t *testing.T) {
 			EnablePeering:    false,
 			Expected: `
 			node_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			service_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}`,
 		},
 		{
@@ -1052,10 +1052,10 @@ func TestDnsProxyRules(t *testing.T) {
 			EnablePeering:    true,
 			Expected: `
 			node_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			service_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}`,
 		},
 		{
@@ -1066,10 +1066,10 @@ func TestDnsProxyRules(t *testing.T) {
 			Expected: `
 			partition "part-1" {
 			node_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			service_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			}`,
 		},
@@ -1081,10 +1081,10 @@ func TestDnsProxyRules(t *testing.T) {
 			Expected: `
 			partition "part-1" {
 			node_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			service_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			}`,
 		},

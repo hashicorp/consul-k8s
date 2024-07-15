@@ -454,10 +454,10 @@ func (c *Command) dnsProxyRules() (string, error) {
 			partition "{{ .PartitionName }}" {
 		{{- end }}
 			node_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 			service_prefix "" {
-			  policy = "deny"
+			  policy = "read"
 			}
 		{{- if .EnablePartitions }}
 			}
