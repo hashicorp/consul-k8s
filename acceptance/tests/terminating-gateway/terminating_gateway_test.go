@@ -55,7 +55,17 @@ func TestTerminatingGateway(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Register the external service
-			helpers.RegisterExternalService(t, consulClient, "", staticServerName, staticServerName, 80)
+			// helpers.RegisterExternalService(t, consulClient, "", staticServerName, staticServerName, 80)
+			logger.Log(t, fmt.Sprintf("registering the external service %s", staticServerName))
+			k8s.KubectlApply(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway/external-service.yaml")
+
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				// Note: this delete command won't wait for pods to be fully terminated.
+				// This shouldn't cause any test pollution because the underlying
+				// objects are deployments, and so when other tests create these
+				// they should have different pod names.
+				k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway/external-service.yaml")
+			})
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
