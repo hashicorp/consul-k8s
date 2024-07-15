@@ -677,7 +677,7 @@ func (c *Command) Run(args []string) int {
 
 		dnsProxyRules, err := c.dnsProxyRules()
 		if err != nil {
-			c.log.Error("Error templating inject rules", "err", err)
+			c.log.Error("Error templating dns-proxy rules", "err", err)
 			return 1
 		}
 

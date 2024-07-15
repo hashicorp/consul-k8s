@@ -1013,7 +1013,7 @@ partition "part-1" {
 	}
 }
 
-// Test the inject rules with namespaces enabled or disabled.
+// Test the dns-proxy rules with namespaces enabled or disabled.
 func TestDnsProxyRules(t *testing.T) {
 	cases := []struct {
 		EnableNamespaces bool

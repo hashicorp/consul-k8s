@@ -445,9 +445,11 @@ func (c *Command) renderRulesGeneric(tmpl string, data interface{}) (string, err
 	return buf.String(), nil
 }
 
-// acl = "write" is required when creating namespace with a default policy.
-// Attaching a default ACL policy to a namespace requires acl = "write" in the
-// namespace that the policy is defined in, which in our case is "default".
+// dnsProxyRules defines the ACL policy for the `dns-proxy` service.  It defines the following:
+// it defines the following:
+// - read access to all nodes within the scoped partition
+// - read access to all services within the scoped partition
+// These accesses are needed to be able to perform DNS request over gRPC.
 func (c *Command) dnsProxyRules() (string, error) {
 	dnsProxyRulesTpl := `
 		{{- if .EnablePartitions }}
