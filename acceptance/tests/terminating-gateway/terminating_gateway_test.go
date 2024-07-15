@@ -66,15 +66,7 @@ func TestTerminatingGateway(t *testing.T) {
 
 			logger.Log(t, "creating terminating gateway config entry")
 			// Create the config entry for the terminating gateway.
-			k8s.KubectlApply(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway/terminating-gateway.yaml")
-
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				// Note: this delete command won't wait for pods to be fully terminated.
-				// This shouldn't cause any test pollution because the underlying
-				// objects are deployments, and so when other tests create these
-				// they should have different pod names.
-				k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway/terminating-gateway.yaml")
-			})
+			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway/terminating-gateway.yaml")
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")

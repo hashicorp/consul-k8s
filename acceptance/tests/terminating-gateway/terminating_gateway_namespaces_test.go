@@ -87,6 +87,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 			}
 
 			// Create the config entry for the terminating gateway.
+			// This case cannot be replicated using CRDs because the consul namespace does not match the kubernetes namespace the terminating gateway is in
 			CreateTerminatingGatewayConfigEntry(t, consulClient, testNamespace, testNamespace, staticServerName)
 
 			// Deploy the static client.
@@ -195,8 +196,8 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				UpdateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
-			// Create the config entry for the terminating gateway
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", testNamespace, staticServerName)
+			// Create the config entry for the terminating gateway.
+			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway-namespaces/terminating-gateway.yaml")
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
