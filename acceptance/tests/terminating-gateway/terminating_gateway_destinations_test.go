@@ -86,7 +86,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			CreateMeshConfigEntry(t, consulClient, "")
 
 			// Create the config entry for the terminating gateway.
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerHostnameID, staticServerIPID)
+			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway-destinations/terminating-gateway.yaml")
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
