@@ -1,0 +1,17 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: Registration
+metadata:
+  name: static-server-registration
+  namespace: ns1
+spec:
+  datacenter: dc1
+  node: external
+  nodeMeta:
+    external-node: "true"
+    external-probe: "true"
+  address: static-server.ns1
+  service:
+    id: static-server
+    name: static-server
+    namespace: ns1
+    port: 80 
