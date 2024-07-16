@@ -3641,6 +3641,33 @@ webhookCertManager:
   # @type: string
   nodeSelector: null
 
+  # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+  # This should be a YAML map corresponding to a Kubernetes
+  # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+  # object.
+  #
+  # Example:
+  #
+  # ```yaml
+  # resources:
+  #   requests:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  #   limits:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  # ```
+  #
+  # @recurse: false
+  # @type: map
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "100m"
+    limits:
+      memory: "50Mi"
+      cpu: "1oom"
+
 # Configures a demo Prometheus installation.
 prometheus:
   # When true, the Helm chart will install a demo Prometheus server instance
