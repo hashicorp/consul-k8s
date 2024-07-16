@@ -76,8 +76,8 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 			logger.Log(t, "creating static-server deployment")
 			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
-			// Register the external service.
-			helpers.RegisterExternalService(t, consulClient, testNamespace, staticServerName, staticServerName, 80)
+			// Register the external service
+			helpers.RegisterExternalServiceCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway-namespaces/external-service.yaml")
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
@@ -187,7 +187,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			k8s.DeployKustomize(t, ns1K8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Register the external service
-			helpers.RegisterExternalService(t, consulClient, testNamespace, staticServerName, staticServerName, 80)
+			helpers.RegisterExternalServiceCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway-namespaces/external-service.yaml")
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service

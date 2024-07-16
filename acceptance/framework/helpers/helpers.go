@@ -154,13 +154,30 @@ func MergeMaps(a, b map[string]string) {
 	}
 }
 
+func RegisterExternalServiceCRD(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure, noCleanup bool, configPath string) {
+	t.Logf("Registering external service %s", configPath)
+	t.Helper()
+	// Register the external service
+	k8s.KubectlApply(t, options, configPath)
+
+	Cleanup(t, noCleanupOnFailure, noCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		k8s.KubectlDelete(t, options, configPath)
+	})
+}
+
 // RegisterExternalService registers an external service to a virtual node in Consul for testing purposes.
 // This function takes a testing.T object, a Consul client, service namespace, service name, address, and port as
 // parameters. It registers the service with Consul, and if a namespace is provided, it also creates the namespace
 // in Consul. It uses the provided testing.T object to log registration details and verify the registration process.
 // If the registration fails, the test calling the function will fail.
+// DEPRECATED: Use RegisterExternalServiceCRD instead
 func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name, address string, port int) {
 	t.Helper()
+	t.Log("RegisterExternalService is DEPRECATED, use RegisterExternalServiceCRD instead")
 
 	service := &api.AgentService{
 		ID:      name,
