@@ -174,7 +174,7 @@ func RegisterExternalServiceCRD(t *testing.T, options *k8s.KubectlOptions, noCle
 // parameters. It registers the service with Consul, and if a namespace is provided, it also creates the namespace
 // in Consul. It uses the provided testing.T object to log registration details and verify the registration process.
 // If the registration fails, the test calling the function will fail.
-// DEPRECATED: Use RegisterExternalServiceCRD instead
+// DEPRECATED: Use RegisterExternalServiceCRD instead.
 func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name, address string, port int) {
 	t.Helper()
 	t.Log("RegisterExternalService is DEPRECATED, use RegisterExternalServiceCRD instead")
