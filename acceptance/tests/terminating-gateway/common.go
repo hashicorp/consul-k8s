@@ -43,14 +43,14 @@ func AddIntention(t *testing.T, consulClient *api.Client, sourcePeer, sourceNS, 
 
 func CreateTerminatingGatewayFromCRD(t *testing.T, kubectlOptions *k8s.KubectlOptions, noCleanupOnFailure, noCleanup bool, path string) {
 	// Create the config entry for the terminating gateway.
-	k8s.KubectlApply(t, kubectlOptions, "../fixtures/cases/terminating-gateway/terminating-gateway.yaml")
+	k8s.KubectlApply(t, kubectlOptions, path)
 
 	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
 		// This shouldn't cause any test pollution because the underlying
 		// objects are deployments, and so when other tests create these
 		// they should have different pod names.
-		k8s.KubectlDelete(t, kubectlOptions, "../fixtures/cases/terminating-gateway/terminating-gateway.yaml")
+		k8s.KubectlDelete(t, kubectlOptions, path)
 	})
 }
 
