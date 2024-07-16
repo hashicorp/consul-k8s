@@ -1507,7 +1507,12 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 			if container.Image == dataplaneImage {
 				hasDataplaneContainer = true
 				require.NotNil(t, container.SecurityContext)
+				require.NotNil(t, container.SecurityContext.AllowPrivilegeEscalation)
+				assert.False(t, *container.SecurityContext.AllowPrivilegeEscalation)
 				require.NotNil(t, container.SecurityContext.Capabilities)
+				require.NotNil(t, container.SecurityContext.RunAsNonRoot)
+				assert.True(t, *container.SecurityContext.RunAsNonRoot)
+				assert.Nil(t, container.SecurityContext.RunAsUser)
 				require.NotNil(t, container.SecurityContext.ReadOnlyRootFilesystem)
 				assert.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)
 				assert.Equal(t, []corev1.Capability{netBindCapability}, container.SecurityContext.Capabilities.Add)
