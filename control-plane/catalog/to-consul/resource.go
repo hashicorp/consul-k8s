@@ -78,6 +78,10 @@ type ServiceResource struct {
 	// is applied before checking pod annotations.
 	AllowK8sNamespacesSet mapset.Set
 
+	// DatacenterName indicates the Consul Datacenter name catalog sync
+	// should register targets under.
+	Datacenter string
+
 	// DenyK8sNamespacesSet is a set of k8s namespaces to explicitly deny
 	// syncing and thus service registration with Consul. An empty set
 	// means that no namespaces are removed from consideration. This filter
@@ -420,6 +424,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		NodeMeta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
 		},
+		Datacenter: t.Datacenter,
 	}
 
 	baseService := consulapi.AgentService{

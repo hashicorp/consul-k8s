@@ -319,8 +319,9 @@ func (s *ConsulSyncer) watchService(ctx context.Context, name, namespace string)
 			}
 
 			s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
-				Node:      svc.Node,
-				ServiceID: svc.ServiceID,
+				Datacenter: svc.Datacenter,
+				Node:       svc.Node,
+				ServiceID:  svc.ServiceID,
 			}
 			if s.EnableNamespaces {
 				s.deregs[svc.ServiceID].Namespace = namespace
@@ -363,8 +364,9 @@ func (s *ConsulSyncer) scheduleReapServiceLocked(name, namespace string) error {
 	// Create deregistrations for all of these
 	for _, svc := range services {
 		s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
-			Node:      svc.Node,
-			ServiceID: svc.ServiceID,
+			Datacenter: svc.Datacenter,
+			Node:       svc.Node,
+			ServiceID:  svc.ServiceID,
 		}
 		if s.EnableNamespaces {
 			s.deregs[svc.ServiceID].Namespace = namespace
