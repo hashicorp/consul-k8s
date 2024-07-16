@@ -1429,7 +1429,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 
   local actual=$(echo "$object" |
       yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
-  [ "${actual}" = 'grpc://$(HOST_IP):4317' ]
+  [ "${actual}" = 'http://$(HOST_IP):4317' ]
 }
 
 @test "telemetryCollector/Deployment: DataDog OTLP Collector gRPC protocol verification, case-insensitive" {
@@ -1448,5 +1448,5 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 
   local actual=$(echo "$object" |
       yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
-  [ "${actual}" = 'grpc://$(HOST_IP):4317' ]
+  [ "${actual}" = 'http://$(HOST_IP):4317' ]
 }

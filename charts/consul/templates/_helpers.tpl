@@ -684,5 +684,5 @@ Usage: {{ template "consul.versionInfo" }}
 {{- else }}
     {{- $sanitizedVersion = $versionInfo }}
 {{- end -}}
-{{- printf "%s" $sanitizedVersion | quote }}
+{{- printf "%s" $sanitizedVersion | trunc 63 | quote }}
 {{- end -}}
