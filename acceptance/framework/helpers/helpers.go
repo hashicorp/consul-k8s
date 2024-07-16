@@ -154,18 +154,39 @@ func MergeMaps(a, b map[string]string) {
 	}
 }
 
-func RegisterExternalServiceCRD(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure, noCleanup bool, configPath string) {
-	t.Logf("Registering external service %s", configPath)
-	t.Helper()
-	// Register the external service
-	k8s.KubectlApply(t, options, configPath)
+type K8sOptions struct {
+	Options            *k8s.KubectlOptions
+	NoCleanupOnFailure bool
+	NoCleanup          bool
+	ConfigPath         string
+}
 
-	Cleanup(t, noCleanupOnFailure, noCleanup, func() {
+type ConsulOptions struct {
+	ConsulClient *api.Client
+	Namespace    string
+}
+
+func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptions ConsulOptions) {
+	t.Helper()
+	t.Logf("Registering external service %s", k8sOptions.ConfigPath)
+
+	if consulOptions.Namespace != "" {
+		logger.Logf(t, "creating the %s namespace in Consul", consulOptions.Namespace)
+		_, _, err := consulOptions.ConsulClient.Namespaces().Create(&api.Namespace{
+			Name: consulOptions.Namespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	// Register the external service
+	k8s.KubectlApply(t, k8sOptions.Options, k8sOptions.ConfigPath)
+
+	Cleanup(t, k8sOptions.NoCleanupOnFailure, k8sOptions.NoCleanup, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
 		// This shouldn't cause any test pollution because the underlying
 		// objects are deployments, and so when other tests create these
 		// they should have different pod names.
-		k8s.KubectlDelete(t, options, configPath)
+		k8s.KubectlDelete(t, k8sOptions.Options, k8sOptions.ConfigPath)
 	})
 }
 
