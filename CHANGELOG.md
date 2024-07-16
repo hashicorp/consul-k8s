@@ -1,3 +1,23 @@
+## 1.5.1 (July 16, 2024)
+
+SECURITY:
+
+* Upgrade go version to 1.22.5 to address [CVE-2024-24791](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24791) [[GH-4154](https://github.com/hashicorp/consul-k8s/issues/4154)]
+* Upgrade go-retryablehttp to v0.7.7 to address [GHSA-v6v8-xj6m-xwqh](https://github.com/advisories/GHSA-v6v8-xj6m-xwqh) [[GH-4169](https://github.com/hashicorp/consul-k8s/issues/4169)]
+
+IMPROVEMENTS:
+
+* api-gateways: Change security settings to make root file system read only and to not allow privilage escalation. [[GH-3959](https://github.com/hashicorp/consul-k8s/issues/3959)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
+* partition-init: Role no longer includes unnecessary access to Secrets resource. [[GH-4053](https://github.com/hashicorp/consul-k8s/issues/4053)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where API Gateway specific acl roles/policy were not being cleaned up on deletion of an api-gateway [[GH-4060](https://github.com/hashicorp/consul-k8s/issues/4060)]
+* connect-inject: add NET_BIND_SERVICE capability when injecting consul-dataplane sidecar [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
+* endpoints-controller: graceful shutdown logic should not run on a new pod with the same name. Fixes a case where statefulset rollouts could get stuck in graceful shutdown when the new pods come up. [[GH-4059](https://github.com/hashicorp/consul-k8s/issues/4059)]
+* terminating-gateway: Fix generated acl policy for external services to include the namespace and partition block if they are enabled. [[GH-4153](https://github.com/hashicorp/consul-k8s/issues/4153)]
+
 ## 1.5.0 (June 13, 2024)
 
 > NOTE: Consul K8s 1.5.x is compatible with Consul 1.19.x and Consul Dataplane 1.5.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
