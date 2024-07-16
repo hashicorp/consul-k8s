@@ -53,10 +53,10 @@ spec:
         image: {{ .Values.global.imageK8S }}
         name: webhook-cert-manager
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
-        { { - with .Values.webhookCertManager.resources } }
+        {{- with .Values.webhookCertManager.resources }}
         resources:
-          { { - toYaml . | nindent 12 } }
-        { { - end } }
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
         volumeMounts:
         - name: config
           mountPath: /bootstrap/config
