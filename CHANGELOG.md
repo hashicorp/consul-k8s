@@ -1,3 +1,19 @@
+## 1.1.14 (July 16, 2024)
+
+SECURITY:
+
+* Upgrade go version to 1.22.5 to address [CVE-2024-24791](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24791) [[GH-4154](https://github.com/hashicorp/consul-k8s/issues/4154)]
+* Upgrade go-retryablehttp to v0.7.7 to address [GHSA-v6v8-xj6m-xwqh](https://github.com/advisories/GHSA-v6v8-xj6m-xwqh) [[GH-4169](https://github.com/hashicorp/consul-k8s/issues/4169)]
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.4. [[GH-4085](https://github.com/hashicorp/consul-k8s/issues/4085)]
+* partition-init: Role no longer includes unnecessary access to Secrets resource. [[GH-4053](https://github.com/hashicorp/consul-k8s/issues/4053)]
+
+BUG FIXES:
+
+* cni: fix incorrect release version due to unstable submodule pinning [[GH-4091](https://github.com/hashicorp/consul-k8s/issues/4091)]
+
 ## 1.1.13 (May 24, 2024)
 
 IMPROVEMENTS:
