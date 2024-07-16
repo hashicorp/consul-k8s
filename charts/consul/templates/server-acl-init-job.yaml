@@ -227,7 +227,9 @@ spec:
             {{- if .Values.meshGateway.enabled }}
             -mesh-gateway=true \
             {{- end }}
-
+            {{- if .Values.dns.proxy.enabled }}
+              -dns-proxy=true \
+            {{- end }}
             {{- if .Values.ingressGateways.enabled }}
             {{- if .Values.global.enableConsulNamespaces }}
             {{- $root := . }}
