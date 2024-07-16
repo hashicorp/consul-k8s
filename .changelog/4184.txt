@@ -1,0 +1,3 @@
+```release-note:improvement
+* helm: Adds `webhookCertManager.resources` field which can be configured to override the `resource` settings for the `webhook-cert-manager` deployment.
+```
