@@ -9,4 +9,3 @@
 - {runner: 4, test-packages: "cli vault metrics"}
 - {runner: 5, test-packages: "api-gateway ingress-gateway sync example consul-dns"}
 - {runner: 6, test-packages: "config-entries terminating-gateway basic"}
-- {runner: 7, test-packages: "mesh_v2"}
