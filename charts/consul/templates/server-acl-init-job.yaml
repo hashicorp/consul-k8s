@@ -32,6 +32,11 @@ metadata:
     {{- if .Values.global.extraLabels }}
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
+  {{- if .Values.global.argocd.enabled }}
+  annotations:
+    "argocd.argoproj.io/hook": "Sync"
+    "argocd.argoproj.io/hook-delete-policy": "HookSucceeded"
+  {{- end }}
 spec:
   template:
     metadata:
@@ -50,12 +55,7 @@ spec:
         {{- if .Values.global.acls.annotations }}
           {{- tpl .Values.global.acls.annotations . | nindent 8 }}
         {{- end }}
-        {{- if .Values.global.argocd.enabled }}
-        "argocd.argoproj.io/hook": "Sync"
-        "argocd.argoproj.io/hook-delete-policy": "HookSucceeded"
-        {{- end }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
-
         {{- /* Run the Vault agent as both an init container and sidecar.
         The Vault agent sidecar is needed when server-acl-init bootstraps ACLs
         and writes the bootstrap token back to Vault.
