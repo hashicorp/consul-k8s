@@ -27,7 +27,7 @@ function contains() {
 files_to_check=$(git diff --name-only "$(git merge-base origin/$SKIP_CHECK_BRANCH HEAD~)"...HEAD)
 
 # Define the directories to check
-skipped_directories=("assets" ".changelog/", "version", ".github")
+skipped_directories=("assets" ".changelog/", "version")
 
 # utilize bash pattern matching to skip files https://www.gnu.org/software/bash/manual/bash.html#Pattern-Matching
 # markdown files are already skipped by the loop below so no need to check for README.md or CONTRIBUTING.md
