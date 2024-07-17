@@ -76,8 +76,19 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 			logger.Log(t, "creating static-server deployment")
 			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
-			// Register the external service.
-			helpers.RegisterExternalService(t, consulClient, testNamespace, staticServerName, staticServerName, 80)
+			// Register the external service
+			k8sOptions := helpers.K8sOptions{
+				Options:            ctx.KubectlOptions(t),
+				NoCleanupOnFailure: cfg.NoCleanupOnFailure,
+				NoCleanup:          cfg.NoCleanup,
+				ConfigPath:         "../fixtures/cases/terminating-gateway-namespaces/external-service.yaml",
+			}
+
+			consulOptions := helpers.ConsulOptions{
+				ConsulClient: consulClient,
+			}
+
+			helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
@@ -87,6 +98,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 			}
 
 			// Create the config entry for the terminating gateway.
+			// This case cannot be replicated using CRDs because the consul namespace does not match the kubernetes namespace the terminating gateway is in
 			CreateTerminatingGatewayConfigEntry(t, consulClient, testNamespace, testNamespace, staticServerName)
 
 			// Deploy the static client.
@@ -186,7 +198,19 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			k8s.DeployKustomize(t, ns1K8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Register the external service
-			helpers.RegisterExternalService(t, consulClient, testNamespace, staticServerName, staticServerName, 80)
+			k8sOptions := helpers.K8sOptions{
+				Options:            ctx.KubectlOptions(t),
+				NoCleanupOnFailure: cfg.NoCleanupOnFailure,
+				NoCleanup:          cfg.NoCleanup,
+				ConfigPath:         "../fixtures/cases/terminating-gateway-namespaces/external-service.yaml",
+			}
+
+			consulOptions := helpers.ConsulOptions{
+				ConsulClient: consulClient,
+				Namespace:    testNamespace,
+			}
+
+			helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
@@ -195,8 +219,8 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				UpdateTerminatingGatewayRole(t, consulClient, fmt.Sprintf(staticServerPolicyRulesNamespace, testNamespace))
 			}
 
-			// Create the config entry for the terminating gateway
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", testNamespace, staticServerName)
+			// Create the config entry for the terminating gateway.
+			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway-namespaces/terminating-gateway.yaml")
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")

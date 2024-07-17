@@ -55,7 +55,18 @@ func TestTerminatingGateway(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Register the external service
-			helpers.RegisterExternalService(t, consulClient, "", staticServerName, staticServerName, 80)
+			k8sOptions := helpers.K8sOptions{
+				Options:            ctx.KubectlOptions(t),
+				NoCleanupOnFailure: cfg.NoCleanupOnFailure,
+				NoCleanup:          cfg.NoCleanup,
+				ConfigPath:         "../fixtures/cases/terminating-gateway/external-service.yaml",
+			}
+
+			consulOptions := helpers.ConsulOptions{
+				ConsulClient: consulClient,
+			}
+
+			helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
@@ -64,8 +75,9 @@ func TestTerminatingGateway(t *testing.T) {
 				UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
 			}
 
+			logger.Log(t, "creating terminating gateway config entry")
 			// Create the config entry for the terminating gateway.
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerName)
+			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway/terminating-gateway.yaml")
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
