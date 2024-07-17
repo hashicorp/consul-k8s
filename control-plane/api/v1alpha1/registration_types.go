@@ -74,7 +74,7 @@ type Service struct {
 	Tags              []string                  `json:"tags,omitempty"`
 	Meta              map[string]string         `json:"meta,omitempty"`
 	Port              int                       `json:"port"`
-	Address           string                    `json:"address"`
+	Address           string                    `json:"address,omitempty"`
 	SocketPath        string                    `json:"socketPath,omitempty"`
 	TaggedAddresses   map[string]ServiceAddress `json:"taggedAddresses,omitempty"`
 	Weights           Weights                   `json:"weights,omitempty"`

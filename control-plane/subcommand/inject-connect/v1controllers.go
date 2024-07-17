@@ -27,7 +27,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
-func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
+func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
 
@@ -108,7 +108,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 		return err
 	}
 
-	cache, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
+	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: gatewaycommon.HelmConfig{
 			ConsulConfig: gatewaycommon.ConsulConfig{
 				Address:    c.consul.Addresses,
@@ -152,6 +152,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 	}
 
 	go cache.Run(ctx)
+	go cleaner.Run(ctx)
 
 	// wait for the cache to fill
 	setupLog.Info("waiting for Consul cache sync")
@@ -289,7 +290,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 	if err := (&registration.RegistrationsController{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Cache:  registration.NewRegistrationCache(consulConfig, watcher),
+		Cache:  registration.NewRegistrationCache(ctx, consulConfig, watcher, mgr.GetClient(), c.flagEnableNamespaces, c.flagEnablePartitions),
 		Log:    ctrl.Log.WithName("controller").WithName(apicommon.Registration),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.Registration)

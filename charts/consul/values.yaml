@@ -907,6 +907,7 @@ global:
 
   # Consul feature flags that will be enabled across components.
   # Supported feature flags:
+  #
   # - `v1dns`:
   #   When this flag is set, Consul agents use the legacy DNS implementation.
   #   This setting exists in the case a DNS bug is found after the refactoring introduced in v1.19.0.
@@ -1913,6 +1914,17 @@ dns:
   # @type: string
   additionalSpec: null
 
+  # Configures dns-proxy deployment.
+  proxy:
+    # True if you want to enable dns-proxy
+    enabled: false
+
+    # The number of deployment replicas.
+    replicas: 1
+
+    # Port number to be used by DNS proxy
+    port: 53
+
 # Values that configure the Consul UI.
 ui:
   # If true, the UI will be enabled. This will
@@ -2304,6 +2316,8 @@ syncCatalog:
   #
   # @type: string
   annotations: null
+
+
 
 # Configures the automatic Connect sidecar injector.
 connectInject:

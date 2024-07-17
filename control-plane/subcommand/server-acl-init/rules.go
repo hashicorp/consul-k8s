@@ -444,3 +444,26 @@ func (c *Command) renderRulesGeneric(tmpl string, data interface{}) (string, err
 
 	return buf.String(), nil
 }
+
+// dnsProxyRules defines the ACL policy for the `dns-proxy` service.  It defines the following:
+// it defines the following:
+// - read access to all nodes within the scoped partition
+// - read access to all services within the scoped partition
+// These accesses are needed to be able to perform DNS request over gRPC.
+func (c *Command) dnsProxyRules() (string, error) {
+	dnsProxyRulesTpl := `
+		{{- if .EnablePartitions }}
+			partition "{{ .PartitionName }}" {
+		{{- end }}
+			node_prefix "" {
+			  policy = "read"
+			}
+			service_prefix "" {
+			  policy = "read"
+			}
+		{{- if .EnablePartitions }}
+			}
+		{{- end }}
+	`
+	return c.renderRules(dnsProxyRulesTpl)
+}

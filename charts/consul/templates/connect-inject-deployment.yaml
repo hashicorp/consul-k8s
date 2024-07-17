@@ -14,7 +14,6 @@
 {{- $dnsRedirectionEnabled := (or (and (ne (.Values.dns.enableRedirection | toString) "-") .Values.dns.enableRedirection) (and (eq (.Values.dns.enableRedirection | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
-{{ template "consul.validateResourceAPIs" . }}
 # The deployment for running the Connect sidecar injector
 apiVersion: apps/v1
 kind: Deployment
@@ -155,12 +154,6 @@ spec:
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
                 -listen=:8080 \
-                {{- if (mustHas "resource-apis" .Values.global.experiments) }}
-                -enable-resource-apis=true \
-                {{- end }}
-                {{- if (mustHas "v2tenancy" .Values.global.experiments) }}
-                -enable-v2tenancy=true \
-                {{- end }}
                 {{- range $k, $v := .Values.connectInject.consulNode.meta }}
                 -node-meta={{ $k }}={{ $v }} \
                 {{- end }}

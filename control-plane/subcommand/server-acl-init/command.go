@@ -34,6 +34,8 @@ import (
 	k8sflags "github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
+const dnsProxyName = "dns-proxy"
+
 type Command struct {
 	UI cli.Ui
 
@@ -43,8 +45,6 @@ type Command struct {
 
 	flagResourcePrefix string
 	flagK8sNamespace   string
-
-	flagResourceAPIs bool // Use V2 APIs
 
 	flagAllowDNS bool
 
@@ -122,11 +122,13 @@ type Command struct {
 
 	state discovery.State
 
-	once sync.Once
-	help string
+	once         sync.Once
+	help         string
+	flagDNSProxy bool
 }
 
 func (c *Command) init() {
+
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flags.StringVar(&c.flagResourcePrefix, "resource-prefix", "",
 		"Prefix to use for Kubernetes resources.")
@@ -134,9 +136,6 @@ func (c *Command) init() {
 		"Name of Kubernetes namespace where Consul and consul-k8s components are deployed.")
 
 	c.flags.BoolVar(&c.flagSetServerTokens, "set-server-tokens", true, "Toggle for setting agent tokens for the servers.")
-
-	c.flags.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
-		"Enable or disable Consul V2 Resource APIs. This will affect the binding rule used for Kubernetes auth (Service vs. WorkloadIdentity)")
 
 	c.flags.BoolVar(&c.flagAllowDNS, "allow-dns", false,
 		"Toggle for updating the anonymous token to allow DNS queries to work")
@@ -226,6 +225,9 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+
+	c.flags.BoolVar(&c.flagDNSProxy, dnsProxyName, false,
+		"Toggle for configuring ACL login for the DNS proxy.")
 
 	c.k8s = &k8sflags.K8SFlags{}
 	c.consulFlags = &flags.ConsulFlags{}
@@ -668,6 +670,21 @@ func (c *Command) Run(args []string) int {
 		}
 		err = c.createLocalACL(common.DatadogAgentTokenName, rules, consulDC, primary, dynamicClient)
 		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+	}
+
+	if c.flagDNSProxy {
+		serviceAccountName := c.withPrefix(dnsProxyName)
+
+		dnsProxyRules, err := c.dnsProxyRules()
+		if err != nil {
+			c.log.Error("Error templating dns-proxy rules", "err", err)
+			return 1
+		}
+
+		if err := c.createACLPolicyRoleAndBindingRule(dnsProxyName, dnsProxyRules, consulDC, primaryDC, localPolicy, primary, localComponentAuthMethodName, serviceAccountName, dynamicClient); err != nil {
 			c.log.Error(err.Error())
 			return 1
 		}

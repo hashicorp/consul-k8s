@@ -384,7 +384,7 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 }
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
-func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, error) {
+func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
 	cacheConfig := cache.Config{
 		ConsulClientConfig:      config.ConsulClientConfig,
 		ConsulServerConnMgr:     config.ConsulServerConnMgr,
@@ -420,7 +420,14 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		gatewayCache:          gwc,
 	}
 
-	return c, ctrl.NewControllerManagedBy(mgr).
+	cleaner := binding.Cleaner{
+		Logger:       mgr.GetLogger(),
+		ConsulConfig: config.ConsulClientConfig,
+		ServerMgr:    config.ConsulServerConnMgr,
+		AuthMethod:   config.HelmConfig.AuthMethod,
+	}
+
+	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).

@@ -228,49 +228,15 @@ const (
 	ManagedByValue = "consul-k8s-endpoints-controller"
 )
 
-// ********************
-// V2 Exclusive Annotations & Labels
-// ********************
-
-const (
-	// AnnotationMeshInject is the key of the annotation that controls whether
-	// V2 mesh injection is explicitly enabled or disabled for a pod using.
-	// be set to a truthy or falsy value, as parseable by strconv.ParseBool.
-	AnnotationMeshInject = "consul.hashicorp.com/mesh-inject"
-
-	// KeyMeshInjectStatus is the key of the annotation that is added to
-	// a pod after an injection is done.
-	KeyMeshInjectStatus = "consul.hashicorp.com/mesh-inject-status"
-
-	// ManagedByEndpointsValue is used in Consul metadata to identify the manager
-	// of resources. The 'v2' suffix is used to differentiate from the legacy
-	// endpoints controller of the same name.
-	ManagedByEndpointsValue = "consul-k8s-endpoints-controller-v2"
-
-	// ManagedByPodValue is used in Consul metadata to identify the manager
-	// of resources.
-	ManagedByPodValue = "consul-k8s-pod-controller"
-
-	// ManagedByServiceAccountValue is used in Consul metadata to identify the manager
-	// of resources.
-	ManagedByServiceAccountValue = "consul-k8s-service-account-controller"
-
-	// AnnotationMeshDestinations is a list of destinations to register with the
-	// proxy. The service name should map to a Consul service name and the local
-	// port is the local port in the pod that the listener will bind to. It can
-	// be a named port.
-	AnnotationMeshDestinations = "consul.hashicorp.com/mesh-service-destinations"
-
-	// AnnotationMeshInjectMountVolumes is the key of the annotation that controls whether
-	// the data volume that mesh inject uses to store data including the Consul ACL token
-	// is mounted to other containers in the pod. It is a comma-separated list of container names
-	// to mount the volume on. It will be mounted at the path `/consul/mesh-inject`.
-	AnnotationMeshInjectMountVolumes = "consul.hashicorp.com/mesh-inject-mount-volume"
-)
-
 // Annotations used by Prometheus.
 const (
 	AnnotationPrometheusScrape = "prometheus.io/scrape"
 	AnnotationPrometheusPath   = "prometheus.io/path"
 	AnnotationPrometheusPort   = "prometheus.io/port"
+)
+
+// Annotations used by OpenShift.
+const (
+	AnnotationOpenShiftGroups   = "openshift.io/sa.scc.supplemental-groups"
+	AnnotationOpenShiftUIDRange = "openshift.io/sa.scc.uid-range"
 )

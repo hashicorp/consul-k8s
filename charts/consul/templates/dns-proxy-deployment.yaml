@@ -1,0 +1,198 @@
+{{- if (or (and (ne (.Values.dns.proxy.enabled | toString) "-") .Values.dns.proxy.enabled) (and (eq (.Values.dns.proxy.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
+{{ template "consul.validateRequiredCloudSecretsExist" . }}
+{{ template "consul.validateCloudSecretKeys" . }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "consul.fullname" . }}-dns-proxy
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: dns-proxy
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.dns.proxy.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: dns-proxy
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: dns-proxy
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
+        "vault.hashicorp.com/agent-init-first": "true"
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.dns.annotations }}
+        {{- tpl .Values.dns.annotations . | nindent 8 }}
+        {{- end }}
+    spec:
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: {{ template "consul.fullname" . }}-dns-proxy
+      volumes:
+        - name: consul-service
+          emptyDir:
+            medium: "Memory"
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+        - name: consul-ca-cert
+          secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+            items:
+              - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+                path: tls.crt
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: dns-proxy
+          image: {{ .Values.global.imageConsulDataplane | quote }}
+          volumeMounts:
+            - mountPath: /consul/service
+              name: consul-service
+              readOnly: true
+        {{- if .Values.global.tls.enabled }}
+        {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+        {{- end }}
+        {{- end }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: DP_CREDENTIAL_LOGIN_META1
+              value: pod=$(NAMESPACE)/$(POD_NAME)
+            - name: DP_CREDENTIAL_LOGIN_META2
+              value: component=dns-proxy
+            - name: DP_SERVICE_NODE_NAME
+              value: $(NODE_NAME)-virtual
+          command:
+            - consul-dataplane
+          args:
+            - -consul-dns-bind-addr=0.0.0.0
+            - -consul-dns-bind-port={{ .Values.dns.proxy.port }}
+        {{- if .Values.externalServers.enabled }}
+            - -addresses={{ .Values.externalServers.hosts | first }}
+        {{- else }}
+            - -addresses={{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc
+        {{- end }}
+        {{- if .Values.externalServers.enabled }}
+            - -grpc-port={{ .Values.externalServers.grpcPort }}
+        {{- else }}
+            - -grpc-port=8502
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        {{- if (not (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots)) }}
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+            - -ca-certs=/vault/secrets/serverca.crt
+        {{- else }}
+            - -ca-certs=/consul/tls/ca/tls.crt
+        {{- end }}
+        {{- end }}
+        {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
+            - -tls-server-name={{.Values.externalServers.tlsServerName }}
+        {{- else if .Values.global.cloud.enabled }}
+            - -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}
+        {{- end }}
+        {{- else }}
+            - -tls-disabled
+        {{- end }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+            - -credential-type=login
+            - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
+        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+            - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+            - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
+        {{- else }}
+            - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method
+        {{- end }}
+        {{- if .Values.global.adminPartitions.enabled }}
+            - -login-partition={{ .Values.global.adminPartitions.name }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.adminPartitions.enabled }}
+            - -service-partition={{ .Values.global.adminPartitions.name }}
+        {{- end }}
+            - -log-level={{ default .Values.global.logLevel .Values.dns.proxy.logLevel }}
+            - -log-json={{ .Values.global.logJSON }}
+
+        {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
+            - -server-watch-disabled=true
+        {{- end }}
+            - -mode=dns-proxy
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.dns.proxy.port }}
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.dns.proxy.port }}
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          ports:
+            - containerPort: {{ .Values.dns.proxy.port }}
+              hostPort: {{ .Values.dns.proxy.port }}
+              protocol: "TCP"
+              name: dns-tcp
+            - containerPort: {{ .Values.dns.proxy.port }}
+              hostPort: {{ .Values.dns.proxy.port }}
+              protocol: "UDP"
+              name: dns-udp
+{{- end }}

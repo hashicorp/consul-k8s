@@ -350,7 +350,7 @@ func TestReconcile_Success(tt *testing.T) {
 				Client: fakeClient,
 				Log:    logrtest.NewTestLogger(t),
 				Scheme: s,
-				Cache:  registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
+				Cache:  registration.NewRegistrationCache(context.Background(), testClient.Cfg, testClient.Watcher, fakeClient, false, false),
 			}
 
 			_, err := controller.Reconcile(ctx, ctrl.Request{
@@ -870,7 +870,7 @@ func TestReconcile_Failure(tt *testing.T) {
 				Client: fakeClient,
 				Log:    logrtest.NewTestLogger(t),
 				Scheme: s,
-				Cache:  registration.NewRegistrationCache(testClient.Cfg, testClient.Watcher),
+				Cache:  registration.NewRegistrationCache(context.Background(), testClient.Cfg, testClient.Watcher, fakeClient, false, false),
 			}
 
 			_, err := controller.Reconcile(ctx, ctrl.Request{

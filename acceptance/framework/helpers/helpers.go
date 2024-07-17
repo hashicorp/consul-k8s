@@ -154,13 +154,51 @@ func MergeMaps(a, b map[string]string) {
 	}
 }
 
+type K8sOptions struct {
+	Options            *k8s.KubectlOptions
+	NoCleanupOnFailure bool
+	NoCleanup          bool
+	ConfigPath         string
+}
+
+type ConsulOptions struct {
+	ConsulClient *api.Client
+	Namespace    string
+}
+
+func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptions ConsulOptions) {
+	t.Helper()
+	t.Logf("Registering external service %s", k8sOptions.ConfigPath)
+
+	if consulOptions.Namespace != "" {
+		logger.Logf(t, "creating the %s namespace in Consul", consulOptions.Namespace)
+		_, _, err := consulOptions.ConsulClient.Namespaces().Create(&api.Namespace{
+			Name: consulOptions.Namespace,
+		}, nil)
+		require.NoError(t, err)
+	}
+
+	// Register the external service
+	k8s.KubectlApply(t, k8sOptions.Options, k8sOptions.ConfigPath)
+
+	Cleanup(t, k8sOptions.NoCleanupOnFailure, k8sOptions.NoCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		k8s.KubectlDelete(t, k8sOptions.Options, k8sOptions.ConfigPath)
+	})
+}
+
 // RegisterExternalService registers an external service to a virtual node in Consul for testing purposes.
 // This function takes a testing.T object, a Consul client, service namespace, service name, address, and port as
 // parameters. It registers the service with Consul, and if a namespace is provided, it also creates the namespace
 // in Consul. It uses the provided testing.T object to log registration details and verify the registration process.
 // If the registration fails, the test calling the function will fail.
+// DEPRECATED: Use RegisterExternalServiceCRD instead.
 func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name, address string, port int) {
 	t.Helper()
+	t.Log("RegisterExternalService is DEPRECATED, use RegisterExternalServiceCRD instead")
 
 	service := &api.AgentService{
 		ID:      name,
@@ -179,7 +217,7 @@ func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, 
 		require.NoError(t, err)
 	}
 
-	logger.Log(t, "registering the external service %s", name)
+	logger.Log(t, fmt.Sprintf("registering the external service %s", name))
 	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
 		Node:     "external",
 		Address:  address,

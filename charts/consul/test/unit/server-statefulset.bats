@@ -3498,30 +3498,3 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
-#--------------------------------------------------------------------
-# global.experiments=["resource-apis"]
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is not set in command when global.experiments is empty" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr)
-
-  # Test the flag is set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-}
-
-@test "server/StatefulSet: experiments=[\"resource-apis\"] is set in command when global.experiments contains \"resource-apis\"" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.experiments[0]=resource-apis' \
-      --set 'ui.enabled=false' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"experiments=[\\\"resource-apis\\\"]\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}

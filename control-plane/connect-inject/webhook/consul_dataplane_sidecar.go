@@ -210,34 +210,62 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		return corev1.Container{}, err
 	}
 
+	// Default values for non-Openshift environments.
+	uid := int64(sidecarUserAndGroupID)
+	group := int64(sidecarUserAndGroupID)
+
 	// If not running in transparent proxy mode and in an OpenShift environment,
 	// skip setting the security context and let OpenShift set it for us.
 	// When transparent proxy is enabled, then consul-dataplane needs to run as our specific user
 	// so that traffic redirection will work.
 	if tproxyEnabled || !w.EnableOpenShift {
-		if pod.Spec.SecurityContext != nil {
-			// User container and consul-dataplane container cannot have the same UID.
-			if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == sidecarUserAndGroupID {
-				return corev1.Container{}, fmt.Errorf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID)
+		if !w.EnableOpenShift {
+			if pod.Spec.SecurityContext != nil {
+				// User container and consul-dataplane container cannot have the same UID.
+				if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == sidecarUserAndGroupID {
+					return corev1.Container{}, fmt.Errorf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID)
+				}
 			}
-		}
-		// Ensure that none of the user's containers have the same UID as consul-dataplane. At this point in injection the meshWebhook
-		// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
-		for _, c := range pod.Spec.Containers {
-			// User container and consul-dataplane container cannot have the same UID.
-			if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil && *c.SecurityContext.RunAsUser == sidecarUserAndGroupID && c.Image != w.ImageConsulDataplane {
-				return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", c.Name, sidecarUserAndGroupID)
+
+			// Ensure that none of the user's containers have the same UID as consul-dataplane. At this point in injection the meshWebhook
+			// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
+			for _, c := range pod.Spec.Containers {
+				// User container and consul-dataplane container cannot have the same UID.
+				if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil &&
+					*c.SecurityContext.RunAsUser == sidecarUserAndGroupID &&
+					c.Image != w.ImageConsulDataplane {
+					return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", c.Name, sidecarUserAndGroupID)
+				}
 			}
-		}
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:             pointer.Bool(true),
-			AllowPrivilegeEscalation: pointer.Bool(false),
-			ReadOnlyRootFilesystem:   pointer.Bool(true),
 		}
 	}
 
+	if w.EnableOpenShift {
+		// Transparent proxy is set in OpenShift. There is an annotation on the namespace that tells us what
+		// the user and group ids should be for the sidecar.
+		var err error
+		uid, err = common.GetDataplaneUID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		group, err = common.GetDataplaneGroupID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+	}
+
+	container.SecurityContext = &corev1.SecurityContext{
+		RunAsUser:                pointer.Int64(uid),
+		RunAsGroup:               pointer.Int64(group),
+		RunAsNonRoot:             pointer.Bool(true),
+		AllowPrivilegeEscalation: pointer.Bool(false),
+		// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
+		// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
+		Capabilities: &corev1.Capabilities{
+			Add: []corev1.Capability{"NET_BIND_SERVICE"},
+		},
+		ReadOnlyRootFilesystem: pointer.Bool(true),
+	}
 	return container, nil
 }
 
