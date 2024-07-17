@@ -3534,7 +3534,7 @@ webhookCertManager:
       cpu: "100m"
     limits:
       memory: "50Mi"
-      cpu: "200m"
+      cpu: "100m"
 
 # Configures a demo Prometheus installation.
 prometheus:
