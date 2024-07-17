@@ -4,6 +4,17 @@
 
 set -euo pipefail
 
+# first argument is the list, second is the item to check
+function contains() {
+  list=($1)
+  for item in "${list[@]}"; do
+    if [ "$item" == "$2" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # Get the list of changed files
 # Using `git merge-base` ensures that we're always comparing against the correct branch point.
 #For example, given the commits:
@@ -20,7 +31,7 @@ skipped_directories=("assets" ".changelog/", "version", ".github")
 
 # utilize bash pattern matching to skip files https://www.gnu.org/software/bash/manual/bash.html#Pattern-Matching
 # markdown files are already skipped by the loop below so no need to check for README.md or CONTRIBUTING.md
-files_to_skip=@("LICENSE"|".copyright.hcl"|".gitignore")
+files_to_skip=("LICENSE" ".copywrite.hcl" ".gitignore")
 
 # Loop through the changed files and find directories/files outside the skipped ones
 files_to_check_array=($files_to_check)
@@ -36,7 +47,7 @@ for file_to_check in "${files_to_check_array[@]}"; do
     if [[ "$file_to_check" == */check_skip_ci.sh ]] ||
       [[ "$file_to_check" == "$dir"* ]] ||
       [[ "$file_to_check" == *.md ]] ||
-      [[ "$file_to_check" = $files_to_skip ]]; then
+      contains "${files_to_skip[*]}" "$file_to_check"; then
       file_is_skipped=true
       break
     fi
