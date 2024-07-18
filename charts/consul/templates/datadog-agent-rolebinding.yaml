@@ -1,0 +1,26 @@
+{{- if .Values.global.metrics.datadog.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "consul.fullname" . }}-datadog-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: agent
+subjects:
+  - kind: ServiceAccount
+    apiGroup: ""
+    name: datadog-agent
+    namespace: datadog
+  - kind: ServiceAccount
+    apiGroup: ""
+    name: datadog-cluster-agent
+    namespace: datadog
+roleRef:
+  kind: Role
+  name: {{ template "consul.fullname" . }}-datadog-metrics
+  apiGroup: ""
+{{- end }}

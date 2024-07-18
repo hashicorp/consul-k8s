@@ -248,6 +248,19 @@ spec:
             - name: SSL_CERT_DIR
               value: "/etc/ssl/certs:/trusted-cas"
             {{- end }}
+            {{- if .Values.global.metrics.datadog.otlp.enabled }}
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            {{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}
+            - name: CO_OTEL_HTTP_ENDPOINT
+              value: "http://$(HOST_IP):4318"
+            {{- else if eq (.Values.global.metrics.datadog.otlp.protocol | lower) "grpc" }}
+            - name: CO_OTEL_HTTP_ENDPOINT
+              value: "grpc://$(HOST_IP):4317"
+            {{- end }}
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.telemetryCollector | nindent 12 }}
         command:
         - "/bin/sh"
