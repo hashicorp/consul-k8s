@@ -39,7 +39,6 @@ jobs:
           - check-name: acceptance
           - check-name: acceptance-cni
           - check-name: acceptance-tproxy
-          - check-name: unit-acceptance-framework
     steps:
     - name: Update final status
       uses: docker://ghcr.io/curtbushko/commit-status-action:e1d661c757934ab35c74210b4b70c44099ec747a
