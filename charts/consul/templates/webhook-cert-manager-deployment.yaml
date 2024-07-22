@@ -54,13 +54,10 @@ spec:
         {{ template "consul.imagePullPolicy" . }}
         name: webhook-cert-manager
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+        {{- with .Values.webhookCertManager.resources }}
         resources:
-          limits:
-            cpu: 100m
-            memory: 50Mi
-          requests:
-            cpu: 100m
-            memory: 50Mi
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
         volumeMounts:
         - name: config
           mountPath: /bootstrap/config

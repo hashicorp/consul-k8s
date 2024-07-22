@@ -89,13 +89,10 @@ spec:
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
             - -metrics-port={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
             {{- end }}
+          {{- with .Values.connectInject.apiGateway.managedGatewayClass.resourceJob.resources }}
           resources:
-            requests:
-              memory: "50Mi"
-              cpu: "50m"
-            limits:
-              memory: "50Mi"
-              cpu: "50m"
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - name: config
               mountPath: /consul/config
