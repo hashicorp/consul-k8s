@@ -40,8 +40,8 @@ jobs:
           - check-name: acceptance-cni
           - check-name: acceptance-tproxy
           - check-name: Unit test helm templates
-          - check-name: Unit test enterprise control-plane
-          - check-name: Unit test control-plane
+          - check-name: Unit test enterprise control plane
+          - check-name: Unit test control plane
           - check-name: Unit test cli
           - check-name: Unit test acceptance
     steps:
