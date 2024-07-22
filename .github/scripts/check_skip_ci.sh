@@ -29,8 +29,6 @@ files_to_check=$(git diff --name-only "$(git merge-base origin/$SKIP_CHECK_BRANC
 # Define the directories to check
 skipped_directories=("assets" ".changelog/", "version", ".github/")
 
-# utilize bash pattern matching to skip files https://www.gnu.org/software/bash/manual/bash.html#Pattern-Matching
-# markdown files are already skipped by the loop below so no need to check for README.md or CONTRIBUTING.md
 files_to_skip=("LICENSE" ".copywrite.hcl" ".gitignore")
 
 # Loop through the changed files and find directories/files outside the skipped ones
