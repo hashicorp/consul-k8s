@@ -2462,6 +2462,35 @@ connectInject:
       # will be the 80 + the number defined below.
       mapPrivilegedContainerPorts: 0
 
+      # This value contains settings related to the gateway_resources_job that runs on helm install
+      resourceJob:
+        # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+        # This should be a YAML map corresponding to a Kubernetes
+        # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+        # object.
+        #
+        # Example:
+        #
+        # ```yaml
+        # resources:
+        #   requests:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        #   limits:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        # ```
+        #
+        # @recurse: false
+        # @type: map
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
+
     # Configuration for the ServiceAccount created for the api-gateway component
     serviceAccount:
       # This value defines additional annotations for the client service account. This should be formatted as a multi-line
