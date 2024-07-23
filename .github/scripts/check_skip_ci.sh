@@ -27,7 +27,7 @@ function contains() {
 files_to_check=$(git diff --name-only "$(git merge-base origin/$SKIP_CHECK_BRANCH HEAD~)"...HEAD)
 
 # Define the directories to check
-skipped_directories=("assets" ".changelog/", "version", ".github")
+skipped_directories=("assets" ".changelog/", "version")
 
 files_to_skip=("LICENSE" ".copywrite.hcl" ".gitignore")
 
