@@ -32,7 +32,11 @@ const defaultPartition = "default"
 const secondaryPartition = "secondary"
 const defaultNamespace = "default"
 
-// Test that Sync Catalog works in a default and ACLsEnabled installations for partitions.
+// Test that Sync Catalog works in a default and ACLsEnabled installations for partitions
+// DNS queries for services across partitions. It validates:
+// - returning the local partition's service when tenancy is not included in the question.
+// - properly not resolving DNS for unexported services when ACLs are enabled.
+// - properly resolving DNS for exported services when ACLs are enabled.
 func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
