@@ -81,8 +81,8 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespa
 	require.NoError(t, err)
 
 	servicePodIPs := make([]string, len(podList.Items))
-	for _, serverPod := range podList.Items {
-		servicePodIPs = append(servicePodIPs, serverPod.Status.PodIP)
+	for i, serverPod := range podList.Items {
+		servicePodIPs[i] = serverPod.Status.PodIP
 	}
 
 	logger.Log(t, "launch a pod to test the dns resolution.")
@@ -123,17 +123,15 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespa
 		strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
 		strippedLogs = strings.Replace(strippedLogs, " ", "", -1)
 		for _, ip := range servicePodIPs {
-			if ip != "" {
-				aRecordPattern := "%s.0INA%s"
-				if shouldResolveDNSRecord {
-					require.Contains(r, logs, "ANSWER SECTION:")
-					require.Contains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
-				} else {
-					require.NotContains(r, logs, "ANSWER SECTION:")
-					require.NotContains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
-					require.Contains(r, logs, "status: NXDOMAIN")
-					require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t0\tIN\tSOA\tns.consul. hostmaster.consul.")
-				}
+			aRecordPattern := "%s.0INA%s"
+			if shouldResolveDNSRecord {
+				require.Contains(r, logs, "ANSWER SECTION:")
+				require.Contains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
+			} else {
+				require.NotContains(r, logs, "ANSWER SECTION:")
+				require.NotContains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
+				require.Contains(r, logs, "status: NXDOMAIN")
+				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t0\tIN\tSOA\tns.consul. hostmaster.consul.")
 			}
 		}
 	})
