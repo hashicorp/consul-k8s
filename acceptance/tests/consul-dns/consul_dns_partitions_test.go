@@ -32,12 +32,13 @@ const defaultPartition = "default"
 const secondaryPartition = "secondary"
 const defaultNamespace = "default"
 
-// Test that Sync Catalog works in a default and ACLsEnabled installations for partitions
-// DNS queries for services across partitions. It validates:
-// - returning the local partition's service when tenancy is not included in the question.
+// TestConsulDNSProxy_WithPartitionsAndCatalogSync verifies DNS queries for services across partitions
+// when DNS proxy is enabled. It configures CoreDNS to use configure consul domain queries to
+// be forwarded to the Consul DNS Proxy.  The test validates:
+// - returning the local partition's service when tenancy is not included in the DNS question.
 // - properly not resolving DNS for unexported services when ACLs are enabled.
 // - properly resolving DNS for exported services when ACLs are enabled.
-func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
+func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -70,6 +71,9 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 			releaseName, consulClient, secondaryPartitionQueryOpts := setupClusters(t, cfg,
 				primaryClusterContext, secondaryClusterContext, c, secondaryPartition,
 				defaultPartition)
+
+			updateCoreDNSWithConsulDomain(t, primaryClusterContext, releaseName, true)
+			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true)
 
 			podLabelSelector := "app=static-server"
 			serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
