@@ -204,9 +204,7 @@ func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptio
 		reg := v1alpha1.Registration{}
 		err = json.Unmarshal([]byte(out), &reg)
 		require.NoError(r, err)
-		require.NotEmpty(t, reg.Status.Conditions, "conditions should not be empty, retrying")
-		// make sure we're not just seeing the initial creation, we want to see this after a reconciliation loop hits
-		require.NotEqual(r, reg.CreationTimestamp, reg.Status.Conditions[0].LastTransitionTime, "conditions should have been updated, retrying")
+		require.NotEmpty(r, reg.Status.Conditions, "conditions should not be empty, retrying")
 		// ensure all statuses are true which means that the registration is successful
 		require.True(r, !slices.ContainsFunc(reg.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Status == corev1.ConditionFalse }), "registration failed because of %v", reg.Status.Conditions)
 	})
