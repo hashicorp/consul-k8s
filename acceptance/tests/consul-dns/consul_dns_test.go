@@ -88,6 +88,7 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	require.NoError(t, err)
 	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsIP, -1)
 	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
+	require.NoError(t, err)
 }
 
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
@@ -98,7 +99,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	require.NoError(t, err)
 	require.Contains(t, logs, "configmap/coredns replaced")
 	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
-	logs, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
+	_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
 }
 
