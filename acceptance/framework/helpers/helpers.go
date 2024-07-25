@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -22,12 +23,15 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/yaml"
 )
 
 // RandomName generates a random string with a 'test-' prefix.
@@ -182,6 +186,30 @@ func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptio
 
 	// Register the external service
 	k8s.KubectlApply(t, k8sOptions.Options, k8sOptions.ConfigPath)
+
+	configFileData, err := os.ReadFile(k8sOptions.ConfigPath)
+	require.NoError(t, err)
+
+	data := make(map[string]any)
+	err = yaml.Unmarshal(configFileData, &data)
+	require.NoError(t, err)
+
+	metadata := data["metadata"].(map[string]any)
+	regName := metadata["name"].(string)
+
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
+		var err error
+		out, err := k8s.RunKubectlAndGetOutputE(r, k8sOptions.Options, "get", "-o=json", "registrations.consul.hashicorp.com", regName)
+		require.NoError(r, err)
+		reg := v1alpha1.Registration{}
+		err = json.Unmarshal([]byte(out), &reg)
+		require.NoError(r, err)
+		require.NotEmpty(t, reg.Status.Conditions, "conditions should not be empty, retrying")
+		// make sure we're not just seeing the initial creation, we want to see this after a reconciliation loop hits
+		require.NotEqual(r, reg.CreationTimestamp, reg.Status.Conditions[0].LastTransitionTime, "conditions should have been updated, retrying")
+		// ensure all statuses are true which means that the registration is successful
+		require.True(r, !slices.ContainsFunc(reg.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Status == corev1.ConditionFalse }), "registration failed because of %v", reg.Status.Conditions)
+	})
 
 	Cleanup(t, k8sOptions.NoCleanupOnFailure, k8sOptions.NoCleanup, func() {
 		// Note: this delete command won't wait for pods to be fully terminated.
