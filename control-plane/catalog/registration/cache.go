@@ -213,10 +213,6 @@ func (c *RegistrationCache) registerService(log logr.Logger, reg *v1alpha1.Regis
 	return nil
 }
 
-func emptyOrDefault(s string) bool {
-	return s == "" || s == "default"
-}
-
 func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, registration *v1alpha1.Registration, termGWsToUpdate []v1alpha1.TerminatingGateway) error {
 	if len(termGWsToUpdate) == 0 {
 		log.Info("terminating gateway not found")
@@ -231,9 +227,9 @@ func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, registration *v
 	var data bytes.Buffer
 	if err := gatewayTpl.Execute(&data, templateArgs{
 		EnablePartitions: c.partitionsEnabled,
-		Partition:        registration.Spec.Service.Partition,
+		Partition:        defaultIfEmpty(registration.Spec.Service.Partition),
 		EnableNamespaces: c.namespacesEnabled,
-		Namespace:        registration.Spec.Service.Namespace,
+		Namespace:        defaultIfEmpty(registration.Spec.Service.Namespace),
 		ServiceName:      registration.Spec.Service.Name,
 	}); err != nil {
 		// just panic if we can't compile the simple template
@@ -390,6 +386,17 @@ func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, registration *v
 	}
 
 	return mErr
+}
+
+func emptyOrDefault(s string) bool {
+	return s == "" || s == "default"
+}
+
+func defaultIfEmpty(s string) string {
+	if s == "" {
+		return "default"
+	}
+	return s
 }
 
 func servicePolicyName(name string) string {
