@@ -9,12 +9,10 @@ load _helpers
         .
 }
 
-@test "dnsProxy/Deployment: enable with global.enabled false, client.enabled true" {
+@test "dnsProxy/Deployment: enable with dns.proxy.enabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/dns-proxy-deployment.yaml  \
-      --set 'global.enabled=false' \
-      --set 'client.enabled=true' \
       --set 'dns.proxy.enabled=true' \
       . | tee /dev/stderr |
       yq 'length > 0' | tee /dev/stderr)
