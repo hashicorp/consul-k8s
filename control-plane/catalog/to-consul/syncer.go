@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/armon/go-metrics/prometheus"
 	"github.com/cenkalti/backoff"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -16,6 +18,25 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
+
+var CatalogCounters = []prometheus.CounterDefinition{
+	{
+		Name: []string{"catalog-sync", "register"},
+		Help: "Increments for each service registered to Consul via catalog sync",
+	},
+	{
+		Name: []string{"catalog-sync", "deregister"},
+		Help: "Increments for each service deregistered from Consul via catalog sync",
+	},
+	{
+		Name: []string{"catalog-sync", "register", "error"},
+		Help: "Increments whenever a Consul api client returns an error for a catalog sync register request",
+	},
+	{
+		Name: []string{"catalog-sync", "deregister", "error"},
+		Help: "Increments whenever a Consul api client returns an error for a catalog sync deregister request request",
+	},
+}
 
 const (
 	// ConsulSyncPeriod is how often the syncer will attempt to
@@ -440,7 +461,21 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 				"service-id", r.ServiceID,
 				"service-consul-namespace", r.Namespace,
 				"err", err)
+
+			// metric count for error syncing K8S services with Consul via calatog sync
+			labels := []metrics.Label{
+				{Name: "id", Value: r.ServiceID},
+				{Name: "error", Value: err.Error()},
+			}
+			metrics.IncrCounterWithLabels([]string{"catalog-sync", "deregister", "error"}, 1, labels)
 		}
+		
+		// metric count for calatog sync process to unsync K8S services from Consul
+		labels := []metrics.Label{
+			{Name: "id", Value: r.ServiceID},
+			{Name: "service-consul-namespace", Value: r.Namespace}, // default: "k8s-sync"
+		}
+		metrics.IncrCounterWithLabels([]string{"catalog-sync", "deregister"}, 1, labels)
 	}
 
 	// Always clear deregistrations, they'll repopulate if we had errors
@@ -470,6 +505,13 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 					"service-name", r.Service.Service,
 					"service", r.Service,
 					"err", err)
+
+				// metric count for error syncing K8S services with Consul via calatog sync
+				labels := []metrics.Label{
+					{Name: "service_name", Value: r.Service.Service},
+					{Name: "error", Value: err.Error()},
+				}
+				metrics.IncrCounterWithLabels([]string{"catalog-sync", "register", "error"}, 1, labels)
 				continue
 			}
 
@@ -478,6 +520,19 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 				"service-name", r.Service.Service,
 				"consul-namespace-name", r.Service.Namespace,
 				"service", r.Service)
+
+			// metric count for calatog sync process to sync K8S with Consul
+			if r.Service != nil && r.Check != nil {
+				labels := []metrics.Label{
+					{Name: "id", Value: r.Service.ID},
+					{Name: "service", Value: r.Service.Service},
+					{Name: "status", Value: r.Check.Status},
+					{Name: "external_k8s_ref_name", Value: r.Service.Meta["external-k8s-ref-name"]},
+					{Name: "namespace", Value: r.Service.Namespace},
+					{Name: "datacenter", Value: r.Datacenter},
+				}
+				metrics.IncrCounterWithLabels([]string{"catalog-sync", "register"}, 1, labels)
+			}
 		}
 	}
 }

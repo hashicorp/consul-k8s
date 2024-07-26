@@ -5,6 +5,7 @@ package synccatalog
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -23,12 +24,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/control-plane/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	metricsutil "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -67,6 +70,11 @@ type Command struct {
 	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
+
+	// Metrics settings.
+	flagEnableMetrics string
+	flagMetricsPort   string
+	flagMetricsPath   string
 
 	// Flags to support Kubernetes Ingress resources
 	flagEnableIngress   bool // Register services using the hostname from an ingress resource
@@ -155,6 +163,10 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+
+	c.flags.StringVar(&c.flagEnableMetrics, "enable-metrics", "", "specify as 'true' or 'false' to enable or disable metrics collection")
+	c.flags.StringVar(&c.flagMetricsPath, "metrics-path", "", "specify to set the path used for metrics scraping")
+	c.flags.StringVar(&c.flagMetricsPort, "metrics-port", "", "specify to set the port used for metrics scraping")
 
 	c.flags.BoolVar(&c.flagEnableIngress, "enable-ingress", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
@@ -259,6 +271,10 @@ func (c *Command) Run(args []string) int {
 		// it will be the only allowed namespace
 		allowSet = mapset.NewSet(c.flagK8SSourceNamespace)
 	}
+
+	// already validated flag is set c.validateFlags() above
+	metricsEnabled, _ := metricsutil.GetMetricsEnabled(c.flagEnableMetrics)
+
 	c.logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
 		"k8s namespaces denied from syncing", denySet)
 
@@ -286,15 +302,15 @@ func (c *Command) Run(args []string) int {
 		ctl := &controller.Controller{
 			Log: c.logger.Named("to-consul/controller"),
 			Resource: &catalogtoconsul.ServiceResource{
-				Log:                        c.logger.Named("to-consul/source"),
-				Client:                     c.clientset,
-				Syncer:                     syncer,
-				Ctx:                        ctx,
-				AllowK8sNamespacesSet:      allowSet,
-				DenyK8sNamespacesSet:       denySet,
-				ExplicitEnable:             !c.flagK8SDefault,
-				ClusterIPSync:              c.flagSyncClusterIPServices,
-				LoadBalancerEndpointsSync:  c.flagSyncLBEndpoints,
+				Log:                       c.logger.Named("to-consul/source"),
+				Client:                    c.clientset,
+				Syncer:                    syncer,
+				Ctx:                       ctx,
+				AllowK8sNamespacesSet:     allowSet,
+				DenyK8sNamespacesSet:      denySet,
+				ExplicitEnable:            !c.flagK8SDefault,
+				ClusterIPSync:             c.flagSyncClusterIPServices,
+				LoadBalancerEndpointsSync: c.flagSyncLBEndpoints,
 				NodePortSync:               catalogtoconsul.NodePortSyncType(c.flagNodePortSyncType),
 				ConsulK8STag:               c.flagConsulK8STag,
 				ConsulServicePrefix:        c.flagConsulServicePrefix,
@@ -306,6 +322,11 @@ func (c *Command) Run(args []string) int {
 				ConsulNodeName:             c.flagConsulNodeName,
 				EnableIngress:              c.flagEnableIngress,
 				SyncLoadBalancerIPs:        c.flagLoadBalancerIPs,
+				MetricsConfig: metrics.Config{
+					EnableSyncCatalogMetrics:    metricsEnabled,
+					DefaultPrometheusScrapePort: c.flagMetricsPort,
+					DefaultPrometheusScrapePath: c.flagMetricsPath,
+				},
 			},
 		}
 
@@ -436,6 +457,18 @@ func (c *Command) validateFlags() error {
 			"via DNS due to it being too long. Valid lengths are between 1 and 63 bytes",
 			c.flagConsulNodeName,
 		)
+	}
+
+	if c.flagEnableMetrics != "" {
+		if _, valid := metricsutil.GetMetricsEnabled(c.flagEnableMetrics); !valid {
+			return errors.New("-enable-metrics must be either 'true' or 'false'")
+		}
+	}
+
+	if c.flagMetricsPort != "" {
+		if _, valid := metricsutil.GetScrapePort(c.flagMetricsPort); !valid {
+			return errors.New("-metrics-port must be a valid unprivileged port number")
+		}
 	}
 
 	return nil

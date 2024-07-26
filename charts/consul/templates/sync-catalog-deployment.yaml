@@ -196,6 +196,17 @@ spec:
             {{- if .Values.syncCatalog.syncLoadBalancerEndpoints }}
             -sync-lb-services-endpoints=true \
             {{- end }}
+            {{- if (or (and (ne (.Values.syncCatalog.metrics.enabled | toString) "-") .Values.syncCatalog.metrics.enabled) (and (eq (.Values.syncCatalog.metrics.enabled | toString) "-") .Values.global.metrics.enabled)) }}
+            -enable-metrics=true \
+            {{- else }}
+            -enable-metrics=false \
+            {{- end }}
+            {{- if .Values.syncCatalog.metrics.path }}
+            -metrics-path={{ .Values.syncCatalog.metrics.path }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.metrics.port }}
+            -metrics-port={{ .Values.syncCatalog.metrics.port }} \
+            {{- end }}
         livenessProbe:
           httpGet:
             path: /health/ready

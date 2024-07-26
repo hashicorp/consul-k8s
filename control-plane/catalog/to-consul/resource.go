@@ -6,11 +6,14 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -101,6 +104,11 @@ type ServiceResource struct {
 
 	// LoadBalancerEndpointsSync set to true (default false) will sync ServiceTypeLoadBalancer endpoints.
 	LoadBalancerEndpointsSync bool
+
+	// MetricsConfig contains metrics configuration and has methods to determine whether
+	// configuration should come from the default flags or annotations. The syncCatalog uses this to configure prometheus
+	// annotations.
+	MetricsConfig metrics.Config
 
 	// NodeExternalIPSync set to true (the default) syncs NodePort services
 	// using the node's external ip address. When false, the node's internal
@@ -200,6 +208,14 @@ func (t *ServiceResource) Informer() cache.SharedIndexInformer {
 
 // Upsert implements the controller.Resource interface.
 func (t *ServiceResource) Upsert(key string, raw interface{}) error {
+	var pod corev1.Pod
+
+	// Add annotations for metrics.
+	if err := t.prometheusAnnotations(&pod); err != nil {
+		t.Log.Error("error configuring prometheus annotations", err)
+		return nil
+	}
+
 	// We expect a Service. If it isn't a service then just ignore it.
 	service, ok := raw.(*corev1.Service)
 	if !ok {
@@ -1077,6 +1093,27 @@ func (t *ServiceResource) addPrefixAndK8SNamespace(name, namespace string) strin
 // isIngressService return if a service has an Ingress resource that references it.
 func (t *ServiceResource) isIngressService(key string) bool {
 	return t.serviceHostnameMap != nil && t.serviceHostnameMap[key].hostName != ""
+}
+
+// prometheusAnnotations sets the Prometheus scraping configuration
+// annotations on the Pod.
+func (t *ServiceResource) prometheusAnnotations(pod *corev1.Pod) error {
+	enableMetrics, err := t.MetricsConfig.EnableMetrics(*pod)
+	if err != nil {
+		return err
+	}
+	prometheusScrapePort, err := t.MetricsConfig.PrometheusScrapePort(*pod)
+	if err != nil {
+		return err
+	}
+	prometheusScrapePath := t.MetricsConfig.PrometheusScrapePath(*pod)
+
+	if enableMetrics {
+		pod.Annotations[constants.AnnotationPrometheusScrape] = "true"
+		pod.Annotations[constants.AnnotationPrometheusPort] = prometheusScrapePort
+		pod.Annotations[constants.AnnotationPrometheusPath] = prometheusScrapePath
+	}
+	return nil
 }
 
 // consulHealthCheckID deterministically generates a health check ID based on service ID and Kubernetes namespace.
