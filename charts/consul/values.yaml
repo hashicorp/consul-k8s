@@ -2203,6 +2203,19 @@ syncCatalog:
   # If false, LoadBalancer endpoints are not synced to Consul.
   syncLoadBalancerEndpoints: false
 
+  # Metrics settings for syncCatalog
+  metrics:
+    # This value enables or disables metrics collection for registered services, overriding the global metrics collection settings.
+    # @type: boolean
+    enabled: false
+    # This value sets the port to use for scraping syncCatalog metrics via prometheus, defaults to 20300 if not set. Must be in the port
+    # range of 1024-65535.
+    # @type: int
+    port: null
+    # This value sets the path to use for scraping syncCatalog metrics via prometheus, defaults to /metrics if not set.
+    # @type: string
+    path: null
+
   ingress:
     # Syncs the hostname from a Kubernetes Ingress resource to service registrations
     # when a rule matched a service. Currently only supports host based routing and

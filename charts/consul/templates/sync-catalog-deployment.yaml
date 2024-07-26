@@ -61,6 +61,13 @@ spec:
         "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
         {{- end }}
         {{- end }}
+        {{- if .Values.syncCatalog.metrics.enabled | default .Values.global.metrics.enabled }}
+        "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.syncCatalog.annotations | fromYaml) "prometheus.io/path")}}
+        "prometheus.io/path": {{ default "/metrics" .Values.syncCatalog.metrics.path }} 
+        {{- end }}
+        "prometheus.io/port": {{ .Values.syncCatalog.metrics.port | default "20300" | quote }}
+        {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
       volumes:
@@ -196,6 +203,16 @@ spec:
             {{- if .Values.syncCatalog.syncLoadBalancerEndpoints }}
             -sync-lb-services-endpoints=true \
             {{- end }}
+            {{- if .Values.syncCatalog.metrics.enabled | default .Values.global.metrics.enabled }}
+            -enable-metrics \
+            {{- end }}
+            {{- if .Values.syncCatalog.metrics.path }}
+            -metrics-path={{ .Values.syncCatalog.metrics.path }} \
+            {{- end }}
+            {{- if .Values.syncCatalog.metrics.port }}
+            -metrics-port={{ .Values.syncCatalog.metrics.port }} \
+            {{- end }}
+            -prometheus-retention-time={{ .Values.global.metrics.agentMetricsRetentionTime }} \
         livenessProbe:
           httpGet:
             path: /health/ready
@@ -219,6 +236,11 @@ spec:
         {{- with .Values.syncCatalog.resources }}
         resources:
         {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if or (eq (.Values.syncCatalog.metrics.enabled | toString) "-") .Values.syncCatalog.metrics.enabled .Values.global.metrics.enabled }}
+        ports:
+        - name: prometheus
+          containerPort: {{ .Values.syncCatalog.metrics.port | default "20300" | int }}
         {{- end }}
       {{- if .Values.syncCatalog.priorityClassName }}
       priorityClassName: {{ .Values.syncCatalog.priorityClassName | quote }}

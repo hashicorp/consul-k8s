@@ -1750,7 +1750,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 
 			// Change the config entry so protocol is https instead of http if test case says to
 			if c.makeDifferentFromConsul {
-				svcDefaults.Spec.Protocol = "https"
+				svcDefaults.Spec.Protocol = "tcp"
 			}
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
@@ -1788,7 +1788,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
-				req.Equal(err, c.expErr)
+				req.Equal(c.expErr, err)
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.

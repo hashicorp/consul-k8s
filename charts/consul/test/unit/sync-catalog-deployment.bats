@@ -1025,6 +1025,28 @@ load _helpers
   [ "${actual}" = "bar" ]
 }
 
+@test "syncCatalog/Deployment: metrics annotations can be set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/sync-catalog-deployment.yaml  \
+      --set 'syncCatalog.enabled=true' \
+      --set 'syncCatalog.metrics.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject")' |
+      tee /dev/stderr)
+
+  # Annotations to check
+  annotations=("prometheus.io/scrape" "prometheus.io/path" "prometheus.io/port")
+
+  # Check each annotation
+  for annotation in "${annotations[@]}"; do
+    actual=$(echo "$object" | yq -r "has(\"$annotation\")")
+    [ "$actual" = "true" ]
+  done
+}
+
 #--------------------------------------------------------------------
 # logLevel
 

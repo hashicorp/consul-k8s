@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/armon/go-metrics/prometheus"
 	"github.com/cenkalti/backoff"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -16,6 +18,41 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
+
+var (
+	baseName            = []string{"consul", "sync_catalog", "to_consul"}
+	registerName        = append(baseName, "register")
+	deregisterName      = append(baseName, "deregister")
+	registerErrorName   = append(baseName, "register", "error")
+	deregisterErrorName = append(baseName, "deregister", "error")
+	syncCatalogStatus   = append(baseName, "status")
+)
+
+var SyncToConsulCounters = []prometheus.CounterDefinition{
+	{
+		Name: registerName,
+		Help: "Increments for each service instance registered to Consul via catalog sync",
+	},
+	{
+		Name: deregisterName,
+		Help: "Increments for each service deregistered from Consul via catalog sync",
+	},
+	{
+		Name: registerErrorName,
+		Help: "Increments whenever a Consul API client returns an error for a catalog sync register request",
+	},
+	{
+		Name: deregisterErrorName,
+		Help: "Increments whenever a Consul API client returns an error for a catalog sync deregister request request",
+	},
+}
+
+var SyncCatalogGauge = []prometheus.GaugeDefinition{
+	{
+		Name: syncCatalogStatus,
+		Help: "Status of the Consul Client endpoint. 1 for connected, 0 for disconnected",
+	},
+}
 
 const (
 	// ConsulSyncPeriod is how often the syncer will attempt to
@@ -101,6 +138,8 @@ type ConsulSyncer struct {
 	// watchers is all namespaces mapped to a map of Consul service
 	// names mapped to a cancel function for watcher routines
 	watchers map[string]map[string]context.CancelFunc
+
+	PrometheusSink *prometheus.PrometheusSink
 }
 
 // Sync implements Syncer.
@@ -433,14 +472,30 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 			"node-name", r.Node,
 			"service-id", r.ServiceID,
 			"service-consul-namespace", r.Namespace)
+
 		_, err = consulClient.Catalog().Deregister(r, nil)
 		if err != nil {
+			// metric count for error deregistering k8s services from Consul
+			labels := []metrics.Label{
+				{Name: "error", Value: err.Error()},
+			}
+			s.PrometheusSink.IncrCounterWithLabels(deregisterErrorName, 1, labels)
+
 			s.Log.Warn("error deregistering service",
 				"node-name", r.Node,
 				"service-id", r.ServiceID,
 				"service-consul-namespace", r.Namespace,
 				"err", err)
+			continue
 		}
+
+		// metric count for deregistering k8s services from Consul
+		labels := []metrics.Label{
+			{Name: "id", Value: r.ServiceID},
+			{Name: "node", Value: r.Node},
+			{Name: "namespace", Value: r.Namespace},
+		}
+		s.PrometheusSink.IncrCounterWithLabels(deregisterName, 1, labels)
 	}
 
 	// Always clear deregistrations, they'll repopulate if we had errors
@@ -465,6 +520,14 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 			// Register the service.
 			_, err = consulClient.Catalog().Register(r, nil)
 			if err != nil {
+				// metric count for error syncing K8S services to Consul
+				label := []metrics.Label{
+					{Name: "error", Value: err.Error()},
+				}
+				s.PrometheusSink.IncrCounterWithLabels(registerErrorName, 1, label)
+				// Set to 0 if the endpoint is down or returns an error
+				s.PrometheusSink.SetGauge(syncCatalogStatus, 0)
+
 				s.Log.Warn("error registering service",
 					"node-name", r.Node,
 					"service-name", r.Service.Service,
@@ -478,6 +541,25 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 				"service-name", r.Service.Service,
 				"consul-namespace-name", r.Service.Namespace,
 				"service", r.Service)
+
+			// metric count and service metadata syncing k8s services to Consul
+			labels := []metrics.Label{
+				{Name: "id", Value: r.Service.ID},
+				{Name: "service", Value: r.Service.Service},
+				{Name: "node", Value: r.Node},
+				{Name: "namespace", Value: r.Service.Namespace},
+				{Name: "datacenter", Value: r.Datacenter},
+			}
+
+			if val, exists := r.Service.Meta["external-k8s-ref-name"]; exists && val != "" {
+				labels = append(labels, metrics.Label{Name: "external_k8s_ref_name", Value: val})
+			}
+			if r.Check != nil {
+				labels = append(labels, metrics.Label{Name: "status", Value: r.Check.Status})
+			}
+			s.PrometheusSink.IncrCounterWithLabels(registerName, 1, labels)
+			// Set to 1 if the endpoint is healthy
+			s.PrometheusSink.SetGauge(syncCatalogStatus, 1)
 		}
 	}
 }
