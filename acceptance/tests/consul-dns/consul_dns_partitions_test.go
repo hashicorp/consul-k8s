@@ -106,7 +106,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 			require.Equal(t, 1, len(serviceInSecondary))
 			require.Equal(t, []string{"k8s"}, serviceInSecondary[0].ServiceTags)
 
-			logger.Log(t, "verify static-server.service.secondary.ap.consul from the secondary partition.")
+			logger.Log(t, "- verify static-server.service.secondary.ap.consul from the secondary partition.")
 			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, secondaryClusterContext,
 				podLabelSelector, serviceRequestInSecondaryPartition,
 				true, dnsUtilsPodIndex)

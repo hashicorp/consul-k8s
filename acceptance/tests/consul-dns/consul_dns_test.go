@@ -161,7 +161,7 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespa
 				require.NotContains(r, logs, "ANSWER SECTION:")
 				require.NotContains(r, strippedLogs, aRecord)
 				require.Contains(r, logs, "status: NXDOMAIN")
-				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t0\tIN\tSOA\tns.consul. hostmaster.consul.")
+				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t5\tIN\tSOA\tns.consul. hostmaster.consul.")
 			}
 		}
 	})
