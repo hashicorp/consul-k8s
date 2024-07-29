@@ -7,9 +7,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -20,6 +22,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TestConsulDNS configures CoreDNS to use configure consul domain queries to
+// be forwarded to the Consul DNS Service or the Consul DNS Proxy depending on
+// the test case.  The test validates that the DNS queries are resolved when querying
+// for .consul services in secure and non-secure modes.
 func TestConsulDNS(t *testing.T) {
 	cfg := suite.Config()
 	if cfg.EnableCNI {
@@ -52,43 +58,67 @@ func TestConsulDNS(t *testing.T) {
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"dns.proxy.enabled":            strconv.FormatBool(c.enableDNSProxy),
 			}
+
 			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
 			cluster.Create(t)
 
-			contextNamespace := ctx.KubectlOptions(t).Namespace
-
-			verifyDNS(t, releaseName, c.enableDNSProxy, contextNamespace, ctx, ctx, "app=consul,component=server",
+			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
+			verifyDNS(t, releaseName, c.enableDNSProxy, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
-
 		})
 	}
 }
 
+func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
+	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, "coredns-custom.yaml")
+	updateCoreDNS(t, ctx, "coredns-custom.yaml")
+	time.Sleep(5 * time.Second)
+	t.Cleanup(func() {
+		updateCoreDNS(t, ctx, "coredns-original.yaml")
+		time.Sleep(5 * time.Second)
+	})
+}
+
+func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
+	enableDNSProxy bool, dnsFileName string) {
+	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
+	require.NoError(t, err)
+
+	input, err := os.ReadFile("coredns-template.yaml")
+	require.NoError(t, err)
+	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsIP, -1)
+	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
+	require.NoError(t, err)
+}
+
+func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
+	coreDNSCommand := []string{
+		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
+	}
+	logs, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), coreDNSCommand...)
+	require.NoError(t, err)
+	require.Contains(t, logs, "configmap/coredns replaced")
+	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
+	_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
+	require.NoError(t, err)
+}
+
 func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespace string, requestingCtx, svcContext environment.TestContext,
 	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
-	logger.Log(t, "get the in cluster dns service or proxy.")
-	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
-	if enableDNSProxy {
-		dnsSvcName += "-proxy"
-	}
-	dnsService, err := requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
-	require.NoError(t, err)
-	dnsIP := dnsService.Spec.ClusterIP
-
 	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: podLabelSelector,
 	})
 	require.NoError(t, err)
 
 	servicePodIPs := make([]string, len(podList.Items))
-	for _, serverPod := range podList.Items {
-		servicePodIPs = append(servicePodIPs, serverPod.Status.PodIP)
+	for i, serverPod := range podList.Items {
+		servicePodIPs[i] = serverPod.Status.PodIP
 	}
 
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", fmt.Sprintf("@%s", dnsSvcName), svcName,
+		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
 	}
 
 	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
@@ -117,24 +147,33 @@ func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespa
 		// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
 
 		logger.Log(t, "verify the DNS results.")
-		require.Contains(r, logs, fmt.Sprintf("SERVER: %s", dnsIP))
 		// strip logs of tabs, newlines and spaces to make it easier to assert on the content when there is a DNS match
 		strippedLogs := strings.Replace(logs, "\t", "", -1)
 		strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
 		strippedLogs = strings.Replace(strippedLogs, " ", "", -1)
 		for _, ip := range servicePodIPs {
-			if ip != "" {
-				aRecordPattern := "%s.0INA%s"
-				if shouldResolveDNSRecord {
-					require.Contains(r, logs, "ANSWER SECTION:")
-					require.Contains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
-				} else {
-					require.NotContains(r, logs, "ANSWER SECTION:")
-					require.NotContains(r, strippedLogs, fmt.Sprintf(aRecordPattern, svcName, ip))
-					require.Contains(r, logs, "status: NXDOMAIN")
-					require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t0\tIN\tSOA\tns.consul. hostmaster.consul.")
-				}
+			aRecordPattern := "%s.5INA%s"
+			aRecord := fmt.Sprintf(aRecordPattern, svcName, ip)
+			if shouldResolveDNSRecord {
+				require.Contains(r, logs, "ANSWER SECTION:")
+				require.Contains(r, strippedLogs, aRecord)
+			} else {
+				require.NotContains(r, logs, "ANSWER SECTION:")
+				require.NotContains(r, strippedLogs, aRecord)
+				require.Contains(r, logs, "status: NXDOMAIN")
+				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t5\tIN\tSOA\tns.consul. hostmaster.consul.")
 			}
 		}
 	})
+}
+
+func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {
+	logger.Log(t, "get the in cluster dns service or proxy.")
+	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
+	if enableDNSProxy {
+		dnsSvcName += "-proxy"
+	}
+	dnsService, err := requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
+	require.NoError(t, err)
+	return dnsService.Spec.ClusterIP, err
 }
