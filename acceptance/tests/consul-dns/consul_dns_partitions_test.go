@@ -24,8 +24,19 @@ const staticServerName = "static-server"
 const staticServerNamespace = "ns1"
 
 type dnsWithPartitionsTestCase struct {
-	name   string
-	secure bool
+	name           string
+	secure         bool
+	enableDNSProxy bool
+}
+
+type dnsVerfication struct {
+	name              string
+	enableDNSProxy    bool
+	requestingCtx     environment.TestContext
+	svcContext        environment.TestContext
+	svcName           string
+	shouldResolveDNS  bool
+	preProcessingFunc func(t *testing.T)
 }
 
 const defaultPartition = "default"
@@ -51,100 +62,159 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 
 	cases := []dnsWithPartitionsTestCase{
 		{
-			"not secure - ACLs and auto-encrypt not enabled",
-			false,
+			name:           "dns service / not secure - ACLs and auto-encrypt not enabled",
+			secure:         false,
+			enableDNSProxy: false,
 		},
 		{
-			"secure - ACLs and auto-encrypt enabled",
-			true,
+			name:           "dns service / secure - ACLs and auto-encrypt enabled",
+			secure:         true,
+			enableDNSProxy: false,
+		},
+		{
+			name:           "dns-proxy / not secure - ACLs and auto-encrypt not enabled",
+			secure:         false,
+			enableDNSProxy: true,
+		},
+		{
+			name:           "dns-proxy / secure - ACLs and auto-encrypt enabled",
+			secure:         true,
+			enableDNSProxy: true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			primaryClusterContext := env.DefaultContext(t)
+			defaultClusterContext := env.DefaultContext(t)
 			secondaryClusterContext := env.Context(t, 1)
 
-			// On Kind, there are no load balancers but since all clusters
-			// share the same node network (docker bridge), we can use
-			// a NodePort service so that we can access node(s) in a different Kind cluster.
-			releaseName, consulClient, secondaryPartitionQueryOpts := setupClusters(t, cfg,
-				primaryClusterContext, secondaryClusterContext, c, secondaryPartition,
+			// Setup the clusters and the static service.
+			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts := setupClustersAndStaticService(t, cfg,
+				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
 				defaultPartition)
 
-			updateCoreDNSWithConsulDomain(t, primaryClusterContext, releaseName, true)
+			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
+			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
 			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true)
 
 			podLabelSelector := "app=static-server"
-			serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
-			serviceRequestInDefaultPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition)
-			serviceRequestInSecondaryPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition)
+			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
 			dnsUtilsPodIndex := 0
+
+			// When ACLs are enabled, the unexported service should not resolve.
 			shouldResolveUnexportedCrossPartitionDNSRecord := true
 			if c.secure {
 				shouldResolveUnexportedCrossPartitionDNSRecord = false
 			}
 
+			// Verify that the service is in the catalog under each partition.
+			verifyServiceInCatalog(t, consulClient, defaultPartitionOpts)
+			verifyServiceInCatalog(t, consulClient, secondaryPartitionQueryOpts)
+
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
-			logger.Log(t, "- verify static-server.service.consul from default partition resolves the default partition ip address.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, primaryClusterContext,
-				podLabelSelector, serviceRequestWithNoPartition, true, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-			logger.Log(t, "- verify static-server.service.default.ap.consul resolves the default partition ip address.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, primaryClusterContext,
-				podLabelSelector, serviceRequestInDefaultPartition, true, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-
-			logger.Log(t, "- verify the unexported static-server.service.secondary.ap.consul from the default partition. With ACLs turned on, this should not resolve. Otherwise, it will resolve.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, secondaryClusterContext,
-				podLabelSelector, serviceRequestInSecondaryPartition, shouldResolveUnexportedCrossPartitionDNSRecord, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-
-			logger.Log(t, "verify the service in the secondary partition of the Consul catalog.")
-			serviceInSecondary, _, err := consulClient.Catalog().Service(staticServerName, "", secondaryPartitionQueryOpts)
-			require.NoError(t, err)
-			require.Equal(t, 1, len(serviceInSecondary))
-			require.Equal(t, []string{"k8s"}, serviceInSecondary[0].ServiceTags)
-
-			logger.Log(t, "- verify static-server.service.secondary.ap.consul from the secondary partition.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, secondaryClusterContext,
-				podLabelSelector, serviceRequestInSecondaryPartition,
-				true, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-
-			logger.Log(t, "- verify static-server.service.consul from the secondary partition should return the ip in the secondary.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, secondaryClusterContext,
-				podLabelSelector, serviceRequestWithNoPartition, true, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-
-			logger.Log(t, "- verify static-server.service.default.ap.consul from the secondary partition. With ACLs turned on, this should not resolve. Otherwise, it will resolve.")
-			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, primaryClusterContext,
-				podLabelSelector, serviceRequestInDefaultPartition, shouldResolveUnexportedCrossPartitionDNSRecord, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-
-			logger.Log(t, "exporting services and verifying that they are available in the other partition with or without ACLs enabled.")
-			k8s.KubectlApplyK(t, primaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
-			k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.KubectlDeleteK(t, primaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
-				k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
-			})
-
-			logger.Log(t, "- verify static-server.service.secondary.ap.consul from the default partition")
-			verifyDNS(t, releaseName, true, staticServerNamespace, primaryClusterContext, secondaryClusterContext,
-				podLabelSelector, serviceRequestInSecondaryPartition, true, dnsUtilsPodIndex)
-			dnsUtilsPodIndex++
-
-			logger.Log(t, "- verify static-server.service.default.ap.consul from the secondary partition")
-			verifyDNS(t, releaseName, true, staticServerNamespace, secondaryClusterContext, primaryClusterContext,
-				podLabelSelector, serviceRequestInDefaultPartition, true, dnsUtilsPodIndex)
+			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
+				shouldResolveUnexportedCrossPartitionDNSRecord, cfg) {
+				t.Run(v.name, func(t *testing.T) {
+					if v.preProcessingFunc != nil {
+						v.preProcessingFunc(t)
+					}
+					verifyDNS(t, releaseName, c.enableDNSProxy, staticServerNamespace, v.requestingCtx, v.svcContext,
+						podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
+					dnsUtilsPodIndex++
+				})
+			}
 		})
 	}
 }
 
-func setupClusters(t *testing.T, cfg *config.TestConfig, primaryClusterContext environment.TestContext,
+func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
+	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig) []dnsVerfication {
+	serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
+	serviceRequestInDefaultPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition)
+	serviceRequestInSecondaryPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition)
+	return []dnsVerfication{
+		{
+			name:             "verify static-server.service.consul from default partition resolves the default partition ip address.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestWithNoPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify static-server.service.default.ap.consul resolves the default partition ip address.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify the unexported static-server.service.secondary.ap.consul from the default partition. With ACLs turned on, this should not resolve. Otherwise, it will resolve.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: shouldResolveUnexportedCrossPartitionDNSRecord,
+		},
+		{
+			name:             "verify static-server.service.secondary.ap.consul from the secondary partition.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify static-server.service.consul from the secondary partition should return the ip in the secondary.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestWithNoPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify static-server.service.default.ap.consul from the secondary partition. With ACLs turned on, this should not resolve. Otherwise, it will resolve.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: shouldResolveUnexportedCrossPartitionDNSRecord,
+		},
+		{
+			name:             "verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				})
+			},
+		},
+		{
+			name:             "verify static-server.service.default.ap.consul from the secondary partition once the service is exported.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				k8s.KubectlApplyK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				})
+			},
+		},
+	}
+}
+
+func verifyServiceInCatalog(t *testing.T, consulClient *api.Client, queryOpts *api.QueryOptions) {
+	logger.Log(t, "verify the service in the secondary partition of the Consul catalog.")
+	svc, _, err := consulClient.Catalog().Service(staticServerName, "", queryOpts)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(svc))
+	require.Equal(t, []string{"k8s"}, svc[0].ServiceTags)
+}
+
+func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, defaultClusterContext environment.TestContext,
 	secondaryClusterContext environment.TestContext, c dnsWithPartitionsTestCase, secondaryPartition string,
-	defaultPartition string) (string, *api.Client, *api.QueryOptions) {
+	defaultPartition string) (string, *api.Client, *api.QueryOptions, *api.QueryOptions) {
 	commonHelmValues := map[string]string{
 		"global.adminPartitions.enabled": "true",
 		"global.enableConsulNamespaces":  "true",
@@ -180,31 +250,31 @@ func setupClusters(t *testing.T, cfg *config.TestConfig, primaryClusterContext e
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)
 
 	// Install the consul cluster with servers in the default kubernetes context.
-	primaryConsulCluster := consul.NewHelmCluster(t, serverHelmValues, primaryClusterContext, cfg, releaseName)
-	primaryConsulCluster.Create(t)
+	defaultConsulCluster := consul.NewHelmCluster(t, serverHelmValues, defaultClusterContext, cfg, releaseName)
+	defaultConsulCluster.Create(t)
 
 	// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
 	caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
 	caKeySecretName := fmt.Sprintf("%s-consul-ca-key", releaseName)
 
 	logger.Logf(t, "retrieving ca cert secret %s from the server cluster and applying to the client cluster", caCertSecretName)
-	k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, caCertSecretName)
+	k8s.CopySecret(t, defaultClusterContext, secondaryClusterContext, caCertSecretName)
 
 	if !c.secure {
 		// When auto-encrypt is disabled, we need both
 		// the CA cert and CA key to be available in the clients cluster to generate client certificates and keys.
 		logger.Logf(t, "retrieving ca key secret %s from the server cluster and applying to the client cluster", caKeySecretName)
-		k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, caKeySecretName)
+		k8s.CopySecret(t, defaultClusterContext, secondaryClusterContext, caKeySecretName)
 	}
 
 	partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
 	if c.secure {
 		logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
-		k8s.CopySecret(t, primaryClusterContext, secondaryClusterContext, partitionToken)
+		k8s.CopySecret(t, defaultClusterContext, secondaryClusterContext, partitionToken)
 	}
 
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
-	partitionSvcAddress := k8s.ServiceHost(t, cfg, primaryClusterContext, partitionServiceName)
+	partitionSvcAddress := k8s.ServiceHost(t, cfg, defaultClusterContext, partitionServiceName)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryClusterContext)
 
@@ -243,9 +313,9 @@ func setupClusters(t *testing.T, cfg *config.TestConfig, primaryClusterContext e
 	secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
 
-	primaryStaticServerOpts := &terratestk8s.KubectlOptions{
-		ContextName: primaryClusterContext.KubectlOptions(t).ContextName,
-		ConfigPath:  primaryClusterContext.KubectlOptions(t).ConfigPath,
+	defaultStaticServerOpts := &terratestk8s.KubectlOptions{
+		ContextName: defaultClusterContext.KubectlOptions(t).ContextName,
+		ConfigPath:  defaultClusterContext.KubectlOptions(t).ConfigPath,
 		Namespace:   staticServerNamespace,
 	}
 	secondaryStaticServerOpts := &terratestk8s.KubectlOptions{
@@ -255,9 +325,9 @@ func setupClusters(t *testing.T, cfg *config.TestConfig, primaryClusterContext e
 	}
 
 	logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
-	k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	k8s.RunKubectl(t, defaultClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+		k8s.RunKubectl(t, defaultClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
 
 	logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
@@ -266,7 +336,7 @@ func setupClusters(t *testing.T, cfg *config.TestConfig, primaryClusterContext e
 		k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
 
-	consulClient, _ := primaryConsulCluster.SetupConsulClient(t, c.secure)
+	consulClient, _ := defaultConsulCluster.SetupConsulClient(t, c.secure)
 
 	defaultPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: defaultPartition}
 	secondaryPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: secondaryPartition}
@@ -297,7 +367,7 @@ func setupClusters(t *testing.T, cfg *config.TestConfig, primaryClusterContext e
 
 	logger.Log(t, "creating a static-server with a service")
 	// create service in default partition.
-	k8s.DeployKustomize(t, primaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
+	k8s.DeployKustomize(t, defaultStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 	// create service in secondary partition.
 	k8s.DeployKustomize(t, secondaryStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
@@ -328,5 +398,5 @@ func setupClusters(t *testing.T, cfg *config.TestConfig, primaryClusterContext e
 	require.Equal(t, 1, len(service))
 	require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 
-	return releaseName, consulClient, secondaryPartitionQueryOpts
+	return releaseName, consulClient, defaultPartitionQueryOpts, secondaryPartitionQueryOpts
 }
