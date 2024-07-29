@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Specify "core" instead of "" for apiGroups in server-acl-init-role
+```
