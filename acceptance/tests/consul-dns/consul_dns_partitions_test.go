@@ -31,7 +31,6 @@ type dnsWithPartitionsTestCase struct {
 
 type dnsVerfication struct {
 	name              string
-	enableDNSProxy    bool
 	requestingCtx     environment.TestContext
 	svcContext        environment.TestContext
 	svcName           string
