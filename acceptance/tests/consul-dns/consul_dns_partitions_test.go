@@ -118,13 +118,36 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 					if v.preProcessingFunc != nil {
 						v.preProcessingFunc(t)
 					}
-					verifyDNS(t, releaseName, c.enableDNSProxy, staticServerNamespace, v.requestingCtx, v.svcContext,
+					verifyDNS(t, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
 						podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
 					dnsUtilsPodIndex++
 				})
 			}
+
+			if c.enableDNSProxy {
+				t.Run("restart dns-proxy and verify DNS queries for exported services across partitions", func(t *testing.T) {
+					restartDNSProxy(t, releaseName, defaultClusterContext)
+					verifyDNS(t, releaseName, staticServerNamespace, defaultClusterContext, secondaryClusterContext,
+						podLabelSelector, fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition), true,
+						dnsUtilsPodIndex)
+					verifyDNS(t, releaseName, staticServerNamespace, secondaryClusterContext, defaultClusterContext,
+						podLabelSelector, fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition), true,
+						dnsUtilsPodIndex)
+				})
+			}
 		})
 	}
+}
+
+func restartDNSProxy(t *testing.T, releaseName string, ctx environment.TestContext) {
+	dnsDeploymentName := fmt.Sprintf("deployment/%s-consul-dns-proxy", releaseName)
+	restartDNSProxyCommand := []string{"rollout", "restart", dnsDeploymentName}
+	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartDNSProxyCommand...)
+	require.NoError(t, err)
+
+	// Wait for restart to finish.
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "1m", "--watch", dnsDeploymentName)
+	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,

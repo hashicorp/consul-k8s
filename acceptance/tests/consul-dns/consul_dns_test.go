@@ -63,7 +63,7 @@ func TestConsulDNS(t *testing.T) {
 			cluster.Create(t)
 
 			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
-			verifyDNS(t, releaseName, c.enableDNSProxy, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
+			verifyDNS(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
 	}
@@ -72,7 +72,7 @@ func TestConsulDNS(t *testing.T) {
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
 	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, "coredns-custom.yaml")
 	updateCoreDNS(t, ctx, "coredns-custom.yaml")
-	time.Sleep(5 * time.Second)
+
 	t.Cleanup(func() {
 		updateCoreDNS(t, ctx, "coredns-original.yaml")
 		time.Sleep(5 * time.Second)
@@ -101,9 +101,12 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
 	_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
+	// Wait for restart to finish.
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "1m", "--watch", "deployment/coredns", "-n", "kube-system")
+	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 
-func verifyDNS(t *testing.T, releaseName string, enableDNSProxy bool, svcNamespace string, requestingCtx, svcContext environment.TestContext,
+func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
 	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
 	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: podLabelSelector,
