@@ -5,7 +5,7 @@ apiVersion: consul.hashicorp.com/v1alpha1
 kind: TerminatingGateway
 metadata:
   name: terminating-gateway 
+  namespace: ns1
 spec:
   services:
     - name: static-server
-      namespace: ns1

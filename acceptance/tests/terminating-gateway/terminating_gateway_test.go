@@ -68,13 +68,6 @@ func TestTerminatingGateway(t *testing.T) {
 
 			helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
 
-			// If ACLs are enabled we need to update the role of the terminating gateway
-			// with service:write permissions to the static-server service
-			// so that it can request Connect certificates for it.
-			if c.secure {
-				UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
-			}
-
 			logger.Log(t, "creating terminating gateway config entry")
 			// Create the config entry for the terminating gateway.
 			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway/terminating-gateway.yaml")
@@ -101,7 +94,3 @@ func TestTerminatingGateway(t *testing.T) {
 		})
 	}
 }
-
-const staticServerPolicyRules = `service "static-server" {
-  policy = "write"
-}`

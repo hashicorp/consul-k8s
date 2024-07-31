@@ -31,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/yaml"
 )
 
 // RandomName generates a random string with a 'test-' prefix.
@@ -168,8 +167,9 @@ type K8sOptions struct {
 }
 
 type ConsulOptions struct {
-	ConsulClient *api.Client
-	Namespace    string
+	ConsulClient                    *api.Client
+	Namespace                       string
+	ExternalServiceNameRegistration string
 }
 
 func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptions ConsulOptions) {
@@ -186,20 +186,29 @@ func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptio
 
 	// Register the external service
 	k8s.KubectlApply(t, k8sOptions.Options, k8sOptions.ConfigPath)
+	Cleanup(t, k8sOptions.NoCleanupOnFailure, k8sOptions.NoCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		k8s.KubectlDelete(t, k8sOptions.Options, k8sOptions.ConfigPath)
+	})
 
-	configFileData, err := os.ReadFile(k8sOptions.ConfigPath)
-	require.NoError(t, err)
+	CheckExternalServiceConditions(t, consulOptions.ExternalServiceNameRegistration, k8sOptions.Options)
+}
 
-	data := make(map[string]any)
-	err = yaml.Unmarshal(configFileData, &data)
-	require.NoError(t, err)
+func CheckExternalServiceConditions(t *testing.T, externalServiceName string, opts *k8s.KubectlOptions) {
+	t.Helper()
 
-	metadata := data["metadata"].(map[string]any)
-	regName := metadata["name"].(string)
+	ogLogger := opts.Logger
+	defer func() {
+		opts.Logger = ogLogger
+	}()
 
+	opts.Logger = terratestLogger.Discard
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
 		var err error
-		out, err := k8s.RunKubectlAndGetOutputE(r, k8sOptions.Options, "get", "-o=json", "registrations.consul.hashicorp.com", regName)
+		out, err := k8s.RunKubectlAndGetOutputE(r, opts, "get", "-o=json", "registrations.consul.hashicorp.com", externalServiceName)
 		require.NoError(r, err)
 		reg := v1alpha1.Registration{}
 		err = json.Unmarshal([]byte(out), &reg)
@@ -207,14 +216,6 @@ func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptio
 		require.NotEmpty(r, reg.Status.Conditions, "conditions should not be empty, retrying")
 		// ensure all statuses are true which means that the registration is successful
 		require.True(r, !slices.ContainsFunc(reg.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Status == corev1.ConditionFalse }), "registration failed because of %v", reg.Status.Conditions)
-	})
-
-	Cleanup(t, k8sOptions.NoCleanupOnFailure, k8sOptions.NoCleanup, func() {
-		// Note: this delete command won't wait for pods to be fully terminated.
-		// This shouldn't cause any test pollution because the underlying
-		// objects are deployments, and so when other tests create these
-		// they should have different pod names.
-		k8s.KubectlDelete(t, k8sOptions.Options, k8sOptions.ConfigPath)
 	})
 }
 

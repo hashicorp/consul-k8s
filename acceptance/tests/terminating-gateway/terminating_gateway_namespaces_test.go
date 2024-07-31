@@ -138,14 +138,28 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		termGWConfigPath                      string
-		externalServiceRegistrationConfigPath string
-		staticClientConfigPath                string
+		termGWConfig                      config
+		externalServiceRegistrationConfig config
+		staticServerConfig                config
+		staticClientConfig                config
 	}{
 		"all in default namespace": {
-			termGWConfigPath:                      "../fixtures/cases/terminating-gateway/terminating-gateway.yaml",
-			externalServiceRegistrationConfigPath: "../fixtures/cases/terminating-gateway/external-service.yaml",
-			staticClientConfigPath:                "../fixtures/bases/static-server",
+			termGWConfig: config{
+				path:      "../fixtures/bases/terminating-gateway",
+				namespace: "default",
+			},
+			externalServiceRegistrationConfig: config{
+				path:      "../fixtures/bases/external-service-registration",
+				namespace: "default",
+			},
+			staticServerConfig: config{
+				path:      "../fixtures/bases/static-server",
+				namespace: "default",
+			},
+			staticClientConfig: config{
+				path:      "../fixtures/cases/static-client-inject",
+				namespace: "default",
+			},
 		},
 		// "all in non-default namespace": {},
 		// "external service in default namespace everything else in non-default namespace":    {},
@@ -186,65 +200,77 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
 				})
 
-				StaticClientNamespace := "ns2"
-				logger.Logf(t, "creating Kubernetes namespace %s", StaticClientNamespace)
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", StaticClientNamespace)
-				})
+				for _, ns := range []string{tc.externalServiceRegistrationConfig.namespace, tc.staticServerConfig.namespace, tc.staticClientConfig.namespace, tc.termGWConfig.namespace} {
+					if ns != "default" {
+						logger.Logf(t, "creating Kubernetes namespace %s", ns)
+						k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", ns)
+						helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+							k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", ns)
+						})
+					}
+				}
 
-				// ns1K8SOptions := &terratestk8s.KubectlOptions{
-				// ContextName: ctx.KubectlOptions(t).ContextName,
-				// ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
-				// Namespace:   testNamespace,
-				// }
-				// ns2K8SOptions := &terratestk8s.KubectlOptions{
-				// ContextName: ctx.KubectlOptions(t).ContextName,
-				// ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
-				// Namespace:   StaticClientNamespace,
-				// }
+				staticServerNSOpts := &terratestk8s.KubectlOptions{
+					ContextName: ctx.KubectlOptions(t).ContextName,
+					ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
+					Namespace:   tc.staticServerConfig.namespace,
+				}
+
+				staticClientNSOpts := &terratestk8s.KubectlOptions{
+					ContextName: ctx.KubectlOptions(t).ContextName,
+					ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
+					Namespace:   tc.staticClientConfig.namespace,
+				}
+
+				termGWNSOpts := &terratestk8s.KubectlOptions{
+					ContextName: ctx.KubectlOptions(t).ContextName,
+					ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
+					Namespace:   tc.termGWConfig.namespace,
+				}
+
+				externalServiceRegistrationNSOpts := &terratestk8s.KubectlOptions{
+					ContextName: ctx.KubectlOptions(t).ContextName,
+					ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
+					Namespace:   tc.externalServiceRegistrationConfig.namespace,
+				}
 
 				// Deploy a static-server that will play the role of an external service.
 				logger.Log(t, "creating static-server deployment")
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, tc.staticClientConfigPath)
+				k8s.DeployKustomize(t, staticServerNSOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, tc.staticServerConfig.path)
 
-				// Register the external service
-				k8sOptions := helpers.K8sOptions{
-					Options:            ctx.KubectlOptions(t),
-					NoCleanupOnFailure: cfg.NoCleanupOnFailure,
-					NoCleanup:          cfg.NoCleanup,
-					ConfigPath:         tc.externalServiceRegistrationConfigPath,
-				}
-
-				consulOptions := helpers.ConsulOptions{
-					ConsulClient: consulClient,
-					Namespace:    testNamespace,
-				}
+				logger.Log(t, "registering external service")
+				k8s.KubectlApplyK(t, externalServiceRegistrationNSOpts, tc.externalServiceRegistrationConfig.path)
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, externalServiceRegistrationNSOpts, tc.externalServiceRegistrationConfig.path)
+				})
+				helpers.CheckExternalServiceConditions(t, "static-server-registration", externalServiceRegistrationNSOpts)
 
 				// Create the config entry for the terminating gateway.
-				CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, tc.termGWConfigPath)
-
-				helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
+				logger.Log(t, "creating terminating gateway")
+				k8s.KubectlApplyK(t, termGWNSOpts, tc.termGWConfig.path)
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, termGWNSOpts, tc.termGWConfig.path)
+				})
 
 				// Deploy the static client
 				logger.Log(t, "deploying static client")
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
-
+				k8s.DeployKustomize(t, staticClientNSOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, tc.staticClientConfig.path)
 				// If ACLs are enabled, test that intentions prevent connections.
 				if secure {
 					// With the terminating gateway up, we test that we can make a call to it
 					// via the static-server. It should fail to connect with the
 					// static-server pod because of intentions.
 					logger.Log(t, "testing intentions prevent connections through the terminating gateway")
-					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, staticServerLocalAddress)
+					k8s.CheckStaticServerConnectionFailing(t, staticClientNSOpts, staticClientName, staticServerLocalAddress)
 
 					logger.Log(t, "adding intentions to allow traffic from client ==> server")
-					AddIntention(t, consulClient, "", StaticClientNamespace, staticClientName, testNamespace, staticServerName)
+					AddIntention(t, consulClient, "", tc.staticClientConfig.namespace, staticClientName, tc.staticServerConfig.namespace, staticServerName)
 				}
 
+				// time.Sleep(5 * time.Minute)
 				// Test that we can make a call to the terminating gateway
 				logger.Log(t, "trying calls to terminating gateway")
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerLocalAddress)
+				k8s.CheckStaticServerConnectionSuccessful(t, staticClientNSOpts, staticClientName, staticServerLocalAddress)
 			})
 		}
 	}
