@@ -161,7 +161,24 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				namespace: "default",
 			},
 		},
-		// "all in non-default namespace": {},
+		"all in same non-default namespace": {
+			termGWConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/all-non-default/terminating-gateway",
+				namespace: "ns1",
+			},
+			externalServiceRegistrationConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/all-non-default/external-service-registration",
+				namespace: "ns1",
+			},
+			staticServerConfig: config{
+				path:      "../fixtures/bases/static-server",
+				namespace: "ns1",
+			},
+			staticClientConfig: config{
+				path:      "../fixtures/cases/static-client-namespaces",
+				namespace: "ns1",
+			},
+		},
 		// "external service in default namespace everything else in non-default namespace":    {},
 		// "terminating gateway in default namespace everything else in non-default namespace": {},
 		// "mesh service in default namespace everything else in non-default namespace":        {},
@@ -182,9 +199,10 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					"global.acls.manageSystemACLs":  strconv.FormatBool(secure),
 					"global.tls.enabled":            strconv.FormatBool(secure),
 
-					"terminatingGateways.enabled":              "true",
-					"terminatingGateways.gateways[0].name":     "terminating-gateway",
-					"terminatingGateways.gateways[0].replicas": "1",
+					"terminatingGateways.enabled":                     "true",
+					"terminatingGateways.gateways[0].name":            "terminating-gateway",
+					"terminatingGateways.gateways[0].replicas":        "1",
+					"terminatingGateways.gateways[0].consulNamespace": tc.termGWConfig.namespace,
 				}
 
 				releaseName := helpers.RandomName()
@@ -194,19 +212,16 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 
 				consulClient, _ := consulCluster.SetupConsulClient(t, secure)
 
-				logger.Logf(t, "creating Kubernetes namespace %s", testNamespace)
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", testNamespace)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", testNamespace)
-				})
-
+				seen := make(map[string]struct{}, 4)
 				for _, ns := range []string{tc.externalServiceRegistrationConfig.namespace, tc.staticServerConfig.namespace, tc.staticClientConfig.namespace, tc.termGWConfig.namespace} {
-					if ns != "default" {
+					_, ok := seen[ns]
+					if ns != "default" && !ok {
 						logger.Logf(t, "creating Kubernetes namespace %s", ns)
 						k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "ns", ns)
 						helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 							k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ns", ns)
 						})
+						seen[ns] = struct{}{}
 					}
 				}
 
@@ -275,7 +290,6 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					AddIntention(t, consulClient, "", tc.staticClientConfig.namespace, staticClientName, tc.staticServerConfig.namespace, staticServerName)
 				}
 
-				// time.Sleep(5 * time.Minute)
 				// Test that we can make a call to the terminating gateway
 				logger.Log(t, "trying calls to terminating gateway")
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientNSOpts, staticClientName, staticServerLocalAddress)
