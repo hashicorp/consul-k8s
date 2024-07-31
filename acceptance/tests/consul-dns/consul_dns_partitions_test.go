@@ -25,9 +25,8 @@ const staticServerName = "static-server"
 const staticServerNamespace = "ns1"
 
 type dnsWithPartitionsTestCase struct {
-	name           string
-	secure         bool
-	enableDNSProxy bool
+	name   string
+	secure bool
 }
 
 type dnsVerification struct {
@@ -43,13 +42,13 @@ const defaultPartition = "default"
 const secondaryPartition = "secondary"
 const defaultNamespace = "default"
 
-// TestConsulDNS_WithPartitionsAndCatalogSync verifies DNS queries for services across partitions
+// TestConsulDNSProxy_WithPartitionsAndCatalogSync verifies DNS queries for services across partitions
 // when DNS proxy is enabled. It configures CoreDNS to use configure consul domain queries to
 // be forwarded to the Consul DNS Proxy.  The test validates:
 // - returning the local partition's service when tenancy is not included in the DNS question.
 // - properly not resolving DNS for unexported services when ACLs are enabled.
 // - properly resolving DNS for exported services when ACLs are enabled.
-func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
+func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -62,24 +61,12 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 
 	cases := []dnsWithPartitionsTestCase{
 		{
-			name:           "dns service / not secure - ACLs and auto-encrypt not enabled",
-			secure:         false,
-			enableDNSProxy: false,
+			name:   "not secure - ACLs and auto-encrypt not enabled",
+			secure: false,
 		},
 		{
-			name:           "dns service / secure - ACLs and auto-encrypt enabled",
-			secure:         true,
-			enableDNSProxy: false,
-		},
-		{
-			name:           "dns-proxy / not secure - ACLs and auto-encrypt not enabled",
-			secure:         false,
-			enableDNSProxy: true,
-		},
-		{
-			name:           "dns-proxy / secure - ACLs and auto-encrypt enabled",
-			secure:         true,
-			enableDNSProxy: true,
+			name:   "secure - ACLs and auto-encrypt enabled",
+			secure: true,
 		},
 	}
 
@@ -113,7 +100,7 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
 			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
-				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, c.enableDNSProxy, releaseName) {
+				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName) {
 				t.Run(v.name, func(t *testing.T) {
 					if v.preProcessingFunc != nil {
 						v.preProcessingFunc(t)
@@ -128,7 +115,7 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 }
 
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
-	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, enableDNSProxy bool, releaseName string) []dnsVerification {
+	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, releaseName string) []dnsVerification {
 	serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
 	serviceRequestInDefaultPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition)
 	serviceRequestInSecondaryPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition)
@@ -203,51 +190,49 @@ func getVerifications(defaultClusterContext environment.TestContext, secondaryCl
 		},
 	}
 
-	if enableDNSProxy {
+	// validate proxy works after pods roll.
+	var restartDNSProxy = func(t *testing.T, releaseName string, ctx environment.TestContext) {
+		dnsDeploymentName := fmt.Sprintf("deployment/%s-consul-dns-proxy", releaseName)
+		restartDNSProxyCommand := []string{"rollout", "restart", dnsDeploymentName}
+		k8sOptions := ctx.KubectlOptions(t)
+		logger.Log(t, fmt.Sprintf("restarting the dns-proxy deployment in %s k8s context", k8sOptions.ContextName))
+		_, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, restartDNSProxyCommand...)
+		require.NoError(t, err)
 
-		var restartDNSProxy = func(t *testing.T, releaseName string, ctx environment.TestContext) {
-			dnsDeploymentName := fmt.Sprintf("deployment/%s-consul-dns-proxy", releaseName)
-			restartDNSProxyCommand := []string{"rollout", "restart", dnsDeploymentName}
-			k8sOptions := ctx.KubectlOptions(t)
-			logger.Log(t, fmt.Sprintf("restarting the dns-proxy deployment in %s k8s context", k8sOptions.ContextName))
-			_, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, restartDNSProxyCommand...)
-			require.NoError(t, err)
-
-			// Wait for restart to finish.
-			out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "1m", "--watch", dnsDeploymentName)
-			require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
-			logger.Log(t, fmt.Sprintf("dns-proxy deployment in %s k8s context has finished restarting", k8sOptions.ContextName))
-		}
-		verifications = append(verifications,
-			dnsVerification{
-				name:             "after rollout restart of dns-proxy in default partition - verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
-				requestingCtx:    defaultClusterContext,
-				svcContext:       secondaryClusterContext,
-				svcName:          serviceRequestInSecondaryPartition,
-				shouldResolveDNS: true,
-				preProcessingFunc: func(t *testing.T) {
-					restartDNSProxy(t, releaseName, defaultClusterContext)
-					k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-						k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
-					})
-				},
-			},
-			dnsVerification{
-				name:             "after rollout restart of dns-proxy in secondary partition - verify static-server.service.default.ap.consul from the secondary partition once the service is exported.",
-				requestingCtx:    secondaryClusterContext,
-				svcContext:       defaultClusterContext,
-				svcName:          serviceRequestInDefaultPartition,
-				shouldResolveDNS: true,
-				preProcessingFunc: func(t *testing.T) {
-					restartDNSProxy(t, releaseName, secondaryClusterContext)
-					k8s.KubectlApplyK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-						k8s.KubectlDeleteK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
-					})
-				},
-			})
+		// Wait for restart to finish.
+		out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "1m", "--watch", dnsDeploymentName)
+		require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
+		logger.Log(t, fmt.Sprintf("dns-proxy deployment in %s k8s context has finished restarting", k8sOptions.ContextName))
 	}
+	verifications = append(verifications,
+		dnsVerification{
+			name:             "after rollout restart of dns-proxy in default partition - verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				restartDNSProxy(t, releaseName, defaultClusterContext)
+				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				})
+			},
+		},
+		dnsVerification{
+			name:             "after rollout restart of dns-proxy in secondary partition - verify static-server.service.default.ap.consul from the secondary partition once the service is exported.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				restartDNSProxy(t, releaseName, secondaryClusterContext)
+				k8s.KubectlApplyK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				})
+			},
+		})
 
 	return verifications
 }
