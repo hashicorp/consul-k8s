@@ -127,20 +127,6 @@ func TestConsulDNS_WithPartitionsAndCatalogSync(t *testing.T) {
 	}
 }
 
-func restartDNSProxy(t *testing.T, releaseName string, ctx environment.TestContext) {
-	dnsDeploymentName := fmt.Sprintf("deployment/%s-consul-dns-proxy", releaseName)
-	restartDNSProxyCommand := []string{"rollout", "restart", dnsDeploymentName}
-	k8sOptions := ctx.KubectlOptions(t)
-	logger.Log(t, fmt.Sprintf("restarting the dns-proxy deployment in %s k8s context", k8sOptions.ContextName))
-	_, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, restartDNSProxyCommand...)
-	require.NoError(t, err)
-
-	// Wait for restart to finish.
-	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "1m", "--watch", dnsDeploymentName)
-	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
-	logger.Log(t, fmt.Sprintf("dns-proxy deployment in %s k8s context has finished restarting", k8sOptions.ContextName))
-}
-
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
 	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, enableDNSProxy bool, releaseName string) []dnsVerification {
 	serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
@@ -218,6 +204,20 @@ func getVerifications(defaultClusterContext environment.TestContext, secondaryCl
 	}
 
 	if enableDNSProxy {
+
+		var restartDNSProxy = func(t *testing.T, releaseName string, ctx environment.TestContext) {
+			dnsDeploymentName := fmt.Sprintf("deployment/%s-consul-dns-proxy", releaseName)
+			restartDNSProxyCommand := []string{"rollout", "restart", dnsDeploymentName}
+			k8sOptions := ctx.KubectlOptions(t)
+			logger.Log(t, fmt.Sprintf("restarting the dns-proxy deployment in %s k8s context", k8sOptions.ContextName))
+			_, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, restartDNSProxyCommand...)
+			require.NoError(t, err)
+
+			// Wait for restart to finish.
+			out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "1m", "--watch", dnsDeploymentName)
+			require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
+			logger.Log(t, fmt.Sprintf("dns-proxy deployment in %s k8s context has finished restarting", k8sOptions.ContextName))
+		}
 		verifications = append(verifications,
 			dnsVerification{
 				name:             "after rollout restart of dns-proxy in default partition - verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
