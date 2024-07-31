@@ -137,6 +137,8 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 		namespace string
 	}
 
+	// for simplicity/to keep from an explosion of test cases we're keeping the registration in the same namespace as the
+	// service being registered, this shouldn't matter because external services should be outside of the cluster typically
 	cases := map[string]struct {
 		termGWConfig                      config
 		externalServiceRegistrationConfig config
@@ -179,9 +181,60 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				namespace: "ns1",
 			},
 		},
-		// "external service in default namespace everything else in non-default namespace":    {},
-		// "terminating gateway in default namespace everything else in non-default namespace": {},
-		// "mesh service in default namespace everything else in non-default namespace":        {},
+		"mesh service in default namespace everything else in non-default namespace": {
+			termGWConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/all-non-default/terminating-gateway",
+				namespace: "ns1",
+			},
+			externalServiceRegistrationConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/all-non-default/external-service-registration",
+				namespace: "ns1",
+			},
+			staticServerConfig: config{
+				path:      "../fixtures/bases/static-server",
+				namespace: "ns1",
+			},
+			staticClientConfig: config{
+				path:      "../fixtures/cases/static-client-namespaces",
+				namespace: "default",
+			},
+		},
+		"external service in default namespace everything else in non-default namespace": {
+			termGWConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/client-non-default/terminating-gateway",
+				namespace: "ns1",
+			},
+			externalServiceRegistrationConfig: config{
+				path:      "../fixtures/bases/external-service-registration",
+				namespace: "default",
+			},
+			staticServerConfig: config{
+				path:      "../fixtures/bases/static-server",
+				namespace: "default",
+			},
+			staticClientConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/client-non-default/static-client-inject",
+				namespace: "ns1",
+			},
+		},
+		"terminating gateway in default namespace everything else in non-default namespace": {
+			termGWConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/all-non-default/terminating-gateway",
+				namespace: "default",
+			},
+			externalServiceRegistrationConfig: config{
+				path:      "../fixtures/cases/terminating-gateway-namespaces/all-non-default/external-service-registration",
+				namespace: "ns1",
+			},
+			staticServerConfig: config{
+				path:      "../fixtures/bases/static-server",
+				namespace: "ns1",
+			},
+			staticClientConfig: config{
+				path:      "../fixtures/cases/static-client-namespaces",
+				namespace: "ns1",
+			},
+		},
 	}
 	for name, tc := range cases {
 		for _, secure := range []bool{true, false} {
