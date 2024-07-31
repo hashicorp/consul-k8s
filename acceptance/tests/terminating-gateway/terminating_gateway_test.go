@@ -55,22 +55,26 @@ func TestTerminatingGateway(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Register the external service
-			k8sOptions := helpers.K8sOptions{
-				Options:            ctx.KubectlOptions(t),
-				NoCleanupOnFailure: cfg.NoCleanupOnFailure,
-				NoCleanup:          cfg.NoCleanup,
-				ConfigPath:         "../fixtures/cases/terminating-gateway/external-service.yaml",
+			k8sOpts := helpers.K8sOptions{
+				Options:             ctx.KubectlOptions(t),
+				NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
+				NoCleanup:           cfg.NoCleanup,
+				KustomizeConfigPath: "../fixtures/bases/external-service-registration",
 			}
 
-			consulOptions := helpers.ConsulOptions{
-				ConsulClient: consulClient,
+			consulOpts := helpers.ConsulOptions{
+				ConsulClient:                    consulClient,
+				ExternalServiceNameRegistration: "static-server-registration",
 			}
 
-			helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
+			helpers.RegisterExternalServiceCRD(t, k8sOpts, consulOpts)
 
-			logger.Log(t, "creating terminating gateway config entry")
 			// Create the config entry for the terminating gateway.
-			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway/terminating-gateway.yaml")
+			logger.Log(t, "creating terminating gateway")
+			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
+			})
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")

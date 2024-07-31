@@ -78,10 +78,10 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Register the external service
 			k8sOptions := helpers.K8sOptions{
-				Options:            ctx.KubectlOptions(t),
-				NoCleanupOnFailure: cfg.NoCleanupOnFailure,
-				NoCleanup:          cfg.NoCleanup,
-				ConfigPath:         "../fixtures/cases/terminating-gateway-namespaces/external-service.yaml",
+				Options:             ctx.KubectlOptions(t),
+				NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
+				NoCleanup:           cfg.NoCleanup,
+				KustomizeConfigPath: "../fixtures/cases/terminating-gateway-namespaces/external-service.yaml",
 			}
 
 			consulOptions := helpers.ConsulOptions{
@@ -238,12 +238,20 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				logger.Log(t, "creating static-server deployment")
 				k8s.DeployKustomize(t, staticServerNSOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, tc.staticServerConfig.path)
 
-				logger.Log(t, "registering external service")
-				k8s.KubectlApplyK(t, externalServiceRegistrationNSOpts, tc.externalServiceRegistrationConfig.path)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, externalServiceRegistrationNSOpts, tc.externalServiceRegistrationConfig.path)
-				})
-				helpers.CheckExternalServiceConditions(t, "static-server-registration", externalServiceRegistrationNSOpts)
+				k8sOpts := helpers.K8sOptions{
+					Options:             externalServiceRegistrationNSOpts,
+					NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
+					NoCleanup:           cfg.NoCleanup,
+					KustomizeConfigPath: tc.externalServiceRegistrationConfig.path,
+				}
+
+				consulOpts := helpers.ConsulOptions{
+					ConsulClient:                    consulClient,
+					Namespace:                       tc.externalServiceRegistrationConfig.namespace,
+					ExternalServiceNameRegistration: "static-server-registration",
+				}
+
+				helpers.RegisterExternalServiceCRD(t, k8sOpts, consulOpts)
 
 				// Create the config entry for the terminating gateway.
 				logger.Log(t, "creating terminating gateway")
