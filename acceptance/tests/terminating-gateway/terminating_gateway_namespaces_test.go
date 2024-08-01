@@ -98,8 +98,6 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				k8s.KubectlDeleteK(t, nsK8SOptions, "../fixtures/cases/terminating-gateway-namespaces/all-non-default/terminating-gateway")
 			})
 
-			CreateTerminatingGatewayConfigEntry(t, consulClient, testNamespace, testNamespace, staticServerName)
-
 			// Deploy the static client.
 			logger.Log(t, "deploying static client")
 			k8s.DeployKustomize(t, nsK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
@@ -349,8 +347,3 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 		}
 	}
 }
-
-const staticServerPolicyRulesNamespace = `namespace %q {
-service "static-server" {
-  policy = "write"
-}}`
