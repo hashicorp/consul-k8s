@@ -380,6 +380,7 @@ func WaitForInput(t *testing.T) {
 		Addr:    fmt.Sprintf(":%s", listenerPort),
 		Handler: mux,
 	}
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			err := r.Body.Close()
@@ -387,15 +388,19 @@ func WaitForInput(t *testing.T) {
 				t.Logf("error closing request body: %v", err)
 			}
 		}()
+
 		w.WriteHeader(http.StatusOK)
+
 		_, err := w.Write([]byte("input received\n"))
 		if err != nil {
 			t.Logf("writing body: %v", err)
 		}
+
 		err = srv.Shutdown(context.Background())
 		if err != nil {
 			t.Logf("error closing listener: %v", err)
 		}
+
 		t.Log("input received, continuing test")
 	})
 
