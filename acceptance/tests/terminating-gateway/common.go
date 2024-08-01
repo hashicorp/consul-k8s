@@ -39,37 +39,6 @@ func AddIntention(t *testing.T, consulClient *api.Client, sourcePeer, sourceNS, 
 	require.NoError(t, err)
 }
 
-func CreateTerminatingGatewayConfigEntry(t *testing.T, consulClient *api.Client, gwNamespace, serviceNamespace string, serviceNames ...string) {
-	t.Helper()
-
-	logger.Log(t, "creating config entry")
-
-	if serviceNamespace != "" {
-		logger.Logf(t, "creating the %s namespace in Consul", serviceNamespace)
-		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
-			Name: serviceNamespace,
-		}, nil)
-		require.NoError(t, err)
-	}
-
-	var gatewayServices []api.LinkedService
-	for _, serviceName := range serviceNames {
-		linkedService := api.LinkedService{Name: serviceName, Namespace: serviceNamespace}
-		gatewayServices = append(gatewayServices, linkedService)
-	}
-
-	configEntry := &api.TerminatingGatewayConfigEntry{
-		Kind:      api.TerminatingGateway,
-		Name:      "terminating-gateway",
-		Namespace: gwNamespace,
-		Services:  gatewayServices,
-	}
-
-	created, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
-	require.NoError(t, err)
-	require.True(t, created, "failed to create config entry")
-}
-
 func UpdateTerminatingGatewayRole(t *testing.T, consulClient *api.Client, rules string) {
 	t.Helper()
 
