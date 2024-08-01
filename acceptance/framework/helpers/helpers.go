@@ -361,7 +361,7 @@ func createCmdArgs(options *k8s.KubectlOptions) []string {
 	return cmdArgs
 }
 
-const DEFAULT_PAUSE_PORT = ":8517"
+const DEFAULT_PAUSE_PORT = "38501"
 
 // WaitForInput starts a http server on a random port (which is output in the logs) and waits until you
 // issue a request to that endpoint to continue the tests. This is useful for debugging tests that require
@@ -369,16 +369,15 @@ const DEFAULT_PAUSE_PORT = ":8517"
 func WaitForInput(t *testing.T) {
 	t.Helper()
 
-	envPort := os.Getenv("CONSUL_K8S_TEST_PAUSE_PORT")
-	listenerPort := DEFAULT_PAUSE_PORT
+	listenerPort := os.Getenv("CONSUL_K8S_TEST_PAUSE_PORT")
 
-	if envPort != "" {
-		listenerPort = ":" + envPort
+	if listenerPort == "" {
+		listenerPort = DEFAULT_PAUSE_PORT
 	}
 
 	mux := http.NewServeMux()
 	srv := &http.Server{
-		Addr:    listenerPort,
+		Addr:    fmt.Sprintf(":%s", listenerPort),
 		Handler: mux,
 	}
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -400,7 +399,7 @@ func WaitForInput(t *testing.T) {
 		t.Log("input received, continuing test")
 	})
 
-	t.Logf("Waiting for input on http://localhost%s", listenerPort)
+	t.Logf("Waiting for input on http://localhost:%s", listenerPort)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		t.Fatal(err)
 	}
