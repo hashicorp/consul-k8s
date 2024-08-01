@@ -1029,14 +1029,13 @@ You can interact with the running kubernetes clusters now using `kubectl [COMMAN
 2. The other option is to use the helper method in the framework: `helpers.WaitForInput(t)` at the spot in your acceptance test where you would like to pause execution to inspect the cluster. This will pause the test execution until you execute a request to `localhost:8715` which tells the test to continue running, you can override the port value used by setting the `CONSUL_K8S_TEST_PAUSE_PORT` environment variable to a port of your choosing. When running the tests with the `-v` flag you will see a log output of the endpoint that the test is waiting on.
 
 ```go
-
 import "github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 
 func TestSomeTest(t *testing.T) {
   // stuff to setup
 
   // test execution will pause here until the endpoint is hit
-	helpers.WaitForInput(t)
+  helpers.WaitForInput(t)
 
   // rest of test
 }
