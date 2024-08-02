@@ -122,7 +122,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 }
 
 // Test we can connect through the terminating gateway when the terminating gateway,
-// the external service, and the connect service are in different namespace.
+// the external service, and the connect service are in different combinations of namespaces.
 func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
