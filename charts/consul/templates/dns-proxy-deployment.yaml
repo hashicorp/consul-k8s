@@ -188,11 +188,9 @@ spec:
             timeoutSeconds: 5
           ports:
             - containerPort: {{ .Values.dns.proxy.port }}
-              hostPort: {{ .Values.dns.proxy.port }}
               protocol: "TCP"
               name: dns-tcp
             - containerPort: {{ .Values.dns.proxy.port }}
-              hostPort: {{ .Values.dns.proxy.port }}
               protocol: "UDP"
               name: dns-udp
 {{- end }}

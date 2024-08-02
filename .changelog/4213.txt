@@ -1,0 +1,3 @@
+```release-note:bug
+Fixes install of Consul on GKE Autopilot where the option 'manageNonStandardCRDs' was not being used for the TCPRoute CRD.
+```
