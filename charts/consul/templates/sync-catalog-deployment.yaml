@@ -61,6 +61,13 @@ spec:
         "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
         {{- end }}
         {{- end }}
+        {{- if or .Values.global.metrics.enabled .Values.syncCatalog.metrics.enabled }}
+        "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.syncCatalog.annotations | fromYaml) "prometheus.io/path")}}
+        "prometheus.io/path": {{ default "/metrics" .Values.syncCatalog.metrics.path }}
+        {{- end }}
+        "prometheus.io/port": {{ .Values.syncCatalog.metrics.port | default "20200" | quote }}
+        {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
       volumes:
@@ -207,6 +214,7 @@ spec:
             {{- if .Values.syncCatalog.metrics.port }}
             -metrics-port={{ .Values.syncCatalog.metrics.port }} \
             {{- end }}
+            -prometheus-retention-time={{ .Values.global.metrics.agentMetricsRetentionTime }} \
         livenessProbe:
           httpGet:
             path: /health/ready
@@ -226,10 +234,15 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
           successThreshold: 1
-          timeoutSeconds: 5
+          timeoutSeconds: 5      
         {{- with .Values.syncCatalog.resources }}
         resources:
         {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if or (eq (.Values.syncCatalog.metrics.enabled | toString) "-") .Values.syncCatalog.metrics.enabled .Values.global.metrics.enabled }}
+        ports:
+        - name: prometheus
+          containerPort: {{ .Values.syncCatalog.metrics.port | default "20200" | int }}
         {{- end }}
       {{- if .Values.syncCatalog.priorityClassName }}
       priorityClassName: {{ .Values.syncCatalog.priorityClassName | quote }}
