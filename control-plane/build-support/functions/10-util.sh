@@ -95,10 +95,7 @@ function have_gpg_key {
 
 function parse_version {
 	# Arguments:
-	#   $1 - Path to the top level Consul K8s source
-	#   $2 - boolean value for whether the release version should be parsed from the source
-	#   $3 - boolean whether to use GIT_DESCRIBE and GIT_COMMIT environment variables
-	#   $4 - boolean whether to omit the version part of the version string. (optional)
+	#   $1 - Path to the top level Consul K8s source. Defaults to current directory.
 	#
 	# Return:
 	#   0 - success (will write the version to stdout)
@@ -108,7 +105,7 @@ function parse_version {
 	#   If the GOTAGS environment variable is present then it is used to determine which
 	#   version file to use for parsing.
 
-	local vfile="${1}/version/version.go"
+	local vfile="${1:-.}/version/VERSION"
 
 	# ensure the version file exists
 	if ! test -f "${vfile}"; then
@@ -116,39 +113,12 @@ function parse_version {
 		return 1
 	fi
 
-	local include_release="$2"
-	local use_git_env="$3"
-	local omit_version="$4"
-
 	local git_version=""
 	local git_commit=""
 
-	if test -z "${include_release}"; then
-		include_release=true
-	fi
-
-	if test -z "${use_git_env}"; then
-		use_git_env=true
-	fi
-
-	if is_set "${use_git_env}"; then
-		git_version="${GIT_DESCRIBE}"
-		git_commit="${GIT_COMMIT}"
-	fi
-
 	# Get the main version out of the source file
-	version_main=$(awk '$1 == "Version" && $2 == "=" { gsub(/"/, "", $3); print $3 }' <${vfile})
-	release_main=$(awk '$1 == "VersionPrerelease" && $2 == "=" { gsub(/"/, "", $3); print $3 }' <${vfile})
-
-	# try to determine the version if we have build tags
-	for tag in "$GOTAGS"; do
-		for vfile in $(find "${1}/version" -name "version_*.go" 2>/dev/null | sort); do
-			if grep -q "// +build $tag" "${vfile}"; then
-				version_main=$(awk '$1 == "Version" && $2 == "=" { gsub(/"/, "", $3); print $3 }' <${vfile})
-				release_main=$(awk '$1 == "VersionPrerelease" && $2 == "=" { gsub(/"/, "", $3); print $3 }' <${vfile})
-			fi
-		done
-	done
+	version_main=$(cat ${vfile} | awk '{ split($0, arr, "-"); print arr[1]; }')
+	release_main=$(cat ${vfile} | awk '{ split($0, arr, "-"); print arr[2]; }')
 
 	local version="${version_main}"
 	# override the version from source with the value of the GIT_DESCRIBE env var if present
@@ -156,22 +126,13 @@ function parse_version {
 		version="${git_version}"
 	fi
 
-	local rel_ver=""
-	if is_set "${include_release}"; then
-		# Default to pre-release from the source
-		rel_ver="${release_main}"
+    # Default to pre-release from the source
+    local rel_ver="${release_main}"
 
-		# When no GIT_DESCRIBE env var is present and no release is in the source then we
-		# are definitely in dev mode
-		if test -z "${git_version}" -a -z "${rel_ver}" && is_set "${use_git_env}"; then
-			rel_ver="dev"
-		fi
-
-		# Add the release to the version
-		if test -n "${rel_ver}" -a -n "${git_commit}"; then
-			rel_ver="${rel_ver} (${git_commit})"
-		fi
-	fi
+    # Add the release to the version
+    if test -n "${rel_ver}" -a -n "${git_commit}"; then
+        rel_ver="${rel_ver} (${git_commit})"
+    fi
 
 	if test -n "${rel_ver}"; then
 		if is_set "${omit_version}"; then
@@ -191,23 +152,18 @@ function parse_version {
 function get_version {
 	# Arguments:
 	#   $1 - Path to the top level Consul K8s source
-	#   $2 - Whether the release version should be parsed from source (optional)
-	#   $3 - Whether to use GIT_DESCRIBE and GIT_COMMIT environment variables
 	#
 	# Returns:
 	#   0 - success (the version is also echoed to stdout)
 	#   1 - error
 	#
 	# Notes:
-	#   If a VERSION environment variable is present it will override any parsing of the version from the source
-	#   In addition to processing the main version.go, version_*.go files will be processed if they have
-	#   a Go build tag that matches the one in the GOTAGS environment variable. This tag processing is
-	#   primitive though and will not match complex build tags in the files with negation etc.
+	#   If a VERSION environment variable is present it will override any parsing of the version from the source.
 
 	local vers="$VERSION"
 	if test -z "$vers"; then
 		# parse the OSS version from version.go
-		vers="$(parse_version ${1} ${2} ${3})"
+		vers="$(parse_version ${1})"
 	fi
 
 	if test -z "$vers"; then
@@ -574,7 +530,7 @@ function update_version {
 	#   * - error
 
 	if ! test -f "$1"; then
-		err "ERROR: '$1' is not a regular file. update_version must be called with the path to a go version file"
+		err "ERROR: '$1' is not a regular file. update_version must be called with the path to a version file"
 		return 1
 	fi
 
@@ -586,8 +542,11 @@ function update_version {
 	local vfile="$1"
 	local version="$2"
 	local prerelease="$3"
+	if ! test -z "$prerelease"; then
+        version="${version}-${prerelease}"
+    fi
 
-	sed_i ${SED_EXT} -e "s/(Version[[:space:]]*=[[:space:]]*)\"[^\"]*\"/\1\"${version}\"/g" -e "s/(VersionPrerelease[[:space:]]*=[[:space:]]*)\"[^\"]*\"/\1\"${prerelease}\"/g" "${vfile}"
+	echo -n "${version}" > "${vfile}"
 	return $?
 }
 
@@ -710,8 +669,8 @@ function set_version {
 	local consul_vers="$6"
 	local consul_dataplane_vers="$8"
 
-	status_stage "==> Updating version/version.go with version info: ${vers} "$4""
-	if ! update_version "${sdir}/version/version.go" "${vers}" "$4"; then
+	status_stage "==> Updating version/VERSION: ${vers} "$4""
+	if ! update_version "${sdir}/version/VERSION" "${vers}" "$4"; then
 		return 1
 	fi
 
