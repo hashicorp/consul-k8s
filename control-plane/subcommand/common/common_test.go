@@ -198,7 +198,6 @@ func TestConsulLogin_TokenFileUnwritable(t *testing.T) {
 		AuthMethod:      testAuthMethod,
 		BearerTokenFile: bearerTokenFile,
 		TokenSinkFile:   randFileName,
-		NumRetries:      2,
 	}
 	_, err = ConsulLogin(client, params, log)
 	require.Error(t, err)
