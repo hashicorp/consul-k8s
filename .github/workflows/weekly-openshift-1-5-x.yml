@@ -1,0 +1,8 @@
+name: weekly-openshift-1-5-x
+on:
+  workflow_dispatch:
+jobs:
+  create-cluster:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: container-tools/microshift-action@v0.3
