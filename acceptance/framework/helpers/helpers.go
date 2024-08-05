@@ -6,7 +6,9 @@ package helpers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -357,4 +359,53 @@ func createCmdArgs(options *k8s.KubectlOptions) []string {
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
 	return cmdArgs
+}
+
+const DEFAULT_PAUSE_PORT = "38501"
+
+// WaitForInput starts a http server on a random port (which is output in the logs) and waits until you
+// issue a request to that endpoint to continue the tests. This is useful for debugging tests that require
+// inspecting the current state of a running cluster and you don't need to use long sleeps.
+func WaitForInput(t *testing.T) {
+	t.Helper()
+
+	listenerPort := os.Getenv("CONSUL_K8S_TEST_PAUSE_PORT")
+
+	if listenerPort == "" {
+		listenerPort = DEFAULT_PAUSE_PORT
+	}
+
+	mux := http.NewServeMux()
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%s", listenerPort),
+		Handler: mux,
+	}
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			err := r.Body.Close()
+			if err != nil {
+				t.Logf("error closing request body: %v", err)
+			}
+		}()
+
+		w.WriteHeader(http.StatusOK)
+
+		_, err := w.Write([]byte("input received\n"))
+		if err != nil {
+			t.Logf("writing body: %v", err)
+		}
+
+		err = srv.Shutdown(context.Background())
+		if err != nil {
+			t.Logf("error closing listener: %v", err)
+		}
+
+		t.Log("input received, continuing test")
+	})
+
+	t.Logf("Waiting for input on http://localhost:%s", listenerPort)
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		t.Fatal(err)
+	}
 }
