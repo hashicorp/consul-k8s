@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
-	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -215,7 +214,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				namespace: "ns1",
 			},
 		},
-		// TODO: (NET-10248) need to dig in more on why this isn't working when acls are enabled
+		// TODO: (NET-10248) need to dig in more on why this isn't working when acls are enabled.
 		// "terminating gateway in default namespace everything else in non-default namespace": {
 		// termGWConfig: config{
 		// path:      "../fixtures/cases/terminating-gateway-namespaces/all-non-default/terminating-gateway",
