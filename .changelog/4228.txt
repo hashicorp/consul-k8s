@@ -1,3 +1,6 @@
 ```release-note:security
 Upgrade Docker cli to use v.27.1. This addresses CVE
 [CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-41110)```
+
+```release-note:security
+Bump Go to 1.22.5 to address [CVE-2024-24791](https://nvd.nist.gov/vuln/detail/CVE-2024-24791)```
