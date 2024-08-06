@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-preflight-check
+  labels:
+    app.kubernetes.io/managed-by: {{.Release.Service | quote }}
+    app.kubernetes.io/instance: {{.Release.Name | quote }}
+    helm.sh/chart: "{{.Chart.Name}}-{{.Chart.Version}}"
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: preflight-check
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+spec:
+  template:
+    spec:
+      containers:
+        - name: preflight-check
+          image: {{ .Values.global.imageK8S }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              consul-k8s-control-plane preflight-check \
+                -datacenter={{ .Values.global.datacenter }}
+                -log-level={{ .Values.global.logLevel | default "info" }}
+                -log-json={{ .Values.global.logJSON | default false }}
+          env:
+            - name: ENTERPRISE_LICENSE
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.enterpriseLicense.secretName }}
+                  key: {{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
+            - name: CONSUL_HTTP_ADDR
+              {{- if .Values.global.tls.enabled }}
+              value: https://{{ template "consul.fullname" . }}-server:8501
+              {{- else }}
+              value: http://{{ template "consul.fullname" . }}-server:8500
+              {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name:  CONSUL_CACERT
+              value: /consul/tls/ca/tls.crt
+            {{- end}}
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: CONSUL_HTTP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ template "consul.fullname" . }}-acl-token"
+                  key: "token"
+            {{- end}}
