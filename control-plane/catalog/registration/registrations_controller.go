@@ -49,7 +49,7 @@ type RegistrationsController struct {
 
 func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.V(1).WithValues("registration", req.NamespacedName)
-	log.Info("Reconciling Registaration")
+	log.Info("Reconciling Registration")
 
 	registration := &v1alpha1.Registration{}
 	// get the registration
