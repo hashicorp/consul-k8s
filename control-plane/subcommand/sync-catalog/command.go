@@ -5,6 +5,7 @@ package synccatalog
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -15,20 +16,24 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/armon/go-metrics/prometheus"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/control-plane/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	metricsutil "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -67,6 +72,12 @@ type Command struct {
 	flagEnableK8SNSMirroring       bool     // Enables mirroring of k8s namespaces into Consul
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
+
+	// Metrics settings.
+	flagEnableMetrics        string
+	flagMetricsPort          string
+	flagMetricsPath          string
+	flagMetricsRetentionTime string
 
 	// Flags to support Kubernetes Ingress resources
 	flagEnableIngress   bool // Register services using the hostname from an ingress resource
@@ -155,6 +166,11 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+
+	c.flags.StringVar(&c.flagEnableMetrics, "enable-metrics", "false", "specify as 'true' or 'false' to enable or disable metrics collection")
+	c.flags.StringVar(&c.flagMetricsPath, "metrics-path", "/metrics", "specify to set the path used for metrics scraping")
+	c.flags.StringVar(&c.flagMetricsPort, "metrics-port", "20200", "specify to set the port used for metrics scraping")
+	c.flags.StringVar(&c.flagMetricsRetentionTime, "prometheus-retention-time", "1m", "configures the retention time for metrics in the Prometheus sink")
 
 	c.flags.BoolVar(&c.flagEnableIngress, "enable-ingress", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
@@ -259,6 +275,17 @@ func (c *Command) Run(args []string) int {
 		// it will be the only allowed namespace
 		allowSet = mapset.NewSet(c.flagK8SSourceNamespace)
 	}
+
+	metricsConfig := metrics.SyncCatalogMetricsConfig(c.flagEnableMetrics, c.flagMetricsPort, c.flagMetricsPath)
+	metricsConfig.PrometheusMetricsRetentionTime = c.flagMetricsRetentionTime
+
+	// Create the metrics sink
+	sink, error := c.recordMetrics()
+	if error != nil {
+		c.UI.Error(fmt.Sprintf("unable to create metrics sink: %s", error))
+		return 1
+	}
+
 	c.logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
 		"k8s namespaces denied from syncing", denySet)
 
@@ -279,6 +306,7 @@ func (c *Command) Run(args []string) int {
 			ServicePollPeriod:       c.flagConsulWritePeriod * 2,
 			ConsulK8STag:            c.flagConsulK8STag,
 			ConsulNodeName:          c.flagConsulNodeName,
+			Sink:                    sink,
 		}
 		go syncer.Run(ctx)
 
@@ -306,6 +334,7 @@ func (c *Command) Run(args []string) int {
 				ConsulNodeName:             c.flagConsulNodeName,
 				EnableIngress:              c.flagEnableIngress,
 				SyncLoadBalancerIPs:        c.flagLoadBalancerIPs,
+				MetricsConfig:              metricsConfig,
 			},
 		}
 
@@ -358,6 +387,18 @@ func (c *Command) Run(args []string) int {
 
 		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
 		if err := http.ListenAndServe(c.flagListen, handler); err != nil {
+			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+		}
+	}()
+
+	// Start metrics handler
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle(c.flagMetricsPath, promhttp.Handler())
+		var handler http.Handler = mux
+
+		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagMetricsPort))
+		if err := http.ListenAndServe(fmt.Sprintf(":%s", c.flagMetricsPort), handler); err != nil {
 			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
 		}
 	}()
@@ -438,7 +479,50 @@ func (c *Command) validateFlags() error {
 		)
 	}
 
+	if c.flagEnableMetrics != "" {
+		if _, valid := metricsutil.GetMetricsEnabled(c.flagEnableMetrics); !valid {
+			return errors.New("-enable-metrics must be either 'true' or 'false'")
+		}
+	}
+
+	if c.flagMetricsPort != "" {
+		if _, valid := metricsutil.GetScrapePort(c.flagMetricsPort); !valid {
+			return errors.New("-metrics-port must be a valid unprivileged port number")
+		}
+	}
+
 	return nil
+}
+
+func (c *Command) recordMetrics() (*prometheus.PrometheusSink, error) {
+	duration, err := time.ParseDuration(c.flagMetricsRetentionTime)
+	if err != nil {
+		return nil, err
+	}
+
+	var counters = [][]prometheus.CounterDefinition{
+		catalogtoconsul.SyncToConsulCounters,
+		catalogtok8s.SyncToK8sCounters,
+	}
+
+	var counterDefs []prometheus.CounterDefinition
+
+	for _, counter := range counters {
+		counterDefs = append(counterDefs, counter...)
+	}
+
+	opts := prometheus.PrometheusOpts{
+		Expiration:         duration,
+		CounterDefinitions: counterDefs,
+		// Name:               "consul",
+	}
+
+	sink, err := prometheus.NewPrometheusSinkFrom(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return sink, nil
 }
 
 const synopsis = "Sync Kubernetes services and Consul services."

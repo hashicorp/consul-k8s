@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/armon/go-metrics/prometheus"
 	"github.com/cenkalti/backoff"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -16,6 +18,25 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 )
+
+var SyncToConsulCounters = []prometheus.CounterDefinition{
+	{
+		Name: []string{"consul", "sync_catalog", "to_consul"},
+		Help: "Increments for each service registered to Consul via catalog sync",
+	},
+	{
+		Name: []string{"consul", "sync_catalog", "to_consul", "deregister"},
+		Help: "Increments for each service deregistered from Consul via catalog sync",
+	},
+	{
+		Name: []string{"consul", "sync_catalog", "to_consul", "error"},
+		Help: "Increments whenever a Consul api client returns an error for a catalog sync register request",
+	},
+	{
+		Name: []string{"consul", "sync_catalog", "to_consul", "deregister", "error"},
+		Help: "Increments whenever a Consul api client returns an error for a catalog sync deregister request request",
+	},
+}
 
 const (
 	// ConsulSyncPeriod is how often the syncer will attempt to
@@ -101,6 +122,8 @@ type ConsulSyncer struct {
 	// watchers is all namespaces mapped to a map of Consul service
 	// names mapped to a cancel function for watcher routines
 	watchers map[string]map[string]context.CancelFunc
+
+	Sink *prometheus.PrometheusSink
 }
 
 // Sync implements Syncer.
@@ -433,14 +456,32 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 			"node-name", r.Node,
 			"service-id", r.ServiceID,
 			"service-consul-namespace", r.Namespace)
+
 		_, err = consulClient.Catalog().Deregister(r, nil)
 		if err != nil {
+			// metric count for error syncing K8S services with Consul via calatog sync
+			labels := []metrics.Label{
+				{Name: "id", Value: r.ServiceID},
+				{Name: "node", Value: r.Node},
+				{Name: "error", Value: err.Error()},
+			}
+			s.Sink.IncrCounterWithLabels([]string{"consul", "sync_catalog", "to_consul", "deregister", "error"}, 1, labels)
+
 			s.Log.Warn("error deregistering service",
 				"node-name", r.Node,
 				"service-id", r.ServiceID,
 				"service-consul-namespace", r.Namespace,
 				"err", err)
+			continue
 		}
+
+		// metric count for calatog sync process to unsync K8S services from Consul
+		labels := []metrics.Label{
+			{Name: "id", Value: r.ServiceID},
+			{Name: "service_consul_namespace", Value: r.Namespace},
+			{Name: "node", Value: r.Node},
+		}
+		s.Sink.IncrCounterWithLabels([]string{"consul", "sync_catalog", "to_consul", "deregister"}, 1, labels)
 	}
 
 	// Always clear deregistrations, they'll repopulate if we had errors
@@ -465,6 +506,14 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 			// Register the service.
 			_, err = consulClient.Catalog().Register(r, nil)
 			if err != nil {
+				// metric count for error syncing K8S services to Consul
+				labels := []metrics.Label{
+					{Name: "service_name", Value: r.Service.Service},
+					{Name: "error", Value: err.Error()},
+					{Name: "node", Value: r.Node},
+				}
+				s.Sink.IncrCounterWithLabels([]string{"consul", "sync_catalog", "to_consul", "error"}, 1, labels)
+
 				s.Log.Warn("error registering service",
 					"node-name", r.Node,
 					"service-name", r.Service.Service,
@@ -478,6 +527,20 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 				"service-name", r.Service.Service,
 				"consul-namespace-name", r.Service.Namespace,
 				"service", r.Service)
+
+			// metric count for calatog sync process to sync K8S with Consul
+			labels := []metrics.Label{
+				{Name: "id", Value: r.Service.ID},
+				{Name: "service", Value: r.Service.Service},
+				{Name: "external_k8s_ref_name", Value: r.Service.Meta["external-k8s-ref-name"]},
+				{Name: "namespace", Value: r.Service.Namespace},
+				{Name: "datacenter", Value: r.Datacenter},
+				{Name: "node", Value: r.Node},
+			}
+			if r.Check != nil {
+				labels = append(labels, metrics.Label{Name: "status", Value: r.Check.Status})
+			}
+			s.Sink.IncrCounterWithLabels([]string{"consul", "sync_catalog", "to_consul"}, 1, labels)
 		}
 	}
 }
