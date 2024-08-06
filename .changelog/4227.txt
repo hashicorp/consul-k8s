@@ -1,0 +1,4 @@
+```release-note:bug
+openshift: order SecurityContextConstraint volumes alphabetically to match OpenShift behavior.
+This ensures that diff detection tools like ArgoCD consider the source and reconciled resources to be identical.
+```
