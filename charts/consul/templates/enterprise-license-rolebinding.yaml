@@ -1,5 +1,6 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
 {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey (not .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -18,5 +19,6 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ template "consul.fullname" . }}-enterprise-license
+{{- end }}
 {{- end }}
 {{- end }}

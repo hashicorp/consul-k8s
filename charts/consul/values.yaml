@@ -27,6 +27,10 @@ global:
   # @type: string
   name: null
 
+  rbac:
+    # Create required ClusterRoles and ClusterRoleBindings for cert-manager
+    create: true
+
   # The domain Consul will answer DNS queries for
   # (Refer to [`-domain`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_domain)) and the domain services synced from
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.

@@ -1,4 +1,5 @@
 {{- if .Values.global.gossipEncryption.autoGenerate }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -20,4 +21,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
+{{- end }}
 {{- end }}

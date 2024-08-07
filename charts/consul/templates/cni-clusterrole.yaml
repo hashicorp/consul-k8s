@@ -1,4 +1,5 @@
 {{- if .Values.connectInject.cni.enabled }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -34,5 +35,6 @@ rules:
   - {{ template "consul.fullname" . }}-cni
   verbs:
   - use
+{{- end }}
 {{- end }}
 {{- end }}

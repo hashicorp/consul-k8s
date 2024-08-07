@@ -1,4 +1,5 @@
 {{- if .Values.ingressGateways.enabled }}
+{{- if .Values.global.rbac.create }}
 {{- $root := . }}
 {{- range .Values.ingressGateways.gateways }}
 apiVersion: rbac.authorization.k8s.io/v1
@@ -21,5 +22,6 @@ subjects:
   - kind: ServiceAccount
     name: {{ template "consul.fullname" $root }}-{{ .name }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}

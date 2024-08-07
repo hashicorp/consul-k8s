@@ -1,4 +1,5 @@
 {{- if .Values.connectInject.cni.enabled }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -17,4 +18,5 @@ subjects:
 - kind: ServiceAccount
   name: {{ template "consul.fullname" . }}-cni
   namespace: {{ default .Release.Namespace .Values.connectInject.cni.namespace }}
+{{- end }}
 {{- end }}

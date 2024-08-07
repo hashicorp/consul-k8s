@@ -1,4 +1,5 @@
 {{- if .Values.global.acls.manageSystemACLs }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -15,4 +16,5 @@ rules:
   - serviceaccounts
   verbs:
   - get
+{{- end }}
 {{- end }}
