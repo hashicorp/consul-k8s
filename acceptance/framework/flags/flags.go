@@ -226,7 +226,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		DisablePeering: t.flagDisablePeering,
 
 		HelmChartVersion:       t.flagHelmChartVersion,
-		ConsulImage:            t.flagConsulImage,
+		ConsulImage:            "jmurrethc/consul-ent-dev", // t.flagConsulImage,
 		ConsulK8SImage:         t.flagConsulK8sImage,
 		ConsulDataplaneImage:   t.flagConsulDataplaneImage,
 		ConsulVersion:          consulVersion,
