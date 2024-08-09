@@ -80,8 +80,19 @@ type LinkedService struct {
 	// SNI is the optional name to specify during the TLS handshake with a linked service.
 	SNI string `json:"sni,omitempty"`
 
-	//DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
+	// DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
 	DisableAutoHostRewrite bool `json:"disableAutoHostRewrite,omitempty"`
+}
+
+func (l LinkedService) NamespaceName() string {
+	return defaultIfEmpty(l.Namespace) + "." + l.Name
+}
+
+func defaultIfEmpty(s string) string {
+	if s == "" {
+		return "default"
+	}
+	return s
 }
 
 func (in *TerminatingGateway) GetObjectMeta() metav1.ObjectMeta {

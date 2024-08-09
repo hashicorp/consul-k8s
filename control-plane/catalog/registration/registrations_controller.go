@@ -44,8 +44,8 @@ type RegistrationsController struct {
 	Log    logr.Logger
 }
 
-// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=registration,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=registration/status,verbs=get;update;patch
 
 func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.V(1).WithValues("registration", req.NamespacedName)
@@ -62,10 +62,11 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 
 	cachedRegistration, ok := r.Cache.get(registration.Spec.Service.Name)
 	if slices.ContainsFunc(registration.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Type == ConditionDeregistered }) {
+		// registration is already in sync so we do nothing, this happens when consul deregisters a service
+		// and we update the status to show that consul deregistered it
 		if ok && registration.EqualExceptStatus(cachedRegistration) {
+			r.Cache.set(registration.Spec.Service.Name, registration)
 			log.Info("Registration is in sync")
-			// registration is already in sync so we do nothing, this happens when consul deregisters a service
-			// and we update the status to show that consul deregistered it
 			return ctrl.Result{}, nil
 		}
 	}
@@ -113,7 +114,6 @@ func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 				continue
 			}
 			for _, reg := range regList.Items {
-
 				err := c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registering: false, ConsulDeregistered: true})
 				if err != nil {
 					c.Log.Error(err, "failed to update Registration status", "name", reg.Name, "namespace", reg.Namespace)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -54,6 +55,18 @@ func TestTerminatingGateway(t *testing.T) {
 			// Once the cluster is up, register the external service, then create the config entry.
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
+			logger.Log(t, "creating terminating gateway")
+			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
+			})
+
+			time.Sleep(5 * time.Second)
+			// helpers.WaitForInput(t)
+
+			// if c.secure {
+			// UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
+			// }
 			// Register the external service
 			k8sOpts := helpers.K8sOptions{
 				Options:             ctx.KubectlOptions(t),
@@ -69,16 +82,27 @@ func TestTerminatingGateway(t *testing.T) {
 
 			helpers.RegisterExternalServiceCRD(t, k8sOpts, consulOpts)
 
-			// Create the config entry for the terminating gateway.
-			logger.Log(t, "creating terminating gateway")
-			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
-			})
+			// CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", "static-server")
+
+			// if c.secure {
+			// UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
+			// }
+			// helpers.WaitForInput(t)
+			//
+
+			helpers.CheckExternalServiceConditions(t, "static-server-registration", k8sOpts.Options)
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+
+			// if c.secure {
+			// UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
+			// }
+			// Create the config entry for the terminating gateway.
+
+			// k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
+			// k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -92,9 +116,15 @@ func TestTerminatingGateway(t *testing.T) {
 				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerName)
 			}
 
+			helpers.WaitForInput(t)
+
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerLocalAddress)
 		})
 	}
 }
+
+const staticServerPolicyRules = `service "static-server" {
+  policy = "write"
+}`

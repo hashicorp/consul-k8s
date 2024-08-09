@@ -190,10 +190,10 @@ func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptio
 		k8s.KubectlDeleteFromKustomize(t, k8sOptions.Options, k8sOptions.KustomizeConfigPath)
 	})
 
-	CheckExternalServiceConditions(t, consulOptions.ExternalServiceNameRegistration, k8sOptions.Options)
+	// CheckExternalServiceConditions(t, consulOptions.ExternalServiceNameRegistration, k8sOptions.Options)
 }
 
-func CheckExternalServiceConditions(t *testing.T, externalServiceName string, opts *k8s.KubectlOptions) {
+func CheckExternalServiceConditions(t *testing.T, registrationName string, opts *k8s.KubectlOptions) {
 	t.Helper()
 
 	ogLogger := opts.Logger
@@ -204,7 +204,7 @@ func CheckExternalServiceConditions(t *testing.T, externalServiceName string, op
 	opts.Logger = terratestLogger.Discard
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
 		var err error
-		out, err := k8s.RunKubectlAndGetOutputE(r, opts, "get", "-o=json", "registrations.consul.hashicorp.com", externalServiceName)
+		out, err := k8s.RunKubectlAndGetOutputE(r, opts, "get", "-o=json", "registrations.consul.hashicorp.com", registrationName)
 		require.NoError(r, err)
 		reg := v1alpha1.Registration{}
 		err = json.Unmarshal([]byte(out), &reg)
@@ -368,26 +368,29 @@ func WaitForInput(t *testing.T) {
 	}
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			err := r.Body.Close()
-			if err != nil {
-				t.Logf("error closing request body: %v", err)
-			}
-		}()
-
+		fmt.Println("writing header")
 		w.WriteHeader(http.StatusOK)
 
+		fmt.Println("writing body")
 		_, err := w.Write([]byte("input received\n"))
 		if err != nil {
-			t.Logf("writing body: %v", err)
+			t.Logf("error writing body: %v", err)
+			err = nil
 		}
 
-		err = srv.Shutdown(context.Background())
+		err = r.Body.Close()
 		if err != nil {
-			t.Logf("error closing listener: %v", err)
+			t.Logf("error closing request body: %v", err)
+			err = nil
 		}
 
 		t.Log("input received, continuing test")
+		go func() {
+			err = srv.Shutdown(context.Background())
+			if err != nil {
+				t.Logf("error closing listener: %v", err)
+			}
+		}()
 	})
 
 	t.Logf("Waiting for input on http://localhost:%s", listenerPort)

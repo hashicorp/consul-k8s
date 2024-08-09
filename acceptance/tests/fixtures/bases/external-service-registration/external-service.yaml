@@ -11,7 +11,8 @@ spec:
   nodeMeta:
     external-node: "true"
     external-probe: "true"
-  address: static-server.default
+    one-more: "true"
+  address: static-server
   service:
     id: static-server
     name: static-server

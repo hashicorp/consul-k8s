@@ -304,6 +304,13 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				logger.Log(t, "creating static-server deployment")
 				k8s.DeployKustomize(t, staticServerNSOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, tc.staticServerConfig.path)
 
+				// Create the config entry for the terminating gateway.
+				logger.Log(t, "creating terminating gateway")
+				k8s.KubectlApplyK(t, termGWNSOpts, tc.termGWConfig.path)
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, termGWNSOpts, tc.termGWConfig.path)
+				})
+
 				k8sOpts := helpers.K8sOptions{
 					Options:             externalServiceRegistrationNSOpts,
 					NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
@@ -318,13 +325,6 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 				}
 
 				helpers.RegisterExternalServiceCRD(t, k8sOpts, consulOpts)
-
-				// Create the config entry for the terminating gateway.
-				logger.Log(t, "creating terminating gateway")
-				k8s.KubectlApplyK(t, termGWNSOpts, tc.termGWConfig.path)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, termGWNSOpts, tc.termGWConfig.path)
-				})
 
 				// Deploy the static client
 				logger.Log(t, "deploying static client")
