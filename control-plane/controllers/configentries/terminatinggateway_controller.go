@@ -79,7 +79,13 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if aclsEnabled(r.ConfigEntryController.ConsulClientConfig) {
+	enabled, err := r.aclsEnabled()
+	if err != nil {
+		log.Error(err, "error checking if acls are enabled")
+		return ctrl.Result{}, err
+	}
+
+	if enabled {
 		err := r.updateACls(log, termGW)
 		if err != nil {
 			log.Error(err, "error updating terminating-gateway roles")
@@ -120,8 +126,12 @@ func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.C
 	}
 }
 
-func aclsEnabled(consulClientConfig *consul.Config) bool {
-	return consulClientConfig.APIClientConfig.Token != "" || consulClientConfig.APIClientConfig.TokenFile != ""
+func (r *TerminatingGatewayController) aclsEnabled() (bool, error) {
+	state, err := r.ConfigEntryController.ConsulServerConnMgr.State()
+	if err != nil {
+		return false, err
+	}
+	return state.Token != "", nil
 }
 
 func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consulv1alpha1.TerminatingGateway) error {
