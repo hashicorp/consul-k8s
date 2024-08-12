@@ -143,46 +143,7 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 		return result
 	}
 
-	if r.Cache.aclsEnabled() {
-		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)
-			return result
-		}
-
-		err = r.Cache.updateTermGWACLRole(log, registration, termGWsToUpdate)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)
-			return result
-		}
-	}
 	return result
-}
-
-func (r *RegistrationsController) terminatingGatewaysToUpdate(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration) ([]v1alpha1.TerminatingGateway, error) {
-	termGWList := &v1alpha1.TerminatingGatewayList{}
-	err := r.Client.List(ctx, termGWList)
-	if err != nil {
-		log.Error(err, "error listing terminating gateways")
-		return nil, err
-	}
-
-	termGWsToUpdate := make([]v1alpha1.TerminatingGateway, 0, len(termGWList.Items))
-	for _, termGW := range termGWList.Items {
-		if slices.ContainsFunc(termGW.Spec.Services, termGWContainsService(registration)) {
-			termGWsToUpdate = append(termGWsToUpdate, termGW)
-		}
-	}
-
-	return termGWsToUpdate, nil
-}
-
-func termGWContainsService(registration *v1alpha1.Registration) func(v1alpha1.LinkedService) bool {
-	return func(svc v1alpha1.LinkedService) bool {
-		return svc.Name == registration.Spec.Service.Name
-	}
 }
 
 func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration) Result {
@@ -193,22 +154,6 @@ func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.L
 		result.Sync = err
 		result.Deregistration = fmt.Errorf("%w: %s", ErrDeregisteringService, err)
 		return result
-	}
-
-	if r.Cache.aclsEnabled() {
-		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)
-			return result
-		}
-
-		err = r.Cache.removeTermGWACLRole(log, registration, termGWsToUpdate)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)
-			return result
-		}
 	}
 
 	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
@@ -231,10 +176,6 @@ func (r *RegistrationsController) UpdateStatus(ctx context.Context, log logr.Log
 		registration.Status.Conditions = append(registration.Status.Conditions, registrationCondition(result))
 	} else {
 		registration.Status.Conditions = append(registration.Status.Conditions, deregistrationCondition(result))
-	}
-
-	if r.Cache.aclsEnabled() {
-		registration.Status.Conditions = append(registration.Status.Conditions, aclCondition(result))
 	}
 
 	err := r.Status().Update(ctx, registration)
