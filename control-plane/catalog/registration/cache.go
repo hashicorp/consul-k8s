@@ -7,7 +7,6 @@ import (
 	"context"
 	"strings"
 	"sync"
-	"text/template"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
@@ -18,39 +17,6 @@ import (
 )
 
 const NotInServiceMeshFilter = "ServiceMeta[\"managed-by\"] != \"consul-k8s-endpoints-controller\""
-
-func init() {
-	gatewayTpl = template.Must(template.New("root").Parse(strings.TrimSpace(gatewayRulesTpl)))
-}
-
-type templateArgs struct {
-	EnablePartitions bool
-	Partition        string
-	EnableNamespaces bool
-	Namespace        string
-	ServiceName      string
-}
-
-var (
-	gatewayTpl      *template.Template
-	gatewayRulesTpl = `
-{{ if .EnablePartitions }}
-partition "{{.Partition}}" {
-{{- end }}
-  {{- if .EnableNamespaces }}
-  namespace "{{.Namespace}}" {
-  {{- end }}
-    service "{{.ServiceName}}" { 
-      policy = "write" 
-    }
-  {{- if .EnableNamespaces }}
-  }
-  {{- end }}
-{{- if .EnablePartitions }}
-}
-{{- end }}
-`
-)
 
 type RegistrationCache struct {
 	// we include the context here so that we can use it for cancellation of `run` invocations that are scheduled after the cache is started
@@ -193,10 +159,6 @@ func (c *RegistrationCache) set(name string, reg *v1alpha1.Registration) {
 	c.serviceMtx.Lock()
 	defer c.serviceMtx.Unlock()
 	c.Services[name] = reg
-}
-
-func (c *RegistrationCache) aclsEnabled() bool {
-	return c.ConsulClientConfig.APIClientConfig.Token != "" || c.ConsulClientConfig.APIClientConfig.TokenFile != ""
 }
 
 func (c *RegistrationCache) registerService(log logr.Logger, reg *v1alpha1.Registration) error {

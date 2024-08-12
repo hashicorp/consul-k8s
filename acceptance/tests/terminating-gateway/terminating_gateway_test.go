@@ -98,7 +98,3 @@ func TestTerminatingGateway(t *testing.T) {
 		})
 	}
 }
-
-const staticServerPolicyRules = `service "static-server" {
-  policy = "write"
-}`
