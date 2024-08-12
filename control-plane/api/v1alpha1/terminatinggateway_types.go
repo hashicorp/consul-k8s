@@ -22,6 +22,13 @@ const (
 	terminatingGatewayKubeKind = "terminatinggateway"
 )
 
+const (
+	TerminatingGatewayFailedToSetACLs string = "FailedToSetACLs"
+)
+
+// Condition Type
+const ConsulACLStatus ConditionType = "ConsulACLsSynced"
+
 func init() {
 	SchemeBuilder.Register(&TerminatingGateway{}, &TerminatingGatewayList{})
 }
@@ -142,15 +149,41 @@ func (in *TerminatingGateway) KubernetesName() string {
 }
 
 func (in *TerminatingGateway) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
-	in.Status.Conditions = Conditions{
-		{
-			Type:               ConditionSynced,
-			Status:             status,
-			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
-		},
+	cond := Condition{
+		Type:               ConditionSynced,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
 	}
+
+	for idx, c := range in.Status.Conditions {
+		if c.Type == ConditionSynced {
+			in.Status.Conditions[idx] = cond
+			return
+		}
+	}
+
+	in.Status.Conditions = append(in.Status.Conditions, cond)
+}
+
+func (in *TerminatingGateway) SetACLStatusConditon(status corev1.ConditionStatus, reason, message string) {
+	cond := Condition{
+		Type:               ConsulACLStatus,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+
+	for idx, c := range in.Status.Conditions {
+		if c.Type == ConsulACLStatus {
+			in.Status.Conditions[idx] = cond
+			return
+		}
+	}
+
+	in.Status.Conditions = append(in.Status.Conditions, cond)
 }
 
 func (in *TerminatingGateway) SetLastSyncedTime(time *metav1.Time) {

@@ -13,12 +13,14 @@ import (
 
 	"github.com/go-logr/logr"
 	capi "github.com/hashicorp/consul/api"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
@@ -74,7 +76,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	// get the registration
 	if err := r.Client.Get(ctx, req.NamespacedName, termGW); err != nil {
 		if !k8serrors.IsNotFound(err) {
-			log.Error(err, "unable to get registration")
+			log.Error(err, "unable to get terminating-gateway")
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -82,10 +84,20 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	if aclsEnabled(r.ConsulClientConfig) {
 		err := r.updateACls(log, termGW)
 		if err != nil {
+			log.Error(err, "error updating terminating-gateway roles")
+			r.UpdateStatusFailedToSetACLs(ctx, termGW, err)
+			return ctrl.Result{}, err
+		}
+
+		termGW.SetACLStatusConditon(corev1.ConditionTrue, "", "")
+		err = r.UpdateStatus(ctx, termGW)
+		if err != nil {
+			log.Error(err, "error updating terminating-gateway status")
 			return ctrl.Result{}, err
 		}
 	}
-	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.TerminatingGateway{})
+
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, termGW)
 }
 
 func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Logger {
@@ -93,11 +105,21 @@ func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Lo
 }
 
 func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	termGW := obj.(*v1alpha1.TerminatingGateway)
+	fmt.Println(termGW.Status.Conditions)
 	return r.Status().Update(ctx, obj, opts...)
 }
 
 func (r *TerminatingGatewayController) SetupWithManager(mgr ctrl.Manager) error {
 	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
+}
+
+func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, err error) {
+	termGW.SetSyncedCondition(corev1.ConditionFalse, consulv1alpha1.TerminatingGatewayFailedToSetACLs, err.Error())
+	termGW.SetACLStatusConditon(corev1.ConditionFalse, consulv1alpha1.TerminatingGatewayFailedToSetACLs, err.Error())
+	if err := r.UpdateStatus(ctx, termGW); err != nil {
+		r.Log.Error(err, "error updating status")
+	}
 }
 
 func aclsEnabled(consulClientConfig *consul.Config) bool {
