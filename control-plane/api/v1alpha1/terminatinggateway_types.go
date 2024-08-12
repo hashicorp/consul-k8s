@@ -26,7 +26,7 @@ const (
 	TerminatingGatewayFailedToSetACLs string = "FailedToSetACLs"
 )
 
-// Condition Type
+// Condition Type.
 const ConsulACLStatus ConditionType = "ConsulACLsSynced"
 
 func init() {
