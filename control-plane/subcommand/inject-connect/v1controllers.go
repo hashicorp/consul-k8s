@@ -255,8 +255,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.TerminatingGateway),
 		NamespacesEnabled:     c.flagEnableNamespaces,
-		ConsulClientConfig:    consulConfig,
-		ConsulServerConnMgr:   watcher,
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.TerminatingGateway)

@@ -31,8 +31,6 @@ var _ Controller = (*TerminatingGatewayController)(nil)
 type TerminatingGatewayController struct {
 	client.Client
 	FinalizerPatcher
-	ConsulClientConfig  *consul.Config
-	ConsulServerConnMgr consul.ServerConnectionManager
 
 	NamespacesEnabled bool
 
@@ -81,7 +79,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if aclsEnabled(r.ConsulClientConfig) {
+	if aclsEnabled(r.ConfigEntryController.ConsulClientConfig) {
 		err := r.updateACls(log, termGW)
 		if err != nil {
 			log.Error(err, "error updating terminating-gateway roles")
@@ -127,7 +125,7 @@ func aclsEnabled(consulClientConfig *consul.Config) bool {
 }
 
 func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consulv1alpha1.TerminatingGateway) error {
-	client, err := consul.NewClientFromConnMgr(r.ConsulClientConfig, r.ConsulServerConnMgr)
+	client, err := consul.NewClientFromConnMgr(r.ConfigEntryController.ConsulClientConfig, r.ConfigEntryController.ConsulServerConnMgr)
 	if err != nil {
 		return err
 	}
