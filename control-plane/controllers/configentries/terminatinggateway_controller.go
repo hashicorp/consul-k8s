@@ -109,8 +109,6 @@ func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Lo
 }
 
 func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-	termGW := obj.(*v1alpha1.TerminatingGateway)
-	fmt.Println(termGW.Status.Conditions)
 	return r.Status().Update(ctx, obj, opts...)
 }
 
