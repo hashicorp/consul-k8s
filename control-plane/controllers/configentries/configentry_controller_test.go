@@ -15,6 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -543,48 +544,59 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.kubeKind, func(t *testing.T) {
-			req := require.New(t)
-			ctx := context.Background()
+		for _, secure := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s: %t", c.kubeKind, secure), func(t *testing.T) {
+				req := require.New(t)
+				ctx := context.Background()
 
-			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
+				s := runtime.NewScheme()
+				s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
 
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
+				var cb testutil.ServerConfigCallback
+				if secure {
+					adminToken := "123e4567-e89b-12d3-a456-426614174000"
+					cb = func(c *testutil.TestServerConfig) {
+						c.ACL.Enabled = true
+						c.ACL.Tokens.InitialManagement = adminToken
+					}
+				}
 
-			for _, configEntry := range c.consulPrereqs {
-				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				testClient := test.TestServerWithMockConnMgrWatcher(t, cb)
+				testClient.TestServer.WaitForServiceIntentions(t)
+				consulClient := testClient.APIClient
+
+				for _, configEntry := range c.consulPrereqs {
+					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+					req.NoError(err)
+					req.True(written)
+				}
+
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
+				namespacedName := types.NamespacedName{
+					Namespace: kubeNS,
+					Name:      c.configEntryResource.KubernetesName(),
+				}
+				resp, err := r.Reconcile(ctx, ctrl.Request{
+					NamespacedName: namespacedName,
+				})
 				req.NoError(err)
-				req.True(written)
-			}
+				req.False(resp.Requeue)
 
-			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
-			namespacedName := types.NamespacedName{
-				Namespace: kubeNS,
-				Name:      c.configEntryResource.KubernetesName(),
-			}
-			resp, err := r.Reconcile(ctx, ctrl.Request{
-				NamespacedName: namespacedName,
+				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
+				req.NoError(err)
+				req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
+				c.compare(t, cfg)
+
+				// Check that the status is "synced".
+				err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
+				req.NoError(err)
+				req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
+
+				// Check that the finalizer is added.
+				req.Contains(c.configEntryResource.Finalizers(), FinalizerName)
 			})
-			req.NoError(err)
-			req.False(resp.Requeue)
-
-			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
-			req.NoError(err)
-			req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
-			c.compare(t, cfg)
-
-			// Check that the status is "synced".
-			err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
-			req.NoError(err)
-			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
-
-			// Check that the finalizer is added.
-			req.Contains(c.configEntryResource.Finalizers(), FinalizerName)
-		})
+		}
 	}
 }
 
