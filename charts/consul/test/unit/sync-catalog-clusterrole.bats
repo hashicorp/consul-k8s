@@ -35,6 +35,14 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "syncCatalog/ClusterRole: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/sync-catalog-clusterrole.yaml  \
+        --set 'syncCatalog.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "syncCatalog/ClusterRole: enabled with sync enabled and global.enabled=false" {
   cd `chart_dir`
   local actual=$(helm template \

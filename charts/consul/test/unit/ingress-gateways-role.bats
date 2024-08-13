@@ -20,6 +20,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "ingressGateways/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/ingress-gateways-role.yaml  \
+        --set 'ingressGateways.enabled=true' \
+        --set 'connectInject.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
+
 @test "ingressGateways/Role: rules for PodSecurityPolicy" {
   cd `chart_dir`
   local actual=$(helm template \

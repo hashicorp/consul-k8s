@@ -8,7 +8,15 @@ load _helpers
       -s templates/client-securitycontextconstraints.yaml  \
       .
 }
+@test "client/SecurityContextConstraints: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/client-securitycontextconstraints.yaml  \
+        --set 'client.enabled=true' \
+        --set 'global.rbac.create=false' \
+        .
 
+}
 @test "client/SecurityContextConstraints: disabled with client disabled and global.openshift.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \

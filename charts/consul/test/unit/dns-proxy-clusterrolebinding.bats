@@ -8,7 +8,14 @@ load _helpers
       -s templates/dns-proxy-clusterrolebinding.yaml  \
       .
 }
-
+@test "dnsProxy/ClusterRoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/dns-proxy-clusterrolebinding.yaml \
+        --set 'dns.proxy.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "dnsProxy/ClusterRoleBinding: enabled with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \

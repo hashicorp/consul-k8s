@@ -20,6 +20,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "ingressGateways/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/ingress-gateways-rolebinding.yaml  \
+        --set 'ingressGateways.enabled=true' \
+        --set 'connectInject.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "ingressGateways/RoleBinding: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \

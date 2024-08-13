@@ -39,6 +39,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "tlsInit/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/tls-init-rolebinding.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      --set 'global.rbac.create=false'  \
+      .
+}
+
 @test "tlsInit/RoleBinding: disabled when server.enabled=false" {
   cd `chart_dir`
   assert_empty helm template \

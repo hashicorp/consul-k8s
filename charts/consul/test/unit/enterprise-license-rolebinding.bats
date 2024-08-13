@@ -9,6 +9,16 @@ load _helpers
       .
 }
 
+@test "enterpriseLicense/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/enterprise-license-rolebinding.yaml \
+        --set 'global.enterpriseLicense.secretName=foo' \
+        --set 'global.enterpriseLicense.secretKey=bar' \
+        --set 'global.rbac.create=false'  \
+        .
+}
+
 @test "enterpriseLicense/RoleBinding: disabled if autoload is true (default)" {
   cd `chart_dir`
   assert_empty helm template \

@@ -60,4 +60,3 @@ rules:
   - watch
 {{- end }}
 {{- end }}
-{{- end }}

@@ -20,7 +20,13 @@ target=templates/gateway-cleanup-clusterrole.yaml
         --set 'connectInject.enabled=false' \
         . 
 }
-
+@test "gatewaycleanup/ClusterRole: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s $target \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "gatewaycleanup/ClusterRole: can use podsecuritypolicies with global.enablePodSecurityPolicy=true" {
     cd `chart_dir`
     local actual=$(helm template \
