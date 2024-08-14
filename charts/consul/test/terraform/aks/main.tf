@@ -1,8 +1,15 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+terraform {
+  required_providers {
+    azurerm = {
+      version = "3.40.0"
+    }
+  }
+}
+
 provider "azurerm" {
-  version = "3.40.0"
   features {}
 }
 
@@ -48,7 +55,7 @@ resource "azurerm_kubernetes_cluster" "default" {
   location                          = azurerm_resource_group.default[count.index].location
   resource_group_name               = azurerm_resource_group.default[count.index].name
   dns_prefix                        = "consul-k8s-${random_id.suffix[count.index].dec}"
-  kubernetes_version                = "1.24.6"
+  kubernetes_version                = var.kubernetes_version
   role_based_access_control_enabled = true
 
   // We're setting the network plugin and other network properties explicitly

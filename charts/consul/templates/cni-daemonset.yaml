@@ -37,6 +37,7 @@ spec:
         {{- end }}
       annotations:
         consul.hashicorp.com/connect-inject: "false"
+        consul.hashicorp.com/mesh-inject: "false"
     spec:
       # consul-cni only runs on linux operating systems
       nodeSelector:
@@ -61,6 +62,7 @@ spec:
         # This container installs the consul CNI binaries and CNI network config file on each node
         - name: install-cni
           image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
           securityContext:
             privileged: true
           command:

@@ -1,0 +1,3 @@
+```release-note:improvement
+catalog: Topology zone and region information is now read from the Kubernetes endpoints and associated node and added to registered consul services under Metadata.
+```

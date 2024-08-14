@@ -11,9 +11,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +25,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 // AcceptorController reconciles a PeeringAcceptor object.
@@ -341,7 +341,7 @@ func (r *AcceptorController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&consulv1alpha1.PeeringAcceptor{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForPeeringTokens),
 			builder.WithPredicates(predicate.NewPredicateFuncs(r.filterPeeringAcceptors)),
 		).Complete(r)
@@ -375,12 +375,12 @@ func (r *AcceptorController) deletePeering(ctx context.Context, apiClient *api.C
 // the list of acceptors and creates a request for the acceptor that has the same secret as it's
 // secretRef and that of the updated secret that is being watched.
 // We compare it to the secret in the status as the resource has created the secret.
-func (r *AcceptorController) requestsForPeeringTokens(object client.Object) []reconcile.Request {
+func (r *AcceptorController) requestsForPeeringTokens(ctx context.Context, object client.Object) []reconcile.Request {
 	r.Log.Info("received update for Peering Token Secret", "name", object.GetName(), "namespace", object.GetNamespace())
 
 	// Get the list of all acceptors.
 	var acceptorList consulv1alpha1.PeeringAcceptorList
-	if err := r.Client.List(r.Context, &acceptorList); err != nil {
+	if err := r.Client.List(ctx, &acceptorList); err != nil {
 		r.Log.Error(err, "failed to list Peering Acceptors")
 		return []ctrl.Request{}
 	}

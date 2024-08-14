@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
@@ -25,11 +26,6 @@ const (
 	NamespaceEnvVar  = "CONSUL_NAMESPACE"
 	PartitionEnvVar  = "CONSUL_PARTITION"
 	DatacenterEnvVar = "CONSUL_DATACENTER"
-
-	UseTLSEnvVar        = "CONSUL_USE_TLS"
-	CACertFileEnvVar    = "CONSUL_CACERT_FILE"
-	CACertPEMEnvVar     = "CONSUL_CACERT_PEM"
-	TLSServerNameEnvVar = "CONSUL_TLS_SERVER_NAME"
 
 	ACLTokenEnvVar     = "CONSUL_ACL_TOKEN"
 	ACLTokenFileEnvVar = "CONSUL_ACL_TOKEN_FILE"
@@ -93,7 +89,7 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 	// behave as if that env variable is not provided.
 	grpcPort, _ := strconv.Atoi(os.Getenv(GRPCPortEnvVar))
 	httpPort, _ := strconv.Atoi(os.Getenv(HTTPPortEnvVar))
-	useTLS, _ := strconv.ParseBool(os.Getenv(UseTLSEnvVar))
+	useTLS, _ := strconv.ParseBool(os.Getenv(constants.UseTLSEnvVar))
 	skipServerWatch, _ := strconv.ParseBool(os.Getenv(SkipServerWatchEnvVar))
 	consulLoginMetaFromEnv := os.Getenv(LoginMetaEnvVar)
 	if consulLoginMetaFromEnv != "" {
@@ -142,11 +138,11 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 		"[Enterprise only] Consul admin partition. Default to \"default\" if Admin Partitions are enabled.")
 	fs.StringVar(&f.Datacenter, "datacenter", os.Getenv(DatacenterEnvVar),
 		"Consul datacenter.")
-	fs.StringVar(&f.CACertFile, "ca-cert-file", os.Getenv(CACertFileEnvVar),
+	fs.StringVar(&f.CACertFile, "ca-cert-file", os.Getenv(constants.CACertFileEnvVar),
 		"Path to a CA certificate to use for TLS when communicating with Consul.")
-	fs.StringVar(&f.CACertPEM, "ca-cert-pem", os.Getenv(CACertPEMEnvVar),
+	fs.StringVar(&f.CACertPEM, "ca-cert-pem", os.Getenv(constants.CACertPEMEnvVar),
 		"CA certificate PEM to use for TLS when communicating with Consul.")
-	fs.StringVar(&f.TLSServerName, "tls-server-name", os.Getenv(TLSServerNameEnvVar),
+	fs.StringVar(&f.TLSServerName, "tls-server-name", os.Getenv(constants.TLSServerNameEnvVar),
 		"The server name to use as the SNI host when connecting via TLS. "+
 			"This can also be specified via the CONSUL_TLS_SERVER_NAME environment variable.")
 	fs.BoolVar(&f.UseTLS, "use-tls", useTLS, "If true, use TLS for connections to Consul.")

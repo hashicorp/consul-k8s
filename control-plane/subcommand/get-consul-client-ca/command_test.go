@@ -157,6 +157,7 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		// start the test server after 100ms
 		time.Sleep(100 * time.Millisecond)
 		a, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -176,7 +177,6 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 			c.KeyFile = keyFile
 		})
 		require.NoError(t, err)
-		wg.Done()
 	}()
 	defer func() {
 		if a != nil {
@@ -203,9 +203,10 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	retrier := &retry.Timer{Timeout: 20 * time.Second, Wait: 1 * time.Second}
 	// get the actual ca cert from consul
 	var expectedCARoot string
-	retry.Run(t, func(r *retry.R) {
+	retry.RunWith(retrier, t, func(r *retry.R) {
 		roots, _, err := client.Agent().ConnectCARoots(nil)
 		require.NoError(r, err)
 		require.NotNil(r, roots)

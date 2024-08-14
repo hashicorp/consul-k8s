@@ -44,7 +44,7 @@ func TestExample(t *testing.T) {
 	k8s.KubectlApply(t, ctx.KubectlOptions(t), "path/to/config")
 
 	// Clean up any Kubernetes resources you have created
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDelete(t, ctx.KubectlOptions(t), "path/to/config")
 	})
 

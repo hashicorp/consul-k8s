@@ -15,12 +15,6 @@ metadata:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation
 rules:
-  - apiGroups: [""]
-    resources:
-      - secrets
-    verbs:
-      - create
-      - get
 {{- if .Values.connectInject.enabled }}
   - apiGroups: [""]
     resources:

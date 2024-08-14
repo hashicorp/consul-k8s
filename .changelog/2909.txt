@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Add readOnlyRootFilesystem to the default restricted security context when runnning `consul-k8s` in a restricted namespaces.
+```

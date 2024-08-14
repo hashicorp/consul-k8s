@@ -1,0 +1,250 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.1
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+  name: registrations.consul.hashicorp.com
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: Registration
+    listKind: RegistrationList
+    plural: registrations
+    singular: registration
+  scope: Cluster
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Registration defines the resource for working with service registrations.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec defines the desired state of Registration.
+            properties:
+              address:
+                type: string
+              check:
+                description: HealthCheck is used to represent a single check.
+                properties:
+                  checkId:
+                    type: string
+                  definition:
+                    description: HealthCheckDefinition is used to store the details
+                      about a health check's execution.
+                    properties:
+                      body:
+                        type: string
+                      deregisterCriticalServiceAfterDuration:
+                        type: string
+                      grpc:
+                        type: string
+                      grpcUseTLS:
+                        type: boolean
+                      header:
+                        additionalProperties:
+                          items:
+                            type: string
+                          type: array
+                        type: object
+                      http:
+                        type: string
+                      intervalDuration:
+                        type: string
+                      method:
+                        type: string
+                      osService:
+                        type: string
+                      tcp:
+                        type: string
+                      tcpUseTLS:
+                        type: boolean
+                      timeoutDuration:
+                        type: string
+                      tlsServerName:
+                        type: string
+                      tlsSkipVerify:
+                        type: boolean
+                      udp:
+                        type: string
+                    required:
+                    - intervalDuration
+                    type: object
+                  exposedPort:
+                    type: integer
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  node:
+                    type: string
+                  notes:
+                    type: string
+                  output:
+                    type: string
+                  partition:
+                    type: string
+                  serviceId:
+                    type: string
+                  serviceName:
+                    type: string
+                  status:
+                    type: string
+                  type:
+                    type: string
+                required:
+                - checkId
+                - definition
+                - name
+                - serviceId
+                - serviceName
+                - status
+                type: object
+              datacenter:
+                type: string
+              id:
+                type: string
+              locality:
+                properties:
+                  region:
+                    type: string
+                  zone:
+                    type: string
+                type: object
+              node:
+                type: string
+              nodeMeta:
+                additionalProperties:
+                  type: string
+                type: object
+              partition:
+                type: string
+              service:
+                properties:
+                  address:
+                    type: string
+                  enableTagOverride:
+                    type: boolean
+                  id:
+                    type: string
+                  locality:
+                    properties:
+                      region:
+                        type: string
+                      zone:
+                        type: string
+                    type: object
+                  meta:
+                    additionalProperties:
+                      type: string
+                    type: object
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  partition:
+                    type: string
+                  port:
+                    type: integer
+                  socketPath:
+                    type: string
+                  taggedAddresses:
+                    additionalProperties:
+                      properties:
+                        address:
+                          type: string
+                        port:
+                          type: integer
+                      required:
+                      - address
+                      - port
+                      type: object
+                    type: object
+                  tags:
+                    items:
+                      type: string
+                    type: array
+                  weights:
+                    properties:
+                      passing:
+                        type: integer
+                      warning:
+                        type: integer
+                    required:
+                    - passing
+                    - warning
+                    type: object
+                required:
+                - name
+                - port
+                type: object
+              skipNodeUpdate:
+                type: boolean
+              taggedAddresses:
+                additionalProperties:
+                  type: string
+                type: object
+            type: object
+          status:
+            description: RegistrationStatus defines the observed state of Registration.
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end }}

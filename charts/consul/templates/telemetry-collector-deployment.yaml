@@ -5,6 +5,7 @@
 {{ template "consul.validateCloudSecretKeys" . }}
 {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{ template "consul.validateTelemetryCollectorCloudSecretKeys" . }}
+{{ template "consul.validateTelemetryCollectorResourceId" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -34,8 +35,11 @@ spec:
         # This annotation tells the endpoints controller that this pod was injected even though it wasn't. The
         # endpoints controller would then sync the endpoint into Consul
         "consul.hashicorp.com/connect-inject-status": "injected"
+        # Signals to the endpoints controller that we should force Consul NS creation, since we bypass the mesh webhook.
+        "consul.hashicorp.com/telemetry-collector": "true"
         # We aren't using tproxy and we don't have an original pod. This would be simpler if we made a path similar
         # to gateways
+        "consul.hashicorp.com/connect-service-port": "metricsserver"
         "consul.hashicorp.com/transparent-proxy": "false"
         "consul.hashicorp.com/transparent-proxy-overwrite-probes": "false"
         "consul.hashicorp.com/connect-k8s-version": {{ $.Chart.Version }}
@@ -57,6 +61,9 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
 
       labels:
@@ -69,7 +76,9 @@ spec:
           {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ template "consul.fullname" . }}-telemetry-collector
+      # This needs to explicitly be consul-telemetry-collector because we look this up from each service consul-dataplane
+      # to forward metrics to it.
+      serviceAccountName: consul-telemetry-collector
       initContainers:
       # We're manually managing this init container instead of using the connect injector so that we don't run into
       # any race conditions on the connect-injector deployment or upgrade
@@ -87,39 +96,54 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-          {{- if .Values.global.acls.manageSystemACLs }}
-          - name: CONSUL_LOGIN_AUTH_METHOD
-            value: {{ template "consul.fullname" . }}-k8s-auth-method
-          - name: CONSUL_LOGIN_META
-            value: "component=consul-telemetry-collector,pod=$(NAMESPACE)/$(POD_NAME)"
-          {{- end }}
           - name: CONSUL_NODE_NAME
             value: $(NODE_NAME)-virtual
           {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
+          # acl login info
+          {{- if .Values.global.acls.manageSystemACLs }}
+          - name: CONSUL_LOGIN_AUTH_METHOD
+            value: {{ template "consul.fullname" . }}-k8s-auth-method
+          - name: CONSUL_LOGIN_DATACENTER
+            value: {{ .Values.global.datacenter }}
+          - name: CONSUL_LOGIN_META
+            value: "component=consul-telemetry-collector,pod=$(NAMESPACE)/$(POD_NAME)"
+          {{- end }}
+          # service and login namespace
+          # this is attempting to replicate the behavior of webhooks in calculating namespace
+          # https://github.com/hashicorp/consul-k8s/blob/b84339050bb2c4b62b60cec96275f74952b0ac9d/control-plane/connect-inject/webhook/consul_dataplane_sidecar.go#L200 
           {{- if .Values.global.enableConsulNamespaces }}
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
           - name: CONSUL_NAMESPACE
-            value: {{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
-          {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
+            value: {{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
+          {{- else }}
+          - name: CONSUL_NAMESPACE
+            value: {{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }}
+          {{- if .Values.global.acls.manageSystemACLs }}
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
           - name: CONSUL_LOGIN_NAMESPACE
-            value: "default"
+            value: default
           {{- else }}
           - name: CONSUL_LOGIN_NAMESPACE
-            value: {{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
+            value: {{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }} 
           {{- end }}
           {{- end }}
         command:
           - /bin/sh
           - -ec
           - |-
-            consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-              -log-level={{ default .Values.global.logLevel }} \
+            exec consul-k8s-control-plane connect-init \
               -log-json={{ .Values.global.logJSON }} \
+              -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }} \
+              -pod-name=${POD_NAME} \
+              -pod-namespace=${POD_NAMESPACE} \
+              -proxy-id-file="/consul/connect-inject/proxyid" \
               -service-account-name="consul-telemetry-collector" \
-              -service-name="" \
-              -proxy-id-file="/consul/connect-inject/proxyid"
+              -service-name=""
 
         image: {{ .Values.global.imageK8S }}
-        imagePullPolicy: IfNotPresent
+        {{ template "consul.imagePullPolicy" . }}
         {{- if .Values.telemetryCollector.initContainer.resources }}
         resources:
           {{- toYaml .Values.telemetryCollector.initContainer.resources | nindent 12 }}
@@ -147,7 +171,7 @@ spec:
       containers:
       - name: consul-telemetry-collector
         image: {{ .Values.telemetryCollector.image }}
-        imagePullPolicy: Always
+        {{ template "consul.imagePullPolicy" . }}
         ports:
         - containerPort: 9090
           name: metrics
@@ -159,13 +183,32 @@ spec:
             # These are mounted as secrets so that the telemetry-collector can use them when cloud is enabled.
             # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
             #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
-            # - HCP_RESOURCE_ID is created for use in the global cloud section but we will share it here
+            # - HCP_RESOURCE_ID is created either in the global cloud section or in telemetryCollector.cloud
+            {{- if .Values.telemetryCollector.cloud.resourceId.secretName }}
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.telemetryCollector.cloud.resourceId.secretName }}
+                  key: {{ .Values.telemetryCollector.cloud.resourceId.secretKey }}
+            {{- else if .Values.global.cloud.resourceId.secretName }}
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.resourceId.secretName }}
+                  key: {{ .Values.global.cloud.resourceId.secretKey }}
+            {{- end }}
             {{- if .Values.telemetryCollector.cloud.clientId.secretName }}
             - name: HCP_CLIENT_ID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.telemetryCollector.cloud.clientId.secretName }}
                   key: {{ .Values.telemetryCollector.cloud.clientId.secretKey }}
+            {{- else if .Values.global.cloud.clientId.secretName }}
+            - name: HCP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.clientId.secretName }}
+                  key: {{ .Values.global.cloud.clientId.secretKey }}
             {{- end }}
             {{- if .Values.telemetryCollector.cloud.clientSecret.secretName }}
             - name: HCP_CLIENT_SECRET
@@ -173,14 +216,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.telemetryCollector.cloud.clientSecret.secretName }}
                   key: {{ .Values.telemetryCollector.cloud.clientSecret.secretKey }}
-            {{- end}}
-            {{- if .Values.global.cloud.resourceId.secretName }}
-            - name: HCP_RESOURCE_ID
+            {{- else if .Values.global.cloud.clientSecret.secretName }}
+            - name: HCP_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.global.cloud.resourceId.secretName }}
-                  key: {{ .Values.global.cloud.resourceId.secretKey }}
-            {{- end }}
+                  name: {{ .Values.global.cloud.clientSecret.secretName }}
+                  key: {{ .Values.global.cloud.clientSecret.secretKey }}
+            {{- end}}
             {{- if .Values.global.cloud.authUrl.secretName }}
             - name: HCP_AUTH_URL
               valueFrom:
@@ -202,21 +244,54 @@ spec:
                   name: {{ .Values.global.cloud.scadaAddress.secretName }}
                   key: {{ .Values.global.cloud.scadaAddress.secretKey }}
             {{- end}}
-
+            {{- if .Values.global.trustedCAs }}
+            - name: SSL_CERT_DIR
+              value: "/etc/ssl/certs:/trusted-cas"
+            {{- end }}
+            {{- if .Values.global.metrics.datadog.otlp.enabled }}
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            {{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}
+            - name: CO_OTEL_HTTP_ENDPOINT
+              value: "http://$(HOST_IP):4318"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://$(HOST_IP):4318"
+            {{- else if eq (.Values.global.metrics.datadog.otlp.protocol | lower) "grpc" }}
+            - name: CO_OTEL_HTTP_ENDPOINT
+              value: "http://$(HOST_IP):4317"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://$(HOST_IP):4317"
+            {{- end }}
+            {{- end }}
+            {{- include "consul.extraEnvironmentVars" .Values.telemetryCollector | nindent 12 }}
         command:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-telemetry-collector agent
-        {{- if .Values.telemetryCollector.customExporterConfig }}
-        args:
-        - -config-file-path /consul/config/config.json
-        {{ end }}
-        {{- if .Values.telemetryCollector.customExporterConfig }}
+          {{- if .Values.global.trustedCAs }}
+          {{- range $i, $cert := .Values.global.trustedCAs }}
+          cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
+          {{- $cert | nindent 10 }}
+          EOF
+          {{- end }}
+          {{- end }}
+
+          exec consul-telemetry-collector agent \
+          {{- if .Values.telemetryCollector.customExporterConfig }}
+            -config-file-path /consul/config/config.json \
+          {{ end }}
         volumeMounts:
+          {{- if .Values.telemetryCollector.customExporterConfig }}
           - name: config
             mountPath: /consul/config
-        {{- end }}
+          {{- end }}
+          {{- if .Values.global.trustedCAs }}
+          - name: trusted-cas
+            mountPath: /trusted-cas
+            readOnly: false
+          {{- end }}
         resources:
         {{- if .Values.telemetryCollector.resources }}
           {{- toYaml .Values.telemetryCollector.resources | nindent 12 }}
@@ -224,7 +299,7 @@ spec:
       # consul-dataplane container
       - name: consul-dataplane
         image: "{{ .Values.global.imageConsulDataplane }}"
-        imagePullPolicy: IfNotPresent
+        {{ template "consul.imagePullPolicy" . }}
         command:
           - consul-dataplane
         args:
@@ -263,28 +338,34 @@ spec:
           - -credential-type=login
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
           - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
+          {{- end }}
+          # service and login namespace
           {{- if .Values.global.enableConsulNamespaces }}
-          {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
-          - -login-namespace="default"
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+          - -service-namespace={{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
           {{- else }}
-          - -login-namespace={{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
+          - -service-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }}
+          {{- if .Values.global.acls.manageSystemACLs }}
+          {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+          - -login-namespace=default
+          {{- else }}
+          - -login-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+          {{- end }} 
           {{- end }}
           {{- end }}
+          # service and login partition
           {{- if .Values.global.adminPartitions.enabled }}
-          - foo
+          - -service-partition={{ .Values.global.adminPartitions.name }}
+          {{- if .Values.global.acls.manageSystemACLs }}
           - -login-partition={{ .Values.global.adminPartitions.name }}
           {{- end }}
           {{- end }}
-          {{- if .Values.global.enableConsulNamespaces }}
-          - -service-namespace={{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
-          {{- end }}
-          {{- if .Values.global.adminPartitions.enabled }}
-          - -service-partition={{ .Values.global.adminPartitions.name }}
-          {{- end }}
+          # telemetry
           {{- if .Values.global.metrics.enabled }}
           - -telemetry-prom-scrape-path=/metrics
           {{- end }}
-          - -log-level={{ default .Values.global.logLevel }}
+          - -log-level={{ default .Values.global.logLevel .Values.telemetryCollector.logLevel }}
           - -log-json={{ .Values.global.logJSON }}
           - -envoy-concurrency=2
           {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
@@ -347,6 +428,11 @@ spec:
         - emptyDir:
             medium: Memory
           name: consul-connect-inject-data
+        {{- if .Values.global.trustedCAs }}
+        - name: trusted-cas
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
       {{- if .Values.global.tls.enabled }}
       {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
         - name: consul-ca-cert

@@ -13,14 +13,15 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 // get-consul-client-ca command talks to the Consul servers

@@ -75,6 +75,9 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- if and .Values.global.enterpriseLicense.secretName (not .Values.global.acls.manageSystemACLs) }}
         {{- with .Values.global.enterpriseLicense }}
         "vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt": "{{ .secretName }}"
@@ -83,13 +86,16 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/client-config-configmap.yaml") . | sha256sum }}
+        "consul.hashicorp.com/mesh-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ print (include (print $.Template.BasePath "/client-config-configmap.yaml") .) (include (print $.Template.BasePath "/client-tmp-extra-config-configmap.yaml") .) | sha256sum }}
         {{- if .Values.client.annotations }}
           {{- tpl .Values.client.annotations . | nindent 8 }}
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
         "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.client.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/v1/agent/metrics"
+        {{- end }}
         "prometheus.io/port": "8500"
         {{- end }}
     spec:
@@ -138,6 +144,9 @@ spec:
         - name: consul-data
           emptyDir:
             medium: "Memory"
+        - name: tmp-extra-config
+          configMap:
+            name: {{ template "consul.fullname" . }}-client-tmp-extra-config
         {{- if .Values.global.tls.enabled }}
         {{- if not .Values.global.secretsBackend.vault.enabled }}
         - name: consul-ca-cert
@@ -191,15 +200,14 @@ spec:
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.client.image }}"
+          {{ template "consul.imagePullPolicy" . }}
           {{- if .Values.global.acls.manageSystemACLs }}
           lifecycle:
             preStop:
               exec:
                 command:
-                  - "/bin/sh"
-                  - "-ec"
-                  - |
-                    consul logout
+                  - "/bin/consul"
+                  - "logout"
           {{- end }}
           env:
             {{- if .Values.global.acls.manageSystemACLs }}
@@ -386,7 +394,7 @@ spec:
                 {{- range $value := .Values.global.recursors }}
                 -recursor={{ quote $value }} \
                 {{- end }}
-                -config-file=/consul/extra-config/extra-from-values.json \
+                -config-dir=/consul/extra-config \
                 -domain={{ .Values.global.domain }}
           volumeMounts:
             - name: data
@@ -395,6 +403,8 @@ spec:
               mountPath: /consul/config
             - name: extra-config
               mountPath: /consul/extra-config
+            - name: tmp-extra-config
+              mountPath: /consul/tmp/extra-config
             - mountPath: /consul/login
               name: consul-data
               readOnly: true
@@ -493,6 +503,7 @@ spec:
       {{- if .Values.global.acls.manageSystemACLs }}
       - name: client-acl-init
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         env:
         - name: NAMESPACE
           valueFrom:
@@ -510,16 +521,12 @@ spec:
           value: "component=client,pod=$(NAMESPACE)/$(POD_NAME)"
         {{- end }}
         - name: CONSUL_LOGIN_DATACENTER
-        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-          value: {{ .Values.global.federation.primaryDatacenter }}
-        {{- else }}
           value: {{ .Values.global.datacenter }}
-        {{- end}}
         command:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s-control-plane acl-init \
+            exec consul-k8s-control-plane acl-init \
               -log-level={{ default .Values.global.logLevel .Values.client.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
               -init-type="client"
@@ -549,6 +556,7 @@ spec:
       {{- if and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt) }}
       - name: client-tls-init
         image: "{{ default .Values.global.image .Values.client.image }}"
+        {{ template "consul.imagePullPolicy" . }}
         env:
         - name: HOST_IP
           valueFrom:

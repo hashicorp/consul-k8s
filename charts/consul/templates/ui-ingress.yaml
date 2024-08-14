@@ -25,9 +25,11 @@ metadata:
     {{ tpl .Values.ui.ingress.annotations . | nindent 4 | trim }}
   {{- end }}
 spec:
+  {{- if ne .Values.ui.ingress.ingressClassName "" }}
   ingressClassName: {{ .Values.ui.ingress.ingressClassName }}
+  {{- end }}
   rules:
-  {{ $global := .Values.global }}
+  {{- $global := .Values.global }}
   {{- if or ( gt .Capabilities.KubeVersion.Major "1" ) ( ge .Capabilities.KubeVersion.Minor "19" ) }}
   {{- range .Values.ui.ingress.hosts }}
   - host: {{ .host | quote }}

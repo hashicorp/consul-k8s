@@ -35,12 +35,24 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        {{- if .Values.global.tls.annotations }}
+          {{- tpl .Values.global.tls.annotations . | nindent 8 }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-tls-init-cleanup
+      {{- if .Values.server.containerSecurityContext.tlsInit }}
+      securityContext:
+        {{- toYaml .Values.server.containerSecurityContext.tlsInit | nindent 8 }}
+      {{- end }}
       containers:
         - name: tls-init-cleanup
           image: "{{ .Values.global.image }}"
+          {{ template "consul.imagePullPolicy" . }}
+          {{- if not .Values.server.containerSecurityContext.tlsInit }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          {{- end }}
           env:
             - name: NAMESPACE
               valueFrom:

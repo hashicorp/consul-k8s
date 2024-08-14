@@ -8,14 +8,15 @@ import (
 	"encoding/json"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestValidateMesh(t *testing.T) {
@@ -92,12 +93,11 @@ func TestValidateMesh(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &Mesh{}, &MeshList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			validator := &MeshWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.New(t),
 				decoder: decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{

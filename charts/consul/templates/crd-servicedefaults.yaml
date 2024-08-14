@@ -1,18 +1,16 @@
 {{- if .Values.connectInject.enabled }}
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
-  name: servicedefaults.consul.hashicorp.com
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
+  name: servicedefaults.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -189,6 +187,69 @@ spec:
                   unlock usage of the service-splitter and service-router config entries
                   for a service.
                 type: string
+              rateLimits:
+                description: RateLimits is rate limiting configuration that is applied
+                  to inbound traffic for a service. Rate limiting is a Consul enterprise
+                  feature.
+                properties:
+                  instanceLevel:
+                    description: InstanceLevel represents rate limit configuration
+                      that is applied per service instance.
+                    properties:
+                      requestsMaxBurst:
+                        description: "RequestsMaxBurst is the maximum number of requests
+                          that can be sent in a burst. Should be equal to or greater
+                          than RequestsPerSecond. If unset, defaults to RequestsPerSecond.
+                          \n Internally, this is the maximum size of the token bucket
+                          used for rate limiting."
+                        type: integer
+                      requestsPerSecond:
+                        description: "RequestsPerSecond is the average number of requests
+                          per second that can be made without being throttled. This
+                          field is required if RequestsMaxBurst is set. The allowed
+                          number of requests may exceed RequestsPerSecond up to the
+                          value specified in RequestsMaxBurst. \n Internally, this
+                          is the refill rate of the token bucket used for rate limiting."
+                        type: integer
+                      routes:
+                        description: Routes is a list of rate limits applied to specific
+                          routes. For a given request, the first matching route will
+                          be applied, if any. Overrides any top-level configuration.
+                        items:
+                          properties:
+                            pathExact:
+                              description: Exact path to match. Exactly one of PathExact,
+                                PathPrefix, or PathRegex must be specified.
+                              type: string
+                            pathPrefix:
+                              description: Prefix to match. Exactly one of PathExact,
+                                PathPrefix, or PathRegex must be specified.
+                              type: string
+                            pathRegex:
+                              description: Regex to match. Exactly one of PathExact,
+                                PathPrefix, or PathRegex must be specified.
+                              type: string
+                            requestsMaxBurst:
+                              description: RequestsMaxBurst is the maximum number
+                                of requests that can be sent in a burst. Should be
+                                equal to or greater than RequestsPerSecond. If unset,
+                                defaults to RequestsPerSecond. Internally, this is
+                                the maximum size of the token bucket used for rate
+                                limiting.
+                              type: integer
+                            requestsPerSecond:
+                              description: RequestsPerSecond is the average number
+                                of requests per second that can be made without being
+                                throttled. This field is required if RequestsMaxBurst
+                                is set. The allowed number of requests may exceed
+                                RequestsPerSecond up to the value specified in RequestsMaxBurst.
+                                Internally, this is the refill rate of the token bucket
+                                used for rate limiting.
+                              type: integer
+                          type: object
+                        type: array
+                    type: object
+                type: object
               transparentProxy:
                 description: 'TransparentProxy controls configuration specific to
                   proxies in transparent mode. Note: This cannot be set using the
@@ -291,18 +352,22 @@ spec:
                               The real time is equal to the base time multiplied by
                               the number of times the host has been ejected and is
                               capped by max_ejection_time (Default 300s). Defaults
-                              to 30000ms or 30s.
+                              to 30s.
                             type: string
-                          enforcing_consecutive_5xx:
+                          enforcingConsecutive5xx:
                             description: EnforcingConsecutive5xx is the % chance that
                               a host will be actually ejected when an outlier status
                               is detected through consecutive 5xx. This setting can
                               be used to disable ejection or to ramp it up slowly.
+                              Ex. Setting this to 10 will make it a 10% chance that
+                              the host will be ejected.
                             format: int32
                             type: integer
                           interval:
                             description: Interval between health check analysis sweeps.
                               Each sweep may remove hosts or return hosts to the pool.
+                              Ex. setting this to "10s" will set the interval to 10
+                              seconds.
                             type: string
                           maxEjectionPercent:
                             description: The maximum % of an upstream cluster that
@@ -408,19 +473,22 @@ spec:
                                 The real time is equal to the base time multiplied
                                 by the number of times the host has been ejected and
                                 is capped by max_ejection_time (Default 300s). Defaults
-                                to 30000ms or 30s.
+                                to 30s.
                               type: string
-                            enforcing_consecutive_5xx:
+                            enforcingConsecutive5xx:
                               description: EnforcingConsecutive5xx is the % chance
                                 that a host will be actually ejected when an outlier
                                 status is detected through consecutive 5xx. This setting
                                 can be used to disable ejection or to ramp it up slowly.
+                                Ex. Setting this to 10 will make it a 10% chance that
+                                the host will be ejected.
                               format: int32
                               type: integer
                             interval:
                               description: Interval between health check analysis
                                 sweeps. Each sweep may remove hosts or return hosts
-                                to the pool.
+                                to the pool. Ex. setting this to "10s" will set the
+                                interval to 10 seconds.
                               type: string
                             maxEjectionPercent:
                               description: The maximum % of an upstream cluster that
@@ -494,10 +562,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

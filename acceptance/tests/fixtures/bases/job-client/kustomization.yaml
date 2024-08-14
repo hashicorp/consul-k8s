@@ -1,0 +1,7 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+resources:
+  - ./job.yaml
+  - service.yaml
+  - serviceaccount.yaml

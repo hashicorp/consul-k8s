@@ -6,29 +6,32 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const (
@@ -43,10 +46,11 @@ const (
 	meshGateway        = "mesh-gateway"
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
+	apiGateway         = "api-gateway"
 
-	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
-	envoyPrometheusBindAddr    = "envoy_prometheus_bind_addr"
-	defaultNS                  = "default"
+	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
+	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
+	defaultNS                            = "default"
 
 	// clusterIPTaggedAddressName is the key for the tagged address to store the service's cluster IP and service port
 	// in Consul. Note: This value should not be changed without a corresponding change in Consul.
@@ -56,12 +60,6 @@ const (
 	// This address does not need to be routable as this node is ephemeral, and we're only providing it because
 	// Consul's API currently requires node address to be provided when registering a node.
 	consulNodeAddress = "127.0.0.1"
-
-	// consulKubernetesCheckType is the type of health check in Consul for Kubernetes readiness status.
-	consulKubernetesCheckType = "kubernetes-readiness"
-
-	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
-	consulKubernetesCheckName = "Kubernetes Readiness Check"
 )
 
 type Controller struct {
@@ -99,6 +97,8 @@ type Controller struct {
 	// any created Consul namespaces to allow cross namespace service discovery.
 	// Only necessary if ACLs are enabled.
 	CrossNSACLPolicy string
+	// Lifecycle config set graceful startup/shutdown defaults for pods.
+	LifecycleConfig lifecycle.Config
 	// ReleaseName is the Consul Helm installation release.
 	ReleaseName string
 	// ReleaseNamespace is the namespace where Consul is installed.
@@ -119,6 +119,10 @@ type Controller struct {
 	// to Consul client agents.
 	EnableAutoEncrypt bool
 
+	// EnableTelemetryCollector controls whether the proxy service should be registered
+	// with config to enable telemetry forwarding.
+	EnableTelemetryCollector bool
+
 	MetricsConfig metrics.Config
 	Log           logr.Logger
 
@@ -137,7 +141,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	var serviceEndpoints corev1.Endpoints
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
-	if shouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
+	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
 		return ctrl.Result{}, nil
 	}
 
@@ -155,18 +159,13 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	err = r.Client.Get(ctx, req.NamespacedName, &serviceEndpoints)
 
-	// endpointPods holds a set of all pods this endpoints object is currently pointing to.
-	// We use this later when we reconcile ACL tokens to decide whether an ACL token in Consul
-	// is for a pod that no longer exists.
-	endpointPods := mapset.NewSet()
-
 	// If the endpoints object has been deleted (and we get an IsNotFound
 	// error), we need to deregister all instances in Consul for that service.
 	if k8serrors.IsNotFound(err) {
 		// Deregister all instances in Consul for this service. The function deregisterService handles
 		// the case where the Consul service name is different from the Kubernetes service name.
-		err = r.deregisterService(apiClient, req.Name, req.Namespace, nil)
-		return ctrl.Result{}, err
+		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
+		return ctrl.Result{RequeueAfter: requeueAfter}, err
 	} else if err != nil {
 		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
 		return ctrl.Result{}, err
@@ -178,14 +177,14 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
 	if isLabeledIgnore(serviceEndpoints.Labels) {
 		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
-		r.Log.Info("Ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
-		err = r.deregisterService(apiClient, req.Name, req.Namespace, nil)
-		return ctrl.Result{}, err
+		r.Log.Info("ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
+		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
+		return ctrl.Result{RequeueAfter: requeueAfter}, err
 	}
 
-	// endpointAddressMap stores every IP that corresponds to a Pod in the Endpoints object. It is used to compare
+	// deregisterEndpointAddress stores every IP that corresponds to a Pod in the Endpoints object. It is used to compare
 	// against service instances in Consul to deregister them if they are not in the map.
-	endpointAddressMap := map[string]bool{}
+	deregisterEndpointAddress := map[string]bool{}
 
 	// Register all addresses of this Endpoints object as service instances in Consul.
 	for _, subset := range serviceEndpoints.Subsets {
@@ -194,26 +193,43 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
 				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
-					r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
-					errs = multierror.Append(errs, err)
+					// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
+					if k8serrors.IsNotFound(err) {
+						deregisterEndpointAddress[address.IP] = true
+						r.Log.Info("pod not found", "name", address.TargetRef.Name)
+					} else {
+						// If there was a different error fetching the pod, then log the error but don't deregister it
+						// since this could be a K8s API blip and we don't want to prematurely deregister.
+						deregisterEndpointAddress[address.IP] = false
+						r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
+						errs = multierror.Append(errs, err)
+					}
 					continue
 				}
 
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
 				if ok && serviceEndpoints.Name != svcName {
 					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-					// deregistration for service instances that don't match the annotation happens
-					// later because we don't add this pod to the endpointAddressMap.
+					// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
+					deregisterEndpointAddress[address.IP] = true
 					continue
 				}
 
+				if isTelemetryCollector(pod) {
+					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
+						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
+						errs = multierror.Append(errs, err)
+					}
+				}
+
 				if hasBeenInjected(pod) {
-					endpointPods.Add(address.TargetRef.Name)
 					if isConsulDataplaneSupported(pod) {
-						if err = r.registerServicesAndHealthCheck(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
+						if err = r.registerServicesAndHealthCheck(apiClient, pod, serviceEndpoints, healthStatus); err != nil {
 							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 							errs = multierror.Append(errs, err)
 						}
+						// Build the deregisterEndpointAddress map up for deregistering service instances later.
+						deregisterEndpointAddress[pod.Status.PodIP] = false
 					} else {
 						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
@@ -234,26 +250,29 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						continue
 					}
 				}
+
 				if isGateway(pod) {
-					endpointPods.Add(address.TargetRef.Name)
-					if err = r.registerGateway(apiClient, pod, serviceEndpoints, healthStatus, endpointAddressMap); err != nil {
+					if err = r.registerGateway(apiClient, pod, serviceEndpoints, healthStatus); err != nil {
 						r.Log.Error(err, "failed to register gateway or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						errs = multierror.Append(errs, err)
 					}
+					// Build the deregisterEndpointAddress map up for deregistering service instances later.
+					deregisterEndpointAddress[pod.Status.PodIP] = false
 				}
 			}
 		}
 	}
 
 	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
-	// from Consul. This uses endpointAddressMap which is populated with the addresses in the Endpoints object during
-	// the registration codepath.
-	if err = r.deregisterService(apiClient, serviceEndpoints.Name, serviceEndpoints.Namespace, endpointAddressMap); err != nil {
+	// from Consul. This uses deregisterEndpointAddress which is populated with the addresses in the Endpoints object to
+	// either deregister or keep during the registration codepath.
+	requeueAfter, err := r.deregisterService(ctx, apiClient, serviceEndpoints.Name, serviceEndpoints.Namespace, deregisterEndpointAddress)
+	if err != nil {
 		r.Log.Error(err, "failed to deregister endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 		errs = multierror.Append(errs, err)
 	}
 
-	return ctrl.Result{}, errs
+	return ctrl.Result{RequeueAfter: requeueAfter}, errs
 }
 
 func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
@@ -268,10 +287,7 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string, endpointAddressMap map[string]bool) error {
-	// Build the endpointAddressMap up for deregistering service instances later.
-	endpointAddressMap[pod.Status.PodIP] = true
-
+func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	var managedByEndpointsController bool
 	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
@@ -287,7 +303,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 
 		// Register the service instance with Consul.
 		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.ID)
+			"id", serviceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
@@ -303,7 +319,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 
 		// Register the proxy service instance with Consul.
-		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service)
+		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service, "id", proxyServiceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Service.Service)
@@ -313,12 +329,23 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	return nil
 }
 
+func parseLocality(node corev1.Node) *api.Locality {
+	region := node.Labels[corev1.LabelTopologyRegion]
+	zone := node.Labels[corev1.LabelTopologyZone]
+
+	if region == "" {
+		return nil
+	}
+
+	return &api.Locality{
+		Region: region,
+		Zone:   zone,
+	}
+}
+
 // registerGateway creates Consul registrations for the Connect Gateways and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string, endpointAddressMap map[string]bool) error {
-	// Build the endpointAddressMap up for deregistering service instances later.
-	endpointAddressMap[pod.Status.PodIP] = true
-
+func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	var managedByEndpointsController bool
 	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
@@ -379,6 +406,18 @@ func proxyServiceID(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 	return fmt.Sprintf("%s-%s", pod.Name, proxySvcName)
 }
 
+func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
+	parsed := make(map[string]any)
+	if config, ok := pod.Annotations[constants.AnnotationProxyConfigMap]; ok && config != "" {
+		err := json.Unmarshal([]byte(config), &parsed)
+		if err != nil {
+			// Always return an empty map on error
+			return make(map[string]any), fmt.Errorf("unable to parse `%v` annotation for pod `%v`: %w", constants.AnnotationProxyConfigMap, pod.Name, err)
+		}
+	}
+	return parsed, nil
+}
+
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
 func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
@@ -400,6 +439,11 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 	}
 
+	var node corev1.Node
+	// Ignore errors because we don't want failures to block running services.
+	_ = r.Client.Get(context.Background(), types.NamespacedName{Name: pod.Spec.NodeName, Namespace: pod.Namespace}, &node)
+	locality := parseLocality(node)
+
 	// We only want that annotation to be present when explicitly overriding the consul svc name
 	// Otherwise, the Consul service name should equal the Kubernetes Service name.
 	// The service name in Consul defaults to the Endpoints object name, and is overridden by the pod
@@ -413,6 +457,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		metaKeyKubeServiceName:   serviceEndpoints.Name,
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
+		constants.MetaKeyPodUID:  string(pod.UID),
 		metaKeySyntheticNode:     "true",
 	}
 	for k, v := range pod.Annotations {
@@ -427,6 +472,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
+
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
@@ -435,6 +481,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Meta:      meta,
 		Namespace: consulNS,
 		Tags:      tags,
+		Locality:  locality,
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
@@ -445,8 +492,8 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, svcID),
-			Name:      consulKubernetesCheckName,
-			Type:      consulKubernetesCheckType,
+			Name:      constants.ConsulKubernetesCheckName,
+			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: svcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
@@ -458,10 +505,16 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 
 	proxySvcName := proxyServiceName(pod, serviceEndpoints)
 	proxySvcID := proxyServiceID(pod, serviceEndpoints)
+
+	// Set the default values from the annotation, if possible.
+	baseConfig, err := annotationProxyConfigMap(pod)
+	if err != nil {
+		r.Log.Error(err, "annotation unable to be applied")
+	}
 	proxyConfig := &api.AgentServiceConnectProxyConfig{
 		DestinationServiceName: svcName,
 		DestinationServiceID:   svcID,
-		Config:                 make(map[string]interface{}),
+		Config:                 baseConfig,
 	}
 
 	// If metrics are enabled, the proxyConfig should set envoy_prometheus_bind_addr to a listener on 0.0.0.0 on
@@ -480,6 +533,10 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 		prometheusScrapeListener := fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
+	}
+
+	if r.EnableTelemetryCollector && proxyConfig.Config != nil {
+		proxyConfig.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/connect-inject"
 	}
 
 	if consulServicePort > 0 {
@@ -507,6 +564,8 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Namespace: consulNS,
 		Proxy:     proxyConfig,
 		Tags:      tags,
+		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
+		Locality: locality,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.
@@ -523,7 +582,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 
 	if tproxyEnabled {
 		var k8sService corev1.Service
-
+		proxyService.Proxy.Mode = api.ProxyModeTransparent
 		err = r.Client.Get(r.Context, types.NamespacedName{Name: serviceEndpoints.Name, Namespace: serviceEndpoints.Namespace}, &k8sService)
 		if err != nil {
 			return nil, nil, err
@@ -566,7 +625,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 			service.TaggedAddresses = taggedAddresses
 			proxyService.TaggedAddresses = taggedAddresses
 
-			proxyService.Proxy.Mode = api.ProxyModeTransparent
 		} else {
 			r.Log.Info("skipping syncing service cluster IP to Consul", "name", k8sService.Name, "ns", k8sService.Namespace, "ip", k8sService.Spec.ClusterIP)
 		}
@@ -634,8 +692,8 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		Service: proxyService,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, proxySvcID),
-			Name:      consulKubernetesCheckName,
-			Type:      consulKubernetesCheckType,
+			Name:      constants.ConsulKubernetesCheckName,
+			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: proxySvcID,
 			Output:    getHealthCheckStatusReason(healthStatus, pod.Name, pod.Namespace),
@@ -656,12 +714,22 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		constants.MetaKeyKubeNS:  serviceEndpoints.Namespace,
 		metaKeyManagedBy:         constants.ManagedByValue,
 		metaKeySyntheticNode:     "true",
+		constants.MetaKeyPodUID:  string(pod.UID),
+	}
+
+	// Set the default values from the annotation, if possible.
+	baseConfig, err := annotationProxyConfigMap(pod)
+	if err != nil {
+		r.Log.Error(err, "annotation unable to be applied")
 	}
 
 	service := &api.AgentService{
 		ID:      pod.Name,
 		Address: pod.Status.PodIP,
 		Meta:    meta,
+		Proxy: &api.AgentServiceConnectProxyConfig{
+			Config: baseConfig,
+		},
 	}
 
 	gatewayServiceName, ok := pod.Annotations[constants.AnnotationGatewayConsulServiceName]
@@ -734,31 +802,25 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 				Port:    wanPort,
 			},
 		}
-		service.Proxy = &api.AgentServiceConnectProxyConfig{
-			Config: map[string]interface{}{
-				"envoy_gateway_no_default_bind": true,
-				"envoy_gateway_bind_addresses": map[string]interface{}{
-					"all-interfaces": map[string]interface{}{
-						"address": "0.0.0.0",
-					},
-				},
+		service.Proxy.Config["envoy_gateway_no_default_bind"] = true
+		service.Proxy.Config["envoy_gateway_bind_addresses"] = map[string]interface{}{
+			"all-interfaces": map[string]interface{}{
+				"address": "0.0.0.0",
 			},
 		}
-
+	case apiGateway:
+		// Do nothing. This is only here so that API gateway pods have annotations
+		// consistent with other gateway types but don't return an error below.
 	default:
-		return nil, fmt.Errorf("%s must be one of %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway)
+		return nil, fmt.Errorf("%s must be one of %s, %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		if pod.Annotations[constants.AnnotationGatewayKind] == ingressGateway {
-			service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
-		} else {
-			service.Proxy = &api.AgentServiceConnectProxyConfig{
-				Config: map[string]interface{}{
-					"envoy_prometheus_bind_addr": fmt.Sprintf("%s:20200", pod.Status.PodIP),
-				},
-			}
-		}
+		service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
+	}
+
+	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {
+		service.Proxy.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/service"
 	}
 
 	serviceRegistration := &api.CatalogRegistration{
@@ -770,8 +832,8 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		Service: service,
 		Check: &api.AgentCheck{
 			CheckID:   consulHealthCheckID(pod.Namespace, pod.Name),
-			Name:      consulKubernetesCheckName,
-			Type:      consulKubernetesCheckType,
+			Name:      constants.ConsulKubernetesCheckName,
+			Type:      constants.ConsulKubernetesCheckType,
 			Status:    healthStatus,
 			ServiceID: pod.Name,
 			Namespace: consulNS,
@@ -863,7 +925,7 @@ func consulHealthCheckID(k8sNS string, serviceID string) string {
 // as well as pod name and namespace and returns the reason message.
 func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string) string {
 	if healthCheckStatus == api.HealthPassing {
-		return kubernetesSuccessReasonMsg
+		return constants.KubernetesSuccessReasonMsg
 	}
 
 	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
@@ -875,78 +937,231 @@ func getHealthCheckStatusReason(healthCheckStatus, podName, podNamespace string)
 // "k8s-service-name". So, we query Consul services by "k8s-service-name" metadata.
 // When querying by the k8s service name and namespace, the request will return service instances and
 // associated proxy service instances.
-// The argument endpointsAddressesMap decides whether to deregister *all* service instances or selectively deregister
-// them only if they are not in endpointsAddressesMap. If the map is nil, it will deregister all instances. If the map
+// The argument deregisterEndpointAddress decides whether to deregister *all* service instances or selectively deregister
+// them only if they are not in deregisterEndpointAddress. If the map is nil, it will deregister all instances. If the map
 // has addresses, it will only deregister instances not in the map.
-func (r *Controller) deregisterService(apiClient *api.Client, k8sSvcName, k8sSvcNamespace string, endpointsAddressesMap map[string]bool) error {
-	// Get services matching metadata.
-	nodesWithSvcs, err := r.serviceInstancesForK8sNodes(apiClient, k8sSvcName, k8sSvcNamespace)
+// If the pod backing a Consul service instance still exists and the graceful shutdown lifecycle mode is enabled, the instance
+// will not be deregistered. Instead, its health check will be updated to Critical in order to drain incoming traffic and
+// this function will return a requeueAfter duration. This can be used to requeue the event at the longest shutdown time
+// interval to clean up these instances after they have exited.
+func (r *Controller) deregisterService(
+	ctx context.Context,
+	apiClient *api.Client,
+	k8sSvcName string,
+	k8sSvcNamespace string,
+	deregisterEndpointAddress map[string]bool) (time.Duration, error) {
+
+	// Get services matching metadata from Consul
+	serviceInstances, err := r.serviceInstances(apiClient, k8sSvcName, k8sSvcNamespace)
 	if err != nil {
 		r.Log.Error(err, "failed to get service instances", "name", k8sSvcName)
-		return err
+		return 0, err
 	}
 
-	// Deregister each service instance that matches the metadata.
-	for _, nodeSvcs := range nodesWithSvcs {
-		for _, svc := range nodeSvcs.Services {
-			// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
-			// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
-			// every service instance.
-			var serviceDeregistered bool
-			if endpointsAddressesMap != nil {
-				if _, ok := endpointsAddressesMap[svc.Address]; !ok {
-					// If the service address is not in the Endpoints addresses, deregister it.
-					r.Log.Info("deregistering service from consul", "svc", svc.ID)
-					_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-						Node:      nodeSvcs.Node.Node,
-						ServiceID: svc.ID,
-						Namespace: svc.Namespace,
-					}, nil)
-					if err != nil {
-						r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
-						return err
-					}
-					serviceDeregistered = true
-				}
-			} else {
-				r.Log.Info("deregistering service from consul", "svc", svc.ID)
-				if _, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
-					Node:      nodeSvcs.Node.Node,
-					ServiceID: svc.ID,
-					Namespace: svc.Namespace,
-				}, nil); err != nil {
-					r.Log.Error(err, "failed to deregister service instance", "id", svc.ID)
-					return err
-				}
-				serviceDeregistered = true
+	var errs error
+	var requeueAfter time.Duration
+	for _, svc := range serviceInstances {
+		// We need to get services matching "k8s-service-name" and "k8s-namespace" metadata.
+		// If we selectively deregister, only deregister if the address is not in the map. Otherwise, deregister
+		// every service instance.
+		var serviceDeregistered bool
+
+		if deregister(svc.ServiceAddress, deregisterEndpointAddress) {
+			// If graceful shutdown is enabled, continue to the next service instance and
+			// mark that an event requeue is needed. We should requeue at the longest time interval
+			// to prevent excessive re-queues. Also, updating the health status in Consul to Critical
+			// should prevent routing during gracefulShutdown.
+			podShutdownDuration, err := r.getGracefulShutdownAndUpdatePodCheck(ctx, apiClient, svc, k8sSvcNamespace)
+			if err != nil {
+				r.Log.Error(err, "failed to get pod shutdown duration", "svc", svc.ServiceName)
+				errs = multierror.Append(errs, err)
 			}
 
-			if r.AuthMethod != "" && serviceDeregistered {
-				r.Log.Info("reconciling ACL tokens for service", "svc", svc.Service)
-				err = r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.Meta[constants.MetaKeyPodName])
-				if err != nil {
-					r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.Service)
-					return err
-				}
+			// set requeue response, then continue to the next service instance
+			if podShutdownDuration > requeueAfter {
+				requeueAfter = podShutdownDuration
+			}
+			if podShutdownDuration > 0 {
+				continue
+			}
+
+			// If the service address is not in the Endpoints addresses, deregister it.
+			r.Log.Info("deregistering service from consul", "svc", svc.ServiceID)
+			_, err = apiClient.Catalog().Deregister(&api.CatalogDeregistration{
+				Node:      svc.Node,
+				ServiceID: svc.ServiceID,
+				Namespace: svc.Namespace,
+			}, nil)
+			if err != nil {
+				// Do not exit right away as there might be other services that need to be deregistered.
+				r.Log.Error(err, "failed to deregister service instance", "id", svc.ServiceID)
+				errs = multierror.Append(errs, err)
+			} else {
+				serviceDeregistered = true
+			}
+		}
+
+		if r.AuthMethod != "" && serviceDeregistered {
+			r.Log.Info("reconciling ACL tokens for service", "svc", svc.ServiceName)
+			err := r.deleteACLTokensForServiceInstance(apiClient, svc, k8sSvcNamespace, svc.ServiceMeta[constants.MetaKeyPodName], svc.ServiceMeta[constants.MetaKeyPodUID])
+			if err != nil {
+				r.Log.Error(err, "failed to reconcile ACL tokens for service", "svc", svc.ServiceName)
+				errs = multierror.Append(errs, err)
+			}
+		}
+
+		if serviceDeregistered {
+			err = r.deregisterNode(apiClient, svc.Node)
+			if err != nil {
+				r.Log.Error(err, "failed to deregister node", "svc", svc.ServiceName)
+				errs = multierror.Append(errs, err)
 			}
 		}
 	}
 
+	if requeueAfter > 0 {
+		r.Log.Info("re-queueing event for graceful shutdown", "name", k8sSvcName, "k8sNamespace", k8sSvcNamespace, "requeueAfter", requeueAfter)
+	}
+
+	return requeueAfter, errs
+}
+
+// getGracefulShutdownAndUpdatePodCheck checks if the pod is in the process of being terminated and if so, updates the
+// health status of the service to critical. It returns the duration for which the pod should be re-queued (which is the pods
+// gracefulShutdownPeriod setting).
+func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, apiClient *api.Client, svc *api.CatalogService, k8sNamespace string) (time.Duration, error) {
+	// Get the pod, and check if it is still running. We do this to defer ACL/node cleanup for pods that are
+	// in graceful termination
+	podName := svc.ServiceMeta[constants.MetaKeyPodName]
+	if podName == "" {
+		return 0, nil
+	}
+
+	var pod corev1.Pod
+	err := r.Client.Get(ctx, types.NamespacedName{Name: podName, Namespace: k8sNamespace}, &pod)
+	if k8serrors.IsNotFound(err) {
+		return 0, nil
+	}
+	if err != nil {
+		r.Log.Error(err, "failed to get terminating pod", "name", podName, "k8sNamespace", k8sNamespace)
+		return 0, fmt.Errorf("failed to get terminating pod %s/%s: %w", k8sNamespace, podName, err)
+	}
+
+	// In a statefulset rollout, pods can go down and a new pod will come back up with the same name but a different uid
+	// or node name. In older consul-k8s patches, the pod uid may not be set, so to account for that we also check if
+	// the node changed, since newer service instances should exist for the new node. In that case, it's not the old pod
+	// that is gracefully shutting down; the old pod is gone and we should deregister that old instance from Consul.
+	if string(pod.UID) != svc.ServiceMeta[constants.MetaKeyPodUID] || common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName) != svc.Node {
+		return 0, nil
+	}
+
+	shutdownSeconds, err := r.getGracefulShutdownPeriodSecondsForPod(pod)
+	if err != nil {
+		r.Log.Error(err, "failed to get graceful shutdown period for pod", "name", pod, "k8sNamespace", k8sNamespace)
+		return 0, fmt.Errorf("failed to get graceful shutdown period for pod %s/%s: %w", k8sNamespace, podName, err)
+	}
+
+	if shutdownSeconds > 0 {
+		// Update the health status of the service to critical so that we can drain inbound traffic.
+		// We don't need to handle the proxy service since that will be reconciled looping through all the service instances.
+		serviceRegistration := &api.CatalogRegistration{
+			Node:    svc.Node,
+			Address: pod.Status.HostIP,
+			// Service is nil since we are patching the health status
+			Check: &api.AgentCheck{
+				CheckID:   consulHealthCheckID(pod.Namespace, svc.ServiceID),
+				Name:      constants.ConsulKubernetesCheckName,
+				Type:      constants.ConsulKubernetesCheckType,
+				Status:    api.HealthCritical,
+				ServiceID: svc.ServiceID,
+				Output:    fmt.Sprintf("Pod \"%s/%s\" is terminating", pod.Namespace, podName),
+				Namespace: r.consulNamespace(pod.Namespace),
+			},
+			SkipNodeUpdate: true,
+		}
+
+		r.Log.Info("updating health status of service with Consul to critical in order to drain inbound traffic", "name", svc.ServiceName,
+			"id", svc.ServiceID, "pod", podName, "k8sNamespace", pod.Namespace)
+		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to update service health status to critical", "name", svc.ServiceName, "pod", podName)
+			return 0, fmt.Errorf("failed to update service health status for pod %s/%s to critical: %w", pod.Namespace, podName, err)
+		}
+
+		// Return the duration for which the pod should be re-queued. We add 20% to the shutdownSeconds to account for
+		// any potential delay in the pod killed.
+		return time.Duration(shutdownSeconds+int(math.Ceil(float64(shutdownSeconds)*0.2))) * time.Second, nil
+	}
+	return 0, nil
+}
+
+// getGracefulShutdownPeriodSecondsForPod returns the graceful shutdown period for the pod. If one is not specified,
+// either through the controller configuration or pod annotations, it returns 0.
+func (r *Controller) getGracefulShutdownPeriodSecondsForPod(pod corev1.Pod) (int, error) {
+	enabled, err := r.LifecycleConfig.EnableProxyLifecycle(pod)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get parse proxy lifecycle configuration for pod %s/%s: %w", pod.Namespace, pod.Name, err)
+	}
+	// Check that SidecarProxyLifecycle is enabled.
+	if !enabled {
+		return 0, nil
+	}
+
+	return r.LifecycleConfig.ShutdownGracePeriodSeconds(pod)
+}
+
+// deregisterNode removes a node if it does not have any associated services attached to it.
+// When using Consul Enterprise, serviceInstancesForK8SServiceNameAndNamespace will search across all namespaces
+// (wildcard) to determine if there any other services associated with the Node. We also only search for nodes that have
+// the correct kubernetes metadata (managed-by-endpoints-controller and synthetic-node).
+func (r *Controller) deregisterNode(apiClient *api.Client, nodeName string) error {
+	var (
+		serviceList *api.CatalogNodeServiceList
+		err         error
+	)
+
+	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q`,
+		"synthetic-node", "true", metaKeyManagedBy, constants.ManagedByValue)
+	if r.EnableConsulNamespaces {
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
+	} else {
+		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter})
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get a list of node services: %s", err)
+	}
+
+	if len(serviceList.Services) == 0 {
+		r.Log.Info("deregistering node from consul", "node", nodeName, "services", serviceList.Services)
+		_, err := apiClient.Catalog().Deregister(&api.CatalogDeregistration{Node: nodeName}, nil)
+		if err != nil {
+			r.Log.Error(err, "failed to deregister node", "name", nodeName)
+		}
+	}
 	return nil
 }
 
 // deleteACLTokensForServiceInstance finds the ACL tokens that belongs to the service instance and deletes it from Consul.
 // It will only check for ACL tokens that have been created with the auth method this controller
-// has been configured with and will only delete tokens for the provided podName.
-func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.AgentService, k8sNS, podName string) error {
+// has been configured with and will only delete tokens for the provided podName and podUID.
+func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, svc *api.CatalogService, k8sNS, podName, podUID string) error {
 	// Skip if podName is empty.
 	if podName == "" {
 		return nil
 	}
 
-	tokens, _, err := apiClient.ACL().TokenList(&api.QueryOptions{
-		Namespace: svc.Namespace,
-	})
+	// Note that while the `TokenListFiltered` query below should only return a subset
+	// of tokens from the Consul servers, it will return an unfiltered list on older
+	// versions of Consul (because they do not yet support the query parameter).
+	// To be safe, we still need to iterate over tokens and assert the service name
+	// matches as well.
+	tokens, _, err := apiClient.ACL().TokenListFiltered(
+		api.ACLTokenFilterOptions{
+			ServiceName: svc.ServiceName,
+		},
+		&api.QueryOptions{
+			Namespace: svc.Namespace,
+		})
 	if err != nil {
 		return fmt.Errorf("failed to get a list of tokens from Consul: %s", err)
 	}
@@ -957,7 +1172,7 @@ func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, sv
 		// * have a single service identity whose service name is the same as 'svc.Service'
 		if token.AuthMethod == r.AuthMethod &&
 			len(token.ServiceIdentities) == 1 &&
-			token.ServiceIdentities[0].ServiceName == svc.Service {
+			token.ServiceIdentities[0].ServiceName == svc.ServiceName {
 			tokenMeta, err := getTokenMetaFromDescription(token.Description)
 			if err != nil {
 				return fmt.Errorf("failed to parse token metadata: %s", err)
@@ -965,8 +1180,11 @@ func (r *Controller) deleteACLTokensForServiceInstance(apiClient *api.Client, sv
 
 			tokenPodName := strings.TrimPrefix(tokenMeta[tokenMetaPodNameKey], k8sNS+"/")
 
+			// backward compability logic on token with no podUID in metadata
+			podUIDMatched := tokenMeta[constants.MetaKeyPodUID] == podUID || tokenMeta[constants.MetaKeyPodUID] == ""
+
 			// If we can't find token's pod, delete it.
-			if tokenPodName == podName {
+			if tokenPodName == podName && podUIDMatched {
 				r.Log.Info("deleting ACL token for pod", "name", podName)
 				if _, err := apiClient.ACL().TokenDelete(token.AccessorID, &api.WriteOptions{Namespace: svc.Namespace}); err != nil {
 					return fmt.Errorf("failed to delete token from Consul: %s", err)
@@ -1052,38 +1270,100 @@ func getTokenMetaFromDescription(description string) (map[string]string, error) 
 	return tokenMeta, nil
 }
 
-func (r *Controller) serviceInstancesForK8sNodes(apiClient *api.Client, k8sServiceName, k8sServiceNamespace string) ([]*api.CatalogNodeServiceList, error) {
-	var serviceList []*api.CatalogNodeServiceList
-	// Get a list of k8s nodes.
-	var nodeList corev1.NodeList
-	err := r.Client.List(r.Context, &nodeList)
+func (r *Controller) serviceInstances(apiClient *api.Client, k8sServiceName, k8sServiceNamespace string) ([]*api.CatalogService, error) {
+	var (
+		instances []*api.CatalogService
+		errs      error
+	)
+
+	// Get the names of services that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
+	// This is necessary so that we can then list the service instances for each Consul service name, which may
+	// not match the K8s service name.
+	services, err := r.servicesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace)
+	if err != nil {
+		r.Log.Error(err, "failed to get catalog services", "name", k8sServiceName)
+		return nil, err
+	}
+
+	// Query consul catalog for a list of service instances matching the given service names.
+	filter := fmt.Sprintf(`NodeMeta[%q] == %q and ServiceMeta[%q] == %q and ServiceMeta[%q] == %q and ServiceMeta[%q] == %q`,
+		metaKeySyntheticNode, "true",
+		metaKeyKubeServiceName, k8sServiceName,
+		constants.MetaKeyKubeNS, k8sServiceNamespace,
+		metaKeyManagedBy, constants.ManagedByValue)
+	for _, service := range services {
+		var is []*api.CatalogService
+		// Always query the default NS. This ensures that we include mesh gateways, which are always registered to the default NS.
+		// It also ensures that during migrations that enable namespaces, we deregister old service instances in the default NS.
+		// An alternative approach to this dual query would be a service instance list using the wildcard NS, which would also
+		// include instances in Consul namespaces that are no longer in use (e.g. configuration change); this capability does
+		// not currently exist in Consul's catalog API (as of 1.17) and would need to first be added.
+		//
+		// This request uses the service index of the services table (does not perform a full table scan), then decorates each
+		// result with a single node fetched by ID index from the nodes table.
+		is, _, err = apiClient.Catalog().Service(service, "", &api.QueryOptions{Filter: filter})
+		if err != nil {
+			errs = multierror.Append(errs, err)
+		} else {
+			instances = append(instances, is...)
+		}
+		// If namespaces are enabled a non-default NS is targeted, also query by target Consul NS.
+		if r.EnableConsulNamespaces {
+			nonDefaultNamespace := namespaces.NonDefaultConsulNamespace(r.consulNamespace(k8sServiceNamespace))
+			if nonDefaultNamespace != "" {
+				is, _, err = apiClient.Catalog().Service(service, "", &api.QueryOptions{Filter: filter, Namespace: nonDefaultNamespace})
+				if err != nil {
+					errs = multierror.Append(errs, err)
+				} else {
+					instances = append(instances, is...)
+				}
+			}
+		}
+	}
+
+	return instances, errs
+}
+
+// servicesForK8SServiceNameAndNamespace calls Consul's Services to get the list
+// of services that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
+func (r *Controller) servicesForK8SServiceNameAndNamespace(apiClient *api.Client, k8sServiceName, k8sServiceNamespace string) ([]string, error) {
+	var (
+		services map[string][]string
+		err      error
+	)
+	filter := fmt.Sprintf(`ServiceMeta[%q] == %q and ServiceMeta[%q] == %q and ServiceMeta[%q] == %q`,
+		metaKeyKubeServiceName, k8sServiceName, constants.MetaKeyKubeNS, k8sServiceNamespace, metaKeyManagedBy, constants.ManagedByValue)
+	// Always query the default NS. This ensures that we cover CE->Ent upgrades where services were previously
+	// in the default NS, as well as mesh gateways, which are always registered to the default NS.
+	//
+	// This request performs a NS-bound scan of the services table. If needed in the future, its performance
+	// could be improved by adding an index on ServiceMeta to Consul's state store.
+	services, _, err = apiClient.Catalog().Services(&api.QueryOptions{Filter: filter})
 	if err != nil {
 		return nil, err
 	}
-	for _, node := range nodeList.Items {
-		var nodeServices *api.CatalogNodeServiceList
-		nodeServices, err = r.serviceInstancesForK8SServiceNameAndNamespace(apiClient, k8sServiceName, k8sServiceNamespace, common.ConsulNodeNameFromK8sNode(node.Name))
-		serviceList = append(serviceList, nodeServices)
-	}
-
-	return serviceList, err
-}
-
-// serviceInstancesForK8SServiceNameAndNamespace calls Consul's ServicesWithFilter to get the list
-// of services instances that have the provided k8sServiceName and k8sServiceNamespace in their metadata.
-func (r *Controller) serviceInstancesForK8SServiceNameAndNamespace(apiClient *api.Client, k8sServiceName, k8sServiceNamespace, nodeName string) (*api.CatalogNodeServiceList, error) {
-	var (
-		serviceList *api.CatalogNodeServiceList
-		err         error
-	)
-	filter := fmt.Sprintf(`Meta[%q] == %q and Meta[%q] == %q and Meta[%q] == %q`,
-		metaKeyKubeServiceName, k8sServiceName, constants.MetaKeyKubeNS, k8sServiceNamespace, metaKeyManagedBy, constants.ManagedByValue)
+	// If namespaces are enabled a non-default NS is targeted, also query by target Consul NS.
 	if r.EnableConsulNamespaces {
-		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter, Namespace: namespaces.WildcardNamespace})
-	} else {
-		serviceList, _, err = apiClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: filter})
+		nonDefaultNamespace := namespaces.NonDefaultConsulNamespace(r.consulNamespace(k8sServiceNamespace))
+		if nonDefaultNamespace != "" {
+			ss, _, err := apiClient.Catalog().Services(&api.QueryOptions{Filter: filter, Namespace: nonDefaultNamespace})
+			if err != nil {
+				return nil, err
+			}
+			// Add to existing map to deduplicate.
+			for s := range ss {
+				services[s] = nil // We don't use the tags, so just set to nil
+			}
+		}
 	}
-	return serviceList, err
+
+	// Return just the service name keys (we don't need the tags)
+	// https://developer.hashicorp.com/consul/api-docs/catalog#list-services
+	var serviceNames []string
+	for s := range services {
+		serviceNames = append(serviceNames, s)
+	}
+	return serviceNames, err
 }
 
 // processPreparedQueryUpstream processes an upstream in the format:
@@ -1108,8 +1388,9 @@ func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) api.Upstre
 
 // processUnlabeledUpstream processes an upstream in the format:
 // [service-name].[service-namespace].[service-partition]:[port]:[optional datacenter].
+// There is no unlabeled field for peering.
 func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
-	var datacenter, svcName, namespace, partition, peer string
+	var datacenter, svcName, namespace, partition string
 	var port int32
 	var upstream api.Upstream
 
@@ -1143,7 +1424,7 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 		upstream = api.Upstream{
 			DestinationType:      api.UpstreamDestTypeService,
 			DestinationPartition: partition,
-			DestinationPeer:      peer,
+			DestinationPeer:      "",
 			DestinationNamespace: namespace,
 			DestinationName:      svcName,
 			Datacenter:           datacenter,
@@ -1233,26 +1514,6 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 	return upstream, nil
 }
 
-// shouldIgnore ignores namespaces where we don't connect-inject.
-func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
-	// Ignores system namespaces.
-	if namespace == metav1.NamespaceSystem || namespace == metav1.NamespacePublic || namespace == "local-path-storage" {
-		return true
-	}
-
-	// Ignores deny list.
-	if denySet.Contains(namespace) {
-		return true
-	}
-
-	// Ignores if not in allow list or allow list is not *.
-	if !allowSet.Contains("*") && !allowSet.Contains(namespace) {
-		return true
-	}
-
-	return false
-}
-
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
 // depending on Consul Namespaces being enabled and the value of namespace mirroring.
 func (r *Controller) consulNamespace(namespace string) string {
@@ -1293,10 +1554,33 @@ func hasBeenInjected(pod corev1.Pod) bool {
 	return false
 }
 
-// isGateway checks the value of the gateway annotation and returns true if the Pod represents a Gateway.
+// isGateway checks the value of the gateway annotation and returns true if the Pod
+// represents a Gateway kind that should be acted upon by the endpoints controller.
 func isGateway(pod corev1.Pod) bool {
 	anno, ok := pod.Annotations[constants.AnnotationGatewayKind]
+	return ok && anno != "" && anno != apiGateway
+}
+
+// isTelemetryCollector checks whether a pod is part of a deployment for a Consul Telemetry Collector. If so,
+// and this is the first pod deployed to a Namespace, we need to create the Namespace in Consul. Otherwise the
+// deployment may fail out during service registration because it is deployed to a Namespace that does not exist.
+func isTelemetryCollector(pod corev1.Pod) bool {
+	anno, ok := pod.Annotations[constants.LabelTelemetryCollector]
 	return ok && anno != ""
+}
+
+// ensureNamespaceExists creates a Consul namespace for a pod in the event it does not exist.
+// At the time of writing, we use this for the Consul Telemetry Collector which may be the first
+// pod deployed to a namespace. If it is, it's connect-inject will fail for lack of a namespace.
+func (r *Controller) ensureNamespaceExists(apiClient *api.Client, pod corev1.Pod) error {
+	if r.EnableConsulNamespaces {
+		consulNS := r.consulNamespace(pod.Namespace)
+		if _, err := namespaces.EnsureExists(apiClient, consulNS, r.CrossNSACLPolicy); err != nil {
+			r.Log.Error(err, "failed to ensure Consul namespace exists", "ns", pod.Namespace, "consul ns", consulNS)
+			return err
+		}
+	}
+	return nil
 }
 
 // mapAddresses combines all addresses to a mapping of address to its health status.
@@ -1351,4 +1635,17 @@ func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
 		}
 	}
 	return -1
+}
+
+// deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
+// marked in the map for deregistration.
+func deregister(address string, deregisterEndpointAddress map[string]bool) bool {
+	if deregisterEndpointAddress == nil {
+		return true
+	}
+	deregister, ok := deregisterEndpointAddress[address]
+	if ok {
+		return deregister
+	}
+	return true
 }

@@ -6,16 +6,13 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	logrtest "github.com/go-logr/logr/testr"
+	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -27,6 +24,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 func TestHandlerHandle(t *testing.T) {
@@ -43,8 +47,7 @@ func TestHandlerHandle(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name    string
@@ -56,7 +59,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"kube-system namespace",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -76,7 +79,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"already injected",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -100,7 +103,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod basic",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -138,11 +141,78 @@ func TestHandlerHandle(t *testing.T) {
 				},
 			},
 		},
+		{
+			"empty pod basic with lifecycle",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+				LifecycleConfig:       lifecycle.Config{DefaultEnableProxyLifecycle: true},
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+			},
+		},
 
 		{
 			"pod with upstreams specified",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -177,6 +247,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -201,7 +275,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod with injection disabled",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -227,7 +301,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"empty pod with injection truthy",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -270,6 +344,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -282,7 +360,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with empty volume mount annotation",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -325,6 +403,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -336,7 +418,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with volume mount annotation",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -399,6 +481,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -410,7 +496,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with sidecar volume mount annotation",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -459,6 +545,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -470,7 +560,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with sidecar invalid volume mount annotation",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -501,7 +591,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with service annotation",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -544,6 +634,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -556,7 +650,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"pod with existing label",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -606,7 +700,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"tproxy with overwriteProbes is enabled",
 			MeshWebhook{
-				Log:                    logrtest.TestLogger{T: t},
+				Log:                    logrtest.New(t),
 				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:   mapset.NewSet(),
 				EnableTransparentProxy: true,
@@ -629,14 +723,14 @@ func TestHandlerHandle(t *testing.T) {
 								{
 									Name: "web",
 									LivenessProbe: &corev1.Probe{
-										Handler: corev1.Handler{
+										ProbeHandler: corev1.ProbeHandler{
 											HTTPGet: &corev1.HTTPGetAction{
 												Port: intstr.FromInt(8080),
 											},
 										},
 									},
 									ReadinessProbe: &corev1.Probe{
-										Handler: corev1.Handler{
+										ProbeHandler: corev1.ProbeHandler{
 											HTTPGet: &corev1.HTTPGetAction{
 												Port: intstr.FromInt(8081),
 											},
@@ -681,6 +775,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -696,7 +794,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -744,6 +842,10 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
@@ -755,7 +857,7 @@ func TestHandlerHandle(t *testing.T) {
 		{
 			"multiport pod kube 1.24 with AuthMethod, serviceaccount does not have secret ref",
 			MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -803,12 +905,252 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+			},
+		},
+		{
+			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref, lifecycle enabled",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             testClientWithServiceAccountAndSecretRefs(),
+				AuthMethod:            "k8s",
+				LifecycleConfig:       lifecycle.Config{DefaultEnableProxyLifecycle: true},
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationService: "web,web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+			},
+		},
+		{
+			"dns redirection enabled",
+			MeshWebhook{
+				Log:                    logrtest.New(t),
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSet(),
+				EnableTransparentProxy: true,
+				TProxyOverwriteProbes:  true,
+				decoder:                decoder,
+				Clientset:              defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{},
+							Annotations: map[string]string{constants.KeyConsulDNS: "true"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "web",
+								},
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyTransparentProxyStatus),
+				},
+
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/dnsPolicy",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/dnsConfig",
+				},
+			},
+		},
+		{
+			"dns redirection only enabled if tproxy enabled",
+			MeshWebhook{
+				Log:                    logrtest.New(t),
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSet(),
+				EnableTransparentProxy: true,
+				TProxyOverwriteProbes:  true,
+				decoder:                decoder,
+				Clientset:              defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{},
+							Annotations: map[string]string{
+								constants.KeyConsulDNS:        "true",
+								constants.KeyTransparentProxy: "false",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "web",
+								},
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				// Note: no DNS policy/config additions.
 			},
 		},
 	}
@@ -837,6 +1179,223 @@ func TestHandlerHandle(t *testing.T) {
 	}
 }
 
+// This test validates that overwrite probes match the iptables configuration fromiptablesConfigJSON()
+// Because they happen at different points in the injection, the port numbers can get out of sync.
+func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
+	t.Parallel()
+	s := runtime.NewScheme()
+	s.AddKnownTypes(schema.GroupVersion{
+		Group:   "",
+		Version: "v1",
+	}, &corev1.Pod{})
+	decoder := admission.NewDecoder(s)
+
+	cases := []struct {
+		Name    string
+		Webhook MeshWebhook
+		Req     admission.Request
+		Err     string // expected error string, not exact
+		Patches []jsonpatch.Operation
+	}{
+		{
+			"tproxy with overwriteProbes is enabled",
+			MeshWebhook{
+				Log:                    logrtest.New(t),
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSet(),
+				EnableTransparentProxy: true,
+				TProxyOverwriteProbes:  true,
+				LifecycleConfig:        lifecycle.Config{DefaultEnableProxyLifecycle: true},
+				decoder:                decoder,
+				Clientset:              defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{},
+							// We're setting an existing annotation so that we can assert on the
+							// specific annotations that are set as a result of probes being overwritten.
+							Annotations: map[string]string{"foo": "bar"},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "web",
+									LivenessProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8080),
+											},
+										},
+									},
+									ReadinessProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8081),
+											},
+										},
+									},
+									StartupProbe: &corev1.Probe{
+										ProbeHandler: corev1.ProbeHandler{
+											HTTPGet: &corev1.HTTPGetAction{
+												Port: intstr.FromInt(8082),
+											},
+										},
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe/tcpSocket",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe/initialDelaySeconds",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/readinessProbe/httpGet",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/startupProbe",
+				},
+				{
+					Operation: "remove",
+					Path:      "/spec/containers/0/livenessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyTransparentProxyStatus),
+				},
+
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			tt.Webhook.ConsulConfig = &consul.Config{HTTPPort: 8500}
+			ctx := context.Background()
+			resp := tt.Webhook.Handle(ctx, tt.Req)
+			if (tt.Err == "") != resp.Allowed {
+				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
+			}
+			if tt.Err != "" {
+				require.Contains(t, resp.Result.Message, tt.Err)
+				return
+			}
+
+			var iptablesCfg iptables.Config
+			var overwritePorts []string
+			actual := resp.Patches
+			if len(actual) > 0 {
+				for i := range actual {
+
+					// We want to grab the iptables configuration from the connect-init container's
+					// environment.
+					if actual[i].Path == "/spec/initContainers" {
+						value := actual[i].Value.([]any)
+						valueMap := value[0].(map[string]any)
+						envs := valueMap["env"].([]any)
+						redirectEnv := envs[8].(map[string]any)
+						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
+						iptablesJson := redirectEnv["value"].(string)
+
+						err := json.Unmarshal([]byte(iptablesJson), &iptablesCfg)
+						require.NoError(t, err)
+					}
+
+					// We want to accumulate the httpGet Probes from the application container to
+					// compare them to the iptables rules. This is now the second container in the spec
+					if strings.Contains(actual[i].Path, "/spec/containers/1") {
+						valueMap, ok := actual[i].Value.(map[string]any)
+						require.True(t, ok)
+
+						for k, v := range valueMap {
+							if strings.Contains(k, "Probe") {
+								probe := v.(map[string]any)
+								httpProbe := probe["httpGet"]
+								httpProbeMap := httpProbe.(map[string]any)
+								port := httpProbeMap["port"]
+								portNum := port.(float64)
+
+								overwritePorts = append(overwritePorts, strconv.Itoa(int(portNum)))
+							}
+						}
+					}
+
+					// nil out all the patch values to just compare the keys changing.
+					actual[i].Value = nil
+				}
+			}
+			// Make sure the iptables excluded ports match the ports on the container
+			require.ElementsMatch(t, iptablesCfg.ExcludeInboundPorts, overwritePorts)
+			require.ElementsMatch(t, tt.Patches, actual)
+		})
+	}
+}
+
 func TestHandlerDefaultAnnotations(t *testing.T) {
 	cases := []struct {
 		Name     string
@@ -848,8 +1407,9 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			"empty",
 			&corev1.Pod{},
 			map[string]string{
-				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
-				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -869,8 +1429,9 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
-				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -896,9 +1457,10 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				"consul.hashicorp.com/connect-service": "foo",
-				constants.AnnotationOriginalPod:        "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
-				constants.AnnotationConsulK8sVersion:   version.GetHumanVersion(),
+				"consul.hashicorp.com/connect-service":     "foo",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
 
 			"",
@@ -925,9 +1487,10 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationPort:             "http",
-				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
-				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationPort:                   "http",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -952,9 +1515,10 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationPort:             "8080",
-				constants.AnnotationOriginalPod:      "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
-				constants.AnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationPort:                   "8080",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
 			"",
 		},
@@ -1463,7 +2027,7 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8080),
 							},
@@ -1489,7 +2053,7 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8080),
 							},
@@ -1516,7 +2080,7 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8080),
 							},
@@ -1543,7 +2107,7 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8080),
 							},
@@ -1570,7 +2134,7 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					LivenessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8081),
 							},
@@ -1606,21 +2170,21 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					LivenessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8081),
 							},
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8080),
 							},
 						},
 					},
 					StartupProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8082),
 							},
@@ -1649,21 +2213,21 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					LivenessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8081),
 							},
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8080),
 							},
 						},
 					},
 					StartupProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8080),
 							},
@@ -1683,21 +2247,21 @@ func TestOverwriteProbes(t *testing.T) {
 						},
 					},
 					LivenessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8083),
 							},
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8082),
 							},
 						},
 					},
 					StartupProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							HTTPGet: &corev1.HTTPGetAction{
 								Port: intstr.FromInt(8082),
 							},

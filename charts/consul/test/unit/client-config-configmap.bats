@@ -31,17 +31,6 @@ load _helpers
       .
 }
 
-@test "client/ConfigMap: extraConfig is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/client-config-configmap.yaml  \
-      --set 'client.enabled=true' \
-      --set 'client.extraConfig="{\"hello\": \"world\"}"' \
-      . | tee /dev/stderr |
-      yq '.data["extra-from-values.json"] | match("world") | length > 1' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 #--------------------------------------------------------------------
 # connectInject.centralConfig [DEPRECATED]
 
@@ -94,4 +83,30 @@ load _helpers
       yq -r '.data["client.json"]' | jq -r .auto_reload_config | tee /dev/stderr)
 
   [ "${actual}" = null ]
+}
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "client/ConfigMap: client.logLevel is empty" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      --set 'client.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "client/ConfigMap: client.logLevel is non empty" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-config-configmap.yaml  \
+      --set 'client.enabled=true' \
+      --set 'client.logLevel=DEBUG' \
+      . | tee /dev/stderr |
+      yq -r '.data["log-level.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${actual}" = "DEBUG" ]
 }

@@ -1,0 +1,15 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: consul-telemetry-collector
+spec:
+  destination:
+    name: 'consul-telemetry-collector'
+  sources:
+    - name: '*'
+      action: allow
+
+
+    

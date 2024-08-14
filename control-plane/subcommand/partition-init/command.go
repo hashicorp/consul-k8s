@@ -11,13 +11,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/cli"
+
+	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
+
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
-	"github.com/hashicorp/consul-server-connection-manager/discovery"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
 )
 
 type Command struct {
@@ -69,6 +71,52 @@ func (c *Command) Help() string {
 	return c.help
 }
 
+func (c *Command) ensurePartition(scm consul.ServerConnectionManager) error {
+	state, err := scm.State()
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to get Consul server addresses from watcher: %s", err))
+		return err
+	}
+
+	consulClient, err := consul.NewClientFromConnMgrState(c.consul.ConsulClientConfig(), state)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create Consul client: %s", err))
+		return err
+	}
+
+	for {
+		partition, _, err := consulClient.Partitions().Read(c.ctx, c.consul.Partition, nil)
+		// The API does not return an error if the Partition does not exist. It returns a nil Partition.
+		if err != nil {
+			c.log.Error("Error reading Partition from Consul", "name", c.consul.Partition, "error", err.Error())
+		} else if partition == nil {
+			// Retry Admin Partition creation until it succeeds, or we reach the command timeout.
+			_, _, err = consulClient.Partitions().Create(c.ctx, &api.Partition{
+				Name:        c.consul.Partition,
+				Description: "Created by Helm installation",
+			}, nil)
+			if err == nil {
+				c.log.Info("Successfully created Admin Partition", "name", c.consul.Partition)
+				return nil
+			}
+			c.log.Error("Error creating partition", "name", c.consul.Partition, "error", err.Error())
+		} else {
+			c.log.Info("Admin Partition already exists", "name", c.consul.Partition)
+			return nil
+		}
+		// Wait on either the retry duration (in which case we continue) or the
+		// overall command timeout.
+		c.log.Info("Retrying in " + c.retryDuration.String())
+		select {
+		case <-time.After(c.retryDuration):
+			continue
+		case <-c.ctx.Done():
+			c.log.Error("Timed out attempting to create partition", "name", c.consul.Partition)
+			return fmt.Errorf("")
+		}
+	}
+}
+
 // Run bootstraps Admin Partitions on Consul servers.
 // The function will retry its tasks until success, or it exceeds its timeout.
 func (c *Command) Run(args []string) int {
@@ -114,49 +162,11 @@ func (c *Command) Run(args []string) int {
 	go watcher.Run()
 	defer watcher.Stop()
 
-	state, err := watcher.State()
+	err = c.ensurePartition(watcher)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("unable to get Consul server addresses from watcher: %s", err))
 		return 1
 	}
-
-	consulClient, err := consul.NewClientFromConnMgrState(c.consul.ConsulClientConfig(), state)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("unable to create Consul client: %s", err))
-		return 1
-	}
-
-	for {
-		partition, _, err := consulClient.Partitions().Read(c.ctx, c.consul.Partition, nil)
-		// The API does not return an error if the Partition does not exist. It returns a nil Partition.
-		if err != nil {
-			c.log.Error("Error reading Partition from Consul", "name", c.consul.Partition, "error", err.Error())
-		} else if partition == nil {
-			// Retry Admin Partition creation until it succeeds, or we reach the command timeout.
-			_, _, err = consulClient.Partitions().Create(c.ctx, &api.Partition{
-				Name:        c.consul.Partition,
-				Description: "Created by Helm installation",
-			}, nil)
-			if err == nil {
-				c.log.Info("Successfully created Admin Partition", "name", c.consul.Partition)
-				return 0
-			}
-			c.log.Error("Error creating partition", "name", c.consul.Partition, "error", err.Error())
-		} else {
-			c.log.Info("Admin Partition already exists", "name", c.consul.Partition)
-			return 0
-		}
-		// Wait on either the retry duration (in which case we continue) or the
-		// overall command timeout.
-		c.log.Info("Retrying in " + c.retryDuration.String())
-		select {
-		case <-time.After(c.retryDuration):
-			continue
-		case <-c.ctx.Done():
-			c.log.Error("Timed out attempting to create partition", "name", c.consul.Partition)
-			return 1
-		}
-	}
+	return 0
 }
 
 func (c *Command) validateFlags() error {
@@ -171,6 +181,7 @@ func (c *Command) validateFlags() error {
 	if c.consul.APITimeout <= 0 {
 		return errors.New("-api-timeout must be set to a value greater than 0")
 	}
+
 	return nil
 }
 

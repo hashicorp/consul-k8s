@@ -21,6 +21,8 @@ spec:
   # but we can provide it for defense in depth.
   requiredDropCapabilities:
     - ALL
+  defaultAddCapabilities:
+    - NET_BIND_SERVICE
   # Allow core volume types.
   volumes:
     - 'configMap'

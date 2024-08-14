@@ -47,6 +47,7 @@ type PortForward struct {
 type PortForwarder interface {
 	Open(context.Context) (string, error)
 	Close()
+	GetLocalPort() int
 }
 
 // forwarder is an interface which can be used for opening a port forward session.
@@ -115,6 +116,10 @@ func (pf *PortForward) Open(ctx context.Context) (string, error) {
 // Close closes the port forward connection.
 func (pf *PortForward) Close() {
 	close(pf.stopChan)
+}
+
+func (pf *PortForward) GetLocalPort() int {
+	return pf.localPort
 }
 
 // allocateLocalPort looks for an open port on localhost and sets it to the

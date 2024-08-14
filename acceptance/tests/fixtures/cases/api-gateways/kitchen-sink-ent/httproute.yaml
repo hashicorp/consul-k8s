@@ -1,0 +1,45 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: http-route
+spec:
+  parentRefs:
+  - name: gateway
+    sectionName: http
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: "/v1"
+      backendRefs:
+        - name: static-server
+          port: 8080
+      filters:
+        - type: ExtensionRef
+          extensionRef:
+            group: consul.hashicorp.com
+            kind: RouteAuthFilter
+            name: route-jwt-auth-filter
+        - type: ExtensionRef
+          extensionRef:
+            group: consul.hashicorp.com
+            kind: RouteRetryFilter
+            name: retrytrafficfilter
+        - type: ExtensionRef
+          extensionRef:
+            group: consul.hashicorp.com
+            kind: RouteTimeoutFilter
+            name: timeouttrafficfilter
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+                - name: my-header
+                  value: foo
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: "ReplacePrefixMatch"
+              replacePrefixMatch: "/v1/test"

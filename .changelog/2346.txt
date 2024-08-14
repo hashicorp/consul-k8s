@@ -1,0 +1,3 @@
+```release-note:feature
+Set locality on services registered with connect-inject.
+```

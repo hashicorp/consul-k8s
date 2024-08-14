@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -19,6 +18,8 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 // Test flag validation.
@@ -556,14 +557,14 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 						require.Len(r, instances, 1)
 						require.Equal(r, instances[0].ServiceName, svcName)
 					}
-					tt.Log("existing services verified")
+					r.Log("existing services verified")
 
 					for _, svcName := range c.SecondRunExpDeletedServices {
 						instances, _, err := consulClient.Catalog().Service(svcName, "k8s", nil)
 						require.NoError(r, err)
 						require.Len(r, instances, 0)
 					}
-					tt.Log("deleted services verified")
+					r.Log("deleted services verified")
 				})
 			}
 		})

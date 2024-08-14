@@ -12,12 +12,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/go-discover/mocks"
 )
 
 func TestLogger_InvalidLogLevel(t *testing.T) {

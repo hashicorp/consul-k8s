@@ -7,12 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -93,7 +93,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			staticServerPeerClusterContext := env.DefaultContext(t)
-			staticClientPeerClusterContext := env.Context(t, environment.SecondaryContextName)
+			staticClientPeerClusterContext := env.Context(t, 1)
 
 			commonHelmValues := map[string]string{
 				"global.peering.enabled":        "true",
@@ -117,62 +117,77 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
-			staticServerPeerHelmValues := map[string]string{
-				"global.datacenter": staticServerPeer,
-			}
-
-			if !cfg.UseKind {
-				staticServerPeerHelmValues["server.replicas"] = "3"
-			}
-
-			// On Kind, there are no load balancers but since all clusters
-			// share the same node network (docker bridge), we can use
-			// a NodePort service so that we can access node(s) in a different Kind cluster.
-			if cfg.UseKind {
-				staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
-				staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
-				staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-			}
-
+			var wg sync.WaitGroup
 			releaseName := helpers.RandomName()
 
-			helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
+			var staticServerPeerCluster *consul.HelmCluster
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				staticServerPeerHelmValues := map[string]string{
+					"global.datacenter": staticServerPeer,
+				}
 
-			// Install the first peer where static-server will be deployed in the static-server kubernetes context.
-			staticServerPeerCluster := consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
-			staticServerPeerCluster.Create(t)
+				if !cfg.UseKind {
+					staticServerPeerHelmValues["server.replicas"] = "3"
+				}
 
-			staticClientPeerHelmValues := map[string]string{
-				"global.datacenter": staticClientPeer,
-			}
+				// On Kind, there are no load balancers but since all clusters
+				// share the same node network (docker bridge), we can use
+				// a NodePort service so that we can access node(s) in a different Kind cluster.
+				if cfg.UseKind {
+					staticServerPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+					staticServerPeerHelmValues["meshGateway.service.type"] = "NodePort"
+					staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				}
 
-			if !cfg.UseKind {
-				staticClientPeerHelmValues["server.replicas"] = "3"
-			}
+				helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
 
-			if cfg.UseKind {
-				staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
-				staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
-				staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
-			}
+				// Install the first peer where static-server will be deployed in the static-server kubernetes context.
+				staticServerPeerCluster = consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
+				staticServerPeerCluster.Create(t)
+			}()
 
-			helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
+			var staticClientPeerCluster *consul.HelmCluster
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				staticClientPeerHelmValues := map[string]string{
+					"global.datacenter": staticClientPeer,
+				}
 
-			// Install the second peer where static-client will be deployed in the static-client kubernetes context.
-			staticClientPeerCluster := consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
-			staticClientPeerCluster.Create(t)
+				if !cfg.UseKind {
+					staticClientPeerHelmValues["server.replicas"] = "3"
+				}
+
+				if cfg.UseKind {
+					staticClientPeerHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+					staticClientPeerHelmValues["meshGateway.service.type"] = "NodePort"
+					staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
+				}
+
+				helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
+
+				// Install the second peer where static-client will be deployed in the static-client kubernetes context.
+				staticClientPeerCluster = consul.NewHelmCluster(t, staticClientPeerHelmValues, staticClientPeerClusterContext, cfg, releaseName)
+				staticClientPeerCluster.Create(t)
+			}()
+
+			// Wait for the clusters to start up
+			logger.Log(t, "waiting for clusters to start up . . .")
+			wg.Wait()
 
 			// Create Mesh resource to use mesh gateways.
 			logger.Log(t, "creating mesh config")
 			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
 
 			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
 
 			k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
 
@@ -199,13 +214,13 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 
 			// Ensure the secret is created.
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
 				require.NotEmpty(r, acceptorSecretName)
 			})
@@ -215,7 +230,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			// Create the peering dialer on the server peer.
 			k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 				k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 			})
@@ -233,13 +248,13 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s in server peer", staticServerNamespace)
 			k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})
 
 			logger.Logf(t, "creating namespaces %s in client peer", staticClientNamespace)
 			k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "create", "ns", staticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 			})
 
@@ -257,26 +272,26 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			kustomizeDir := "../fixtures/bases/mesh-gateway"
 
 			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 
 			k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 
 			logger.Log(t, "creating static-server in server peer")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Log(t, "creating static-client deployments in client peer")
 			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 			} else {
 				if c.destinationNamespace == defaultNamespace {
-					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default-namespace")
+					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default-namespace")
 				} else {
-					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
+					k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/non-default-namespace")
 				}
 			}
 			// Check that both static-server and static-client have been injected and now have 2 containers.
@@ -313,12 +328,12 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			logger.Log(t, "creating exported services")
 			if c.destinationNamespace == defaultNamespace {
 				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-namespace")
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-namespace")
 				})
 			} else {
 				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
 				})
 			}

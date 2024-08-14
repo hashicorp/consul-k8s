@@ -310,6 +310,37 @@ func (in *FailoverPolicy) validate(path *field.Path) field.ErrorList {
 	return errs
 }
 
+// PrioritizeByLocality controls whether the locality of services within the
+// local partition will be used to prioritize connectivity.
+type PrioritizeByLocality struct {
+	// Mode specifies the type of prioritization that will be performed
+	// when selecting nodes in the local partition.
+	// Valid values are: "" (default "none"), "none", and "failover".
+	Mode string `json:"mode,omitempty"`
+}
+
+func (in *PrioritizeByLocality) toConsul() *capi.ServiceResolverPrioritizeByLocality {
+	if in == nil {
+		return nil
+	}
+
+	return &capi.ServiceResolverPrioritizeByLocality{
+		Mode: in.Mode,
+	}
+}
+
+func (in *PrioritizeByLocality) validate(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in == nil {
+		return nil
+	}
+	modes := []string{"", "none", "failover"}
+	if !sliceContains(modes, in.Mode) {
+		errs = append(errs, field.Invalid(path.Child("mode"), in.Mode, notInSliceMessage(modes)))
+	}
+	return errs
+}
+
 func notInSliceMessage(slice []string) string {
 	return fmt.Sprintf(`must be one of "%s"`, strings.Join(slice, `", "`))
 }

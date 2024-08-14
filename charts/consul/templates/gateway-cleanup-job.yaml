@@ -1,0 +1,68 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-gateway-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gateway-cleanup
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-gateway-cleanup
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: gateway-cleanup
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-gateway-cleanup
+      containers:
+        - name: gateway-cleanup
+          image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - gateway-cleanup
+            - -gateway-class-name=consul
+            - -gateway-class-config-name=consul-api-gateway
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+          volumeMounts:
+            - name: config
+              mountPath: /consul/config
+              readOnly: true
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ template "consul.fullname" . }}-gateway-resources-config
+{{- end }}

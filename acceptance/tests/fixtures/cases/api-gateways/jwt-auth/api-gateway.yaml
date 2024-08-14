@@ -1,0 +1,43 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: gateway
+spec:
+  gatewayClassName: gateway-class
+  listeners:
+  - protocol: HTTP
+    port: 8081
+    name: http-auth
+    allowedRoutes:
+      namespaces:
+        from: "All"
+  - protocol: HTTP
+    port: 8082
+    name: http-invalid-attach
+    allowedRoutes:
+      namespaces:
+        from: "All"
+  - protocol: HTTP
+    port: 80
+    name: http
+    allowedRoutes:
+      namespaces:
+        from: "All"
+  - protocol: TCP
+    port: 81
+    name: tcp
+    allowedRoutes:
+      namespaces:
+        from: "All"
+  - protocol: HTTPS
+    port: 443
+    name: https
+    tls:
+      certificateRefs:
+        - name: "certificate"
+    allowedRoutes:
+      namespaces:
+        from: "All"

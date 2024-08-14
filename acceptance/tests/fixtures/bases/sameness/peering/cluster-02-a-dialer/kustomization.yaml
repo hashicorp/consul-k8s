@@ -1,0 +1,5 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+resources:
+  - peering-dialer-cluster-03-a.yaml

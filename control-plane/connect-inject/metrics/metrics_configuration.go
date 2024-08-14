@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	corev1 "k8s.io/api/core/v1"
 )
 
 // Config represents configuration common to connect-inject components related to metrics.
@@ -98,13 +99,13 @@ func (mc Config) EnableMetricsMerging(pod corev1.Pod) (bool, error) {
 // MergedMetricsPort returns the port to run the merged metrics server on, either via the default value in the meshWebhook,
 // or if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
 func (mc Config) MergedMetricsPort(pod corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, constants.AnnotationMergedMetricsPort, mc.DefaultMergedMetricsPort, false)
+	return common.DetermineAndValidatePort(pod, constants.AnnotationMergedMetricsPort, mc.DefaultMergedMetricsPort, false)
 }
 
 // PrometheusScrapePort returns the port for Prometheus to scrape from, either via the default value in the meshWebhook, or
 // if it's been overridden via the annotation. It also validates the port is in the unprivileged port range.
 func (mc Config) PrometheusScrapePort(pod corev1.Pod) (string, error) {
-	return determineAndValidatePort(pod, constants.AnnotationPrometheusScrapePort, mc.DefaultPrometheusScrapePort, false)
+	return common.DetermineAndValidatePort(pod, constants.AnnotationPrometheusScrapePort, mc.DefaultPrometheusScrapePort, false)
 }
 
 // PrometheusScrapePath returns the path for Prometheus to scrape from, either via the default value in the meshWebhook, or
@@ -133,14 +134,14 @@ func (mc Config) ServiceMetricsPort(pod corev1.Pod) (string, error) {
 		// written their service in such a way that it expects to be able to use
 		// privileged ports. So, the port metrics are exposed on the service can
 		// be privileged.
-		return determineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, raw, true)
+		return common.DetermineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, raw, true)
 	}
 
 	// If the annotationPort is not set, the serviceMetrics port will be 0
 	// unless overridden by the service-metrics-port annotation. If the service
 	// metrics port is 0, the consul sidecar will not run a merged metrics
 	// server.
-	return determineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, "0", true)
+	return common.DetermineAndValidatePort(pod, constants.AnnotationServiceMetricsPort, "0", true)
 }
 
 // ServiceMetricsPath returns a default of /metrics, or overrides
@@ -179,38 +180,4 @@ func (mc Config) ShouldRunMergedMetricsServer(pod corev1.Pod) (bool, error) {
 		return true, nil
 	}
 	return false, nil
-}
-
-// determineAndValidatePort behaves as follows:
-// If the annotation exists, validate the port and return it.
-// If the annotation does not exist, return the default port.
-// If the privileged flag is true, it will allow the port to be in the
-// privileged port range of 1-1023. Otherwise, it will only allow ports in the
-// unprivileged range of 1024-65535.
-func determineAndValidatePort(pod corev1.Pod, annotation string, defaultPort string, privileged bool) (string, error) {
-	if raw, ok := pod.Annotations[annotation]; ok && raw != "" {
-		port, err := common.PortValue(pod, raw)
-		if err != nil {
-			return "", fmt.Errorf("%s annotation value of %s is not a valid integer", annotation, raw)
-		}
-
-		if privileged && (port < 1 || port > 65535) {
-			return "", fmt.Errorf("%s annotation value of %d is not in the valid port range 1-65535", annotation, port)
-		} else if !privileged && (port < 1024 || port > 65535) {
-			return "", fmt.Errorf("%s annotation value of %d is not in the unprivileged port range 1024-65535", annotation, port)
-		}
-
-		// If the annotation exists, return the validated port.
-		return fmt.Sprint(port), nil
-	}
-
-	// If the annotation does not exist, return the default.
-	if defaultPort != "" {
-		port, err := common.PortValue(pod, defaultPort)
-		if err != nil {
-			return "", fmt.Errorf("%s is not a valid port on the pod %s", defaultPort, pod.Name)
-		}
-		return fmt.Sprint(port), nil
-	}
-	return "", nil
 }

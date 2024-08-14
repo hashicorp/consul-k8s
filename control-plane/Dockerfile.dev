@@ -1,0 +1,11 @@
+# DANGER: this dockerfile is experimental and could be modified/removed at any time.
+# A simple image for testing changes to consul-k8s
+#
+# Meant to be used with the following make target
+# DEV_IMAGE=<name:tag> make control-plane-dev-skaffold
+
+FROM hashicorp/consul-k8s-control-plane as cache
+ARG TARGETARCH
+
+COPY pkg/bin/linux_${TARGETARCH}/consul-k8s-control-plane /bin
+COPY cni/pkg/bin/linux_${TARGETARCH}/consul-cni /bin

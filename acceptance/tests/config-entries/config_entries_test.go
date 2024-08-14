@@ -9,6 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"github.com/hashicorp/go-uuid"
+	"github.com/stretchr/testify/require"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -16,10 +21,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil/retry"
-	"github.com/hashicorp/go-uuid"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -84,18 +85,18 @@ func TestController(t *testing.T) {
 					// Retry the kubectl apply because we've seen sporadic
 					// "connection refused" errors where the mutating webhook
 					// endpoint fails initially.
-					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/crds-oss")
+					out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/crds-oss")
 					require.NoError(r, err, out)
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
-						// Ignore errors here because if the test ran as expected
-						// the custom resources will have been deleted.
-						k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/crds-oss")
-					})
+				})
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					// Ignore errors here because if the test ran as expected
+					// the custom resources will have been deleted.
+					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/crds-oss")
 				})
 
 				// On startup, the controller can take upwards of 1m to perform
 				// leader election so we may need to wait a long time for
-				// the reconcile loop to run (hence the 1m timeout here).
+				// the reconcile loop to run (hence the 2m timeout here).
 				counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
 					// service-defaults
@@ -104,6 +105,7 @@ func TestController(t *testing.T) {
 					svcDefaultEntry, ok := entry.(*api.ServiceConfigEntry)
 					require.True(r, ok, "could not cast to ServiceConfigEntry")
 					require.Equal(r, "http", svcDefaultEntry.Protocol)
+					require.Equal(r, 1234, svcDefaultEntry.RateLimits.InstanceLevel.RequestsPerSecond)
 
 					// service-resolver
 					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
@@ -178,6 +180,65 @@ func TestController(t *testing.T) {
 					require.Equal(r, "certFile", terminatingGatewayEntry.Services[0].CertFile)
 					require.Equal(r, "keyFile", terminatingGatewayEntry.Services[0].KeyFile)
 					require.Equal(r, "sni", terminatingGatewayEntry.Services[0].SNI)
+
+					// jwt-provider
+					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.NoError(r, err)
+					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+					require.Equal(r, "jwks.txt", jwtProviderConfigEntry.JSONWebKeySet.Local.Filename)
+					require.Equal(r, "test-issuer", jwtProviderConfigEntry.Issuer)
+					require.ElementsMatch(r, []string{"aud1", "aud2"}, jwtProviderConfigEntry.Audiences)
+					require.Equal(r, "x-jwt-header", jwtProviderConfigEntry.Locations[0].Header.Name)
+					require.Equal(r, "x-query-param", jwtProviderConfigEntry.Locations[1].QueryParam.Name)
+					require.Equal(r, "session-id", jwtProviderConfigEntry.Locations[2].Cookie.Name)
+					require.Equal(r, "x-forwarded-jwt", jwtProviderConfigEntry.Forwarding.HeaderName)
+					require.True(r, jwtProviderConfigEntry.Forwarding.PadForwardPayloadHeader)
+					require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
+					require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig.Size)
+
+					// exported-services
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+					require.NoError(r, err)
+					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, "frontend", exportedServicesConfigEntry.Services[0].Name)
+					require.Equal(r, "peerName", exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
+					require.Equal(r, "groupName", exportedServicesConfigEntry.Services[0].Consumers[1].SamenessGroup)
+
+					// control-plane-request-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
+					require.NoError(r, err)
+					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+					require.Equal(r, "permissive", rateLimitIPConfigEntry.Mode)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.ACL.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.ACL.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Catalog.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Catalog.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConfigEntry.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConfigEntry.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConnectCA.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConnectCA.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Coordinate.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Coordinate.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.DiscoveryChain.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.DiscoveryChain.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Health.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Health.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Intention.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Intention.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)
+					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.WriteRate)
+
 				})
 			}
 
@@ -215,6 +276,17 @@ func TestController(t *testing.T) {
 				logger.Log(t, "patching terminating-gateway custom resource")
 				patchSNI := "patch-sni"
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
+
+				logger.Log(t, "patching JWTProvider custom resource")
+				patchIssuer := "other-issuer"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "jwtprovider", "jwt-provider", "-p", fmt.Sprintf(`{"spec": {"issuer": "%s"}}`, patchIssuer), "--type=merge")
+
+				logger.Log(t, "patching ExportedServices custom resource")
+				patchPeer := "destination"
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "exportedservices", "default", "-p", fmt.Sprintf(`{"spec": {"services": [{"name": "frontend", "consumers":  [{"peer":  "%s"}, {"samenessGroup":  "groupName"}]}]}}`, patchPeer), "--type=merge")
+
+				logger.Log(t, "patching control-plane-request-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -283,6 +355,27 @@ func TestController(t *testing.T) {
 					terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
 					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
 					require.Equal(r, patchSNI, terminatingGatewayEntry.Services[0].SNI)
+
+					// jwt-provider
+					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.NoError(r, err)
+					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+					require.Equal(r, patchIssuer, jwtProviderConfigEntry.Issuer)
+
+					// exported-services
+					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+					require.NoError(r, err)
+					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+					require.Equal(r, patchPeer, exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
+
+					// control-plane-request-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
+					require.NoError(r, err)
+					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+					require.Equal(r, rateLimitIPConfigEntry.Mode, "disabled")
 				})
 			}
 
@@ -314,6 +407,15 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "deleting terminating-gateway custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "terminatinggateway", "terminating-gateway")
+
+				logger.Log(t, "deleting jwt-provider custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "jwtprovider", "jwt-provider")
+
+				logger.Log(t, "deleting exported-services custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "exportedservices", "default")
+
+				logger.Log(t, "deleting control-plane-request-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "controlplanerequestlimit", "controlplanerequestlimit")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -358,7 +460,22 @@ func TestController(t *testing.T) {
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 
 					// terminating-gateway
-					_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "terminating-gateway", nil)
+					_, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// jwt-provider
+					_, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// exported-services
+					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// control-plane-request-limit
+					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})

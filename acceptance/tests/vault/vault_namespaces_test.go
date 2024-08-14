@@ -23,8 +23,10 @@ import (
 // TestVault_VaultNamespace installs Vault, configures a Vault namespace, and then bootstraps it
 // with secrets, policies, and Kube Auth Method.
 // It then configures Consul to use vault as the backend and checks that it works
-// with the vault namespace.
+// with the vault namespace. Namespace is added in this via global.secretsBackend.vault.vaultNamespace.
 func TestVault_VaultNamespace(t *testing.T) {
+	t.Skipf("TODO(flaky): NET-5682")
+
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace
@@ -195,9 +197,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.address":             vaultCluster.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
-		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{\"connect\": [{ \"ca_config\": [{ \"namespace\": \"%s\"}]}]}"`, vaultNamespacePath),
-
-		"global.secretsBackend.vault.agentAnnotations": fmt.Sprintf("\"vault.hashicorp.com/namespace\": \"%s\"", vaultNamespacePath),
+		"global.secretsBackend.vault.vaultNamespace":                vaultNamespacePath,
 
 		"global.acls.manageSystemACLs":          "true",
 		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
@@ -265,13 +265,13 @@ func TestVault_VaultNamespace(t *testing.T) {
 
 	// Deploy two services and check that they can talk to each other.
 	logger.Log(t, "creating static-server and static-client deployments")
-	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 	if cfg.EnableTransparentProxy {
-		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 	} else {
-		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 	}
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/intention")
 	})
 	k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/intention")

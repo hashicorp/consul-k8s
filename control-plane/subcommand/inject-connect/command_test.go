@@ -132,6 +132,12 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "-default-envoy-proxy-concurrency must be >= 0 if set",
 		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-global-image-pull-policy", "garbage",
+			},
+			expErr: "-global-image-pull-policy must be `IfNotPresent`, `Always`, `Never`, or `` ",
+		},
 	}
 
 	for _, c := range cases {

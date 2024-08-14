@@ -1,0 +1,3 @@
+```release-note:bug
+helm: adds imagePullSecret to the gateway-resources job and the gateway-cleanup job, would fail before if the image was in a private registry
+```

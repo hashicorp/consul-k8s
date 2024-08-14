@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Update prometheus port and scheme annotations if tls is enabled
+```

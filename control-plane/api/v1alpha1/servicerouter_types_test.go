@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // Test MatchesConsul.
@@ -52,9 +53,10 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 						{
 							Match: &ServiceRouteMatch{
 								HTTP: &ServiceRouteHTTPMatch{
-									PathExact:  "pathExact",
-									PathPrefix: "pathPrefix",
-									PathRegex:  "pathRegex",
+									CaseInsensitive: true,
+									PathExact:       "pathExact",
+									PathPrefix:      "pathPrefix",
+									PathRegex:       "pathRegex",
 									Header: []ServiceRouteHTTPMatchHeader{
 										{
 											Name:    "name",
@@ -82,9 +84,11 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 								ServiceSubset:         "serviceSubset",
 								Namespace:             "namespace",
 								PrefixRewrite:         "prefixRewrite",
+								IdleTimeout:           metav1.Duration{Duration: 1 * time.Second},
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
+								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{
@@ -128,9 +132,10 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 					{
 						Match: &capi.ServiceRouteMatch{
 							HTTP: &capi.ServiceRouteHTTPMatch{
-								PathExact:  "pathExact",
-								PathPrefix: "pathPrefix",
-								PathRegex:  "pathRegex",
+								CaseInsensitive: true,
+								PathExact:       "pathExact",
+								PathPrefix:      "pathPrefix",
+								PathRegex:       "pathRegex",
 								Header: []capi.ServiceRouteHTTPMatchHeader{
 									{
 										Name:    "name",
@@ -157,10 +162,13 @@ func TestServiceRouter_MatchesConsul(t *testing.T) {
 							Service:               "service",
 							ServiceSubset:         "serviceSubset",
 							Namespace:             "namespace",
+							Partition:             "default",
 							PrefixRewrite:         "prefixRewrite",
+							IdleTimeout:           1 * time.Second,
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
+							RetryOn:               []string{"gateway-error"},
 							RetryOnStatusCodes:    []uint32{500, 400},
 							RequestHeaders: &capi.HTTPHeaderModifiers{
 								Add: map[string]string{
@@ -253,9 +261,10 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 						{
 							Match: &ServiceRouteMatch{
 								HTTP: &ServiceRouteHTTPMatch{
-									PathExact:  "pathExact",
-									PathPrefix: "pathPrefix",
-									PathRegex:  "pathRegex",
+									CaseInsensitive: true,
+									PathExact:       "pathExact",
+									PathPrefix:      "pathPrefix",
+									PathRegex:       "pathRegex",
 									Header: []ServiceRouteHTTPMatchHeader{
 										{
 											Name:    "name",
@@ -283,9 +292,11 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 								ServiceSubset:         "serviceSubset",
 								Namespace:             "namespace",
 								PrefixRewrite:         "prefixRewrite",
+								IdleTimeout:           metav1.Duration{Duration: 1 * time.Second},
 								RequestTimeout:        metav1.Duration{Duration: 1 * time.Second},
 								NumRetries:            1,
 								RetryOnConnectFailure: true,
+								RetryOn:               []string{"gateway-error"},
 								RetryOnStatusCodes:    []uint32{500, 400},
 								RequestHeaders: &HTTPHeaderModifiers{
 									Add: map[string]string{
@@ -329,9 +340,10 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 					{
 						Match: &capi.ServiceRouteMatch{
 							HTTP: &capi.ServiceRouteHTTPMatch{
-								PathExact:  "pathExact",
-								PathPrefix: "pathPrefix",
-								PathRegex:  "pathRegex",
+								CaseInsensitive: true,
+								PathExact:       "pathExact",
+								PathPrefix:      "pathPrefix",
+								PathRegex:       "pathRegex",
 								Header: []capi.ServiceRouteHTTPMatchHeader{
 									{
 										Name:    "name",
@@ -359,9 +371,11 @@ func TestServiceRouter_ToConsul(t *testing.T) {
 							ServiceSubset:         "serviceSubset",
 							Namespace:             "namespace",
 							PrefixRewrite:         "prefixRewrite",
+							IdleTimeout:           1 * time.Second,
 							RequestTimeout:        1 * time.Second,
 							NumRetries:            1,
 							RetryOnConnectFailure: true,
+							RetryOn:               []string{"gateway-error"},
 							RetryOnStatusCodes:    []uint32{500, 400},
 							RequestHeaders: &capi.HTTPHeaderModifiers{
 								Add: map[string]string{
@@ -717,7 +731,7 @@ func TestServiceRouter_Validate(t *testing.T) {
 			},
 			namespacesEnabled: false,
 			expectedErrMsgs: []string{
-				`servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\",\"requestTimeout\":\"0s\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
+				`servicerouter.consul.hashicorp.com "foo" is invalid: spec.routes[0]: Invalid value: "{\"match\":{\"http\":{}},\"destination\":{\"prefixRewrite\":\"prefixRewrite\",\"idleTimeout\":\"0s\",\"requestTimeout\":\"0s\"}}": destination.prefixRewrite requires that either match.http.pathPrefix or match.http.pathExact be configured on this route`,
 			},
 		},
 		"namespaces disabled: single destination namespace specified": {

@@ -1,0 +1,3 @@
+```release-note:enhancement
+api-gateway: Expose prometheus scrape metrics on api-gateway pods.
+```

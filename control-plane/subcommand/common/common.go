@@ -13,12 +13,13 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/go-logr/logr"
-	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-discover"
 	"github.com/hashicorp/go-hclog"
 	"go.uber.org/zap/zapcore"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	godiscover "github.com/hashicorp/consul-k8s/control-plane/helper/go-discover"
 )
 
 const (
@@ -26,6 +27,8 @@ const (
 	// Kubernetes secret. It is consumed in both the server-acl-init and
 	// create-federation-secret commands and so lives in this common package.
 	ACLReplicationTokenName = "acl-replication"
+
+	DatadogAgentTokenName = "datadog-agent-metrics"
 
 	// ACLTokenSecretKey is the key that we store the ACL tokens in when we
 	// create Kubernetes secrets.
@@ -39,8 +42,8 @@ const (
 	// The number of times to attempt ACL Login.
 	numLoginRetries = 100
 
-	raftReplicationTimeout   = 2 * time.Second
-	tokenReadPollingInterval = 100 * time.Millisecond
+	raftReplicationTimeout   = 60 * time.Second
+	tokenReadPollingInterval = 500 * time.Millisecond
 )
 
 // Logger returns an hclog instance with log level set and JSON logging enabled/disabled, or an error if level is invalid.
@@ -70,7 +73,7 @@ func ZapLogger(level string, jsonLogging bool) (logr.Logger, error) {
 		level = "debug"
 	}
 	if err := zapLevel.UnmarshalText([]byte(level)); err != nil {
-		return nil, fmt.Errorf("unknown log level %q: %s", level, err.Error())
+		return logr.Logger{}, fmt.Errorf("unknown log level %q: %s", level, err.Error())
 	}
 	if jsonLogging {
 		return zap.New(zap.UseDevMode(false), zap.Level(zapLevel), zap.JSONEncoder()), nil

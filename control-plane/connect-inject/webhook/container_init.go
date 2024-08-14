@@ -10,10 +10,11 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -103,8 +104,9 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
 	container := corev1.Container{
-		Name:  initContainerName,
-		Image: w.ImageConsulK8S,
+		Name:            initContainerName,
+		Image:           w.ImageConsulK8S,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",
@@ -155,15 +157,15 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if w.TLSEnabled {
 		container.Env = append(container.Env,
 			corev1.EnvVar{
-				Name:  "CONSUL_USE_TLS",
+				Name:  constants.UseTLSEnvVar,
 				Value: "true",
 			},
 			corev1.EnvVar{
-				Name:  "CONSUL_CACERT_PEM",
+				Name:  constants.CACertPEMEnvVar,
 				Value: w.ConsulCACert,
 			},
 			corev1.EnvVar{
-				Name:  "CONSUL_TLS_SERVER_NAME",
+				Name:  constants.TLSServerNameEnvVar,
 				Value: w.ConsulTLSServerName,
 			})
 	}
@@ -223,8 +225,46 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			})
 	}
 
+	// OpenShift without CNI is the only environment where privileged must be true.
+	privileged := false
+	if w.EnableOpenShift && !w.EnableCNI {
+		privileged = true
+	}
+
 	if tproxyEnabled {
-		if !w.EnableCNI {
+		if w.EnableCNI {
+			// For non Openshift, we use the initContainersUserAndGroupID for the user and group id.
+			uid := int64(initContainersUserAndGroupID)
+			group := int64(initContainersUserAndGroupID)
+
+			// For Openshift with Transparent proxy + CNI, there is an annotation on the namespace that tells us what
+			// the user and group ids should be for the sidecar.
+			if w.EnableOpenShift {
+				var err error
+
+				uid, err = common.GetConnectInitUID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+				if err != nil {
+					return corev1.Container{}, err
+				}
+
+				group, err = common.GetConnectInitGroupID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+				if err != nil {
+					return corev1.Container{}, err
+				}
+			}
+
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:    pointer.Int64(uid),
+				RunAsGroup:   pointer.Int64(group),
+				RunAsNonRoot: pointer.Bool(true),
+				Privileged:   pointer.Bool(privileged),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				ReadOnlyRootFilesystem:   pointer.Bool(true),
+				AllowPrivilegeEscalation: pointer.Bool(false),
+			}
+		} else {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
 			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
 			if err != nil {
@@ -243,19 +283,9 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				RunAsGroup: pointer.Int64(rootUserAndGroupID),
 				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
 				RunAsNonRoot: pointer.Bool(false),
-				Privileged:   pointer.Bool(true),
+				Privileged:   pointer.Bool(privileged),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
-				},
-			}
-		} else {
-			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-				RunAsNonRoot: pointer.Bool(true),
-				Privileged:   pointer.Bool(false),
-				Capabilities: &corev1.Capabilities{
-					Drop: []corev1.Capability{"ALL"},
 				},
 			}
 		}
@@ -267,7 +297,17 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 // consulDNSEnabled returns true if Consul DNS should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
-func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled bool) (bool, error) {
+func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalDNSEnabled bool, globalTProxyEnabled bool) (bool, error) {
+	// DNS is only possible when tproxy is also enabled because it relies
+	// on traffic being redirected.
+	tproxy, err := common.TransparentProxyEnabled(namespace, pod, globalTProxyEnabled)
+	if err != nil {
+		return false, err
+	}
+	if !tproxy {
+		return false, nil
+	}
+
 	// First check to see if the pod annotation exists to override the namespace or global settings.
 	if raw, ok := pod.Annotations[constants.KeyConsulDNS]; ok {
 		return strconv.ParseBool(raw)
@@ -277,7 +317,7 @@ func consulDNSEnabled(namespace corev1.Namespace, pod corev1.Pod, globalEnabled 
 		return strconv.ParseBool(raw)
 	}
 	// Else fall back to the global default.
-	return globalEnabled, nil
+	return globalDNSEnabled, nil
 }
 
 // splitCommaSeparatedItemsFromAnnotation takes an annotation and a pod

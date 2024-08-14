@@ -9,10 +9,12 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	admissionv1 "k8s.io/api/admission/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // +kubebuilder:object:generate=false
@@ -67,7 +69,7 @@ func (v *ProxyDefaultsWebhook) Handle(ctx context.Context, req admission.Request
 	return admission.Allowed(fmt.Sprintf("valid %s request", proxyDefaults.KubeKind()))
 }
 
-func (v *ProxyDefaultsWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+func (v *ProxyDefaultsWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults", &admission.Webhook{Handler: v})
 }

@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testing"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -117,12 +117,11 @@ func TestValidateProxyDefault(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &ProxyDefaults{}, &ProxyDefaultsList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			validator := &ProxyDefaultsWebhook{
 				Client:  client,
-				Logger:  logrtest.TestLogger{T: t},
+				Logger:  logrtest.New(t),
 				decoder: decoder,
 			}
 			response := validator.Handle(ctx, admission.Request{

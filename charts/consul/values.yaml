@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: "hashicorp/consul:1.15.1"
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.20-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -80,13 +80,18 @@ global:
   #   - name: pull-secret-name-2
   # ```
   # @type: array<map>
-  imagePullSecrets: [ ]
+  imagePullSecrets: []
 
   # The name (and tag) of the consul-k8s-control-plane Docker
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.2.0-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.6-dev
+
+  # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
+  # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+  # @default: ""
+  imagePullPolicy: ""
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -114,6 +119,11 @@ global:
   # secretKey should be in the form of "key".
   secretsBackend:
     vault:
+      # Vault namespace (optional). This sets the Vault namespace for the `vault.hashicorp.com/namespace`
+      # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
+      # To override one of these values individually, see `agentAnnotations` and `connectCA.additionalConfig`.
+      vaultNamespace: ""
+
       # Enabling the Vault secrets backend will replace Kubernetes secrets with referenced Vault secrets.
       enabled: false
 
@@ -230,7 +240,6 @@ global:
         #   {
         #     "connect": [{
         #       "ca_config": [{
-        #            "namespace": "my-vault-ns",
         #            "leaf_cert_ttl": "36h"
         #         }]
         #     }]
@@ -289,13 +298,16 @@ global:
     # The key within the Kubernetes secret or Vault secret key that holds the gossip
     # encryption key.
     secretKey: ""
+    # Override global log verbosity level for gossip-encryption-autogenerate-job pods. One of "trace", "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
   # Refer to [`-recursor`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_recursor) for more details.
   # If this is an empty array (the default), then Consul DNS will only resolve queries for the Consul top level domain (by default `.consul`).
   # @type: array<string>
-  recursors: [ ]
+  recursors: []
 
   # Enables [TLS](https://developer.hashicorp.com/consul/tutorials/security/tls-encryption-secure)
   # across the cluster to verify authenticity of the Consul servers and clients.
@@ -307,6 +319,10 @@ global:
     # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
     enabled: false
 
+    # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
+
     # If true, turns on the auto-encrypt feature on clients and servers.
     # It also switches consul-k8s-control-plane components to retrieve the CA from the servers
     # via the API. Requires Consul 1.7.1+.
@@ -316,13 +332,13 @@ global:
     # in the server certificate. This is useful when you need to access the
     # Consul server(s) externally, for example, if you're using the UI.
     # @type: array<string>
-    serverAdditionalDNSSANs: [ ]
+    serverAdditionalDNSSANs: []
 
     # A list of additional IP addresses to set as Subject Alternative Names (SANs)
     # in the server certificate. This is useful when you need to access the
     # Consul server(s) externally, for example, if you're using the UI.
     # @type: array<string>
-    serverAdditionalIPSANs: [ ]
+    serverAdditionalIPSANs: []
 
     # If true, `verify_outgoing`, `verify_server_hostname`,
     # and `verify_incoming` for internal RPC communication will be set to `true` for Consul servers and clients.
@@ -379,6 +395,18 @@ global:
       # @type: string
       secretKey: null
 
+    # This value defines additional annotations for
+    # tls init jobs. This should be formatted as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
   # [Enterprise Only] `enableConsulNamespaces` indicates that you are running
   # Consul Enterprise v1.7+ with a valid Consul Enterprise license and would
   # like to make use of configuration beyond registering everything into
@@ -389,11 +417,14 @@ global:
 
   # Configure ACLs.
   acls:
-
     # If true, the Helm chart will automatically manage ACL tokens and policies
     # for all Consul and consul-k8s-control-plane components.
     # This requires Consul >= 1.4.
     manageSystemACLs: false
+
+    # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
 
     # A Kubernetes or Vault secret containing the bootstrap token to use for creating policies and
     # tokens for all Consul and consul-k8s-control-plane components. If `secretName` and `secretKey`
@@ -431,6 +462,33 @@ global:
       # @type: string
       secretKey: null
 
+    # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+    # This should be a YAML map corresponding to a Kubernetes
+    # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+    # object.
+    #
+    # Example:
+    #
+    # ```yaml
+    # resources:
+    #   requests:
+    #     memory: '200Mi'
+    #     cpu: '100m'
+    #   limits:
+    #     memory: '200Mi'
+    #     cpu: '100m'
+    # ```
+    #
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "50Mi"
+        cpu: "50m"
+
     # partitionToken references a Vault secret containing the ACL token to be used in non-default partitions.
     # This value should only be provided in the default partition and only when setting
     # the `global.secretsBackend.vault.enabled` value to true.
@@ -463,6 +521,26 @@ global:
     # @type: string
     nodeSelector: null
 
+    # This value defines additional annotations for
+    # acl init jobs. This should be formatted as a multi-line string.
+    #
+    # ```yaml
+    # annotations: |
+    #   "sample/annotation1": "foo"
+    #   "sample/annotation2": "bar"
+    # ```
+    #
+    # @type: string
+    annotations: null
+
+  # If argocd.enabled is set to true, following annotations are added to
+  # job - server-acl-init-job
+  # annotations -
+  #   argocd.argoproj.io/hook: Sync
+  #   argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  argocd:
+    enabled: false
+
   # [Enterprise Only] This value refers to a Kubernetes or Vault secret that you have created
   # that contains your enterprise license. It is required if you are using an
   # enterprise binary. Defining it here applies it to your cluster once a leader
@@ -485,8 +563,9 @@ global:
     # If enabled, this datacenter will be federation-capable. Only federation
     # via mesh gateways is supported.
     # Mesh gateways and servers will be configured to allow federation.
-    # Requires `global.tls.enabled`, `meshGateway.enabled` and `connectInject.enabled`
-    # to be true. Requires Consul 1.8+.
+    # Requires `global.tls.enabled`, `connectInject.enabled`, and one of
+    # `meshGateway.enabled` or `externalServers.enabled` to be true.
+    # Requires Consul 1.8+.
     enabled: false
 
     # If true, the chart will create a Kubernetes secret that can be imported
@@ -502,10 +581,10 @@ global:
     # @type: string
     primaryDatacenter: null
 
-    # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`.
-    # (e.g. ["1.1.1.1:443", "2.3.4.5:443"]
+    # A list of addresses of the primary mesh gateways in the form `<ip>:<port>`
+    # (e.g. `["1.1.1.1:443", "2.3.4.5:443"]`).
     # @type: array<string>
-    primaryGateways: [ ]
+    primaryGateways: []
 
     # If you are setting `global.federation.enabled` to true and are in a secondary datacenter,
     # set `k8sAuthMethodHost` to the address of the Kubernetes API server of the secondary datacenter.
@@ -513,6 +592,9 @@ global:
     # This auth method will be used to provision ACL tokens for Consul components and is different
     # from the one used by the Consul Service Mesh.
     # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+    #
+    # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
+    # `externalServers.k8sAuthMethodHost` should be set to the same value.
     #
     # You can retrieve this value from your `kubeconfig` by running:
     #
@@ -523,6 +605,10 @@ global:
     #
     # @type: string
     k8sAuthMethodHost: null
+
+    # Override global log verbosity level for the create-federation-secret-job pods. One of "trace", "debug", "info", "warn", or "error".
+    # @type: string
+    logLevel: ""
 
   # Configures metrics for Consul service mesh
   metrics:
@@ -536,6 +622,16 @@ global:
     # `global.metrics.enabled` is true.
     # @type: boolean
     enableAgentMetrics: false
+
+    # Set to true to stop prepending the machine's hostname to gauge-type metrics. Default is false.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
+    # @type: boolean
+    disableAgentHostName: false
+
+    # Configures consul agent underlying host metrics. Default is false.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
+    # @type: boolean
+    enableHostMetrics: false
 
     # Configures the retention time for metrics in Consul clients and
     # servers. This must be greater than 0 for Consul clients and servers
@@ -553,12 +649,151 @@ global:
     # Configures the Helm chart’s components to forward envoy metrics for the Consul service mesh to the
     # consul-telemetry-collector. This includes gateway metrics and sidecar metrics.
     # @type: boolean
-    enableTelemetryCollector: true
+    enableTelemetryCollector: false
+
+    # Configures the list of filter rules to apply for allowing or blocking
+    # metrics by prefix in the following format:
+    #
+    # A leading "+" will enable any metrics with the given prefix, and a leading "-" will block them.
+    # If there is overlap between two rules, the more specific rule will take precedence.
+    # Blocking will take priority if the same prefix is listed multiple times.
+    prefixFilter:
+      # @type: array<string>
+      allowList: []
+      # @type: array<string>
+      blockList: []
+
+    # Configures consul integration configurations for datadog on kubernetes.
+    # Only applicable if `global.metrics.enabled` and `global.metrics.enableAgentMetrics` is true.
+    datadog:
+      # Enables datadog [Consul Autodiscovery Integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#metric-collection)
+      # by configuring the required `ad.datadoghq.com/consul.checks` annotation. The following _Consul_ agent metrics/health statuses
+      # are monitored by Datadog unless monitoring via OpenMetrics (Prometheus) or DogStatsD:
+      #   - Serf events and member flaps
+      #   - The Raft protocol
+      #   - DNS performance
+      #   - API Endpoints scraped:
+      #     - `/v1/agent/metrics?format=prometheus`
+      #     - `/v1/agent/self`
+      #     - `/v1/status/leader`
+      #     - `/v1/status/peers`
+      #     - `/v1/catalog/services`
+      #     - `/v1/health/service`
+      #     - `/v1/health/state/any`
+      #     - `/v1/coordinate/datacenters`
+      #     - `/v1/coordinate/nodes`
+      #
+      # Setting either `global.metrics.datadog.otlp.enabled=true` or `global.metrics.datadog.dogstatsd.enabled=true` disables the above checks
+      # in lieu of metrics data collection via DogStatsD or by a customer OpenMetrics (Prometheus) collection endpoint.
+      #
+      # ~> **Note:** If you have a [dogstatsd_mapper_profile](https://docs.datadoghq.com/integrations/consul/?tab=host#dogstatsd) configured for Consul
+      # residing on either your Datadog NodeAgent or ClusterAgent the default Consul agent metrics/health status checks will fail. If you do not desire
+      # to utilize DogStatsD metrics emission from Consul, remove this configuration file, and restart your Datadog agent to permit the checks to run.
+      #
+      # @default: false
+      # @type: boolean
+      enabled: false
+
+      # Configures Kubernetes Prometheus/OpenMetrics auto-discovery annotations for use with Datadog.
+      # This configuration is less common and more for advanced usage with custom metrics monitoring
+      # configurations. Refer to the [Datadog documentation](https://docs.datadoghq.com/containers/kubernetes/prometheus/?tab=kubernetesadv2) for more details.
+      openMetricsPrometheus:
+        # @default: false
+        # @type: boolean
+        enabled: false
+
+      otlp:
+        # Enables forwarding of Consul's Telemetry Collector OTLP metrics for
+        # ingestion by Datadog Agent.
+        # @default: false
+        # @type: boolean
+        enabled: false
+        # Protocol used for DataDog Endpoint OTLP ingestion.
+        #
+        # Valid protocol options are one of either:
+        #
+        #   - "http": will forward to DataDog HTTP OTLP Node Agent Endpoint default - "0.0.0.0:4318"
+        #   - "grpc": will forward to DataDog gRPC OTLP Node Agent Endpoint default - "0.0.0.0:4317"
+        #
+        # @default: "http"
+        # @type: string
+        protocol: "http"
+
+      # Configuration settings for DogStatsD metrics aggregation service
+      # that is bundled with the Datadog Agent.
+      # DogStatsD implements the StatsD protocol and adds a few Datadog-specific extensions:
+      # - Histogram metric type
+      # - Service checks
+      # - Events
+      # - Tagging
+      dogstatsd:
+        enabled: false
+        # Sets the socket transport type for dogstatsd:
+        #  - "UDS" (Unix Domain Socket): prefixes `unix://` to URL and appends path to socket (i.e., "unix:///var/run/datadog/dsd.socket")
+        #    If set, this will create the required [hostPath](https://kubernetes.io/docs/concepts/storage/volumes/#hostpath) mount for
+        #    managing [DogStatsD with Unix Domain Socket on Kubernetes](https://docs.datadoghq.com/developers/dogstatsd/unix_socket/?tab=kubernetes).
+        #    The volume is mounted using the `DirectoryOrCreate` type, thereby setting `0755` permissions with the same kubelet group ownership.
+        #
+        #  Applies the following `volumes` and `volumeMounts` to the consul-server stateful set consul containers:
+        #
+        # ```yaml
+        # volumes:
+        #   - name: dsdsocket
+        #     hostPath:
+        #       path: /var/run/datadog
+        #       type: DirectoryOrCreate
+        # volumeMounts:
+        #   - name: dsdsocket
+        #     mountPath: /var/run/datadog
+        #     readOnly: true
+        # ```
+        #  - "UDP" (User Datagram Protocol): assigns address to use `hostname/IP:Port` formatted URL for UDP transport to hostIP based
+        #     dogstatsd sink (i.e., 127.0.0.1:8125). HostIP of Datadog agent must be reachable and known to Consul server emitting metrics.
+        #
+        # @default: "UDS"
+        # @type: string
+        socketTransportType: "UDS"
+        # Sets URL path for dogstatsd:
+        #
+        # Can be either a path to unix domain socket or an IP Address or Hostname that's reachable from the
+        # consul-server service, server containers. When using "UDS" the path will be appended. When using "UDP"
+        # the path will be prepended to the specified `dogstatsdPort`.
+        #
+        # @default: "/var/run/datadog/dsd.socket"
+        # @type: string
+        dogstatsdAddr: "/var/run/datadog/dsd.socket"
+        # Configures IP based dogstatsd designated port that will be appended to "UDP" based transport socket IP/Hostname URL.
+        #
+        # If using a kubernetes service based address (i.e., datadog.default.svc.cluster.local), set this to 0 to
+        # mitigate appending a port value to the dogstatsd address field. Resultant address would be "datadog.default.svc.cluster.local" with
+        # default port setting, while appending a non-zero port would result in "172.10.23.6:8125" with a dogstatsdAddr value
+        # of "172.10.23.6".
+        #
+        # @default: 0
+        # @type: integer
+        dogstatsdPort: 0
+        # Configures datadog [autodiscovery](https://docs.datadoghq.com/containers/kubernetes/log/?tab=operator#autodiscovery)
+        # style [log integration](https://docs.datadoghq.com/integrations/consul/?tab=containerized#log-collection)
+        # configuration for Consul.
+        #
+        # The default settings should handle most Consul Kubernetes deployment schemes. The resultant annotation
+        # will reside on the consul-server statefulset as autodiscovery annotations.
+        # (i.e., ad.datadoghq.com/consul.logs: ["source:consul","consul_service:consul-server", ""])
+        #
+        # @default: ["source:consul","consul_service:consul-server"]
+        # @type: array<string>
+        dogstatsdTags: ["source:consul","consul_service:consul-server"]
+      # Namespace
+      #
+      # @default: "default"
+      # @type: string
+      namespace: "default"
+
 
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: "hashicorp/consul-dataplane:1.1.0"
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.6-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -571,14 +806,19 @@ global:
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
-  # Enables installing an HCP Consul self-managed cluster.
+  # Enables installing an HCP Consul Central self-managed cluster.
   # Requires Consul v1.14+.
   cloud:
-    # If true, the Helm chart will enable the installation of an HCP Consul
-    # self-managed cluster.
+    # If true, the Helm chart will link a [self-managed cluster to HCP](https://developer.hashicorp.com/hcp/docs/consul/self-managed).
+    # This can either be used to [configure a new cluster](https://developer.hashicorp.com/hcp/docs/consul/self-managed/new)
+    # or [link an existing one](https://developer.hashicorp.com/hcp/docs/consul/self-managed/existing).
+    #
+    # Note: this setting should not be enabled for [HCP Consul Dedicated clusters](/hcp/docs/consul/dedicated).
+    # It is strictly for linking self-managed clusters.
     enabled: false
 
-    # The name of the Kubernetes secret that holds the HCP resource id.
+    # The resource id of the HCP Consul Central cluster to link to. Eg:
+    # organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster
     # This is required when global.cloud.enabled is true.
     resourceId:
       # The name of the Kubernetes secret that holds the resource id.
@@ -588,7 +828,8 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud client id.
+    # The client id portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
+    # in global.cloud.resourceId to HCP Consul Central.
     # This is required when global.cloud.enabled is true.
     clientId:
       # The name of the Kubernetes secret that holds the client id.
@@ -598,7 +839,8 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud client secret.
+    # The client secret portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to link the cluster
+    # in global.cloud.resourceId to HCP Consul Central.
     # This is required when global.cloud.enabled is true.
     clientSecret:
       # The name of the Kubernetes secret that holds the client secret.
@@ -608,8 +850,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud client id.
-    # This is optional when global.cloud.enabled is true.
+    # The hostname of HCP's API. This setting is used for internal testing and validation.
     apiHost:
       # The name of the Kubernetes secret that holds the api hostname.
       # @type: string
@@ -618,8 +859,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud authorization url.
-    # This is optional when global.cloud.enabled is true.
+    # The URL of HCP's auth API. This setting is used for internal testing and validation.
     authUrl:
       # The name of the Kubernetes secret that holds the authorization url.
       # @type: string
@@ -628,8 +868,7 @@ global:
       # @type: string
       secretKey: null
 
-    # The name of the Kubernetes secret that holds the HCP cloud scada address.
-    # This is optional when global.cloud.enabled is true.
+    # The address of HCP's scada service. This setting is used for internal testing and validation.
     scadaAddress:
       # The name of the Kubernetes secret that holds the scada address.
       # @type: string
@@ -651,17 +890,50 @@ global:
   # @type: map
   extraLabels: {}
 
+  # Optional PEM-encoded CA certificates that will be added to trusted system CAs.
+  #
+  # Example:
+  #
+  # ```yaml
+  # trustedCAs: [
+  #   |
+  #   -----BEGIN CERTIFICATE-----
+  #   MIIC7jCCApSgAwIBAgIRAIq2zQEVexqxvtxP6J0bXAwwCgYIKoZIzj0EAwIwgbkx
+  #   ...
+  # ]
+  # ```
+  # @type: array<string>
+  trustedCAs: []
+
+  # Consul feature flags that will be enabled across components.
+  # Supported feature flags:
+  #
+  # - `v1dns`:
+  #   When this flag is set, Consul agents use the legacy DNS implementation.
+  #   This setting exists in the case a DNS bug is found after the refactoring introduced in v1.19.0.
+  #
+  # Example:
+  #
+  # ```yaml
+  # experiments: [ "v1dns" ]
+  # ```
+  # @type: array<string>
+  experiments: []
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
 server:
-
   # If true, the chart will install all the resources necessary for a
   # Consul server cluster. If you're running Consul externally and want agents
   # within Kubernetes to join that cluster, this should probably be false.
   # @default: global.enabled
   # @type: boolean
   enabled: "-"
+
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # The name of the Docker image (including any tag) for the containers running
   # Consul server agents.
@@ -765,12 +1037,33 @@ server:
   # @type: string
   storageClass: null
 
-  # This will enable/disable [Connect](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
+  # The [Persistent Volume Claim (PVC) retention policy](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention)
+  # controls if and how PVCs are deleted during the lifecycle of a StatefulSet.
+  # WhenDeleted specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is deleted,
+  # and WhenScaled specifies what happens to PVCs created from StatefulSet VolumeClaimTemplates when the StatefulSet is scaled down.
+  #
+  # Example:
+  #
+  # ```yaml
+  # persistentVolumeClaimRetentionPolicy:
+  #   whenDeleted: Retain
+  #   whenScaled: Retain
+  # ```
+  # @type: map
+  persistentVolumeClaimRetentionPolicy: null
+
+  # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
-  # a new CA and set of certificates. Additional Connect settings can be configured
-  # by setting the `server.extraConfig` value.
+  # a new CA and set of certificates. Additional service mesh settings can be configured
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
   connect: true
+
+  # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
+  # This setting is only required for clusters without ACL enabled. Sets `enable_debug` in server agent config to `true`.
+  # If you change this setting, you must restart the agent for the change to take effect. Default is false.
+  # @type: boolean
+  enableAgentDebug: false
 
   serviceAccount:
     # This value defines additional annotations for the server service account. This should be formatted as a multi-line
@@ -795,10 +1088,10 @@ server:
   # ```yaml
   # resources:
   #   requests:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   #   limits:
-  #     memory: '100Mi'
+  #     memory: '200Mi'
   #     cpu: '100m'
   # ```
   #
@@ -806,10 +1099,10 @@ server:
   # @type: map
   resources:
     requests:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
     limits:
-      memory: "100Mi"
+      memory: "200Mi"
       cpu: "100m"
 
   # The security context for the server pods. This should be a YAML map corresponding to a
@@ -837,6 +1130,14 @@ server:
     # @type: map
     # @recurse: false
     server: null
+    # The acl-init job
+    # @type: map
+    # @recurse: false
+    aclInit: null
+    # The tls-init job
+    # @type: map
+    # @recurse: false
+    tlsInit: null
 
   # This value is used to carefully
   # control a rolling update of Consul server agents. This value specifies the
@@ -854,8 +1155,14 @@ server:
     # the server cluster is enabled. To disable, set to `false`.
     enabled: true
 
-    # The maximum number of unavailable pods. By default, this will be
-    # automatically computed based on the `server.replicas` value to be `(n/2)-1`.
+    # The maximum number of unavailable pods. In most cases you should not change this as it is automatically set to
+    # the correct number when left as null. This setting has been kept to preserve backwards compatibility.
+    #
+    # By default, this is set to 1 internally in the chart. When server pods are stopped gracefully, they leave the Raft
+    # consensus pool. When running an odd number of servers, one server leaving the pool does not change the quorum
+    # size, and so fault tolerance is not affected. However, if more than one server were to leave the pool, the quorum
+    # size would change. That's why this is set to 1 internally and should not be changed in most cases.
+    #
     # If you need to set this to `0`, you will need to add a
     # --set 'server.disruptionBudget.maxUnavailable=0'` flag to the helm chart installation
     # command because of a limitation in the Helm templating language.
@@ -910,7 +1217,7 @@ server:
   #   with `-config-dir`. This defaults to false.
   #
   # @type: array<map>
-  extraVolumes: [ ]
+  extraVolumes: []
 
   # A list of sidecar containers.
   # Example:
@@ -923,7 +1230,7 @@ server:
   #    - ...
   # ```
   # @type: array<map>
-  extraContainers: [ ]
+  extraContainers: []
 
   # This value defines the [affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
   # for server pods. It defaults to allowing only a single server pod on each node, which
@@ -1079,7 +1386,7 @@ server:
   # feature, in case kubernetes cluster is behind egress http proxies. Additionally,
   # it could be used to configure custom consul parameters.
   # @type: map
-  extraEnvironmentVars: { }
+  extraEnvironmentVars: {}
 
   # [Enterprise Only] Values for setting up and running
   # [snapshot agents](https://developer.hashicorp.com/consul/commands/snapshot/agent)
@@ -1131,6 +1438,97 @@ server:
     # @type: string
     caCert: null
 
+  # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
+  # and configure a sink and filters for their audit logs. Please refer to
+  # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
+  # for further information.
+  auditLogs:
+    # Controls whether Consul logs out each time a user performs an operation.
+    # global.acls.manageSystemACLs must be enabled to use this feature.
+    enabled: false
+
+    # A single entry of the sink object provides configuration for the destination to which Consul
+    # will log auditing events.
+    #
+    # Example:
+    #
+    # ```yaml
+    # sinks:
+    #   - name: My Sink
+    #     type: file
+    #     format: json
+    #     path: /tmp/audit.json
+    #     delivery_guarantee: best-effort
+    #     rotate_duration: 24h
+    #     rotate_max_files: 15
+    #     rotate_bytes: 25165824
+    #
+    # ```
+    #
+    # The sink object supports the following keys:
+    #
+    # - `name` - Name of the sink.
+    #
+    # - `type` - Type specifies what kind of sink this is. Currently only file sinks are available
+    #
+    # - `format` - Format specifies what format the events will be emitted with. Currently only `json`
+    #   events are emitted.
+    #
+    # - `path` - The directory and filename to write audit events to.
+    #
+    # - `delivery_guarantee` - Specifies the rules governing how audit events are written. Consul
+    #   only supports `best-effort` event delivery.
+    #
+    # - `mode` - The permissions to set on the audit log files.
+    #
+    # - `rotate_duration` - Specifies the interval by which the system rotates to a new log file.
+    #    At least one of `rotate_duration` or `rotate_bytes` must be configured to enable audit logging.
+    #
+    # - `rotate_bytes` -  Specifies how large an individual log file can grow before Consul rotates to a new file.
+    #    At least one of rotate_bytes or rotate_duration must be configured to enable audit logging.
+    #
+    # - `rotate_max_files` - Defines the limit that Consul should follow before it deletes old log files.
+    #
+    # @type: array<map>
+    sinks: []
+
+  # Settings for potentially limiting timeouts, rate limiting on clients as well
+  # as servers, and other settings to limit exposure too many requests, requests
+  # waiting for too long, and other runtime considerations.
+  limits:
+    # This object specifies configurations that limit the rate of RPC and gRPC
+    # requests on the Consul server. Limiting the rate of gRPC and RPC requests
+    # also limits HTTP requests to the Consul server.
+    # https://developer.hashicorp.com/consul/docs/agent/config/config-files#request_limits
+    requestLimits:
+      # Setting for disabling or enabling rate limiting.  If not disabled, it
+      # enforces the action that will occur when RequestLimitsReadRate
+      # or RequestLimitsWriteRate is exceeded.  The default value of "disabled" will
+      # prevent any rate limiting from occuring.  A value of "enforce" will block
+      # the request from processings by returning an error.  A value of
+      # "permissive" will not block the request and will allow the request to
+      # continue processing.
+      # @type: string
+      mode: "disabled"
+
+      # Setting that controls how frequently RPC, gRPC, and HTTP
+      # queries are allowed to happen. In any large enough time interval, rate
+      # limiter limits the rate to RequestLimitsReadRate tokens per second.
+      #
+      # See https://en.wikipedia.org/wiki/Token_bucket for more about token
+      # buckets.
+      # @type: integer
+      readRate: -1
+
+      # Setting that controls how frequently RPC, gRPC, and HTTP
+      # writes are allowed to happen. In any large enough time interval, rate
+      # limiter limits the rate to RequestLimitsWriteRate tokens per second.
+      #
+      # See https://en.wikipedia.org/wiki/Token_bucket for more about token
+      # buckets.
+      # @type: integer
+      writeRate: -1
+
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
 # if setting `global.tls.enableAutoEncrypt` to true
@@ -1148,9 +1546,9 @@ externalServers:
   # Note: If enabling clients, `client.join` must also be set to the hosts that should be
   # used to join the cluster. In most cases, the `client.join` values
   # should be the same, however, they may be different if you
-  # wish to use separate hosts for the HTTPS connections.
+  # wish to use separate hosts for the HTTPS connections. `tlsServerName` is required if TLS is enabled and 'hosts' is not a DNS name.
   # @type: array<string>
-  hosts: [ ]
+  hosts: []
 
   # The HTTPS port of the Consul servers.
   httpsPort: 8501
@@ -1158,7 +1556,7 @@ externalServers:
   # The GRPC port of the Consul servers.
   grpcPort: 8502
 
-  # The server name to use as the SNI host header when connecting with HTTPS.
+  # The server name to use as the SNI host header when connecting with HTTPS. This name also appears as the hostname in the server certificate's subject field.
   # @type: string
   tlsServerName: null
 
@@ -1175,6 +1573,9 @@ externalServers:
   # `connectInject.enabled` to true, set `k8sAuthMethodHost` to the address of the Kubernetes API server.
   # This address must be reachable from the Consul servers.
   # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+  #
+  # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
+  # `externalServers.k8sAuthMethodHost` should be set to the same value.
   #
   # You could retrieve this value from your `kubeconfig` by running:
   #
@@ -1197,6 +1598,10 @@ client:
   # `server.enabled`, since the agents can be configured to join an external cluster.
   # @type: boolean
   enabled: false
+
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # The name of the Docker image (including any tag) for the containers
   # running Consul client agents.
@@ -1348,7 +1753,7 @@ client:
   #   with `-config-dir`. This defaults to false.
   #
   # @type: array<map>
-  extraVolumes: [ ]
+  extraVolumes: []
 
   # A list of sidecar containers.
   # Example:
@@ -1361,7 +1766,7 @@ client:
   #    - ...
   # ```
   # @type: array<map>
-  extraContainers: [ ]
+  extraContainers: []
 
   # Toleration Settings for Client pods
   # This should be a multi-line string matching the Toleration array
@@ -1439,7 +1844,7 @@ client:
   # feature, in case kubernetes cluster is behind egress http proxies. Additionally,
   # it could be used to configure custom consul parameters.
   # @type: map
-  extraEnvironmentVars: { }
+  extraEnvironmentVars: {}
 
   # This value defines the [Pod DNS policy](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy)
   # for client pods to use.
@@ -1480,7 +1885,7 @@ dns:
   # @type: boolean
   enabled: "-"
 
-  # If true, services using Consul Connect will use Consul DNS
+  # If true, services using Consul service mesh will use Consul DNS
   # for default DNS resolution. The DNS lookups fall back to the nameserver IPs
   # listed in /etc/resolv.conf if not found in Consul.
   # @type: boolean
@@ -1509,6 +1914,17 @@ dns:
   # @type: string
   additionalSpec: null
 
+  # Configures dns-proxy deployment.
+  proxy:
+    # True if you want to enable dns-proxy
+    enabled: false
+
+    # The number of deployment replicas.
+    replicas: 1
+
+    # Port number to be used by DNS proxy
+    port: 53
+
 # Values that configure the Consul UI.
 ui:
   # If true, the UI will be enabled. This will
@@ -1533,7 +1949,6 @@ ui:
 
     # Set the port value of the UI service.
     port:
-
       # HTTP port.
       http: 80
 
@@ -1544,7 +1959,6 @@ ui:
     # If not set and using a NodePort service, Kubernetes will automatically assign
     # a port.
     nodePort:
-
       # HTTP node port
       # @type: integer
       http: null
@@ -1597,7 +2011,7 @@ ui:
     # ```
     #
     # @type: array<map>
-    hosts: [ ]
+    hosts: []
 
     # tls is a list of hosts and secret name in an Ingress
     # which tells the Ingress controller to secure the channel.
@@ -1609,7 +2023,7 @@ ui:
     #     secretName: testsecret-tls
     # ```
     # @type: array<map>
-    tls: [ ]
+    tls: []
 
     # Annotations to apply to the UI ingress.
     #
@@ -1700,7 +2114,7 @@ syncCatalog:
   #
   # Note: `k8sDenyNamespaces` takes precedence over values defined here.
   # @type: array<string>
-  k8sAllowNamespaces: [ "*" ]
+  k8sAllowNamespaces: ["*"]
 
   # List of k8s namespaces that should not have their
   # services synced. This list takes precedence over `k8sAllowNamespaces`.
@@ -1710,7 +2124,7 @@ syncCatalog:
   # `["namespace1", "namespace2"]`, then all k8s namespaces besides `namespace1`
   # and `namespace2` will be synced.
   # @type: array<string>
-  k8sDenyNamespaces: [ "kube-system", "kube-public" ]
+  k8sDenyNamespaces: ["kube-system", "kube-public"]
 
   # [DEPRECATED] Use k8sAllowNamespaces and k8sDenyNamespaces instead. For
   # backwards compatibility, if both this and the allow/deny lists are set,
@@ -1784,6 +2198,10 @@ syncCatalog:
   # or may not be broadly accessible depending on your Kubernetes cluster.
   # Set this to false to skip syncing ClusterIP services.
   syncClusterIPServices: true
+
+  # If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul. 
+  # If false, LoadBalancer endpoints are not synced to Consul.
+  syncLoadBalancerEndpoints: false
 
   ingress:
     # Syncs the hostname from a Kubernetes Ingress resource to service registrations
@@ -1899,6 +2317,8 @@ syncCatalog:
   # @type: string
   annotations: null
 
+
+
 # Configures the automatic Connect sidecar injector.
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
@@ -1955,6 +2375,143 @@ connectInject:
     # Takes precedence over maxUnavailable if set.
     # @type: integer
     minAvailable: null
+
+  # Configuration settings for the Consul API Gateway integration.
+  apiGateway:
+    # Enables Consul on Kubernetes to manage the CRDs used for Gateway API.
+    # Setting this to true will install the CRDs used for the Gateway API when Consul on Kubernetes is installed.
+    # These CRDs can clash with existing Gateway API CRDs if they are already installed in your cluster.
+    # If this setting is false, you will need to install the Gateway API CRDs manually.
+    manageExternalCRDs: true
+
+    # Enables Consul on Kubernets to manage only the non-standard CRDs used for Gateway API. If manageExternalCRDs is true
+    # then all CRDs will be installed; otherwise, if manageNonStandardCRDs is true then only TCPRoute, GatewayClassConfig and MeshService
+    # will be installed.
+    manageNonStandardCRDs: false
+
+    # Configuration settings for the GatewayClass installed by Consul on Kubernetes.
+    managedGatewayClass:
+      # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+      # labels for gateway pod assignment, formatted as a multi-line string.
+      #
+      # Example:
+      #
+      # ```yaml
+      # nodeSelector: |
+      #   beta.kubernetes.io/arch: amd64
+      # ```
+      #
+      # @type: string
+      nodeSelector: null
+
+      # Toleration settings for gateway pods created with the managed gateway class.
+      # This should be a multi-line string matching the
+      # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+      #
+      # @type: string
+      tolerations: null
+
+      # This value defines the type of Service created for gateways (e.g. LoadBalancer, ClusterIP)
+      serviceType: LoadBalancer
+
+      # Configuration settings for annotations to be copied from the Gateway to other child resources.
+      copyAnnotations:
+        # This value defines a list of annotations to be copied from the Gateway to the Service created, formatted as a multi-line string.
+        #
+        # Example:
+        #
+        # ```yaml
+        # service:
+        #   annotations: |
+        #     - external-dns.alpha.kubernetes.io/hostname
+        # ```
+        #
+        # @type: string
+        service: null
+
+      # Metrics settings for gateways created with this gateway class configuration.
+      metrics:
+        # This value enables or disables metrics collection on a gateway, overriding the global gateway metrics collection settings.
+        # @type: boolean
+        enabled: "-"
+        # This value sets the port to use for scraping gateway metrics via prometheus, defaults to 20200 if not set. Must be in the port
+        # range of 1024-65535.
+        # @type: int
+        port: null
+        # This value sets the path to use for scraping gateway metrics via prometheus, defaults to /metrics if not set.
+        # @type: string
+        path: null
+        
+      # The resource settings for Pods handling traffic for Gateway API.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "100Mi"
+          cpu: "100m"
+        limits:
+          memory: "100Mi"
+          cpu: "100m"
+
+      # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
+      deployment:
+        defaultInstances: 1
+        maxInstances: 1
+        minInstances: 1
+
+      # The name of the OpenShift SecurityContextConstraints resource to use for Gateways.
+      # Only applicable if `global.openshift.enabled` is true.
+      # @type: string
+      openshiftSCCName: "restricted-v2"
+
+      # This value defines the amount we will add to privileged container ports on gateways that use this class.
+      # This is useful if you don't want to give your containers extra permissions to run privileged ports.
+      # Example: The gateway listener is defined on port 80, but the underlying value of the port on the container
+      # will be the 80 + the number defined below.
+      mapPrivilegedContainerPorts: 0
+
+      # This value contains settings related to the gateway_resources_job that runs on helm install
+      resourceJob:
+        # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+        # This should be a YAML map corresponding to a Kubernetes
+        # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+        # object.
+        #
+        # Example:
+        #
+        # ```yaml
+        # resources:
+        #   requests:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        #   limits:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        # ```
+        #
+        # @recurse: false
+        # @type: map
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
+
+    # Configuration for the ServiceAccount created for the api-gateway component
+    serviceAccount:
+      # This value defines additional annotations for the client service account. This should be formatted as a multi-line
+      # string.
+      #
+      # ```yaml
+      # annotations: |
+      #   "sample/annotation1": "foo"
+      #   "sample/annotation2": "bar"
+      # ```
+      #
+      # @type: string
+      annotations: null
 
   # Configures consul-cni plugin for Consul Service mesh services
   cni:
@@ -2056,8 +2613,7 @@ connectInject:
     # @type: map
     meta: null
 
-
-  # Configures metrics for Consul Connect services. All values are overridable
+  # Configures metrics for Consul service mesh services. All values are overridable
   # via annotations on a per-pod basis.
   metrics:
     # If true, the connect-injector will automatically
@@ -2134,7 +2690,7 @@ connectInject:
   # @type: string
   imageConsul: null
 
-  # Override global log verbosity level. One of "debug", "info", "warn", or "error".
+  # Sets the `logLevel` for the `consul-dataplane` sidecar and the `consul-connect-inject-init` container. When set, this value overrides the global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
 
@@ -2157,14 +2713,14 @@ connectInject:
     requests:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"
     limits:
       # Recommended production default: 500Mi
       # @type: string
-      memory: "50Mi"
+      memory: "200Mi"
       # Recommended production default: 250m
       # @type: string
       cpu: "50m"
@@ -2207,7 +2763,7 @@ connectInject:
   # annotated. Use `["*"]` to automatically allow all k8s namespaces.
   #
   # For example, `["namespace1", "namespace2"]` will only allow pods in the k8s
-  # namespaces `namespace1` and `namespace2` to have Connect sidecars injected
+  # namespaces `namespace1` and `namespace2` to have Consul service mesh sidecars injected
   # and registered with Consul. All other k8s namespaces will be ignored.
   #
   # To deny all namespaces, set this to `[]`.
@@ -2216,7 +2772,7 @@ connectInject:
   # `namespaceSelector` takes precedence over both since it is applied first.
   # `kube-system` and `kube-public` are never injected, even if included here.
   # @type: array<string>
-  k8sAllowNamespaces: [ "*" ]
+  k8sAllowNamespaces: ["*"]
 
   # List of k8s namespaces that should not allow Connect
   # sidecar injection. This list takes precedence over `k8sAllowNamespaces`.
@@ -2229,7 +2785,7 @@ connectInject:
   # Note: `namespaceSelector` takes precedence over this since it is applied first.
   # `kube-system` and `kube-public` are never injected.
   # @type: array<string>
-  k8sDenyNamespaces: [ ]
+  k8sDenyNamespaces: []
 
   # [Enterprise Only] These settings manage the connect injector's interaction with
   # Consul namespaces (requires consul-ent v1.7+).
@@ -2347,6 +2903,39 @@ connectInject:
         # Recommended production default: 100m
         # @type: string
         cpu: null
+    # Set default lifecycle management configuration for sidecar proxy.
+    # These settings can be overridden on a per-pod basis via these annotations:
+    #
+    # - `consul.hashicorp.com/enable-sidecar-proxy-lifecycle`
+    # - `consul.hashicorp.com/enable-sidecar-proxy-shutdown-drain-listeners`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-startup-grace-period-seconds`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-port`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-startup-path`
+    # @type: map
+    lifecycle:
+      # @type: boolean
+      defaultEnabled: true
+      # @type: boolean
+      defaultEnableShutdownDrainListeners: true
+      # @type: integer
+      defaultShutdownGracePeriodSeconds: 30
+      # @type: integer
+      defaultStartupGracePeriodSeconds: 0
+      # @type: integer
+      defaultGracefulPort: 20600
+      # @type: string
+      defaultGracefulShutdownPath: "/graceful_shutdown"
+      # @type: string
+      defaultGracefulStartupPath: "/graceful_startup"
+
+    # Configures how long the k8s startup probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultStartupFailureSeconds: 0
+    # Configures how long the k8s liveness probe will wait before the proxy is considered to be unhealthy and the container is restarted.
+    # A value of zero disables the probe.
+    defaultLivenessFailureSeconds: 0
 
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
@@ -2372,10 +2961,14 @@ connectInject:
 # [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
 meshGateway:
   # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
-  # gateways and Consul Connect will be configured to use gateways.
+  # gateways and Consul service mesh will be configured to use gateways.
   # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
+
+  # Override global log verbosity level for mesh-gateway-deployment pods. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # Number of replicas for the Deployment.
   replicas: 1
@@ -2406,7 +2999,7 @@ meshGateway:
     #   are routable from other datacenters.
     #
     # - `Static` - Use the address hardcoded in `meshGateway.wanAddress.static`.
-    source: "Service"
+    source: Service
 
     # Port that gets registered for WAN traffic.
     # If source is set to "Service" then this setting will have no effect.
@@ -2589,6 +3182,10 @@ ingressGateways:
   # Enable ingress gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
 
+  # Override global log verbosity level for ingress-gateways-deployment pods. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
+
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list
   # will override the default values provided here. Annotations will
@@ -2614,10 +3211,10 @@ ingressGateways:
       # @default: [{port: 8080, port: 8443}]
       # @recurse: false
       ports:
-      - port: 8080
-        nodePort: null
-      - port: 8443
-        nodePort: null
+        - port: 8080
+          nodePort: null
+        - port: 8443
+          nodePort: null
 
       # Annotations to apply to the ingress gateway service. Annotations defined
       # here will be applied to all ingress gateway services in addition to any
@@ -2738,11 +3335,12 @@ ingressGateways:
 
   # Gateways is a list of gateway objects. The only required field for
   # each is `name`, though they can also contain any of the fields in
-  # `defaults`. Values defined here override the defaults except in the
-  # case of annotations where both will be applied.
+  # `defaults`. You must provide a unique name for each ingress gateway. These names
+  # must be unique across different namespaces.
+  # Values defined here override the defaults, except in the case of annotations where both will be applied.
   # @type: array<map>
   gateways:
-  - name: ingress-gateway
+    - name: ingress-gateway
 
 # Configuration options for terminating gateways. Default values for all
 # terminating gateways are defined in `terminatingGateways.defaults`. Any of
@@ -2754,6 +3352,10 @@ ingressGateways:
 terminatingGateways:
   # Enable terminating gateway deployment. Requires `connectInject.enabled=true`.
   enabled: false
+
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
 
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list
@@ -2777,7 +3379,7 @@ terminatingGateways:
     #         path: path # secret will now mount to /consul/userconfig/my-secret/path
     # ```
     # @type: array<map>
-    extraVolumes: [ ]
+    extraVolumes: []
 
     # Resource limits for all terminating gateway pods
     # @recurse: false
@@ -2883,180 +3485,11 @@ terminatingGateways:
   # case of annotations where both will be applied.
   # @type: array<map>
   gateways:
-  - name: terminating-gateway
-
-# Configuration settings for the Consul API Gateway integration
-apiGateway:
-  # When true the helm chart will install the Consul API Gateway controller
-  enabled: false
-
-  # Image to use for the api-gateway-controller pods and gateway instances
-  #
-  # ~> **Note:** Using API Gateway <= 0.4 with external servers requires setting `client.enabled: true`.
-  # @type: string
-  image: null
-
-  # The name (and tag) of the Envoy Docker image used for the
-  # apiGateway. For other Consul compoenents, imageEnvoy has been replaced with Consul Dataplane.
-  # @default: envoyproxy/envoy:<latest supported version>
-  imageEnvoy: "envoyproxy/envoy:v1.25.1"
-
-  # Override global log verbosity level for api-gateway-controller pods. One of "debug", "info", "warn", or "error".
-  # @type: string
-  logLevel: info
-
-  # Configuration settings for the optional GatewayClass installed by consul-k8s (enabled by default)
-  managedGatewayClass:
-    # When true a GatewayClass is configured to automatically work with Consul as installed by helm.
-    enabled: true
-
-    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
-    # labels for gateway pod assignment, formatted as a multi-line string.
-    #
-    # Example:
-    #
-    # ```yaml
-    # nodeSelector: |
-    #   beta.kubernetes.io/arch: amd64
-    # ```
-    #
-    # @type: string
-    nodeSelector: null
-
-    # Toleration settings for gateway pods created with the managed gateway class.
-    # This should be a multi-line string matching the
-    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
-    #
-    # @type: string
-    tolerations: null
-
-    # This value defines the type of service created for gateways (e.g. LoadBalancer, ClusterIP)
-    serviceType: LoadBalancer
-
-    # This value toggles if the gateway ports should be mapped to host ports
-    useHostPorts: false
-
-    # Configuration settings for annotations to be copied from the Gateway to other child resources.
-    copyAnnotations:
-      # This value defines a list of annotations to be copied from the Gateway to the Service created, formatted as a multi-line string.
-      #
-      # Example:
-      #
-      # ```yaml
-      # service:
-      #   annotations: |
-      #     - external-dns.alpha.kubernetes.io/hostname
-      # ```
-      #
-      # @type: string
-      service: null
-
-    # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
-    #
-    # Example:
-    #
-    # ```yaml
-    # deployment:
-    #   defaultInstances: 3
-    #   maxInstances: 8
-    #   minInstances: 1
-    # ```
-    #
-    # @type: map
-    deployment: null
-
-  # Configuration for the ServiceAccount created for the api-gateway component
-  serviceAccount:
-    # This value defines additional annotations for the client service account. This should be formatted as a multi-line
-    # string.
-    #
-    # ```yaml
-    # annotations: |
-    #   "sample/annotation1": "foo"
-    #   "sample/annotation2": "bar"
-    # ```
-    #
-    # @type: string
-    annotations: null
-
-  # Configuration for the api-gateway controller component
-  controller:
-    # This value sets the number of controller replicas to deploy.
-    replicas: 1
-
-    # Annotations to apply to the api-gateway-controller pods.
-    #
-    # ```yaml
-    # annotations: |
-    #   "annotation-key": "annotation-value"
-    # ```
-    #
-    # @type: string
-    annotations: null
-
-    # This value references an existing
-    # Kubernetes [`priorityClassName`](https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority)
-    # that can be assigned to api-gateway-controller pods.
-    priorityClassName: ""
-
-    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
-    # labels for api-gateway-controller pod assignment, formatted as a multi-line string.
-    #
-    # Example:
-    #
-    # ```yaml
-    # nodeSelector: |
-    #   beta.kubernetes.io/arch: amd64
-    # ```
-    #
-    # @type: string
-    nodeSelector: null
-
-    # This value defines the tolerations for api-gateway-controller pod, this should be a multi-line string matching the
-    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
-    #
-    # @type: string
-    tolerations: null
-
-    # Configuration for the Service created for the api-gateway-controller
-    service:
-      # Annotations to apply to the api-gateway-controller service.
-      #
-      # ```yaml
-      # annotations: |
-      #   "annotation-key": "annotation-value"
-      # ```
-      #
-      # @type: string
-      annotations: null
-
-  # The resource settings for api gateway pods.
-  # @recurse: false
-  # @type: map
-  resources:
-    requests:
-      memory: "100Mi"
-      cpu: "100m"
-    limits:
-      memory: "100Mi"
-      cpu: "100m"
-
-  # The resource settings for the `copy-consul-bin` init container.
-  # @recurse: false
-  # @type: map
-  initCopyConsulContainer:
-    resources:
-      requests:
-        memory: "25Mi"
-        cpu: "50m"
-      limits:
-        memory: "150Mi"
-        cpu: "50m"
+    - name: terminating-gateway
 
 # Configuration settings for the webhook-cert-manager
 # `webhook-cert-manager` ensures that cert bundles are up to date for the mutating webhook.
 webhookCertManager:
-
   # Toleration Settings
   # This should be a multi-line string matching the Toleration array
   # in a PodSpec.
@@ -3076,6 +3509,33 @@ webhookCertManager:
   # @type: string
   nodeSelector: null
 
+  # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+  # This should be a YAML map corresponding to a Kubernetes
+  # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+  # object.
+  #
+  # Example:
+  #
+  # ```yaml
+  # resources:
+  #   requests:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  #   limits:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  # ```
+  #
+  # @recurse: false
+  # @type: map
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "100m"
+    limits:
+      memory: "50Mi"
+      cpu: "100m"
+
 # Configures a demo Prometheus installation.
 prometheus:
   # When true, the Helm chart will install a demo Prometheus server instance
@@ -3093,10 +3553,14 @@ telemetryCollector:
   # @type: boolean
   enabled: false
 
+  # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
+  # @type: string
+  logLevel: ""
+
   # The name of the Docker image (including any tag) for the containers running
   # the consul-telemetry-collector
   # @type: string
-  image: "hashicorp/consul-telemetry-collector:0.0.1"
+  image: "hashicorp/consul-telemetry-collector:0.0.2"
 
   # The resource settings for consul-telemetry-collector pods.
   # @recurse: false
@@ -3124,7 +3588,7 @@ telemetryCollector:
   customExporterConfig: null
 
   service:
-    # This value defines additional annotations for the server service account. This should be formatted as a multi-line
+    # This value defines additional annotations for the telemetry-collector's service account. This should be formatted as a multi-line
     # string.
     #
     # ```yaml
@@ -3150,11 +3614,51 @@ telemetryCollector:
     annotations: null
 
   cloud:
-    clientId:
+    # The resource id of the HCP Consul Central cluster to push metrics for. Eg:
+    # `organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster`
+    #
+    # This is used for HCP Consul Central-linked or HCP Consul Dedicated clusters where global.cloud.resourceId is unset. For example, when using externalServers
+    # with HCP Consul Dedicated clusters or HCP Consul Central-linked clusters in a different admin partition.
+    #
+    # If global.cloud.resourceId is set, this should either be unset (defaulting to global.cloud.resourceId) or be the same as global.cloud.resourceId.
+    #
+    # @default: global.cloud.resourceId
+    resourceId:
+      # The name of the Kubernetes secret that holds the resource id.
+      # @type: string
       secretName: null
+      # The key within the Kubernetes secret that holds the resource id.
+      # @type: string
       secretKey: null
-    clientSecret:
+
+    # The client id portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to push metrics to HCP
+    #
+    # This is set in two scenarios:
+    #   - the service principal in global.cloud is unset
+    #   - the HCP UI provides a service principal with more narrowly scoped permissions that the service principal used in global.cloud
+    #
+    # @default: global.cloud.clientId
+    clientId:
+      # The name of the Kubernetes secret that holds the client id.
+      # @type: string
       secretName: null
+      # The key within the Kubernetes secret that holds the client id.
+      # @type: string
+      secretKey: null
+
+    # The client secret portion of a [service principal](https://developer.hashicorp.com/hcp/docs/hcp/admin/iam/service-principals#service-principals) with authorization to push metrics to HCP.
+    #
+    # This is set in two scenarios:
+    #   - the service principal in global.cloud is unset
+    #   - the HCP UI provides a service principal with more narrowly scoped permissions that the service principal used in global.cloud
+    #
+    # @default: global.cloud.clientSecret
+    clientSecret:
+      # The name of the Kubernetes secret that holds the client secret.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the client secret.
+      # @type: string
       secretKey: null
 
   initContainer:
@@ -3170,3 +3674,10 @@ telemetryCollector:
   # Optional priorityClassName.
   # @type: string
   priorityClassName: ""
+
+  # A list of extra environment variables to set within the deployment.
+  # These could be used to include proxy settings required for cloud auto-join
+  # feature, in case kubernetes cluster is behind egress http proxies. Additionally,
+  # it could be used to configure custom consul parameters.
+  # @type: map
+  extraEnvironmentVars: {}

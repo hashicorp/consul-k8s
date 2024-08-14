@@ -1,18 +1,16 @@
 {{- if .Values.connectInject.enabled }}
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
-  name: ingressgateways.consul.hashicorp.com
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
+  name: ingressgateways.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -78,6 +76,43 @@ spec:
                       while waiting for a connection to be established.
                     format: int32
                     type: integer
+                  passiveHealthCheck:
+                    description: PassiveHealthCheck configuration determines how upstream
+                      proxy instances will be monitored for removal from the load
+                      balancing pool.
+                    properties:
+                      baseEjectionTime:
+                        description: The base time that a host is ejected for. The
+                          real time is equal to the base time multiplied by the number
+                          of times the host has been ejected and is capped by max_ejection_time
+                          (Default 300s). Defaults to 30s.
+                        type: string
+                      enforcingConsecutive5xx:
+                        description: EnforcingConsecutive5xx is the % chance that
+                          a host will be actually ejected when an outlier status is
+                          detected through consecutive 5xx. This setting can be used
+                          to disable ejection or to ramp it up slowly. Ex. Setting
+                          this to 10 will make it a 10% chance that the host will
+                          be ejected.
+                        format: int32
+                        type: integer
+                      interval:
+                        description: Interval between health check analysis sweeps.
+                          Each sweep may remove hosts or return hosts to the pool.
+                          Ex. setting this to "10s" will set the interval to 10 seconds.
+                        type: string
+                      maxEjectionPercent:
+                        description: The maximum % of an upstream cluster that can
+                          be ejected due to outlier detection. Defaults to 10% but
+                          will eject at least one host regardless of the value.
+                        format: int32
+                        type: integer
+                      maxFailures:
+                        description: MaxFailures is the count of consecutive failures
+                          that results in a host being removed from the pool.
+                        format: int32
+                        type: integer
+                    type: object
                 type: object
               listeners:
                 description: Listeners declares what ports the ingress gateway should
@@ -157,6 +192,47 @@ spec:
                               service is located. Partitioning is a Consul Enterprise
                               feature.
                             type: string
+                          passiveHealthCheck:
+                            description: PassiveHealthCheck configuration determines
+                              how upstream proxy instances will be monitored for removal
+                              from the load balancing pool.
+                            properties:
+                              baseEjectionTime:
+                                description: The base time that a host is ejected
+                                  for. The real time is equal to the base time multiplied
+                                  by the number of times the host has been ejected
+                                  and is capped by max_ejection_time (Default 300s).
+                                  Defaults to 30s.
+                                type: string
+                              enforcingConsecutive5xx:
+                                description: EnforcingConsecutive5xx is the % chance
+                                  that a host will be actually ejected when an outlier
+                                  status is detected through consecutive 5xx. This
+                                  setting can be used to disable ejection or to ramp
+                                  it up slowly. Ex. Setting this to 10 will make it
+                                  a 10% chance that the host will be ejected.
+                                format: int32
+                                type: integer
+                              interval:
+                                description: Interval between health check analysis
+                                  sweeps. Each sweep may remove hosts or return hosts
+                                  to the pool. Ex. setting this to "10s" will set
+                                  the interval to 10 seconds.
+                                type: string
+                              maxEjectionPercent:
+                                description: The maximum % of an upstream cluster
+                                  that can be ejected due to outlier detection. Defaults
+                                  to 10% but will eject at least one host regardless
+                                  of the value.
+                                format: int32
+                                type: integer
+                              maxFailures:
+                                description: MaxFailures is the count of consecutive
+                                  failures that results in a host being removed from
+                                  the pool.
+                                format: int32
+                                type: integer
+                            type: object
                           requestHeaders:
                             description: Allow HTTP header manipulation to be configured.
                             properties:
@@ -368,10 +444,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

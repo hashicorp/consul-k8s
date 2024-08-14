@@ -1,0 +1,14 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TCPRoute
+metadata:
+  name: tcp-route
+spec:
+  parentRefs:
+  - name: gateway
+  rules:
+  - backendRefs:
+    - kind: Service
+      name: static-server-tcp

@@ -1,0 +1,38 @@
+{{- if .Values.global.metrics.datadog.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "consul.fullname" . }}-datadog-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: datadog
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: agent
+{{- if (or (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts) .Values.global.enablePodSecurityPolicies) }}
+{{- if .Values.global.enablePodSecurityPolicies }}
+rules:
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-datadog-metrics
+    verbs:
+      - use
+{{- end }}
+{{- if (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts ) }}
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-datadog-metrics
+    verbs:
+      - use
+{{- end }}
+{{- else}}
+rules:
+  - apiGroups: [ "" ]
+    resources: [ "secrets" ]
+    resourceNames:
+      - {{ .Release.Namespace }}-datadog-agent-metrics-acl-token
+    verbs: [ "get", "watch", "list" ]
+{{- end }}
+{{- end }}

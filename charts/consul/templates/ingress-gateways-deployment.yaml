@@ -74,6 +74,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/gateway-kind": "ingress-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
         {{- if $root.Values.global.enableConsulNamespaces }}
@@ -125,10 +126,15 @@ spec:
         {{- if $root.Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl $root.Values.global.secretsBackend.vault.agentAnnotations $root | nindent 8 | trim }}
         {{- end }}
+        {{- if (and ($root.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" $root.Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ $root.Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
         {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
         "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" $defaults.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/metrics"
+        {{- end }}
         "prometheus.io/port": "20200"
         {{- end }}
         {{- if $defaults.annotations }}
@@ -154,6 +160,9 @@ spec:
       terminationGracePeriodSeconds: {{ default $defaults.terminationGracePeriodSeconds .terminationGracePeriodSeconds }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
+      - name: tmp
+        emptyDir:
+          medium: "Memory"
       - name: consul-service
         emptyDir:
           medium: "Memory"
@@ -175,6 +184,8 @@ spec:
       # ingress-gateway-init registers the ingress gateway service with Consul.
       - name: ingress-gateway-init
         image: {{ $root.Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" $root }}
+        {{- include "consul.restrictedSecurityContext" $ | nindent 8 }}
         env:
         - name: NAMESPACE
           valueFrom:
@@ -207,13 +218,15 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
-          -gateway-kind="ingress-gateway" \
-          -proxy-id-file=/consul/service/proxy-id \
-          -service-name={{ template "consul.fullname" $root }}-{{ .name }} \
-          -log-level={{ default $root.Values.global.logLevel }} \
-          -log-json={{ $root.Values.global.logJSON }}
+          exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+            -gateway-kind="ingress-gateway" \
+            -proxy-id-file=/consul/service/proxy-id \
+            -service-name={{ template "consul.fullname" $root }}-{{ .name }} \
+            -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }} \
+            -log-json={{ $root.Values.global.logJSON }}
         volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         - name: consul-service
           mountPath: /consul/service
         {{- if $root.Values.global.tls.enabled }}
@@ -233,10 +246,14 @@ spec:
       containers:
       - name: ingress-gateway
         image: {{ $root.Values.global.imageConsulDataplane | quote }}
+        {{ template "consul.imagePullPolicy" $root }}
+        {{- include "consul.restrictedSecurityContext" $ | nindent 8 }}
         {{- if (default $defaults.resources .resources) }}
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         - name: consul-service
           mountPath: /consul/service
           readOnly: true
@@ -319,7 +336,7 @@ spec:
         {{- if $root.Values.global.adminPartitions.enabled }}
         - -service-partition={{ $root.Values.global.adminPartitions.name }}
         {{- end }}
-        - -log-level={{ default $root.Values.global.logLevel }}
+        - -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }}
         - -log-json={{ $root.Values.global.logJSON }}
         {{- if (and $root.Values.global.metrics.enabled $root.Values.global.metrics.enableGatewayMetrics) }}
         - -telemetry-prom-scrape-path=/metrics

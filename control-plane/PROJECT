@@ -90,4 +90,65 @@ resources:
   kind: SamenessGroup
   path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  controller: true
+  domain: hashicorp.com
+  group: consul
+  kind: JWTProvider
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  controller: true
+  domain: hashicorp.com
+  group: consul
+  kind: ControlPlaneRequestLimit
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  controller: true
+  domain: hashicorp.com
+  group: consul
+  kind: RouteRetryFilter
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  controller: true
+  domain: hashicorp.com
+  group: consul
+  kind: RouteTimeoutFilter
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  domain: hashicorp.com
+  group: consul
+  kind: RouteAuthFilter
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  domain: hashicorp.com
+  group: consul
+  kind: GatewayPolicy
+  path: github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1beta1
+    namespaced: true
+  controller: true
+  domain: consul.hashicorp.com
+  group: auth
+  kind: TrafficPermissions
+  path: github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1
+  version: v2beta1
 version: "3"

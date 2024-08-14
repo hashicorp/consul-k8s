@@ -36,6 +36,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         {{- if (and .Values.global.secretsBackend.vault.enabled (or .Values.global.tls.enabled .Values.global.acls.manageSystemACLs)) }}
         "vault.hashicorp.com/agent-pre-populate-only": "true"
         "vault.hashicorp.com/agent-inject": "true"
@@ -59,6 +60,9 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
     spec:
       restartPolicy: Never
@@ -81,6 +85,8 @@ spec:
       containers:
         - name: partition-init-job
           image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           env:
           {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
           {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
@@ -107,7 +113,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s-control-plane partition-init \
+              exec consul-k8s-control-plane partition-init \
                 -log-level={{ .Values.global.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 {{- if .Values.global.cloud.enabled }}

@@ -1,0 +1,81 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multiport
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multiport
+  template:
+    metadata:
+      name: multiport
+      labels:
+        app: multiport
+      annotations:
+        "consul.hashicorp.com/mesh-inject": "true"
+        # TODO: remove this when we add tproxy patch support for this fixture
+        'consul.hashicorp.com/transparent-proxy': 'true'
+        'consul.hashicorp.com/enable-metrics': 'false'
+        'consul.hashicorp.com/enable-metrics-merging': 'false'
+    spec:
+      containers:
+        - name: multiport
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          args:
+            - -text="hello world"
+            - -listen=:8080
+          ports:
+            - containerPort: 8080
+              name: web
+          livenessProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 8080
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
+          readinessProbe:
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy-multiport']
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+        - name: multiport-admin
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          args:
+            - -text="hello world from 9090 admin"
+            - -listen=:9090
+          ports:
+            - containerPort: 9090
+              # This name is meant to be used alongside the _numeric_ K8s service target port
+              # to verify that we can still route traffic to the named port when there's a mismatch.
+              name: admin
+          livenessProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
+          readinessProbe:
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy-multiport-admin']
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+      serviceAccountName: multiport
+      terminationGracePeriodSeconds: 0 # so deletion is quick

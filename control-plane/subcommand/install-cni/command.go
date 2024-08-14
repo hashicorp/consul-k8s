@@ -16,10 +16,11 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 const (

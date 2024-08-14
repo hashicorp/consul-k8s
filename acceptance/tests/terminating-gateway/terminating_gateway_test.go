@@ -12,8 +12,6 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-	"github.com/hashicorp/consul/api"
-	"github.com/stretchr/testify/require"
 )
 
 // Test that terminating gateways work in a default and secure installations.
@@ -51,27 +49,39 @@ func TestTerminatingGateway(t *testing.T) {
 
 			// Deploy a static-server that will play the role of an external service.
 			logger.Log(t, "creating static-server deployment")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/bases/static-server")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server")
 
 			// Once the cluster is up, register the external service, then create the config entry.
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// Register the external service
-			registerExternalService(t, consulClient, "")
+			k8sOptions := helpers.K8sOptions{
+				Options:            ctx.KubectlOptions(t),
+				NoCleanupOnFailure: cfg.NoCleanupOnFailure,
+				NoCleanup:          cfg.NoCleanup,
+				ConfigPath:         "../fixtures/cases/terminating-gateway/external-service.yaml",
+			}
+
+			consulOptions := helpers.ConsulOptions{
+				ConsulClient: consulClient,
+			}
+
+			helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
 
 			// If ACLs are enabled we need to update the role of the terminating gateway
 			// with service:write permissions to the static-server service
 			// so that it can request Connect certificates for it.
 			if c.secure {
-				updateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
+				UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
 			}
 
+			logger.Log(t, "creating terminating gateway config entry")
 			// Create the config entry for the terminating gateway.
-			createTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerName)
+			CreateTerminatingGatewayFromCRD(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, "../fixtures/cases/terminating-gateway/terminating-gateway.yaml")
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 
 			// If ACLs are enabled, test that intentions prevent connections.
 			if c.secure {
@@ -82,7 +92,7 @@ func TestTerminatingGateway(t *testing.T) {
 				k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, staticServerLocalAddress)
 
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				addIntention(t, consulClient, "", staticClientName, "", staticServerName)
+				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerName)
 			}
 
 			// Test that we can make a call to the terminating gateway.
@@ -95,34 +105,3 @@ func TestTerminatingGateway(t *testing.T) {
 const staticServerPolicyRules = `service "static-server" {
   policy = "write"
 }`
-
-func registerExternalService(t *testing.T, consulClient *api.Client, namespace string) {
-	t.Helper()
-
-	address := staticServerName
-	service := &api.AgentService{
-		ID:      staticServerName,
-		Service: staticServerName,
-		Port:    80,
-	}
-
-	if namespace != "" {
-		address = fmt.Sprintf("%s.%s", staticServerName, namespace)
-		service.Namespace = namespace
-
-		logger.Logf(t, "creating the %s namespace in Consul", namespace)
-		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
-			Name: namespace,
-		}, nil)
-		require.NoError(t, err)
-	}
-
-	logger.Log(t, "registering the external service")
-	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
-		Node:     "legacy_node",
-		Address:  address,
-		NodeMeta: map[string]string{"external-node": "true", "external-probe": "true"},
-		Service:  service,
-	}, nil)
-	require.NoError(t, err)
-}

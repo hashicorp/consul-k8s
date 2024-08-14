@@ -1,3 +1,0 @@
-```release-note:security
-upgrade to use Go 1.19.6. This resolves vulnerabilities CVE-2022-41724 in crypto/tls and CVE-2022-41723 in net/http.
-```

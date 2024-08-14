@@ -145,38 +145,6 @@ partition_prefix "" {
 	return c.renderRules(anonTokenRulesTpl)
 }
 
-func (c *Command) apiGatewayControllerRules() (string, error) {
-	apiGatewayRulesTpl := `{{- if .EnablePartitions }}
-partition "{{ .PartitionName }}" {
-  mesh = "write"
-  acl = "write"
-{{- else }}
-operator = "write"
-acl = "write"
-{{- end }}
-
-{{- if .EnableNamespaces }}
-namespace_prefix "" {
-  policy = "write"
-{{- end }}
-  service_prefix "" {
-    policy = "write"
-    intentions = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-{{- if .EnableNamespaces }}
-}
-{{- end }}
-{{- if .EnablePartitions }}
-}
-{{- end }}
-`
-
-	return c.renderRules(apiGatewayRulesTpl)
-}
-
 // This assumes users are using the default name for the service, i.e.
 // "mesh-gateway".
 func (c *Command) meshGatewayRules() (string, error) {
@@ -321,15 +289,16 @@ partition "{{ .PartitionName }}" {
 func (c *Command) injectRules() (string, error) {
 	// The Connect injector needs permissions to create namespaces when namespaces are enabled.
 	// It must also create/update service health checks via the endpoints controller.
-	// When ACLs are enabled, the endpoints controller needs "acl:write" permissions
-	// to delete ACL tokens created via "consul login". policy = "write" is required when
-	// creating namespaces within a partition.
+	// When ACLs are enabled, the endpoints controller (V1) or pod controller (v2)
+	// needs "acl:write" permissions to delete ACL tokens created via "consul login".
+	// policy = "write" is required when creating namespaces within a partition.
 	injectRulesTpl := `
 {{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
 {{- else }}
+  mesh = "write"
   operator = "write"
   acl = "write"
 {{- end }}
@@ -347,6 +316,10 @@ partition "{{ .PartitionName }}" {
 {{- end }}
     acl = "write"
     service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }
@@ -394,6 +367,32 @@ partition "default" {
 {{- end }}
 `
 	return c.renderRules(aclReplicationRulesTpl)
+}
+
+func (c *Command) datadogAgentRules() (string, error) {
+	ddAgentRulesTpl := `{{- if .EnablePartitions }}
+partition "{{ .PartitionName }}" {
+{{- end }}
+  agent_prefix "" {
+    policy = "read"
+  }
+  node_prefix "" {
+    policy = "read"
+  }
+{{- if .EnableNamespaces }}
+  namespace_prefix "" {
+{{- end }}
+    service_prefix "" {
+      policy = "read"
+    }
+{{- if .EnableNamespaces }}
+  }
+{{- end }}
+{{- if .EnablePartitions }}
+}
+{{- end }}
+`
+	return c.renderRules(ddAgentRulesTpl)
 }
 
 func (c *Command) rulesData() rulesData {
@@ -444,4 +443,27 @@ func (c *Command) renderRulesGeneric(tmpl string, data interface{}) (string, err
 	}
 
 	return buf.String(), nil
+}
+
+// dnsProxyRules defines the ACL policy for the `dns-proxy` service.  It defines the following:
+// it defines the following:
+// - read access to all nodes within the scoped partition
+// - read access to all services within the scoped partition
+// These accesses are needed to be able to perform DNS request over gRPC.
+func (c *Command) dnsProxyRules() (string, error) {
+	dnsProxyRulesTpl := `
+		{{- if .EnablePartitions }}
+			partition "{{ .PartitionName }}" {
+		{{- end }}
+			node_prefix "" {
+			  policy = "read"
+			}
+			service_prefix "" {
+			  policy = "read"
+			}
+		{{- if .EnablePartitions }}
+			}
+		{{- end }}
+	`
+	return c.renderRules(dnsProxyRulesTpl)
 }

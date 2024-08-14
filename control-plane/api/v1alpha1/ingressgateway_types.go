@@ -9,14 +9,15 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const (
@@ -77,6 +78,9 @@ type IngressServiceConfig struct {
 	// will be allowed at a single point in time. Use this to limit HTTP/2 traffic,
 	// since HTTP/2 has many requests per connection.
 	MaxConcurrentRequests *uint32 `json:"maxConcurrentRequests,omitempty"`
+	// PassiveHealthCheck configuration determines how upstream proxy instances will
+	// be monitored for removal from the load balancing pool.
+	PassiveHealthCheck *PassiveHealthCheck `json:"passiveHealthCheck,omitempty"`
 }
 
 type GatewayTLSConfig struct {
@@ -266,8 +270,18 @@ func (in *IngressGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+
+	specialEquality := cmp.Options{
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Listeners.Services.Namespace"
+		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Listeners.Services.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
+	}
+
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.IngressGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.IngressGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(), specialEquality)
 }
 
 func (in *IngressGateway) Validate(consulMeta common.ConsulMeta) error {
@@ -364,6 +378,7 @@ func (in IngressService) toConsul() capi.IngressService {
 		MaxConnections:        in.MaxConnections,
 		MaxPendingRequests:    in.MaxPendingRequests,
 		MaxConcurrentRequests: in.MaxConcurrentRequests,
+		PassiveHealthCheck:    in.PassiveHealthCheck.toConsul(),
 	}
 }
 
@@ -468,5 +483,6 @@ func (in *IngressServiceConfig) toConsul() *capi.IngressServiceConfig {
 		MaxConnections:        in.MaxConnections,
 		MaxPendingRequests:    in.MaxPendingRequests,
 		MaxConcurrentRequests: in.MaxConcurrentRequests,
+		PassiveHealthCheck:    in.PassiveHealthCheck.toConsul(),
 	}
 }

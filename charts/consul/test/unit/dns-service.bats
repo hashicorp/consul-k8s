@@ -38,6 +38,15 @@ load _helpers
       .
 }
 
+@test "dns/Service: disable with dns.proxy.enabled set to true" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/dns-service.yaml  \
+      --set 'dns.enabled=true' \
+      --set 'dns.proxy.enabled=true' \
+      .
+}
+
 #--------------------------------------------------------------------
 # annotations
 

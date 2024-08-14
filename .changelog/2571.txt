@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: fix bug in endpoints controller when deregistering services from consul when a node is deleted.
+```

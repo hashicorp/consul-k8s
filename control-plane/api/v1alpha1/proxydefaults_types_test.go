@@ -98,6 +98,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 						Mode:    "sequential",
 						Regions: []string{"us-west-1"},
 					},
+					PrioritizeByLocality: &PrioritizeByLocality{
+						Mode: "failover",
+					},
 				},
 			},
 			Theirs: &capi.ProxyConfigEntry{
@@ -160,6 +163,9 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
 					Mode:    "sequential",
 					Regions: []string{"us-west-1"},
+				},
+				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
+					Mode: "failover",
 				},
 			},
 			Matches: true,
@@ -318,6 +324,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 						Mode:    "sequential",
 						Regions: []string{"us-west-1"},
 					},
+					PrioritizeByLocality: &PrioritizeByLocality{
+						Mode: "none",
+					},
 				},
 			},
 			Exp: &capi.ProxyConfigEntry{
@@ -381,6 +390,9 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 				FailoverPolicy: &capi.ServiceResolverFailoverPolicy{
 					Mode:    "sequential",
 					Regions: []string{"us-west-1"},
+				},
+				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
+					Mode: "none",
 				},
 				Meta: map[string]string{
 					common.SourceKey:     common.SourceValue,
@@ -651,6 +663,19 @@ func TestProxyDefaults_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.failoverPolicy.mode: Invalid value: "wrong-mode": must be one of "", "sequential", "order-by-locality"`,
+		},
+		"prioritize by locality invalid": {
+			input: &ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: ProxyDefaultsSpec{
+					PrioritizeByLocality: &PrioritizeByLocality{
+						Mode: "wrong-mode",
+					},
+				},
+			},
+			expectedErrMsg: `proxydefaults.consul.hashicorp.com "global" is invalid: spec.prioritizeByLocality.mode: Invalid value: "wrong-mode": must be one of "", "none", "failover"`,
 		},
 		"multi-error": {
 			input: &ProxyDefaults{

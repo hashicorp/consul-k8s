@@ -38,16 +38,6 @@ load _helpers
       .
 }
 
-@test "server/ConfigMap: extraConfig is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/server-config-configmap.yaml  \
-      --set 'server.extraConfig="{\"hello\": \"world\"}"' \
-      . | tee /dev/stderr |
-      yq '.data["extra-from-values.json"] | match("world") | length' | tee /dev/stderr)
-  [ ! -z "${actual}" ]
-}
-
 #--------------------------------------------------------------------
 # retry-join
 
@@ -658,6 +648,83 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "server/ConfigMap: doesn't set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is blank in values.yaml" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("namespace")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is not blank in values.yaml" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+
+@test "server/ConfigMap: do not set Vault Namespace in connect CA config from global.secretsBackend.vault.vaultNamespace when also set in connectCA.additionalConfig" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
+      --set 'global.secretsBackend.vault.connectCA.additionalConfig=\{\"connect\":\[\{\"ca_config\":\[\{\"namespace\": \"vns\"}\]\}\]\}' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: set Vault Namespace in connect CA config when global.secretsBackend.vault.vaultNamespace is not blank and connectCA.additionalConfig is blank" {
+  cd `chart_dir`
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=foo' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.connectCA.address=example.com' \
+      --set 'global.secretsBackend.vault.connectCA.rootPKIPath=root' \
+      --set 'global.secretsBackend.vault.connectCA.intermediatePKIPath=int' \
+      --set 'global.secretsBackend.vault.ca.secretName=ca' \
+      --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vault-namespace' \
+      . | tee /dev/stderr |
+      yq '.data["connect-ca-config.json"] | contains("\"namespace\": \"vault-namespace\"")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "server/ConfigMap: doesn't add federation config when global.federation.enabled is false (default)" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -964,4 +1031,552 @@ load _helpers
       yq -r '.data["server.json"]' | jq -r .peering.enabled | tee /dev/stderr)
 
   [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# server.limits.requestLimits
+
+@test "server/ConfigMap: server.limits.requestLimits.mode is disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "disabled" ]
+}
+
+@test "server/ConfigMap: server.limits.requestLimits.mode accepts disabled, permissive, and enforce" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=disabled' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "disabled" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=permissive' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "permissive" ]
+
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=enforce' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.mode | tee /dev/stderr)
+
+  [ "${actual}" = "enforce" ]
+}
+
+@test "server/ConfigMap: server.limits.requestLimits.mode errors with value other than disabled, permissive, and enforce" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.mode=notvalid' \
+      .
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "server.limits.requestLimits.mode must be one of the following values: disabled, permissive, and enforce" ]]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.read_rate is -1 by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.read_rate | tee /dev/stderr)
+
+  [ "${actual}" = "-1" ]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.read_rate is set properly when specified " {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.readRate=100' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.read_rate | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.write_rate is -1 by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.write_rate | tee /dev/stderr)
+
+  [ "${actual}" = "-1" ]
+}
+
+@test "server/ConfigMap: server.limits.request_limits.write_rate is set properly when specified " {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.limits.requestLimits.writeRate=100' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .limits.request_limits.write_rate | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+}
+
+#--------------------------------------------------------------------
+# server.auditLogs
+
+@test "server/ConfigMap: server.auditLogs is disabled by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=false' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | jq -r .audit | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled but ACLs are disabled" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      .
+
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "ACLs must be enabled inorder to configure audit logs" ]]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled without sink inputs" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | jq -r .audit.sink | tee /dev/stderr)
+
+  [ "${actual}" = "{}" ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled with 1 sink input object" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12455355' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit.json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.delivery_guarantee | tee /dev/stderr)
+  [ "${actual}" = "best-effort" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_duration | tee /dev/stderr)
+  [ "${actual}" = "24h" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 20 ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink.rotate_bytes | tee /dev/stderr)
+  [ ${actual} = 12455355 ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled with 1 sink input object and it does not contain the name attribute" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12455355' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | jq -r .audit.sink.name | tee /dev/stderr)
+
+  [ "${actual}" = "null" ]
+}
+
+@test "server/ConfigMap: server.auditLogs is enabled with multiple sink input objects" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.auditLogs.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.auditLogs.sinks[0].name=MySink1' \
+      --set 'server.auditLogs.sinks[0].type=file' \
+      --set 'server.auditLogs.sinks[0].format=json' \
+      --set 'server.auditLogs.sinks[0].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[0].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[0].rotate_max_files=15' \
+      --set 'server.auditLogs.sinks[0].rotate_bytes=12445' \
+      --set 'server.auditLogs.sinks[0].path=/tmp/audit.json' \
+      --set 'server.auditLogs.sinks[1].name=MySink2' \
+      --set 'server.auditLogs.sinks[1].type=file' \
+      --set 'server.auditLogs.sinks[1].format=json' \
+      --set 'server.auditLogs.sinks[1].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[1].rotate_duration=24h' \
+      --set 'server.auditLogs.sinks[1].rotate_max_files=25' \
+      --set 'server.auditLogs.sinks[1].rotate_bytes=152445' \
+      --set 'server.auditLogs.sinks[1].path=/tmp/audit-2.json' \
+      --set 'server.auditLogs.sinks[2].name=MySink3' \
+      --set 'server.auditLogs.sinks[2].type=file' \
+      --set 'server.auditLogs.sinks[2].format=json' \
+      --set 'server.auditLogs.sinks[2].delivery_guarantee=best-effort' \
+      --set 'server.auditLogs.sinks[2].rotate_max_files=20' \
+      --set 'server.auditLogs.sinks[2].rotate_duration=18h' \
+      --set 'server.auditLogs.sinks[2].rotate_bytes=12445' \
+      --set 'server.auditLogs.sinks[2].path=/tmp/audit-3.json' \
+      . | tee /dev/stderr |
+      yq -r '.data["audit-logging.json"]' | tee /dev/stderr)
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit.json" ]
+  
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit-3.json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink2.path | tee /dev/stderr)
+  [ "${actual}" = "/tmp/audit-2.json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.name | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 15 ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.delivery_guarantee | tee /dev/stderr)
+  [ "${actual}" = "best-effort" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink2.rotate_duration | tee /dev/stderr)
+  [ "${actual}" = "24h" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink2.rotate_bytes | tee /dev/stderr)
+  [ ${actual} = 152445 ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink1.format | tee /dev/stderr)
+  [ "${actual}" = "json" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.type | tee /dev/stderr)
+  [ "${actual}" = "file" ]
+
+  local actual=$(echo $object |  jq -r .audit.sink.MySink3.rotate_max_files | tee /dev/stderr)
+  [ ${actual} = 20 ]
+}
+
+@test "server/ConfigMap: server.logLevel is empty" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${configmap}" = "null" ]
+}
+
+@test "server/ConfigMap: server.logLevel is non empty" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${configmap}" = "DEBUG" ]
+}
+
+#--------------------------------------------------------------------
+# Datadog
+
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets default telemetry.dogstatsd_addr config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_addr | tee /dev/stderr)
+
+  [ "${actual}" = "unix:///var/run/datadog/dsd.socket" ]
+}
+
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default telemetry.dogstatsd_addr config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.socketTransportType="UDP"'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="datadog-agent.default.svc.cluster.local"'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_addr | tee /dev/stderr)
+
+  [ "${actual}" = "datadog-agent.default.svc.cluster.local" ]
+}
+
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default namespace telemetry.dogstatsd_addr with non-default port config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.socketTransportType="UDP"'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdAddr="127.0.0.1"'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdPort=8000'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_addr | tee /dev/stderr)
+
+  [ "${actual}" = "127.0.0.1:8000" ]
+}
+
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets default telemetry.dogstatsd_tags config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true' \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_tags | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
+
+  [ "${actual}" = "source:consul consul_service:consul-server" ]
+}
+
+@test "server/ConfigMap: when global.metrics.datadog.enabled=true, sets non-default telemetry.dogstatsd_tags config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true'  \
+      --set 'global.metrics.datadog.dogstatsd.dogstatsdTags'='[\"source:consul-dataplane\"\,\"service:consul-server-connection-manager\"]' \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.dogstatsd_tags | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
+
+  [ "${actual}" = "source:consul-dataplane service:consul-server-connection-manager" ]
+}
+
+#--------------------------------------------------------------------
+# Consul Agent Metrics Prefix Filtering
+
+@test "server/ConfigMap: when global.metrics.prefixFilter default, empty telemetry.prefix_filter string list" {
+  cd `chart_dir`
+  local actual=$(helm template \
+  -s templates/server-config-configmap.yaml \
+  --set 'global.metrics.enabled=true' \
+  --set 'global.metrics.enableAgentMetrics=true' \
+  . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prefix_filter | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
+
+  [ "${actual}" = "" ]
+}
+
+@test "server/ConfigMap: when global.metrics.prefixFilter.allowList, sets correctly prepended telemetry.prefix_filter string list" {
+  cd `chart_dir`
+  local actual=$(helm template \
+  -s templates/server-config-configmap.yaml \
+  --set 'global.metrics.enabled=true' \
+  --set 'global.metrics.enableAgentMetrics=true' \
+  --set 'global.metrics.prefixFilter.allowList'={'"consul.rpc.server.call"'\,'"consul.grpc.server.call"'} \
+  . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prefix_filter | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
+
+  [ "${actual}" = "+consul.rpc.server.call +consul.grpc.server.call" ]
+}
+
+@test "server/ConfigMap: when global.metrics.prefixFilter.blockList, sets correctly prepended telemetry.prefix_filter string list" {
+  cd `chart_dir`
+  local actual=$(helm template \
+  -s templates/server-config-configmap.yaml \
+  --set 'global.metrics.enabled=true' \
+  --set 'global.metrics.enableAgentMetrics=true' \
+  --set 'global.metrics.prefixFilter.blockList'={'"consul.rpc.server.call"'\,'"consul.grpc.server.call"'} \
+  . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prefix_filter | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
+
+  [ "${actual}" = "-consul.rpc.server.call -consul.grpc.server.call" ]
+}
+
+@test "server/ConfigMap: when global.metrics.prefixFilter.blockList and allowList, sets correctly prepended telemetry.prefix_filter string list" {
+  cd `chart_dir`
+  local actual=$(helm template \
+  -s templates/server-config-configmap.yaml \
+  --set 'global.metrics.enabled=true' \
+  --set 'global.metrics.enableAgentMetrics=true' \
+  --set 'global.metrics.prefixFilter.allowList'={'"consul.rpc.server.call"'\,'"consul.http.GET"'} \
+  --set 'global.metrics.prefixFilter.blockList'={'"consul.http"'\,'"consul.raft.apply"'} \
+  . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.prefix_filter | jq -r '[ .[] ]| join (" ")' | tee /dev/stderr)
+
+  [ "${actual}" = "+consul.rpc.server.call +consul.http.GET -consul.http -consul.raft.apply" ]
+}
+
+#--------------------------------------------------------------------
+# Consul Agent Debug (PPROF)
+
+@test "server/ConfigMap: global.server.enableAgentDebug default, sets default enable_debug = false in server agent config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .enable_debug | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: when global.server.enableAgentDebug=true, sets enable_debug = true in server agent config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.enableAgentDebug=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .enable_debug | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# Consul Agent Telemetry Host Metrics
+
+@test "server/ConfigMap: when global.metrics.enableHostMetrics is default, telemetry.enable_host_metrics = false in agent config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.enable_host_metrics | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: when global.metrics.enableHostMetrics=true, sets telemetry.enable_host_metrics = true in agent config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.enableHostMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.enable_host_metrics | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# Consul Agent Telemetry Hostname Disable
+
+@test "server/ConfigMap: when global.metrics.disableAgentHostName is default, telemetry.disableAgentHostName = false in agent config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.enable_host_metrics | tee /dev/stderr)
+
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: when global.metrics.disableAgentHostName=true, sets telemetry.disableAgentHostName = true in agent config" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.enableHostMetrics=true'  \
+      . | tee /dev/stderr |
+      yq -r '.data["telemetry-config.json"]' | jq -r .telemetry.enable_host_metrics | tee /dev/stderr)
+
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# server.autopilot.min_quorum
+
+@test "server/ConfigMap: autopilot.min_quorum=1 when replicas=1" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=1' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "1" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=2 when replicas=2" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=2' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "2" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=2 when replicas=3" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=3' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "2" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=3 when replicas=4" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=4' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "3" ]
+}
+
+@test "server/ConfigMap: autopilot.min_quorum=3 when replicas=5" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'server.replicas=5' \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .autopilot.min_quorum | tee /dev/stderr)
+
+  [ "${actual}" = "3" ]
 }

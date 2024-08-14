@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestServiceResolver_MatchesConsul(t *testing.T) {
@@ -63,8 +64,12 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Service:       "redirect",
 						ServiceSubset: "redirect_subset",
 						Namespace:     "redirect_namespace",
+						Partition:     "default",
 						Datacenter:    "redirect_datacenter",
 						Peer:          "redirect_peer",
+					},
+					PrioritizeByLocality: &PrioritizeByLocality{
+						Mode: "failover",
 					},
 					Failover: map[string]ServiceResolverFailover{
 						"failover1": {
@@ -93,6 +98,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 							Targets: []ServiceResolverFailoverTarget{
 								{Peer: "failover_peer3"},
 								{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+								{Peer: "failover_peer4"},
 							},
 							Policy: &FailoverPolicy{
 								Mode:    "order-by-locality",
@@ -101,6 +107,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						},
 					},
 					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
+					RequestTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -147,6 +154,9 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 					Datacenter:    "redirect_datacenter",
 					Peer:          "redirect_peer",
 				},
+				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
+					Mode: "failover",
+				},
 				Failover: map[string]capi.ServiceResolverFailover{
 					"failover1": {
 						Service:       "failover1",
@@ -174,6 +184,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 						Targets: []capi.ServiceResolverFailoverTarget{
 							{Peer: "failover_peer3"},
 							{Partition: "failover_partition3", Namespace: "failover_namespace3"},
+							{Peer: "failover_peer4", Partition: "default", Namespace: "default"},
 						},
 						Policy: &capi.ServiceResolverFailoverPolicy{
 							Mode:    "order-by-locality",
@@ -182,6 +193,7 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 					},
 				},
 				ConnectTimeout: 1 * time.Second,
+				RequestTimeout: 1 * time.Second,
 				LoadBalancer: &capi.LoadBalancer{
 					Policy: "policy",
 					RingHashConfig: &capi.RingHashConfig{
@@ -277,6 +289,9 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						Datacenter:    "redirect_datacenter",
 						Partition:     "redirect_partition",
 					},
+					PrioritizeByLocality: &PrioritizeByLocality{
+						Mode: "none",
+					},
 					Failover: map[string]ServiceResolverFailover{
 						"failover1": {
 							Service:       "failover1",
@@ -312,6 +327,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 						},
 					},
 					ConnectTimeout: metav1.Duration{Duration: 1 * time.Second},
+					RequestTimeout: metav1.Duration{Duration: 1 * time.Second},
 					LoadBalancer: &LoadBalancer{
 						Policy: "policy",
 						RingHashConfig: &RingHashConfig{
@@ -358,6 +374,9 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 					Datacenter:    "redirect_datacenter",
 					Partition:     "redirect_partition",
 				},
+				PrioritizeByLocality: &capi.ServiceResolverPrioritizeByLocality{
+					Mode: "none",
+				},
 				Failover: map[string]capi.ServiceResolverFailover{
 					"failover1": {
 						Service:       "failover1",
@@ -393,6 +412,7 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 					},
 				},
 				ConnectTimeout: 1 * time.Second,
+				RequestTimeout: 1 * time.Second,
 				LoadBalancer: &capi.LoadBalancer{
 					Policy: "policy",
 					RingHashConfig: &capi.RingHashConfig{
@@ -880,6 +900,22 @@ func TestServiceResolver_Validate(t *testing.T) {
 			expectedErrMsgs: []string{
 				"spec.failover[failA].namespace: Invalid value: \"namespace-a\": Consul Enterprise namespaces must be enabled to set failover.namespace",
 				"spec.failover[failB].namespace: Invalid value: \"namespace-b\": Consul Enterprise namespaces must be enabled to set failover.namespace",
+			},
+		},
+		"prioritize by locality invalid": {
+			input: &ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceResolverSpec{
+					PrioritizeByLocality: &PrioritizeByLocality{
+						Mode: "bad",
+					},
+				},
+			},
+			namespacesEnabled: false,
+			expectedErrMsgs: []string{
+				"serviceresolver.consul.hashicorp.com \"foo\" is invalid: spec.prioritizeByLocality.mode: Invalid value: \"bad\": must be one of \"\", \"none\", \"failover\"",
 			},
 		},
 	}

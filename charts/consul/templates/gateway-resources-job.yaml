@@ -1,0 +1,108 @@
+{{- if .Values.apiGateway}}{{fail "[DEPRECATED and REMOVED] the apiGateway stanza is no longer supported as of Consul 1.19.0. Use connectInject.apiGateway instead."}}{{- end -}}
+{{- if .Values.connectInject.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-gateway-resources
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gateway-resources
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-gateway-resources
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: gateway-resources
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-gateway-resources
+      containers:
+        - name: gateway-resources
+          image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - gateway-resources
+            - -gateway-class-name=consul
+            - -gateway-class-config-name=consul-api-gateway
+            - -controller-name=consul.hashicorp.com/gateway-controller
+            - -app={{template "consul.name" .}}
+            - -chart={{template "consul.chart" .}}
+            - -heritage={{ .Release.Service }}
+            - -release-name={{ .Release.Name }}
+            - -component=api-gateway
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+            - -deployment-default-instances={{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
+            {{- end}}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+            - -deployment-max-instances={{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.maxInstances }}
+            {{- end}}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+            - -deployment-min-instances={{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.minInstances }}
+            {{- end}}
+            {{- end}}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector }}
+            - -node-selector
+            - {{- toYaml .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | nindent 14 -}}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
+            - -tolerations={{ .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
+            - -service-annotations
+            - {{- toYaml .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations | nindent 14 -}}
+            {{- end }}
+            - -service-type={{ .Values.connectInject.apiGateway.managedGatewayClass.serviceType }}
+            {{- if .Values.global.openshift.enabled  }}
+            - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+            {{- end }}
+            - -map-privileged-container-ports={{ .Values.connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts }}
+            {{- if (ne (.Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString) "-") }}
+            - -enable-metrics={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.enabled | toString }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            - -metrics-path={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.path }}
+            {{- end }}
+            {{- if .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            - -metrics-port={{ .Values.connectInject.apiGateway.managedGatewayClass.metrics.port }}
+            {{- end }}
+          {{- with .Values.connectInject.apiGateway.managedGatewayClass.resourceJob.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /consul/config
+              readOnly: true
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ template "consul.fullname" . }}-gateway-resources-config
+{{- end }}

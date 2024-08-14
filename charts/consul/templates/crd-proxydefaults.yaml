@@ -1,18 +1,16 @@
 {{- if .Values.connectInject.enabled }}
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
-  name: proxydefaults.consul.hashicorp.com
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
+  name: proxydefaults.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -192,6 +190,16 @@ spec:
                   your services secure, we recommend using "strict" mode whenever
                   possible and enabling "permissive" mode only when necessary.'
                 type: string
+              prioritizeByLocality:
+                description: PrioritizeByLocality controls whether the locality of
+                  services within the local partition will be used to prioritize connectivity.
+                properties:
+                  mode:
+                    description: 'Mode specifies the type of prioritization that will
+                      be performed when selecting nodes in the local partition. Valid
+                      values are: "" (default "none"), "none", and "failover".'
+                    type: string
+                type: object
               transparentProxy:
                 description: 'TransparentProxy controls configuration specific to
                   proxies in transparent mode. Note: This cannot be set using the
@@ -254,10 +262,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

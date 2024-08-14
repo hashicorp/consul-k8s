@@ -4,5 +4,8 @@
 FILE=$1
 VERSION=$(yq .global.image $FILE)
 
-# echo full string "hashicorp/consul:1.15.1" | remove first and last characters | cut everything before ':'
-echo "${VERSION}" | sed 's/^.//;s/.$//' | cut -d ':' -f2-
+if [[ "${VERSION}" == *"consul-enterprise:"* ]]; then
+	VERSION=$(echo ${VERSION} | sed "s/consul-enterprise:/consul:/g")
+fi
+
+echo "${VERSION}"

@@ -1,0 +1,29 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fake-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fake-server
+  template:
+    metadata:
+      name: fake-server
+      labels:
+        app: fake-server
+    spec:
+      containers:
+        - name: fake-server
+          # TODO: move this to a hashicorp mirror
+          image: docker.io/achooo/fakeserver:latest
+          ports:
+            - containerPort: 443
+              name: https
+            - containerPort: 8080
+              name: http
+      serviceAccountName: fake-server
+      terminationGracePeriodSeconds: 0 # so deletion is quick

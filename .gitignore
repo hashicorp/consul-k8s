@@ -10,3 +10,4 @@ pkg/
 .idea/
 .vscode
 .bob/
+control-plane/cni/cni

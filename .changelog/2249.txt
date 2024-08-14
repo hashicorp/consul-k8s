@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Update the default amount of memory used by the connect-inject controller so that its less likely to get OOM killed.
+```

@@ -176,77 +176,104 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 		annotations      map[string]string
 		expTproxyEnabled bool
 		namespaceLabel   map[string]string
+		openShiftEnabled bool
 	}{
-		"enabled globally, ns not set, annotation not provided, cni disabled": {
+		"enabled globally, ns not set, annotation not provided, cni disabled, openshift disabled": {
 			true,
 			false,
 			nil,
 			true,
 			nil,
+			false,
 		},
-		"enabled globally, ns not set, annotation is false, cni disabled": {
+		"enabled globally, ns not set, annotation is false, cni disabled, openshift disabled": {
 			true,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "false"},
 			false,
 			nil,
+			false,
 		},
-		"enabled globally, ns not set, annotation is true, cni disabled": {
+		"enabled globally, ns not set, annotation is true, cni disabled, openshift disabled": {
 			true,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "true"},
 			true,
 			nil,
+			false,
 		},
-		"disabled globally, ns not set, annotation not provided, cni disabled": {
+		"disabled globally, ns not set, annotation not provided, cni disabled, openshift disabled": {
 			false,
 			false,
 			nil,
 			false,
 			nil,
+			false,
 		},
-		"disabled globally, ns not set, annotation is false, cni disabled": {
+		"disabled globally, ns not set, annotation is false, cni disabled, openshift disabled": {
 			false,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "false"},
 			false,
 			nil,
+			false,
 		},
-		"disabled globally, ns not set, annotation is true, cni disabled": {
+		"disabled globally, ns not set, annotation is true, cni disabled, openshift disabled": {
 			false,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "true"},
 			true,
 			nil,
+			false,
 		},
-		"disabled globally, ns enabled, annotation not set, cni disabled": {
+		"disabled globally, ns enabled, annotation not set, cni disabled, openshift disabled": {
 			false,
 			false,
 			nil,
 			true,
 			map[string]string{constants.KeyTransparentProxy: "true"},
+			false,
 		},
-		"enabled globally, ns disabled, annotation not set, cni disabled": {
+		"enabled globally, ns disabled, annotation not set, cni disabled, openshift disabled": {
 			true,
 			false,
 			nil,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "false"},
+			false,
 		},
-		"disabled globally, ns enabled, annotation not set, cni enabled": {
+		"disabled globally, ns enabled, annotation not set, cni enabled, openshift disabled": {
 			false,
 			true,
 			nil,
 			false,
 			map[string]string{constants.KeyTransparentProxy: "true"},
+			false,
 		},
 
-		"enabled globally, ns not set, annotation not set, cni enabled": {
+		"enabled globally, ns not set, annotation not set, cni enabled, openshift disabled": {
 			true,
 			true,
 			nil,
 			false,
 			nil,
+			false,
+		},
+		"enabled globally, ns not set, annotation not set, cni enabled, openshift enabled": {
+			true,
+			true,
+			nil,
+			false,
+			nil,
+			true,
+		},
+		"enabled globally, ns not set, annotation not set, cni disabled, openshift enabled": {
+			true,
+			false,
+			nil,
+			true,
+			nil,
+			true,
 		},
 	}
 	for name, c := range cases {
@@ -255,33 +282,67 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 				EnableTransparentProxy: c.globalEnabled,
 				EnableCNI:              c.cniEnabled,
 				ConsulConfig:           &consul.Config{HTTPPort: 8500},
+				EnableOpenShift:        c.openShiftEnabled,
 			}
 			pod := minimal()
 			pod.Annotations = c.annotations
 
+			privileged := false
+			if c.openShiftEnabled && !c.cniEnabled {
+				privileged = true
+			}
+
 			var expectedSecurityContext *corev1.SecurityContext
-			if c.cniEnabled {
+			if c.cniEnabled && !c.openShiftEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
 					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
 					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
 					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(false),
+					Privileged:   pointer.Bool(privileged),
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{"ALL"},
 					},
+					ReadOnlyRootFilesystem:   pointer.Bool(true),
+					AllowPrivilegeEscalation: pointer.Bool(false),
 				}
 			} else if c.expTproxyEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
 					RunAsUser:    pointer.Int64(0),
 					RunAsGroup:   pointer.Int64(0),
 					RunAsNonRoot: pointer.Bool(false),
-					Privileged:   pointer.Bool(true),
+					Privileged:   pointer.Bool(privileged),
 					Capabilities: &corev1.Capabilities{
 						Add: []corev1.Capability{netAdminCapability},
 					},
 				}
+			} else if c.cniEnabled && c.openShiftEnabled {
+				// When cni + openShift
+				expectedSecurityContext = &corev1.SecurityContext{
+					RunAsUser:    pointer.Int64(1000799999),
+					RunAsGroup:   pointer.Int64(1000799999),
+					RunAsNonRoot: pointer.Bool(true),
+					Privileged:   pointer.Bool(privileged),
+					Capabilities: &corev1.Capabilities{
+						Drop: []corev1.Capability{"ALL"},
+					},
+					ReadOnlyRootFilesystem:   pointer.Bool(true),
+					AllowPrivilegeEscalation: pointer.Bool(false),
+				}
 			}
-			ns := testNS
+			ns := corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        k8sNamespace,
+					Namespace:   k8sNamespace,
+					Annotations: map[string]string{},
+					Labels:      map[string]string{},
+				},
+			}
+
+			if c.openShiftEnabled {
+				ns.Annotations[constants.AnnotationOpenShiftUIDRange] = "1000700000/100000"
+				ns.Annotations[constants.AnnotationOpenShiftGroups] = "1000700000/100000"
+			}
+
 			ns.Labels = c.namespaceLabel
 			container, err := w.containerInit(ns, *pod, multiPortInfo{})
 			require.NoError(t, err)
@@ -750,7 +811,8 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 					serviceName:  "web-admin",
 				},
 			},
-			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			[]string{
+				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -multiport=true \
@@ -788,7 +850,8 @@ func TestHandlerContainerInit_Multiport(t *testing.T) {
 					serviceName:  "web-admin",
 				},
 			},
-			[]string{`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
+			[]string{
+				`/bin/sh -ec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level=info \
   -log-json=false \
   -service-account-name="web" \
@@ -887,7 +950,6 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 					}
 				}
 			}
-
 		})
 	}
 }
@@ -937,7 +999,8 @@ func TestHandlerContainerInit_Resources(t *testing.T) {
 
 var testNS = corev1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
-		Name: k8sNamespace,
+		Name:   k8sNamespace,
+		Labels: map[string]string{},
 	},
 }
 

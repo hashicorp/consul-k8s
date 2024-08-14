@@ -1,0 +1,15 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../../../bases/api-gateway
+- ../../static-server-inject
+- filters.yaml
+
+
+patches:
+- path: gatewayclassconfig.yaml
+- path: httproute.yaml
+- path: api-gateway.yaml

@@ -36,6 +36,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/webhook-cert-manager-configmap.yaml") . | sha256sum }}
     spec:
       containers:
@@ -43,21 +44,20 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane webhook-cert-manager \
+          exec consul-k8s-control-plane webhook-cert-manager \
             -log-level={{ .Values.global.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -config-file=/bootstrap/config/webhook-config.json \
             -deployment-name={{ template "consul.fullname" . }}-webhook-cert-manager \
             -deployment-namespace={{ .Release.Namespace }}
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         name: webhook-cert-manager
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+        {{- with .Values.webhookCertManager.resources }}
         resources:
-          limits:
-            cpu: 100m
-            memory: 50Mi
-          requests:
-            cpu: 100m
-            memory: 50Mi
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
         volumeMounts:
         - name: config
           mountPath: /bootstrap/config

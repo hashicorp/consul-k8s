@@ -1,0 +1,7 @@
+```release-note:bug
+control-plane: remove extraneous error log in v2 pod controller when attempting to delete ACL tokens.
+```
+```
+release-note:bug
+init container: fix a bug that didn't clear ACL tokens for init container when tproxy is enabled.
+```

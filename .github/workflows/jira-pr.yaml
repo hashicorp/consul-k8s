@@ -39,7 +39,7 @@ jobs:
         id: is-team-member
         run: |
           TEAM=consul
-          ROLE="$(hub api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
+          ROLE="$(gh api orgs/hashicorp/teams/${TEAM}/memberships/${{ github.actor }} | jq -r '.role | select(.!=null)')"
           if [[ -n ${ROLE} ]]; then
             echo "Actor ${{ github.actor }} is a ${TEAM} team member"
             echo "MESSAGE=true" >> $GITHUB_OUTPUT
@@ -60,9 +60,7 @@ jobs:
           description: "${{ github.event.issue.body || github.event.pull_request.body }}\n\n_Created in GitHub by ${{ github.actor }}._"
           # customfield_10089 is "Issue Link", customfield_10371 is "Source" (use JIRA API to retrieve)
           extraFields: '{ "customfield_10089": "${{ github.event.pull_request.html_url }}",
-                          "customfield_10371": { "value": "GitHub" },     
-                          "customfield_10535": [{ "value": "Service Mesh" }],
-                          "components": [{ "name": "${{ github.event.repository.name }}" }],
+                          "customfield_10371": { "value": "GitHub" },
                           "labels": ${{ steps.set-ticket-labels.outputs.LABELS }} }'
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}

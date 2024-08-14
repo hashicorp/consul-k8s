@@ -15,9 +15,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-bexpr"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const ServiceResolverKubeKind string = "serviceresolver"
@@ -76,9 +77,15 @@ type ServiceResolverSpec struct {
 	// ConnectTimeout is the timeout for establishing new network connections
 	// to this service.
 	ConnectTimeout metav1.Duration `json:"connectTimeout,omitempty"`
+	// RequestTimeout is the timeout for receiving an HTTP response from this
+	// service before the connection is terminated.
+	RequestTimeout metav1.Duration `json:"requestTimeout,omitempty"`
 	// LoadBalancer determines the load balancing policy and configuration for services
 	// issuing requests to this upstream service.
 	LoadBalancer *LoadBalancer `json:"loadBalancer,omitempty"`
+	// PrioritizeByLocality controls whether the locality of services within the
+	// local partition will be used to prioritize connectivity.
+	PrioritizeByLocality *PrioritizeByLocality `json:"prioritizeByLocality,omitempty"`
 }
 
 type ServiceResolverRedirect struct {
@@ -300,15 +307,17 @@ func (in *ServiceResolver) SyncedConditionStatus() corev1.ConditionStatus {
 // ToConsul converts the entry into its Consul equivalent struct.
 func (in *ServiceResolver) ToConsul(datacenter string) capi.ConfigEntry {
 	return &capi.ServiceResolverConfigEntry{
-		Kind:           in.ConsulKind(),
-		Name:           in.ConsulName(),
-		DefaultSubset:  in.Spec.DefaultSubset,
-		Subsets:        in.Spec.Subsets.toConsul(),
-		Redirect:       in.Spec.Redirect.toConsul(),
-		Failover:       in.Spec.Failover.toConsul(),
-		ConnectTimeout: in.Spec.ConnectTimeout.Duration,
-		LoadBalancer:   in.Spec.LoadBalancer.toConsul(),
-		Meta:           meta(datacenter),
+		Kind:                 in.ConsulKind(),
+		Name:                 in.ConsulName(),
+		DefaultSubset:        in.Spec.DefaultSubset,
+		Subsets:              in.Spec.Subsets.toConsul(),
+		Redirect:             in.Spec.Redirect.toConsul(),
+		Failover:             in.Spec.Failover.toConsul(),
+		ConnectTimeout:       in.Spec.ConnectTimeout.Duration,
+		RequestTimeout:       in.Spec.RequestTimeout.Duration,
+		LoadBalancer:         in.Spec.LoadBalancer.toConsul(),
+		PrioritizeByLocality: in.Spec.PrioritizeByLocality.toConsul(),
+		Meta:                 meta(datacenter),
 	}
 }
 
@@ -317,8 +326,24 @@ func (in *ServiceResolver) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+
+	specialEquality := cmp.Options{
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Redirect.Namespace"
+		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Redirect.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Failover.Targets.Namespace"
+		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Failover.Targets.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
+	}
+
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceResolverConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(), specialEquality)
 }
 
 func (in *ServiceResolver) ConsulGlobalResource() bool {
@@ -338,6 +363,7 @@ func (in *ServiceResolver) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.Spec.Redirect.validate(path.Child("redirect"), consulMeta)...)
+	errs = append(errs, in.Spec.PrioritizeByLocality.validate(path.Child("prioritizeByLocality"))...)
 	errs = append(errs, in.Spec.Subsets.validate(path.Child("subsets"))...)
 	errs = append(errs, in.Spec.LoadBalancer.validate(path.Child("loadBalancer"))...)
 	errs = append(errs, in.validateEnterprise(consulMeta)...)
@@ -425,7 +451,7 @@ func (in *ServiceResolverRedirect) validate(path *field.Path, consulMeta common.
 			"service resolver redirect cannot be empty"))
 	}
 
-	if consulMeta.Partition != "default" && in.Datacenter != "" {
+	if consulMeta.Partition != "default" && consulMeta.Partition != "" && in.Datacenter != "" {
 		errs = append(errs, field.Invalid(path.Child("datacenter"), in.Datacenter,
 			"cross-datacenter redirect is only supported in the default partition"))
 	}

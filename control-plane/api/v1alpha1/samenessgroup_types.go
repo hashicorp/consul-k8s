@@ -5,9 +5,9 @@ package v1alpha1
 
 import (
 	"encoding/json"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul/api"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const (
@@ -166,8 +168,13 @@ func (in *SamenessGroup) MatchesConsul(candidate api.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.SamenessGroupConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(),
-		cmp.Comparer(transparentProxyConfigComparer))
+
+	specialEquality := cmp.Options{
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "Members.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
+	}
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.SamenessGroupConfigEntry{}, "Partition", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(), specialEquality)
 }
 
 func (in *SamenessGroup) Validate(consulMeta common.ConsulMeta) error {

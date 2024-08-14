@@ -1,0 +1,3 @@
+```release-note:improvement
+ partition-init: Role no longer includes unnecessary access to Secrets resource.
+ ```

@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Change `/bin/sh -ec "<command>"` to `/bin/sh -ec "exec <command>"` in helm deployments
+```

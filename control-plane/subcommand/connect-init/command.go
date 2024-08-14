@@ -17,17 +17,19 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 const (
@@ -161,6 +163,17 @@ func (c *Command) Run(args []string) int {
 		c.logger.Error("Unable to get client connection", "error", err)
 		return 1
 	}
+	if version.IsFIPS() {
+		// make sure we are also using FIPS Consul
+		var versionInfo map[string]interface{}
+		_, err := consulClient.Raw().Query("/v1/agent/version", versionInfo, nil)
+		if err != nil {
+			c.logger.Warn("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. Unable to verify FIPS Consul while setting up Consul API client.")
+		}
+		if val, ok := versionInfo["FIPS"]; !ok || val == "" {
+			c.logger.Warn("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. A non-FIPS version of Consul was detected.")
+		}
+	}
 	proxyService := &api.AgentService{}
 	if c.flagGatewayKind != "" {
 		err = backoff.Retry(c.getGatewayRegistration(consulClient), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
@@ -186,13 +199,14 @@ func (c *Command) Run(args []string) int {
 
 	// todo (agentless): this should eventually be passed to consul-dataplane as a string so we don't need to write it to file.
 	if c.consul.UseTLS && c.consul.CACertPEM != "" {
-		if err = common.WriteFileWithPerms(constants.ConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
+		if err = common.WriteFileWithPerms(constants.LegacyConsulCAFile, c.consul.CACertPEM, 0444); err != nil {
 			c.logger.Error("error writing CA cert file", "error", err)
 			return 1
 		}
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
+		c.watcher.Stop() // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
 		err = c.applyTrafficRedirectionRules(proxyService)
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)
@@ -316,7 +330,7 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 		}
 		for _, gateway := range gatewayList.Services {
 			switch gateway.Kind {
-			case api.ServiceKindMeshGateway, api.ServiceKindIngressGateway, api.ServiceKindTerminatingGateway:
+			case api.ServiceKindAPIGateway, api.ServiceKindMeshGateway, api.ServiceKindIngressGateway, api.ServiceKindTerminatingGateway:
 				proxyID = gateway.ID
 			}
 		}

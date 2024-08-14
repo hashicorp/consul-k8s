@@ -4,13 +4,15 @@
 package v1alpha1
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"testing"
+	"time"
+
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
-	"time"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestSamenessGroups_ToConsul(t *testing.T) {
@@ -120,6 +122,9 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 						{
 							Partition: "p2",
 						},
+						{
+							Peer: "test-peer",
+						},
 					},
 				},
 			},
@@ -138,6 +143,10 @@ func TestSamenessGroups_MatchesConsul(t *testing.T) {
 					},
 					{
 						Partition: "p2",
+					},
+					{
+						Peer:      "test-peer",
+						Partition: "default",
 					},
 				},
 			},

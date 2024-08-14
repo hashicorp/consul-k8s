@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: prevent updation of anonymous-token-policy and anonymous-token if anonymous-token-policy is already attached to the anonymous-token
+```

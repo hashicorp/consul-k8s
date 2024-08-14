@@ -6,6 +6,8 @@ package vault
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,11 +15,13 @@ import (
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
@@ -44,6 +48,7 @@ type VaultCluster struct {
 	kubernetesClient kubernetes.Interface
 
 	noCleanupOnFailure bool
+	noCleanup          bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 }
@@ -54,12 +59,32 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)
+	ns := ctx.KubectlOptions(t).Namespace
+
+	entstr := "-ent"
 
 	values := defaultHelmValues(releaseName)
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
+	vaultReleaseName := helpers.RandomName()
+	k8sClient := environment.KubernetesClientFromOptions(t, ctx.KubectlOptions(t))
+	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
+	vaultLicenseSecretKey := "license"
+
+	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
+
 	if cfg.VaultServerVersion != "" {
+
+		if strings.Contains(cfg.VaultServerVersion, entstr) {
+
+			logger.Logf(t, "Creating secret for Vault license")
+			consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
+
+			values["server.image.repository"] = "docker.mirror.hashicorp.services/hashicorp/vault-enterprise"
+			values["server.enterpriseLicense.secretName"] = vaultLicenseSecretName
+			values["server.enterpriseLicense.secretKey"] = vaultLicenseSecretKey
+		}
 		values["server.image.tag"] = cfg.VaultServerVersion
 	}
 	vaultHelmChartVersion := defaultVaultHelmChartVersion
@@ -89,6 +114,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 		kubectlOptions:     kopts,
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
+		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		releaseName:        releaseName,
@@ -99,7 +125,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 func (v *VaultCluster) VaultClient(*testing.T) *vapi.Client { return v.vaultClient }
 
 // SetupVaultClient sets up and returns a Vault Client.
-func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
+func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 	t.Helper()
 
 	if v.vaultClient != nil {
@@ -119,12 +145,8 @@ func (v *VaultCluster) SetupVaultClient(t *testing.T) *vapi.Client {
 		remotePort,
 		v.logger)
 
-	// Retry creating the port forward since it can fail occasionally.
 	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
-		// NOTE: It's okay to pass in `t` to ForwardPortE despite being in a retry
-		// because we're using ForwardPortE (not ForwardPort) so the `t` won't
-		// get used to fail the test, just for logging.
-		require.NoError(r, tunnel.ForwardPortE(t))
+		require.NoError(r, tunnel.ForwardPortE(r))
 	})
 
 	t.Cleanup(func() {
@@ -176,7 +198,7 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 				},
 				Type: corev1.SecretTypeServiceAccountToken,
 			}, metav1.CreateOptions{})
-			require.NoError(t, err)
+			require.NoError(r, err)
 		}
 	})
 	v.ConfigureAuthMethod(t, v.vaultClient, "kubernetes", "https://kubernetes.default.svc", vaultServerServiceAccountName, namespace)
@@ -224,7 +246,7 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext, vaultNa
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
-	helpers.Cleanup(t, v.noCleanupOnFailure, func() {
+	helpers.Cleanup(t, v.noCleanupOnFailure, v.noCleanup, func() {
 		v.Destroy(t)
 	})
 
@@ -346,7 +368,7 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		if !v.noCleanupOnFailure {
+		if !(v.noCleanupOnFailure || v.noCleanup) {
 			// We're ignoring error here because secret deletion is best-effort.
 			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), certSecretName(v.releaseName), metav1.DeleteOptions{})
 			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), CASecretName(v.releaseName), metav1.DeleteOptions{})
@@ -389,15 +411,15 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 
 	v.logger.Logf(t, "initializing and unsealing Vault")
 	namespace := v.helmOptions.KubectlOptions.Namespace
-	retrier := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
+	retrier := &retry.Timer{Timeout: 4 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		// Wait for vault server pod to be running so that we can create Vault client without errors.
 		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
 		require.NoError(r, err)
-		require.Equal(r, serverPod.Status.Phase, corev1.PodRunning)
+		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
 
 		// Set up the client so that we can make API calls to initialize and unseal.
-		v.vaultClient = v.SetupVaultClient(t)
+		v.vaultClient = v.SetupVaultClient(r)
 
 		// Initialize Vault with 1 secret share. We don't need to
 		// more key shares for this test installation.
@@ -419,7 +441,7 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	rootTokenSecret := fmt.Sprintf("%s-vault-root-token", v.releaseName)
 	v.logger.Logf(t, "saving Vault root token to %q Kubernetes secret", rootTokenSecret)
 
-	helpers.Cleanup(t, v.noCleanupOnFailure, func() {
+	helpers.Cleanup(t, v.noCleanupOnFailure, v.noCleanup, func() {
 		_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), rootTokenSecret, metav1.DeleteOptions{})
 	})
 	_, err := v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{

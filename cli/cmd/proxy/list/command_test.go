@@ -276,10 +276,31 @@ func TestListCommandOutput(t *testing.T) {
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "api-gateway",
+				Name:      "depricated-api-gateway",
 				Namespace: "consul",
 				Labels: map[string]string{
 					"api-gateway.consul.hashicorp.com/managed": "true",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "api-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "both-labels-api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+					"component": "api-gateway",
+					"chart":     "consul-helm",
 				},
 			},
 		},
@@ -314,6 +335,106 @@ func TestListCommandOutput(t *testing.T) {
 	for _, expression := range expected {
 		require.Regexp(t, expression, actual)
 	}
+	for _, expression := range notExpected {
+		require.NotRegexp(t, expression, actual)
+	}
+}
+
+func TestListCommandOutputInJsonFormat(t *testing.T) {
+	// These regular expressions must be present in the output.
+	expected := ".*Name.*api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*both-labels-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*mesh-gateway.*\n.*Namespace.*consul.*\n.*Type.*Mesh Gateway.*\n.*\n.*\n.*Name.*terminating-gateway.*\n.*Namespace.*consul.*\n.*Type.*Terminating Gateway.*\n.*\n.*\n.*Name.*ingress-gateway.*\n.*Namespace.*default.*\n.*Type.*Ingress Gateway.*\n.*\n.*\n.*Name.*deprecated-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*pod1.*\n.*Namespace.*default.*\n.*Type.*Sidecar.*"
+	notExpected := "default.*dont-fetch.*Sidecar"
+
+	pods := []v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ingress-gateway",
+				Namespace: "default",
+				Labels: map[string]string{
+					"component": "ingress-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mesh-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "mesh-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "terminating-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "terminating-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "api-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "both-labels-api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+					"component": "api-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "deprecated-api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dont-fetch",
+				Namespace: "default",
+				Labels:    map[string]string{},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod1",
+				Namespace: "default",
+				Labels: map[string]string{
+					"consul.hashicorp.com/connect-inject-status": "injected",
+				},
+			},
+		},
+	}
+	client := fake.NewSimpleClientset(&v1.PodList{Items: pods})
+
+	buf := new(bytes.Buffer)
+	c := setupCommand(buf)
+	c.kubernetes = client
+
+	out := c.Run([]string{"-A", "-o", "json"})
+	require.Equal(t, 0, out)
+
+	actual := buf.String()
+
+	require.Regexp(t, expected, actual)
 	for _, expression := range notExpected {
 		require.NotRegexp(t, expression, actual)
 	}

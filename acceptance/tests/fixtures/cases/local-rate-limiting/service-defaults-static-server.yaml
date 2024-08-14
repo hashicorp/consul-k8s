@@ -1,0 +1,23 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: static-server
+  namespace: default
+spec:
+  protocol: http
+  rateLimits:
+    instanceLevel:
+      requestsPerSecond: 2
+      requestsMaxBurst: 2
+      routes:
+        - pathExact: "/exact"
+          requestsPerSecond: 3
+          requestsMaxBurst: 3
+        - pathPrefix: "/prefix"
+          requestsPerSecond: 4
+        - pathRegex: "/regex"
+          requestsPerSecond: 5
+  

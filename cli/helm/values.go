@@ -411,7 +411,7 @@ type TransparentProxy struct {
 }
 
 type Metrics struct {
-	DefaultEnabled              string `yaml:"defaultEnabled"`
+	DefaultEnabled              bool   `yaml:"defaultEnabled"`
 	DefaultEnableMerging        bool   `yaml:"defaultEnableMerging"`
 	DefaultMergedMetricsPort    int    `yaml:"defaultMergedMetricsPort"`
 	DefaultPrometheusScrapePort int    `yaml:"defaultPrometheusScrapePort"`
@@ -425,10 +425,21 @@ type ACLInjectToken struct {
 
 type SidecarProxy struct {
 	Resources Resources `yaml:"resources"`
+	Lifecycle Lifecycle `yaml:"lifecycle"`
 }
 
 type InitContainer struct {
 	Resources Resources `yaml:"resources"`
+}
+
+type Lifecycle struct {
+	DefaultEnabled                      bool   `yaml:"defaultEnabled"`
+	DefaultEnableShutdownDrainListeners bool   `yaml:"defaultEnableShutdownDrainListeners"`
+	DefaultShutdownGracePeriodSeconds   int    `yaml:"defaultShutdownGracePeriodSeconds"`
+	DefaultGracefulPort                 int    `yaml:"defaultGracefulPort"`
+	DefaultGracefulShutdownPath         string `yaml:"defaultGracefulShutdownPath"`
+	DefaultStartupGracePeriodSeconds    int    `yaml:"defaultStartupGracePeriodSeconds"`
+	DefaultGracefulStartupPath          string `yaml:"defaultGracefulStartupPath"`
 }
 
 type ConnectInject struct {
@@ -567,11 +578,13 @@ type CopyAnnotations struct {
 }
 
 type ManagedGatewayClass struct {
-	Enabled         bool            `yaml:"enabled"`
-	NodeSelector    interface{}     `yaml:"nodeSelector"`
-	ServiceType     string          `yaml:"serviceType"`
-	UseHostPorts    bool            `yaml:"useHostPorts"`
-	CopyAnnotations CopyAnnotations `yaml:"copyAnnotations"`
+	Enabled                     bool            `yaml:"enabled"`
+	NodeSelector                interface{}     `yaml:"nodeSelector"`
+	ServiceType                 string          `yaml:"serviceType"`
+	UseHostPorts                bool            `yaml:"useHostPorts"`
+	CopyAnnotations             CopyAnnotations `yaml:"copyAnnotations"`
+	OpenshiftSCCName            string          `yaml:"openshiftSCCName"`
+	MapPrivilegedContainerPorts int             `yaml:"mapPrivilegedContainerPorts"`
 }
 
 type Service struct {

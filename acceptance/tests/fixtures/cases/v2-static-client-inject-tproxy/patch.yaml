@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-client
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/mesh-inject": "true"
+        "consul.hashicorp.com/transparent-proxy": "true"

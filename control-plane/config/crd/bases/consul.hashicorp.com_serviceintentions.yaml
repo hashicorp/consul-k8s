@@ -1,13 +1,11 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: serviceintentions.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -69,6 +67,43 @@ spec:
                       to match all services in all namespaces that don't otherwise
                       have intentions defined.
                     type: string
+                type: object
+              jwt:
+                description: JWT specifies the configuration to validate a JSON Web
+                  Token for all incoming requests.
+                properties:
+                  providers:
+                    description: Providers is a list of providers to consider when
+                      verifying a JWT.
+                    items:
+                      properties:
+                        name:
+                          description: Name is the name of the JWT provider. There
+                            MUST be a corresponding "jwt-provider" config entry with
+                            this name.
+                          type: string
+                        verifyClaims:
+                          description: VerifyClaims is a list of additional claims
+                            to verify in a JWT's payload.
+                          items:
+                            properties:
+                              path:
+                                description: Path is the path to the claim in the
+                                  token JSON.
+                                items:
+                                  type: string
+                                type: array
+                              value:
+                                description: Value is the expected value at the given
+                                  path. If the type at the path is a list then we
+                                  verify that this value is contained in the list.
+                                  If the type at the path is a string then we verify
+                                  that this value matches.
+                                type: string
+                            type: object
+                          type: array
+                      type: object
+                    type: array
                 type: object
               sources:
                 description: Sources is the list of all intention sources and the
@@ -179,6 +214,44 @@ spec:
                                   match on the HTTP request path.
                                 type: string
                             type: object
+                          jwt:
+                            description: JWT specifies configuration to validate a
+                              JSON Web Token for incoming requests.
+                            properties:
+                              providers:
+                                description: Providers is a list of providers to consider
+                                  when verifying a JWT.
+                                items:
+                                  properties:
+                                    name:
+                                      description: Name is the name of the JWT provider.
+                                        There MUST be a corresponding "jwt-provider"
+                                        config entry with this name.
+                                      type: string
+                                    verifyClaims:
+                                      description: VerifyClaims is a list of additional
+                                        claims to verify in a JWT's payload.
+                                      items:
+                                        properties:
+                                          path:
+                                            description: Path is the path to the claim
+                                              in the token JSON.
+                                            items:
+                                              type: string
+                                            type: array
+                                          value:
+                                            description: Value is the expected value
+                                              at the given path. If the type at the
+                                              path is a list then we verify that this
+                                              value is contained in the list. If the
+                                              type at the path is a string then we
+                                              verify that this value matches.
+                                            type: string
+                                        type: object
+                                      type: array
+                                  type: object
+                                type: array
+                            type: object
                         type: object
                       type: array
                     samenessGroup:
@@ -231,9 +304,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

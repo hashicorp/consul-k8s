@@ -59,6 +59,21 @@ func (t *Table) AddRow(cols []string, colors []string) {
 	t.Rows = append(t.Rows, row)
 }
 
+func (t *Table) ToJson() []map[string]interface{} {
+	if t == nil {
+		return make([]map[string]interface{}, 0)
+	}
+	jsonRes := make([]map[string]interface{}, 0)
+	for _, row := range t.Rows {
+		jsonRow := make(map[string]interface{})
+		for i, ent := range row {
+			jsonRow[t.Headers[i]] = ent.Value
+		}
+		jsonRes = append(jsonRes, jsonRow)
+	}
+	return jsonRes
+}
+
 // Table implements UI.
 func (u *basicUI) Table(tbl *Table, opts ...Option) {
 	// Build our config and set our options

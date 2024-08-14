@@ -7,12 +7,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 // Test that createAuthMethodTmpl returns an error when

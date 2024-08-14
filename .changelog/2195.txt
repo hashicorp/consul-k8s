@@ -1,0 +1,3 @@
+```release-note:improvement
+consul-telemetry-collector: add acceptance tests for consul telemetry collector component.
+```

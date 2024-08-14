@@ -11,7 +11,6 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -30,6 +29,11 @@ const StaticClientNamespace = "ns2"
 func TestPartitions_Connect(t *testing.T) {
 	env := suite.Environment()
 	cfg := suite.Config()
+
+	// TODO: We are monitoring that NET-5819 is fixed, if this test is still flaking in CNI, re-enable this skip
+	//if cfg.EnableCNI {
+	//	t.Skipf("TODO(flaky): NET-5819")
+	//}
 
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
@@ -85,7 +89,7 @@ func TestPartitions_Connect(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			defaultPartitionClusterContext := env.DefaultContext(t)
-			secondaryPartitionClusterContext := env.Context(t, environment.SecondaryContextName)
+			secondaryPartitionClusterContext := env.Context(t, 1)
 
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
@@ -109,6 +113,7 @@ func TestPartitions_Connect(t *testing.T) {
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
+			// Setup the default partition
 			defaultPartitionHelmValues := make(map[string]string)
 
 			// On Kind, there are no load balancers but since all clusters
@@ -130,6 +135,7 @@ func TestPartitions_Connect(t *testing.T) {
 			serverConsulCluster := consul.NewHelmCluster(t, defaultPartitionHelmValues, defaultPartitionClusterContext, cfg, releaseName)
 			serverConsulCluster.Create(t)
 
+			// Copy secrets from the default partition to the secondary partition
 			// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
 			caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
 
@@ -147,7 +153,7 @@ func TestPartitions_Connect(t *testing.T) {
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryPartitionClusterContext)
 
-			// Create client cluster.
+			// Create secondary partition cluster.
 			secondaryPartitionHelmValues := map[string]string{
 				"global.enabled": "false",
 
@@ -205,14 +211,14 @@ func TestPartitions_Connect(t *testing.T) {
 			logger.Logf(t, "creating namespaces %s and %s in servers cluster", staticServerNamespace, StaticClientNamespace)
 			k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
 			})
 
 			logger.Logf(t, "creating namespaces %s and %s in clients cluster", staticServerNamespace, StaticClientNamespace)
 			k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 			k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "create", "ns", StaticClientNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, secondaryPartitionClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace, StaticClientNamespace)
 			})
 
@@ -272,37 +278,37 @@ func TestPartitions_Connect(t *testing.T) {
 			kustomizeDir := "../fixtures/bases/mesh-gateway"
 
 			k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), kustomizeDir)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 
 			k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), kustomizeDir)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 			// This section of the tests runs the in-partition networking tests.
 			t.Run("in-partition", func(t *testing.T) {
 				logger.Log(t, "test in-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
-				k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+					k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
 					if c.destinationNamespace == defaultNamespace {
-						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 					} else {
-						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 					}
 				}
 				logger.Log(t, "creating static-server and static-client deployments in client cluster")
-				k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+					k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
 					if c.destinationNamespace == defaultNamespace {
-						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 					} else {
-						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
+						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
 					}
 				}
 				// Check that both static-server and static-client have been injected and now have 2 containers in server cluster.
@@ -384,7 +390,7 @@ func TestPartitions_Connect(t *testing.T) {
 					require.NoError(t, err)
 					_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: secondaryPartition})
 					require.NoError(t, err)
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 						_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: defaultPartition})
 						require.NoError(t, err)
 						_, err = consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: secondaryPartition})
@@ -404,8 +410,8 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
@@ -425,25 +431,25 @@ func TestPartitions_Connect(t *testing.T) {
 			t.Run("cross-partition", func(t *testing.T) {
 				logger.Log(t, "test cross-partition networking")
 				logger.Log(t, "creating static-server and static-client deployments in server cluster")
-				k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				k8s.DeployKustomize(t, defaultPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+					k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
 					if c.destinationNamespace == defaultNamespace {
-						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-partition")
+						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-partition")
 					} else {
-						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/ns-partition")
+						k8s.DeployKustomize(t, defaultPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/ns-partition")
 					}
 				}
 				logger.Log(t, "creating static-server and static-client deployments in client cluster")
-				k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				k8s.DeployKustomize(t, secondaryPartitionClusterStaticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+					k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
 					if c.destinationNamespace == defaultNamespace {
-						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition")
+						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition")
 					} else {
-						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/ns-default-partition")
+						k8s.DeployKustomize(t, secondaryPartitionClusterStaticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/ns-default-partition")
 					}
 				}
 				// Check that both static-server and static-client have been injected and now have 2 containers in server cluster.
@@ -497,14 +503,14 @@ func TestPartitions_Connect(t *testing.T) {
 				if c.destinationNamespace == defaultNamespace {
 					k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
 					k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 						k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
 						k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
 					})
 				} else {
 					k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-ns1")
 					k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-ns1")
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 						k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-ns1")
 						k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-ns1")
 					})
@@ -552,7 +558,7 @@ func TestPartitions_Connect(t *testing.T) {
 					intention.Sources[0].Partition = defaultPartition
 					_, _, err = consulClient.ConfigEntries().Set(intention, &api.WriteOptions{Partition: secondaryPartition})
 					require.NoError(t, err)
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 						_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: defaultPartition})
 						require.NoError(t, err)
 						_, err = consulClient.ConfigEntries().Delete(api.ServiceIntentions, staticServerName, &api.WriteOptions{Partition: secondaryPartition})
@@ -577,8 +583,8 @@ func TestPartitions_Connect(t *testing.T) {
 				// Test that kubernetes readiness status is synced to Consul.
 				// Create the file so that the readiness probe of the static-server pod fails.
 				logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
-				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, defaultPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
+				k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "exec", "deploy/"+staticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
 
 				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.

@@ -4,20 +4,22 @@
 package list
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"sync"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
 
 const (
@@ -25,6 +27,7 @@ const (
 	flagNameAllNamespaces = "all-namespaces"
 	flagNameKubeConfig    = "kubeconfig"
 	flagNameKubeContext   = "context"
+	flagOutputFormat      = "output-format"
 )
 
 // ListCommand is the command struct for the proxy list command.
@@ -37,6 +40,7 @@ type ListCommand struct {
 
 	flagNamespace     string
 	flagAllNamespaces bool
+	flagOutputFormat  string
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -62,6 +66,13 @@ func (c *ListCommand) init() {
 		Default: false,
 		Usage:   "List pods in all namespaces.",
 		Aliases: []string{"A"},
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagOutputFormat,
+		Default: "table",
+		Target:  &c.flagOutputFormat,
+		Usage:   "Output format",
+		Aliases: []string{"o"},
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -137,6 +148,7 @@ func (c *ListCommand) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameAllNamespaces): complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeConfig):    complete.PredictFiles("*"),
 		fmt.Sprintf("-%s", flagNameKubeContext):   complete.PredictNothing,
+		fmt.Sprintf("-%s", flagOutputFormat):      complete.PredictNothing,
 	}
 }
 
@@ -200,21 +212,51 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 
 	// Fetch all pods in the namespace with labels matching the gateway component names.
 	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
-		LabelSelector: "component in (ingress-gateway, mesh-gateway, terminating-gateway), chart=consul-helm",
+		LabelSelector: "component in (api-gateway, ingress-gateway, mesh-gateway, terminating-gateway), chart=consul-helm",
 	})
 	if err != nil {
 		return nil, err
 	}
 	pods = append(pods, gatewaypods.Items...)
 
-	// Fetch all pods in the namespace with a label indicating they are an API gateway.
+	// Fetch API Gateway pods with deprecated label and append if they aren't already in the list
+	// TODO this block can be deleted if and when we decide we are ok with no longer listing pods of people using previous API Gateway
+	// versions.
 	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
 	})
+
+	namespacedName := func(pod v1.Pod) string {
+		return pod.Namespace + pod.Name
+	}
 	if err != nil {
 		return nil, err
 	}
-	pods = append(pods, apigatewaypods.Items...)
+	if len(apigatewaypods.Items) > 0 {
+		//Deduplicated pod list
+		seenPods := map[string]struct{}{}
+		for _, pod := range apigatewaypods.Items {
+			if _, ok := seenPods[namespacedName(pod)]; ok {
+				continue
+			}
+			found := false
+			for _, gatewayPod := range gatewaypods.Items {
+				//note that we already have this pod in the list so we can exit early.
+				seenPods[namespacedName(gatewayPod)] = struct{}{}
+
+				if (namespacedName(gatewayPod)) == namespacedName(pod) {
+					found = true
+					break
+				}
+			}
+			//pod isn't in the list already, we can add it.
+			if !found {
+				pods = append(pods, pod)
+			}
+
+		}
+	}
+	//---
 
 	// Fetch all pods in the namespace with a label indicating they are a service networked by Consul.
 	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
@@ -257,22 +299,22 @@ func (c *ListCommand) output(pods []v1.Pod) {
 
 		// Get the type for ingress, mesh, and terminating gateways.
 		switch pod.Labels["component"] {
+		case "api-gateway":
+			proxyType = "API Gateway"
 		case "ingress-gateway":
 			proxyType = "Ingress Gateway"
 		case "mesh-gateway":
 			proxyType = "Mesh Gateway"
 		case "terminating-gateway":
 			proxyType = "Terminating Gateway"
-		}
-
-		// Determine if the pod is an API Gateway.
-		if pod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
-			proxyType = "API Gateway"
-		}
-
-		// Fallback to "Sidecar" as a default
-		if proxyType == "" {
+		default:
+			// Fallback to "Sidecar" as a default
 			proxyType = "Sidecar"
+
+			// Determine if deprecated API Gateway pod.
+			if pod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
+				proxyType = "API Gateway"
+			}
 		}
 
 		if c.flagAllNamespaces {
@@ -282,5 +324,16 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		}
 	}
 
-	c.UI.Table(tbl)
+	if c.flagOutputFormat == "json" {
+		tableJson := tbl.ToJson()
+		jsonSt, err := json.MarshalIndent(tableJson, "", "    ")
+		if err != nil {
+			c.UI.Output("Error converting table to json: %v", err.Error(), terminal.WithErrorStyle())
+		} else {
+			c.UI.Output(string(jsonSt))
+		}
+	} else {
+		c.UI.Table(tbl)
+	}
+
 }

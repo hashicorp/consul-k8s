@@ -17,7 +17,7 @@ metadata:
     release: {{ .Release.Name }}
     component: server
 spec:
-  maxUnavailable: {{ template "consul.pdb.maxUnavailable" . }}
+  maxUnavailable: {{ template "consul.server.pdb.maxUnavailable" . }}
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}

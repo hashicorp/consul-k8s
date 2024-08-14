@@ -211,6 +211,19 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: metrics.enableTelemetryCollector can be configured" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enableTelemetryCollector=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-enable-telemetry-collector=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 #--------------------------------------------------------------------
 # consul and consul-dataplane images
 
@@ -947,7 +960,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"200Mi"},"requests":{"cpu":"50m","memory":"200Mi"}}' ]
 }
 
 @test "connectInject/Deployment: can set resources" {
@@ -986,7 +999,7 @@ load _helpers
   local actual=$(echo "$cmd" |
     yq 'any(contains("-init-container-memory-limit=150Mi"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-  
+
 }
 
 @test "connectInject/Deployment: can set init container resources" {
@@ -1219,6 +1232,198 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# sidecarProxy.lifecycle
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management can be disabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultEnabled=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management shutdown listener draining is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management shutdown listener draining can be disabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultEnableShutdownDrainListeners=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management shutdown grace period is set to 30 seconds" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds=30"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management shutdown grace period can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=23' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds=23"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management startup grace period is set to 0 seconds" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-startup-grace-period-seconds=0"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management startup grace period can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultStartupGracePeriodSeconds=13' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-startup-grace-period-seconds=13"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management port is set to 20600" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-port=20600"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management port can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulPort=20307' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-port=20307"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management graceful shutdown path is set to /graceful_shutdown" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-shutdown-path=\"/graceful_shutdown\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management graceful shutdown path can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulShutdownPath=/exit' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-shutdown-path=\"/exit\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: by default sidecar proxy lifecycle management graceful startup path is set to /graceful_startup" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-startup-path=\"/graceful_startup\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sidecar proxy lifecycle management graceful startup path can be set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.sidecarProxy.lifecycle.defaultGracefulStartupPath=/start' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-default-sidecar-proxy-lifecycle-graceful-startup-path=\"/start\""))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
 # priorityClassName
 
 @test "connectInject/Deployment: no priorityClassName by default" {
@@ -1310,7 +1515,10 @@ load _helpers
       -s templates/connect-inject-deployment.yaml  \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -1405,7 +1613,7 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
-# cni 
+# cni
 
 @test "connectInject/Deployment: cni is disabled by default" {
   cd `chart_dir`
@@ -1630,6 +1838,71 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.spec.template.spec.containers.volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
+}
+
+@test "connectInject/Deployment: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "connectInject/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is see and agentAnnotations are set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "connectInject/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
 }
 
 #--------------------------------------------------------------------
@@ -2001,7 +2274,12 @@ load _helpers
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/role")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -2287,7 +2565,7 @@ reservedNameTest() {
       --set 'global.cloud.authUrl.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2308,7 +2586,7 @@ reservedNameTest() {
       --set 'global.cloud.authUrl.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2329,7 +2607,7 @@ reservedNameTest() {
       --set 'global.cloud.apiHost.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2350,7 +2628,7 @@ reservedNameTest() {
       --set 'global.cloud.apiHost.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2371,7 +2649,7 @@ reservedNameTest() {
       --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2392,7 +2670,7 @@ reservedNameTest() {
       --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2413,6 +2691,30 @@ reservedNameTest() {
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: validates that externalServers.hosts is not set with an HCP-managed cluster's address" {
+  cd `chart_dir`
+  run helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'global.enabled=false' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'externalServers.enabled=true' \
+      --set 'externalServers.hosts[0]=abc.aws.hashicorp.cloud' \
+      --set 'global.cloud.enabled=true' \
+      --set 'global.cloud.clientId.secretName=client-id-name' \
+      --set 'global.cloud.clientId.secretKey=client-id-key' \
+      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
+      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
+      --set 'global.cloud.resourceId.secretName=resource-id-name' \
+      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
+     . > /dev/stderr
+
+  [ "$status" -eq 1 ]
+
+  [[ "$output" =~ "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked self-managed clusters." ]]
 }
 
 @test "connectInject/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {

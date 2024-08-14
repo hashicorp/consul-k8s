@@ -55,6 +55,29 @@ func EnsureExists(client *capi.Client, ns string, crossNSAClPolicy string) (bool
 	return true, err
 }
 
+// EnsureDeleted ensures a Consul namespace with name ns is deleted. If it is already not found
+// the call to delete will be skipped.
+func EnsureDeleted(client *capi.Client, ns string) error {
+	if ns == WildcardNamespace || ns == DefaultNamespace {
+		return nil
+	}
+	// Check if the Consul namespace exists.
+	namespaceInfo, _, err := client.Namespaces().Read(ns, nil)
+	if err != nil {
+		return fmt.Errorf("could not read namespace %s: %w", ns, err)
+	}
+	if namespaceInfo == nil {
+		return nil
+	}
+
+	// If not empty, delete it.
+	_, err = client.Namespaces().Delete(ns, nil)
+	if err != nil {
+		return fmt.Errorf("could not delete namespace %s: %w", ns, err)
+	}
+	return nil
+}
+
 // ConsulNamespace returns the consul namespace that a service should be
 // registered in based on the namespace options. It returns an
 // empty string if namespaces aren't enabled.
@@ -69,4 +92,13 @@ func ConsulNamespace(kubeNS string, enableConsulNamespaces bool, consulDestNS st
 	}
 
 	return consulDestNS
+}
+
+// NonDefaultConsulNamespace returns the given Consul namespace if it is not default or empty.
+// Otherwise, it returns the empty string.
+func NonDefaultConsulNamespace(consulNS string) string {
+	if consulNS == "" || consulNS == DefaultNamespace {
+		return ""
+	}
+	return consulNS
 }

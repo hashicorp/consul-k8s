@@ -30,6 +30,8 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 		caseName := fmt.Sprintf("secure: %t", secure)
 		t.Run(caseName, func(t *testing.T) {
 			cfg := suite.Config()
+			cfg.SkipWhenOpenshiftAndCNI(t)
+
 			ctx := suite.Environment().DefaultContext(t)
 
 			serverHelmValues := map[string]string{
@@ -73,11 +75,11 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 			} else {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
 			}
 
 			// Check that both static-server and static-client have been injected and now have 2 containers.
@@ -126,7 +128,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			// Test that kubernetes readiness status is synced to Consul.
 			// Create the file so that the readiness probe of the static-server pod fails.
 			logger.Log(t, "testing k8s -> consul health checks sync by making the static-server unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+connhelper.StaticServerName, "--", "touch", "/tmp/unhealthy")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+connhelper.StaticServerName, "-c", "static-server", "--", "touch", "/tmp/unhealthy")
 
 			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
 			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.

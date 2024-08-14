@@ -6,6 +6,11 @@ variable "location" {
   description = "The location to launch this AKS cluster in."
 }
 
+variable "kubernetes_version" {
+  default     = "1.27"
+  description = "Kubernetes version supported on AKS"
+}
+
 variable "client_id" {
   default     = ""
   description = "The client ID of the service principal to be used by Kubernetes when creating Azure resources like load balancers."

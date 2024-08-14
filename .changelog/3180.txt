@@ -1,0 +1,3 @@
+```release-note:feature
+helm: add persistentVolumeClaimRetentionPolicy variable for managing Statefulsets PVC retain policy when deleting or downsizing the statefulset.
+```

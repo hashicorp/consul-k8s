@@ -9,11 +9,7 @@ import (
 	"testing"
 	"time"
 
-	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -24,11 +20,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 // TestReconcile_CreateUpdatePeeringDialer creates a peering dialer.
@@ -264,6 +264,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
 			acceptorPeerServer.WaitForServiceIntentions(t)
+			acceptorPeerServer.WaitForActiveCARoot(t)
 
 			cfg := &api.Config{
 				Address: acceptorPeerServer.HTTPAddr,
@@ -280,9 +281,11 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			var encodedPeeringToken string
 			if tt.peeringName != "" {
 				// Create the initial token.
-				baseToken, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.peeringName}, nil)
-				require.NoError(t, err)
-				encodedPeeringToken = baseToken.PeeringToken
+				retry.Run(t, func(r *retry.R) {
+					baseToken, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: tt.peeringName}, nil)
+					require.NoError(r, err)
+					encodedPeeringToken = baseToken.PeeringToken
+				})
 			}
 
 			// If the peering is not supposed to already exist in Consul, then create a secret with the generated token.
@@ -297,6 +300,7 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 			// Create test consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			dialerClient := testClient.APIClient
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			// If the peering is supposed to already exist in Consul, then establish a peering with the existing token, so the peering will exist on the dialing side.
 			if tt.peeringExists {
@@ -314,14 +318,18 @@ func TestReconcile_CreateUpdatePeeringDialer(t *testing.T) {
 				secret.SetResourceVersion("latest-version")
 				k8sObjects = append(k8sObjects, secret)
 			}
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 
 			// Create the peering dialer controller
 			controller := &PeeringDialerController{
 				Client:              fakeClient,
-				Log:                 logrtest.TestLogger{T: t},
+				Log:                 logrtest.New(t),
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 				Scheme:              s,
@@ -441,6 +449,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 			defer acceptorPeerServer.Stop()
 			acceptorPeerServer.WaitForServiceIntentions(t)
+			acceptorPeerServer.WaitForActiveCARoot(t)
 
 			cfg := &api.Config{
 				Address: acceptorPeerServer.HTTPAddr,
@@ -482,8 +491,11 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			// Create a peering connection in Consul by generating and establishing a peering connection before calling
 			// Reconcile().
 			// Generate a token.
-			generatedToken, _, err := acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "peering"}, nil)
-			require.NoError(t, err)
+			var generatedToken *api.PeeringGenerateTokenResponse
+			retry.Run(t, func(r *retry.R) {
+				generatedToken, _, err = acceptorClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "peering"}, nil)
+				require.NoError(r, err)
+			})
 
 			// Create test consul server.
 			var testServerCfg *testutil.TestServerConfig
@@ -493,6 +505,7 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			require.NoError(t, err)
 			defer dialerPeerServer.Stop()
 			dialerPeerServer.WaitForServiceIntentions(t)
+			dialerPeerServer.WaitForActiveCARoot(t)
 
 			consulConfig := &consul.Config{
 				APIClientConfig: &api.Config{Address: dialerPeerServer.HTTPAddr},
@@ -524,14 +537,18 @@ func TestReconcile_VersionAnnotationPeeringDialer(t *testing.T) {
 			secret.SetResourceVersion("latest-version")
 			k8sObjects = append(k8sObjects, secret)
 
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 
 			// Create the peering dialer controller
 			controller := &PeeringDialerController{
 				Client:              fakeClient,
-				Log:                 logrtest.TestLogger{T: t},
+				Log:                 logrtest.New(t),
 				ConsulClientConfig:  consulConfig,
 				ConsulServerConnMgr: watcher,
 				Scheme:              s,
@@ -740,13 +757,18 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	k8sObjects := []runtime.Object{ns, dialer}
 
 	// Add peering types to the scheme.
-	s := scheme.Scheme
+	s := runtime.NewScheme()
+	corev1.AddToScheme(s)
 	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).
+		WithRuntimeObjects(k8sObjects...).
+		WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+		Build()
 
 	// Create test consul server.
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	consulClient := testClient.APIClient
+	testClient.TestServer.WaitForActiveCARoot(t)
 
 	// Add the initial peerings into Consul by calling the Generate token endpoint.
 	_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "dialer-deleted"}, nil)
@@ -755,7 +777,7 @@ func TestReconcileDeletePeeringDialer(t *testing.T) {
 	// Create the peering dialer controller.
 	pdc := &PeeringDialerController{
 		Client:              fakeClient,
-		Log:                 logrtest.TestLogger{T: t},
+		Log:                 logrtest.New(t),
 		ConsulClientConfig:  testClient.Cfg,
 		ConsulServerConnMgr: testClient.Watcher,
 		Scheme:              s,
@@ -881,13 +903,17 @@ func TestDialerUpdateStatus(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.peeringDialer)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				Scheme: s,
 			}
 
@@ -993,13 +1019,18 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.dialer)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
+
 			// Create the peering dialer controller.
 			controller := &PeeringDialerController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				Scheme: s,
 			}
 
@@ -1012,6 +1043,7 @@ func TestDialerUpdateStatusError(t *testing.T) {
 			}
 			err := fakeClient.Get(context.Background(), dialerName, dialer)
 			require.NoError(t, err)
+			require.Len(t, dialer.Status.Conditions, 1)
 			require.Equal(t, tt.expStatus.Conditions[0].Message, dialer.Status.Conditions[0].Message)
 
 		})
@@ -1277,14 +1309,18 @@ func TestDialer_RequestsForPeeringTokens(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringDialer{}, &v1alpha1.PeeringDialerList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.dialers).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(tt.secret, &tt.dialers).
+				WithStatusSubresource(&v1alpha1.PeeringDialer{}).
+				Build()
 			controller := PeeringDialerController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 			}
-			result := controller.requestsForPeeringTokens(tt.secret)
+			result := controller.requestsForPeeringTokens(context.Background(), tt.secret)
 
 			require.Equal(t, tt.result, result)
 		})

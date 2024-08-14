@@ -47,27 +47,36 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        {{- if .Values.global.acls.annotations }}
+          {{- tpl .Values.global.acls.annotations . | nindent 8 }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init-cleanup
+      {{- if .Values.server.containerSecurityContext.aclInit }}
+      securityContext:
+        {{- toYaml .Values.server.containerSecurityContext.aclInit | nindent 8 }}
+      {{- end }}
       containers:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- if not .Values.server.containerSecurityContext.aclInit }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          {{- end }}
           command:
             - consul-k8s-control-plane
           args:
             - delete-completed-job
-            - -log-level={{ .Values.global.logLevel }}
+            - -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel }}
             - -log-json={{ .Values.global.logJSON }}
             - -k8s-namespace={{ .Release.Namespace }}
             - {{ template "consul.fullname" . }}-server-acl-init
+          {{- if .Values.global.acls.resources }}
           resources:
-            requests:
-              memory: "50Mi"
-              cpu: "50m"
-            limits:
-              memory: "50Mi"
-              cpu: "50m"
+            {{- toYaml .Values.global.acls.resources | nindent 12 }}
+          {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}

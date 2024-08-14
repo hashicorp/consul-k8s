@@ -1,18 +1,16 @@
 {{- if .Values.connectInject.enabled }}
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
-  name: serviceresolvers.consul.hashicorp.com
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
+  name: serviceresolvers.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -227,6 +225,16 @@ spec:
                         type: integer
                     type: object
                 type: object
+              prioritizeByLocality:
+                description: PrioritizeByLocality controls whether the locality of
+                  services within the local partition will be used to prioritize connectivity.
+                properties:
+                  mode:
+                    description: 'Mode specifies the type of prioritization that will
+                      be performed when selecting nodes in the local partition. Valid
+                      values are: "" (default "none"), "none", and "failover".'
+                    type: string
+                type: object
               redirect:
                 description: Redirect when configured, all attempts to resolve the
                   service this resolver defines will be substituted for the supplied
@@ -266,6 +274,10 @@ spec:
                       If empty the default subset is used.
                     type: string
                 type: object
+              requestTimeout:
+                description: RequestTimeout is the timeout for receiving an HTTP response
+                  from this service before the connection is terminated.
+                type: string
               subsets:
                 additionalProperties:
                   properties:
@@ -333,10 +345,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

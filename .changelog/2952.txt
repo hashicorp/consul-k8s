@@ -1,0 +1,3 @@
+```release-note:improvement
+Add support for running on GKE Autopilot.
+```

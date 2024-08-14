@@ -32,23 +32,6 @@ load _helpers
   [ "${actual}" = "podsecuritypolicies" ]
 }
 
-@test "terminatingGateways/Role: rules for global.acls.manageSystemACLs=true" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/terminating-gateways-role.yaml  \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      . | tee /dev/stderr |
-      yq -s -r '.[0].rules[0]' | tee /dev/stderr)
-
-  local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
-  [ "${actual}" = "secrets" ]
-
-  local actual=$(echo $object | yq -r '.resourceNames[0]' | tee /dev/stderr)
-  [ "${actual}" = "release-name-consul-terminating-gateway-acl-token" ]
-}
-
 @test "terminatingGateways/Role: rules is empty if no ACLs, PSPs" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -70,7 +53,7 @@ load _helpers
       --set 'global.enablePodSecurityPolicies=true' \
       . | tee /dev/stderr |
       yq -s -r '.[0].rules | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 }
 
 @test "terminatingGateways/Role: rules for ACLs, PSPs with multiple gateways" {
@@ -93,10 +76,10 @@ load _helpers
   [ "${actual}" = "release-name-consul-gateway2" ]
 
   local actual=$(echo $object | yq '.[0].rules | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 
   local actual=$(echo $object | yq '.[1].rules | length' | tee /dev/stderr)
-  [ "${actual}" = "2" ]
+  [ "${actual}" = "1" ]
 
   local actual=$(echo $object | yq '.[2] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "false" ]

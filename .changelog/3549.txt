@@ -1,0 +1,5 @@
+```release-note:bug
+mesh-gw: update capabilities on the security context needed for the dataplane container.
+Adds NET_BIND_SERVICE to capabilities.add
+Adds ALL to capabilities.drop unless .Values.meshGateway.hostNetwork is true
+```

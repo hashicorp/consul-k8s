@@ -1,0 +1,3 @@
+```release-note:feature
+sync-catalog: add ability to support weighted loadbalancing by service annotation `consul.hashicorp.com/service-weight: <number>`
+```

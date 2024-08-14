@@ -15,16 +15,6 @@ import (
 	"sync"
 	"syscall"
 
-	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
-	"github.com/hashicorp/consul-k8s/control-plane/controllers"
-	mutatingwebhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/mutating-webhook-configuration"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
@@ -37,10 +27,20 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
-	ctrlRuntimeWebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
-const WebhookCAFilename = "ca.crt"
+const (
+	WebhookCAFilename = "ca.crt"
+)
 
 type Command struct {
 	UI cli.Ui
@@ -51,6 +51,7 @@ type Command struct {
 	flagConsulImage           string // Docker image for Consul
 	flagConsulDataplaneImage  string // Docker image for Envoy
 	flagConsulK8sImage        string // Docker image for consul-k8s
+	flagGlobalImagePullPolicy string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
 	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
 	flagEnableWebhookCAUpdate bool
@@ -79,6 +80,18 @@ type Command struct {
 	flagDefaultSidecarProxyMemoryLimit   string
 	flagDefaultSidecarProxyMemoryRequest string
 	flagDefaultEnvoyProxyConcurrency     int
+
+	// Proxy lifecycle settings.
+	flagDefaultEnableSidecarProxyLifecycle                       bool
+	flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners bool
+	flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds   int
+	flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds    int
+	flagDefaultSidecarProxyLifecycleGracefulPort                 string
+	flagDefaultSidecarProxyLifecycleGracefulShutdownPath         string
+	flagDefaultSidecarProxyLifecycleGracefulStartupPath          string
+
+	flagDefaultSidecarProxyStartupFailureSeconds  int
+	flagDefaultSidecarProxyLivenessFailureSeconds int
 
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
@@ -112,6 +125,9 @@ type Command struct {
 
 	flagEnableAutoEncrypt bool
 
+	// Consul telemetry collector
+	flagEnableTelemetryCollector bool
+
 	// Consul DNS flags.
 	flagEnableConsulDNS bool
 	flagResourcePrefix  string
@@ -122,6 +138,18 @@ type Command struct {
 	consul  *flags.ConsulFlags
 
 	clientset kubernetes.Interface
+
+	// sidecarProxy* are resource limits that are parsed and validated from other flags
+	// these are individual members because there are override annotations
+	sidecarProxyCPULimit      resource.Quantity
+	sidecarProxyCPURequest    resource.Quantity
+	sidecarProxyMemoryLimit   resource.Quantity
+	sidecarProxyMemoryRequest resource.Quantity
+
+	// static resources requirements for connect-init
+	initContainerResources corev1.ResourceRequirements
+
+	caCertPem []byte
 
 	once sync.Once
 	help string
@@ -134,9 +162,13 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
+	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
+	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
+
+	// +kubebuilder:scaffold:scheme
 }
 
 func (c *Command) init() {
@@ -153,6 +185,8 @@ func (c *Command) init() {
 		"Docker image for Consul Dataplane.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
+	c.flagSet.StringVar(&c.flagGlobalImagePullPolicy, "global-image-pull-policy", "",
+		"ImagePullPolicy for all images used by Consul (consul, consul-dataplane, consul-k8s).")
 	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
 	c.flagSet.BoolVar(&c.flagEnableFederation, "enable-federation", false, "Enable Consul WAN Federation.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
@@ -195,6 +229,8 @@ func (c *Command) init() {
 		"Enables updating the CABundle on the webhook within this controller rather than using the web cert manager.")
 	c.flagSet.BoolVar(&c.flagEnableAutoEncrypt, "enable-auto-encrypt", false,
 		"Indicates whether TLS with auto-encrypt should be used when talking to Consul clients.")
+	c.flagSet.BoolVar(&c.flagEnableTelemetryCollector, "enable-telemetry-collector", false,
+		"Indicates whether proxies should be registered with configuration to enable forwarding metrics to consul-telemetry-collector")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", zapcore.InfoLevel.String(),
 		fmt.Sprintf("Log verbosity level. Supported values (in order of detail) are "+
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
@@ -206,6 +242,18 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryRequest, "default-sidecar-proxy-memory-request", "", "Default sidecar proxy memory request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyMemoryLimit, "default-sidecar-proxy-memory-limit", "", "Default sidecar proxy memory limit.")
+
+	// Proxy lifecycle setting flags.
+	c.flagSet.BoolVar(&c.flagDefaultEnableSidecarProxyLifecycle, "default-enable-sidecar-proxy-lifecycle", false, "Default for enabling sidecar proxy lifecycle management.")
+	c.flagSet.BoolVar(&c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners, "default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners", false, "Default for enabling sidecar proxy listener draining of inbound connections during shutdown.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds, "default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds", 0, "Default sidecar proxy shutdown grace period in seconds.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds, "default-sidecar-proxy-lifecycle-startup-grace-period-seconds", 0, "Default sidecar proxy startup grace period in seconds.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulPort, "default-sidecar-proxy-lifecycle-graceful-port", strconv.Itoa(constants.DefaultGracefulPort), "Default port for sidecar proxy lifecycle management HTTP endpoints.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath, "default-sidecar-proxy-lifecycle-graceful-shutdown-path", "/graceful_shutdown", "Default sidecar proxy lifecycle management graceful shutdown path.")
+	c.flagSet.StringVar(&c.flagDefaultSidecarProxyLifecycleGracefulStartupPath, "default-sidecar-proxy-lifecycle-graceful-startup-path", "/graceful_startup", "Default sidecar proxy lifecycle management graceful startup path.")
+
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyStartupFailureSeconds, "default-sidecar-proxy-startup-failure-seconds", 0, "Default number of seconds for the k8s startup probe to fail before the proxy container is restarted. Zero disables the probe.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLivenessFailureSeconds, "default-sidecar-proxy-liveness-failure-seconds", 0, "Default number of seconds for the k8s liveness probe to fail before the proxy container is restarted. Zero disables the probe.")
 
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
@@ -245,67 +293,13 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Proxy resources.
-	var sidecarProxyCPULimit, sidecarProxyCPURequest, sidecarProxyMemoryLimit, sidecarProxyMemoryRequest resource.Quantity
-	var err error
-	if c.flagDefaultSidecarProxyCPURequest != "" {
-		sidecarProxyCPURequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-request is invalid: %s", err))
-			return 1
-		}
-	}
-
-	if c.flagDefaultSidecarProxyCPULimit != "" {
-		sidecarProxyCPULimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-cpu-limit is invalid: %s", err))
-			return 1
-		}
-	}
-	if sidecarProxyCPULimit.Value() != 0 && sidecarProxyCPURequest.Cmp(sidecarProxyCPULimit) > 0 {
-		c.UI.Error(fmt.Sprintf(
-			"request must be <= limit: -default-sidecar-proxy-cpu-request value of %q is greater than the -default-sidecar-proxy-cpu-limit value of %q",
-			c.flagDefaultSidecarProxyCPURequest, c.flagDefaultSidecarProxyCPULimit))
-		return 1
-	}
-
-	if c.flagDefaultSidecarProxyMemoryRequest != "" {
-		sidecarProxyMemoryRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryRequest)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-request is invalid: %s", err))
-			return 1
-		}
-	}
-	if c.flagDefaultSidecarProxyMemoryLimit != "" {
-		sidecarProxyMemoryLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryLimit)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("-default-sidecar-proxy-memory-limit is invalid: %s", err))
-			return 1
-		}
-	}
-	if sidecarProxyMemoryLimit.Value() != 0 && sidecarProxyMemoryRequest.Cmp(sidecarProxyMemoryLimit) > 0 {
-		c.UI.Error(fmt.Sprintf(
-			"request must be <= limit: -default-sidecar-proxy-memory-request value of %q is greater than the -default-sidecar-proxy-memory-limit value of %q",
-			c.flagDefaultSidecarProxyMemoryRequest, c.flagDefaultSidecarProxyMemoryLimit))
-		return 1
-	}
-
-	// Validate ports in metrics flags.
-	err = common.ValidateUnprivilegedPort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
-	if err != nil {
-		c.UI.Error(err.Error())
-		return 1
-	}
-	err = common.ValidateUnprivilegedPort("-default-prometheus-scrape-port", c.flagDefaultPrometheusScrapePort)
-	if err != nil {
+	if err := c.parseAndValidateSidecarProxyFlags(); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
 
 	// Validate resource request/limit flags and parse into corev1.ResourceRequirements
-	initResources, err := c.parseAndValidateResourceFlags()
-	if err != nil {
+	if err := c.parseAndValidateResourceFlags(); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
@@ -323,10 +317,6 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
-
-	// Convert allow/deny lists to sets.
-	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
-	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
 	zapLogger, err := common.ZapLogger(c.flagLogLevel, c.flagLogJSON)
 	if err != nil {
@@ -354,13 +344,9 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Create Consul API config object.
-	consulConfig := c.consul.ConsulClientConfig()
-
-	var caCertPem []byte
 	if c.consul.CACertFile != "" {
 		var err error
-		caCertPem, err = os.ReadFile(c.consul.CACertFile)
+		c.caCertPem, err = os.ReadFile(c.consul.CACertFile)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("error reading Consul's CA cert file %q", c.consul.CACertFile))
 			return 1
@@ -377,14 +363,14 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("unable to create config for consul-server-connection-manager: %s", err))
 		return 1
 	}
-	watcher, err := discovery.NewWatcher(ctx, serverConnMgrCfg, hcLog)
+
+	watcher, err := discovery.NewWatcher(ctx, serverConnMgrCfg, hcLog.Named("consul-server-connection-manager"))
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to create Consul server watcher: %s", err))
 		return 1
 	}
-
-	go watcher.Run()
 	defer watcher.Stop()
+	go watcher.Run()
 
 	// This is a blocking command that is run in order to ensure we only start the
 	// connect-inject controllers only after we have access to the Consul server.
@@ -395,339 +381,29 @@ func (c *Command) Run(args []string) int {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		LeaderElection:         true,
-		LeaderElectionID:       "consul-controller-lock",
-		Host:                   listenSplits[0],
-		Port:                   port,
-		Logger:                 zapLogger,
-		MetricsBindAddress:     "0.0.0.0:9444",
+		Scheme:           scheme,
+		LeaderElection:   true,
+		LeaderElectionID: "consul-controller-lock",
+		Logger:           zapLogger,
+		Metrics: metricsserver.Options{
+			BindAddress: "0.0.0.0:9444",
+		},
 		HealthProbeBindAddress: "0.0.0.0:9445",
+		WebhookServer: webhook.NewServer(webhook.Options{
+			CertDir: c.flagCertDir,
+			Host:    listenSplits[0],
+			Port:    port,
+		}),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		return 1
 	}
 
-	metricsConfig := metrics.Config{
-		DefaultEnableMetrics:        c.flagDefaultEnableMetrics,
-		EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
-		DefaultEnableMetricsMerging: c.flagDefaultEnableMetricsMerging,
-		DefaultMergedMetricsPort:    c.flagDefaultMergedMetricsPort,
-		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-	}
-
-	if err = (&endpoints.Controller{
-		Client:                     mgr.GetClient(),
-		ConsulClientConfig:         consulConfig,
-		ConsulServerConnMgr:        watcher,
-		AllowK8sNamespacesSet:      allowK8sNamespaces,
-		DenyK8sNamespacesSet:       denyK8sNamespaces,
-		MetricsConfig:              metricsConfig,
-		EnableConsulPartitions:     c.flagEnablePartitions,
-		EnableConsulNamespaces:     c.flagEnableNamespaces,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
-		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
-		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
-		EnableTransparentProxy:     c.flagDefaultEnableTransparentProxy,
-		EnableWANFederation:        c.flagEnableFederation,
-		TProxyOverwriteProbes:      c.flagTransparentProxyDefaultOverwriteProbes,
-		AuthMethod:                 c.flagACLAuthMethod,
-		NodeMeta:                   c.flagNodeMeta,
-		Log:                        ctrl.Log.WithName("controller").WithName("endpoints"),
-		Scheme:                     mgr.GetScheme(),
-		ReleaseName:                c.flagReleaseName,
-		ReleaseNamespace:           c.flagReleaseNamespace,
-		EnableAutoEncrypt:          c.flagEnableAutoEncrypt,
-		Context:                    ctx,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
+	err = c.configureControllers(ctx, mgr, watcher)
+	if err != nil {
+		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1
-	}
-
-	consulMeta := apicommon.ConsulMeta{
-		PartitionsEnabled:    c.flagEnablePartitions,
-		Partition:            c.consul.Partition,
-		NamespacesEnabled:    c.flagEnableNamespaces,
-		DestinationNamespace: c.flagConsulDestinationNamespace,
-		Mirroring:            c.flagEnableK8SNSMirroring,
-		Prefix:               c.flagK8SNSMirroringPrefix,
-	}
-
-	configEntryReconciler := &controllers.ConfigEntryController{
-		ConsulClientConfig:         c.consul.ConsulClientConfig(),
-		ConsulServerConnMgr:        watcher,
-		DatacenterName:             c.consul.Datacenter,
-		EnableConsulNamespaces:     c.flagEnableNamespaces,
-		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
-		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
-		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
-		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
-	}
-	if err = (&controllers.ServiceDefaultsController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceDefaults),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceDefaults)
-		return 1
-	}
-	if err = (&controllers.ServiceResolverController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceResolver),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceResolver)
-		return 1
-	}
-	if err = (&controllers.ProxyDefaultsController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ProxyDefaults),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.ProxyDefaults)
-		return 1
-	}
-	if err = (&controllers.MeshController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.Mesh),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.Mesh)
-		return 1
-	}
-	if err = (&controllers.ExportedServicesController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ExportedServices),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.ExportedServices)
-		return 1
-	}
-	if err = (&controllers.ServiceRouterController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceRouter),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceRouter)
-		return 1
-	}
-	if err = (&controllers.ServiceSplitterController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceSplitter),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceSplitter)
-		return 1
-	}
-	if err = (&controllers.ServiceIntentionsController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.ServiceIntentions),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.ServiceIntentions)
-		return 1
-	}
-	if err = (&controllers.IngressGatewayController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.IngressGateway),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.IngressGateway)
-		return 1
-	}
-	if err = (&controllers.TerminatingGatewayController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.TerminatingGateway),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.TerminatingGateway)
-		return 1
-	}
-	if err = (&controllers.SamenessGroupController{
-		ConfigEntryController: configEntryReconciler,
-		Client:                mgr.GetClient(),
-		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.SamenessGroup),
-		Scheme:                mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", apicommon.SamenessGroup)
-		return 1
-	}
-
-	if err = mgr.AddReadyzCheck("ready", webhook.ReadinessCheck{CertDir: c.flagCertDir}.Ready); err != nil {
-		setupLog.Error(err, "unable to create readiness check", "controller", endpoints.Controller{})
-		return 1
-	}
-
-	if c.flagEnablePeering {
-		if err = (&peering.AcceptorController{
-			Client:                   mgr.GetClient(),
-			ConsulClientConfig:       consulConfig,
-			ConsulServerConnMgr:      watcher,
-			ExposeServersServiceName: c.flagResourcePrefix + "-expose-servers",
-			ReleaseNamespace:         c.flagReleaseNamespace,
-			Log:                      ctrl.Log.WithName("controller").WithName("peering-acceptor"),
-			Scheme:                   mgr.GetScheme(),
-			Context:                  ctx,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "peering-acceptor")
-			return 1
-		}
-		if err = (&peering.PeeringDialerController{
-			Client:              mgr.GetClient(),
-			ConsulClientConfig:  consulConfig,
-			ConsulServerConnMgr: watcher,
-			Log:                 ctrl.Log.WithName("controller").WithName("peering-dialer"),
-			Scheme:              mgr.GetScheme(),
-			Context:             ctx,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "peering-dialer")
-			return 1
-		}
-
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors",
-			&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.PeeringAcceptorWebhook{
-				Client: mgr.GetClient(),
-				Logger: ctrl.Log.WithName("webhooks").WithName("peering-acceptor"),
-			}})
-		mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringdialers",
-			&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.PeeringDialerWebhook{
-				Client: mgr.GetClient(),
-				Logger: ctrl.Log.WithName("webhooks").WithName("peering-dialer"),
-			}})
-	}
-
-	mgr.GetWebhookServer().CertDir = c.flagCertDir
-
-	mgr.GetWebhookServer().Register("/mutate",
-		&ctrlRuntimeWebhook.Admission{Handler: &webhook.MeshWebhook{
-			Clientset:                    c.clientset,
-			ReleaseNamespace:             c.flagReleaseNamespace,
-			ConsulConfig:                 consulConfig,
-			ConsulServerConnMgr:          watcher,
-			ImageConsul:                  c.flagConsulImage,
-			ImageConsulDataplane:         c.flagConsulDataplaneImage,
-			EnvoyExtraArgs:               c.flagEnvoyExtraArgs,
-			ImageConsulK8S:               c.flagConsulK8sImage,
-			RequireAnnotation:            !c.flagDefaultInject,
-			AuthMethod:                   c.flagACLAuthMethod,
-			ConsulCACert:                 string(caCertPem),
-			TLSEnabled:                   c.consul.UseTLS,
-			ConsulAddress:                c.consul.Addresses,
-			SkipServerWatch:              c.consul.SkipServerWatch,
-			ConsulTLSServerName:          c.consul.TLSServerName,
-			DefaultProxyCPURequest:       sidecarProxyCPURequest,
-			DefaultProxyCPULimit:         sidecarProxyCPULimit,
-			DefaultProxyMemoryRequest:    sidecarProxyMemoryRequest,
-			DefaultProxyMemoryLimit:      sidecarProxyMemoryLimit,
-			DefaultEnvoyProxyConcurrency: c.flagDefaultEnvoyProxyConcurrency,
-			MetricsConfig:                metricsConfig,
-			InitContainerResources:       initResources,
-			ConsulPartition:              c.consul.Partition,
-			AllowK8sNamespacesSet:        allowK8sNamespaces,
-			DenyK8sNamespacesSet:         denyK8sNamespaces,
-			EnableNamespaces:             c.flagEnableNamespaces,
-			ConsulDestinationNamespace:   c.flagConsulDestinationNamespace,
-			EnableK8SNSMirroring:         c.flagEnableK8SNSMirroring,
-			K8SNSMirroringPrefix:         c.flagK8SNSMirroringPrefix,
-			CrossNamespaceACLPolicy:      c.flagCrossNamespaceACLPolicy,
-			EnableTransparentProxy:       c.flagDefaultEnableTransparentProxy,
-			EnableCNI:                    c.flagEnableCNI,
-			TProxyOverwriteProbes:        c.flagTransparentProxyDefaultOverwriteProbes,
-			EnableConsulDNS:              c.flagEnableConsulDNS,
-			EnableOpenShift:              c.flagEnableOpenShift,
-			Log:                          ctrl.Log.WithName("handler").WithName("connect"),
-			LogLevel:                     c.flagLogLevel,
-			LogJSON:                      c.flagLogJSON,
-		}})
-
-	// Note: The path here should be identical to the one on the kubebuilder
-	// annotation in each webhook file.
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicedefaults",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceDefaultsWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceDefaults),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceresolver",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceResolverWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceResolver),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-proxydefaults",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ProxyDefaultsWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ProxyDefaults),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-mesh",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.MeshWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Mesh),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-exportedservices",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ExportedServicesWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ExportedServices),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicerouter",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceRouterWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceRouter),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceSplitterWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceSplitter),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-serviceintentions",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.ServiceIntentionsWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ServiceIntentions),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-ingressgateway",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.IngressGatewayWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.IngressGateway),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-terminatinggateway",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.TerminatingGatewayWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.TerminatingGateway),
-			ConsulMeta: consulMeta,
-		}})
-	mgr.GetWebhookServer().Register("/mutate-v1alpha1-samenessgroup",
-		&ctrlRuntimeWebhook.Admission{Handler: &v1alpha1.SamenessGroupWebhook{
-			Client:     mgr.GetClient(),
-			Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.SamenessGroup),
-			ConsulMeta: consulMeta,
-		}})
-
-	if c.flagEnableWebhookCAUpdate {
-		err = c.updateWebhookCABundle(ctx)
-		if err != nil {
-			setupLog.Error(err, "problem getting CA Cert")
-			return 1
-		}
 	}
 
 	if err = mgr.Start(ctx); err != nil {
@@ -736,20 +412,6 @@ func (c *Command) Run(args []string) int {
 	}
 	c.UI.Info("shutting down")
 	return 0
-}
-
-func (c *Command) updateWebhookCABundle(ctx context.Context) error {
-	webhookConfigName := fmt.Sprintf("%s-connect-injector", c.flagResourcePrefix)
-	caPath := fmt.Sprintf("%s/%s", c.flagCertDir, WebhookCAFilename)
-	caCert, err := os.ReadFile(caPath)
-	if err != nil {
-		return err
-	}
-	err = mutatingwebhookconfiguration.UpdateWithCABundle(ctx, c.clientset, webhookConfigName, caCert)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (c *Command) validateFlags() error {
@@ -761,6 +423,16 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagConsulDataplaneImage == "" {
 		return errors.New("-consul-dataplane-image must be set")
+	}
+
+	switch corev1.PullPolicy(c.flagGlobalImagePullPolicy) {
+	case corev1.PullAlways:
+	case corev1.PullNever:
+	case corev1.PullIfNotPresent:
+	case "":
+		break
+	default:
+		return errors.New("-global-image-pull-policy must be `IfNotPresent`, `Always`, `Never`, or `` ")
 	}
 
 	if c.flagEnablePartitions && c.consul.Partition == "" {
@@ -775,48 +447,95 @@ func (c *Command) validateFlags() error {
 		return errors.New("-default-envoy-proxy-concurrency must be >= 0 if set")
 	}
 
+	// Validate ports in metrics flags.
+	err := common.ValidateUnprivilegedPort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
+	if err != nil {
+		return err
+	}
+	err = common.ValidateUnprivilegedPort("-default-prometheus-scrape-port", c.flagDefaultPrometheusScrapePort)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, error) {
+func (c *Command) parseAndValidateSidecarProxyFlags() error {
+	var err error
+
+	if c.flagDefaultSidecarProxyCPURequest != "" {
+		c.sidecarProxyCPURequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPURequest)
+		if err != nil {
+			return fmt.Errorf("-default-sidecar-proxy-cpu-request is invalid: %w", err)
+		}
+	}
+
+	if c.flagDefaultSidecarProxyCPULimit != "" {
+		c.sidecarProxyCPULimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyCPULimit)
+		if err != nil {
+			return fmt.Errorf("-default-sidecar-proxy-cpu-limit is invalid: %w", err)
+		}
+	}
+	if c.sidecarProxyCPULimit.Value() != 0 && c.sidecarProxyCPURequest.Cmp(c.sidecarProxyCPULimit) > 0 {
+		return fmt.Errorf("request must be <= limit: -default-sidecar-proxy-cpu-request value of %q is greater than the -default-sidecar-proxy-cpu-limit value of %q",
+			c.flagDefaultSidecarProxyCPURequest, c.flagDefaultSidecarProxyCPULimit)
+	}
+
+	if c.flagDefaultSidecarProxyMemoryRequest != "" {
+		c.sidecarProxyMemoryRequest, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryRequest)
+		if err != nil {
+			return fmt.Errorf("-default-sidecar-proxy-memory-request is invalid: %w", err)
+		}
+	}
+	if c.flagDefaultSidecarProxyMemoryLimit != "" {
+		c.sidecarProxyMemoryLimit, err = resource.ParseQuantity(c.flagDefaultSidecarProxyMemoryLimit)
+		if err != nil {
+			return fmt.Errorf("-default-sidecar-proxy-memory-limit is invalid: %w", err)
+		}
+	}
+	if c.sidecarProxyMemoryLimit.Value() != 0 && c.sidecarProxyMemoryRequest.Cmp(c.sidecarProxyMemoryLimit) > 0 {
+		return fmt.Errorf("request must be <= limit: -default-sidecar-proxy-memory-request value of %q is greater than the -default-sidecar-proxy-memory-limit value of %q",
+			c.flagDefaultSidecarProxyMemoryRequest, c.flagDefaultSidecarProxyMemoryLimit)
+	}
+
+	return nil
+}
+
+func (c *Command) parseAndValidateResourceFlags() error {
 	// Init container
 	var initContainerCPULimit, initContainerCPURequest, initContainerMemoryLimit, initContainerMemoryRequest resource.Quantity
 
 	// Parse and validate the initContainer resources.
 	initContainerCPURequest, err := resource.ParseQuantity(c.flagInitContainerCPURequest)
 	if err != nil {
-		return corev1.ResourceRequirements{},
-			fmt.Errorf("-init-container-cpu-request '%s' is invalid: %s", c.flagInitContainerCPURequest, err)
+		return fmt.Errorf("-init-container-cpu-request '%s' is invalid: %s", c.flagInitContainerCPURequest, err)
 	}
 	initContainerCPULimit, err = resource.ParseQuantity(c.flagInitContainerCPULimit)
 	if err != nil {
-		return corev1.ResourceRequirements{},
-			fmt.Errorf("-init-container-cpu-limit '%s' is invalid: %s", c.flagInitContainerCPULimit, err)
+		return fmt.Errorf("-init-container-cpu-limit '%s' is invalid: %s", c.flagInitContainerCPULimit, err)
 	}
 	if initContainerCPULimit.Value() != 0 && initContainerCPURequest.Cmp(initContainerCPULimit) > 0 {
-		return corev1.ResourceRequirements{}, fmt.Errorf(
+		return fmt.Errorf(
 			"request must be <= limit: -init-container-cpu-request value of %q is greater than the -init-container-cpu-limit value of %q",
 			c.flagInitContainerCPURequest, c.flagInitContainerCPULimit)
 	}
 
 	initContainerMemoryRequest, err = resource.ParseQuantity(c.flagInitContainerMemoryRequest)
 	if err != nil {
-		return corev1.ResourceRequirements{},
-			fmt.Errorf("-init-container-memory-request '%s' is invalid: %s", c.flagInitContainerMemoryRequest, err)
+		return fmt.Errorf("-init-container-memory-request '%s' is invalid: %s", c.flagInitContainerMemoryRequest, err)
 	}
 	initContainerMemoryLimit, err = resource.ParseQuantity(c.flagInitContainerMemoryLimit)
 	if err != nil {
-		return corev1.ResourceRequirements{},
-			fmt.Errorf("-init-container-memory-limit '%s' is invalid: %s", c.flagInitContainerMemoryLimit, err)
+		return fmt.Errorf("-init-container-memory-limit '%s' is invalid: %s", c.flagInitContainerMemoryLimit, err)
 	}
 	if initContainerMemoryLimit.Value() != 0 && initContainerMemoryRequest.Cmp(initContainerMemoryLimit) > 0 {
-		return corev1.ResourceRequirements{}, fmt.Errorf(
+		return fmt.Errorf(
 			"request must be <= limit: -init-container-memory-request value of %q is greater than the -init-container-memory-limit value of %q",
 			c.flagInitContainerMemoryRequest, c.flagInitContainerMemoryLimit)
 	}
 
 	// Put into corev1.ResourceRequirements form
-	initResources := corev1.ResourceRequirements{
+	c.initContainerResources = corev1.ResourceRequirements{
 		Requests: corev1.ResourceList{
 			corev1.ResourceCPU:    initContainerCPURequest,
 			corev1.ResourceMemory: initContainerMemoryRequest,
@@ -827,7 +546,7 @@ func (c *Command) parseAndValidateResourceFlags() (corev1.ResourceRequirements, 
 		},
 	}
 
-	return initResources, nil
+	return nil
 }
 
 func (c *Command) Synopsis() string { return synopsis }

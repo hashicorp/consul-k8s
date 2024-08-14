@@ -32,6 +32,11 @@ metadata:
     {{- if .Values.global.extraLabels }}
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
+  {{- if .Values.global.argocd.enabled }}
+  annotations:
+    "argocd.argoproj.io/hook": "Sync"
+    "argocd.argoproj.io/hook-delete-policy": "HookSucceeded"
+  {{- end }}
 spec:
   template:
     metadata:
@@ -46,8 +51,11 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        {{- if .Values.global.acls.annotations }}
+          {{- tpl .Values.global.acls.annotations . | nindent 8 }}
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
-
         {{- /* Run the Vault agent as both an init container and sidecar.
         The Vault agent sidecar is needed when server-acl-init bootstraps ACLs
         and writes the bootstrap token back to Vault.
@@ -90,10 +98,17 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-server-acl-init
+      {{- if .Values.server.containerSecurityContext.aclInit }}
+      securityContext:
+        {{- toYaml .Values.server.containerSecurityContext.aclInit | nindent 8 }}
+      {{- end }}
       {{- if (or .Values.global.tls.enabled .Values.global.acls.replicationToken.secretName .Values.global.acls.bootstrapToken.secretName) }}
       volumes:
       {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
@@ -122,6 +137,10 @@ spec:
       containers:
       - name: server-acl-init-job
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
+        {{- if not .Values.server.containerSecurityContext.aclInit }}
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+        {{- end }}
         env:
         - name: NAMESPACE
           valueFrom:
@@ -133,9 +152,12 @@ spec:
               fieldPath: metadata.name
         # Extract the Vault namespace from the Vault agent annotations.
         {{- if .Values.global.secretsBackend.vault.enabled }}
-        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{- if and (.Values.global.secretsBackend.vault.agentAnnotations) (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace") }}
         - name: VAULT_NAMESPACE
           value: {{ get (tpl .Values.global.secretsBackend.vault.agentAnnotations . | fromYaml) "vault.hashicorp.com/namespace" }}
+        {{- else if .Values.global.secretsBackend.vault.vaultNamespace }}
+        - name: VAULT_NAMESPACE
+          value: {{ .Values.global.secretsBackend.vault.vaultNamespace }}
         {{- end }}
         {{- end }}
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
@@ -160,8 +182,8 @@ spec:
         - |
           CONSUL_FULLNAME="{{template "consul.fullname" . }}"
 
-          consul-k8s-control-plane server-acl-init \
-            -log-level={{ .Values.global.logLevel }} \
+          exec consul-k8s-control-plane server-acl-init \
+            -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel}} \
             -log-json={{ .Values.global.logJSON }} \
             -resource-prefix=${CONSUL_FULLNAME} \
             -k8s-namespace={{ .Release.Namespace }} \
@@ -205,7 +227,9 @@ spec:
             {{- if .Values.meshGateway.enabled }}
             -mesh-gateway=true \
             {{- end }}
-
+            {{- if .Values.dns.proxy.enabled }}
+              -dns-proxy=true \
+            {{- end }}
             {{- if .Values.ingressGateways.enabled }}
             {{- if .Values.global.enableConsulNamespaces }}
             {{- $root := . }}
@@ -248,6 +272,10 @@ spec:
             -create-enterprise-license-token=true \
             {{- end }}
 
+            {{- if (and (not .Values.global.metrics.datadog.dogstatsd.enabled) .Values.global.metrics.datadog.enabled .Values.global.acls.manageSystemACLs) }}
+            -create-dd-agent-token=true \
+            {{- end }}
+
             {{- if .Values.server.snapshotAgent.enabled }}
             -snapshot-agent=true \
             {{- end }}
@@ -273,10 +301,6 @@ spec:
             {{- end }}
             {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.partitionToken.secretName }}
             -partition-token-file=/vault/secrets/partition-token \
-            {{- end }}
-
-            {{- if .Values.apiGateway.enabled }}
-            -api-gateway-controller=true \
             {{- end }}
 
             {{- if .Values.global.enableConsulNamespaces }}
@@ -307,13 +331,10 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+        {{- if .Values.global.acls.resources }}
         resources:
-          requests:
-            memory: "50Mi"
-            cpu: "50m"
-          limits:
-            memory: "50Mi"
-            cpu: "50m"
+          {{- toYaml .Values.global.acls.resources | nindent 10 }}
+        {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}

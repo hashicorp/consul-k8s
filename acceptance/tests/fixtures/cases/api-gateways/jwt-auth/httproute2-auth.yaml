@@ -1,0 +1,32 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: http-route2-auth
+spec:
+  parentRefs:
+  - name: gateway
+    sectionName: http-auth
+  rules:
+    - matches:
+      - path:
+          type: PathPrefix
+          value: "/admin-2"
+      backendRefs:
+        - name: static-server
+          port: 8080
+      filters:
+      - type: ExtensionRef
+        extensionRef:
+          group: consul.hashicorp.com
+          kind: RouteAuthFilter
+          name: route-jwt-auth-filter
+    - matches:
+      - path:
+          type: PathPrefix
+          value: "/pet-2"
+      backendRefs:
+        - name: static-server
+          port: 8080

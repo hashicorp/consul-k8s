@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -528,6 +529,7 @@ type mockPortForwarder struct {
 
 func (m *mockPortForwarder) Open(ctx context.Context) (string, error) { return m.openBehavior(ctx) }
 func (m *mockPortForwarder) Close()                                   {}
+func (m *mockPortForwarder) GetLocalPort() int                        { return int(rand.Int63nRange(0, 65535)) }
 
 func testLogConfig() map[string]string {
 	cfg := make(map[string]string, len(EnvoyLoggers))

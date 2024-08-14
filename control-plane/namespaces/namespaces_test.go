@@ -40,7 +40,7 @@ func TestEnsureExists_AlreadyExists(tt *testing.T) {
 			})
 			req.NoError(err)
 			defer consul.Stop()
-			consul.WaitForSerfCheck(t)
+			consul.WaitForLeader(t)
 			consulClient, err := capi.NewClient(&capi.Config{
 				Address: consul.HTTPAddr,
 				Token:   masterToken,
@@ -154,6 +154,56 @@ func TestEnsureExists_CreatesNS(tt *testing.T) {
 				req.Equal(cNS.ACLs.PolicyDefaults[0].Name, crossNSPolicy)
 			} else {
 				req.Len(cNS.ACLs.PolicyDefaults, 0)
+			}
+		})
+	}
+}
+
+// Test that it creates the namespace if it doesn't exist.
+func TestEnsureDelete(tt *testing.T) {
+	name := "foo"
+	for _, c := range []struct {
+		NamespaceExists bool
+	}{
+		{
+			NamespaceExists: true,
+		},
+		{
+			NamespaceExists: false,
+		},
+	} {
+		tt.Run(fmt.Sprintf("namespace: %t", c.NamespaceExists), func(t *testing.T) {
+			consul, err := testutil.NewTestServerConfigT(t, nil)
+			require.NoError(t, err)
+			defer consul.Stop()
+			consul.WaitForLeader(t)
+
+			consulClient, err := capi.NewClient(&capi.Config{
+				Address: consul.HTTPAddr,
+			})
+			require.NoError(t, err)
+
+			if c.NamespaceExists {
+				ns := capi.Namespace{
+					Name: name,
+				}
+				_, _, err = consulClient.Namespaces().Create(&ns, nil)
+				require.NoError(t, err)
+
+				check, _, err := consulClient.Namespaces().Read(name, nil)
+				require.NoError(t, err)
+				require.NotNil(t, check)
+				require.Equal(t, name, check.Name)
+			}
+
+			err = EnsureDeleted(consulClient, name)
+			require.NoError(t, err)
+
+			// Ensure it was deleted.
+			cNS, _, err := consulClient.Namespaces().Read(name, nil)
+			require.NoError(t, err)
+			if cNS != nil && cNS.DeletedAt == nil {
+				require.Fail(t, "the namespace was not deleted")
 			}
 		})
 	}

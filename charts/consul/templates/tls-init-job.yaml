@@ -35,9 +35,17 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        {{- if .Values.global.tls.annotations }}
+          {{- tpl .Values.global.tls.annotations . | nindent 8 }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-tls-init
+      {{- if .Values.server.containerSecurityContext.tlsInit }}
+      securityContext:
+        {{- toYaml .Values.server.containerSecurityContext.tlsInit | nindent 8 }}
+      {{- end }}
       {{- if (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName) }}
       volumes:
       - name: consul-ca-cert
@@ -56,6 +64,10 @@ spec:
       containers:
         - name: tls-init
           image: "{{ .Values.global.imageK8S }}"
+          {{ template "consul.imagePullPolicy" . }}
+          {{- if not .Values.server.containerSecurityContext.tlsInit }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          {{- end }}
           env:
             - name: NAMESPACE
               valueFrom:
@@ -69,8 +81,8 @@ spec:
               # Suppress globbing so we can interpolate the $NAMESPACE environment variable
               # and use * at the start of the dns name when setting -additional-dnsname.
               set -o noglob
-              consul-k8s-control-plane tls-init \
-                -log-level={{ .Values.global.logLevel }} \
+              exec consul-k8s-control-plane tls-init \
+                -log-level={{ default .Values.global.logLevel .Values.global.tls.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -domain={{ .Values.global.domain }} \
                 -days=730 \

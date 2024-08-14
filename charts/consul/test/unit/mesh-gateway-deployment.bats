@@ -44,7 +44,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "7" ]
+  [ "${actual}" = "8" ]
 }
 
 @test "meshGateway/Deployment: extra annotations can be set" {
@@ -57,7 +57,7 @@ load _helpers
 key2: value2' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations | length' | tee /dev/stderr)
-  [ "${actual}" = "9" ]
+  [ "${actual}" = "10" ]
 }
 
 #--------------------------------------------------------------------
@@ -97,6 +97,19 @@ key2: value2' \
       . | tee /dev/stderr |
        yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
   [ "${actual}" = "/metrics" ]
+}
+
+@test "meshGateway/Deployment: when global.metrics.enabled=true, and mesh gateways annotation for prometheus path is specified, it uses the specified annotation rather than default." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'meshGateway.annotations=prometheus.io/path: /anew/path' \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/anew/path" ]
 }
 
 @test "meshGateway/Deployment: when global.metrics.enableGatewayMetrics=false, does not set annotations" {
@@ -1332,6 +1345,74 @@ key2: value2' \
   [ "${actual}" = "true" ]
 }
 
+@test "meshGateway/Deployment: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "meshGateway/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "meshGateway/Deployment: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
+}
+
 #--------------------------------------------------------------------
 # Vault agent annotations
 
@@ -1347,7 +1428,18 @@ key2: value2' \
       --set 'global.tls.caCert.secretName=foo' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."consul.hashicorp.com/gateway-kind") | del(."consul.hashicorp.com/gateway-wan-address-source") | del(."consul.hashicorp.com/mesh-gateway-container-port") | del(."consul.hashicorp.com/gateway-wan-address-static") | del(."consul.hashicorp.com/gateway-wan-port") | del(."consul.hashicorp.com/gateway-consul-service-name")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/role") |
+      del(."consul.hashicorp.com/gateway-kind") |
+      del(."consul.hashicorp.com/gateway-wan-address-source") |
+      del(."consul.hashicorp.com/mesh-gateway-container-port") |
+      del(."consul.hashicorp.com/gateway-wan-address-static") |
+      del(."consul.hashicorp.com/gateway-wan-port") |
+      del(."consul.hashicorp.com/gateway-consul-service-name")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -1643,4 +1735,93 @@ key2: value2' \
   local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
+}
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "meshGateway/Deployment: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: override global.logLevel when meshGateway.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'meshGateway.logLevel=warn' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: use global.logLevel by default for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "meshGateway/Deployment: override global.logLevel when meshGateway.logLevel is set for dataplane container" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'meshGateway.logLevel=warn' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=warn"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# security context
+
+@test "meshGateway/Deployment: don't drop ALL capabilities when hostNetwork=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'meshGateway.hostNetwork=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.capabilities.drop | length') -eq 0 ]
+}
+
+@test "meshGateway/Deployment: drop ALL capabilities when hostNetwork!=true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/mesh-gateway-deployment.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].securityContext' | tee /dev/stderr)
+
+  [ $(echo "${actual}" | yq -r '.capabilities.drop[0]') = "ALL" ]
 }

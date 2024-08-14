@@ -13,7 +13,8 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	current "github.com/containernetworking/cni/pkg/types/100"
-	"github.com/containernetworking/cni/pkg/version"
+	cniv "github.com/containernetworking/cni/pkg/version"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +33,10 @@ const (
 	// keyInjectStatus is the key of the annotation that is added to
 	// a pod after an injection is done.
 	keyInjectStatus = "consul.hashicorp.com/connect-inject-status"
+
+	// keyMeshInjectStatus is the mesh v2 key of the annotation that is added to
+	// a pod after an injection is done.
+	keyMeshInjectStatus = "consul.hashicorp.com/mesh-inject-status"
 
 	// keyTransparentProxyStatus is the key of the annotation that is added to
 	// a pod when transparent proxy is done.
@@ -68,6 +73,10 @@ type CNIArgs struct {
 	K8S_POD_NAMESPACE types.UnmarshallableString
 	// K8S_POD_INFRA_CONTAINER_ID is the runtime container ID that the pod runs under.
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
+
+	// CONSUL_IPTABLES_CONFIG is the runtime iptables configuration passed by
+	// orchestrator (ex. the Nomad client agent)
+	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
 
 // PluginConf is is the configuration used by the plugin.
@@ -91,9 +100,8 @@ type PluginConf struct {
 	Multus bool `json:"multus"`
 	// Kubeconfig file name. Can be set as a cli flag.
 	Kubeconfig string `json:"kubeconfig"`
-	// LogLevl is the logging level. Can be set as a cli flag.
+	// LogLevel is the logging level. Can be set as a cli flag.
 	LogLevel string `json:"log_level"`
-	//
 }
 
 // parseConfig parses the supplied CNI configuration (and prevResult) from stdin.
@@ -106,7 +114,7 @@ func parseConfig(stdin []byte) (*PluginConf, error) {
 
 	// The previous result is passed from the previously run plugin to our plugin. We do not
 	// do anything with the result but instead just pass it on when our plugin is finished.
-	if err := version.ParsePrevResult(&cfg.NetConf); err != nil {
+	if err := cniv.ParsePrevResult(&cfg.NetConf); err != nil {
 		return nil, fmt.Errorf("could not parse prevResult: %w", err)
 	}
 
@@ -128,9 +136,11 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	podNamespace := string(cniArgs.K8S_POD_NAMESPACE)
 	podName := string(cniArgs.K8S_POD_NAME)
+	cniArgsIPTablesCfg := string(cniArgs.CONSUL_IPTABLES_CONFIG)
 
-	// We should never encounter this unless there has been an error in the kubelet. A good safeguard.
-	if podNamespace == "" || podName == "" {
+	// We should never encounter this unless there has been an error in the
+	// kubelet. A good safeguard.
+	if (podNamespace == "" || podName == "") && cniArgsIPTablesCfg == "" {
 		return fmt.Errorf("not running in a pod, namespace and pod should have values")
 	}
 
@@ -163,49 +173,55 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		result = prevResult
 	}
 
-	ctx := context.Background()
-	if c.client == nil {
+	var iptablesCfg iptables.Config
 
-		// Connect to kubernetes.
-		restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
+	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
+	if cniArgsIPTablesCfg != "" {
+		var err error
+		iptablesCfg, err = parseIPTablesFromCNIArgs(cniArgsIPTablesCfg)
 		if err != nil {
-			return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+			return err
+		}
+	} else {
+		if c.client == nil {
+			if err := c.createK8sClient(cfg); err != nil {
+				return err
+			}
 		}
 
-		c.client, err = kubernetes.NewForConfig(restConfig)
+		ctx := context.Background()
+		pod, err := c.client.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("error initializing Kubernetes client: %s", err)
+			return fmt.Errorf("error retrieving pod: %s", err)
 		}
-	}
 
-	pod, err := c.client.CoreV1().Pods(podNamespace).Get(ctx, podName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("error retrieving pod: %s", err)
-	}
+		// Skip traffic redirection if the correct annotations are not on the pod.
+		if skipTrafficRedirection(*pod) {
+			logger.Debug("skipping traffic redirection because the pod is either not injected or transparent proxy is disabled: %s", pod.Name)
+			return types.PrintResult(result, cfg.CNIVersion)
+		}
 
-	// Skip traffic redirection if the correct annotations are not on the pod.
-	if skipTrafficRedirection(*pod) {
-		logger.Debug("skipping traffic redirection because the pod is either not injected or transparent proxy is disabled: %s", pod.Name)
-		return types.PrintResult(result, cfg.CNIVersion)
-	}
+		// We do not throw an error here because kubernetes will often throw a
+		// benign error where the pod has been updated in between the get and
+		// update of the annotation. Eventually kubernetes will update the
+		// annotation
+		ok := c.updateTransparentProxyStatusAnnotation(podName, podNamespace, waiting)
+		if !ok {
+			logger.Info("unable to update %s pod annotation to waiting", keyTransparentProxyStatus)
+		}
 
-	// We do not throw an error here because kubernetes will often throw a benign error where the pod has been
-	// updated in between the get and update of the annotation. Eventually kubernetes will update the annotation
-	ok := c.updateTransparentProxyStatusAnnotation(podName, podNamespace, waiting)
-	if !ok {
-		logger.Info("unable to update %s pod annotation to waiting", keyTransparentProxyStatus)
-	}
-
-	// Parse the cni-proxy-config annotation into an iptables.Config object.
-	iptablesCfg, err := parseAnnotation(*pod, annotationRedirectTraffic)
-	if err != nil {
-		return err
+		// Parse the cni-proxy-config annotation into an iptables.Config object.
+		iptablesCfg, err = parseAnnotation(*pod, annotationRedirectTraffic)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Set NetNS passed through the CNI.
 	iptablesCfg.NetNS = args.Netns
 
-	// Set the provider to a fake provider in testing, otherwise use the default iptables.Provider
+	// Set the provider to a fake provider in testing, otherwise use the default
+	// iptables.Provider
 	if c.iptablesProvider != nil {
 		iptablesCfg.IptablesProvider = c.iptablesProvider
 	}
@@ -216,15 +232,21 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("could not apply iptables setup: %v", err)
 	}
 
-	// We do not throw an error here because kubernetes will often throw a benign error where the pod has been
-	// updated in between the get and update of the annotation. Eventually kubernetes will update the annotation
-	ok = c.updateTransparentProxyStatusAnnotation(podName, podNamespace, complete)
-	if !ok {
-		logger.Info("unable to update %s pod annotation to complete", keyTransparentProxyStatus)
+	if cniArgsIPTablesCfg == "" {
+
+		// We do not throw an error here because kubernetes will often throw a
+		// benign error where the pod has been updated in between the get and update
+		// of the annotation. Eventually kubernetes will update the annotation
+		ok := c.updateTransparentProxyStatusAnnotation(podName, podNamespace, complete)
+		if !ok {
+			logger.Info("unable to update %s pod annotation to complete", keyTransparentProxyStatus)
+		}
 	}
 
-	logger.Debug("traffic redirect rules applied to pod: %s", pod.Name)
-	// Pass through the result for the next plugin even though we are the final plugin in the chain.
+	logger.Debug("traffic redirect rules applied to pod: %s", podName)
+
+	// Pass through the result for the next plugin even if we are the final
+	// plugin in the chain.
 	return types.PrintResult(result, cfg.CNIVersion)
 }
 
@@ -242,21 +264,50 @@ func cmdCheck(_ *skel.CmdArgs) error {
 
 func main() {
 	c := &Command{}
-	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("consul-cni"))
+	bv.BuildVersion = version.GetHumanVersion()
+	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, cniv.All, bv.BuildString("consul-cni"))
+}
+
+// createK8sClient configures the command's Kubernetes API client if it doesn't
+// already exist.
+func (c *Command) createK8sClient(cfg *PluginConf) error {
+	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
+	if err != nil {
+		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+	}
+
+	c.client, err = kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("error initializing Kubernetes client: %s", err)
+	}
+	return nil
 }
 
 // skipTrafficRedirection looks for annotations on the pod and determines if it should skip traffic redirection.
-// The absence of the annotations is the equivalent of "disabled" because it means that the connect inject mutating
+// The absence of the annotations is the equivalent of "disabled" because it means that the connect-inject mutating
 // webhook did not run against the pod.
 func skipTrafficRedirection(pod corev1.Pod) bool {
+	// If keyInjectStatus exists, then we are dealing with a mesh v1 pod
+	// else we have a mesh v2 pod. We need to check for both before we can skip.
 	if anno, ok := pod.Annotations[keyInjectStatus]; !ok || anno == "" {
-		return true
+		if anno, ok := pod.Annotations[keyMeshInjectStatus]; !ok || anno == "" {
+			return true
+		}
 	}
 
 	if anno, ok := pod.Annotations[keyTransparentProxyStatus]; !ok || anno == "" {
 		return true
 	}
 	return false
+}
+
+func parseIPTablesFromCNIArgs(args string) (iptables.Config, error) {
+	cfg := iptables.Config{}
+	err := json.Unmarshal([]byte(args), &cfg)
+	if err != nil {
+		return cfg, fmt.Errorf("could not unmarshal CNI args: %w", err)
+	}
+	return cfg, nil
 }
 
 // parseAnnotation parses the cni-proxy-config annotation into an iptables.Config object.

@@ -159,3 +159,98 @@ load _helpers
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "serverACLInitCleanup/Job: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInitCleanup/Job: override global.logLevel when global.acls.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+# resources
+
+@test "serverACLInitCleanup/Job: resources defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+}
+
+@test "serverACLInitCleanup/Job: resources can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.resources.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# server.containerSecurityContext.aclInit
+
+@test "serverACLInitCleanup/Job: securityContext is set when server.containerSecurityContext.aclInit is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.containerSecurityContext.aclInit.runAsUser=100' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext.runAsUser' | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+}
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "serverACLInitCleanup/Job: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "serverACLInitCleanup/Job: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-cleanup-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.annotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}

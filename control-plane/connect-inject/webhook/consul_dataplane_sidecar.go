@@ -10,12 +10,13 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -50,12 +51,12 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		containerName = fmt.Sprintf("%s-%s", sidecarContainer, mpi.serviceName)
 	}
 
-	var probe *corev1.Probe
+	var readinessProbe *corev1.Probe
 	if useProxyHealthCheck(pod) {
 		// If using the proxy health check for a service, configure an HTTP handler
 		// that queries the '/ready' endpoint of the proxy.
-		probe = &corev1.Probe{
-			Handler: corev1.Handler{
+		readinessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(constants.ProxyDefaultHealthPort + mpi.serviceIndex),
 					Path: "/ready",
@@ -64,8 +65,8 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			InitialDelaySeconds: 1,
 		}
 	} else {
-		probe = &corev1.Probe{
-			Handler: corev1.Handler{
+		readinessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
 				TCPSocket: &corev1.TCPSocketAction{
 					Port: intstr.FromInt(constants.ProxyDefaultInboundPort + mpi.serviceIndex),
 				},
@@ -74,10 +75,32 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		}
 	}
 
+	// Configure optional probes on the proxy to force restart it in failure scenarios.
+	var startupProbe, livenessProbe *corev1.Probe
+	startupSeconds := w.getStartupFailureSeconds(pod)
+	livenessSeconds := w.getLivenessFailureSeconds(pod)
+	if startupSeconds > 0 {
+		startupProbe = &corev1.Probe{
+			// Use the same handler as the readiness probe.
+			ProbeHandler:     readinessProbe.ProbeHandler,
+			PeriodSeconds:    1,
+			FailureThreshold: startupSeconds,
+		}
+	}
+	if livenessSeconds > 0 {
+		livenessProbe = &corev1.Probe{
+			// Use the same handler as the readiness probe.
+			ProbeHandler:     readinessProbe.ProbeHandler,
+			PeriodSeconds:    1,
+			FailureThreshold: livenessSeconds,
+		}
+	}
+
 	container := corev1.Container{
-		Name:      containerName,
-		Image:     w.ImageConsulDataplane,
-		Resources: resources,
+		Name:            containerName,
+		Image:           w.ImageConsulDataplane,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       resources,
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
 		// consul-dataplane can write files to it. Otherwise, it wouldn't be able to
 		// because we set file system to be read-only.
@@ -98,6 +121,39 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				Name:  "DP_SERVICE_NODE_NAME",
 				Value: "$(NODE_NAME)-virtual",
 			},
+			// The pod name isn't known currently, so we must rely on the environment variable to fill it in rather than using args.
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
+			},
+			{
+				Name: "POD_UID",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.uid"},
+				},
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			},
+			// This entry exists to support certain versions of consul dataplane, where environment variable entries
+			// utilize this numbered notation to indicate individual KV pairs in a map.
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META1",
+				Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+			},
+			{
+				Name:  "DP_CREDENTIAL_LOGIN_META2",
+				Value: "pod-uid=$(POD_UID)",
+			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -106,7 +162,9 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			},
 		},
 		Args:           args,
-		ReadinessProbe: probe,
+		ReadinessProbe: readinessProbe,
+		StartupProbe:   startupProbe,
+		LivenessProbe:  livenessProbe,
 	}
 
 	if w.AuthMethod != "" {
@@ -138,38 +196,76 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		container.VolumeMounts = append(container.VolumeMounts, volumeMounts...)
 	}
 
+	// Container Ports
+	metricsPorts, err := w.getMetricsPorts(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if metricsPorts != nil {
+		container.Ports = append(container.Ports, metricsPorts...)
+	}
+
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
 	}
+
+	// Default values for non-Openshift environments.
+	uid := int64(sidecarUserAndGroupID)
+	group := int64(sidecarUserAndGroupID)
 
 	// If not running in transparent proxy mode and in an OpenShift environment,
 	// skip setting the security context and let OpenShift set it for us.
 	// When transparent proxy is enabled, then consul-dataplane needs to run as our specific user
 	// so that traffic redirection will work.
 	if tproxyEnabled || !w.EnableOpenShift {
-		if pod.Spec.SecurityContext != nil {
-			// User container and consul-dataplane container cannot have the same UID.
-			if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == sidecarUserAndGroupID {
-				return corev1.Container{}, fmt.Errorf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID)
+		if !w.EnableOpenShift {
+			if pod.Spec.SecurityContext != nil {
+				// User container and consul-dataplane container cannot have the same UID.
+				if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser == sidecarUserAndGroupID {
+					return corev1.Container{}, fmt.Errorf("pod's security context cannot have the same UID as consul-dataplane: %v", sidecarUserAndGroupID)
+				}
 			}
-		}
-		// Ensure that none of the user's containers have the same UID as consul-dataplane. At this point in injection the meshWebhook
-		// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
-		for _, c := range pod.Spec.Containers {
-			// User container and consul-dataplane container cannot have the same UID.
-			if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil && *c.SecurityContext.RunAsUser == sidecarUserAndGroupID && c.Image != w.ImageConsulDataplane {
-				return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", c.Name, sidecarUserAndGroupID)
+
+			// Ensure that none of the user's containers have the same UID as consul-dataplane. At this point in injection the meshWebhook
+			// has only injected init containers so all containers defined in pod.Spec.Containers are from the user.
+			for _, c := range pod.Spec.Containers {
+				// User container and consul-dataplane container cannot have the same UID.
+				if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil &&
+					*c.SecurityContext.RunAsUser == sidecarUserAndGroupID &&
+					c.Image != w.ImageConsulDataplane {
+					return corev1.Container{}, fmt.Errorf("container %q has runAsUser set to the same UID \"%d\" as consul-dataplane which is not allowed", c.Name, sidecarUserAndGroupID)
+				}
 			}
-		}
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:              pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:             pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:           pointer.Bool(true),
-			ReadOnlyRootFilesystem: pointer.Bool(true),
 		}
 	}
 
+	if w.EnableOpenShift {
+		// Transparent proxy is set in OpenShift. There is an annotation on the namespace that tells us what
+		// the user and group ids should be for the sidecar.
+		var err error
+		uid, err = common.GetDataplaneUID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+		group, err = common.GetDataplaneGroupID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+	}
+
+	container.SecurityContext = &corev1.SecurityContext{
+		RunAsUser:                pointer.Int64(uid),
+		RunAsGroup:               pointer.Int64(group),
+		RunAsNonRoot:             pointer.Bool(true),
+		AllowPrivilegeEscalation: pointer.Bool(false),
+		// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
+		// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
+		Capabilities: &corev1.Capabilities{
+			Add: []corev1.Capability{"NET_BIND_SERVICE"},
+		},
+		ReadOnlyRootFilesystem: pointer.Bool(true),
+	}
 	return container, nil
 }
 
@@ -208,7 +304,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			"-credential-type=login",
 			"-login-auth-method="+w.AuthMethod,
 			"-login-bearer-token-path="+bearerTokenFile,
-			"-login-meta="+fmt.Sprintf("pod=%s/%s", namespace.Name, pod.Name),
+			// We don't know the pod name at this time, so we must use environment variables to populate the login-meta instead.
 		)
 		if w.EnableNamespaces {
 			if w.EnableK8SNSMirroring {
@@ -232,7 +328,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 			args = append(args, "-tls-server-name="+w.ConsulTLSServerName)
 		}
 		if w.ConsulCACert != "" {
-			args = append(args, "-ca-certs="+constants.ConsulCAFile)
+			args = append(args, "-ca-certs="+constants.LegacyConsulCAFile)
 		}
 	} else {
 		args = append(args, "-tls-disabled")
@@ -245,6 +341,51 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 	if mpi.serviceName != "" {
 		args = append(args, fmt.Sprintf("-envoy-admin-bind-port=%d", 19000+mpi.serviceIndex))
+	}
+
+	// The consul-dataplane HTTP listener always starts for graceful shutdown. To avoid port conflicts, the
+	// graceful port always needs to be set
+	gracefulPort, err := w.LifecycleConfig.GracefulPort(pod)
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine proxy lifecycle graceful port: %w", err)
+	}
+
+	// To avoid conflicts
+	if mpi.serviceName != "" {
+		gracefulPort = gracefulPort + mpi.serviceIndex
+	}
+	args = append(args, fmt.Sprintf("-graceful-port=%d", gracefulPort))
+
+	enableProxyLifecycle, err := w.LifecycleConfig.EnableProxyLifecycle(pod)
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine if proxy lifecycle management is enabled: %w", err)
+	}
+	if enableProxyLifecycle {
+		shutdownDrainListeners, err := w.LifecycleConfig.EnableShutdownDrainListeners(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine if proxy lifecycle shutdown listener draining is enabled: %w", err)
+		}
+		if shutdownDrainListeners {
+			args = append(args, "-shutdown-drain-listeners")
+		}
+
+		shutdownGracePeriodSeconds, err := w.LifecycleConfig.ShutdownGracePeriodSeconds(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine proxy lifecycle shutdown grace period: %w", err)
+		}
+		args = append(args, fmt.Sprintf("-shutdown-grace-period-seconds=%d", shutdownGracePeriodSeconds))
+
+		gracefulShutdownPath := w.LifecycleConfig.GracefulShutdownPath(pod)
+		args = append(args, fmt.Sprintf("-graceful-shutdown-path=%s", gracefulShutdownPath))
+
+		startupGracePeriodSeconds, err := w.LifecycleConfig.StartupGracePeriodSeconds(pod)
+		if err != nil {
+			return nil, fmt.Errorf("unable to determine proxy lifecycle startup grace period: %w", err)
+		}
+		args = append(args, fmt.Sprintf("-startup-grace-period-seconds=%d", startupGracePeriodSeconds))
+
+		gracefulStartupPath := w.LifecycleConfig.GracefulStartupPath(pod)
+		args = append(args, fmt.Sprintf("-graceful-startup-path=%s", gracefulStartupPath))
 	}
 
 	// Set a default scrape path that can be overwritten by the annotation.
@@ -314,7 +455,11 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 	// If Consul DNS is enabled, we want to configure consul-dataplane to be the DNS proxy
 	// for Consul DNS in the pod.
-	if w.EnableConsulDNS {
+	dnsEnabled, err := consulDNSEnabled(namespace, pod, w.EnableConsulDNS, w.EnableTransparentProxy)
+	if err != nil {
+		return nil, err
+	}
+	if dnsEnabled {
 		args = append(args, "-consul-dns-bind-port="+strconv.Itoa(consulDataplaneDNSBindPort))
 	}
 
@@ -432,4 +577,64 @@ func useProxyHealthCheck(pod corev1.Pod) bool {
 		return useProxyHealthCheck
 	}
 	return false
+}
+
+// getStartupFailureSeconds returns number of seconds configured by the annotation 'consul.hashicorp.com/sidecar-proxy-startup-failure-seconds'
+// and indicates how long we should wait for the sidecar proxy to initialize before considering the pod unhealthy.
+func (w *MeshWebhook) getStartupFailureSeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProxyStartupFailureSeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyStartupFailureSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
+}
+
+// getLivenessFailureSeconds returns number of seconds configured by the annotation 'consul.hashicorp.com/sidecar-proxy-liveness-failure-seconds'
+// and indicates how long we should wait for the sidecar proxy to initialize before considering the pod unhealthy.
+func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProxyLivenessFailureSeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
+}
+
+// getMetricsPorts creates container ports for exposing services such as prometheus.
+// Prometheus in particular needs a named port for use with the operator.
+// https://github.com/hashicorp/consul-k8s/pull/1440
+func (w *MeshWebhook) getMetricsPorts(pod corev1.Pod) ([]corev1.ContainerPort, error) {
+	enableMetrics, err := w.MetricsConfig.EnableMetrics(pod)
+	if err != nil {
+		return nil, fmt.Errorf("error determining if metrics are enabled: %w", err)
+	}
+	if !enableMetrics {
+		return nil, nil
+	}
+
+	prometheusScrapePort, err := w.MetricsConfig.PrometheusScrapePort(pod)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
+	}
+	if prometheusScrapePort == "" {
+		return nil, nil
+	}
+
+	port, err := strconv.Atoi(prometheusScrapePort)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing prometheus port from pod: %w", err)
+	}
+
+	return []corev1.ContainerPort{
+		{
+			Name:          "prometheus",
+			ContainerPort: int32(port),
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}, nil
 }

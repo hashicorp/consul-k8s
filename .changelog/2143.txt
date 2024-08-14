@@ -1,0 +1,4 @@
+
+```release-note:feature
+consul-telemetry-collector: Configure envoy proxy config during registration when consul-telemetry-collector is enabled.
+```

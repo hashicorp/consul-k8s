@@ -67,3 +67,18 @@ load _helpers
       yq -r '.metadata.annotations.foo' | tee /dev/stderr)
   [ "${actual}" = "bar" ]
 }
+
+
+#--------------------------------------------------------------------
+# consul.name
+
+@test "telemetryCollector/ServiceAccount: name is constant regardless of consul name" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-serviceaccount.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'consul.name=foobar' \
+      . | tee /dev/stderr |
+      yq -r '.metadata.name' | tee /dev/stderr)
+  [ "${actual}" = "consul-telemetry-collector" ]
+}

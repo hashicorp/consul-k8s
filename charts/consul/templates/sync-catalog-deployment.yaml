@@ -40,6 +40,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         {{- if .Values.syncCatalog.annotations }}
         {{- tpl .Values.syncCatalog.annotations . | nindent 8 }}
         {{- end }}
@@ -55,6 +56,9 @@ spec:
         {{- end }}
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
         {{- end }}
         {{- end }}
     spec:
@@ -77,6 +81,8 @@ spec:
       containers:
       - name: sync-catalog
         image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
+        {{ template "consul.imagePullPolicy" . }}
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
         env:
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if .Values.global.acls.manageSystemACLs }}
@@ -118,7 +124,7 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane sync-catalog \
+          exec consul-k8s-control-plane sync-catalog \
             -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -k8s-default-sync={{ .Values.syncCatalog.default }} \
@@ -186,6 +192,9 @@ spec:
             {{- if .Values.syncCatalog.ingress.loadBalancerIPs }}
             -loadBalancer-ips=true \
             {{- end }}
+            {{- end }}
+            {{- if .Values.syncCatalog.syncLoadBalancerEndpoints }}
+            -sync-lb-services-endpoints=true \
             {{- end }}
         livenessProbe:
           httpGet:

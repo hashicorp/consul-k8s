@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: reduce Consul Catalog API requests required for endpoints reconcile in large clusters
+```

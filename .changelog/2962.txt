@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: (Consul Enterprise) Add JWT authentication and authorization for API Gateway and HTTPRoutes.
+```

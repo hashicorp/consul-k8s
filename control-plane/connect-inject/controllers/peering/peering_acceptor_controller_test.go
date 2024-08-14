@@ -10,10 +10,7 @@ import (
 	"testing"
 	"time"
 
-	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -22,11 +19,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 // TestReconcile_CreateUpdatePeeringAcceptor creates a peering acceptor.
@@ -501,13 +501,18 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 			// Create fake k8s client
 			k8sObjects := append(tt.k8sObjects(), &ns)
 
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringAcceptor{}).
+				Build()
 
 			// Create test consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			if tt.initialConsulPeerName != "" {
 				// Add the initial peerings into Consul by calling the Generate token endpoint.
@@ -520,7 +525,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 				Client:                   fakeClient,
 				ExposeServersServiceName: "test-expose-servers",
 				ReleaseNamespace:         "default",
-				Log:                      logrtest.TestLogger{T: t},
+				Log:                      logrtest.New(t),
 				ConsulClientConfig:       testClient.Cfg,
 				ConsulServerConnMgr:      testClient.Watcher,
 				Scheme:                   s,
@@ -622,14 +627,19 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 	k8sObjects := []runtime.Object{&ns, acceptor}
 
 	// Add peering types to the scheme.
-	s := scheme.Scheme
+	s := runtime.NewScheme()
+	corev1.AddToScheme(s)
 	s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).
+		WithRuntimeObjects(k8sObjects...).
+		WithStatusSubresource(&v1alpha1.PeeringAcceptor{}).
+		Build()
 
 	// Create test consulServer server
 	// Create test consul server.
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	consulClient := testClient.APIClient
+	testClient.TestServer.WaitForActiveCARoot(t)
 
 	// Add the initial peerings into Consul by calling the Generate token endpoint.
 	_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-deleted"}, nil)
@@ -638,7 +648,7 @@ func TestReconcile_DeletePeeringAcceptor(t *testing.T) {
 	// Create the peering acceptor controller.
 	controller := &AcceptorController{
 		Client:              fakeClient,
-		Log:                 logrtest.TestLogger{T: t},
+		Log:                 logrtest.New(t),
 		ConsulClientConfig:  testClient.Cfg,
 		ConsulServerConnMgr: testClient.Watcher,
 		Scheme:              s,
@@ -768,13 +778,18 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			// Create fake k8s client
 			k8sObjects := []runtime.Object{acceptor, secret, ns}
 
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringAcceptor{}).
+				Build()
 
 			// Create test consul server.
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			consulClient := testClient.APIClient
+			testClient.TestServer.WaitForActiveCARoot(t)
 
 			_, _, err := consulClient.Peerings().GenerateToken(context.Background(), api.PeeringGenerateTokenRequest{PeerName: "acceptor-created"}, nil)
 			require.NoError(t, err)
@@ -782,7 +797,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 			// Create the peering acceptor controller
 			controller := &AcceptorController{
 				Client:              fakeClient,
-				Log:                 logrtest.TestLogger{T: t},
+				Log:                 logrtest.New(t),
 				ConsulClientConfig:  testClient.Cfg,
 				ConsulServerConnMgr: testClient.Watcher,
 				Scheme:              s,
@@ -1080,13 +1095,17 @@ func TestAcceptorUpdateStatus(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.peeringAcceptor)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringAcceptor{}).
+				Build()
 			// Create the peering acceptor controller.
 			pac := &AcceptorController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				Scheme: s,
 			}
 
@@ -1192,13 +1211,17 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			k8sObjects = append(k8sObjects, tt.acceptor)
 
 			// Add peering types to the scheme.
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(k8sObjects...).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(k8sObjects...).
+				WithStatusSubresource(&v1alpha1.PeeringAcceptor{}).
+				Build()
 			// Create the peering acceptor controller.
 			controller := &AcceptorController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 				Scheme: s,
 			}
 
@@ -1211,6 +1234,7 @@ func TestAcceptorUpdateStatusError(t *testing.T) {
 			}
 			err := fakeClient.Get(context.Background(), acceptorName, acceptor)
 			require.NoError(t, err)
+			require.Len(t, acceptor.Status.Conditions, 1)
 			require.Equal(t, tt.expStatus.Conditions[0].Message, acceptor.Status.Conditions[0].Message)
 
 		})
@@ -1476,14 +1500,18 @@ func TestAcceptor_RequestsForPeeringTokens(t *testing.T) {
 
 	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := scheme.Scheme
+			s := runtime.NewScheme()
+			corev1.AddToScheme(s)
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.PeeringAcceptor{}, &v1alpha1.PeeringAcceptorList{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.secret, &tt.acceptors).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithRuntimeObjects(tt.secret, &tt.acceptors).
+				WithStatusSubresource(&v1alpha1.PeeringAcceptor{}).
+				Build()
 			controller := AcceptorController{
 				Client: fakeClient,
-				Log:    logrtest.TestLogger{T: t},
+				Log:    logrtest.New(t),
 			}
-			result := controller.requestsForPeeringTokens(tt.secret)
+			result := controller.requestsForPeeringTokens(context.Background(), tt.secret)
 
 			require.Equal(t, tt.result, result)
 		})

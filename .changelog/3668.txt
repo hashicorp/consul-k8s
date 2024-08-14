@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: publish `consul-k8s-control-plane` and `consul-k8s-control-plane-fips` images to official HashiCorp AWS ECR. 
+```

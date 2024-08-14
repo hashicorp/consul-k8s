@@ -19,6 +19,9 @@
 {{- end -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
+{{ template "consul.validateMetricsConfig" . }}
+{{ template "consul.validateDatadogConfiguration" . }}
+{{ template "consul.validateExtraConfig" . }}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -44,6 +47,9 @@ spec:
     rollingUpdate:
       partition: {{ .Values.server.updatePartition }}
   {{- end }}
+  {{- if and (semverCompare ">= 1.23-0" .Capabilities.KubeVersion.Version) (.Values.server.persistentVolumeClaimRetentionPolicy) }}
+  persistentVolumeClaimRetentionPolicy: {{ toYaml .Values.server.persistentVolumeClaimRetentionPolicy | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}
@@ -59,6 +65,11 @@ spec:
         release: {{ .Release.Name }}
         component: server
         hasDNS: "true"
+        {{- if .Values.global.metrics.datadog.enabled }}
+        "tags.datadoghq.com/version": {{ template "consul.versionInfo" . }}
+        "tags.datadoghq.com/env": {{ template "consul.name" . }}
+        "tags.datadoghq.com/service": "consul-server"
+        {{- end }}
         {{- if .Values.server.extraLabels }}
           {{- toYaml .Values.server.extraLabels | nindent 8 }}
         {{- end }}
@@ -98,6 +109,9 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- if .Values.global.enterpriseLicense.secretName }}
         {{- with .Values.global.enterpriseLicense }}
         "vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt": "{{ .secretName }}"
@@ -112,14 +126,85 @@ spec:
         {{- end }}
         {{- end }}
         "consul.hashicorp.com/connect-inject": "false"
-        "consul.hashicorp.com/config-checksum": {{ include (print $.Template.BasePath "/server-config-configmap.yaml") . | sha256sum }}
+        "consul.hashicorp.com/mesh-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ print (include (print $.Template.BasePath "/server-config-configmap.yaml") .) (include (print $.Template.BasePath "/server-tmp-extra-config-configmap.yaml") .) | sha256sum }}
         {{- if .Values.server.annotations }}
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+        {{- if (or (not .Values.global.metrics.datadog.enabled) (and .Values.global.metrics.datadog.enabled (.Values.global.metrics.datadog.dogstatsd.enabled))) }}
         "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.server.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/v1/agent/metrics"
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        "prometheus.io/port": "8501"
+        "prometheus.io/scheme": "https"
+        {{- else }}
         "prometheus.io/port": "8500"
+        "prometheus.io/scheme": "http"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.metrics.datadog.enabled }}
+        "ad.datadoghq.com/tolerate-unready": "true"
+        "ad.datadoghq.com/consul.logs": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson | replace "[" "[{" | replace "]" "}]" | replace ":" "\": \"" | join "\",\"" | squote }}
+        {{- if .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+        "ad.datadoghq.com/consul.checks": |
+          {
+            "openmetrics": {
+              "init_config": {},
+              "instances": [
+                {
+        {{- if .Values.global.tls.enabled }}
+                  "openmetrics_endpoint": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501/v1/agent/metrics?format=prometheus",
+                  "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
+                  "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
+                  "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
+        {{- else }}
+                  "openmetrics_endpoint": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
+        {{- end }}
+        {{- if ( .Values.global.acls.manageSystemACLs) }}
+                  "headers": {
+                    "X-Consul-Token": "ENC[k8s_secret@{{ .Release.Namespace }}/{{ .Release.Namespace }}-datadog-agent-metrics-acl-token/token]"
+                  },
+        {{- end }}
+                  "namespace": "{{ .Release.Namespace }}",
+                  "metrics": [ ".*" ]
+                }
+              ]
+            }
+          }
+        {{- else if (not .Values.global.metrics.datadog.dogstatsd.enabled) }}
+        "ad.datadoghq.com/consul.checks": |
+          {
+            "consul": {
+              "init_config": {},
+              "instances": [
+                {
+        {{- if .Values.global.tls.enabled }}
+                  "url": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501",
+                  "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
+                  "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
+                  "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
+        {{- else }}
+                  "url": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500",
+        {{- end }}
+                  "use_prometheus_endpoint": true,
+        {{- if ( .Values.global.acls.manageSystemACLs) }}
+                  "acl_token": "ENC[k8s_secret@{{ .Release.Namespace }}/{{ .Release.Namespace }}-datadog-agent-metrics-acl-token/token]",
+        {{- end }}
+                  "new_leader_checks": true,
+                  "network_latency_checks": true,
+                  "catalog_checks": true,
+                  "auth_type": "basic"
+                }
+              ]
+            }
+          }
+        {{- else }}
+        "ad.datadoghq.com/consul.metrics_exclude": "true"
+        {{- end }}
+        {{- end }}
         {{- end }}
     spec:
     {{- if .Values.server.affinity }}
@@ -141,11 +226,16 @@ spec:
         {{- toYaml .Values.server.securityContext | nindent 8 }}
       {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
         - name: extra-config
           emptyDir: {}
+        - name: tmp-extra-config
+          configMap:
+            name: {{ template "consul.fullname" . }}-server-tmp-extra-config
         {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
         - name: consul-ca-cert
           secret:
@@ -198,6 +288,17 @@ spec:
             medium: "Memory"
         {{- end }}
         {{- end }}
+        {{- if .Values.global.trustedCAs }}
+        - name: trusted-cas
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
+        {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
+        - name: dsdsocket
+          hostPath:
+            path: {{ dir .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}
+            type: DirectoryOrCreate
+        {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
           {{ .type }}:
@@ -220,6 +321,7 @@ spec:
       initContainers:
       - name: locality-init
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         env:
         - name: NODE_NAME
           valueFrom:
@@ -229,13 +331,16 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
+            exec consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
         volumeMounts:
           - name: extra-config
             mountPath: /consul/extra-config
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
       containers:
         - name: consul
-          image: "{{ default .Values.global.image .Values.server.image }}"
+          image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
+          {{ template "consul.imagePullPolicy" . }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -354,11 +459,23 @@ spec:
                   key: {{ .Values.global.cloud.scadaAddress.secretKey }}
             {{- end}}
             {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: SSL_CERT_DIR
+              value: "/etc/ssl/certs:/trusted-cas"
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
           command:
             - "/bin/sh"
             - "-ec"
             - |
+              {{- if .Values.global.trustedCAs }}
+              {{- range $i, $cert := .Values.global.trustedCAs }}
+              cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
+              {{- $cert | nindent 14 }}
+              EOF
+              {{- end }}
+              {{- end }}
+
               {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
               GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
               {{- end }}
@@ -391,10 +508,21 @@ spec:
                 -config-dir=/consul/userconfig/{{ .name }} \
                 {{- end }}
                 {{- end }}
-                -config-file=/consul/extra-config/extra-from-values.json \
-                -config-file=/consul/extra-config/locality.json
+                -config-dir=/consul/extra-config \
                 {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
                 -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
+                {{- end }}
+                
+                {{- if .Values.global.experiments }}
+                {{- $commaSeparatedValues := "" }}
+                {{- range $index, $value := .Values.global.experiments }}
+                  {{- if ne $index 0 }}
+                    {{- $commaSeparatedValues = printf "%s,\\\"%s\\\"" $commaSeparatedValues $value }}
+                  {{- else }}
+                    {{- $commaSeparatedValues = printf "\\\"%s\\\"" $value }}
+                  {{- end }}
+                {{- end }}
+                -hcl="experiments=[{{ $commaSeparatedValues }}]"
                 {{- end }}
           volumeMounts:
             - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
@@ -403,6 +531,8 @@ spec:
               mountPath: /consul/config
             - name: extra-config
               mountPath: /consul/extra-config
+            - name: tmp-extra-config
+              mountPath: /consul/tmp/extra-config
             {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-ca-cert
               mountPath: /consul/tls/ca/
@@ -416,6 +546,11 @@ spec:
               mountPath: /consul/license
               readOnly: true
             {{- end }}
+            {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
+            - name: dsdsocket
+              mountPath: {{ dir .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}
+              readOnly: true
+            {{- end }}
             {{- range .Values.server.extraVolumes }}
             - name: userconfig-{{ .name }}
               readOnly: true
@@ -426,6 +561,14 @@ spec:
               mountPath: /consul/vault-ca/
               readOnly: true
             {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: trusted-cas
+              mountPath: /trusted-cas
+              readOnly: false
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+              readOnly: false
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - name: http
@@ -504,9 +647,11 @@ spec:
             {{- toYaml .Values.server.resources | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- if not .Values.global.openshift.enabled }}
+          {{- if .Values.server.containerSecurityContext.server }}
           securityContext:
             {{- toYaml .Values.server.containerSecurityContext.server | nindent 12 }}
+          {{- else }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           {{- end }}
           {{- if .Values.server.extraContainers }}
           {{ toYaml .Values.server.extraContainers | nindent 8 }}
@@ -514,6 +659,7 @@ spec:
         {{- if .Values.server.snapshotAgent.enabled }}
         - name: consul-snapshot-agent
           image: "{{ default .Values.global.image .Values.server.image }}"
+          {{ template "consul.imagePullPolicy" . }}
           env:
             {{- if .Values.server.snapshotAgent.caCert }}
             - name: SSL_CERT_DIR

@@ -1,13 +1,11 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.12.1
   name: terminatinggateways.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -71,6 +69,10 @@ spec:
                         to use for TLS connections from the gateway to the linked
                         service.
                       type: string
+                    disableAutoHostRewrite:
+                      description: DisableAutoHostRewrite disables terminating gateways
+                        auto host rewrite feature when set to true.
+                      type: boolean
                     keyFile:
                       description: KeyFile is the optional path to a private key to
                         use for TLS connections from the gateway to the linked service.
@@ -132,9 +134,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

@@ -1,0 +1,30 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+   name: job-client
+   namespace: default
+   labels:
+     app: job-client
+spec:
+  template:
+    metadata:
+      labels:
+        app: job-client
+    spec:
+      containers:
+      - name: job-client
+        image: alpine/curl:3.14
+        ports:
+        - containerPort: 80
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Started test job"
+            sleep 120
+            echo "Ended test job"
+      serviceAccountName: job-client
+      restartPolicy: Never

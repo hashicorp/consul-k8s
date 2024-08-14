@@ -35,6 +35,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-gossip-encryption-autogenerate
@@ -48,15 +49,17 @@ spec:
       containers:
         - name: gossip-encryption-autogen
           image: "{{ .Values.global.imageK8S }}"
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           command:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s-control-plane gossip-encryption-autogenerate \
+              exec consul-k8s-control-plane gossip-encryption-autogenerate \
                 -namespace={{ .Release.Namespace }} \
                 -secret-name={{ template "consul.fullname" . }}-gossip-encryption-key \
                 -secret-key="key" \
-                -log-level={{ .Values.global.logLevel }} \
+                -log-level={{ default .Values.global.logLevel .Values.global.gossipEncryption.logLevel }} \
                 -log-json={{ .Values.global.logJSON }}
           resources:
             requests:

@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: Improve performance for pod deletions by reducing the number of fetched tokens.
+```

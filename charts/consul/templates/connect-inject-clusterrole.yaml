@@ -24,11 +24,21 @@ rules:
   - serviceintentions
   - ingressgateways
   - terminatinggateways
+  - gatewayclassconfigs
+  - meshservices
   - samenessgroups
+  - controlplanerequestlimits
+  - routeretryfilters
+  - routetimeoutfilters
+  - routeauthfilters
+  - gatewaypolicies
+  - registrations
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
   - peeringdialers
   {{- end }}
+  - jwtproviders
+  - routeauthfilters
   verbs:
   - create
   - delete
@@ -51,26 +61,37 @@ rules:
   - ingressgateways/status
   - terminatinggateways/status
   - samenessgroups/status
+  - controlplanerequestlimits/status
+  - registrations/status
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors/status
   - peeringdialers/status
   {{- end }}
+  - jwtproviders/status
+  - routeauthfilters/status
+  - gatewaypolicies/status
   verbs:
   - get
   - patch
   - update
-{{- if .Values.global.acls.manageSystemACLs }}
 - apiGroups: [ "" ]
-  resources: [ "serviceaccounts", "secrets" ]
+  resources: [ "secrets", "serviceaccounts", "endpoints", "services", "namespaces", "nodes" ]
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - delete
+  - update
+- apiGroups: [ "rbac.authorization.k8s.io" ]
+  resources: [ "roles", "rolebindings" ]
   verbs:
   - get
-{{- end }}
-- apiGroups: [ "" ]
-  resources: [ "endpoints", "services", "namespaces", "nodes" ]
-  verbs:
-  - "get"
-  - "list"
-  - "watch"
+  - list
+  - watch
+  - delete
+  - create
+  - update
 - apiGroups: [ "" ]
   resources:
   - pods
@@ -93,6 +114,7 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
   verbs:
   - get
   - list
@@ -110,12 +132,78 @@ rules:
   - "update"
   - "delete"
 {{- end }}
-{{- if .Values.global.enablePodSecurityPolicies }}
 - apiGroups: [ "policy" ]
   resources: [ "podsecuritypolicies" ]
-  resourceNames:
-  - {{ template "consul.fullname" . }}-connect-injector
   verbs:
   - use
-{{- end }}
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gatewayclasses
+  - gateways
+  - httproutes
+  - tcproutes
+  - referencegrants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gatewayclasses/finalizers
+  - gateways/finalizers
+  - httproutes/finalizers
+  - tcproutes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gatewayclasses/status
+  - gateways/status
+  - httproutes/status
+  - tcproutes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+    - apps
+  resources:
+    - deployments
+  verbs:
+    - create
+    - get
+    - list
+    - update
+    - watch
+    - delete
+- apiGroups:
+    - core
+  resources:
+    - services
+  verbs:
+    - watch
+    - list
+- apiGroups: [ "" ]
+  resources: [ "secrets" ]
+  verbs:
+    - "get"
+    - "list"
+    - "watch"
+{{- if .Values.global.openshift.enabled }}
+- apiGroups:
+    - security.openshift.io
+  resources:
+    - securitycontextconstraints
+  resourceNames:
+    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+  verbs:
+    - use
+  {{- end }}
 {{- end }}

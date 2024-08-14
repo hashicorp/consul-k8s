@@ -7,14 +7,17 @@ package partition_init
 
 import (
 	"context"
-	"strings"
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
+
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 func TestRun_FlagValidation(t *testing.T) {
@@ -34,7 +37,10 @@ func TestRun_FlagValidation(t *testing.T) {
 		},
 		{
 			flags: []string{
-				"-addresses", "foo", "-partition", "bar", "-api-timeout", "0s"},
+				"-addresses", "foo",
+				"-partition", "bar",
+				"-api-timeout", "0s",
+			},
 			expErr: "-api-timeout must be set to a value greater than 0",
 		},
 		{
@@ -61,103 +67,146 @@ func TestRun_FlagValidation(t *testing.T) {
 func TestRun_PartitionCreate(t *testing.T) {
 	partitionName := "test-partition"
 
-	server, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
-	server.WaitForLeader(t)
-	defer server.Stop()
-
-	consul, err := api.NewClient(&api.Config{
-		Address: server.HTTPAddr,
-	})
-	require.NoError(t, err)
-
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI: ui,
-	}
-	cmd.init()
-	args := []string{
-		"-addresses=" + "127.0.0.1",
-		"-http-port=" + strings.Split(server.HTTPAddr, ":")[1],
-		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
-		"-partition", partitionName,
+	type testCase struct {
+		requirePartitionCreated func(testClient *test.TestServerClient)
 	}
 
-	responseCode := cmd.Run(args)
+	testCases := map[string]testCase{
+		"simple": {
+			requirePartitionCreated: func(testClient *test.TestServerClient) {
+				consul, err := api.NewClient(testClient.Cfg.APIClientConfig)
+				require.NoError(t, err)
 
-	require.Equal(t, 0, responseCode)
+				partition, _, err := consul.Partitions().Read(context.Background(), partitionName, nil)
+				require.NoError(t, err)
+				require.NotNil(t, partition)
+				require.Equal(t, partitionName, partition.Name)
+			},
+		},
+	}
 
-	partition, _, err := consul.Partitions().Read(context.Background(), partitionName, nil)
-	require.NoError(t, err)
-	require.NotNil(t, partition)
-	require.Equal(t, partitionName, partition.Name)
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var serverCfg *testutil.TestServerConfig
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				serverCfg = c
+			})
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+			cmd.init()
+			args := []string{
+				"-addresses=" + "127.0.0.1",
+				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
+				"-partition", partitionName,
+				"-timeout", "1m",
+			}
+
+			responseCode := cmd.Run(args)
+			require.Equal(t, 0, responseCode)
+			tc.requirePartitionCreated(testClient)
+		})
+	}
 }
 
 func TestRun_PartitionExists(t *testing.T) {
 	partitionName := "test-partition"
+	partitionDesc := "Created before test"
 
-	server, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
-	server.WaitForLeader(t)
-	defer server.Stop()
-
-	consul, err := api.NewClient(&api.Config{
-		Address: server.HTTPAddr,
-	})
-	require.NoError(t, err)
-
-	// Create the Admin Partition before the test runs.
-	_, _, err = consul.Partitions().Create(context.Background(), &api.Partition{Name: partitionName, Description: "Created before test"}, nil)
-	require.NoError(t, err)
-
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI: ui,
-	}
-	cmd.init()
-	args := []string{
-		"-addresses=" + "127.0.0.1",
-		"-http-port=" + strings.Split(server.HTTPAddr, ":")[1],
-		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
-		"-partition", partitionName,
+	type testCase struct {
+		preCreatePartition         func(testClient *test.TestServerClient)
+		requirePartitionNotCreated func(testClient *test.TestServerClient)
 	}
 
-	responseCode := cmd.Run(args)
+	testCases := map[string]testCase{
+		"simple": {
+			preCreatePartition: func(testClient *test.TestServerClient) {
+				consul, err := api.NewClient(testClient.Cfg.APIClientConfig)
+				require.NoError(t, err)
 
-	require.Equal(t, 0, responseCode)
+				_, _, err = consul.Partitions().Create(context.Background(), &api.Partition{
+					Name:        partitionName,
+					Description: partitionDesc,
+				}, nil)
+				require.NoError(t, err)
+			},
+			requirePartitionNotCreated: func(testClient *test.TestServerClient) {
+				consul, err := api.NewClient(testClient.Cfg.APIClientConfig)
+				require.NoError(t, err)
 
-	partition, _, err := consul.Partitions().Read(context.Background(), partitionName, nil)
-	require.NoError(t, err)
-	require.NotNil(t, partition)
-	require.Equal(t, partitionName, partition.Name)
-	require.Equal(t, "Created before test", partition.Description)
+				partition, _, err := consul.Partitions().Read(context.Background(), partitionName, nil)
+				require.NoError(t, err)
+				require.NotNil(t, partition)
+				require.Equal(t, partitionName, partition.Name)
+				require.Equal(t, partitionDesc, partition.Description)
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			var serverCfg *testutil.TestServerConfig
+			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+				serverCfg = c
+			})
+
+			// Create the Admin Partition before the test runs.
+			tc.preCreatePartition(testClient)
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI: ui,
+			}
+			cmd.init()
+			args := []string{
+				"-addresses=" + "127.0.0.1",
+				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
+				"-partition", partitionName,
+			}
+
+			responseCode := cmd.Run(args)
+			require.Equal(t, 0, responseCode)
+
+			// Verify that the Admin Partition was not overwritten.
+			tc.requirePartitionNotCreated(testClient)
+		})
+	}
 }
 
 func TestRun_ExitsAfterTimeout(t *testing.T) {
 	partitionName := "test-partition"
 
-	server, err := testutil.NewTestServerConfigT(t, nil)
-	require.NoError(t, err)
+	var serverCfg *testutil.TestServerConfig
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		serverCfg = c
+	})
 
 	ui := cli.NewMockUi()
 	cmd := Command{
 		UI: ui,
 	}
 	cmd.init()
+
+	timeout := 500 * time.Millisecond
 	args := []string{
 		"-addresses=" + "127.0.0.1",
-		"-http-port=" + strings.Split(server.HTTPAddr, ":")[1],
-		"-grpc-port=" + strings.Split(server.GRPCAddr, ":")[1],
-		"-timeout", "500ms",
+		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
+		"-timeout", timeout.String(),
 		"-partition", partitionName,
 	}
-	server.Stop()
+
+	testClient.TestServer.Stop()
 	startTime := time.Now()
 	responseCode := cmd.Run(args)
 	completeTime := time.Now()
-
 	require.Equal(t, 1, responseCode)
+
 	// While the timeout is 500ms, adding a buffer of 500ms ensures we account for
 	// some buffer time required for the task to run and assignments to occur.
-	require.WithinDuration(t, completeTime, startTime, 1*time.Second)
+	require.WithinDuration(t, completeTime, startTime, timeout+500*time.Millisecond)
 }

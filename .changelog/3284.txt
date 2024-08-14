@@ -1,0 +1,3 @@
+```release-note:bug-fix
+control-plane: normalize the `partition` and `namespace` fields in V1 CRDs when comparing with saved version of the config-entry.
+```

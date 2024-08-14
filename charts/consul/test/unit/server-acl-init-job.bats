@@ -591,6 +591,22 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# server.containerSecurityContext.aclInit
+
+@test "serverACLInit/Job: securityContext is set when server.containerSecurityContext.aclInit is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'server.containerSecurityContext.aclInit.runAsUser=100' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext.runAsUser' | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+
+}
+
+#--------------------------------------------------------------------
 # Vault
 
 @test "serverACLInit/Job: fails when vault is enabled but neither bootstrap nor replication token is provided" {
@@ -670,6 +686,80 @@ load _helpers
 
   local actual=$(echo $object | jq -r '.spec.containers[] | select(.name=="server-acl-init-job").volumeMounts')
   [ "${actual}" = "null" ]
+}
+
+@test "serverACLInit/Job: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "serverACLInit/Job: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "serverACLInit/Job: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.bootstrapToken.secretName=foo' \
+      --set 'global.acls.bootstrapToken.secretKey=bar' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.manageSystemACLsRole=aclrole' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
 }
 
 @test "serverACLInit/Job: configures server CA to come from vault when vault and TLS are enabled" {
@@ -991,6 +1081,7 @@ load _helpers
 
   local expected=$(echo '{
     "consul.hashicorp.com/connect-inject": "false",
+    "consul.hashicorp.com/mesh-inject": "false",
     "vault.hashicorp.com/agent-inject": "true",
     "vault.hashicorp.com/agent-pre-populate": "true",
     "vault.hashicorp.com/agent-pre-populate-only": "false",
@@ -2030,7 +2121,7 @@ load _helpers
       --set 'global.cloud.authUrl.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2050,7 +2141,7 @@ load _helpers
       --set 'global.cloud.authUrl.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
 }
 
@@ -2070,7 +2161,7 @@ load _helpers
       --set 'global.cloud.apiHost.secretName=auth-url-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2090,7 +2181,7 @@ load _helpers
       --set 'global.cloud.apiHost.secretKey=auth-url-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
 }
 
@@ -2110,7 +2201,7 @@ load _helpers
       --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2130,7 +2221,7 @@ load _helpers
       --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
       .
   [ "$status" -eq 1 ]
-  
+
   [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
@@ -2201,4 +2292,171 @@ load _helpers
   local actualTemplateBaz=$(echo "${actual}" | yq -r '.spec.template.metadata.labels.baz' | tee /dev/stderr)
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
+}
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "serverACLInit/Job: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: override global.logLevel when global.acls.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/server-acl-init-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.logLevel=debug' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# resources
+
+@test "serverACLInit/Job: resources defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+  [ "${actual}" = '{"limits":{"cpu":"50m","memory":"50Mi"},"requests":{"cpu":"50m","memory":"50Mi"}}' ]
+}
+
+@test "serverACLInit/Job: resources can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.resources.foo=bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "serverACLInit/Job: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "serverACLInit/Job: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'global.acls.annotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
+
+@test "serverACLInit/Job: argocd annotations are set if global.argocd.enabled is true" {
+  cd `chart_dir`
+  local actual=$(helm template \
+     -s templates/server-acl-init-job.yaml \
+     --set 'global.acls.manageSystemACLs=true' \
+     --set 'global.argocd.enabled=true' \
+     . | tee /dev/stderr |
+     yq -r '.metadata.annotations["argocd.argoproj.io/hook"]' | tee /dev/stderr)
+  [ "${actual}" = "Sync" ]
+  local actual=$(helm template \
+     -s templates/server-acl-init-job.yaml \
+     --set 'global.acls.manageSystemACLs=true' \
+     --set 'global.argocd.enabled=true' \
+     . | tee /dev/stderr |
+     yq -r '.metadata.annotations["argocd.argoproj.io/hook-delete-policy"]' | tee /dev/stderr)
+  [ "${actual}" = "HookSucceeded" ]
+}
+
+@test "serverACLInit/Job: argocd annotations are not set if global.argocd.enabled is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+     -s templates/server-acl-init-job.yaml \
+     --set 'global.acls.manageSystemACLs=true' \
+     --set 'global.argocd.enabled=false' \
+     . | tee /dev/stderr |
+     yq -r '.metadata.annotations["argocd.argoproj.io/hook"]' | tee /dev/stderr)
+  [ "${actual}" = null ]
+  local actual=$(helm template \
+     -s templates/server-acl-init-job.yaml \
+     --set 'global.acls.manageSystemACLs=true' \
+     --set 'global.argocd.enabled=false' \
+     . | tee /dev/stderr |
+     yq -r '.metadata.annotations["argocd.argoproj.io/hook-delete-policy"]' | tee /dev/stderr)
+  [ "${actual}" = null ]
+}
+
+#--------------------------------------------------------------------
+# global.metrics.datadog
+
+@test "serverACLInit/Job: -create-dd-agent-token not set when datadog=false and manageSystemACLs=true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$( echo "$command" |
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "serverACLInit/Job: -create-dd-agent-token set when global.metrics.datadog=true and global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$( echo "$command" |
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "serverACLInit/Job: -create-dd-agent-token NOT set when global.metrics.datadog=true, global.metrics.datadog.dogstatsd.enabled=true, and global.acls.manageSystemACLs=true" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/server-acl-init-job.yaml  \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.dogstatsd.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$( echo "$command" |
+    yq 'any(contains("-create-dd-agent-token"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }

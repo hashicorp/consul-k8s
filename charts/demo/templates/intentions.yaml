@@ -59,6 +59,17 @@ spec:
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: ServiceIntentions
 metadata:
+  name: consul-telemetry-collector
+spec:
+  destination:
+    name: 'consul-telemetry-collector'
+  sources:
+    - name: '*'
+      action: allow
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
   name: deny-all
 spec:
   destination:

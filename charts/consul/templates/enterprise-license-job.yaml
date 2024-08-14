@@ -39,6 +39,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-enterprise-license
@@ -58,6 +59,7 @@ spec:
       containers:
         - name: apply-enterprise-license
           image: "{{ default .Values.global.image .Values.server.image }}"
+          {{ template "consul.imagePullPolicy" . }}
           env:
             - name: ENTERPRISE_LICENSE
               {{- if .Values.global.secretsBackend.vault.enabled }}
@@ -124,11 +126,12 @@ spec:
       initContainers:
       - name: ent-license-acl-init
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         command:
           - "/bin/sh"
           - "-ec"
           - |
-            consul-k8s-control-plane acl-init \
+            exec consul-k8s-control-plane acl-init \
               -secret-name="{{ template "consul.fullname" . }}-enterprise-license-acl-token" \
               -k8s-namespace={{ .Release.Namespace }} \
               -consul-api-timeout={{ .Values.global.consulAPITimeout }}

@@ -19,13 +19,16 @@ data:
       "auto_reload_config": true
       {{- end }}
     }
-  extra-from-values.json: |-
-{{ tpl .Values.client.extraConfig . | trimAll "\"" | indent 4 }}
+  log-level.json: |-
+    {
+      {{- if .Values.client.logLevel }}
+      "log_level": "{{ .Values.client.logLevel | upper }}"
+      {{- end }}
+    }
   central-config.json: |-
     {
       "enable_central_service_config": true
     }
-
   {{- if .Values.connectInject.enabled }}
   {{/* We set check_update_interval to 0s so that check output is immediately viewable
        in the UI. */}}

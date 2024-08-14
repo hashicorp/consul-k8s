@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: add samenessGroup CRD
+```

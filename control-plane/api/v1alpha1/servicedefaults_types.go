@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -17,8 +18,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 const (
@@ -114,6 +116,9 @@ type ServiceDefaultsSpec struct {
 	// proxy threads. The only supported value is exact_balance. By default, no connection balancing is used.
 	// Refer to the Envoy Connection Balance config for details.
 	BalanceInboundConnections string `json:"balanceInboundConnections,omitempty"`
+	// RateLimits is rate limiting configuration that is applied to
+	// inbound traffic for a service. Rate limiting is a Consul enterprise feature.
+	RateLimits *RateLimits `json:"rateLimits,omitempty"`
 	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
 	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
 }
@@ -186,7 +191,8 @@ type UpstreamLimits struct {
 // be monitored for removal from the load balancing pool.
 type PassiveHealthCheck struct {
 	// Interval between health check analysis sweeps. Each sweep may remove
-	// hosts or return hosts to the pool.
+	// hosts or return hosts to the pool. Ex. setting this to "10s" will set
+	// the interval to 10 seconds.
 	Interval metav1.Duration `json:"interval,omitempty"`
 	// MaxFailures is the count of consecutive failures that results in a host
 	// being removed from the pool.
@@ -194,13 +200,14 @@ type PassiveHealthCheck struct {
 	// EnforcingConsecutive5xx is the % chance that a host will be actually ejected
 	// when an outlier status is detected through consecutive 5xx.
 	// This setting can be used to disable ejection or to ramp it up slowly.
-	EnforcingConsecutive5xx *uint32 `json:"enforcing_consecutive_5xx,omitempty"`
+	// Ex. Setting this to 10 will make it a 10% chance that the host will be ejected.
+	EnforcingConsecutive5xx *uint32 `json:"enforcingConsecutive5xx,omitempty"`
 	// The maximum % of an upstream cluster that can be ejected due to outlier detection.
 	// Defaults to 10% but will eject at least one host regardless of the value.
 	MaxEjectionPercent *uint32 `json:"maxEjectionPercent,omitempty"`
 	// The base time that a host is ejected for. The real time is equal to the base time
 	// multiplied by the number of times the host has been ejected and is capped by
-	// max_ejection_time (Default 300s). Defaults to 30000ms or 30s.
+	// max_ejection_time (Default 300s). Defaults to 30s.
 	BaseEjectionTime *metav1.Duration `json:"baseEjectionTime,omitempty"`
 }
 
@@ -211,6 +218,150 @@ type ServiceDefaultsDestination struct {
 	// Port is the port that can be dialed on any of the addresses in this
 	// Destination.
 	Port uint32 `json:"port,omitempty"`
+}
+
+// RateLimits is rate limiting configuration that is applied to
+// inbound traffic for a service.
+// Rate limiting is a Consul Enterprise feature.
+type RateLimits struct {
+	// InstanceLevel represents rate limit configuration
+	// that is applied per service instance.
+	InstanceLevel InstanceLevelRateLimits `json:"instanceLevel,omitempty"`
+}
+
+func (rl *RateLimits) toConsul() *capi.RateLimits {
+	if rl == nil {
+		return nil
+	}
+	routes := make([]capi.InstanceLevelRouteRateLimits, len(rl.InstanceLevel.Routes))
+	for i, r := range rl.InstanceLevel.Routes {
+		routes[i] = capi.InstanceLevelRouteRateLimits{
+			PathExact:         r.PathExact,
+			PathPrefix:        r.PathPrefix,
+			PathRegex:         r.PathRegex,
+			RequestsPerSecond: r.RequestsPerSecond,
+			RequestsMaxBurst:  r.RequestsMaxBurst,
+		}
+	}
+	return &capi.RateLimits{
+		InstanceLevel: capi.InstanceLevelRateLimits{
+			RequestsPerSecond: rl.InstanceLevel.RequestsPerSecond,
+			RequestsMaxBurst:  rl.InstanceLevel.RequestsMaxBurst,
+			Routes:            routes,
+		},
+	}
+}
+
+func (rl *RateLimits) validate(path *field.Path) field.ErrorList {
+	if rl == nil {
+		return nil
+	}
+
+	return rl.InstanceLevel.validate(path.Child("instanceLevel"))
+}
+
+type InstanceLevelRateLimits struct {
+	// RequestsPerSecond is the average number of requests per second that can be
+	// made without being throttled. This field is required if RequestsMaxBurst
+	// is set. The allowed number of requests may exceed RequestsPerSecond up to
+	// the value specified in RequestsMaxBurst.
+	//
+	// Internally, this is the refill rate of the token bucket used for rate limiting.
+	RequestsPerSecond int `json:"requestsPerSecond,omitempty"`
+
+	// RequestsMaxBurst is the maximum number of requests that can be sent
+	// in a burst. Should be equal to or greater than RequestsPerSecond.
+	// If unset, defaults to RequestsPerSecond.
+	//
+	// Internally, this is the maximum size of the token bucket used for rate limiting.
+	RequestsMaxBurst int `json:"requestsMaxBurst,omitempty"`
+
+	// Routes is a list of rate limits applied to specific routes.
+	// For a given request, the first matching route will be applied, if any.
+	// Overrides any top-level configuration.
+	Routes []InstanceLevelRouteRateLimits `json:"routes,omitempty"`
+}
+
+func (irl InstanceLevelRateLimits) validate(path *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// Track if RequestsPerSecond is set in at least one place in the config
+	isRateLimitSet := irl.RequestsPerSecond > 0
+
+	// Top-level RequestsPerSecond can be 0 (unset) or a positive number.
+	if irl.RequestsPerSecond < 0 {
+		allErrs = append(allErrs,
+			field.Invalid(path.Child("requestsPerSecond"),
+				irl.RequestsPerSecond,
+				"RequestsPerSecond must be positive"))
+	}
+
+	if irl.RequestsPerSecond == 0 && irl.RequestsMaxBurst > 0 {
+		allErrs = append(allErrs,
+			field.Invalid(path.Child("requestsPerSecond"),
+				irl.RequestsPerSecond,
+				"RequestsPerSecond must be greater than 0 if RequestsMaxBurst is set"))
+	}
+
+	if irl.RequestsMaxBurst < 0 {
+		allErrs = append(allErrs,
+			field.Invalid(path.Child("requestsMaxBurst"),
+				irl.RequestsMaxBurst,
+				"RequestsMaxBurst must be positive"))
+	}
+
+	for i, route := range irl.Routes {
+		if exact, prefix, regex := route.PathExact != "", route.PathPrefix != "", route.PathRegex != ""; (!exact && !prefix && !regex) ||
+			(exact && prefix) || (exact && regex) || (prefix && regex) {
+			allErrs = append(allErrs, field.Required(
+				path.Child("routes").Index(i),
+				"Route must define exactly one of PathExact, PathPrefix, or PathRegex"))
+		}
+
+		isRateLimitSet = isRateLimitSet || route.RequestsPerSecond > 0
+
+		// Unlike top-level RequestsPerSecond, any route MUST have a RequestsPerSecond defined.
+		if route.RequestsPerSecond <= 0 {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("routes").Index(i).Child("requestsPerSecond"),
+				route.RequestsPerSecond, "RequestsPerSecond must be greater than 0"))
+		}
+
+		if route.RequestsMaxBurst < 0 {
+			allErrs = append(allErrs, field.Invalid(
+				path.Child("routes").Index(i).Child("requestsMaxBurst"),
+				route.RequestsMaxBurst, "RequestsMaxBurst must be positive"))
+		}
+	}
+
+	if !isRateLimitSet {
+		allErrs = append(allErrs, field.Invalid(
+			path.Child("requestsPerSecond"),
+			irl.RequestsPerSecond, "At least one of top-level or route-level RequestsPerSecond must be set"))
+	}
+	return allErrs
+}
+
+type InstanceLevelRouteRateLimits struct {
+	// Exact path to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
+	PathExact string `json:"pathExact,omitempty"`
+	// Prefix to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
+	PathPrefix string `json:"pathPrefix,omitempty"`
+	// Regex to match. Exactly one of PathExact, PathPrefix, or PathRegex must be specified.
+	PathRegex string `json:"pathRegex,omitempty"`
+
+	// RequestsPerSecond is the average number of requests per
+	// second that can be made without being throttled. This field is required
+	// if RequestsMaxBurst is set. The allowed number of requests may exceed
+	// RequestsPerSecond up to the value specified in RequestsMaxBurst.
+	// Internally, this is the refill rate of the token bucket used for rate limiting.
+	RequestsPerSecond int `json:"requestsPerSecond,omitempty"`
+
+	// RequestsMaxBurst is the maximum number of requests that can be sent
+	// in a burst. Should be equal to or greater than RequestsPerSecond. If unset,
+	// defaults to RequestsPerSecond. Internally, this is the maximum size of the token
+	// bucket used for rate limiting.
+	RequestsMaxBurst int `json:"requestsMaxBurst,omitempty"`
 }
 
 func (in *ServiceDefaults) ConsulKind() string {
@@ -305,6 +456,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		LocalConnectTimeoutMs:     in.Spec.LocalConnectTimeoutMs,
 		LocalRequestTimeoutMs:     in.Spec.LocalRequestTimeoutMs,
 		BalanceInboundConnections: in.Spec.BalanceInboundConnections,
+		RateLimits:                in.Spec.RateLimits.toConsul(),
 		EnvoyExtensions:           in.Spec.EnvoyExtensions.toConsul(),
 	}
 }
@@ -353,6 +505,7 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 
 	allErrs = append(allErrs, in.Spec.UpstreamConfig.validate(path.Child("upstreamConfig"), consulMeta.PartitionsEnabled)...)
 	allErrs = append(allErrs, in.Spec.Expose.validate(path.Child("expose"))...)
+	allErrs = append(allErrs, in.Spec.RateLimits.validate(path.Child("rateLimits"))...)
 	allErrs = append(allErrs, in.Spec.EnvoyExtensions.validate(path.Child("envoyExtensions"))...)
 
 	if len(allErrs) > 0 {
@@ -465,13 +618,20 @@ func (in *PassiveHealthCheck) toConsul() *capi.PassiveHealthCheck {
 	if in == nil {
 		return nil
 	}
+	var baseEjectiontime *time.Duration
+	if in.BaseEjectionTime == nil {
+		dur := time.Second * 30
+		baseEjectiontime = &dur
+	} else {
+		baseEjectiontime = &in.BaseEjectionTime.Duration
+	}
 
 	return &capi.PassiveHealthCheck{
 		Interval:                in.Interval.Duration,
 		MaxFailures:             in.MaxFailures,
 		EnforcingConsecutive5xx: in.EnforcingConsecutive5xx,
 		MaxEjectionPercent:      in.MaxEjectionPercent,
-		BaseEjectionTime:        &in.BaseEjectionTime.Duration,
+		BaseEjectionTime:        baseEjectiontime,
 	}
 }
 
@@ -543,9 +703,19 @@ func (in *ServiceDefaults) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+
+	specialEquality := cmp.Options{
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "UpstreamConfig.Overrides.Namespace"
+		}, cmp.Transformer("NormalizeNamespace", normalizeEmptyToDefault)),
+		cmp.FilterPath(func(path cmp.Path) bool {
+			return path.String() == "UpstreamConfig.Overrides.Partition"
+		}, cmp.Transformer("NormalizePartition", normalizeEmptyToDefault)),
+		cmp.Comparer(transparentProxyConfigComparer),
+	}
+
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(),
-		cmp.Comparer(transparentProxyConfigComparer))
+	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.ServiceConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty(), specialEquality)
 }
 
 func (in *ServiceDefaults) ConsulGlobalResource() bool {

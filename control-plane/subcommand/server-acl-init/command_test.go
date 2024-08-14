@@ -18,9 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/freeport"
 	"github.com/hashicorp/consul/sdk/testutil"
@@ -32,6 +29,11 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/cert"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 var ns = "default"
@@ -173,6 +175,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			PolicyDCs:   nil,
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 			LocalToken:  false,
+		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
+			LocalToken:  true,
 		},
 	}
 	for _, c := range cases {
@@ -323,6 +333,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
 			LocalToken:  true,
 		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -398,6 +416,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
+		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
 		},
 	}
 	for _, c := range cases {
@@ -640,6 +664,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			rules, _, err := consul.ACL().BindingRuleList(authMethodName, &api.QueryOptions{Token: bootToken})
 			require.NoError(t, err)
 			require.Len(t, rules, 1)
+
 			require.Equal(t, "service", string(rules[0].BindType))
 			require.Equal(t, "${serviceaccount.name}", rules[0].BindName)
 			require.Equal(t, bindingRuleSelector, rules[0].Selector)
@@ -785,13 +810,13 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(t, err)
 		require.Len(t, rules, 1)
-		actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
+		aclRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
 		require.NoError(t, err)
-		require.NotNil(t, actRule)
-		require.Equal(t, "Kubernetes binding rule", actRule.Description)
-		require.Equal(t, api.BindingRuleBindTypeService, actRule.BindType)
-		require.Equal(t, "${serviceaccount.name}", actRule.BindName)
-		require.Equal(t, "serviceaccount.name!=default", actRule.Selector)
+		require.NotNil(t, aclRule)
+		require.Equal(t, "Kubernetes binding rule", aclRule.Description)
+		require.Equal(t, api.BindingRuleBindTypeService, aclRule.BindType)
+		require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
+		require.Equal(t, "serviceaccount.name!=default", aclRule.Selector)
 	}
 
 	// Re-run the command with namespace flags. The policies should be updated.
@@ -811,13 +836,13 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
 		require.NoError(t, err)
 		require.Len(t, rules, 1)
-		actRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
+		aclRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
 		require.NoError(t, err)
-		require.NotNil(t, actRule)
-		require.Equal(t, "Kubernetes binding rule", actRule.Description)
-		require.Equal(t, api.BindingRuleBindTypeService, actRule.BindType)
-		require.Equal(t, "${serviceaccount.name}", actRule.BindName)
-		require.Equal(t, "serviceaccount.name!=changed", actRule.Selector)
+		require.NotNil(t, aclRule)
+		require.Equal(t, "Kubernetes binding rule", aclRule.Description)
+		require.Equal(t, api.BindingRuleBindTypeService, aclRule.BindType)
+		require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
+		require.Equal(t, "serviceaccount.name!=changed", aclRule.Selector)
 	}
 }
 
@@ -919,6 +944,12 @@ func TestRun_ErrorsOnDuplicateACLPolicy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// Make sure the ACL system is bootstrapped first
+	require.Eventually(t, func() bool {
+		_, _, err := consul.ACL().PolicyList(nil)
+		return err == nil
+	}, 5*time.Second, 500*time.Millisecond)
+
 	// Create the policy manually.
 	description := "not the expected description"
 	policy, _, err := consul.ACL().PolicyCreate(&api.ACLPolicy{
@@ -964,7 +995,7 @@ func TestRun_DelayedServers(t *testing.T) {
 	t.Parallel()
 	k8s := fake.NewSimpleClientset()
 	setUpK8sServiceAccount(t, k8s, ns)
-	randomPorts := freeport.GetN(t, 7)
+	randomPorts := freeport.GetN(t, 8)
 
 	ui := cli.NewMockUi()
 	cmd := Command{
@@ -1005,10 +1036,11 @@ func TestRun_DelayedServers(t *testing.T) {
 				DNS:     randomPorts[0],
 				HTTP:    randomPorts[1],
 				GRPC:    randomPorts[2],
-				HTTPS:   randomPorts[3],
-				SerfLan: randomPorts[4],
-				SerfWan: randomPorts[5],
-				Server:  randomPorts[6],
+				GRPCTLS: randomPorts[3],
+				HTTPS:   randomPorts[4],
+				SerfLan: randomPorts[5],
+				SerfWan: randomPorts[6],
+				Server:  randomPorts[7],
 			}
 		})
 		require.NoError(t, err)
@@ -1119,7 +1151,7 @@ func TestRun_NoLeader(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 	}
 
 	done := make(chan bool)
@@ -1286,14 +1318,14 @@ func TestConsulDatacenterList(t *testing.T) {
 			}))
 			defer consulServer.Close()
 
-			consulClient, err := api.NewClient(&api.Config{Address: consulServer.URL})
+			client, err := consul.NewDynamicClient(&api.Config{Address: consulServer.URL})
 			require.NoError(t, err)
 
 			command := Command{
 				log: hclog.New(hclog.DefaultOptions),
 				ctx: context.Background(),
 			}
-			actDC, actPrimaryDC, err := command.consulDatacenterList(consulClient)
+			actDC, actPrimaryDC, err := command.consulDatacenterList(client)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {
@@ -1375,7 +1407,7 @@ func TestRun_ClientPolicyAndBindingRuleRetry(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 	}
 	responseCode := cmd.Run([]string{
 		"-timeout=1m",
@@ -1524,7 +1556,7 @@ func TestRun_AlreadyBootstrapped(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 	}
 
 	responseCode := cmd.Run(cmdArgs)
@@ -1709,7 +1741,7 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort(serverURL.Hostname(), port),
+		watcher:   test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
 		backend:   &FakeSecretsBackend{bootstrapToken: bootToken},
 	}
 	responseCode := cmd.Run([]string{
@@ -1753,7 +1785,7 @@ func TestRun_Timeout(t *testing.T) {
 	cmd := Command{
 		UI:        ui,
 		clientset: k8s,
-		watcher:   test.MockConnMgrForIPAndPort("localhost", 12345),
+		watcher:   test.MockConnMgrForIPAndPort(t, "localhost", 12345, false),
 	}
 
 	responseCode := cmd.Run([]string{
@@ -1945,12 +1977,6 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 			Roles:       []string{resourcePrefix + "-sync-catalog-acl-role"},
 		},
 		{
-			TestName:    "API Gateway Controller",
-			TokenFlags:  []string{"-api-gateway-controller"},
-			PolicyNames: []string{"api-gateway-controller-policy"},
-			Roles:       []string{resourcePrefix + "-api-gateway-controller-acl-role"},
-		},
-		{
 			TestName:    "Snapshot Agent",
 			TokenFlags:  []string{"-snapshot-agent"},
 			PolicyNames: []string{"snapshot-agent-policy"},
@@ -2096,13 +2122,6 @@ func TestRun_PoliciesAndBindingRulesACLLogin_SecondaryDatacenter(t *testing.T) {
 			PolicyNames:      []string{"sync-catalog-policy-" + secondaryDatacenter},
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-" + secondaryDatacenter},
 			GlobalAuthMethod: false,
-		},
-		{
-			TestName:         "API Gateway Controller",
-			TokenFlags:       []string{"-api-gateway-controller"},
-			PolicyNames:      []string{"api-gateway-controller-policy-" + secondaryDatacenter},
-			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-" + secondaryDatacenter},
-			GlobalAuthMethod: true,
 		},
 		{
 			TestName:         "Snapshot Agent",
@@ -2256,12 +2275,6 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 			GlobalToken:   false,
 		},
 		{
-			ComponentName: "api-gateway-controller",
-			TokenFlags:    []string{"-api-gateway-controller"},
-			Roles:         []string{resourcePrefix + "-api-gateway-controller-acl-role"},
-			GlobalToken:   false,
-		},
-		{
 			ComponentName:      "snapshot-agent",
 			TokenFlags:         []string{"-snapshot-agent"},
 			Roles:              []string{resourcePrefix + "-snapshot-agent-acl-role"},
@@ -2391,13 +2404,6 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 			Roles:            []string{resourcePrefix + "-sync-catalog-acl-role-dc2"},
 			GlobalAuthMethod: false,
 			GlobalToken:      false,
-		},
-		{
-			ComponentName:    "api-gateway-controller",
-			TokenFlags:       []string{"-api-gateway-controller"},
-			Roles:            []string{resourcePrefix + "-api-gateway-controller-acl-role-dc2"},
-			GlobalAuthMethod: true,
-			GlobalToken:      true,
 		},
 		{
 			ComponentName:      "snapshot-agent",
@@ -2604,11 +2610,13 @@ func TestRun_SecondaryDatacenter_ComponentAuthMethod(t *testing.T) {
 func completeSetup(t *testing.T) (*fake.Clientset, *test.TestServerClient) {
 	k8s := fake.NewSimpleClientset()
 
-	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+	testServerClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
 	})
 
-	return k8s, testClient
+	testServerClient.TestServer.WaitForActiveCARoot(t)
+
+	return k8s, testServerClient
 }
 
 // Set up test consul agent and kubernetes cluster.

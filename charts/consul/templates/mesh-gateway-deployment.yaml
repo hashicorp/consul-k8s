@@ -43,6 +43,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         "consul.hashicorp.com/gateway-kind": "mesh-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .Values.meshGateway.consulServiceName }}"
         "consul.hashicorp.com/mesh-gateway-container-port": "{{ .Values.meshGateway.containerPort }}"
@@ -70,10 +71,15 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
         "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.meshGateway.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/metrics"
+        {{- end }}
         "prometheus.io/port": "20200"
         {{- end }}
         {{- if .Values.meshGateway.annotations }}
@@ -121,6 +127,7 @@ spec:
       initContainers:
       - name: mesh-gateway-init
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         env:
         - name: NAMESPACE
           valueFrom:
@@ -157,12 +164,12 @@ spec:
         - "/bin/sh"
         - "-ec"
         - |
-          consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
-           -gateway-kind="mesh-gateway" \
-           -proxy-id-file=/consul/service/proxy-id \
-           -service-name={{ .Values.meshGateway.consulServiceName }} \
-           -log-level={{ default .Values.global.logLevel }} \
-           -log-json={{ .Values.global.logJSON }}
+          exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+            -gateway-kind="mesh-gateway" \
+            -proxy-id-file=/consul/service/proxy-id \
+            -service-name={{ .Values.meshGateway.consulServiceName }} \
+            -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }} \
+            -log-json={{ .Values.global.logJSON }}
         volumeMounts:
         - name: consul-service
           mountPath: /consul/service
@@ -179,6 +186,15 @@ spec:
       containers:
       - name: mesh-gateway
         image: {{ .Values.global.imageConsulDataplane | quote }}
+        {{ template "consul.imagePullPolicy" . }}
+        securityContext:
+          capabilities:
+            {{ if not .Values.meshGateway.hostNetwork}}
+            drop:
+              - ALL
+            {{- end }}
+            add:
+              - NET_BIND_SERVICE
         {{- if .Values.meshGateway.resources }}
         resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
@@ -267,7 +283,7 @@ spec:
         {{- if .Values.global.adminPartitions.enabled }}
         - -service-partition={{ .Values.global.adminPartitions.name }}
         {{- end }}
-        - -log-level={{ default .Values.global.logLevel }}
+        - -log-level={{ default .Values.global.logLevel .Values.meshGateway.logLevel }}
         - -log-json={{ .Values.global.logJSON }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableGatewayMetrics) }}
         - -telemetry-prom-scrape-path=/metrics

@@ -1,18 +1,16 @@
 {{- if .Values.connectInject.enabled }}
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
-  name: servicerouters.consul.hashicorp.com
+    controller-gen.kubebuilder.io/version: v0.12.1
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
+  name: servicerouters.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -68,6 +66,10 @@ spec:
                       description: Destination controls how to proxy the matching
                         request(s) to a service.
                       properties:
+                        idleTimeout:
+                          description: IdleTimeout is total amount of time permitted
+                            for the request stream to be idle.
+                          type: string
                         namespace:
                           description: Namespace is the Consul namespace to resolve
                             the service from instead of the current namespace. If
@@ -146,6 +148,13 @@ spec:
                                 any existing header values of the same name.
                               type: object
                           type: object
+                        retryOn:
+                          description: 'RetryOn is a flat list of conditions for Consul
+                            to retry requests based on the response from an upstream
+                            service. Refer to the valid conditions here: https://developer.hashicorp.com/consul/docs/connect/config-entries/service-router#routes-destination-retryon'
+                          items:
+                            type: string
+                          type: array
                         retryOnConnectFailure:
                           description: RetryOnConnectFailure allows for connection
                             failure errors to trigger a retry.
@@ -176,6 +185,10 @@ spec:
                         http:
                           description: HTTP is a set of http-specific match criteria.
                           properties:
+                            caseInsensitive:
+                              description: CaseInsensitive configures PathExact and
+                                PathPrefix matches to ignore upper/lower casing.
+                              type: boolean
                             header:
                               description: Header is a set of criteria that can match
                                 on HTTP request headers. If more than one is configured
@@ -307,10 +320,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

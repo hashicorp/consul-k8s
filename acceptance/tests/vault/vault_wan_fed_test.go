@@ -31,6 +31,7 @@ import (
 // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
 	cfg := suite.Config()
+
 	if cfg.UseKind {
 		t.Skipf("Skipping this test because it's currently flaky on kind")
 	}
@@ -44,7 +45,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 
 	primaryCtx := suite.Environment().DefaultContext(t)
-	secondaryCtx := suite.Environment().Context(t, environment.SecondaryContextName)
+	secondaryCtx := suite.Environment().Context(t, 1)
 
 	ns := primaryCtx.KubectlOptions(t).Namespace
 
@@ -328,8 +329,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	}
 	srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
-	// // Move Vault CA secret from primary to secondary so that we can mount it to pods in the
-	// // secondary cluster.
+	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
+	// secondary cluster.
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
 	vaultCASecret, err := primaryCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
@@ -491,16 +492,18 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	logger.Log(t, "creating proxy-defaults config")
 	kustomizeDir := "../fixtures/bases/mesh-gateway"
 	k8s.KubectlApplyK(t, primaryCtx.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, func() {
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, primaryCtx.KubectlOptions(t), kustomizeDir)
 	})
 
 	// Check that we can connect services over the mesh gateways.
+
 	logger.Log(t, "creating static-server in dc2")
-	k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+	k8s.DeployKustomize(t, secondaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 	logger.Log(t, "creating static-client in dc1")
-	k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
+	k8s.DeployKustomize(t, primaryCtx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-multi-dc")
 
 	logger.Log(t, "creating intention")
 	_, _, err = primaryClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -517,6 +520,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, primaryCtx.KubectlOptions(t), StaticClientName, "http://localhost:1234")
+
 }
 
 // vaultAddress returns Vault's server URL depending on test configuration.

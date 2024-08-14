@@ -1,4 +1,6 @@
 {{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (not (or (eq .Values.server.limits.requestLimits.mode "disabled") (eq .Values.server.limits.requestLimits.mode "permissive") (eq .Values.server.limits.requestLimits.mode "enforce"))) }}{{fail "server.limits.requestLimits.mode must be one of the following values: disabled, permissive, and enforce." }}{{ end -}}
+{{- if and .Values.server.auditLogs.enabled (not .Values.global.acls.manageSystemACLs) }}{{fail "ACLs must be enabled inorder to configure audit logs"}}{{ end -}}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: v1
 kind: ConfigMap
@@ -25,7 +27,18 @@ data:
       },
       "datacenter": "{{ .Values.global.datacenter }}",
       "data_dir": "/consul/data",
+      {{- if .Values.server.logLevel }}
+      "log_level": "{{ .Values.server.logLevel | upper }}",
+      {{- end }}
+      "enable_debug": {{ .Values.server.enableAgentDebug }},
       "domain": "{{ .Values.global.domain }}",
+      "limits": {
+        "request_limits": {
+          "mode": "{{ .Values.server.limits.requestLimits.mode }}",
+          "read_rate": {{ .Values.server.limits.requestLimits.readRate }},
+          "write_rate": {{ .Values.server.limits.requestLimits.writeRate }}
+        }
+      },
       "ports": {
         {{- if not .Values.global.tls.enabled }}
         "grpc": 8502,
@@ -44,7 +57,12 @@ data:
         "enabled": true
       },
       {{- end }}
-      "server": true
+      "server": true,
+      "leave_on_terminate": true,
+      "autopilot": {
+        "min_quorum": {{ template "consul.server.autopilotMinQuorum" . }},
+        "disable_upgrade_migration": true
+      }
     }
   {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
   {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
@@ -60,6 +78,9 @@ data:
               "ca_file": "/consul/vault-ca/tls.crt",
               {{- end }}
               "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
+              {{- if (and (.vaultNamespace) (not (contains "namespace" (default "" .connectCA.additionalConfig)))) }}
+              "namespace": "{{ .vaultNamespace }}",
+              {{- end }}
               "root_pki_path": "{{ .connectCA.rootPKIPath }}",
               "auth_method": {
                 "type": "kubernetes",
@@ -80,8 +101,6 @@ data:
   {{- end }}
   {{- end }}
   {{- end }}
-  extra-from-values.json: |-
-{{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
   {{- if .Values.global.acls.manageSystemACLs }}
   acl-config.json: |-
     {
@@ -174,7 +193,27 @@ data:
   telemetry-config.json: |-
     {
       "telemetry": {
-        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}"
+        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}",
+        "disable_hostname": {{ .Values.global.metrics.disableAgentHostName }},{{ template "consul.prefixFilter" . }}
+        "enable_host_metrics": {{ .Values.global.metrics.enableHostMetrics }}{{- if .Values.global.metrics.datadog.dogstatsd.enabled }},{{ template "consul.dogstatsdAaddressInfo" . }}
+        {{- if .Values.global.metrics.datadog.dogstatsd.enabled }}
+        "dogstatsd_tags": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson }}
+        {{- end }}
+        {{- end }}
+      }
+    }
+  {{- end }}
+  {{- if and .Values.server.auditLogs.enabled .Values.global.acls.manageSystemACLs }}
+  audit-logging.json: |-
+    {
+      "audit": {
+        "enabled": true,
+        "sink": {
+          {{- range $index, $element := .Values.server.auditLogs.sinks }}
+          {{- if ne $index 0 }},{{end}}
+          "{{ get $element "name" }}": {{ omit $element "name" | toJson }}
+          {{- end }}
+        }
       }
     }
   {{- end }}

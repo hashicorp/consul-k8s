@@ -8,17 +8,18 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/sdk/iptables"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 // addRedirectTrafficConfigAnnotation creates an iptables.Config in JSON format based on proxy configuration.
 // iptables.Config:
 //
 //	ConsulDNSIP: an environment variable named RESOURCE_PREFIX_DNS_SERVICE_HOST where RESOURCE_PREFIX is the consul.fullname in helm.
-//	ProxyUserID: a constant set in Annotations
+//	ProxyUserID: a constant set in Annotations or read from namespace when using OpenShift
 //	ProxyInboundPort: the service port or bind port
 //	ProxyOutboundPort: default transparent proxy outbound port or transparent proxy outbound listener port
 //	ExcludeInboundPorts: prometheus, envoy stats, expose paths, checks and excluded pod annotations
@@ -26,8 +27,27 @@ import (
 //	ExcludeOutboundCIDRs: pod annotations
 //	ExcludeUIDs: pod annotations
 func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
-	cfg := iptables.Config{
-		ProxyUserID: strconv.Itoa(sidecarUserAndGroupID),
+	cfg := iptables.Config{}
+
+	if !w.EnableOpenShift {
+		cfg.ProxyUserID = strconv.Itoa(sidecarUserAndGroupID)
+
+		// Add init container user ID to exclude from traffic redirection.
+		cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
+	} else {
+		// When using OpenShift, the uid and group are saved as an annotation on the namespace
+		uid, err := common.GetDataplaneUID(ns, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+		if err != nil {
+			return "", err
+		}
+		cfg.ProxyUserID = strconv.FormatInt(uid, 10)
+
+		// Exclude the user ID for the init container from traffic redirection.
+		uid, err = common.GetConnectInitUID(ns, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+		if err != nil {
+			return "", err
+		}
+		cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.FormatInt(uid, 10))
 	}
 
 	// Set the proxy's inbound port.
@@ -62,20 +82,24 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	}
 
 	if overwriteProbes {
-		for i, container := range pod.Spec.Containers {
-			// skip the "envoy-sidecar" container from having its probes overridden
+		// We don't use the loop index because this needs to line up w.overwriteProbes(),
+		// which is performed after the sidecar is injected.
+		idx := 0
+		for _, container := range pod.Spec.Containers {
+			// skip the "consul-dataplane" container from having its probes overridden
 			if container.Name == sidecarContainer {
 				continue
 			}
 			if container.LivenessProbe != nil && container.LivenessProbe.HTTPGet != nil {
-				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsLivenessPortsRangeStart+i))
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsLivenessPortsRangeStart+idx))
 			}
 			if container.ReadinessProbe != nil && container.ReadinessProbe.HTTPGet != nil {
-				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsReadinessPortsRangeStart+i))
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsReadinessPortsRangeStart+idx))
 			}
 			if container.StartupProbe != nil && container.StartupProbe.HTTPGet != nil {
-				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsStartupPortsRangeStart+i))
+				cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, strconv.Itoa(exposedPathsStartupPortsRangeStart+idx))
 			}
+			idx++
 		}
 	}
 
@@ -95,10 +119,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeUIDs, pod)
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, excludeUIDs...)
 
-	// Add init container user ID to exclude from traffic redirection.
-	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
-
-	dnsEnabled, err := consulDNSEnabled(ns, pod, w.EnableConsulDNS)
+	dnsEnabled, err := consulDNSEnabled(ns, pod, w.EnableConsulDNS, w.EnableTransparentProxy)
 	if err != nil {
 		return "", err
 	}

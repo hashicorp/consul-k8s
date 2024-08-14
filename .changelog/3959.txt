@@ -1,0 +1,3 @@
+```release-note:improvement
+api-gateways: Change security settings to make root file system read only and to not allow privilage escalation.
+```

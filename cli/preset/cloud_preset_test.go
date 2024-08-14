@@ -25,28 +25,32 @@ import (
 )
 
 const (
-	hcpClientID                       = "RAxJflDbxDXw8kLY6jWmwqMz3kVe7NnL"
-	hcpClientSecret                   = "1fNzurLatQPLPwf7jnD4fRtU9f5nH31RKBHayy08uQ6P-6nwI1rFZjMXb4m3cCKH"
-	hcpResourceID                     = "organization/ccbdd191-5dc3-4a73-9e05-6ac30ca67992/project/36019e0d-ed59-4df6-9990-05bb7fc793b6/hashicorp.consul.global-network-manager.cluster/prod-on-prem"
-	expectedSecretNameHCPClientId     = "consul-hcp-client-id"
-	expectedSecretNameHCPClientSecret = "consul-hcp-client-secret"
-	expectedSecretNameHCPResourceId   = "consul-hcp-resource-id"
-	expectedSecretNameHCPAuthURL      = "consul-hcp-auth-url"
-	expectedSecretNameHCPApiHostname  = "consul-hcp-api-host"
-	expectedSecretNameHCPScadaAddress = "consul-hcp-scada-address"
-	expectedSecretNameGossipKey       = "consul-gossip-key"
-	expectedSecretNameBootstrap       = "consul-bootstrap-token"
-	expectedSecretNameServerCA        = "consul-server-ca"
-	expectedSecretNameServerCert      = "consul-server-cert"
-	namespace                         = "consul"
-	validResponse                     = `
+	hcpClientID                                    = "RAxJflDbxDXw8kLY6jWmwqMz3kVe7NnL"
+	hcpClientSecret                                = "1fNzurLatQPLPwf7jnD4fRtU9f5nH31RKBHayy08uQ6P-6nwI1rFZjMXb4m3cCKH"
+	observabilityHCPClientId                       = "fake-client-id"
+	observabilityHCPClientSecret                   = "fake-client-secret"
+	hcpResourceID                                  = "organization/ccbdd191-5dc3-4a73-9e05-6ac30ca67992/project/36019e0d-ed59-4df6-9990-05bb7fc793b6/hashicorp.consul.global-network-manager.cluster/prod-on-prem"
+	expectedSecretNameHCPClientId                  = "consul-hcp-client-id"
+	expectedSecretNameHCPClientSecret              = "consul-hcp-client-secret"
+	expectedSecretNameHCPObservabilityClientId     = "consul-hcp-observability-client-id"
+	expectedSecretNameHCPObservabilityClientSecret = "consul-hcp-observability-client-secret"
+	expectedSecretNameHCPResourceId                = "consul-hcp-resource-id"
+	expectedSecretNameHCPAuthURL                   = "consul-hcp-auth-url"
+	expectedSecretNameHCPApiHostname               = "consul-hcp-api-host"
+	expectedSecretNameHCPScadaAddress              = "consul-hcp-scada-address"
+	expectedSecretNameGossipKey                    = "consul-gossip-key"
+	expectedSecretNameBootstrap                    = "consul-bootstrap-token"
+	expectedSecretNameServerCA                     = "consul-server-ca"
+	expectedSecretNameServerCert                   = "consul-server-cert"
+	namespace                                      = "consul"
+	validResponse                                  = `
 {
-	"cluster": 
+	"cluster":
 	{
-		"id": "dc1",
+		"id": "Dc1",
 		"bootstrap_expect" : 3
 	},
-	"bootstrap": 
+	"bootstrap":
 	{
 		"gossip_key": "Wa6/XFAnYy0f9iqVH2iiG+yore3CqHSemUy4AIVTa/w=",
 		"server_tls": {
@@ -59,11 +63,27 @@ const (
 		"consul_config": "{\"acl\":{\"default_policy\":\"deny\",\"enable_token_persistence\":true,\"enabled\":true,\"tokens\":{\"agent\":\"74044c72-03c8-42b0-b57f-728bb22ca7fb\",\"initial_management\":\"74044c72-03c8-42b0-b57f-728bb22ca7fb\"}},\"auto_encrypt\":{\"allow_tls\":true},\"bootstrap_expect\":1,\"encrypt\":\"yUPhgtteok1/bHoVIoRnJMfOrKrb1TDDyWJRh9rlUjg=\",\"encrypt_verify_incoming\":true,\"encrypt_verify_outgoing\":true,\"ports\":{\"http\":-1,\"https\":8501},\"retry_join\":[],\"verify_incoming\":true,\"verify_outgoing\":true,\"verify_server_hostname\":true}"
 	}
 }`
+	observabilityResponse = `
+{
+	"id": "Dc1",
+	"location": {
+		"organization_id": "abc123",
+		"project_id": "123abc"
+	},
+	"keys": [
+		{
+			"created_at":"",
+			"client_id": "fake-client-id",
+			"client_secret": "fake-client-secret"
+		}
+	]
+}
+`
 )
 
 var validBootstrapReponse *models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse = &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
 	Bootstrap: &models.HashicorpCloudGlobalNetworkManager20220215ClusterBootstrap{
-		ID:              "dc1",
+		ID:              "Dc1",
 		GossipKey:       "Wa6/XFAnYy0f9iqVH2iiG+yore3CqHSemUy4AIVTa/w=",
 		BootstrapExpect: 3,
 		ServerTLS: &models.HashicorpCloudGlobalNetworkManager20220215ServerTLS{
@@ -79,12 +99,14 @@ var validBootstrapReponse *models.HashicorpCloudGlobalNetworkManager20220215Agen
 }
 
 var hcpConfig *HCPConfig = &HCPConfig{
-	ResourceID:   hcpResourceID,
-	ClientID:     hcpClientID,
-	ClientSecret: hcpClientSecret,
-	AuthURL:      "https://foobar",
-	APIHostname:  "https://foo.bar",
-	ScadaAddress: "10.10.10.10",
+	ResourceID:                hcpResourceID,
+	ClientID:                  hcpClientID,
+	ClientSecret:              hcpClientSecret,
+	AuthURL:                   "https://foobar",
+	APIHostname:               "https://foo.bar",
+	ScadaAddress:              "10.10.10.10",
+	ObservabilityClientID:     observabilityHCPClientId,
+	ObservabilityClientSecret: observabilityHCPClientSecret,
 }
 
 var validBootstrapConfig *CloudBootstrapConfig = &CloudBootstrapConfig{
@@ -108,9 +130,19 @@ func TestGetValueMap(t *testing.T) {
 	// Start the mock HCP server.
 	hcpMockServer := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-type", "application/json")
-		if r != nil && r.URL.Path == "/global-network-manager/2022-02-15/organizations/ccbdd191-5dc3-4a73-9e05-6ac30ca67992/projects/36019e0d-ed59-4df6-9990-05bb7fc793b6/clusters/prod-on-prem/agent/bootstrap_config" &&
-			r.Method == "GET" {
-			w.Write([]byte(validResponse))
+		if r != nil && r.Method == "GET" {
+			switch r.URL.Path {
+			case "/global-network-manager/2022-02-15/organizations/ccbdd191-5dc3-4a73-9e05-6ac30ca67992/projects/36019e0d-ed59-4df6-9990-05bb7fc793b6/clusters/prod-on-prem/agent/bootstrap_config":
+				w.Write([]byte(validResponse))
+			case "/global-network-manager/2022-02-15/organizations/ccbdd191-5dc3-4a73-9e05-6ac30ca67992/projects/36019e0d-ed59-4df6-9990-05bb7fc793b6/clusters/prod-on-prem/credentials/observability":
+				w.Write([]byte(observabilityResponse))
+			default:
+				w.Write([]byte(`
+				{
+					"access_token": "dummy-token"
+				}
+				`))
+			}
 		} else {
 			w.Write([]byte(`
 			{
@@ -202,6 +234,14 @@ func TestGetValueMap(t *testing.T) {
 				// Check the hcp client secret secret is as expected.
 				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPClientSecret, secretKeyHCPClientSecret,
 					bsConfig.HCPConfig.ClientSecret, corev1.SecretTypeOpaque)
+
+				// Check the observability hcp client id secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPObservabilityClientID, secretKeyHCPClientID,
+					bsConfig.HCPConfig.ObservabilityClientID, corev1.SecretTypeOpaque)
+
+				// Check the observability hcp client secret secret is as expected.
+				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPObservabilityClientSecret, secretKeyHCPClientSecret,
+					bsConfig.HCPConfig.ObservabilityClientSecret, corev1.SecretTypeOpaque)
 
 				// Check the bootstrap token secret is as expected.
 				ensureSecretKeyValueMatchesExpected(t, k8s, secretNameBootstrapToken, secretKeyBootstrapToken,
@@ -483,6 +523,8 @@ global:
   gossipEncryption:
     secretKey: key
     secretName: consul-gossip-key
+  metrics:
+    enableTelemetryCollector: true
   tls:
     caCert:
       secretKey: tls.crt
@@ -494,6 +536,15 @@ server:
   replicas: 3
   serverCert:
     secretName: consul-server-cert
+telemetryCollector:
+  cloud:
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-observability-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-observability-client-secret
+  enabled: true
 `
 
 	const expectedWithoutOptional = `connectInject:
@@ -521,6 +572,8 @@ global:
   gossipEncryption:
     secretKey: key
     secretName: consul-gossip-key
+  metrics:
+    enableTelemetryCollector: true
   tls:
     caCert:
       secretKey: tls.crt
@@ -532,35 +585,133 @@ server:
   replicas: 3
   serverCert:
     secretName: consul-server-cert
+telemetryCollector:
+  cloud:
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-observability-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-observability-client-secret
+  enabled: true
+`
+
+	const expectedWithoutObservability = `connectInject:
+  enabled: true
+controller:
+  enabled: true
+global:
+  acls:
+    bootstrapToken:
+      secretKey: token
+      secretName: consul-bootstrap-token
+    manageSystemACLs: true
+  cloud:
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-client-secret
+    enabled: true
+    resourceId:
+      secretKey: resource-id
+      secretName: consul-hcp-resource-id
+  datacenter: dc1
+  gossipEncryption:
+    secretKey: key
+    secretName: consul-gossip-key
+  metrics:
+    enableTelemetryCollector: true
+  tls:
+    caCert:
+      secretKey: tls.crt
+      secretName: consul-server-ca
+    enableAutoEncrypt: true
+    enabled: true
+server:
+  affinity: null
+  replicas: 3
+  serverCert:
+    secretName: consul-server-cert
+telemetryCollector:
+  cloud:
+    clientId:
+      secretKey: client-id
+      secretName: consul-hcp-client-id
+    clientSecret:
+      secretKey: client-secret
+      secretName: consul-hcp-client-secret
+  enabled: true
 `
 
 	cloudPreset := &CloudPreset{}
 
-	testCases := []struct {
-		description  string
+	testCases := map[string]struct {
 		config       *CloudBootstrapConfig
 		expectedYaml string
 	}{
-		{"Config including optional parameters",
+		"Config_including_optional_parameters_with_mixedcase_DC": {
 			&CloudBootstrapConfig{
 				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
 					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
 						BootstrapExpect: 3,
-						ID:              "dc1",
+						ID:              "Dc1",
 					},
 				},
 				HCPConfig: HCPConfig{
-					ResourceID:   "consul-hcp-resource-id",
-					ClientID:     "consul-hcp-client-id",
-					ClientSecret: "consul-hcp-client-secret",
-					AuthURL:      "consul-hcp-auth-url",
-					APIHostname:  "consul-hcp-api-host",
-					ScadaAddress: "consul-hcp-scada-address",
+					ResourceID:                "consul-hcp-resource-id",
+					ClientID:                  "consul-hcp-client-id",
+					ClientSecret:              "consul-hcp-client-secret",
+					AuthURL:                   "consul-hcp-auth-url",
+					APIHostname:               "consul-hcp-api-host",
+					ScadaAddress:              "consul-hcp-scada-address",
+					ObservabilityClientID:     "consul-hcp-observability-client-id",
+					ObservabilityClientSecret: "consul-hcp-observability-client-secret",
 				},
 			},
 			expectedFull,
 		},
-		{"Config without optional parameters",
+		"Config_including_optional_parameters": {
+			&CloudBootstrapConfig{
+				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
+					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
+						BootstrapExpect: 3,
+						ID:              "dc1",
+					},
+				},
+				HCPConfig: HCPConfig{
+					ResourceID:                "consul-hcp-resource-id",
+					ClientID:                  "consul-hcp-client-id",
+					ClientSecret:              "consul-hcp-client-secret",
+					AuthURL:                   "consul-hcp-auth-url",
+					APIHostname:               "consul-hcp-api-host",
+					ScadaAddress:              "consul-hcp-scada-address",
+					ObservabilityClientID:     "consul-hcp-observability-client-id",
+					ObservabilityClientSecret: "consul-hcp-observability-client-secret",
+				},
+			},
+			expectedFull,
+		},
+		"Config_without_optional_parameters": {
+			&CloudBootstrapConfig{
+				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
+					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
+						BootstrapExpect: 3,
+						ID:              "dc1",
+					},
+				},
+				HCPConfig: HCPConfig{
+					ResourceID:                "consul-hcp-resource-id",
+					ClientID:                  "consul-hcp-client-id",
+					ClientSecret:              "consul-hcp-client-secret",
+					ObservabilityClientID:     "consul-hcp-observability-client-id",
+					ObservabilityClientSecret: "consul-hcp-observability-client-secret",
+				},
+			},
+			expectedWithoutOptional,
+		},
+		"Config_without_observability_parameters": {
 			&CloudBootstrapConfig{
 				BootstrapResponse: &models.HashicorpCloudGlobalNetworkManager20220215AgentBootstrapResponse{
 					Cluster: &models.HashicorpCloudGlobalNetworkManager20220215Cluster{
@@ -574,11 +725,11 @@ server:
 					ClientSecret: "consul-hcp-client-secret",
 				},
 			},
-			expectedWithoutOptional,
+			expectedWithoutObservability,
 		},
 	}
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
 			cloudHelmValues := cloudPreset.getHelmConfigWithMapSecretNames(tc.config)
 			require.NotNil(t, cloudHelmValues)
 			valuesYaml, err := yaml.Marshal(cloudHelmValues)
@@ -607,6 +758,8 @@ func savePlaceholderSecret(secretName string, k8sClient kubernetes.Interface) {
 func deleteSecrets(k8sClient kubernetes.Interface) {
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPClientId, metav1.DeleteOptions{})
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPClientSecret, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPObservabilityClientId, metav1.DeleteOptions{})
+	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPObservabilityClientSecret, metav1.DeleteOptions{})
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPResourceId, metav1.DeleteOptions{})
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPAuthURL, metav1.DeleteOptions{})
 	k8sClient.CoreV1().Secrets(namespace).Delete(context.Background(), expectedSecretNameHCPApiHostname, metav1.DeleteOptions{})
@@ -634,6 +787,14 @@ func checkAllSecretsWereSaved(t require.TestingT, k8s kubernetes.Interface, expe
 	// Check the hcp client secret secret is as expected.
 	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPClientSecret, secretKeyHCPClientSecret,
 		expectedConfig.HCPConfig.ClientSecret, corev1.SecretTypeOpaque)
+
+	// Check the hcp client id secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPObservabilityClientID, secretKeyHCPClientID,
+		expectedConfig.HCPConfig.ObservabilityClientID, corev1.SecretTypeOpaque)
+
+	// Check the hcp client secret secret is as expected.
+	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPObservabilityClientSecret, secretKeyHCPClientSecret,
+		expectedConfig.HCPConfig.ObservabilityClientSecret, corev1.SecretTypeOpaque)
 
 	// Check the hcp auth URL secret is as expected.
 	ensureSecretKeyValueMatchesExpected(t, k8s, secretNameHCPAuthURL, secretKeyHCPAuthURL,
@@ -680,6 +841,8 @@ func checkSecretsWereNotSaved(k8s kubernetes.Interface) bool {
 	ns, _ := k8s.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	hcpClientIdSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPClientID, metav1.GetOptions{})
 	hcpClientSecretSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPClientSecret, metav1.GetOptions{})
+	hcpObservabilityClientIdSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPObservabilityClientID, metav1.GetOptions{})
+	hcpObservabilityClientSecretSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPObservabilityClientSecret, metav1.GetOptions{})
 	hcpResourceIdSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPResourceID, metav1.GetOptions{})
 	bootstrapSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameBootstrapToken, metav1.GetOptions{})
 	gossipKeySecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameGossipKey, metav1.GetOptions{})
@@ -687,7 +850,7 @@ func checkSecretsWereNotSaved(k8s kubernetes.Interface) bool {
 	serverCASecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameServerCA, metav1.GetOptions{})
 	return ns == nil && hcpClientIdSecret == nil && hcpClientSecretSecret == nil &&
 		hcpResourceIdSecret == nil && bootstrapSecret == nil &&
-		gossipKeySecret == nil && serverCASecret == nil && serverCertSecret == nil
+		gossipKeySecret == nil && serverCASecret == nil && serverCertSecret == nil && hcpObservabilityClientIdSecret == nil && hcpObservabilityClientSecretSecret == nil
 }
 
 func getDeepCopyOfValidBootstrapConfig() *CloudBootstrapConfig {

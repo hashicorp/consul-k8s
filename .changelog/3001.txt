@@ -1,0 +1,3 @@
+```release-note:bug
+crd: fix misspelling of preparedQuery field in ControlPlaneRequestLimit CRD
+```

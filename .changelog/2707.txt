@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: adds ability to map privileged ports on Gateway listeners to unprivileged ports so that containers do not require additional privileges
+```

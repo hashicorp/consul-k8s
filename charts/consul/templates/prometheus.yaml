@@ -410,8 +410,8 @@ spec:
   template:
     metadata:
       annotations:
-        
         consul.hashicorp.com/connect-inject: "false"
+        consul.hashicorp.com/mesh-inject: "false"
       labels:
         component: "server"
         app: prometheus

@@ -1,0 +1,15 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-client
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/transparent-proxy": "false"
+        "consul.hashicorp.com/sidecar-proxy-lifecycle-shutdown-grace-period-seconds": "5"
+        "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"

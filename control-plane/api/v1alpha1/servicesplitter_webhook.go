@@ -8,9 +8,11 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 // +kubebuilder:object:generate=false
@@ -56,7 +58,7 @@ func (v *ServiceSplitterWebhook) List(ctx context.Context) ([]common.ConfigEntry
 	return entries, nil
 }
 
-func (v *ServiceSplitterWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+func (v *ServiceSplitterWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-servicesplitter", &admission.Webhook{Handler: v})
 }

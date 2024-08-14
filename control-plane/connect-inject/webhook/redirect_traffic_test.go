@@ -10,10 +10,9 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
-	logrtest "github.com/go-logr/logr/testing"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,6 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 const (
@@ -34,8 +36,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(s)
 	cases := []struct {
 		name       string
 		webhook    MeshWebhook
@@ -48,7 +49,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "basic bare minimum pod",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -78,7 +79,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "proxy health checks enabled",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -111,7 +112,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "metrics enabled",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -145,7 +146,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "metrics enabled with incorrect annotation",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -180,7 +181,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "overwrite probes, transparent proxy annotation set",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -199,7 +200,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 						{
 							Name: "test",
 							LivenessProbe: &corev1.Probe{
-								Handler: corev1.Handler{
+								ProbeHandler: corev1.ProbeHandler{
 									HTTPGet: &corev1.HTTPGetAction{
 										Port: intstr.FromInt(exposedPathsLivenessPortsRangeStart),
 									},
@@ -221,7 +222,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude inbound ports",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -254,7 +255,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude outbound ports",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -287,7 +288,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude outbound CIDRs",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -320,7 +321,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude UIDs",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -352,7 +353,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		{
 			name: "exclude inbound ports, outbound ports, outbound CIDRs, and UIDs",
 			webhook: MeshWebhook{
-				Log:                   logrtest.TestLogger{T: t},
+				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
 				DenyK8sNamespacesSet:  mapset.NewSet(),
 				decoder:               decoder,
@@ -389,7 +390,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err = c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
+			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
 
 			// Only compare annotation and iptables config on successful runs
 			if c.expErr == nil {
@@ -400,7 +401,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 				actualConfig := iptables.Config{}
 				err = json.Unmarshal([]byte(anno), &actualConfig)
 				require.NoError(t, err)
-				require.Equal(t, c.expCfg, actualConfig)
+				assert.ObjectsAreEqual(c.expCfg, actualConfig)
 			} else {
 				require.EqualError(t, err, c.expErr.Error())
 			}

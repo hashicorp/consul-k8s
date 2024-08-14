@@ -530,7 +530,11 @@ load _helpers
       -s templates/client-daemonset.yaml  \
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -584,6 +588,19 @@ load _helpers
   [ "${actual}" = "/v1/agent/metrics" ]
 }
 
+@test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, and client annotation for prometheus path is specified, it uses the client annotation rather than default." {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'client.annotations=prometheus.io/path: /anew/path' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  [ "${actual}" = "/anew/path" ]
+}
+
 @test "client/DaemonSet: when global.metrics.enableAgentMetrics=true, sets telemetry flag" {
   cd `chart_dir`
   local actual=$(helm template \
@@ -621,7 +638,7 @@ load _helpers
       --set 'client.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = f9be2829fed80a127e3752e10be32f29c2f9ca0ea548abcf3d4fc2c985cb7201 ]
+  [ "${actual}" = 678c5c1c2ca0f8cb1464d38636f12714c05df26fab1a101e43ce619fdbc2e7d1 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when extraConfig is provided" {
@@ -632,7 +649,7 @@ load _helpers
       --set 'client.extraConfig="{\"hello\": \"world\"}"' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = e9fb5f0b4ff4e36a89e8ca2dc1aed2072306e0dd6d4cc60b3edf155cf8dbe2e9 ]
+  [ "${actual}" = 0ef58da6fd14fb57c702a2a0d631c4eecacff152fe3a36836a23283b19d8dbe1 ]
 }
 
 @test "client/DaemonSet: config-checksum annotation changes when connectInject.enabled=true" {
@@ -643,7 +660,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
       yq -r '.spec.template.metadata.annotations."consul.hashicorp.com/config-checksum"' | tee /dev/stderr)
-  [ "${actual}" = f9be2829fed80a127e3752e10be32f29c2f9ca0ea548abcf3d4fc2c985cb7201 ]
+  [ "${actual}" = 678c5c1c2ca0f8cb1464d38636f12714c05df26fab1a101e43ce619fdbc2e7d1 ]
 }
 
 #--------------------------------------------------------------------
@@ -1441,7 +1458,7 @@ load _helpers
       --set 'client.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[2]] | any(contains("consul logout"))' | tee /dev/stderr)
+      yq '[.spec.template.spec.containers[0].lifecycle.preStop.exec.command[1]] | any(contains("logout"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -2127,29 +2144,6 @@ rollingUpdate:
   [[ "$output" =~ "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" ]]
 }
 
-@test "client/DaemonSet: consul login datacenter is set to primary when when federation enabled in non-primary datacenter" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'client.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.acls.manageSystemACLs=true' \
-      --set 'global.datacenter=dc1' \
-      --set 'global.federation.enabled=true' \
-      --set 'global.federation.primaryDatacenter=dc2' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.initContainers[] | select(.name == "client-acl-init")' | tee /dev/stderr)
-
-  local actual=$(echo $object |
-      yq '[.env[11].name] | any(contains("CONSUL_LOGIN_DATACENTER"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  local actual=$(echo $object |
-      yq '[.env[11].value] | any(contains("dc2"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
 #--------------------------------------------------------------------
 # extraContainers
 
@@ -2341,6 +2335,71 @@ rollingUpdate:
   local actual=$(echo $object |
       yq -r '.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
+}
+
+@test "client/DaemonSet: vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "client/DaemonSet: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is see and agentAnnotations are set without vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/agent-extra-secret: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "vns" ]
+}
+
+@test "client/DaemonSet: correct vault namespace annotations is set when global.secretsBackend.vault.vaultNamespace is set and agentAnnotations are also set with vaultNamespace annotation" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulServerRole=bar' \
+      --set 'global.secretsBackend.vault.consulCARole=test' \
+      --set 'global.secretsBackend.vault.vaultNamespace=vns' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.secretsBackend.vault.agentAnnotations=vault.hashicorp.com/namespace: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata' | tee /dev/stderr)
+
+  local actual="$(echo $cmd |
+      yq -r '.annotations["vault.hashicorp.com/namespace"]' | tee /dev/stderr)"
+  [ "${actual}" = "bar" ]
 }
 
 @test "client/DaemonSet: vault gossip annotations are set when gossip encryption enabled" {
@@ -2682,7 +2741,14 @@ rollingUpdate:
       --set 'global.secretsBackend.vault.consulClientRole=test' \
       --set 'global.secretsBackend.vault.consulServerRole=foo' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations | del(."consul.hashicorp.com/connect-inject") | del(."consul.hashicorp.com/config-checksum") | del(."vault.hashicorp.com/agent-inject") | del(."vault.hashicorp.com/role") | del(."vault.hashicorp.com/agent-init-first")' | tee /dev/stderr)
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum") |
+      del(."vault.hashicorp.com/agent-inject") |
+      del(."vault.hashicorp.com/role") |
+      del(."vault.hashicorp.com/agent-init-first")' |
+      tee /dev/stderr)
   [ "${actual}" = "{}" ]
 }
 
@@ -2758,8 +2824,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2778,8 +2842,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2799,8 +2861,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \
@@ -2823,8 +2883,6 @@ rollingUpdate:
   cd `chart_dir`
   run helm template \
       -s templates/client-daemonset.yaml  \
-      --set 'apiGateway.enabled=true' \
-      --set 'apiGateway.image=foo' \
       --set 'global.tls.enabled=true' \
       --set 'global.tls.enableAutoEncrypt=true' \
       --set 'global.datacenter=dc-foo' \

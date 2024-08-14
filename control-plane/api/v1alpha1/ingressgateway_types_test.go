@@ -8,11 +8,13 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
 func TestIngressGateway_MatchesConsul(t *testing.T) {
@@ -70,6 +72,17 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 						MaxConnections:        &defaultMaxConnections,
 						MaxPendingRequests:    &defaultMaxPendingRequests,
 						MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+						PassiveHealthCheck: &PassiveHealthCheck{
+							Interval: metav1.Duration{
+								Duration: 2 * time.Second,
+							},
+							MaxFailures:             uint32(20),
+							EnforcingConsecutive5xx: pointer.Uint32(100),
+							MaxEjectionPercent:      pointer.Uint32(10),
+							BaseEjectionTime: &metav1.Duration{
+								Duration: 10 * time.Second,
+							},
+						},
 					},
 					Listeners: []IngressListener{
 						{
@@ -90,7 +103,6 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 									Name:      "name1",
 									Hosts:     []string{"host1_1", "host1_2"},
 									Namespace: "ns1",
-									Partition: "default",
 									IngressServiceConfig: IngressServiceConfig{
 										MaxConnections:        &maxConnections,
 										MaxPendingRequests:    &maxPendingRequests,
@@ -170,6 +182,13 @@ func TestIngressGateway_MatchesConsul(t *testing.T) {
 					MaxConnections:        &defaultMaxConnections,
 					MaxPendingRequests:    &defaultMaxPendingRequests,
 					MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+					PassiveHealthCheck: &capi.PassiveHealthCheck{
+						Interval:                2 * time.Second,
+						MaxFailures:             uint32(20),
+						EnforcingConsecutive5xx: pointer.Uint32(100),
+						MaxEjectionPercent:      pointer.Uint32(10),
+						BaseEjectionTime:        pointer.Duration(10 * time.Second),
+					},
 				},
 				Listeners: []capi.IngressListener{
 					{
@@ -332,6 +351,17 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 						MaxConnections:        &defaultMaxConnections,
 						MaxPendingRequests:    &defaultMaxPendingRequests,
 						MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+						PassiveHealthCheck: &PassiveHealthCheck{
+							Interval: metav1.Duration{
+								Duration: 2 * time.Second,
+							},
+							MaxFailures:             uint32(20),
+							EnforcingConsecutive5xx: pointer.Uint32(100),
+							MaxEjectionPercent:      pointer.Uint32(10),
+							BaseEjectionTime: &metav1.Duration{
+								Duration: 10 * time.Second,
+							},
+						},
 					},
 					Listeners: []IngressListener{
 						{
@@ -431,6 +461,13 @@ func TestIngressGateway_ToConsul(t *testing.T) {
 					MaxConnections:        &defaultMaxConnections,
 					MaxPendingRequests:    &defaultMaxPendingRequests,
 					MaxConcurrentRequests: &defaultMaxConcurrentRequests,
+					PassiveHealthCheck: &capi.PassiveHealthCheck{
+						Interval:                2 * time.Second,
+						MaxFailures:             uint32(20),
+						EnforcingConsecutive5xx: pointer.Uint32(100),
+						MaxEjectionPercent:      pointer.Uint32(10),
+						BaseEjectionTime:        pointer.Duration(10 * time.Second),
+					},
 				},
 				Listeners: []capi.IngressListener{
 					{

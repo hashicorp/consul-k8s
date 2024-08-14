@@ -213,9 +213,9 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Loop through snapshot agents.  Only one will be the leader and have the snapshot files.
 		pod := podList.Items[0]
-		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
+		snapshotFileListOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(r, kubectlOptions, terratestLogger.Discard, "exec", pod.Name, "-c", "consul-snapshot-agent", "--", "ls", "/tmp")
 		require.NoError(r, err)
-		logger.Logf(t, "Snapshot: \n%s", snapshotFileListOutput)
+		logger.Logf(r, "Snapshot: \n%s", snapshotFileListOutput)
 		require.Contains(r, snapshotFileListOutput, ".snap", "Agent pod does not contain snapshot files")
 	})
 }

@@ -207,3 +207,76 @@ load _helpers
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# logLevel
+
+@test "tlsInit/Job: use global.logLevel by default" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "tlsInit/Job: override global.logLevel when global.tls.logLevel is set" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.logLevel=error' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=error"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+#--------------------------------------------------------------------
+# server.containerSecurityContext.tlsInit
+
+@test "tlsInit/Job: securityContext is set when server.containerSecurityContext.tlsInit is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'server.containerSecurityContext.tlsInit.runAsUser=100' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext.runAsUser' | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+}
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "tlsInit/Job: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "tlsInit/Job: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.annotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}

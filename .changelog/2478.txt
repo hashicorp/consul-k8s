@@ -1,0 +1,5 @@
+```release-note:bug
+api-gateway: fixes bug where envoy will silently reject RSA keys less than 2048 bits in length when not in FIPS mode, and
+will reject keys that are not 2048, 3072, or 4096 bits in length in FIPS mode. We now validate
+and reject invalid certs earlier.
+```

@@ -5,11 +5,11 @@ package serveraclinit
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
 func TestAgentRules(t *testing.T) {
@@ -138,82 +138,6 @@ partition_prefix "" {
 
 			require.NoError(t, err)
 			require.Equal(t, tt.Expected, rules)
-		})
-	}
-}
-
-func TestAPIGatewayControllerRules(t *testing.T) {
-	cases := []struct {
-		Name             string
-		EnableNamespaces bool
-		Partition        string
-		Expected         string
-	}{
-		{
-			Name: "Namespaces are disabled",
-			Expected: `
-operator = "write"
-acl = "write"
-  service_prefix "" {
-    policy = "write"
-    intentions = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }`,
-		},
-		{
-			Name:             "Namespaces are enabled",
-			EnableNamespaces: true,
-			Expected: `
-operator = "write"
-acl = "write"
-namespace_prefix "" {
-  policy = "write"
-  service_prefix "" {
-    policy = "write"
-    intentions = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-}`,
-		},
-		{
-			Name:             "Namespaces are enabled, partitions enabled",
-			EnableNamespaces: true,
-			Partition:        "Default",
-			Expected: `
-partition "Default" {
-  mesh = "write"
-  acl = "write"
-namespace_prefix "" {
-  policy = "write"
-  service_prefix "" {
-    policy = "write"
-    intentions = "write"
-  }
-  node_prefix "" {
-    policy = "read"
-  }
-}
-}`,
-		},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.Name, func(t *testing.T) {
-			cmd := Command{
-				flagEnableNamespaces: tt.EnableNamespaces,
-				consulFlags: &flags.ConsulFlags{
-					Partition: tt.Partition,
-				},
-			}
-
-			meshGatewayRules, err := cmd.apiGatewayControllerRules()
-
-			require.NoError(t, err)
-			require.Equal(t, tt.Expected, strings.Trim(meshGatewayRules, " "))
 		})
 	}
 }
@@ -953,6 +877,7 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
+  mesh = "write"
   operator = "write"
   acl = "write"
   node_prefix "" {
@@ -962,6 +887,10 @@ func TestInjectRules(t *testing.T) {
     service_prefix "" {
       policy = "write"
       intentions = "write"
+    }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
     }`,
 		},
 		{
@@ -969,6 +898,7 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    false,
 			Expected: `
+  mesh = "write"
   operator = "write"
   acl = "write"
   node_prefix "" {
@@ -980,6 +910,10 @@ func TestInjectRules(t *testing.T) {
       policy = "write"
       intentions = "write"
     }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
   }`,
 		},
 		{
@@ -987,6 +921,7 @@ func TestInjectRules(t *testing.T) {
 			EnablePartitions: false,
 			EnablePeering:    true,
 			Expected: `
+  mesh = "write"
   operator = "write"
   acl = "write"
   peering = "write"
@@ -996,6 +931,10 @@ func TestInjectRules(t *testing.T) {
   namespace_prefix "" {
     acl = "write"
     service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }
@@ -1017,6 +956,10 @@ partition "part-1" {
     policy = "write"
     acl = "write"
     service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }
@@ -1040,6 +983,10 @@ partition "part-1" {
     policy = "write"
     acl = "write"
     service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
       policy = "write"
       intentions = "write"
     }
@@ -1059,6 +1006,101 @@ partition "part-1" {
 			}
 
 			injectorRules, err := cmd.injectRules()
+
+			require.NoError(t, err)
+			require.Equal(t, tt.Expected, injectorRules)
+		})
+	}
+}
+
+// Test the dns-proxy rules with namespaces enabled or disabled.
+func TestDnsProxyRules(t *testing.T) {
+	cases := []struct {
+		EnableNamespaces bool
+		EnablePartitions bool
+		EnablePeering    bool
+		PartitionName    string
+		Expected         string
+	}{
+		{
+			EnableNamespaces: false,
+			EnablePartitions: false,
+			EnablePeering:    false,
+			Expected: `
+			node_prefix "" {
+			  policy = "read"
+			}
+			service_prefix "" {
+			  policy = "read"
+			}`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: false,
+			EnablePeering:    false,
+			Expected: `
+			node_prefix "" {
+			  policy = "read"
+			}
+			service_prefix "" {
+			  policy = "read"
+			}`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: false,
+			EnablePeering:    true,
+			Expected: `
+			node_prefix "" {
+			  policy = "read"
+			}
+			service_prefix "" {
+			  policy = "read"
+			}`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: true,
+			EnablePeering:    false,
+			PartitionName:    "part-1",
+			Expected: `
+			partition "part-1" {
+			node_prefix "" {
+			  policy = "read"
+			}
+			service_prefix "" {
+			  policy = "read"
+			}
+			}`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: true,
+			EnablePeering:    true,
+			PartitionName:    "part-1",
+			Expected: `
+			partition "part-1" {
+			node_prefix "" {
+			  policy = "read"
+			}
+			service_prefix "" {
+			  policy = "read"
+			}
+			}`,
+		},
+	}
+
+	for _, tt := range cases {
+		caseName := fmt.Sprintf("ns=%t, partition=%t, peering=%t", tt.EnableNamespaces, tt.EnablePartitions, tt.EnablePeering)
+		t.Run(caseName, func(t *testing.T) {
+
+			cmd := Command{
+				consulFlags:          &flags.ConsulFlags{Partition: tt.PartitionName},
+				flagEnableNamespaces: tt.EnableNamespaces,
+				flagEnablePeering:    tt.EnablePeering,
+			}
+
+			injectorRules, err := cmd.dnsProxyRules()
 
 			require.NoError(t, err)
 			require.Equal(t, tt.Expected, injectorRules)

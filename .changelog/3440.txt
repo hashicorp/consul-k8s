@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix issue where deleting an http-route in a non-default namespace would not remove the route from Consul.
+```

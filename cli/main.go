@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/hashicorp/consul-k8s/cli/version"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )

@@ -14,11 +14,14 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/pointer"
 )
 
 const nodeName1 = "ip-10-11-12-13.ec2.internal"
@@ -44,6 +47,9 @@ func TestServiceResource_createDelete(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	createNodes(t, client)
+	createEndpointSlice(t, client, svc.Name, metav1.NamespaceDefault)
+
 	// Delete
 	require.NoError(t, client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.Background(), "foo", metav1.DeleteOptions{}))
 
@@ -54,6 +60,139 @@ func TestServiceResource_createDelete(t *testing.T) {
 		actual := syncer.Registrations
 		require.Len(r, actual, 0)
 	})
+}
+
+// Test that Loadbalancer service weight is set from service annotation.
+func TestServiceWeight_ingress(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := newTestSyncer()
+	serviceResource := defaultServiceResource(client, syncer)
+
+	// Start the controller
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	// Insert an LB service
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	svc.Annotations[annotationServiceWeight] = "22"
+	svc.Status.LoadBalancer.Ingress = append(
+		svc.Status.LoadBalancer.Ingress,
+		corev1.LoadBalancerIngress{IP: "3.3.3.3"},
+	)
+
+	svc.Status.LoadBalancer.Ingress = append(
+		svc.Status.LoadBalancer.Ingress,
+		corev1.LoadBalancerIngress{IP: "4.4.4.4"},
+	)
+
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Verify what we got
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 3)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "3.3.3.3", actual[1].Service.Address)
+		require.Equal(r, 22, actual[1].Service.Weights.Passing)
+		require.Equal(r, "foo", actual[2].Service.Service)
+		require.Equal(r, "4.4.4.4", actual[2].Service.Address)
+		require.Equal(r, 22, actual[2].Service.Weights.Passing)
+		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
+	})
+}
+
+// Test that Loadbalancer service weight is set from service annotation.
+func TestServiceWeight_externalIP(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := newTestSyncer()
+	serviceResource := defaultServiceResource(client, syncer)
+
+	// Start the controller
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	// Insert an LB service
+	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
+	svc.Annotations[annotationServiceWeight] = "22"
+	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
+
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Verify what we got
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 2)
+		require.Equal(r, "foo", actual[0].Service.Service)
+		require.Equal(r, "3.3.3.3", actual[0].Service.Address)
+		require.Equal(r, 22, actual[0].Service.Weights.Passing)
+		require.Equal(r, "foo", actual[1].Service.Service)
+		require.Equal(r, "4.4.4.4", actual[1].Service.Address)
+		require.Equal(r, 22, actual[1].Service.Weights.Passing)
+		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
+	})
+}
+
+// Test service weight.
+func TestServiceWeight(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		Weight         string
+		ExpectError    bool
+		ExtectedWeight int
+	}{
+		"external-IP": {
+			Weight:         "22",
+			ExpectError:    false,
+			ExtectedWeight: 22,
+		},
+		"non-int-weight": {
+			Weight:         "non-int",
+			ExpectError:    true,
+			ExtectedWeight: 0,
+		},
+		"one-weight": {
+			Weight:         "1",
+			ExpectError:    true,
+			ExtectedWeight: 0,
+		},
+		"zero-weight": {
+			Weight:         "0",
+			ExpectError:    true,
+			ExtectedWeight: 0,
+		},
+		"negative-weight": {
+			Weight:         "-2",
+			ExpectError:    true,
+			ExtectedWeight: 0,
+		},
+		"greater-than-100-is-allowed": {
+			Weight:         "1000",
+			ExpectError:    false,
+			ExtectedWeight: 1000,
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(tt *testing.T) {
+			weightI, err := getServiceWeight(c.Weight)
+			// Verify what we got
+			retry.Run(tt, func(r *retry.R) {
+				if c.ExpectError {
+					require.Error(r, err)
+				} else {
+					require.Equal(r, c.ExtectedWeight, weightI)
+				}
+			})
+		})
+	}
 }
 
 // Test that we're default enabled.
@@ -626,23 +765,36 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 
 	node1, _ := createNodes(t, client)
 
-	// Insert the endpoints
-	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(
+	// Insert the endpoint slice
+	_, err := client.DiscoveryV1().EndpointSlices(metav1.NamespaceDefault).Create(
 		context.Background(),
-		&corev1.Endpoints{
+		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+				GenerateName: "foo-",
+				Labels:       map[string]string{discoveryv1.LabelServiceName: "foo"},
 			},
-
-			Subsets: []corev1.EndpointSubset{
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints: []discoveryv1.Endpoint{
 				{
-					Addresses: []corev1.EndpointAddress{
-						{NodeName: &node1.Name, IP: "8.8.8.8"},
+					Addresses: []string{"8.8.8.8"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
-					Ports: []corev1.EndpointPort{
-						{Name: "http", Port: 8080},
-						{Name: "rpc", Port: 2000},
-					},
+					TargetRef: &corev1.ObjectReference{Kind: "pod", Name: "foo", Namespace: metav1.NamespaceDefault},
+					NodeName:  &node1.Name,
+					Zone:      pointer.String("us-west-2a"),
+				},
+			},
+			Ports: []discoveryv1.EndpointPort{
+				{
+					Name: pointer.String("http"),
+					Port: pointer.Int32(8080),
+				},
+				{
+					Name: pointer.String("rpc"),
+					Port: pointer.Int32(2000),
 				},
 			},
 		},
@@ -681,7 +833,7 @@ func TestServiceResource_nodePort(t *testing.T) {
 
 	createNodes(t, client)
 
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
@@ -721,7 +873,7 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 
 	createNodes(t, client)
 
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
@@ -761,23 +913,36 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 
 	node1, _ := createNodes(t, client)
 
-	// Insert the endpoints
-	_, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Create(
+	// Insert the endpoint slice
+	_, err := client.DiscoveryV1().EndpointSlices(metav1.NamespaceDefault).Create(
 		context.Background(),
-		&corev1.Endpoints{
+		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "foo",
+				GenerateName: "foo-",
+				Labels:       map[string]string{discoveryv1.LabelServiceName: "foo"},
 			},
-
-			Subsets: []corev1.EndpointSubset{
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints: []discoveryv1.Endpoint{
 				{
-					Addresses: []corev1.EndpointAddress{
-						{NodeName: &node1.Name, IP: "1.2.3.4"},
+					Addresses: []string{"1.2.3.4"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
-					Ports: []corev1.EndpointPort{
-						{Name: "http", Port: 8080},
-						{Name: "rpc", Port: 2000},
-					},
+					TargetRef: &corev1.ObjectReference{Kind: "pod", Name: "foo", Namespace: metav1.NamespaceDefault},
+					NodeName:  &node1.Name,
+					Zone:      pointer.String("us-west-2a"),
+				},
+			},
+			Ports: []discoveryv1.EndpointPort{
+				{
+					Name: pointer.String("http"),
+					Port: pointer.Int32(8080),
+				},
+				{
+					Name: pointer.String("rpc"),
+					Port: pointer.Int32(2000),
 				},
 			},
 		},
@@ -816,12 +981,12 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 
 	createNodes(t, client)
 
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
-
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
 	svc.Annotations = map[string]string{annotationServicePort: "rpc"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+	createEndpointSlice(t, client, svc.Name, metav1.NamespaceDefault)
+
 	require.NoError(t, err)
 
 	// Verify what we got
@@ -856,7 +1021,7 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 
 	createNodes(t, client)
 
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
@@ -901,7 +1066,7 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 
 	createNodes(t, client)
 
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
@@ -949,7 +1114,7 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	_, err := client.CoreV1().Nodes().UpdateStatus(context.Background(), node1, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Insert the service
 	svc := nodePortService("foo", metav1.NamespaceDefault)
@@ -991,8 +1156,10 @@ func TestServiceResource_clusterIP(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1006,6 +1173,8 @@ func TestServiceResource_clusterIP(t *testing.T) {
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
 		require.Equal(r, 8080, actual[1].Service.Port)
+		require.Equal(r, "us-west-2a", actual[0].Service.Meta["external-k8s-topology-zone"])
+		require.Equal(r, "us-west-2b", actual[1].Service.Meta["external-k8s-topology-zone"])
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 	})
 }
@@ -1027,8 +1196,10 @@ func TestServiceResource_clusterIP_healthCheck(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1065,8 +1236,10 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1103,8 +1276,10 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1141,8 +1316,10 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1181,8 +1358,10 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1218,8 +1397,10 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1248,8 +1429,10 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	_, err := client.CoreV1().Services(testNamespace).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", testNamespace)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", testNamespace)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1289,8 +1472,10 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1325,8 +1510,10 @@ func TestServiceResource_targetRefInMeta(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Insert the endpoints
-	createEndpoints(t, client, "foo", metav1.NamespaceDefault)
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -1665,8 +1852,8 @@ func TestServiceResource_addIngress(t *testing.T) {
 					},
 				},
 				Status: networkingv1.IngressStatus{
-					LoadBalancer: corev1.LoadBalancerStatus{
-						Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4"}},
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
 					},
 				},
 			},
@@ -1712,8 +1899,8 @@ func TestServiceResource_addIngress(t *testing.T) {
 					},
 				},
 				Status: networkingv1.IngressStatus{
-					LoadBalancer: corev1.LoadBalancerStatus{
-						Ingress: []corev1.LoadBalancerIngress{{IP: "1.2.3.4"}},
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
 					},
 				},
 			},
@@ -1812,7 +1999,10 @@ func TestServiceResource_addIngress(t *testing.T) {
 			// Create the ingress
 			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
 			require.NoError(t, err)
-			createEndpoints(t, client, "test-service", metav1.NamespaceDefault)
+
+			createNodes(t, client)
+			createEndpointSlice(t, client, "test-service", metav1.NamespaceDefault)
+
 			// Verify that the service name annotation is preferred
 			retry.Run(t, func(r *retry.R) {
 				syncer.Lock()
@@ -1933,43 +2123,55 @@ func createNodes(t *testing.T, client *fake.Clientset) (*corev1.Node, *corev1.No
 	return node1, node2
 }
 
-// createEndpoints calls the fake k8s client to create two endpoints on two nodes.
-func createEndpoints(t *testing.T, client *fake.Clientset, serviceName string, namespace string) {
+// createEndpointSlices calls the fake k8s client to create an endpoint slices with two endpoints on different nodes.
+func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName string, namespace string) {
 	node1 := nodeName1
 	node2 := nodeName2
 	targetRef := corev1.ObjectReference{Kind: "pod", Name: "foobar"}
-	_, err := client.CoreV1().Endpoints(namespace).Create(
+
+	_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(
 		context.Background(),
-		&corev1.Endpoints{
+		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: namespace,
+				Labels: map[string]string{discoveryv1.LabelServiceName: serviceName},
+				Name:   serviceName + "-" + rand.String(5),
 			},
-
-			Subsets: []corev1.EndpointSubset{
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints: []discoveryv1.Endpoint{
 				{
-					Addresses: []corev1.EndpointAddress{
-						{NodeName: &node1, IP: "1.1.1.1", TargetRef: &targetRef},
+					Addresses: []string{"1.1.1.1"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
-					Ports: []corev1.EndpointPort{
-						{Name: "http", Port: 8080},
-						{Name: "rpc", Port: 2000},
-					},
+					TargetRef: &targetRef,
+					NodeName:  &node1,
+					Zone:      pointer.String("us-west-2a"),
 				},
-
 				{
-					Addresses: []corev1.EndpointAddress{
-						{NodeName: &node2, IP: "2.2.2.2"},
+					Addresses: []string{"2.2.2.2"},
+					Conditions: discoveryv1.EndpointConditions{
+						Ready:       pointer.Bool(true),
+						Serving:     pointer.Bool(true),
+						Terminating: pointer.Bool(false),
 					},
-					Ports: []corev1.EndpointPort{
-						{Name: "http", Port: 8080},
-						{Name: "rpc", Port: 2000},
-					},
+					NodeName: &node2,
+					Zone:     pointer.String("us-west-2b"),
+				},
+			},
+			Ports: []discoveryv1.EndpointPort{
+				{
+					Name: pointer.String("http"),
+					Port: pointer.Int32(8080),
+				},
+				{
+					Name: pointer.String("rpc"),
+					Port: pointer.Int32(2000),
 				},
 			},
 		},
 		metav1.CreateOptions{})
-
 	require.NoError(t, err)
 }
 

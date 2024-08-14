@@ -1,0 +1,3 @@
+```release-note:bug
+bug: Remove `global.acls.nodeSelector` and `global.acls.annotations` from Gateway Resources Jobs
+```

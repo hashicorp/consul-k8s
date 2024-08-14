@@ -15,6 +15,32 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.restrictedSecurityContext" -}}
+{{- if not .Values.global.enablePodSecurityPolicies -}}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+    add:
+    - NET_BIND_SERVICE
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+{{- if not .Values.global.openshift.enabled -}}
+{{/*
+We must set runAsUser or else the root user will be used in some cases and
+containers will fail to start due to runAsNonRoot above (e.g.
+tls-init-cleanup). On OpenShift, runAsUser is automatically. We pick user 100
+because it is a non-root user id that exists in the consul, consul-dataplane,
+and consul-k8s-control-plane images.
+*/}}
+  runAsUser: 100
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "consul.vaultSecretTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .secretName }}" -{{ "}}" }}
@@ -120,10 +146,33 @@ substitution for HOST_IP/POD_IP/HOSTNAME. Useful for dogstats telemetry. The out
 is passed to consul as a -config-file param on command line.
 */}}
 {{- define "consul.extraconfig" -}}
-              cp /consul/config/extra-from-values.json /consul/extra-config/extra-from-values.json
+              cp /consul/tmp/extra-config/extra-from-values.json /consul/extra-config/extra-from-values.json
               [ -n "${HOST_IP}" ] && sed -Ei "s|HOST_IP|${HOST_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${POD_IP}" ] && sed -Ei "s|POD_IP|${POD_IP?}|g" /consul/extra-config/extra-from-values.json
               [ -n "${HOSTNAME}" ] && sed -Ei "s|HOSTNAME|${HOSTNAME?}|g" /consul/extra-config/extra-from-values.json
+{{- end -}}
+
+{{/*
+Cleanup server.extraConfig entries to avoid conflicting entries:
+    - server.enableAgentDebug:
+      - `enable_debug` should not exist in extraConfig
+    - metrics.disableAgentHostName:
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `disable_hostname` should not exist in extraConfig
+    - metrics.enableHostMetrics:
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `enable_host_metrics` should not exist in extraConfig
+    - metrics.prefixFilter
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `prefix_filter` should not exist in extraConfig
+    - metrics.datadog.enabled:
+      - if global.metrics.datadog.enabled and global.metrics.datadog.dogstatsd.enabled, `dogstatsd_tags` and `dogstatsd_addr` should not exist in extraConfig
+
+Usage: {{ template "consul.validateExtraConfig" . }}
+*/}}
+{{- define "consul.validateExtraConfig" -}}
+{{- if (contains "enable_debug" .Values.server.extraConfig) }}{{ fail "The enable_debug key is present in extra-from-values.json. Use server.enableAgentDebug to set this value." }}{{- end }}
+{{- if (contains "disable_hostname" .Values.server.extraConfig) }}{{ fail "The disable_hostname key is present in extra-from-values.json. Use global.metrics.disableAgentHostName to set this value." }}{{- end }}
+{{- if (contains "enable_host_metrics" .Values.server.extraConfig) }}{{ fail "The enable_host_metrics key is present in extra-from-values.json. Use global.metrics.enableHostMetrics to set this value." }}{{- end }}
+{{- if (contains "prefix_filter" .Values.server.extraConfig) }}{{ fail "The prefix_filter key is present in extra-from-values.json. Use global.metrics.prefix_filter to set this value." }}{{- end }}
+{{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}{{- if (contains "dogstatsd_tags" .Values.server.extraConfig) }}{{ fail "The dogstatsd_tags key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsdTags to set this value." }}{{- end }}{{- end }}{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}{{- if (contains "dogstatsd_addr" .Values.server.extraConfig) }}{{ fail "The dogstatsd_addr key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsd_addr to set this value." }}{{- end }}{{- end }}{{- end }}
 {{- end -}}
 
 {{/*
@@ -141,24 +190,27 @@ Expand the name of the chart.
 {{- end -}}
 
 {{/*
-Compute the maximum number of unavailable replicas for the PodDisruptionBudget.
-This defaults to (n/2)-1 where n is the number of members of the server cluster.
-Special case of replica equaling 3 and allowing a minor disruption of 1 otherwise
-use the integer value
-Add a special case for replicas=1, where it should default to 0 as well.
+Calculate max number of server pods that are allowed to be voluntarily disrupted.
+When there's 1 server, this is set to 0 because this pod should not be disrupted. This is an edge
+case and I'm not sure it makes a difference when there's only one server but that's what the previous config was and
+I don't want to change it for this edge case.
+Otherwise we've changed this to always be 1 as part of the move to set leave_on_terminate
+to true. With leave_on_terminate set to true, whenever a server pod is stopped, the number of peers in raft
+is reduced. If the number of servers is odd and the count is reduced by 1, the quorum size doesn't change,
+but if it's reduced by more than 1, the quorum size can change so that's why this is now always hardcoded to 1.
 */}}
-{{- define "consul.pdb.maxUnavailable" -}}
+{{- define "consul.server.pdb.maxUnavailable" -}}
 {{- if eq (int .Values.server.replicas) 1 -}}
 {{ 0 }}
 {{- else if .Values.server.disruptionBudget.maxUnavailable -}}
 {{ .Values.server.disruptionBudget.maxUnavailable -}}
 {{- else -}}
-{{- if eq (int .Values.server.replicas) 3 -}}
-{{- 1 -}}
-{{- else -}}
-{{- sub (div (int .Values.server.replicas) 2) 1 -}}
+{{ 1 }}
 {{- end -}}
 {{- end -}}
+
+{{- define "consul.server.autopilotMinQuorum" -}}
+{{- add (div (int .Values.server.replicas) 2) 1 -}}
 {{- end -}}
 
 {{- define "consul.pdb.connectInject.maxUnavailable" -}}
@@ -194,6 +246,7 @@ This template is for an init container.
 {{- define "consul.getAutoEncryptClientCA" -}}
 - name: get-auto-encrypt-client-ca
   image: {{ .Values.global.imageK8S }}
+  {{ template "consul.imagePullPolicy" . }}
   command:
     - "/bin/sh"
     - "-ec"
@@ -390,7 +443,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 
 {{/*
-Fails if temeletryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
+Fails if telemetryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
 - telemetryCollector.cloud.clientId.secretName
 - telemetryCollector.cloud.clientSecret.secretName
 - global.cloud.resourceId.secretName
@@ -399,11 +452,11 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 
 */}}
 {{- define "consul.validateTelemetryCollectorCloud" -}}
-{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, global.cloud.resourceId.secretName, telemetryCollector.cloud.clientSecret.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (and (not .Values.global.cloud.clientSecret.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." }}
 {{- end }}
-{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (or (not .Values.global.cloud.resourceId.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, global.cloud.resourceId.secretName,telemetryCollector.cloud.clientId.secretName must also be set."}}
+{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (and (not .Values.global.cloud.clientId.secretName) (not .Values.telemetryCollector.cloud.clientId.secretName))) }}
+{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set." }}
 {{- end }}
 {{- end }}
 
@@ -416,10 +469,191 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 {{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName (not .Values.telemetryCollector.cloud.clientSecret.secretKey)) (and .Values.telemetryCollector.cloud.clientSecret.secretKey (not .Values.telemetryCollector.cloud.clientSecret.secretName)) }}
 {{fail "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set."}}
 {{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
-{{fail "When telemetryCollector has clientId and clientSecret global.cloud.resourceId.secretName must be set"}}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName))) }}
+{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretName or global.cloud.resourceId.secretName must be set"}}
 {{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.global.cloud.resourceId.secretKey)) }}
-{{fail "When telemetryCollector has clientId and clientSecret .global.cloud.resourceId.secretKey must be set"}}
+{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey))) }}
+{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set"}}
 {{- end }}
+{{- end -}}
+
+{{/*
+Fails if telemetryCollector.cloud.resourceId is set but differs from global.cloud.resourceId. This should never happen. Either one or both are set, but they should never differ.
+If they differ, that implies we're configuring servers for one HCP Consul cluster but pushing envoy metrics for a different HCP Consul cluster. A user could set the same value
+in two secrets (it's questionable whether resourceId should be a secret at all) but we won't know at this point, so we just check secret name+key.
+
+Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
+
+*/}}
+{{- define "consul.validateTelemetryCollectorResourceId" -}}
+{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName) (not (eq .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName)) }}
+{{fail "When both global.cloud.resourceId.secretName and telemetryCollector.cloud.resourceId.secretName are set, they should be the same."}}
+{{- end }}
+{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey) (not (eq .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey)) }}
+{{fail "When both global.cloud.resourceId.secretKey and telemetryCollector.cloud.resourceId.secretKey are set, they should be the same."}}
+{{- end }}
+{{- end }}
+
+{{/**/}}
+
+{{/*
+Validation for Consul Metrics configuration:
+
+Fail if metrics.enabled=true and metrics.disableAgentHostName=true, but metrics.enableAgentMetrics=false
+    - metrics.enabled = true
+    - metrics.enableAgentMetrics = false
+    - metrics.disableAgentHostName = true
+
+Fail if metrics.enableAgentMetrics=true and metrics.disableAgentHostName=true, but metrics.enabled=false
+    - metrics.enabled = false
+    - metrics.enableAgentMetrics = true
+    - metrics.disableAgentHostName = true
+
+Fail if metrics.enabled=true and metrics.enableHostMetrics=true, but metrics.enableAgentMetrics=false
+    - metrics.enabled = true
+    - metrics.enableAgentMetrics = false
+    - metrics.enableHostMetrics = true
+
+Fail if metrics.enableAgentMetrics=true and metrics.enableHostMetrics=true, but metrics.enabled=false
+    - metrics.enabled = false
+    - metrics.enableAgentMetrics = true
+    - metrics.enableHostMetrics = true
+
+Usage: {{ template "consul.validateMetricsConfig" . }}
+
+*/}}
+
+{{- define "consul.validateMetricsConfig" -}}
+{{- if and (not .Values.global.metrics.enableAgentMetrics) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enabled )}}
+{{fail "When enabling metrics (global.metrics.enabled) and disabling hostname emission from metrics (global.metrics.disableAgentHostName), global.metrics.enableAgentMetrics must be set to true"}}
+{{- end }}
+{{- if and (not .Values.global.metrics) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enableAgentMetrics )}}
+{{fail "When enabling Consul agent metrics (global.metrics.enableAgentMetrics) and disabling hostname emission from metrics (global.metrics.disableAgentHostName), global metrics enablement (global.metrics.enabled) must be set to true"}}
+{{- end }}
+{{- if and (not .Values.global.metrics.enableAgentMetrics) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enabled )}}
+{{fail "When disabling hostname emission from metrics (global.metrics.disableAgentHostName) and enabling global metrics (global.metrics.enabled), Consul agent metrics must be enabled(global.metrics.enableAgentMetrics=true)"}}
+{{- end }}
+{{- if and (not .Values.global.metrics.enabled) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enableAgentMetrics)}}
+{{fail "When enabling Consul agent metrics (global.metrics.enableAgentMetrics) and disabling hostname metrics emission (global.metrics.disableAgentHostName), global metrics must be enabled (global.metrics.enabled)."}}
+{{- end }}
+{{- end -}}
+
+{{/*
+Validation for Consul Datadog Integration deployment:
+
+Fail if Datadog integration enabled and Consul server agent telemetry is not enabled.
+    - global.metrics.datadog.enabled=true
+    - global.metrics.enableAgentMetrics=false || global.metrics.enabled=false
+
+Fail if Consul OpenMetrics (Prometheus) and DogStatsD metrics are both enabled and configured.
+    - global.metrics.datadog.dogstatsd.enabled (scrapes `/v1/agent/metrics?format=prometheus` via the `use_prometheus_endpoint` option)
+    - global.metrics.datadog.openMetricsPrometheus.enabled (scrapes `/v1/agent/metrics?format=prometheus`)
+    - see https://docs.datadoghq.com/integrations/consul/?tab=host#host for recommendation to not have both
+
+Fail if Datadog OTLP forwarding is enabled and Consul Telemetry Collection is not enabled.
+    - global.metrics.datadog.otlp.enabled=true
+    - telemetryCollector.enabled=false
+
+Fail if Consul Open Telemetry collector forwarding protocol is not one of either "http" or "grpc"
+    - global.metrics.datadog.otlp.protocol!="http" || global.metrics.datadog.otlp.protocol!="grpc"
+
+Usage: {{ template "consul.validateDatadogConfiguration" . }}
+
+*/}}
+
+{{- define "consul.validateDatadogConfiguration" -}}
+{{- if and .Values.global.metrics.datadog.enabled (or (not .Values.global.metrics.enableAgentMetrics) (not .Values.global.metrics.enabled) )}}
+{{fail "When enabling datadog metrics collection, the /v1/agent/metrics is required to be accessible, therefore global.metrics.enableAgentMetrics and global.metrics.enabled must be also be enabled."}}
+{{- end }}
+{{- if and .Values.global.metrics.datadog.dogstatsd.enabled .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+{{fail "You must have one of DogStatsD (global.metrics.datadog.dogstatsd.enabled) or OpenMetrics (global.metrics.datadog.openMetricsPrometheus.enabled) enabled, not both as this is an unsupported configuration." }}
+{{- end }}
+{{- if and .Values.global.metrics.datadog.otlp.enabled (not .Values.telemetryCollector.enabled) }}
+{{fail "Cannot enable Datadog OTLP metrics collection (global.metrics.datadog.otlp.enabled) without consul-telemetry-collector. Ensure Consul OTLP collection is enabled (telemetryCollector.enabled) and configured." }}
+{{- end }}
+{{- if and (ne ( lower .Values.global.metrics.datadog.otlp.protocol) "http") (ne ( lower .Values.global.metrics.datadog.otlp.protocol) "grpc") }}
+{{fail "Valid values for global.metrics.datadog.otlp.protocol must be one of either \"http\" or \"grpc\"." }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Sets the dogstatsd_addr field of the agent configuration dependent on the
+socket transport type being used:
+  - "UDS" (Unix Domain Socket): prefixes "unix://" to URL and appends path to socket (i.e., unix:///var/run/datadog/dsd.socket)
+  - "UDP" (User Datagram Protocol): adds no prefix and appends dogstatsd port number to hostname/IP (i.e., 172.20.180.10:8125)
+- global.metrics.enableDatadogIntegration.dogstatsd configuration
+
+Usage: {{ template "consul.dogstatsdAaddressInfo" . }}
+*/}}
+
+{{- define "consul.dogstatsdAaddressInfo" -}}
+{{- if (and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled) }}
+        "dogstatsd_addr": "{{- if eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" }}unix://{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr }}{{- else }}{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}{{- if ne ( .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | int ) 0 }}:{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | toString }}{{- end }}{{- end }}",{{- end }}
+{{- end -}}
+
+{{/*
+Configures the metrics prefixing that's required to either allow or dissallow certaing RPC or gRPC server calls:
+
+Usage: {{ template "consul.prefixFilter" . }}
+*/}}
+{{- define "consul.prefixFilter" -}}
+{{- $allowList := .Values.global.metrics.prefixFilter.allowList }}
+{{- $blockList := .Values.global.metrics.prefixFilter.blockList }}
+{{- if and (not (empty $allowList)) (not (empty $blockList)) }}
+        "prefix_filter": [{{- range $index, $value := concat $allowList $blockList -}}
+    "{{- if (has $value $allowList) }}{{ printf "+%s" ($value | trimAll "\"") }}{{- else }}{{ printf "-%s" ($value | trimAll "\"") }}{{- end }}"{{- if lt $index (sub (len (concat $allowList $blockList)) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- else if not (empty $allowList) }}
+        "prefix_filter": [{{- range $index, $value := $allowList -}}
+    "{{ printf "+%s" ($value | trimAll "\"") }}"{{- if lt $index (sub (len $allowList) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- else if not (empty $blockList) }}
+        "prefix_filter": [{{- range $index, $value := $blockList -}}
+    "{{ printf "-%s" ($value | trimAll "\"") }}"{{- if lt $index (sub (len $blockList) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- end }}
+{{- end -}}
+
+{{/*
+Retrieves the global consul/consul-enterprise version string for use with labels or tags.
+Requirements for valid labels:
+ -  a valid label must be an empty string or consist of
+    =>  alphanumeric characters
+    =>  '-', '_' or '.'
+    =>  must start and end with an alphanumeric character
+        (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is
+        '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')
+
+Usage: {{ template "consul.versionInfo" }}
+*/}}
+{{- define "consul.versionInfo" -}}
+{{- $imageVersion := regexSplit ":" .Values.global.image -1 }}
+{{- $versionInfo := printf "%s" (index $imageVersion 1 ) | trimSuffix "\"" }}
+{{- $sanitizedVersion := "" }}
+{{- $pattern := "^([A-Za-z0-9][-A-Za-z0-9_.]*[A-Za-z0-9])?$" }}
+{{- if not (regexMatch $pattern $versionInfo) -}}
+    {{- $sanitizedVersion = regexReplaceAll "[^A-Za-z0-9-_.]|sha256" $versionInfo "" }}
+    {{- $sanitizedVersion = printf "%s" (trimSuffix "-" (trimPrefix "-" $sanitizedVersion)) -}}
+{{- else }}
+    {{- $sanitizedVersion = $versionInfo }}
+{{- end -}}
+{{- printf "%s" $sanitizedVersion | trunc 63 | quote }}
+{{- end -}}
+
+{{/*
+Sets the imagePullPolicy for all Consul images (consul, consul-dataplane, consul-k8s, consul-telemetry-collector)
+Valid values are:
+    IfNotPresent
+    Always
+    Never
+    In the case of empty, see https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy for details
+
+Usage: {{ template "consul.imagePullPolicy" . }} TODO: melisa should we name this differently ?
+*/}}
+{{- define "consul.imagePullPolicy" -}}
+{{ if or (eq .Values.global.imagePullPolicy "IfNotPresent") (eq .Values.global.imagePullPolicy "Always") (eq .Values.global.imagePullPolicy "Never")}}imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+{{ else if eq .Values.global.imagePullPolicy "" }}
+{{ else }}
+{{fail "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" }}
+{{ end }}
 {{- end -}}

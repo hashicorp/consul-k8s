@@ -62,7 +62,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	// Add an event handler when data is received from the informer. The
 	// event handlers here will block the informer so we just offload them
 	// immediately into a workqueue.
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			// convert the resource object into a key (in this case
 			// we are just doing it in the format of 'namespace/name')
@@ -81,6 +81,9 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 		},
 		DeleteFunc: c.informerDeleteHandler(queue),
 	})
+	if err != nil {
+		c.Log.Error("error adding informer event handlers", err)
+	}
 
 	// If the type is a background syncer, then we startup the background
 	// process.

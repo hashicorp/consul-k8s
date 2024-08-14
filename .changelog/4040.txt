@@ -1,0 +1,3 @@
+```release-note:improvement
+ cni: package `consul-cni` as .deb and .rpm files
+ ```

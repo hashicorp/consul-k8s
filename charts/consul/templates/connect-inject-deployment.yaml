@@ -6,6 +6,9 @@
 {{ template "consul.validateVaultWebhookCertConfiguration" . }}
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
+{{- if and .Values.externalServers.enabled .Values.global.cloud.enabled }}
+  {{- if and (gt (len .Values.externalServers.hosts) 0) (regexMatch ".+.hashicorp.cloud$" ( first .Values.externalServers.hosts )) }}{{fail "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked self-managed clusters."}}{{- end }}
+{{- end }}
 {{- if and .Values.externalServers.skipServerWatch (not .Values.externalServers.enabled) }}{{ fail "externalServers.enabled must be set if externalServers.skipServerWatch is true" }}{{ end -}}
 {{- $dnsEnabled := (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
 {{- $dnsRedirectionEnabled := (or (and (ne (.Values.dns.enableRedirection | toString) "-") .Values.dns.enableRedirection) (and (eq (.Values.dns.enableRedirection | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
@@ -49,6 +52,7 @@ spec:
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
         {{- if .Values.connectInject.annotations }}
         {{- tpl .Values.connectInject.annotations . | nindent 8 }}
         {{- end }}
@@ -84,16 +88,21 @@ spec:
         {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
         {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
         {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
         {{- end }}
     spec:
       serviceAccountName: {{ template "consul.fullname" . }}-connect-injector
       containers:
         - name: sidecar-injector
           image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
+          {{ template "consul.imagePullPolicy" . }}
           ports:
             - containerPort: 8080
               name: webhook-server
               protocol: TCP
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           env:
             - name: NAMESPACE
               valueFrom:
@@ -131,7 +140,7 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
-              consul-k8s-control-plane inject-connect \
+              exec consul-k8s-control-plane inject-connect \
                 {{- if .Values.global.federation.enabled }}
                 -enable-federation \
                 {{- end }}
@@ -234,7 +243,23 @@ spec:
                 -default-sidecar-proxy-cpu-request={{ $resources.requests.cpu }} \
                 {{- end }}
                 -default-envoy-proxy-concurrency={{ .Values.connectInject.sidecarProxy.concurrency }} \
-
+                {{- if .Values.connectInject.sidecarProxy.lifecycle.defaultEnabled }}
+                -default-enable-sidecar-proxy-lifecycle=true \
+                {{- else }}
+                -default-enable-sidecar-proxy-lifecycle=false \
+                {{- end }}
+                {{- if .Values.connectInject.sidecarProxy.lifecycle.defaultEnableShutdownDrainListeners }}
+                -default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=true \
+                {{- else }}
+                -default-enable-sidecar-proxy-lifecycle-shutdown-drain-listeners=false \
+                {{- end }}
+                -default-sidecar-proxy-lifecycle-shutdown-grace-period-seconds={{ .Values.connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds }} \
+                -default-sidecar-proxy-lifecycle-startup-grace-period-seconds={{ .Values.connectInject.sidecarProxy.lifecycle.defaultStartupGracePeriodSeconds }} \
+                -default-sidecar-proxy-lifecycle-graceful-port={{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulPort }} \
+                -default-sidecar-proxy-lifecycle-graceful-shutdown-path="{{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulShutdownPath }}" \
+                -default-sidecar-proxy-lifecycle-graceful-startup-path="{{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulStartupPath }}" \
+                -default-sidecar-proxy-startup-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultStartupFailureSeconds }} \
+                -default-sidecar-proxy-liveness-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultLivenessFailureSeconds }} \
                 {{- if .Values.connectInject.initContainer }}
                 {{- $initResources := .Values.connectInject.initContainer.resources }}
                 {{- if not (kindIs "invalid" $initResources.limits.memory) }}
@@ -257,6 +282,7 @@ spec:
                 {{- if and .Values.global.tls.enabled .Values.global.tls.enableAutoEncrypt }}
                 -enable-auto-encrypt \
                 {{- end }}
+                -enable-telemetry-collector={{ .Values.global.metrics.enableTelemetryCollector}}  \
           startupProbe:
             httpGet:
               path: /readyz/ready

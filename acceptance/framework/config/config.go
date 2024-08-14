@@ -5,10 +5,12 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"testing"
 
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v2"
@@ -22,45 +24,89 @@ const (
 	LicenseSecretKey  = "key"
 )
 
-// TestConfig holds configuration for the test suite.
-type TestConfig struct {
-	Kubeconfig    string
+type KubeTestConfig struct {
+	KubeConfig    string
 	KubeContext   string
 	KubeNamespace string
+}
 
-	EnableMultiCluster     bool
-	SecondaryKubeconfig    string
-	SecondaryKubeContext   string
-	SecondaryKubeNamespace string
+// NewKubeTestConfigList takes lists of kubernetes configs, contexts and namespaces and constructs KubeTestConfig
+// We validate ahead of time that the lists are either 0 or the same length as we expect that if the length of a list
+// is greater than 0, then the indexes should match. For example: []kubeContexts{"ctx1", "ctx2"} indexes 0, 1 match with []kubeNamespaces{"ns1", "ns2"}.
+func NewKubeTestConfigList(kubeConfigs, kubeContexts, kubeNamespaces []string) []KubeTestConfig {
+	// Grab the longest length.
+	l := math.Max(float64(len(kubeConfigs)),
+		math.Max(float64(len(kubeContexts)), float64(len(kubeNamespaces))))
+
+	// If all are empty, then return a single empty entry
+	if l == 0 {
+		return []KubeTestConfig{{}}
+	}
+
+	// Add each non-zero length list to the new structs, we should have
+	// n structs where n == l.
+	out := make([]KubeTestConfig, int(l))
+	for i := range out {
+		kenv := KubeTestConfig{}
+		if len(kubeConfigs) != 0 {
+			kenv.KubeConfig = kubeConfigs[i]
+		}
+		if len(kubeContexts) != 0 {
+			kenv.KubeContext = kubeContexts[i]
+		}
+		if len(kubeNamespaces) != 0 {
+			kenv.KubeNamespace = kubeNamespaces[i]
+		}
+		out[i] = kenv
+	}
+	return out
+}
+
+// TestConfig holds configuration for the test suite.
+type TestConfig struct {
+	KubeEnvs           []KubeTestConfig
+	EnableMultiCluster bool
 
 	EnableEnterprise  bool
 	EnterpriseLicense string
+
+	SkipDataDogTests        bool
+	DatadogHelmChartVersion string
 
 	EnableOpenshift bool
 
 	EnablePodSecurityPolicies bool
 
-	EnableCNI bool
+	EnableCNI                      bool
+	EnableRestrictedPSAEnforcement bool
 
 	EnableTransparentProxy bool
 
 	DisablePeering bool
 
-	HelmChartVersion string
-	ConsulImage      string
-	ConsulK8SImage   string
-	ConsulVersion    *version.Version
-	EnvoyImage       string
+	HelmChartVersion       string
+	ConsulImage            string
+	ConsulK8SImage         string
+	ConsulDataplaneImage   string
+	ConsulVersion          *version.Version
+	ConsulDataplaneVersion *version.Version
+	EnvoyImage             string
+	ConsulCollectorImage   string
+
+	HCPResourceID string
 
 	VaultHelmChartVersion string
 	VaultServerVersion    string
 
 	NoCleanupOnFailure bool
+	NoCleanup          bool
 	DebugDirectory     string
 
-	UseAKS  bool
-	UseGKE  bool
-	UseKind bool
+	UseAKS          bool
+	UseEKS          bool
+	UseGKE          bool
+	UseGKEAutopilot bool
+	UseKind         bool
 
 	helmChartPath string
 }
@@ -95,10 +141,31 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnableCNI {
 		setIfNotEmpty(helmValues, "connectInject.cni.enabled", "true")
+		setIfNotEmpty(helmValues, "connectInject.cni.logLevel", "debug")
 		// GKE is currently the only cloud provider that uses a different CNI bin dir.
 		if t.UseGKE {
 			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/home/kubernetes/bin")
 		}
+		if t.EnableOpenshift {
+			setIfNotEmpty(helmValues, "connectInject.cni.multus", "true")
+			setIfNotEmpty(helmValues, "connectInject.cni.cniBinDir", "/var/lib/cni/bin")
+			setIfNotEmpty(helmValues, "connectInject.cni.cniNetDir", "/etc/kubernetes/cni/net.d")
+		}
+
+		if t.EnableRestrictedPSAEnforcement {
+			// The CNI requires privilege, so when restricted PSA enforcement is enabled on the Consul
+			// namespace it must be run in a different privileged namespace.
+			setIfNotEmpty(helmValues, "connectInject.cni.namespace", "kube-system")
+		}
+	}
+
+	// UseGKEAutopilot is a temporary hack that we need in place as GKE Autopilot is already installing
+	// Gateway CRDs in the clusters. There are still other CRDs we need to install though (see helm cluster install)
+	if t.UseGKEAutopilot {
+		setIfNotEmpty(helmValues, "global.server.resources.requests.cpu", "500m")
+		setIfNotEmpty(helmValues, "global.server.resources.limits.cpu", "500m")
+		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageExternalCRDs", "false")
+		setIfNotEmpty(helmValues, "connectInject.apiGateway.manageNonStandardCRDs", "true")
 	}
 
 	setIfNotEmpty(helmValues, "connectInject.transparentProxy.defaultEnabled", strconv.FormatBool(t.EnableTransparentProxy))
@@ -106,8 +173,26 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.image", t.ConsulImage)
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
+	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
 
 	return helmValues, nil
+}
+
+// IsExpectedClusterCount check that we have at least the required number of clusters to
+// run a test.
+func (t *TestConfig) IsExpectedClusterCount(count int) bool {
+	return len(t.KubeEnvs) >= count
+}
+
+// GetPrimaryKubeEnv returns the primary Kubernetes environment.
+func (t *TestConfig) GetPrimaryKubeEnv() KubeTestConfig {
+	// Return the first in the list as this is always the primary
+	// kube environment. If empty return an empty kubeEnv
+	if len(t.KubeEnvs) < 1 {
+		return KubeTestConfig{}
+	} else {
+		return t.KubeEnvs[0]
+	}
 }
 
 type values struct {
@@ -145,21 +230,28 @@ func (t *TestConfig) entImage() (string, error) {
 	}
 
 	// Otherwise, assume that we have an image tag with a version in it.
-	consulImageSplits := strings.Split(v.Global.Image, ":")
-	if len(consulImageSplits) != 2 {
-		return "", fmt.Errorf("could not determine consul version from global.image: %s", v.Global.Image)
-	}
-	consulImageVersion := consulImageSplits[1]
+	// Use the same Docker repository and tagging scheme, but replace 'consul' with 'consul-enterprise'.
+	imageTag := strings.Replace(v.Global.Image, "/consul:", "/consul-enterprise:", 1)
 
-	var preRelease string
-	// Handle versions like 1.9.0-rc1.
-	if strings.Contains(consulImageVersion, "-") {
-		split := strings.Split(consulImageVersion, "-")
-		consulImageVersion = split[0]
-		preRelease = fmt.Sprintf("-%s", split[1])
+	// We currently add an '-ent' suffix to release versions of enterprise images (nightly previews
+	// do not include this suffix).
+	if strings.HasPrefix(imageTag, "hashicorp/consul-enterprise:") {
+		imageTag = fmt.Sprintf("%s-ent", imageTag)
 	}
 
-	return fmt.Sprintf("hashicorp/consul-enterprise:%s%s-ent", consulImageVersion, preRelease), nil
+	return imageTag, nil
+}
+
+func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
+	if c.EnableOpenshift && c.EnableCNI {
+		t.Skip("skipping because -enable-cni and -enable-openshift are set and this test doesn't deploy apps correctly")
+	}
+}
+
+func (c *TestConfig) SkipWhenCNI(t *testing.T) {
+	if c.EnableCNI {
+		t.Skip("skipping because -enable-cni is set and doesn't apply to this accepatance test")
+	}
 }
 
 // setIfNotEmpty sets key to val in map m if value is not empty.

@@ -119,3 +119,47 @@ load _helpers
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# server.containerSecurityContext.tlsInit
+
+@test "tlsInitCleanup/Job: securityContext is set when server.containerSecurityContext.tlsInit is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-cleanup-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'server.containerSecurityContext.tlsInit.runAsUser=100' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.securityContext.runAsUser' | tee /dev/stderr)
+
+  [ "${actual}" = "100" ]
+}
+
+
+#--------------------------------------------------------------------
+# annotations
+
+@test "tlsInitCleanup/Job: no annotations defined by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-cleanup-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations |
+      del(."consul.hashicorp.com/connect-inject") |
+      del(."consul.hashicorp.com/mesh-inject") |
+      del(."consul.hashicorp.com/config-checksum")' |
+      tee /dev/stderr)
+  [ "${actual}" = "{}" ]
+}
+
+@test "tlsInitCleanup/Job: annotations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-cleanup-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.annotations=foo: bar' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.annotations.foo' | tee /dev/stderr)
+  [ "${actual}" = "bar" ]
+}
