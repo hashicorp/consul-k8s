@@ -166,6 +166,13 @@ func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway
 	return result
 }
 
+func stringOrEmtpy(s *gwv1beta1.SectionName) string {
+	if s == nil {
+		return ""
+	}
+	return string(*s)
+}
+
 func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
 	results := make(gatewayPolicyValidationResults, 0, len(policies))
 
@@ -176,7 +183,7 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 
 		exists := listenerExistsForPolicy(gateway, policy)
 		if !exists {
-			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingListener(policy.Spec.TargetRef.Name, string(*policy.Spec.TargetRef.SectionName)))
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingListener(policy.Spec.TargetRef.Name, stringOrEmtpy(policy.Spec.TargetRef.SectionName)))
 		}
 
 		missingJWTProviders := make(map[string]struct{})
@@ -212,6 +219,10 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 }
 
 func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
+	if policy.Spec.TargetRef.SectionName == nil {
+		return false
+	}
+
 	return gateway.Name == policy.Spec.TargetRef.Name &&
 		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1beta1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
 }
