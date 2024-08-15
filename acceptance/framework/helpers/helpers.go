@@ -368,10 +368,8 @@ func WaitForInput(t *testing.T) {
 	}
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("writing header")
 		w.WriteHeader(http.StatusOK)
 
-		fmt.Println("writing body")
 		_, err := w.Write([]byte("input received\n"))
 		if err != nil {
 			t.Logf("error writing body: %v", err)
