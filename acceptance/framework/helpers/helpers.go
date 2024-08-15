@@ -190,7 +190,7 @@ func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptio
 		k8s.KubectlDeleteFromKustomize(t, k8sOptions.Options, k8sOptions.KustomizeConfigPath)
 	})
 
-	// CheckExternalServiceConditions(t, consulOptions.ExternalServiceNameRegistration, k8sOptions.Options)
+	CheckExternalServiceConditions(t, consulOptions.ExternalServiceNameRegistration, k8sOptions.Options)
 }
 
 func CheckExternalServiceConditions(t *testing.T, registrationName string, opts *k8s.KubectlOptions) {

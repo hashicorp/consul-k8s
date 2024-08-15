@@ -60,19 +60,6 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	cachedRegistration, ok := r.Cache.get(registration.Spec.Service.Name)
-	if slices.ContainsFunc(registration.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Type == ConditionDeregistered }) {
-		// registration is already in sync so we do nothing, this happens when consul deregisters a service
-		// and we update the status to show that consul deregistered it
-		if ok && registration.EqualExceptStatus(cachedRegistration) {
-			r.Cache.set(registration.Spec.Service.Name, registration)
-			log.Info("Registration is in sync")
-			return ctrl.Result{}, nil
-		}
-	}
-
-	log.Info("need to reconcile")
-
 	// deletion request
 	if !registration.ObjectMeta.DeletionTimestamp.IsZero() {
 		result := r.handleDeletion(ctx, log, registration)
@@ -86,6 +73,19 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		return ctrl.Result{}, nil
 	}
+
+	cachedRegistration, ok := r.Cache.get(registration.Spec.Service.Name)
+	if slices.ContainsFunc(registration.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Type == ConditionDeregistered }) {
+		// registration is already in sync so we do nothing, this happens when consul deregisters a service
+		// and we update the status to show that consul deregistered it
+		if ok && registration.EqualExceptStatus(cachedRegistration) {
+			r.Cache.set(registration.Spec.Service.Name, registration)
+			log.Info("Registration is in sync")
+			return ctrl.Result{}, nil
+		}
+	}
+
+	log.Info("need to reconcile")
 
 	// registration request
 	result := r.handleRegistration(ctx, log, registration)
