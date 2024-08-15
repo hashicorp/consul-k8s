@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix nil pointer deref bug when the section name in a gateway policy is not specified
+```
