@@ -1,0 +1,3 @@
+```release-note:bug
+sync-catalog: After running `helm upgrade` with `syncCatalog` disabled, the registered K8S services should be removed from consul.
+```

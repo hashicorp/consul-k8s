@@ -1,0 +1,112 @@
+{{- if not .Values.syncCatalog.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-sync-catalog-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: sync-catalog
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": pre-delete,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-sync-catalog-cleanup
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: sync-catalog
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
+      volumes:
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+      - name: consul-ca-cert
+        secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+          secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+          items:
+          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+            path: tls.crt
+      {{- end }}
+      {{- end }}
+      containers:
+      - name: sync-catalog
+        image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
+        {{ template "consul.imagePullPolicy" . }}
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+        env:
+        {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: CONSUL_LOGIN_AUTH_METHOD
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
+          value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+          {{- else }}
+          value: {{ template "consul.fullname" . }}-k8s-component-auth-method
+          {{- end }}
+        - name: CONSUL_LOGIN_DATACENTER
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
+          value: {{ .Values.global.federation.primaryDatacenter }}
+          {{- else }}
+          value: {{ .Values.global.datacenter }}
+          {{- end }}
+        - name: CONSUL_LOGIN_META
+          value: "component=sync-catalog,pod=$(NAMESPACE)/$(POD_NAME)"
+        {{- end }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        {{- if (and .Values.syncCatalog.aclSyncToken.secretName .Values.syncCatalog.aclSyncToken.secretKey) }}
+        - name: CONSUL_ACL_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.syncCatalog.aclSyncToken.secretName }}
+              key: {{ .Values.syncCatalog.aclSyncToken.secretKey }}
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.global.tls.enabled }}
+        {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+          - name: consul-ca-cert
+            mountPath: /consul/tls/ca
+            readOnly: true
+        {{- end }}
+        {{- end }}
+        command:
+          - consul-k8s-control-plane
+        args:
+          - sync-catalog
+          - -to-consul=false
+          - -to-k8s=false
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+{{- end }}

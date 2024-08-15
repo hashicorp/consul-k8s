@@ -17,6 +17,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -251,6 +252,13 @@ func (c *Command) Run(args []string) int {
 	}
 	c.ready = true
 
+	if !c.flagToConsul && !c.flagToK8S {
+		if err := c.removeAllK8SServicesFromConsul(consulConfig); err != nil {
+			return 1
+		}
+		return 0
+	}
+
 	// Convert allow/deny lists to sets
 	allowSet := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denySet := flags.ToSet(c.flagDenyK8sNamespacesList)
@@ -391,6 +399,22 @@ func (c *Command) Run(args []string) int {
 		}
 		return 0
 	}
+}
+
+// remove all k8s services from Consul.
+func (c *Command) removeAllK8SServicesFromConsul(consulConfig *consul.Config) error {
+	consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create Consul API client: %s", err))
+		return err
+	}
+	_, err = consulClient.Catalog().Deregister(&api.CatalogDeregistration{Node: c.flagConsulNodeName}, nil)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to deregister services from Consul: %s", err))
+		return err
+	}
+	c.logger.Info("All K8S services were deregistered from Consul")
+	return nil
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {
