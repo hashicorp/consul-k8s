@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/template"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
 	capi "github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
@@ -20,11 +21,14 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 var _ Controller = (*TerminatingGatewayController)(nil)
+
+const terminatingGatewayByLinkedServiceName = "linkedServiceName"
 
 // TerminatingGatewayController is the controller for TerminatingGateway resources.
 type TerminatingGatewayController struct {
@@ -78,6 +82,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// creation/modification
 	enabled, err := r.aclsEnabled()
 	if err != nil {
 		log.Error(err, "error checking if acls are enabled")
@@ -111,8 +116,23 @@ func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj cli
 	return r.Status().Update(ctx, obj, opts...)
 }
 
-func (r *TerminatingGatewayController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *TerminatingGatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	// setup the index to lookup registrations by service name
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.TerminatingGateway{}, terminatingGatewayByLinkedServiceName, termGWLinkedServiceIndexer); err != nil {
+		return err
+	}
+
 	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
+}
+
+func termGWLinkedServiceIndexer(o client.Object) []string {
+	termGW := o.(*v1alpha1.TerminatingGateway)
+	names := make([]string, 0, len(termGW.Spec.Services))
+	for _, service := range termGW.Spec.Services {
+		names = append(names, service.Name)
+	}
+
+	return names
 }
 
 func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, err error) {
@@ -147,7 +167,6 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		if strings.Contains(role.Name, termGW.Name) {
 			terminatingGatewayRoleID = role.ID
 			break
-			// }
 		}
 	}
 
@@ -169,11 +188,60 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		}
 	}
 
-	// add one to length to include the terminating-gateway policy for itself
-	termGWPolicies := make([]*capi.ACLRolePolicyLink, 0, len(termGW.Spec.Services)+1)
-	termGWPolicies = append(termGWPolicies, termGWPolicy)
+	var termGWPoliciesToKeep []*capi.ACLRolePolicyLink
+	var termGWPoliciesToRemove []*capi.ACLRolePolicyLink
 
-	for _, service := range termGW.Spec.Services {
+	existingTermGWPolicies := mapset.NewSet[string]()
+
+	for _, policy := range termGwRole.Policies {
+		existingTermGWPolicies.Add(policy.Name)
+	}
+
+	if termGW.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("terminating gateway is being modified")
+		termGWPoliciesToKeep, termGWPoliciesToRemove, err = r.handleModificationForPolicies(log, client, existingTermGWPolicies, termGW.Spec.Services)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Info("terminating gateway is deleted")
+		termGWPoliciesToKeep, termGWPoliciesToRemove = handleDeletionForPolicies(termGW.Spec.Services)
+	}
+
+	termGWPoliciesToKeep = append(termGWPoliciesToKeep, termGWPolicy)
+	termGwRole.Policies = termGWPoliciesToKeep
+
+	log.Info("updating acl role")
+
+	_, _, err = client.ACL().RoleUpdate(termGwRole, nil)
+	if err != nil {
+		return err
+	}
+
+	err = r.conditionallyDeletePolicies(log, client, termGWPoliciesToRemove, termGW.Name)
+	if err != nil {
+		return err
+	}
+
+	log.Info("finished updating acl roles")
+	return nil
+}
+
+func handleDeletionForPolicies(services []v1alpha1.LinkedService) ([]*capi.ACLRolePolicyLink, []*capi.ACLRolePolicyLink) {
+	var termGWPoliciesToRemove []*capi.ACLRolePolicyLink
+	for _, service := range services {
+		termGWPoliciesToRemove = append(termGWPoliciesToRemove, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name)})
+	}
+	return nil, termGWPoliciesToRemove
+}
+
+func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Logger, client *capi.Client, existingTermGWPolicies mapset.Set[string], services []v1alpha1.LinkedService) ([]*capi.ACLRolePolicyLink, []*capi.ACLRolePolicyLink, error) {
+	// add one to length to include the terminating-gateway policy for itself
+	termGWPoliciesToKeep := make([]*capi.ACLRolePolicyLink, 0, len(services)+1)
+	termGWPoliciesToRemove := make([]*capi.ACLRolePolicyLink, 0, len(services))
+
+	termGWPoliciesToKeepNames := mapset.NewSet[string]()
+	for _, service := range services {
 		var data bytes.Buffer
 		if err := servicePolicyTpl.Execute(&data, templateArgs{
 			EnableNamespaces: r.NamespacesEnabled,
@@ -188,7 +256,7 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name), &capi.QueryOptions{})
 		if err != nil {
 			log.Error(err, "error reading policy")
-			return err
+			return nil, nil, err
 		}
 
 		if existingPolicy == nil {
@@ -197,22 +265,59 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 				Rules: data.String(),
 			}, nil)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 		}
 
-		termGWPolicies = append(termGWPolicies, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name)})
+		termGWPoliciesToKeep = append(termGWPoliciesToKeep, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name)})
+		termGWPoliciesToKeepNames.Add(servicePolicyName(service.Name))
 	}
 
-	termGwRole.Policies = termGWPolicies
-
-	_, _, err = client.ACL().RoleUpdate(termGwRole, nil)
-	if err != nil {
-		return err
+	for _, policy := range existingTermGWPolicies.Difference(termGWPoliciesToKeepNames).ToSlice() {
+		termGWPoliciesToRemove = append(termGWPoliciesToRemove, &capi.ACLRolePolicyLink{Name: policy})
 	}
 
-	log.Info("finished updating acl roles")
-	return nil
+	return termGWPoliciesToKeep, termGWPoliciesToRemove, nil
+}
+
+func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logger, consulClient *capi.Client, policies []*capi.ACLRolePolicyLink, termGWName string) error {
+	policiesToDelete := make([]*capi.ACLRolePolicyLink, 0, len(policies))
+	var mErr error
+	for _, policy := range policies {
+		termGWList := &v1alpha1.TerminatingGatewayList{}
+		serviceName := serviceNameFromPolicy(policy.Name)
+
+		if err := r.Client.List(context.Background(), termGWList, client.MatchingFields{terminatingGatewayByLinkedServiceName: serviceName}); err != nil {
+			log.Error(err, "failed to lookup terminating gateway list for service", serviceName)
+			mErr = errors.Join(mErr, fmt.Errorf("failed to lookup terminating gateway list for service %q: %w", serviceName, err))
+			continue
+		}
+		if len(termGWList.Items) == 0 {
+			policiesToDelete = append(policiesToDelete, policy)
+		}
+	}
+
+	for _, policy := range policiesToDelete {
+		// don't delete the policy for the gateway itself
+		if strings.Contains(policy.Name, termGWName) {
+			continue
+		}
+
+		policy, _, err := consulClient.ACL().PolicyReadByName(policy.Name, nil)
+		if err != nil {
+			log.Error(err, "failed to lookup policy by name from consul", policy.Name)
+			mErr = errors.Join(mErr, fmt.Errorf("error reading policy %q: %w", policy.Name, err))
+			continue
+		}
+
+		_, err = consulClient.ACL().PolicyDelete(policy.ID, nil)
+		if err != nil {
+			log.Error(err, "failed to delete policy from consul", policy.Name)
+			mErr = errors.Join(mErr, fmt.Errorf("error delete policy %q: %w", policy.Name, err))
+		}
+	}
+
+	return mErr
 }
 
 func defaultIfEmpty(s string) string {
@@ -224,4 +329,8 @@ func defaultIfEmpty(s string) string {
 
 func servicePolicyName(name string) string {
 	return fmt.Sprintf("%s-write-policy", name)
+}
+
+func serviceNameFromPolicy(policyName string) string {
+	return strings.TrimSuffix(policyName, "-write-policy")
 }
