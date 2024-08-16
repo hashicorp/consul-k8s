@@ -345,9 +345,9 @@ func TestPeering_Connect(t *testing.T) {
 
 				// Create the config entry for the terminating gateway
 				logger.Log(t, "creating terminating gateway")
-				k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-terminating-gateway")
+				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-terminating-gateway")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-terminating-gateway")
+					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-terminating-gateway")
 				})
 
 				// This is the URL that the static-client will use to dial the external static server in the server peer.
