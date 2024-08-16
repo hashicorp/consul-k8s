@@ -6,7 +6,7 @@ kind: Registration
 metadata:
   name: static-server-registration
 spec:
-  datacenter: dc1
+  datacenter: server
   node: external
   nodeMeta:
     external-node: "true"
