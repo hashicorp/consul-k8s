@@ -44,6 +44,7 @@ type TerminatingGatewayController struct {
 
 func init() {
 	servicePolicyTpl = template.Must(template.New("root").Parse(strings.TrimSpace(servicePolicyRulesTpl)))
+	wildcardPolicyTpl = template.Must(template.New("root").Parse(strings.TrimSpace(wildcardPolicyRulesTpl)))
 }
 
 type templateArgs struct {
@@ -58,8 +59,21 @@ var (
 {{- if .EnableNamespaces }}
 namespace "{{.Namespace}}" {
 {{- end }}
-  service "{{.ServiceName}}" { 
-    policy = "write" 
+  service "{{.ServiceName}}" {
+    policy = "write"
+  }
+{{- if .EnableNamespaces }}
+}
+{{- end }}
+`
+
+	wildcardPolicyTpl      *template.Template
+	wildcardPolicyRulesTpl = `
+{{- if .EnableNamespaces }}
+namespace "{{.Namespace}}" {
+{{- end }}
+  service_preifx "" {
+    policy = "write"
   }
 {{- if .EnableNamespaces }}
 }
@@ -230,7 +244,7 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 func handleDeletionForPolicies(services []v1alpha1.LinkedService) ([]*capi.ACLRolePolicyLink, []*capi.ACLRolePolicyLink) {
 	var termGWPoliciesToRemove []*capi.ACLRolePolicyLink
 	for _, service := range services {
-		termGWPoliciesToRemove = append(termGWPoliciesToRemove, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name)})
+		termGWPoliciesToRemove = append(termGWPoliciesToRemove, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace))})
 	}
 	return nil, termGWPoliciesToRemove
 }
@@ -242,8 +256,9 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 
 	termGWPoliciesToKeepNames := mapset.NewSet[string]()
 	for _, service := range services {
+		policyTemplate := getPolicyTemplateFor(service.Name)
 		var data bytes.Buffer
-		if err := servicePolicyTpl.Execute(&data, templateArgs{
+		if err := policyTemplate.Execute(&data, templateArgs{
 			EnableNamespaces: r.NamespacesEnabled,
 			Namespace:        defaultIfEmpty(service.Namespace),
 			ServiceName:      service.Name,
@@ -253,7 +268,7 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 			panic(err)
 		}
 
-		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name), &capi.QueryOptions{})
+		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)), &capi.QueryOptions{})
 		if err != nil {
 			log.Error(err, "error reading policy")
 			return nil, nil, err
@@ -261,7 +276,7 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 
 		if existingPolicy == nil {
 			_, _, err = client.ACL().PolicyCreate(&capi.ACLPolicy{
-				Name:  servicePolicyName(service.Name),
+				Name:  servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)),
 				Rules: data.String(),
 			}, nil)
 			if err != nil {
@@ -269,8 +284,8 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 			}
 		}
 
-		termGWPoliciesToKeep = append(termGWPoliciesToKeep, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name)})
-		termGWPoliciesToKeepNames.Add(servicePolicyName(service.Name))
+		termGWPoliciesToKeep = append(termGWPoliciesToKeep, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace))})
+		termGWPoliciesToKeepNames.Add(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
 	}
 
 	for _, policy := range existingTermGWPolicies.Difference(termGWPoliciesToKeepNames).ToSlice() {
@@ -320,6 +335,13 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 	return mErr
 }
 
+func getPolicyTemplateFor(service string) *template.Template {
+	if service == "*" {
+		return wildcardPolicyTpl
+	}
+	return servicePolicyTpl
+}
+
 func defaultIfEmpty(s string) string {
 	if s == "" {
 		return "default"
@@ -327,10 +349,18 @@ func defaultIfEmpty(s string) string {
 	return s
 }
 
-func servicePolicyName(name string) string {
-	return fmt.Sprintf("%s-write-policy", name)
+func servicePolicyName(name, namespace string) string {
+	if name == "*" {
+		return fmt.Sprintf("%s-wildcard-write-policy", namespace)
+	}
+
+	return fmt.Sprintf("%s-%s-write-policy", namespace, name)
 }
 
 func serviceNameFromPolicy(policyName string) string {
-	return strings.TrimSuffix(policyName, "-write-policy")
+	// remove the namespace from the beginning of the string
+	_, n, _ := strings.Cut(policyName, "-")
+
+	// remove the write policy suffix
+	return strings.TrimSuffix(n, "-write-policy")
 }
