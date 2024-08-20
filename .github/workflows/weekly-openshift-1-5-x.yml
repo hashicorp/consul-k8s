@@ -21,19 +21,28 @@ jobs:
         run: |
           curl -LO https://dl.fedoraproject.org/pub/alt/okd-crc/linux-amd64/crc
           chmod +x crc
+          sudo cp crc /usr/local/bin/crc
+          crc version
 
-      - name: Setup and start CRC
+      - name: Install required virtualization software
         run: |
           sudo apt-get update -y
           sudo apt-get install -y qemu-kvm libvirt-daemon libvirt-daemon-system network-manager
-          sudo cp crc /usr/local/bin/crc
-          echo "ready to setup"
-          crc version
+
+      - name: Configure CRC
+        run: |
           crc config set skip-check-root-user true
-          crc config set preset okd
           crc config set network-mode user
+
+      - name: Setup CRC
+        run: |
           crc setup
-          echo "ready to start"
+
+      - name: Start CRC
+        run: |
           crc start
+
+      - name: Login to CRC
+        run: |
           crc oc-env
           oc login -u developer https://api.crc.testing:6443
