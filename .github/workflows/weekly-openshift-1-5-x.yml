@@ -19,15 +19,10 @@ jobs:
 
       - name: Download CRC binary
         run: |
-          curl -LO https://dl.fedoraproject.org/pub/alt/okd-crc/linux-amd64/crc
+          curl -LO https://dl.fedoraproject.org/pub/alt/okd-crc/macos-amd64/crc
           chmod +x crc
           sudo cp crc /usr/local/bin/crc
           crc version
-
-      - name: Install required virtualization software
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y qemu-kvm libvirt-daemon libvirt-daemon-system network-manager
 
       - name: Configure CRC
         run: |
