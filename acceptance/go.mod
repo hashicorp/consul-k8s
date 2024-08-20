@@ -29,6 +29,7 @@ require (
 	sigs.k8s.io/gateway-api v0.7.1
 )
 
+// replace these so we always use the latest version of the control-plane types
 replace (
 	github.com/hashicorp/consul-k8s/control-plane => ../control-plane
 	github.com/hashicorp/consul-k8s/version => ../version
