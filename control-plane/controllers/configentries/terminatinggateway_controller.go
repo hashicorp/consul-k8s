@@ -72,7 +72,7 @@ namespace "{{.Namespace}}" {
 {{- if .EnableNamespaces }}
 namespace "{{.Namespace}}" {
 {{- end }}
-  service_preifx "" {
+  service_prefix "" {
     policy = "write"
   }
 {{- if .EnableNamespaces }}
