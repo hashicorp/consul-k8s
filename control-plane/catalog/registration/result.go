@@ -17,7 +17,6 @@ const (
 	ConditionSynced       = "Synced"
 	ConditionRegistered   = "Registered"
 	ConditionDeregistered = "Deregistered"
-	ConditionACLsUpdated  = "ACLsUpdated"
 )
 
 // Status Reasons.
@@ -25,7 +24,6 @@ const (
 	SyncError                 = "SyncError"
 	ConsulErrorRegistration   = "ConsulErrorRegistration"
 	ConsulErrorDeregistration = "ConsulErrorDeregistration"
-	ConsulErrorACL            = "ConsulErrorACL"
 	ConsulDeregistration      = "ConsulDeregistration"
 )
 
@@ -35,17 +33,16 @@ type Result struct {
 	Sync               error
 	Registration       error
 	Deregistration     error
-	ACLUpdate          error
 	Finalizer          error
 }
 
 func (r Result) hasErrors() bool {
-	return r.Sync != nil || r.Registration != nil || r.ACLUpdate != nil || r.Finalizer != nil
+	return r.Sync != nil || r.Registration != nil || r.Finalizer != nil
 }
 
 func (r Result) errors() error {
 	var err error
-	err = errors.Join(err, r.Sync, r.Registration, r.ACLUpdate, r.Finalizer)
+	err = errors.Join(err, r.Sync, r.Registration, r.Finalizer)
 	return err
 }
 
@@ -107,34 +104,6 @@ func deregistrationCondition(result Result) v1alpha1.Condition {
 		Status:             corev1.ConditionTrue,
 		Reason:             reason,
 		Message:            message,
-		LastTransitionTime: metav1.Now(),
-	}
-}
-
-func aclCondition(result Result) v1alpha1.Condition {
-	if result.ACLUpdate != nil {
-		return v1alpha1.Condition{
-			Type:               ConditionACLsUpdated,
-			Status:             corev1.ConditionFalse,
-			Reason:             ConsulErrorACL,
-			Message:            result.ACLUpdate.Error(),
-			LastTransitionTime: metav1.Now(),
-		}
-	}
-
-	if result.ConsulDeregistered {
-		return v1alpha1.Condition{
-			Type:               ConditionACLsUpdated,
-			Status:             corev1.ConditionFalse,
-			Reason:             ConsulDeregistration,
-			Message:            "Consul deregistered this service, acls were not removed",
-			LastTransitionTime: metav1.Now(),
-		}
-	}
-
-	return v1alpha1.Condition{
-		Type:               ConditionACLsUpdated,
-		Status:             corev1.ConditionTrue,
 		LastTransitionTime: metav1.Now(),
 	}
 }

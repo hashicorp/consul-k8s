@@ -1,0 +1,18 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: Registration
+metadata:
+  name: static-server-registration
+spec:
+  datacenter: server
+  node: external
+  nodeMeta:
+    external-node: "true"
+    external-probe: "true"
+  address: static-server.external
+  service:
+    id: static-server
+    name: static-server-hostname
+    port: 80
