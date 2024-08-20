@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: runs-on: custom-linux-xl
+    runs-on: custom-linux-xl
     steps:
       - uses: actions/checkout@v2
 
