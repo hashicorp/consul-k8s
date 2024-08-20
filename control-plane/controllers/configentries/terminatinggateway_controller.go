@@ -189,17 +189,17 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		return errors.New("terminating gateway role not found")
 	}
 
-	termGwRole, _, err := client.ACL().RoleRead(terminatingGatewayRoleID, nil)
+	terminatingGatewayRole, _, err := client.ACL().RoleRead(terminatingGatewayRoleID, nil)
 	if err != nil {
 		return err
 	}
 
-	var termGWPolicy *capi.ACLRolePolicyLink
+	var terminatingGatewayPolicy *capi.ACLRolePolicyLink
 
-	for _, policy := range termGwRole.Policies {
+	for _, policy := range terminatingGatewayRole.Policies {
 		// terminating gateway policies are always of the form ${GATEWAY_NAME}-policy
 		if policy.Name == fmt.Sprintf("%s-policy", termGW.Name) {
-			termGWPolicy = policy
+			terminatingGatewayPolicy = policy
 			break
 		}
 	}
@@ -209,27 +209,23 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 
 	existingTermGWPolicies := mapset.NewSet[string]()
 
-	for _, policy := range termGwRole.Policies {
+	for _, policy := range terminatingGatewayRole.Policies {
 		existingTermGWPolicies.Add(policy.Name)
 	}
 
 	if termGW.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("terminating gateway is being modified")
 		termGWPoliciesToKeep, termGWPoliciesToRemove, err = r.handleModificationForPolicies(log, client, existingTermGWPolicies, termGW.Spec.Services)
 		if err != nil {
 			return err
 		}
 	} else {
-		log.Info("terminating gateway is deleted")
 		termGWPoliciesToKeep, termGWPoliciesToRemove = handleDeletionForPolicies(termGW.Spec.Services)
 	}
 
-	termGWPoliciesToKeep = append(termGWPoliciesToKeep, termGWPolicy)
-	termGwRole.Policies = termGWPoliciesToKeep
+	termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
+	terminatingGatewayRole.Policies = termGWPoliciesToKeep
 
-	log.Info("updating acl role")
-
-	_, _, err = client.ACL().RoleUpdate(termGwRole, nil)
+	_, _, err = client.ACL().RoleUpdate(terminatingGatewayRole, nil)
 	if err != nil {
 		return err
 	}
@@ -239,7 +235,6 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		return err
 	}
 
-	log.Info("finished updating acl roles")
 	return nil
 }
 
@@ -258,18 +253,6 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 
 	termGWPoliciesToKeepNames := mapset.NewSet[string]()
 	for _, service := range services {
-		policyTemplate := getPolicyTemplateFor(service.Name)
-		var data bytes.Buffer
-		if err := policyTemplate.Execute(&data, templateArgs{
-			EnableNamespaces: r.NamespacesEnabled,
-			Namespace:        defaultIfEmpty(service.Namespace),
-			ServiceName:      service.Name,
-		}); err != nil {
-			// just panic if we can't compile the simple template
-			// as it means something else is going severly wrong.
-			panic(err)
-		}
-
 		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)), &capi.QueryOptions{})
 		if err != nil {
 			log.Error(err, "error reading policy")
@@ -277,6 +260,18 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 		}
 
 		if existingPolicy == nil {
+			policyTemplate := getPolicyTemplateFor(service.Name)
+			var data bytes.Buffer
+			if err := policyTemplate.Execute(&data, templateArgs{
+				EnableNamespaces: r.NamespacesEnabled,
+				Namespace:        defaultIfEmpty(service.Namespace),
+				ServiceName:      service.Name,
+			}); err != nil {
+				// just panic if we can't compile the simple template
+				// as it means something else is going severly wrong.
+				panic(err)
+			}
+
 			_, _, err = client.ACL().PolicyCreate(&capi.ACLPolicy{
 				Name:  servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)),
 				Rules: data.String(),

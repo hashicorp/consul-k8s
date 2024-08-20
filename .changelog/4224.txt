@@ -1,2 +1,3 @@
 ```release-note:bug
 terminating-gateways: Fix bug where namespace field was not correctly set on ACL policies if using the `Registration` CRD with the service's namespace unset.
+```
