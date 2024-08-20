@@ -32,7 +32,6 @@ jobs:
       - name: Configure CRC
         run: |
           crc config set skip-check-root-user true
-          crc config set network-mode user
 
       - name: Setup CRC
         run: |
