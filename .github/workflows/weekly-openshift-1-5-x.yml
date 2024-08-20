@@ -29,7 +29,6 @@ jobs:
           sudo cp crc /usr/local/bin/crc
           echo "ready to setup"
           crc version
-          crc config set consent-telemetry no
           crc config set skip-check-root-user true
           crc setup
           echo "ready to start"
