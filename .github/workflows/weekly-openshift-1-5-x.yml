@@ -1,8 +1,35 @@
 name: weekly-openshift-1-5-x
+
 on:
   workflow_dispatch:
+
 jobs:
-  create-cluster:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: container-tools/microshift-action@v0.3
+      - uses: actions/checkout@v2
+
+      - name: Cache CRC binary
+        id: cache-crc-binary
+        uses: actions/cache@v2
+        with:
+          path: crc
+          key: ${{ runner.os }}-okd-crc
+
+      - name: Download CRC binary
+        run: |
+          curl -LO https://dl.fedoraproject.org/pub/alt/okd-crc/linux-amd64/crc
+          chmod +x crc
+
+      - name: Setup and start CRC
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y qemu-kvm libvirt-daemon libvirt-daemon-system network-manager
+          sudo cp crc /usr/local/bin/crc
+          echo "ready to setup"
+          crc version
+          crc setup
+          echo "ready to start"
+          crc start
+          crc oc-env
+          oc login -u developer https://api.crc.testing:6443
