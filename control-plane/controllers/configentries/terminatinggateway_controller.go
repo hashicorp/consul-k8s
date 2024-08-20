@@ -178,7 +178,8 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 
 	terminatingGatewayRoleID := ""
 	for _, role := range roles {
-		if strings.Contains(role.Name, termGW.Name) {
+		// terminating gateway roles are always of the form ${INSTALL_NAME}-consul-${GATEWAY_NAME}-acl-role
+		if strings.HasSuffix(role.Name, fmt.Sprintf("%s-acl-role", termGW.Name)) {
 			terminatingGatewayRoleID = role.ID
 			break
 		}
@@ -196,7 +197,8 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 	var termGWPolicy *capi.ACLRolePolicyLink
 
 	for _, policy := range termGwRole.Policies {
-		if strings.Contains(policy.Name, termGW.Name) {
+		// terminating gateway policies are always of the form ${GATEWAY_NAME}-policy
+		if policy.Name == fmt.Sprintf("%s-policy", termGW.Name) {
 			termGWPolicy = policy
 			break
 		}
@@ -314,7 +316,7 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 
 	for _, policy := range policiesToDelete {
 		// don't delete the policy for the gateway itself
-		if strings.Contains(policy.Name, termGWName) {
+		if policy.Name == fmt.Sprintf("%s-policy", termGWName) {
 			continue
 		}
 
