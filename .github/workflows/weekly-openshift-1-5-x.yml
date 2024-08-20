@@ -30,6 +30,8 @@ jobs:
           echo "ready to setup"
           crc version
           crc config set skip-check-root-user true
+          crc config set preset okd
+          crc config set network-mode user
           crc setup
           echo "ready to start"
           crc start
