@@ -8,8 +8,9 @@ spec:
   nodeMeta:
     external-node: "true"
     external-probe: "true"
-  address: static-server
+  address: static-server.ns1
   service:
     id: static-server
     name: static-server
-    port: 80 
+    namespace: ns1
+    port: 80
