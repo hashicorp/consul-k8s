@@ -4,16 +4,15 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: ingressgateways.consul.hashicorp.com
+spec:
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-spec:
   group: consul.hashicorp.com
   names:
     kind: IngressGateway
@@ -43,14 +42,19 @@ spec:
         description: IngressGateway is the Schema for the ingressgateways API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -61,64 +65,68 @@ spec:
                 description: Defaults is default configuration for all upstream services
                 properties:
                   maxConcurrentRequests:
-                    description: The maximum number of concurrent requests that will
-                      be allowed at a single point in time. Use this to limit HTTP/2
-                      traffic, since HTTP/2 has many requests per connection.
+                    description: |-
+                      The maximum number of concurrent requests that
+                      will be allowed at a single point in time. Use this to limit HTTP/2 traffic,
+                      since HTTP/2 has many requests per connection.
                     format: int32
                     type: integer
                   maxConnections:
-                    description: The maximum number of connections a service instance
-                      will be allowed to establish against the given upstream. Use
-                      this to limit HTTP/1.1 traffic, since HTTP/1.1 has a request
-                      per connection.
+                    description: |-
+                      The maximum number of connections a service instance
+                      will be allowed to establish against the given upstream. Use this to limit
+                      HTTP/1.1 traffic, since HTTP/1.1 has a request per connection.
                     format: int32
                     type: integer
                   maxPendingRequests:
-                    description: The maximum number of requests that will be queued
+                    description: |-
+                      The maximum number of requests that will be queued
                       while waiting for a connection to be established.
                     format: int32
                     type: integer
                   passiveHealthCheck:
-                    description: PassiveHealthCheck configuration determines how upstream
-                      proxy instances will be monitored for removal from the load
-                      balancing pool.
+                    description: |-
+                      PassiveHealthCheck configuration determines how upstream proxy instances will
+                      be monitored for removal from the load balancing pool.
                     properties:
                       baseEjectionTime:
-                        description: The base time that a host is ejected for. The
-                          real time is equal to the base time multiplied by the number
-                          of times the host has been ejected and is capped by max_ejection_time
-                          (Default 300s). Defaults to 30s.
+                        description: |-
+                          The base time that a host is ejected for. The real time is equal to the base time
+                          multiplied by the number of times the host has been ejected and is capped by
+                          max_ejection_time (Default 300s). Defaults to 30s.
                         type: string
                       enforcingConsecutive5xx:
-                        description: EnforcingConsecutive5xx is the % chance that
-                          a host will be actually ejected when an outlier status is
-                          detected through consecutive 5xx. This setting can be used
-                          to disable ejection or to ramp it up slowly. Ex. Setting
-                          this to 10 will make it a 10% chance that the host will
-                          be ejected.
+                        description: |-
+                          EnforcingConsecutive5xx is the % chance that a host will be actually ejected
+                          when an outlier status is detected through consecutive 5xx.
+                          This setting can be used to disable ejection or to ramp it up slowly.
+                          Ex. Setting this to 10 will make it a 10% chance that the host will be ejected.
                         format: int32
                         type: integer
                       interval:
-                        description: Interval between health check analysis sweeps.
-                          Each sweep may remove hosts or return hosts to the pool.
-                          Ex. setting this to "10s" will set the interval to 10 seconds.
+                        description: |-
+                          Interval between health check analysis sweeps. Each sweep may remove
+                          hosts or return hosts to the pool. Ex. setting this to "10s" will set
+                          the interval to 10 seconds.
                         type: string
                       maxEjectionPercent:
-                        description: The maximum % of an upstream cluster that can
-                          be ejected due to outlier detection. Defaults to 10% but
-                          will eject at least one host regardless of the value.
+                        description: |-
+                          The maximum % of an upstream cluster that can be ejected due to outlier detection.
+                          Defaults to 10% but will eject at least one host regardless of the value.
                         format: int32
                         type: integer
                       maxFailures:
-                        description: MaxFailures is the count of consecutive failures
-                          that results in a host being removed from the pool.
+                        description: |-
+                          MaxFailures is the count of consecutive failures that results in a host
+                          being removed from the pool.
                         format: int32
                         type: integer
                     type: object
                 type: object
               listeners:
-                description: Listeners declares what ports the ingress gateway should
-                  listen on, and what services to associated to those ports.
+                description: |-
+                  Listeners declares what ports the ingress gateway should listen on, and
+                  what services to associated to those ports.
                 items:
                   description: IngressListener manages the configuration for a listener
                     on a specific port.
@@ -128,110 +136,119 @@ spec:
                         should listen for traffic.
                       type: integer
                     protocol:
-                      description: 'Protocol declares what type of traffic this listener
-                        is expected to receive. Depending on the protocol, a listener
-                        might support multiplexing services over a single port, or
-                        additional discovery chain features. The current supported
-                        values are: (tcp | http | http2 | grpc).'
+                      description: |-
+                        Protocol declares what type of traffic this listener is expected to
+                        receive. Depending on the protocol, a listener might support multiplexing
+                        services over a single port, or additional discovery chain features. The
+                        current supported values are: (tcp | http | http2 | grpc).
                       type: string
                     services:
-                      description: Services declares the set of services to which
-                        the listener forwards traffic. For "tcp" protocol listeners,
-                        only a single service is allowed. For "http" listeners, multiple
-                        services can be declared.
+                      description: |-
+                        Services declares the set of services to which the listener forwards
+                        traffic.
+                        For "tcp" protocol listeners, only a single service is allowed.
+                        For "http" listeners, multiple services can be declared.
                       items:
-                        description: IngressService manages configuration for services
-                          that are exposed to ingress traffic.
+                        description: |-
+                          IngressService manages configuration for services that are exposed to
+                          ingress traffic.
                         properties:
                           hosts:
-                            description: "Hosts is a list of hostnames which should
-                              be associated to this service on the defined listener.
-                              Only allowed on layer 7 protocols, this will be used
-                              to route traffic to the service by matching the Host
-                              header of the HTTP request. \n If a host is provided
-                              for a service that also has a wildcard specifier defined,
-                              the host will override the wildcard-specifier-provided
-                              \"<service-name>.*\" domain for that listener. \n This
-                              cannot be specified when using the wildcard specifier,
-                              \"*\", or when using a \"tcp\" listener."
+                            description: |-
+                              Hosts is a list of hostnames which should be associated to this service on
+                              the defined listener. Only allowed on layer 7 protocols, this will be used
+                              to route traffic to the service by matching the Host header of the HTTP
+                              request.
+
+
+                              If a host is provided for a service that also has a wildcard specifier
+                              defined, the host will override the wildcard-specifier-provided
+                              "<service-name>.*" domain for that listener.
+
+
+                              This cannot be specified when using the wildcard specifier, "*", or when
+                              using a "tcp" listener.
                             items:
                               type: string
                             type: array
                           maxConcurrentRequests:
-                            description: The maximum number of concurrent requests
-                              that will be allowed at a single point in time. Use
-                              this to limit HTTP/2 traffic, since HTTP/2 has many
-                              requests per connection.
+                            description: |-
+                              The maximum number of concurrent requests that
+                              will be allowed at a single point in time. Use this to limit HTTP/2 traffic,
+                              since HTTP/2 has many requests per connection.
                             format: int32
                             type: integer
                           maxConnections:
-                            description: The maximum number of connections a service
-                              instance will be allowed to establish against the given
-                              upstream. Use this to limit HTTP/1.1 traffic, since
-                              HTTP/1.1 has a request per connection.
+                            description: |-
+                              The maximum number of connections a service instance
+                              will be allowed to establish against the given upstream. Use this to limit
+                              HTTP/1.1 traffic, since HTTP/1.1 has a request per connection.
                             format: int32
                             type: integer
                           maxPendingRequests:
-                            description: The maximum number of requests that will
-                              be queued while waiting for a connection to be established.
+                            description: |-
+                              The maximum number of requests that will be queued
+                              while waiting for a connection to be established.
                             format: int32
                             type: integer
                           name:
-                            description: "Name declares the service to which traffic
-                              should be forwarded. \n This can either be a specific
-                              service, or the wildcard specifier, \"*\". If the wildcard
-                              specifier is provided, the listener must be of \"http\"
-                              protocol and means that the listener will forward traffic
-                              to all services. \n A name can be specified on multiple
-                              listeners, and will be exposed on both of the listeners."
+                            description: |-
+                              Name declares the service to which traffic should be forwarded.
+
+
+                              This can either be a specific service, or the wildcard specifier,
+                              "*". If the wildcard specifier is provided, the listener must be of "http"
+                              protocol and means that the listener will forward traffic to all services.
+
+
+                              A name can be specified on multiple listeners, and will be exposed on both
+                              of the listeners.
                             type: string
                           namespace:
-                            description: Namespace is the namespace where the service
-                              is located. Namespacing is a Consul Enterprise feature.
+                            description: |-
+                              Namespace is the namespace where the service is located.
+                              Namespacing is a Consul Enterprise feature.
                             type: string
                           partition:
-                            description: Partition is the admin-partition where the
-                              service is located. Partitioning is a Consul Enterprise
-                              feature.
+                            description: |-
+                              Partition is the admin-partition where the service is located.
+                              Partitioning is a Consul Enterprise feature.
                             type: string
                           passiveHealthCheck:
-                            description: PassiveHealthCheck configuration determines
-                              how upstream proxy instances will be monitored for removal
-                              from the load balancing pool.
+                            description: |-
+                              PassiveHealthCheck configuration determines how upstream proxy instances will
+                              be monitored for removal from the load balancing pool.
                             properties:
                               baseEjectionTime:
-                                description: The base time that a host is ejected
-                                  for. The real time is equal to the base time multiplied
-                                  by the number of times the host has been ejected
-                                  and is capped by max_ejection_time (Default 300s).
-                                  Defaults to 30s.
+                                description: |-
+                                  The base time that a host is ejected for. The real time is equal to the base time
+                                  multiplied by the number of times the host has been ejected and is capped by
+                                  max_ejection_time (Default 300s). Defaults to 30s.
                                 type: string
                               enforcingConsecutive5xx:
-                                description: EnforcingConsecutive5xx is the % chance
-                                  that a host will be actually ejected when an outlier
-                                  status is detected through consecutive 5xx. This
-                                  setting can be used to disable ejection or to ramp
-                                  it up slowly. Ex. Setting this to 10 will make it
-                                  a 10% chance that the host will be ejected.
+                                description: |-
+                                  EnforcingConsecutive5xx is the % chance that a host will be actually ejected
+                                  when an outlier status is detected through consecutive 5xx.
+                                  This setting can be used to disable ejection or to ramp it up slowly.
+                                  Ex. Setting this to 10 will make it a 10% chance that the host will be ejected.
                                 format: int32
                                 type: integer
                               interval:
-                                description: Interval between health check analysis
-                                  sweeps. Each sweep may remove hosts or return hosts
-                                  to the pool. Ex. setting this to "10s" will set
+                                description: |-
+                                  Interval between health check analysis sweeps. Each sweep may remove
+                                  hosts or return hosts to the pool. Ex. setting this to "10s" will set
                                   the interval to 10 seconds.
                                 type: string
                               maxEjectionPercent:
-                                description: The maximum % of an upstream cluster
-                                  that can be ejected due to outlier detection. Defaults
-                                  to 10% but will eject at least one host regardless
-                                  of the value.
+                                description: |-
+                                  The maximum % of an upstream cluster that can be ejected due to outlier detection.
+                                  Defaults to 10% but will eject at least one host regardless of the value.
                                 format: int32
                                 type: integer
                               maxFailures:
-                                description: MaxFailures is the count of consecutive
-                                  failures that results in a host being removed from
-                                  the pool.
+                                description: |-
+                                  MaxFailures is the count of consecutive failures that results in a host
+                                  being removed from the pool.
                                 format: int32
                                 type: integer
                             type: object
@@ -241,50 +258,52 @@ spec:
                               add:
                                 additionalProperties:
                                   type: string
-                                description: Add is a set of name -> value pairs that
-                                  should be appended to the request or response (i.e.
-                                  allowing duplicates if the same header already exists).
+                                description: |-
+                                  Add is a set of name -> value pairs that should be appended to the request
+                                  or response (i.e. allowing duplicates if the same header already exists).
                                 type: object
                               remove:
-                                description: Remove is the set of header names that
-                                  should be stripped from the request or response.
+                                description: |-
+                                  Remove is the set of header names that should be stripped from the request
+                                  or response.
                                 items:
                                   type: string
                                 type: array
                               set:
                                 additionalProperties:
                                   type: string
-                                description: Set is a set of name -> value pairs that
-                                  should be added to the request or response, overwriting
-                                  any existing header values of the same name.
+                                description: |-
+                                  Set is a set of name -> value pairs that should be added to the request or
+                                  response, overwriting any existing header values of the same name.
                                 type: object
                             type: object
                           responseHeaders:
-                            description: HTTPHeaderModifiers is a set of rules for
-                              HTTP header modification that should be performed by
-                              proxies as the request passes through them. It can operate
-                              on either request or response headers depending on the
-                              context in which it is used.
+                            description: |-
+                              HTTPHeaderModifiers is a set of rules for HTTP header modification that
+                              should be performed by proxies as the request passes through them. It can
+                              operate on either request or response headers depending on the context in
+                              which it is used.
                             properties:
                               add:
                                 additionalProperties:
                                   type: string
-                                description: Add is a set of name -> value pairs that
-                                  should be appended to the request or response (i.e.
-                                  allowing duplicates if the same header already exists).
+                                description: |-
+                                  Add is a set of name -> value pairs that should be appended to the request
+                                  or response (i.e. allowing duplicates if the same header already exists).
                                 type: object
                               remove:
-                                description: Remove is the set of header names that
-                                  should be stripped from the request or response.
+                                description: |-
+                                  Remove is the set of header names that should be stripped from the request
+                                  or response.
                                 items:
                                   type: string
                                 type: array
                               set:
                                 additionalProperties:
                                   type: string
-                                description: Set is a set of name -> value pairs that
-                                  should be added to the request or response, overwriting
-                                  any existing header values of the same name.
+                                description: |-
+                                  Set is a set of name -> value pairs that should be added to the request or
+                                  response, overwriting any existing header values of the same name.
                                 type: object
                             type: object
                           tls:
@@ -301,10 +320,9 @@ spec:
                                       from the SDS service.
                                     type: string
                                   clusterName:
-                                    description: ClusterName is the SDS cluster name
-                                      to connect to, to retrieve certificates. This
-                                      cluster must be specified in the Gateway's bootstrap
-                                      configuration.
+                                    description: |-
+                                      ClusterName is the SDS cluster name to connect to, to retrieve certificates.
+                                      This cluster must be specified in the Gateway's bootstrap configuration.
                                     type: string
                                 type: object
                             type: object
@@ -314,9 +332,9 @@ spec:
                       description: TLS config for this listener.
                       properties:
                         cipherSuites:
-                          description: Define a subset of cipher suites to restrict
-                            Only applicable to connections negotiated via TLS 1.2
-                            or earlier.
+                          description: |-
+                            Define a subset of cipher suites to restrict
+                            Only applicable to connections negotiated via TLS 1.2 or earlier.
                           items:
                             type: string
                           type: array
@@ -334,24 +352,23 @@ spec:
                                 service.
                               type: string
                             clusterName:
-                              description: ClusterName is the SDS cluster name to
-                                connect to, to retrieve certificates. This cluster
-                                must be specified in the Gateway's bootstrap configuration.
+                              description: |-
+                                ClusterName is the SDS cluster name to connect to, to retrieve certificates.
+                                This cluster must be specified in the Gateway's bootstrap configuration.
                               type: string
                           type: object
                         tlsMaxVersion:
-                          description: TLSMaxVersion sets the default maximum TLS
-                            version supported. Must be greater than or equal to `TLSMinVersion`.
-                            One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or
-                            `TLSv1_3`. If unspecified, Envoy will default to TLS 1.3
-                            as a max version for incoming connections.
+                          description: |-
+                            TLSMaxVersion sets the default maximum TLS version supported. Must be greater than or equal to `TLSMinVersion`.
+                            One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+                            If unspecified, Envoy will default to TLS 1.3 as a max version for incoming connections.
                           type: string
                         tlsMinVersion:
-                          description: TLSMinVersion sets the default minimum TLS
-                            version supported. One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`,
-                            `TLSv1_2`, or `TLSv1_3`. If unspecified, Envoy v1.22.0
-                            and newer will default to TLS 1.2 as a min version, while
-                            older releases of Envoy default to TLS 1.0.
+                          description: |-
+                            TLSMinVersion sets the default minimum TLS version supported.
+                            One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+                            If unspecified, Envoy v1.22.0 and newer will default to TLS 1.2 as a min version,
+                            while older releases of Envoy default to TLS 1.0.
                           type: string
                       required:
                       - enabled
@@ -362,8 +379,9 @@ spec:
                 description: TLS holds the TLS configuration for this gateway.
                 properties:
                   cipherSuites:
-                    description: Define a subset of cipher suites to restrict Only
-                      applicable to connections negotiated via TLS 1.2 or earlier.
+                    description: |-
+                      Define a subset of cipher suites to restrict
+                      Only applicable to connections negotiated via TLS 1.2 or earlier.
                     items:
                       type: string
                     type: array
@@ -380,24 +398,23 @@ spec:
                           when fetching the certificate from the SDS service.
                         type: string
                       clusterName:
-                        description: ClusterName is the SDS cluster name to connect
-                          to, to retrieve certificates. This cluster must be specified
-                          in the Gateway's bootstrap configuration.
+                        description: |-
+                          ClusterName is the SDS cluster name to connect to, to retrieve certificates.
+                          This cluster must be specified in the Gateway's bootstrap configuration.
                         type: string
                     type: object
                   tlsMaxVersion:
-                    description: TLSMaxVersion sets the default maximum TLS version
-                      supported. Must be greater than or equal to `TLSMinVersion`.
+                    description: |-
+                      TLSMaxVersion sets the default maximum TLS version supported. Must be greater than or equal to `TLSMinVersion`.
                       One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
-                      If unspecified, Envoy will default to TLS 1.3 as a max version
-                      for incoming connections.
+                      If unspecified, Envoy will default to TLS 1.3 as a max version for incoming connections.
                     type: string
                   tlsMinVersion:
-                    description: TLSMinVersion sets the default minimum TLS version
-                      supported. One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`,
-                      or `TLSv1_3`. If unspecified, Envoy v1.22.0 and newer will default
-                      to TLS 1.2 as a min version, while older releases of Envoy default
-                      to TLS 1.0.
+                    description: |-
+                      TLSMinVersion sets the default minimum TLS version supported.
+                      One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
+                      If unspecified, Envoy v1.22.0 and newer will default to TLS 1.2 as a min version,
+                      while older releases of Envoy default to TLS 1.0.
                     type: string
                 required:
                 - enabled
@@ -409,8 +426,9 @@ spec:
                 description: Conditions indicate the latest available observations
                   of a resource's current state.
                 items:
-                  description: 'Conditions define a readiness condition for a Consul
-                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: |-
+                    Conditions define a readiness condition for a Consul resource.
+                    See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition
@@ -446,10 +464,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

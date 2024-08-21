@@ -4,16 +4,15 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: exportedservices.consul.hashicorp.com
+spec:
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-spec:
   group: consul.hashicorp.com
   names:
     kind: ExportedServices
@@ -43,14 +42,19 @@ spec:
         description: ExportedServices is the Schema for the exportedservices API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -58,11 +62,13 @@ spec:
             description: ExportedServicesSpec defines the desired state of ExportedServices.
             properties:
               services:
-                description: Services is a list of services to be exported and the
-                  list of partitions to expose them to.
+                description: |-
+                  Services is a list of services to be exported and the list of partitions
+                  to expose them to.
                 items:
-                  description: ExportedService manages the exporting of a service
-                    in the local partition to other partitions.
+                  description: |-
+                    ExportedService manages the exporting of a service in the local partition to
+                    other partitions.
                   properties:
                     consumers:
                       description: Consumers is a list of downstream consumers of
@@ -97,8 +103,9 @@ spec:
                 description: Conditions indicate the latest available observations
                   of a resource's current state.
                 items:
-                  description: 'Conditions define a readiness condition for a Consul
-                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: |-
+                    Conditions define a readiness condition for a Consul resource.
+                    See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition
@@ -134,10 +141,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

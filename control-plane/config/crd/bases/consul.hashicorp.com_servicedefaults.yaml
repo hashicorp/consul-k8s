@@ -6,8 +6,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: servicedefaults.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -39,14 +38,19 @@ spec:
         description: ServiceDefaults is the Schema for the servicedefaults API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -54,27 +58,29 @@ spec:
             description: ServiceDefaultsSpec defines the desired state of ServiceDefaults.
             properties:
               balanceInboundConnections:
-                description: BalanceInboundConnections sets the strategy for allocating
-                  inbound connections to the service across proxy threads. The only
-                  supported value is exact_balance. By default, no connection balancing
-                  is used. Refer to the Envoy Connection Balance config for details.
+                description: |-
+                  BalanceInboundConnections sets the strategy for allocating inbound connections to the service across
+                  proxy threads. The only supported value is exact_balance. By default, no connection balancing is used.
+                  Refer to the Envoy Connection Balance config for details.
                 type: string
               destination:
-                description: Destination is an address(es)/port combination that represents
-                  an endpoint outside the mesh. This is only valid when the mesh is
-                  configured in "transparent" mode. Destinations live outside of Consul's
-                  catalog, and because of this, they do not require an artificial
-                  node to be created.
+                description: |-
+                  Destination is an address(es)/port combination that represents an endpoint
+                  outside the mesh. This is only valid when the mesh is configured in "transparent"
+                  mode. Destinations live outside of Consul's catalog, and because of this, they
+                  do not require an artificial node to be created.
                 properties:
                   addresses:
-                    description: Addresses is a list of IPs and/or hostnames that
-                      can be dialed and routed through a terminating gateway.
+                    description: |-
+                      Addresses is a list of IPs and/or hostnames that can be dialed
+                      and routed through a terminating gateway.
                     items:
                       type: string
                     type: array
                   port:
-                    description: Port is the port that can be dialed on any of the
-                      addresses in this Destination.
+                    description: |-
+                      Port is the port that can be dialed on any of the addresses in this
+                      Destination.
                     format: int32
                     type: integer
                 type: object
@@ -99,9 +105,9 @@ spec:
                   for Envoy.
                 properties:
                   checks:
-                    description: Checks defines whether paths associated with Consul
-                      checks will be exposed. This flag triggers exposing all HTTP
-                      and GRPC check paths registered for the service.
+                    description: |-
+                      Checks defines whether paths associated with Consul checks will be exposed.
+                      This flag triggers exposing all HTTP and GRPC check paths registered for the service.
                     type: boolean
                   paths:
                     description: Paths is the list of paths exposed through the proxy.
@@ -120,127 +126,130 @@ spec:
                             ie. "/metrics".
                           type: string
                         protocol:
-                          description: Protocol describes the upstream's service protocol.
+                          description: |-
+                            Protocol describes the upstream's service protocol.
                             Valid values are "http" and "http2", defaults to "http".
                           type: string
                       type: object
                     type: array
                 type: object
               externalSNI:
-                description: ExternalSNI is an optional setting that allows for the
-                  TLS SNI value to be changed to a non-connect value when federating
-                  with an external system.
+                description: |-
+                  ExternalSNI is an optional setting that allows for the TLS SNI value
+                  to be changed to a non-connect value when federating with an external system.
                 type: string
               localConnectTimeoutMs:
-                description: LocalConnectTimeoutMs is the number of milliseconds allowed
-                  to make connections to the local application instance before timing
-                  out. Defaults to 5000.
+                description: |-
+                  LocalConnectTimeoutMs is the number of milliseconds allowed to make connections to the local application
+                  instance before timing out. Defaults to 5000.
                 type: integer
               localRequestTimeoutMs:
-                description: LocalRequestTimeoutMs is the timeout for HTTP requests
-                  to the local application instance in milliseconds. Applies to HTTP-based
-                  protocols only. If not specified, inherits the Envoy default for
+                description: |-
+                  LocalRequestTimeoutMs is the timeout for HTTP requests to the local application instance in milliseconds.
+                  Applies to HTTP-based protocols only. If not specified, inherits the Envoy default for
                   route timeouts (15s).
                 type: integer
               maxInboundConnections:
-                description: MaxInboundConnections is the maximum number of concurrent
-                  inbound connections to each service instance. Defaults to 0 (using
-                  consul's default) if not set.
+                description: |-
+                  MaxInboundConnections is the maximum number of concurrent inbound connections to
+                  each service instance. Defaults to 0 (using consul's default) if not set.
                 type: integer
               meshGateway:
                 description: MeshGateway controls the default mesh gateway configuration
                   for this service.
                 properties:
                   mode:
-                    description: Mode is the mode that should be used for the upstream
-                      connection. One of none, local, or remote.
+                    description: |-
+                      Mode is the mode that should be used for the upstream connection.
+                      One of none, local, or remote.
                     type: string
                 type: object
               mode:
-                description: 'Mode can be one of "direct" or "transparent". "transparent"
-                  represents that inbound and outbound application traffic is being
-                  captured and redirected through the proxy. This mode does not enable
-                  the traffic redirection itself. Instead it signals Consul to configure
-                  Envoy as if traffic is already being redirected. "direct" represents
-                  that the proxy''s listeners must be dialed directly by the local
-                  application and other proxies. Note: This cannot be set using the
-                  CRD and should be set using annotations on the services that are
-                  part of the mesh.'
+                description: |-
+                  Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
+                  application traffic is being captured and redirected through the proxy. This mode does not
+                  enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if
+                  traffic is already being redirected. "direct" represents that the proxy's listeners must be
+                  dialed directly by the local application and other proxies.
+                  Note: This cannot be set using the CRD and should be set using annotations on the
+                  services that are part of the mesh.
                 type: string
               protocol:
-                description: Protocol sets the protocol of the service. This is used
-                  by Connect proxies for things like observability features and to
-                  unlock usage of the service-splitter and service-router config entries
-                  for a service.
+                description: |-
+                  Protocol sets the protocol of the service. This is used by Connect proxies for
+                  things like observability features and to unlock usage of the
+                  service-splitter and service-router config entries for a service.
                 type: string
               transparentProxy:
-                description: 'TransparentProxy controls configuration specific to
-                  proxies in transparent mode. Note: This cannot be set using the
-                  CRD and should be set using annotations on the services that are
-                  part of the mesh.'
+                description: |-
+                  TransparentProxy controls configuration specific to proxies in transparent mode.
+                  Note: This cannot be set using the CRD and should be set using annotations on the
+                  services that are part of the mesh.
                 properties:
                   dialedDirectly:
-                    description: DialedDirectly indicates whether transparent proxies
-                      can dial this proxy instance directly. The discovery chain is
-                      not considered when dialing a service instance directly. This
-                      setting is useful when addressing stateful services, such as
-                      a database cluster with a leader node.
+                    description: |-
+                      DialedDirectly indicates whether transparent proxies can dial this proxy instance directly.
+                      The discovery chain is not considered when dialing a service instance directly.
+                      This setting is useful when addressing stateful services, such as a database cluster with a leader node.
                     type: boolean
                   outboundListenerPort:
-                    description: OutboundListenerPort is the port of the listener
-                      where outbound application traffic is being redirected to.
+                    description: |-
+                      OutboundListenerPort is the port of the listener where outbound application
+                      traffic is being redirected to.
                     type: integer
                 type: object
               upstreamConfig:
-                description: UpstreamConfig controls default configuration settings
-                  that apply across all upstreams, and per-upstream configuration
-                  overrides. Note that per-upstream configuration applies across all
-                  federated datacenters to the pairing of source and upstream destination
-                  services.
+                description: |-
+                  UpstreamConfig controls default configuration settings that apply across all upstreams,
+                  and per-upstream configuration overrides. Note that per-upstream configuration applies
+                  across all federated datacenters to the pairing of source and upstream destination services.
                 properties:
                   defaults:
-                    description: Defaults contains default configuration for all upstreams
-                      of a given service. The name field must be empty.
+                    description: |-
+                      Defaults contains default configuration for all upstreams of a given
+                      service. The name field must be empty.
                     properties:
                       connectTimeoutMs:
-                        description: ConnectTimeoutMs is the number of milliseconds
-                          to timeout making a new connection to this upstream. Defaults
-                          to 5000 (5 seconds) if not set.
+                        description: |-
+                          ConnectTimeoutMs is the number of milliseconds to timeout making a new
+                          connection to this upstream. Defaults to 5000 (5 seconds) if not set.
                         type: integer
                       envoyClusterJSON:
-                        description: 'EnvoyClusterJSON is a complete override ("escape
-                          hatch") for the upstream''s cluster. The Connect client
-                          TLS certificate and context will be injected overriding
-                          any TLS settings present. Note: This escape hatch is NOT
-                          compatible with the discovery chain and will be ignored
-                          if a discovery chain is active.'
+                        description: |-
+                          EnvoyClusterJSON is a complete override ("escape hatch") for the upstream's
+                          cluster. The Connect client TLS certificate and context will be injected
+                          overriding any TLS settings present.
+                          Note: This escape hatch is NOT compatible with the discovery chain and
+                          will be ignored if a discovery chain is active.
                         type: string
                       envoyListenerJSON:
-                        description: 'EnvoyListenerJSON is a complete override ("escape
-                          hatch") for the upstream''s listener. Note: This escape
-                          hatch is NOT compatible with the discovery chain and will
-                          be ignored if a discovery chain is active.'
+                        description: |-
+                          EnvoyListenerJSON is a complete override ("escape hatch") for the upstream's
+                          listener.
+                          Note: This escape hatch is NOT compatible with the discovery chain and
+                          will be ignored if a discovery chain is active.
                         type: string
                       limits:
-                        description: Limits are the set of limits that are applied
-                          to the proxy for a specific upstream of a service instance.
+                        description: |-
+                          Limits are the set of limits that are applied to the proxy for a specific upstream of a
+                          service instance.
                         properties:
                           maxConcurrentRequests:
-                            description: MaxConcurrentRequests is the maximum number
-                              of in-flight requests that will be allowed to the upstream
-                              cluster at a point in time. This is mostly applicable
-                              to HTTP/2 clusters since all HTTP/1.1 requests are limited
-                              by MaxConnections.
+                            description: |-
+                              MaxConcurrentRequests is the maximum number of in-flight requests that will be allowed
+                              to the upstream cluster at a point in time. This is mostly applicable to HTTP/2
+                              clusters since all HTTP/1.1 requests are limited by MaxConnections.
                             type: integer
                           maxConnections:
-                            description: MaxConnections is the maximum number of connections
-                              the local proxy can make to the upstream service.
+                            description: |-
+                              MaxConnections is the maximum number of connections the local proxy can
+                              make to the upstream service.
                             type: integer
                           maxPendingRequests:
-                            description: MaxPendingRequests is the maximum number
-                              of requests that will be queued waiting for an available
-                              connection. This is mostly applicable to HTTP/1.1 clusters
-                              since all HTTP/2 requests are streamed over a single
+                            description: |-
+                              MaxPendingRequests is the maximum number of requests that will be queued
+                              waiting for an available connection. This is mostly applicable to HTTP/1.1
+                              clusters since all HTTP/2 requests are streamed over a single
                               connection.
                             type: integer
                         type: object
@@ -249,8 +258,9 @@ spec:
                           are configured and used.
                         properties:
                           mode:
-                            description: Mode is the mode that should be used for
-                              the upstream connection. One of none, local, or remote.
+                            description: |-
+                              Mode is the mode that should be used for the upstream connection.
+                              One of none, local, or remote.
                             type: string
                         type: object
                       name:
@@ -266,42 +276,40 @@ spec:
                           config entry.
                         type: string
                       passiveHealthCheck:
-                        description: PassiveHealthCheck configuration determines how
-                          upstream proxy instances will be monitored for removal from
-                          the load balancing pool.
+                        description: |-
+                          PassiveHealthCheck configuration determines how upstream proxy instances will
+                          be monitored for removal from the load balancing pool.
                         properties:
                           baseEjectionTime:
-                            description: The base time that a host is ejected for.
-                              The real time is equal to the base time multiplied by
-                              the number of times the host has been ejected and is
-                              capped by max_ejection_time (Default 300s). Defaults
-                              to 30s.
+                            description: |-
+                              The base time that a host is ejected for. The real time is equal to the base time
+                              multiplied by the number of times the host has been ejected and is capped by
+                              max_ejection_time (Default 300s). Defaults to 30s.
                             type: string
                           enforcingConsecutive5xx:
-                            description: EnforcingConsecutive5xx is the % chance that
-                              a host will be actually ejected when an outlier status
-                              is detected through consecutive 5xx. This setting can
-                              be used to disable ejection or to ramp it up slowly.
-                              Ex. Setting this to 10 will make it a 10% chance that
-                              the host will be ejected.
+                            description: |-
+                              EnforcingConsecutive5xx is the % chance that a host will be actually ejected
+                              when an outlier status is detected through consecutive 5xx.
+                              This setting can be used to disable ejection or to ramp it up slowly.
+                              Ex. Setting this to 10 will make it a 10% chance that the host will be ejected.
                             format: int32
                             type: integer
                           interval:
-                            description: Interval between health check analysis sweeps.
-                              Each sweep may remove hosts or return hosts to the pool.
-                              Ex. setting this to "10s" will set the interval to 10
-                              seconds.
+                            description: |-
+                              Interval between health check analysis sweeps. Each sweep may remove
+                              hosts or return hosts to the pool. Ex. setting this to "10s" will set
+                              the interval to 10 seconds.
                             type: string
                           maxEjectionPercent:
-                            description: The maximum % of an upstream cluster that
-                              can be ejected due to outlier detection. Defaults to
-                              10% but will eject at least one host regardless of the
-                              value.
+                            description: |-
+                              The maximum % of an upstream cluster that can be ejected due to outlier detection.
+                              Defaults to 10% but will eject at least one host regardless of the value.
                             format: int32
                             type: integer
                           maxFailures:
-                            description: MaxFailures is the count of consecutive failures
-                              that results in a host being removed from the pool.
+                            description: |-
+                              MaxFailures is the count of consecutive failures that results in a host
+                              being removed from the pool.
                             format: int32
                             type: integer
                         type: object
@@ -310,59 +318,61 @@ spec:
                           config entry.
                         type: string
                       protocol:
-                        description: Protocol describes the upstream's service protocol.
-                          Valid values are "tcp", "http" and "grpc". Anything else
-                          is treated as tcp. This enables protocol aware features
-                          like per-request metrics and connection pooling, tracing,
+                        description: |-
+                          Protocol describes the upstream's service protocol. Valid values are "tcp",
+                          "http" and "grpc". Anything else is treated as tcp. This enables protocol
+                          aware features like per-request metrics and connection pooling, tracing,
                           routing etc.
                         type: string
                     type: object
                   overrides:
-                    description: Overrides is a slice of per-service configuration.
-                      The name field is required.
+                    description: |-
+                      Overrides is a slice of per-service configuration. The name field is
+                      required.
                     items:
                       properties:
                         connectTimeoutMs:
-                          description: ConnectTimeoutMs is the number of milliseconds
-                            to timeout making a new connection to this upstream. Defaults
-                            to 5000 (5 seconds) if not set.
+                          description: |-
+                            ConnectTimeoutMs is the number of milliseconds to timeout making a new
+                            connection to this upstream. Defaults to 5000 (5 seconds) if not set.
                           type: integer
                         envoyClusterJSON:
-                          description: 'EnvoyClusterJSON is a complete override ("escape
-                            hatch") for the upstream''s cluster. The Connect client
-                            TLS certificate and context will be injected overriding
-                            any TLS settings present. Note: This escape hatch is NOT
-                            compatible with the discovery chain and will be ignored
-                            if a discovery chain is active.'
+                          description: |-
+                            EnvoyClusterJSON is a complete override ("escape hatch") for the upstream's
+                            cluster. The Connect client TLS certificate and context will be injected
+                            overriding any TLS settings present.
+                            Note: This escape hatch is NOT compatible with the discovery chain and
+                            will be ignored if a discovery chain is active.
                           type: string
                         envoyListenerJSON:
-                          description: 'EnvoyListenerJSON is a complete override ("escape
-                            hatch") for the upstream''s listener. Note: This escape
-                            hatch is NOT compatible with the discovery chain and will
-                            be ignored if a discovery chain is active.'
+                          description: |-
+                            EnvoyListenerJSON is a complete override ("escape hatch") for the upstream's
+                            listener.
+                            Note: This escape hatch is NOT compatible with the discovery chain and
+                            will be ignored if a discovery chain is active.
                           type: string
                         limits:
-                          description: Limits are the set of limits that are applied
-                            to the proxy for a specific upstream of a service instance.
+                          description: |-
+                            Limits are the set of limits that are applied to the proxy for a specific upstream of a
+                            service instance.
                           properties:
                             maxConcurrentRequests:
-                              description: MaxConcurrentRequests is the maximum number
-                                of in-flight requests that will be allowed to the
-                                upstream cluster at a point in time. This is mostly
-                                applicable to HTTP/2 clusters since all HTTP/1.1 requests
-                                are limited by MaxConnections.
+                              description: |-
+                                MaxConcurrentRequests is the maximum number of in-flight requests that will be allowed
+                                to the upstream cluster at a point in time. This is mostly applicable to HTTP/2
+                                clusters since all HTTP/1.1 requests are limited by MaxConnections.
                               type: integer
                             maxConnections:
-                              description: MaxConnections is the maximum number of
-                                connections the local proxy can make to the upstream
-                                service.
+                              description: |-
+                                MaxConnections is the maximum number of connections the local proxy can
+                                make to the upstream service.
                               type: integer
                             maxPendingRequests:
-                              description: MaxPendingRequests is the maximum number
-                                of requests that will be queued waiting for an available
-                                connection. This is mostly applicable to HTTP/1.1
-                                clusters since all HTTP/2 requests are streamed over
-                                a single connection.
+                              description: |-
+                                MaxPendingRequests is the maximum number of requests that will be queued
+                                waiting for an available connection. This is mostly applicable to HTTP/1.1
+                                clusters since all HTTP/2 requests are streamed over a single
+                                connection.
                               type: integer
                           type: object
                         meshGateway:
@@ -370,8 +380,9 @@ spec:
                             are configured and used.
                           properties:
                             mode:
-                              description: Mode is the mode that should be used for
-                                the upstream connection. One of none, local, or remote.
+                              description: |-
+                                Mode is the mode that should be used for the upstream connection.
+                                One of none, local, or remote.
                               type: string
                           type: object
                         name:
@@ -387,43 +398,40 @@ spec:
                             config entry.
                           type: string
                         passiveHealthCheck:
-                          description: PassiveHealthCheck configuration determines
-                            how upstream proxy instances will be monitored for removal
-                            from the load balancing pool.
+                          description: |-
+                            PassiveHealthCheck configuration determines how upstream proxy instances will
+                            be monitored for removal from the load balancing pool.
                           properties:
                             baseEjectionTime:
-                              description: The base time that a host is ejected for.
-                                The real time is equal to the base time multiplied
-                                by the number of times the host has been ejected and
-                                is capped by max_ejection_time (Default 300s). Defaults
-                                to 30s.
+                              description: |-
+                                The base time that a host is ejected for. The real time is equal to the base time
+                                multiplied by the number of times the host has been ejected and is capped by
+                                max_ejection_time (Default 300s). Defaults to 30s.
                               type: string
                             enforcingConsecutive5xx:
-                              description: EnforcingConsecutive5xx is the % chance
-                                that a host will be actually ejected when an outlier
-                                status is detected through consecutive 5xx. This setting
-                                can be used to disable ejection or to ramp it up slowly.
-                                Ex. Setting this to 10 will make it a 10% chance that
-                                the host will be ejected.
+                              description: |-
+                                EnforcingConsecutive5xx is the % chance that a host will be actually ejected
+                                when an outlier status is detected through consecutive 5xx.
+                                This setting can be used to disable ejection or to ramp it up slowly.
+                                Ex. Setting this to 10 will make it a 10% chance that the host will be ejected.
                               format: int32
                               type: integer
                             interval:
-                              description: Interval between health check analysis
-                                sweeps. Each sweep may remove hosts or return hosts
-                                to the pool. Ex. setting this to "10s" will set the
-                                interval to 10 seconds.
+                              description: |-
+                                Interval between health check analysis sweeps. Each sweep may remove
+                                hosts or return hosts to the pool. Ex. setting this to "10s" will set
+                                the interval to 10 seconds.
                               type: string
                             maxEjectionPercent:
-                              description: The maximum % of an upstream cluster that
-                                can be ejected due to outlier detection. Defaults
-                                to 10% but will eject at least one host regardless
-                                of the value.
+                              description: |-
+                                The maximum % of an upstream cluster that can be ejected due to outlier detection.
+                                Defaults to 10% but will eject at least one host regardless of the value.
                               format: int32
                               type: integer
                             maxFailures:
-                              description: MaxFailures is the count of consecutive
-                                failures that results in a host being removed from
-                                the pool.
+                              description: |-
+                                MaxFailures is the count of consecutive failures that results in a host
+                                being removed from the pool.
                               format: int32
                               type: integer
                           type: object
@@ -432,10 +440,10 @@ spec:
                             config entry.
                           type: string
                         protocol:
-                          description: Protocol describes the upstream's service protocol.
-                            Valid values are "tcp", "http" and "grpc". Anything else
-                            is treated as tcp. This enables protocol aware features
-                            like per-request metrics and connection pooling, tracing,
+                          description: |-
+                            Protocol describes the upstream's service protocol. Valid values are "tcp",
+                            "http" and "grpc". Anything else is treated as tcp. This enables protocol
+                            aware features like per-request metrics and connection pooling, tracing,
                             routing etc.
                           type: string
                       type: object
@@ -448,8 +456,9 @@ spec:
                 description: Conditions indicate the latest available observations
                   of a resource's current state.
                 items:
-                  description: 'Conditions define a readiness condition for a Consul
-                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: |-
+                    Conditions define a readiness condition for a Consul resource.
+                    See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition
@@ -485,9 +494,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
