@@ -22,6 +22,13 @@ const (
 	terminatingGatewayKubeKind = "terminatinggateway"
 )
 
+const (
+	TerminatingGatewayFailedToSetACLs string = "FailedToSetACLs"
+)
+
+// Condition Type.
+const ConsulACLStatus ConditionType = "ConsulACLsSynced"
+
 func init() {
 	SchemeBuilder.Register(&TerminatingGateway{}, &TerminatingGatewayList{})
 }
@@ -80,8 +87,19 @@ type LinkedService struct {
 	// SNI is the optional name to specify during the TLS handshake with a linked service.
 	SNI string `json:"sni,omitempty"`
 
-	//DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
+	// DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
 	DisableAutoHostRewrite bool `json:"disableAutoHostRewrite,omitempty"`
+}
+
+func (l LinkedService) NamespaceName() string {
+	return defaultIfEmpty(l.Namespace) + "." + l.Name
+}
+
+func defaultIfEmpty(s string) string {
+	if s == "" {
+		return "default"
+	}
+	return s
 }
 
 func (in *TerminatingGateway) GetObjectMeta() metav1.ObjectMeta {
@@ -131,15 +149,41 @@ func (in *TerminatingGateway) KubernetesName() string {
 }
 
 func (in *TerminatingGateway) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
-	in.Status.Conditions = Conditions{
-		{
-			Type:               ConditionSynced,
-			Status:             status,
-			LastTransitionTime: metav1.Now(),
-			Reason:             reason,
-			Message:            message,
-		},
+	cond := Condition{
+		Type:               ConditionSynced,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
 	}
+
+	for idx, c := range in.Status.Conditions {
+		if c.Type == ConditionSynced {
+			in.Status.Conditions[idx] = cond
+			return
+		}
+	}
+
+	in.Status.Conditions = append(in.Status.Conditions, cond)
+}
+
+func (in *TerminatingGateway) SetACLStatusConditon(status corev1.ConditionStatus, reason, message string) {
+	cond := Condition{
+		Type:               ConsulACLStatus,
+		Status:             status,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+
+	for idx, c := range in.Status.Conditions {
+		if c.Type == ConsulACLStatus {
+			in.Status.Conditions[idx] = cond
+			return
+		}
+	}
+
+	in.Status.Conditions = append(in.Status.Conditions, cond)
 }
 
 func (in *TerminatingGateway) SetLastSyncedTime(time *metav1.Time) {
