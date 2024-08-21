@@ -59,6 +59,7 @@ type Command struct {
 	flagAddK8SNamespaceSuffix bool
 	flagLogLevel              string
 	flagLogJSON               bool
+	flagPurgeK8SServices      bool
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -139,6 +140,8 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+	c.flags.BoolVar(&c.flagPurgeK8SServices, "purge-k8s-services", false,
+		"Purge all K8S services registered in Consul.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
@@ -252,8 +255,9 @@ func (c *Command) Run(args []string) int {
 	}
 	c.ready = true
 
-	if !c.flagToConsul && !c.flagToK8S {
+	if c.flagPurgeK8SServices {
 		if err := c.removeAllK8SServicesFromConsul(consulConfig); err != nil {
+			c.logger.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
 			return 1
 		}
 		return 0
@@ -405,12 +409,10 @@ func (c *Command) Run(args []string) int {
 func (c *Command) removeAllK8SServicesFromConsul(consulConfig *consul.Config) error {
 	consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("unable to create Consul API client: %s", err))
 		return err
 	}
 	_, err = consulClient.Catalog().Deregister(&api.CatalogDeregistration{Node: c.flagConsulNodeName}, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("unable to deregister services from Consul: %s", err))
 		return err
 	}
 	c.logger.Info("All K8S services were deregistered from Consul")

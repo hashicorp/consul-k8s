@@ -96,8 +96,7 @@ spec:
           - consul-k8s-control-plane
         args:
           - sync-catalog
-          - -to-consul=false
-          - -to-k8s=false
+          - -purge-k8s-services=true
         resources:
           requests:
             memory: "50Mi"
