@@ -6,37 +6,44 @@ on:
 
 jobs:
   build:
-    runs-on: custom-linux-xl
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Cache CRC binary
-        id: cache-crc-binary
-        uses: actions/cache@v2
-        with:
-          path: crc
-          key: ${{ runner.os }}-okd-crc
-
-      - name: Download CRC binary
-        run: |
-          curl -LO https://dl.fedoraproject.org/pub/alt/okd-crc/macos-amd64/crc
-          chmod +x crc
-          sudo cp crc /usr/local/bin/crc
-          crc version
-
-      - name: Configure CRC
-        run: |
-          crc config set skip-check-root-user true
-
-      - name: Setup CRC
-        run: |
-          crc setup
-
-      - name: Start CRC
-        run: |
-          crc start
-
-      - name: Login to CRC
-        run: |
-          crc oc-env
-          oc login -u developer https://api.crc.testing:6443
+    jobs:
+      # trying this just for fun
+      create-cluster:
+        runs-on: ubuntu-latest
+        steps:
+          - name: MicroShift OpenShift Cluster
+            uses: container-tools/microshift-action@v0.3
+#    runs-on: custom-linux-xl
+#    steps:
+#      - uses: actions/checkout@v2
+#
+#      - name: Cache CRC binary
+#        id: cache-crc-binary
+#        uses: actions/cache@v2
+#        with:
+#          path: crc
+#          key: ${{ runner.os }}-okd-crc
+#
+#      - name: Download CRC binary
+#        run: |
+#          curl -LO https://dl.fedoraproject.org/pub/alt/okd-crc/macos-amd64/crc
+#          chmod +x crc
+#          sudo cp crc /usr/local/bin/crc
+#          crc version
+#
+#      - name: Configure CRC
+#        run: |
+#          crc config set skip-check-root-user true
+#
+#      - name: Setup CRC
+#        run: |
+#          crc setup
+#
+#      - name: Start CRC
+#        run: |
+#          crc start
+#
+#      - name: Login to CRC
+#        run: |
+#          crc oc-env
+#          oc login -u developer https://api.crc.testing:6443
