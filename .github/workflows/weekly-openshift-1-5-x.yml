@@ -10,38 +10,38 @@ jobs:
     # trying this just for fun
     steps:
       - name: Set up podman
-          run: |
-            source /etc/os-release
-            echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
-            curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key | sudo apt-key add -
-            sudo apt-get update
-            sudo apt-get -y install podman
-            - name: Set up oc client
-              run: |
-                wget https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz
-                sudo tar xzvf oc.tar.gz -C /usr/local/bin
+        run: |
+          source /etc/os-release
+          echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | sudo tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+          curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key | sudo apt-key add -
+          sudo apt-get update
+          sudo apt-get -y install podman
+      - name: Set up oc client
+        run: |
+          wget https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz
+          sudo tar xzvf oc.tar.gz -C /usr/local/bin
 
       - name: Run a microshift cluster
-          run: |
-            sudo podman run -d --rm --name microshift \
-                 --privileged -v microshift-data:/var/lib -p 6443:6443 \
-                 quay.io/microshift/microshift-aio:latest
-            # get kubeconfig
-            sudo podman exec microshift bash -c \
-                 'while ! test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
-                 do
-                     echo "Waiting for kubeconfig..."
-                     sleep 5
-                 done'
-            mkdir ${HOME}/.kube
-            sudo podman cp \
-                 microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig \
-                 ${HOME}/.kube/config
-            sudo chown ${USER} ${HOME}/.kube/config
-            chmod 600 ${HOME}/.kube/config
-            # wait for the cluster to become available
-            sleep 10
-            kubectl wait --for=condition=available apiservice --all --timeout 300s
+        run: |
+          sudo podman run -d --rm --name microshift \
+               --privileged -v microshift-data:/var/lib -p 6443:6443 \
+               quay.io/microshift/microshift-aio:latest
+          # get kubeconfig
+          sudo podman exec microshift bash -c \
+               'while ! test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
+               do
+                   echo "Waiting for kubeconfig..."
+                   sleep 5
+               done'
+          mkdir ${HOME}/.kube
+          sudo podman cp \
+               microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig \
+               ${HOME}/.kube/config
+          sudo chown ${USER} ${HOME}/.kube/config
+          chmod 600 ${HOME}/.kube/config
+          # wait for the cluster to become available
+          sleep 10
+          kubectl wait --for=condition=available apiservice --all --timeout 300s
 #    runs-on: custom-linux-xl
 #    steps:
 #      - uses: actions/checkout@v2
