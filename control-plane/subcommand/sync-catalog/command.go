@@ -256,7 +256,12 @@ func (c *Command) Run(args []string) int {
 	c.ready = true
 
 	if c.flagPurgeK8SServices {
-		if err := c.removeAllK8SServicesFromConsul(consulConfig); err != nil {
+		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+		if err != nil {
+			c.logger.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
+			return 1
+		}
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient, c.flagConsulNodeName); err != nil {
 			c.logger.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
 			return 1
 		}
@@ -406,17 +411,66 @@ func (c *Command) Run(args []string) int {
 }
 
 // remove all k8s services from Consul.
-func (c *Command) removeAllK8SServicesFromConsul(consulConfig *consul.Config) error {
-	consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, nodeName string) error {
+	node, _, err := consulClient.Catalog().NodeServiceList(nodeName, nil)
 	if err != nil {
 		return err
 	}
-	_, err = consulClient.Catalog().Deregister(&api.CatalogDeregistration{Node: c.flagConsulNodeName}, nil)
-	if err != nil {
+
+	var wg sync.WaitGroup
+	services := node.Services
+	errChan := make(chan error, 1)
+	batchSize := 300
+	maxRetries := 2
+	retryDelay := 200 * time.Millisecond
+
+	for i := 0; i < len(services); i += batchSize {
+		end := i + batchSize
+		if end > len(services) {
+			end = len(services)
+		}
+
+		wg.Add(1)
+		go func(batch []*api.AgentService) {
+			defer wg.Done()
+
+			for _, service := range batch {
+				err := retryOps(func() error {
+					_, err := consulClient.Catalog().Deregister(&api.CatalogDeregistration{
+						Node:      nodeName,
+						ServiceID: service.ID,
+					}, nil)
+					return err
+				}, maxRetries, retryDelay, c.logger)
+				if err != nil {
+					if len(errChan) == 0 {
+						errChan <- err
+					}
+				}
+			}
+		}(services[i:end])
+		wg.Wait()
+	}
+
+	close(errChan)
+	if err = <-errChan; err != nil {
 		return err
 	}
 	c.logger.Info("All K8S services were deregistered from Consul")
 	return nil
+}
+
+func retryOps(operation func() error, maxRetries int, retryDelay time.Duration, logger hclog.Logger) error {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = operation()
+		if err == nil {
+			return nil
+		}
+		logger.Warn("Operation failed: %v. Retrying in %v millisecond...", err, retryDelay)
+		time.Sleep(retryDelay)
+	}
+	return err
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {

@@ -623,8 +623,7 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 	exitChan := runCommandAsynchronously(&cmd, []string{
 		"-addresses", "127.0.0.1",
 		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
-		"-to-consul=false",
-		"-to-k8s=false",
+		"-purge-k8s-services=true",
 	})
 	stopCommand(t, &cmd, exitChan)
 
