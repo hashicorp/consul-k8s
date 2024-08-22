@@ -6,13 +6,11 @@ on:
 
 jobs:
   build:
-    jobs:
-      # trying this just for fun
-      create-cluster:
-        runs-on: ubuntu-latest
-        steps:
-          - name: MicroShift OpenShift Cluster
-            uses: container-tools/microshift-action@v0.3
+    runs-on: ubuntu-latest
+    # trying this just for fun
+    steps:
+      - name: MicroShift OpenShift Cluster
+        uses: container-tools/microshift-action@v0.3
 #    runs-on: custom-linux-xl
 #    steps:
 #      - uses: actions/checkout@v2
