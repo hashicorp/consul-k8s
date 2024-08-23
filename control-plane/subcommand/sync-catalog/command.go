@@ -263,11 +263,11 @@ func (c *Command) Run(args []string) int {
 	if c.flagPurgeK8SServices {
 		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
 		if err != nil {
-			c.logger.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
+			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
 			return 1
 		}
 		if err := c.removeAllK8SServicesFromConsulNode(consulClient, c.flagConsulNodeName); err != nil {
-			c.logger.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
+			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
 			return 1
 		}
 		return 0
@@ -476,7 +476,7 @@ func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, n
 	if err = <-errChan; err != nil {
 		return err
 	}
-	c.logger.Info("All K8S services were deregistered from Consul")
+	c.UI.Info("All K8S services were deregistered from Consul")
 	return nil
 }
 
