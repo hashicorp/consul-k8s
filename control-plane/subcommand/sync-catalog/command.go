@@ -40,29 +40,29 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                     *flag.FlagSet
-	consul                    *flags.ConsulFlags
-	k8s                       *flags.K8SFlags
-	flagListen                string
-	flagToConsul              bool
-	flagToK8S                 bool
-	flagConsulDomain          string
-	flagConsulK8STag          string
-	flagConsulNodeName        string
-	flagK8SDefault            bool
-	flagK8SServicePrefix      string
-	flagConsulServicePrefix   string
-	flagK8SSourceNamespace    string
-	flagK8SWriteNamespace     string
-	flagConsulWritePeriod     time.Duration
-	flagSyncClusterIPServices bool
-	flagSyncLBEndpoints       bool
-	flagNodePortSyncType      string
-	flagAddK8SNamespaceSuffix bool
-	flagLogLevel              string
-	flagLogJSON               bool
-	flagPurgeK8SServices      bool
-	flagFilter                string
+	flags                        *flag.FlagSet
+	consul                       *flags.ConsulFlags
+	k8s                          *flags.K8SFlags
+	flagListen                   string
+	flagToConsul                 bool
+	flagToK8S                    bool
+	flagConsulDomain             string
+	flagConsulK8STag             string
+	flagConsulNodeName           string
+	flagK8SDefault               bool
+	flagK8SServicePrefix         string
+	flagConsulServicePrefix      string
+	flagK8SSourceNamespace       string
+	flagK8SWriteNamespace        string
+	flagConsulWritePeriod        time.Duration
+	flagSyncClusterIPServices    bool
+	flagSyncLBEndpoints          bool
+	flagNodePortSyncType         string
+	flagAddK8SNamespaceSuffix    bool
+	flagLogLevel                 string
+	flagLogJSON                  bool
+	flagPurgeK8SServicesFromNode string
+	flagFilter                   string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -143,8 +143,8 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flags.BoolVar(&c.flagPurgeK8SServices, "purge-k8s-services", false,
-		"Purge all K8S services registered in Consul. Please specify the node name otherwise will purge k8s-sync node")
+	c.flags.StringVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", "",
+		"Purge all K8S services registered in Consul under the node name.")
 	c.flags.StringVar(&c.flagFilter, "filter", "",
 		"Specifies the expression used to filter the queries results for the node.")
 
@@ -260,13 +260,13 @@ func (c *Command) Run(args []string) int {
 	}
 	c.ready = true
 
-	if c.flagPurgeK8SServices {
+	if c.flagPurgeK8SServicesFromNode != "" {
 		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
 			return 1
 		}
-		if err := c.removeAllK8SServicesFromConsulNode(consulClient, c.flagConsulNodeName); err != nil {
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient, c.flagPurgeK8SServicesFromNode); err != nil {
 			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
 			return 1
 		}
