@@ -577,8 +577,22 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 	t.Parallel()
 
 	k8s, testClient := completeSetup(t)
-
 	consulClient := testClient.APIClient
+
+	// Create a mock reader to simulate user input
+	input := "y\n"
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	oldStdin := os.Stdin
+	os.Stdin = reader
+	defer func() { os.Stdin = oldStdin }()
+
+	// Write the simulated user input to the mock reader
+	go func() {
+		defer writer.Close()
+		_, err := writer.WriteString(input)
+		require.NoError(t, err)
+	}()
 
 	// Run the command.
 	ui := cli.NewMockUi()
@@ -594,7 +608,7 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 	}
 
 	// create two services in k8s
-	_, err := k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
+	_, err = k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	_, err = k8s.CoreV1().Services("baz").Create(context.Background(), lbService("foo", "2.2.2.2"), metav1.CreateOptions{})
