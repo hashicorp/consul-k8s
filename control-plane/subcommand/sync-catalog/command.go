@@ -4,6 +4,7 @@
 package synccatalog
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -60,6 +62,7 @@ type Command struct {
 	flagLogLevel              string
 	flagLogJSON               bool
 	flagPurgeK8SServices      bool
+	flagFilter                string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -142,6 +145,8 @@ func (c *Command) init() {
 		"Enable or disable JSON output format for logging.")
 	c.flags.BoolVar(&c.flagPurgeK8SServices, "purge-k8s-services", false,
 		"Purge all K8S services registered in Consul.")
+	c.flags.StringVar(&c.flagFilter, "filter", "",
+		"Specifies the expression used to filter the queries results for the node.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
@@ -412,7 +417,7 @@ func (c *Command) Run(args []string) int {
 
 // remove all k8s services from Consul.
 func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, nodeName string) error {
-	node, _, err := consulClient.Catalog().NodeServiceList(nodeName, nil)
+	node, _, err := consulClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: c.flagFilter})
 	if err != nil {
 		return err
 	}
@@ -423,6 +428,21 @@ func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, n
 	batchSize := 300
 	maxRetries := 2
 	retryDelay := 200 * time.Millisecond
+
+	// Ask for user confirmation
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		c.UI.Info(fmt.Sprintf("Are you sure you want to delete %v K8S services from %v? (y/n): ", len(services), nodeName))
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input == "y" || input == "Y" {
+			break
+		} else if input == "n" || input == "N" {
+			return nil
+		} else {
+			c.UI.Info("Invalid input. Please enter 'y' or 'n'.")
+		}
+	}
 
 	for i := 0; i < len(services); i += batchSize {
 		end := i + batchSize
