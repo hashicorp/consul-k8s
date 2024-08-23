@@ -468,6 +468,7 @@ func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, n
 					}
 				}
 			}
+			c.UI.Info(fmt.Sprintf("Processed %v K8S services from %v", len(batch), nodeName))
 		}(services[i:end])
 		wg.Wait()
 	}
