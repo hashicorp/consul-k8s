@@ -144,7 +144,7 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 	c.flags.BoolVar(&c.flagPurgeK8SServices, "purge-k8s-services", false,
-		"Purge all K8S services registered in Consul.")
+		"Purge all K8S services registered in Consul. Please specify the node name otherwise will purge k8s-sync node")
 	c.flags.StringVar(&c.flagFilter, "filter", "",
 		"Specifies the expression used to filter the queries results for the node.")
 
