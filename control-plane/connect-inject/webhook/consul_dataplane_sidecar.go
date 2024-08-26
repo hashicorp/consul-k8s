@@ -15,7 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -219,11 +219,11 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			}
 		}
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-			RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-			RunAsNonRoot:             pointer.Bool(true),
-			AllowPrivilegeEscalation: pointer.Bool(false),
-			ReadOnlyRootFilesystem:   pointer.Bool(true),
+			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+			RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
+			RunAsNonRoot:             ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
 		}
 	}
 

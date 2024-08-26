@@ -9,7 +9,7 @@ import (
 
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -55,13 +55,13 @@ func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 		if cfg.Timeout != defaultDNSOptionTimeout {
 			options = append(options, corev1.PodDNSConfigOption{
 				Name:  "timeout",
-				Value: pointer.String(strconv.Itoa(cfg.Timeout)),
+				Value: ptr.To(strconv.Itoa(cfg.Timeout)),
 			})
 		}
 		if cfg.Attempts != defaultDNSOptionAttempts {
 			options = append(options, corev1.PodDNSConfigOption{
 				Name:  "attempts",
-				Value: pointer.String(strconv.Itoa(cfg.Attempts)),
+				Value: ptr.To(strconv.Itoa(cfg.Attempts)),
 			})
 		}
 

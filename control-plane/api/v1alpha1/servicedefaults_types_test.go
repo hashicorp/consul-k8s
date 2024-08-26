@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
@@ -89,8 +89,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 									Duration: 2 * time.Second,
 								},
 								MaxFailures:             uint32(20),
-								EnforcingConsecutive5xx: pointer.Uint32(100),
-								MaxEjectionPercent:      pointer.Uint32(10),
+								EnforcingConsecutive5xx: ptr.To(uint32(100)),
+								MaxEjectionPercent:      ptr.To(uint32(10)),
 								BaseEjectionTime: &metav1.Duration{
 									Duration: 10 * time.Second,
 								},
@@ -118,8 +118,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: pointer.Uint32(60),
-									MaxEjectionPercent:      pointer.Uint32(20),
+									EnforcingConsecutive5xx: ptr.To(uint32(60)),
+									MaxEjectionPercent:      ptr.To(uint32(20)),
 									BaseEjectionTime: &metav1.Duration{
 										Duration: 20 * time.Second,
 									},
@@ -146,8 +146,8 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: pointer.Uint32(60),
-									MaxEjectionPercent:      pointer.Uint32(30),
+									EnforcingConsecutive5xx: ptr.To(uint32(60)),
+									MaxEjectionPercent:      ptr.To(uint32(30)),
 									BaseEjectionTime: &metav1.Duration{
 										Duration: 30 * time.Second,
 									},
@@ -226,9 +226,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
-							EnforcingConsecutive5xx: pointer.Uint32(100),
-							MaxEjectionPercent:      pointer.Uint32(10),
-							BaseEjectionTime:        pointer.Duration(10 * time.Second),
+							EnforcingConsecutive5xx: ptr.To(uint32(100)),
+							MaxEjectionPercent:      ptr.To(uint32(10)),
+							BaseEjectionTime:        ptr.To(10 * time.Second),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -251,9 +251,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: pointer.Uint32(60),
-								MaxEjectionPercent:      pointer.Uint32(20),
-								BaseEjectionTime:        pointer.Duration(20 * time.Second),
+								EnforcingConsecutive5xx: ptr.To(uint32(60)),
+								MaxEjectionPercent:      ptr.To(uint32(20)),
+								BaseEjectionTime:        ptr.To(20 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -275,9 +275,9 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: pointer.Uint32(60),
-								MaxEjectionPercent:      pointer.Uint32(30),
-								BaseEjectionTime:        pointer.Duration(30 * time.Second),
+								EnforcingConsecutive5xx: ptr.To(uint32(60)),
+								MaxEjectionPercent:      ptr.To(uint32(30)),
+								BaseEjectionTime:        ptr.To(30 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -488,8 +488,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 									Duration: 2 * time.Second,
 								},
 								MaxFailures:             uint32(20),
-								EnforcingConsecutive5xx: pointer.Uint32(100),
-								MaxEjectionPercent:      pointer.Uint32(10),
+								EnforcingConsecutive5xx: ptr.To(uint32(100)),
+								MaxEjectionPercent:      ptr.To(uint32(10)),
 								BaseEjectionTime: &metav1.Duration{
 									Duration: 10 * time.Second,
 								},
@@ -516,8 +516,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: pointer.Uint32(60),
-									MaxEjectionPercent:      pointer.Uint32(20),
+									EnforcingConsecutive5xx: ptr.To(uint32(60)),
+									MaxEjectionPercent:      ptr.To(uint32(20)),
 									BaseEjectionTime: &metav1.Duration{
 										Duration: 20 * time.Second,
 									},
@@ -542,8 +542,8 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 										Duration: 2 * time.Second,
 									},
 									MaxFailures:             uint32(10),
-									EnforcingConsecutive5xx: pointer.Uint32(60),
-									MaxEjectionPercent:      pointer.Uint32(30),
+									EnforcingConsecutive5xx: ptr.To(uint32(60)),
+									MaxEjectionPercent:      ptr.To(uint32(30)),
 									BaseEjectionTime: &metav1.Duration{
 										Duration: 30 * time.Second,
 									},
@@ -617,9 +617,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 						PassiveHealthCheck: &capi.PassiveHealthCheck{
 							Interval:                2 * time.Second,
 							MaxFailures:             uint32(20),
-							EnforcingConsecutive5xx: pointer.Uint32(100),
-							MaxEjectionPercent:      pointer.Uint32(10),
-							BaseEjectionTime:        pointer.Duration(10 * time.Second),
+							EnforcingConsecutive5xx: ptr.To(uint32(100)),
+							MaxEjectionPercent:      ptr.To(uint32(10)),
+							BaseEjectionTime:        ptr.To(10 * time.Second),
 						},
 						MeshGateway: capi.MeshGatewayConfig{
 							Mode: "local",
@@ -641,9 +641,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: pointer.Uint32(60),
-								MaxEjectionPercent:      pointer.Uint32(20),
-								BaseEjectionTime:        pointer.Duration(20 * time.Second),
+								EnforcingConsecutive5xx: ptr.To(uint32(60)),
+								MaxEjectionPercent:      ptr.To(uint32(20)),
+								BaseEjectionTime:        ptr.To(20 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
@@ -665,9 +665,9 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 							PassiveHealthCheck: &capi.PassiveHealthCheck{
 								Interval:                2 * time.Second,
 								MaxFailures:             uint32(10),
-								EnforcingConsecutive5xx: pointer.Uint32(60),
-								MaxEjectionPercent:      pointer.Uint32(30),
-								BaseEjectionTime:        pointer.Duration(30 * time.Second),
+								EnforcingConsecutive5xx: ptr.To(uint32(60)),
+								MaxEjectionPercent:      ptr.To(uint32(30)),
+								BaseEjectionTime:        ptr.To(30 * time.Second),
 							},
 							MeshGateway: capi.MeshGatewayConfig{
 								Mode: "remote",
