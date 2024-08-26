@@ -48,6 +48,7 @@ func TestMesh_MatchesConsul(t *testing.T) {
 					TransparentProxy: TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
+					ValidateClusters:                 true,
 					AllowEnablingPermissiveMutualTLS: true,
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
@@ -73,6 +74,7 @@ func TestMesh_MatchesConsul(t *testing.T) {
 				TransparentProxy: capi.TransparentProxyMeshConfig{
 					MeshDestinationsOnly: true,
 				},
+				ValidateClusters:                 true,
 				AllowEnablingPermissiveMutualTLS: true,
 				TLS: &capi.MeshTLSConfig{
 					Incoming: &capi.MeshDirectionalTLSConfig{
@@ -150,6 +152,7 @@ func TestMesh_ToConsul(t *testing.T) {
 					TransparentProxy: TransparentProxyMeshConfig{
 						MeshDestinationsOnly: true,
 					},
+					ValidateClusters:                 true,
 					AllowEnablingPermissiveMutualTLS: true,
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
@@ -175,6 +178,7 @@ func TestMesh_ToConsul(t *testing.T) {
 				TransparentProxy: capi.TransparentProxyMeshConfig{
 					MeshDestinationsOnly: true,
 				},
+				ValidateClusters:                 true,
 				AllowEnablingPermissiveMutualTLS: true,
 				TLS: &capi.MeshTLSConfig{
 					Incoming: &capi.MeshDirectionalTLSConfig{
