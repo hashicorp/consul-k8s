@@ -185,8 +185,8 @@ github.com/gruntwork-io/terratest v0.46.7 h1:oqGPBBO87SEsvBYaA0R5xOq+Lm2Xc5dmFVf
 github.com/gruntwork-io/terratest v0.46.7/go.mod h1:6gI5MlLeyF+SLwqocA5GBzcTix+XiuxCy1BPwKuT+WM=
 github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240226161840-f3842c41cb2b h1:AdeWjUb+rxrRryC5ZHaL32oOZuxubOzV2q6oJ97UMT0=
 github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240226161840-f3842c41cb2b/go.mod h1:TVaSJM7vYM/mtKGpVc/Lch53lrqLI9XAXJgy/gY8v4A=
-github.com/hashicorp/consul/api v1.27.1 h1:cCm9utgz8Ee9R4gfCpSv3xtwYlhOqfPHJN2+VU6ll4I=
-github.com/hashicorp/consul/api v1.27.1/go.mod h1:Zq8IxnUcYEAVBziHeL7iRo/l8E6VVnrVeHHulZRrQ2M=
+github.com/hashicorp/consul/api v1.27.2 h1:zsAbIIaydKeAXo56TILS99Brwhm7LNq4kcaJ0HX3jZU=
+github.com/hashicorp/consul/api v1.27.2/go.mod h1:wINl0Kzn39L6ucX3ApP2DdI8JhCxkYx8KS8p99Gm69w=
 github.com/hashicorp/consul/proto-public v0.6.0 h1:9qrBujmoTB5gQQ84kQO+YWvhjgYoYBNrOoHdo4cpHHM=
 github.com/hashicorp/consul/proto-public v0.6.0/go.mod h1:JF6983XNCzvw4wDNOLEwLqOq2IPw7iyT+pkswHSz08U=
 github.com/hashicorp/consul/sdk v0.16.0 h1:SE9m0W6DEfgIVCJX7xU+iv/hUl4m/nxqMTnCdMxDpJ8=
