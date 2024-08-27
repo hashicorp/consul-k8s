@@ -10,7 +10,7 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -214,26 +214,26 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod) 
 			// Running consul mesh-init redirect-traffic with iptables
 			// requires both being a root user and having NET_ADMIN capability.
 			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:  pointer.Int64(rootUserAndGroupID),
-				RunAsGroup: pointer.Int64(rootUserAndGroupID),
+				RunAsUser:  ptr.To(int64(rootUserAndGroupID)),
+				RunAsGroup: ptr.To(int64(rootUserAndGroupID)),
 				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-				RunAsNonRoot: pointer.Bool(false),
-				Privileged:   pointer.Bool(privileged),
+				RunAsNonRoot: ptr.To(false),
+				Privileged:   ptr.To(privileged),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
 			}
 		} else {
 			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-				RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-				RunAsNonRoot: pointer.Bool(true),
-				Privileged:   pointer.Bool(privileged),
+				RunAsUser:    ptr.To(int64(initContainersUserAndGroupID)),
+				RunAsGroup:   ptr.To(int64(initContainersUserAndGroupID)),
+				RunAsNonRoot: ptr.To(true),
+				Privileged:   ptr.To(privileged),
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 			}
 		}
 	}

@@ -12,7 +12,7 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -203,15 +203,15 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 	}
 
 	container.SecurityContext = &corev1.SecurityContext{
-		RunAsUser:    pointer.Int64(uid),
-		RunAsGroup:   pointer.Int64(gid),
-		RunAsNonRoot: pointer.Bool(true),
-		Privileged:   pointer.Bool(false),
+		RunAsUser:    ptr.To(uid),
+		RunAsGroup:   ptr.To(gid),
+		RunAsNonRoot: ptr.To(true),
+		Privileged:   ptr.To(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		AllowPrivilegeEscalation: pointer.Bool(false),
-		ReadOnlyRootFilesystem:   pointer.Bool(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   ptr.To(true),
 	}
 
 	return container, nil

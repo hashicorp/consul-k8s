@@ -6,6 +6,7 @@ package gateways
 import (
 	"testing"
 
+	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -13,9 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
-
-	pbmesh "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+	"k8s.io/utils/ptr"
 
 	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -132,9 +131,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
-								Default: pointer.Int32(1),
-								Min:     pointer.Int32(1),
-								Max:     pointer.Int32(8),
+								Default: ptr.To(int32(1)),
+								Min:     ptr.To(int32(1)),
+								Max:     ptr.To(int32(8)),
 							},
 							PriorityClassName: "priorityclassname",
 							TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
@@ -181,7 +180,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					},
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: pointer.Int32(1),
+					Replicas: ptr.To(int32(1)),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							labelManagedBy: "consul-k8s",
@@ -407,9 +406,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 												"ALL",
 											},
 										},
-										RunAsNonRoot:             pointer.Bool(true),
-										ReadOnlyRootFilesystem:   pointer.Bool(true),
-										AllowPrivilegeEscalation: pointer.Bool(false),
+										RunAsNonRoot:             ptr.To(true),
+										ReadOnlyRootFilesystem:   ptr.To(true),
+										AllowPrivilegeEscalation: ptr.To(false),
 										ProcMount:                nil,
 										SeccompProfile:           nil,
 									},
@@ -526,9 +525,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 							},
 							NodeSelector: map[string]string{"beta.kubernetes.io/arch": "amd64"},
 							Replicas: &meshv2beta1.GatewayClassReplicasConfig{
-								Default: pointer.Int32(1),
-								Min:     pointer.Int32(1),
-								Max:     pointer.Int32(8),
+								Default: ptr.To(int32(1)),
+								Min:     ptr.To(int32(1)),
+								Max:     ptr.To(int32(8)),
 							},
 							PriorityClassName: "priorityclassname",
 							TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
@@ -572,7 +571,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: pointer.Int32(1),
+					Replicas: ptr.To(int32(1)),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
 							labelManagedBy: "consul-k8s",
@@ -808,9 +807,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 												"ALL",
 											},
 										},
-										RunAsNonRoot:             pointer.Bool(true),
-										ReadOnlyRootFilesystem:   pointer.Bool(true),
-										AllowPrivilegeEscalation: pointer.Bool(false),
+										RunAsNonRoot:             ptr.To(true),
+										ReadOnlyRootFilesystem:   ptr.To(true),
+										AllowPrivilegeEscalation: ptr.To(false),
 										ProcMount:                nil,
 										SeccompProfile:           nil,
 									},
@@ -887,7 +886,7 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 					Annotations: map[string]string{},
 				},
 				Spec: appsv1.DeploymentSpec{
-					Replicas: pointer.Int32(1),
+					Replicas: ptr.To(int32(1)),
 					Selector: &metav1.LabelSelector{
 						MatchLabels: defaultLabels,
 					},
@@ -1089,9 +1088,9 @@ func Test_meshGatewayBuilder_Deployment(t *testing.T) {
 												"ALL",
 											},
 										},
-										RunAsNonRoot:             pointer.Bool(true),
-										ReadOnlyRootFilesystem:   pointer.Bool(true),
-										AllowPrivilegeEscalation: pointer.Bool(false),
+										RunAsNonRoot:             ptr.To(true),
+										ReadOnlyRootFilesystem:   ptr.To(true),
+										AllowPrivilegeEscalation: ptr.To(false),
 										ProcMount:                nil,
 										SeccompProfile:           nil,
 									},

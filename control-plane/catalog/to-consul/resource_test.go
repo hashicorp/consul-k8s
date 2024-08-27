@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const nodeName1 = "ip-10-11-12-13.ec2.internal"
@@ -778,23 +778,23 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 				{
 					Addresses: []string{"8.8.8.8"},
 					Conditions: discoveryv1.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					TargetRef: &corev1.ObjectReference{Kind: "pod", Name: "foo", Namespace: metav1.NamespaceDefault},
 					NodeName:  &node1.Name,
-					Zone:      pointer.String("us-west-2a"),
+					Zone:      ptr.To("us-west-2a"),
 				},
 			},
 			Ports: []discoveryv1.EndpointPort{
 				{
-					Name: pointer.String("http"),
-					Port: pointer.Int32(8080),
+					Name: ptr.To("http"),
+					Port: ptr.To(int32(8080)),
 				},
 				{
-					Name: pointer.String("rpc"),
-					Port: pointer.Int32(2000),
+					Name: ptr.To("rpc"),
+					Port: ptr.To(int32(2000)),
 				},
 			},
 		},
@@ -926,23 +926,23 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 				{
 					Addresses: []string{"1.2.3.4"},
 					Conditions: discoveryv1.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					TargetRef: &corev1.ObjectReference{Kind: "pod", Name: "foo", Namespace: metav1.NamespaceDefault},
 					NodeName:  &node1.Name,
-					Zone:      pointer.String("us-west-2a"),
+					Zone:      ptr.To("us-west-2a"),
 				},
 			},
 			Ports: []discoveryv1.EndpointPort{
 				{
-					Name: pointer.String("http"),
-					Port: pointer.Int32(8080),
+					Name: ptr.To("http"),
+					Port: ptr.To(int32(8080)),
 				},
 				{
-					Name: pointer.String("rpc"),
-					Port: pointer.Int32(2000),
+					Name: ptr.To("rpc"),
+					Port: ptr.To(int32(2000)),
 				},
 			},
 		},
@@ -2147,33 +2147,33 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 				{
 					Addresses: []string{"1.1.1.1"},
 					Conditions: discoveryv1.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					TargetRef: &targetRef,
 					NodeName:  &node1,
-					Zone:      pointer.String("us-west-2a"),
+					Zone:      ptr.To("us-west-2a"),
 				},
 				{
 					Addresses: []string{"2.2.2.2"},
 					Conditions: discoveryv1.EndpointConditions{
-						Ready:       pointer.Bool(true),
-						Serving:     pointer.Bool(true),
-						Terminating: pointer.Bool(false),
+						Ready:       ptr.To(true),
+						Serving:     ptr.To(true),
+						Terminating: ptr.To(false),
 					},
 					NodeName: &node2,
-					Zone:     pointer.String("us-west-2b"),
+					Zone:     ptr.To("us-west-2b"),
 				},
 			},
 			Ports: []discoveryv1.EndpointPort{
 				{
-					Name: pointer.String("http"),
-					Port: pointer.Int32(8080),
+					Name: ptr.To("http"),
+					Port: ptr.To(int32(8080)),
 				},
 				{
-					Name: pointer.String("rpc"),
-					Port: pointer.Int32(2000),
+					Name: ptr.To("rpc"),
+					Port: ptr.To(int32(2000)),
 				},
 			},
 		},

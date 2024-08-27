@@ -9,7 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -116,7 +116,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	// If running in vanilla K8s, run as root to allow binding to privileged ports;
 	// otherwise, allow the user to be assigned by OpenShift.
 	container.SecurityContext = &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: pointer.Bool(true),
+		ReadOnlyRootFilesystem: ptr.To(true),
 		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
 		Capabilities: &corev1.Capabilities{
 			Add:  []corev1.Capability{netBindCapability},
@@ -124,7 +124,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		},
 	}
 	if !config.EnableOpenShift {
-		container.SecurityContext.RunAsUser = pointer.Int64(0)
+		container.SecurityContext.RunAsUser = ptr.To(int64(0))
 	}
 
 	return container, nil
