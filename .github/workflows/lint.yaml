@@ -1,4 +1,5 @@
 # Dispatch to the consul-k8s-workflows when a PR is created and on merges to main/release*
+#test if linting works
 name: lint
 on:
   pull_request:
