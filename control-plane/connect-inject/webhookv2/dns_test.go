@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestMeshWebhook_configureDNS(t *testing.T) {
@@ -40,15 +40,15 @@ options ndots:5 timeout:6 attempts:3`,
 				Options: []corev1.PodDNSConfigOption{
 					{
 						Name:  "ndots",
-						Value: pointer.String("5"),
+						Value: ptr.To("5"),
 					},
 					{
 						Name:  "timeout",
-						Value: pointer.String("6"),
+						Value: ptr.To("6"),
 					},
 					{
 						Name:  "attempts",
-						Value: pointer.String("3"),
+						Value: ptr.To("3"),
 					},
 				},
 			},
@@ -65,7 +65,7 @@ options ndots:5`,
 				Options: []corev1.PodDNSConfigOption{
 					{
 						Name:  "ndots",
-						Value: pointer.String("5"),
+						Value: ptr.To("5"),
 					},
 				},
 			},

@@ -10,8 +10,7 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -176,10 +175,10 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 	// Openshift Assigns the security context for us, do not enable if it is enabled.
 	if !config.EnableOpenShift {
 		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-			RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-			RunAsNonRoot: pointer.Bool(true),
-			Privileged:   pointer.Bool(false),
+			RunAsUser:    ptr.To(int64(initContainersUserAndGroupID)),
+			RunAsGroup:   ptr.To(int64(initContainersUserAndGroupID)),
+			RunAsNonRoot: ptr.To(true),
+			Privileged:   ptr.To(false),
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},

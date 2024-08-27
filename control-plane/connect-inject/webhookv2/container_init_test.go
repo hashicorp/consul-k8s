@@ -13,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -286,22 +286,22 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			var expectedSecurityContext *corev1.SecurityContext
 			if c.cniEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(privileged),
+					RunAsUser:    ptr.To(int64(initContainersUserAndGroupID)),
+					RunAsGroup:   ptr.To(int64(initContainersUserAndGroupID)),
+					RunAsNonRoot: ptr.To(true),
+					Privileged:   ptr.To(privileged),
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{"ALL"},
 					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
+					ReadOnlyRootFilesystem:   ptr.To(true),
+					AllowPrivilegeEscalation: ptr.To(false),
 				}
 			} else if c.expTproxyEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(0),
-					RunAsGroup:   pointer.Int64(0),
-					RunAsNonRoot: pointer.Bool(false),
-					Privileged:   pointer.Bool(privileged),
+					RunAsUser:    ptr.To(int64(0)),
+					RunAsGroup:   ptr.To(int64(0)),
+					RunAsNonRoot: ptr.To(false),
+					Privileged:   ptr.To(privileged),
 					Capabilities: &corev1.Capabilities{
 						Add: []corev1.Capability{netAdminCapability},
 					},
