@@ -239,13 +239,13 @@ ensure-controller-gen-version: ## Ensure controller-gen version is v0.14.0.
 ifeq (, $(shell which $(CONTROLLER_GEN)))
 	@echo "You don't have $(CONTROLLER_GEN), please install it first."
 else
-	ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.14.0))
-		@echo "controller-gen version is not v0.14.0, uninstall the binary and install the correct version with 'make get-controller-gen'."
-		@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
-		@exit 1
-	else
-		@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
-	endif
+ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.14.0))
+	@echo "controller-gen version is not v0.14.0, uninstall the binary and install the correct version with 'make get-controller-gen'."
+	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
+	@exit 1
+else
+	@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
+endif
 endif
 
 .PHONY: add-copyright-header
