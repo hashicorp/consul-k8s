@@ -207,6 +207,7 @@ func (in *Mesh) ToConsul(datacenter string) capi.ConfigEntry {
 		TLS:                              in.Spec.TLS.toConsul(),
 		HTTP:                             in.Spec.HTTP.toConsul(),
 		Peering:                          in.Spec.Peering.toConsul(),
+		ValidateClusters:                 in.Spec.ValidateClusters,
 		Meta:                             meta(datacenter),
 	}
 }
