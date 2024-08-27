@@ -1,21 +1,18 @@
 {{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
+    gateway.networking.k8s.io/bundle-version: v0.6.2
+    gateway.networking.k8s.io/channel: experimental
+  creationTimestamp: null
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-    gateway.networking.k8s.io/bundle-version: v0.6.2
-    gateway.networking.k8s.io/channel: experimental
-  creationTimestamp: null
   name: udproutes.gateway.networking.k8s.io
 spec:
   group: gateway.networking.k8s.io
