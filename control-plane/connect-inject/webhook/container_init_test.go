@@ -318,15 +318,15 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			} else if c.cniEnabled && c.openShiftEnabled {
 				// When cni + openShift
 				expectedSecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(1000799999),
-					RunAsGroup:   pointer.Int64(1000799999),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(privileged),
+					RunAsUser:    ptr.To(int64(1000799999)),
+					RunAsGroup:   ptr.To(int64(1000799999)),
+					RunAsNonRoot: ptr.To(true),
+					Privileged:   ptr.To(privileged),
 					Capabilities: &corev1.Capabilities{
 						Drop: []corev1.Capability{"ALL"},
 					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
+					ReadOnlyRootFilesystem:   ptr.To(true),
+					AllowPrivilegeEscalation: ptr.To(false),
 				}
 			}
 			ns := corev1.Namespace{
