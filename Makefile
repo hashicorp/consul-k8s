@@ -231,7 +231,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.1 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
@@ -240,12 +240,12 @@ CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 .PHONY: ensure-controller-gen-version
-ensure-controller-gen-version: ## Ensure controller-gen version is v0.12.1.
+ensure-controller-gen-version: ## Ensure controller-gen version is v0.14.0.
 ifeq (, $(shell which $(CONTROLLER_GEN)))
 	@echo "You don't have $(CONTROLLER_GEN), please install it first."
 else
-ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.12.1))
-	@echo "controller-gen version is not v0.12.1, uninstall the binary and install the correct version with 'make get-controller-gen'."
+ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.14.0))
+	@echo "controller-gen version is not v0.14.0, uninstall the binary and install the correct version with 'make get-controller-gen'."
 	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
 	@exit 1
 else
