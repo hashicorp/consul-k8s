@@ -4,8 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.8.0
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: servicesplitters.consul.hashicorp.com
   labels:
     app: {{ template "consul.name" . }}
@@ -43,14 +42,19 @@ spec:
         description: ServiceSplitter is the Schema for the servicesplitters API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -58,20 +62,20 @@ spec:
             description: ServiceSplitterSpec defines the desired state of ServiceSplitter.
             properties:
               splits:
-                description: Splits defines how much traffic to send to which set
-                  of service instances during a traffic split. The sum of weights
-                  across all splits must add up to 100.
+                description: |-
+                  Splits defines how much traffic to send to which set of service instances during a traffic split.
+                  The sum of weights across all splits must add up to 100.
                 items:
                   properties:
                     namespace:
-                      description: Namespace is the Consul namespace to resolve the
-                        service from instead of the current namespace. If empty the
-                        current namespace is assumed.
+                      description: |-
+                        Namespace is the Consul namespace to resolve the service from instead of
+                        the current namespace. If empty the current namespace is assumed.
                       type: string
                     partition:
-                      description: Partition is the Consul partition to resolve the
-                        service from instead of the current partition. If empty the
-                        current partition is assumed.
+                      description: |-
+                        Partition is the Consul partition to resolve the service from instead of
+                        the current partition. If empty the current partition is assumed.
                       type: string
                     requestHeaders:
                       description: Allow HTTP header manipulation to be configured.
@@ -79,50 +83,52 @@ spec:
                         add:
                           additionalProperties:
                             type: string
-                          description: Add is a set of name -> value pairs that should
-                            be appended to the request or response (i.e. allowing
-                            duplicates if the same header already exists).
+                          description: |-
+                            Add is a set of name -> value pairs that should be appended to the request
+                            or response (i.e. allowing duplicates if the same header already exists).
                           type: object
                         remove:
-                          description: Remove is the set of header names that should
-                            be stripped from the request or response.
+                          description: |-
+                            Remove is the set of header names that should be stripped from the request
+                            or response.
                           items:
                             type: string
                           type: array
                         set:
                           additionalProperties:
                             type: string
-                          description: Set is a set of name -> value pairs that should
-                            be added to the request or response, overwriting any existing
-                            header values of the same name.
+                          description: |-
+                            Set is a set of name -> value pairs that should be added to the request or
+                            response, overwriting any existing header values of the same name.
                           type: object
                       type: object
                     responseHeaders:
-                      description: HTTPHeaderModifiers is a set of rules for HTTP
-                        header modification that should be performed by proxies as
-                        the request passes through them. It can operate on either
-                        request or response headers depending on the context in which
-                        it is used.
+                      description: |-
+                        HTTPHeaderModifiers is a set of rules for HTTP header modification that
+                        should be performed by proxies as the request passes through them. It can
+                        operate on either request or response headers depending on the context in
+                        which it is used.
                       properties:
                         add:
                           additionalProperties:
                             type: string
-                          description: Add is a set of name -> value pairs that should
-                            be appended to the request or response (i.e. allowing
-                            duplicates if the same header already exists).
+                          description: |-
+                            Add is a set of name -> value pairs that should be appended to the request
+                            or response (i.e. allowing duplicates if the same header already exists).
                           type: object
                         remove:
-                          description: Remove is the set of header names that should
-                            be stripped from the request or response.
+                          description: |-
+                            Remove is the set of header names that should be stripped from the request
+                            or response.
                           items:
                             type: string
                           type: array
                         set:
                           additionalProperties:
                             type: string
-                          description: Set is a set of name -> value pairs that should
-                            be added to the request or response, overwriting any existing
-                            header values of the same name.
+                          description: |-
+                            Set is a set of name -> value pairs that should be added to the request or
+                            response, overwriting any existing header values of the same name.
                           type: object
                       type: object
                     service:
@@ -130,13 +136,13 @@ spec:
                         default.
                       type: string
                     serviceSubset:
-                      description: ServiceSubset is a named subset of the given service
-                        to resolve instead of one defined as that service's DefaultSubset.
-                        If empty the default subset is used.
+                      description: |-
+                        ServiceSubset is a named subset of the given service to resolve instead of one defined
+                        as that service's DefaultSubset. If empty the default subset is used.
                       type: string
                     weight:
-                      description: Weight is a value between 0 and 100 reflecting
-                        what portion of traffic should be directed to this split.
+                      description: |-
+                        Weight is a value between 0 and 100 reflecting what portion of traffic should be directed to this split.
                         The smallest representable weight is 1/10000 or .01%.
                       type: number
                   type: object
@@ -148,8 +154,9 @@ spec:
                 description: Conditions indicate the latest available observations
                   of a resource's current state.
                 items:
-                  description: 'Conditions define a readiness condition for a Consul
-                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: |-
+                    Conditions define a readiness condition for a Consul resource.
+                    See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition
@@ -185,10 +192,4 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
 {{- end }}

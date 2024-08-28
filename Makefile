@@ -48,7 +48,7 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 .PHONY: control-plane-dev-skaffold
 # DANGER: this target is experimental and could be modified/removed at any time.
 control-plane-dev-skaffold: ## Build consul-k8s-control-plane dev Docker image for use with skaffold or local development.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh -o linux -a $(GOARCH)
 	@docker build -t '$(DEV_IMAGE)' \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
@@ -101,7 +101,8 @@ cni-plugin-lint:
 
 .PHONY: ctrl-generate
 ctrl-generate: get-controller-gen ## Run CRD code generation.
-	cd control-plane; $(CONTROLLER_GEN) object:headerFile="build-support/controller/boilerplate.go.txt" paths="./..."
+	make ensure-controller-gen-version
+	cd control-plane; $(CONTROLLER_GEN) object paths="./..."
 
 .PHONY: terraform-fmt-check
 terraform-fmt-check: ## Perform a terraform fmt check but don't change anything
@@ -143,22 +144,30 @@ kind-cni-calico: ## install cni plugin on kind
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
 	@sleep 20
 
-.PHONY: kind-cni
-kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
+.PHONY: kind-delete
+kind-delete:
 	kind delete cluster --name dc1
 	kind delete cluster --name dc2
+	kind delete cluster --name dc3
+	kind delete cluster --name dc4
+
+.PHONY: kind-cni
+kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
+	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE)
+	make kind-cni-calico
 
 .PHONY: kind
 kind: kind-delete ## Helper target for doing local acceptance testing
-	kind delete cluster --name dc1
-	kind delete cluster --name dc2
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
-
+	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
+	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
 
 .PHONY: kind-load
 kind-load: ## Helper target for loading local dev images (run with `DEV_IMAGE=...` to load non-k8s images)
@@ -175,6 +184,7 @@ lint: cni-plugin-lint ## Run linter in the control-plane, cli, and acceptance di
 
 .PHONY: ctrl-manifests
 ctrl-manifests: get-controller-gen ## Generate CRD manifests.
+	make ensure-controller-gen-version
 	cd control-plane; $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 	make copy-crds-to-chart
 	make add-copyright-header
@@ -187,12 +197,26 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.8.0 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+.PHONY: ensure-controller-gen-version
+ensure-controller-gen-version: ## Ensure controller-gen version is v0.14.0.
+ifeq (, $(shell which $(CONTROLLER_GEN)))
+	@echo "You don't have $(CONTROLLER_GEN), please install it first."
+else
+ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.14.0))
+	@echo "controller-gen version is not v0.14.0, uninstall the binary and install the correct version with 'make get-controller-gen'."
+	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
+	@exit 1
+else
+	@echo "Found correct version: $(shell $(CONTROLLER_GEN) --version)"
+endif
 endif
 
 .PHONY: add-copyright-header
@@ -299,6 +323,25 @@ endif
 .PHONY: prepare-release
 prepare-release: prepare-release-script check-preview-containers
 
+.PHONY: prepare-rc-script
+prepare-rc-script: ## Sets the versions, updates changelog to prepare this repository to release
+ifndef CONSUL_K8S_RELEASE_VERSION
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
+endif
+ifndef CONSUL_K8S_RELEASE_DATE
+	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
+endif
+ifndef CONSUL_K8S_LAST_RELEASE_GIT_TAG
+	$(error CONSUL_K8S_LAST_RELEASE_GIT_TAG is required)
+endif
+ifndef CONSUL_K8S_CONSUL_VERSION
+	$(error CONSUL_K8S_CONSUL_VERSION is required)
+endif
+	@source $(CURDIR)/control-plane/build-support/scripts/functions.sh; prepare_rc_branch $(CURDIR) $(CONSUL_K8S_RELEASE_VERSION) "$(CONSUL_K8S_RELEASE_DATE)" $(CONSUL_K8S_LAST_RELEASE_GIT_TAG) $(CONSUL_K8S_CONSUL_VERSION) $(CONSUL_K8S_CONSUL_DATAPLANE_VERSION) $(CONSUL_K8S_PRERELEASE_VERSION); \
+
+.PHONY: prepare-rc-branch
+prepare-rc-branch: prepare-rc-script
+
 .PHONY: prepare-main-dev
 prepare-main-dev: ## prepare main dev
 ifndef CONSUL_K8S_RELEASE_VERSION
@@ -327,7 +370,7 @@ ifndef CONSUL_K8S_RELEASE_DATE
 	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
 ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
-	$(error CONSUL_K8S_RELEASE_VERSION is required)
+	$(error CONSUL_K8S_NEXT_RELEASE_VERSION is required)
 endif
 ifndef CONSUL_K8S_CONSUL_VERSION
 	$(error CONSUL_K8S_CONSUL_VERSION is required)

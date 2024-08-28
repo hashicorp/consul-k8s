@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const nodeName = "test-node"
@@ -801,22 +801,22 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 			},
 		},
 		"tproxy enabled; openshift disabled": {
 			tproxyEnabled:    true,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 			},
 		},
 		"tproxy disabled; openshift enabled": {
@@ -828,11 +828,11 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 			},
 		},
 	}
@@ -880,7 +880,7 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser: pointer.Int64(sidecarUserAndGroupID),
+				RunAsUser: ptr.To(int64(sidecarUserAndGroupID)),
 			},
 		},
 	}
@@ -908,14 +908,14 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 							Name: "web",
 							// Setting RunAsUser: 1 should succeed.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(1),
+								RunAsUser: ptr.To(int64(1)),
 							},
 						},
 						{
 							Name: "app",
 							// Setting RunAsUser: 5995 should fail.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(sidecarUserAndGroupID),
+								RunAsUser: ptr.To(int64(sidecarUserAndGroupID)),
 							},
 							Image: "not-consul-dataplane",
 						},
@@ -935,14 +935,14 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 							Name: "web",
 							// Setting RunAsUser: 1 should succeed.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(1),
+								RunAsUser: ptr.To(int64(1)),
 							},
 						},
 						{
 							Name: "sidecar",
 							// Setting RunAsUser: 5995 should succeed if the image matches h.ImageConsulDataplane.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(sidecarUserAndGroupID),
+								RunAsUser: ptr.To(int64(sidecarUserAndGroupID)),
 							},
 							Image: "envoy",
 						},
