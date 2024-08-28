@@ -81,7 +81,7 @@ func realMain(helmPath string) error {
 			}
 			var split int
 			if dir == "bases" {
-				split = 6
+				split = 8
 			} else {
 				split = 9
 			}

@@ -6,13 +6,13 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
   name: peeringacceptors.consul.hashicorp.com
-spec:
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
+spec:
   group: consul.hashicorp.com
   names:
     kind: PeeringAcceptor
