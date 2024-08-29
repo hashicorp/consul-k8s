@@ -5,29 +5,18 @@ SECURITY:
 * Bump Go to 1.22.5 to address [CVE-2024-24791](https://nvd.nist.gov/vuln/detail/CVE-2024-24791) [[GH-4228](https://github.com/hashicorp/consul-k8s/issues/4228)]
 * Upgrade Docker cli to use v.27.1. This addresses CVE
 [CVE-2024-41110](https://nvd.nist.gov/vuln/detail/CVE-2024-41110) [[GH-4228](https://github.com/hashicorp/consul-k8s/issues/4228)]
-* Upgrade go version to 1.22.5 to address [CVE-2024-24791](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24791) [[GH-4154](https://github.com/hashicorp/consul-k8s/issues/4154)]
-* Upgrade go-retryablehttp to v0.7.7 to address [GHSA-v6v8-xj6m-xwqh](https://github.com/advisories/GHSA-v6v8-xj6m-xwqh) [[GH-4169](https://github.com/hashicorp/consul-k8s/issues/4169)]
 
 IMPROVEMENTS:
 
-* upgrade go version to v1.22.4. [[GH-4085](https://github.com/hashicorp/consul-k8s/issues/4085)]
 * helm: Adds `webhookCertManager.resources` field which can be configured to override the `resource` settings for the `webhook-cert-manager` deployment.[[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
 
 * helm: Adds `connectInject.apiGateway.managedGatewayClass.resourceJob.resources` field which can be configured to override the `resource` settings for the `gateway-resources-job` job. [[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
-* api-gateways: Change security settings to make root file system read only and to not allow privilage escalation. [[GH-3959](https://github.com/hashicorp/consul-k8s/issues/3959)]
-* cni: package `consul-cni` as .deb and .rpm files [[GH-4040](https://github.com/hashicorp/consul-k8s/issues/4040)]
 * config-entry: add validate_clusters to mesh config entry [[GH-4256](https://github.com/hashicorp/consul-k8s/issues/4256)]
-* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
-* partition-init: Role no longer includes unnecessary access to Secrets resource. [[GH-4053](https://github.com/hashicorp/consul-k8s/issues/4053)]
 
 BUG FIXES:
 
 * Fixes install of Consul on GKE Autopilot where the option 'manageNonStandardCRDs' was not being used for the TCPRoute CRD. [[GH-4213](https://github.com/hashicorp/consul-k8s/issues/4213)]
-* api-gateway: fix issue where API Gateway specific acl roles/policy were not being cleaned up on deletion of an api-gateway [[GH-4060](https://github.com/hashicorp/consul-k8s/issues/4060)]
 * api-gateway: fix nil pointer deref bug when the section name in a gateway policy is not specified [[GH-4247](https://github.com/hashicorp/consul-k8s/issues/4247)]
-* cni: fix incorrect release version due to unstable submodule pinning [[GH-4091](https://github.com/hashicorp/consul-k8s/issues/4091)]
-* connect-inject: add NET_BIND_SERVICE capability when injecting consul-dataplane sidecar [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
-* endpoints-controller: graceful shutdown logic should not run on a new pod with the same name. Fixes a case where statefulset rollouts could get stuck in graceful shutdown when the new pods come up. [[GH-4059](https://github.com/hashicorp/consul-k8s/issues/4059)]
 * helm: adds imagePullSecret to the gateway-resources job and the gateway-cleanup job, would fail before if the image was in a private registry [[GH-4210](https://github.com/hashicorp/consul-k8s/issues/4210)]
 * openshift: order SecurityContextConstraint volumes alphabetically to match OpenShift behavior.
 This ensures that diff detection tools like ArgoCD consider the source and reconciled resources to be identical. [[GH-4227](https://github.com/hashicorp/consul-k8s/issues/4227)]
