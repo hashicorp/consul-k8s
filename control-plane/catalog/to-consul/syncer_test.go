@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
@@ -286,6 +287,7 @@ func testConsulSyncerWithConfig(testClient *test.TestServerClient, configurator 
 		ServicePollPeriod:   50 * time.Millisecond,
 		ConsulK8STag:        TestConsulK8STag,
 		ConsulNodeName:      ConsulSyncNodeName,
+		PrometheusSink:      &prometheus.PrometheusSink{},
 	}
 	configurator(s)
 	s.init()

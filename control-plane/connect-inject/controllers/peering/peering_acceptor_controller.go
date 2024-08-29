@@ -17,7 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -266,7 +266,7 @@ func (r *AcceptorController) updateStatus(ctx context.Context, acceptorObjKey ty
 			return err
 		}
 		if acceptor.Status.LatestPeeringVersion == nil || *acceptor.Status.LatestPeeringVersion < peeringVersion {
-			acceptor.Status.LatestPeeringVersion = pointer.Uint64(peeringVersion)
+			acceptor.Status.LatestPeeringVersion = ptr.To(uint64(peeringVersion))
 		}
 	}
 	err := r.Status().Update(ctx, acceptor)

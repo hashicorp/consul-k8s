@@ -344,19 +344,33 @@ func TestPeering_Connect(t *testing.T) {
 				terminatinggateway.CreateMeshConfigEntry(t, staticClientPeerClient, "")
 
 				// Create the config entry for the terminating gateway
-				terminatinggateway.CreateTerminatingGatewayConfigEntry(t, staticServerPeerClient, "", "", externalServerHostnameID)
-				if c.ACLsEnabled {
-					// Allow the terminating gateway write access to services prefixed with "static-server".
-					terminatinggateway.UpdateTerminatingGatewayRole(t, staticServerPeerClient, terminatingGatewayRules)
-				}
+				logger.Log(t, "creating terminating gateway")
+				k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-terminating-gateway")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/default-terminating-gateway")
+				})
 
 				// This is the URL that the static-client will use to dial the external static server in the server peer.
 				externalServerHostnameURL := fmt.Sprintf("http://%s.virtual.%s.consul", externalServerHostnameID, staticServerPeer)
 
 				// Register the external service.
 				terminatinggateway.CreateServiceDefaultDestination(t, staticServerPeerClient, "", externalServerHostnameID, "http", 80, fmt.Sprintf("%s.%s", externalServerServiceName, externalServerK8sNamespace))
+
+				// Register the external service
+				k8sOptions := helpers.K8sOptions{
+					Options:             staticServerPeerClusterContext.KubectlOptions(t),
+					NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
+					NoCleanup:           cfg.NoCleanup,
+					KustomizeConfigPath: "../fixtures/cases/crd-peers/external-service-registration",
+				}
+
+				consulOptions := helpers.ConsulOptions{
+					ConsulClient:                    staticServerPeerClient,
+					ExternalServiceNameRegistration: "static-server-registration",
+				}
+
 				// (t-eckert) this shouldn't be required but currently is with HTTP services. It works around a bug.
-				helpers.RegisterExternalService(t, staticServerPeerClient, "", externalServerHostnameID, fmt.Sprintf("%s.%s", externalServerServiceName, externalServerK8sNamespace), 80)
+				helpers.RegisterExternalServiceCRD(t, k8sOptions, consulOptions)
 
 				// Export the external service to the client peer.
 				logger.Log(t, "creating exported external services")

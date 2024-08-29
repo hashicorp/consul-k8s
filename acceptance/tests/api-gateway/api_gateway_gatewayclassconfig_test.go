@@ -21,7 +21,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -32,9 +32,9 @@ import (
 // the child gateways.
 func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	var (
-		defaultInstances = pointer.Int32(2)
-		maxInstances     = pointer.Int32(3)
-		minInstances     = pointer.Int32(1)
+		defaultInstances = ptr.To(int32(2))
+		maxInstances     = ptr.To(int32(3))
+		minInstances     = ptr.To(int32(1))
 
 		namespace        = "default"
 		gatewayClassName = "gateway-class"
@@ -100,7 +100,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	})
 
 	// Create a certificate to reference in listeners.
-	certificateInfo := generateCertificate(t, nil, "certificate.consul.local")
+	certInfo := generateCertificate(t, nil, "certificate.consul.local")
 	certificateName := "certificate"
 	certificate := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -112,8 +112,8 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		},
 		Type: corev1.SecretTypeTLS,
 		Data: map[string][]byte{
-			corev1.TLSCertKey:       certificateInfo.CertPEM,
-			corev1.TLSPrivateKeyKey: certificateInfo.PrivateKeyPEM,
+			corev1.TLSCertKey:       certInfo.CertPEM,
+			corev1.TLSPrivateKeyKey: certInfo.PrivateKeyPEM,
 		},
 	}
 	logger.Log(t, "creating certificate")
@@ -145,16 +145,16 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	logger.Log(t, "updating gatewayclassconfig values")
 	err = k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassConfigName, Namespace: namespace}, gatewayClassConfig)
 	require.NoError(t, err)
-	gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = pointer.Int32(8)
-	gatewayClassConfig.Spec.DeploymentSpec.MinInstances = pointer.Int32(5)
+	gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(8))
+	gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(5))
 	err = k8sClient.Update(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
 	// Scenario: gateways should be able to scale independently and not get overridden by the controller unless it's above the max
-	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(*maxInstances+1))
+	scale(t, k8sClient, gateway.Name, gateway.Namespace, ptr.To(int32(*maxInstances+1)))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
-	scale(t, k8sClient, gateway.Name, gateway.Namespace, pointer.Int32(0))
+	scale(t, k8sClient, gateway.Name, gateway.Namespace, ptr.To(int32(0)))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, minInstances, gateway)
 
 }

@@ -188,6 +188,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - registration
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - registration/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - samenessgroups
   verbs:
   - create

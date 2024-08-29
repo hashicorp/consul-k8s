@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestGetConnectInitIDs(t *testing.T) {
@@ -53,7 +53,7 @@ func TestGetConnectInitIDs(t *testing.T) {
 						{
 							Name: "app",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(100),
+								RunAsUser: ptr.To(int64(100)),
 							},
 						},
 					},
@@ -91,7 +91,7 @@ func TestGetConnectInitIDs(t *testing.T) {
 						{
 							Name: "app",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(104),
+								RunAsUser: ptr.To(int64(104)),
 							},
 						},
 					},
@@ -129,7 +129,7 @@ func TestGetConnectInitIDs(t *testing.T) {
 						{
 							Name: "app",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(100),
+								RunAsUser: ptr.To(int64(100)),
 							},
 						},
 					},
@@ -201,7 +201,7 @@ func TestGetDataplaneIDs(t *testing.T) {
 						{
 							Name: "app",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(100),
+								RunAsUser: ptr.To(int64(100)),
 							},
 						},
 					},
@@ -239,7 +239,7 @@ func TestGetDataplaneIDs(t *testing.T) {
 						{
 							Name: "app",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(104),
+								RunAsUser: ptr.To(int64(104)),
 							},
 						},
 					},
@@ -277,7 +277,7 @@ func TestGetDataplaneIDs(t *testing.T) {
 						{
 							Name: "app",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(100),
+								RunAsUser: ptr.To(int64(100)),
 							},
 						},
 					},
@@ -349,7 +349,7 @@ func TestGetAvailableIDs(t *testing.T) {
 						{
 							Name: "app",
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(100),
+								RunAsUser: ptr.To(int64(100)),
 							},
 						},
 					},

@@ -54,15 +54,13 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 
 			// Run the command.
 			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-				connMgr:   testClient.Watcher,
-				logger: hclog.New(&hclog.LoggerOptions{
-					Name:  tt.Name(),
-					Level: hclog.Debug,
-				}),
-			}
+			connMgr := testClient.Watcher
+			logger := hclog.New(&hclog.LoggerOptions{
+				Name:  tt.Name(),
+				Level: hclog.Debug,
+			})
+
+			cmd := NewTestCommand(t, ui, k8s, logger, connMgr)
 
 			// Create two services in k8s in default and foo namespaces.
 			_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
@@ -79,7 +77,7 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 			_, err = k8s.CoreV1().Services("foo").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
 			require.NoError(tt, err)
 
-			exitChan := runCommandAsynchronously(&cmd, []string{
+			exitChan := runCommandAsynchronously(cmd, []string{
 				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-consul-write-interval", "500ms",
@@ -90,7 +88,7 @@ func TestRun_ToConsulSingleDestinationNamespace(t *testing.T) {
 				"-allow-k8s-namespace=*",
 				"-add-k8s-namespace-suffix=false",
 			})
-			defer stopCommand(tt, &cmd, exitChan)
+			defer stopCommand(tt, cmd, exitChan)
 
 			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 			retry.RunWith(timer, tt, func(r *retry.R) {
@@ -190,15 +188,13 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 
 			// Run the command.
 			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-				connMgr:   testClient.Watcher,
-				logger: hclog.New(&hclog.LoggerOptions{
-					Name:  tt.Name(),
-					Level: hclog.Debug,
-				}),
-			}
+			connMgr := testClient.Watcher
+			logger := hclog.New(&hclog.LoggerOptions{
+				Name:  tt.Name(),
+				Level: hclog.Debug,
+			})
+
+			cmd := NewTestCommand(t, ui, k8s, logger, connMgr)
 
 			// Create two services in k8s in default and foo namespaces.
 			_, err := k8s.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), lbService("default", "1.1.1.1"), metav1.CreateOptions{})
@@ -226,8 +222,8 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 				"-enable-k8s-namespace-mirroring",
 				"-k8s-namespace-mirroring-prefix", c.MirroringPrefix,
 			}, c.ExtraFlags...)
-			exitChan := runCommandAsynchronously(&cmd, args)
-			defer stopCommand(tt, &cmd, exitChan)
+			exitChan := runCommandAsynchronously(cmd, args)
+			defer stopCommand(tt, cmd, exitChan)
 
 			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
 			retry.RunWith(timer, tt, func(r *retry.R) {
@@ -487,16 +483,15 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 
 			// Run the first command.
 			{
-				firstCmd := Command{
-					UI:        ui,
-					clientset: k8s,
-					connMgr:   testClient.Watcher,
-					logger: hclog.New(&hclog.LoggerOptions{
-						Name:  tt.Name() + "-firstrun",
-						Level: hclog.Debug,
-					}),
-				}
-				exitChan := runCommandAsynchronously(&firstCmd, append(commonArgs, c.FirstRunFlags...))
+				connMgr := testClient.Watcher
+				logger := hclog.New(&hclog.LoggerOptions{
+					Name:  tt.Name() + "-firstrun",
+					Level: hclog.Debug,
+				})
+
+				firstCmd := NewTestCommand(t, ui, k8s, logger, connMgr)
+
+				exitChan := runCommandAsynchronously(firstCmd, append(commonArgs, c.FirstRunFlags...))
 
 				// Wait until the expected services are synced.
 				timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
@@ -511,23 +506,21 @@ func TestRun_ToConsulChangingNamespaceFlags(t *testing.T) {
 						require.Equal(r, instances[0].ServiceName, svcName)
 					}
 				})
-				stopCommand(tt, &firstCmd, exitChan)
+				stopCommand(tt, firstCmd, exitChan)
 			}
 			tt.Log("first command run complete")
 
 			// Run the second command.
 			{
-				secondCmd := Command{
-					UI:        ui,
-					clientset: k8s,
-					connMgr:   testClient.Watcher,
-					logger: hclog.New(&hclog.LoggerOptions{
-						Name:  tt.Name() + "-secondrun",
-						Level: hclog.Debug,
-					}),
-				}
-				exitChan := runCommandAsynchronously(&secondCmd, append(commonArgs, c.SecondRunFlags...))
-				defer stopCommand(tt, &secondCmd, exitChan)
+				connMgr := testClient.Watcher
+				logger := hclog.New(&hclog.LoggerOptions{
+					Name:  tt.Name() + "-secondrun",
+					Level: hclog.Debug,
+				})
+
+				secondCmd := NewTestCommand(t, ui, k8s, logger, connMgr)
+				exitChan := runCommandAsynchronously(secondCmd, append(commonArgs, c.SecondRunFlags...))
+				defer stopCommand(tt, secondCmd, exitChan)
 
 				// Wait until the expected services are synced and the old ones
 				// deleted.
@@ -653,15 +646,13 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 
 			// Set up the sync command
 			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-				connMgr:   testClient.Watcher,
-				logger: hclog.New(&hclog.LoggerOptions{
-					Name:  tt.Name(),
-					Level: hclog.Debug,
-				}),
-			}
+			connMgr := testClient.Watcher
+			logger := hclog.New(&hclog.LoggerOptions{
+				Name:  tt.Name(),
+				Level: hclog.Debug,
+			})
+
+			cmd := NewTestCommand(t, ui, k8s, logger, connMgr)
 
 			// Set flags and run the command
 			commonArgs := []string{
@@ -674,8 +665,8 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 				"-enable-namespaces",
 				"-consul-cross-namespace-acl-policy=cross-namespace-policy",
 			}
-			exitChan := runCommandAsynchronously(&cmd, append(commonArgs, c.Flags...))
-			defer stopCommand(tt, &cmd, exitChan)
+			exitChan := runCommandAsynchronously(cmd, append(commonArgs, c.Flags...))
+			defer stopCommand(tt, cmd, exitChan)
 
 			// Check the namespaces are created correctly
 			timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 500 * time.Millisecond}
