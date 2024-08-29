@@ -1,0 +1,3 @@
+```release-note:bug
+sync-catalog: fix infinite retry loop when the catalog fails to connect to consul-server during the sync process
+```
