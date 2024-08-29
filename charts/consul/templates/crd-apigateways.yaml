@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
@@ -39,14 +39,19 @@ spec:
         description: APIGateway is the Schema for the API Gateway
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -60,13 +65,14 @@ spec:
                 items:
                   properties:
                     hostname:
-                      description: Hostname is the host name that a listener should
-                        be bound to, if unspecified, the listener accepts requests
-                        for all hostnames.
+                      description: |-
+                        Hostname is the host name that a listener should be bound to, if
+                        unspecified, the listener accepts requests for all hostnames.
                       type: string
                     name:
-                      description: Name is the name of the listener in a given gateway.
-                        This must be unique within a gateway.
+                      description: |-
+                        Name is the name of the listener in a given gateway. This must be
+                        unique within a gateway.
                       type: string
                     port:
                       format: int32
@@ -74,18 +80,21 @@ spec:
                       minimum: 0
                       type: integer
                     protocol:
-                      description: Protocol is the protocol that a listener should
-                        use, it must either be "http" or "tcp"
+                      description: |-
+                        Protocol is the protocol that a listener should use, it must
+                        either be "http" or "tcp"
                       type: string
                     tls:
                       description: TLS is the TLS settings for the listener.
                       properties:
                         certificates:
-                          description: Certificates is a set of references to certificates
+                          description: |-
+                            Certificates is a set of references to certificates
                             that a gateway listener uses for TLS termination.
                           items:
-                            description: Reference identifies which resource a condition
-                              relates to, when it is not the core resource itself.
+                            description: |-
+                              Reference identifies which resource a condition relates to, when it is not
+                              the core resource itself.
                             properties:
                               name:
                                 description: Name is the user-given name of the resource
@@ -96,44 +105,41 @@ spec:
                                   resource the condition relates to.
                                 type: string
                               tenancy:
-                                description: Tenancy identifies the tenancy units
-                                  (i.e. partition, namespace) in which the resource
-                                  resides.
+                                description: |-
+                                  Tenancy identifies the tenancy units (i.e. partition, namespace) in which
+                                  the resource resides.
                                 properties:
                                   namespace:
-                                    description: "Namespace further isolates resources
-                                      within a partition. https://developer.hashicorp.com/consul/docs/enterprise/namespaces
-                                      \n When using the List and WatchList endpoints,
-                                      provide the wildcard value \"*\" to list resources
-                                      across all namespaces."
+                                    description: |-
+                                      Namespace further isolates resources within a partition.
+                                      https://developer.hashicorp.com/consul/docs/enterprise/namespaces
+
+
+                                      When using the List and WatchList endpoints, provide the wildcard value "*"
+                                      to list resources across all namespaces.
                                     type: string
                                   partition:
-                                    description: "Partition is the topmost administrative
-                                      boundary within a cluster. https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
-                                      \n When using the List and WatchList endpoints,
-                                      provide the wildcard value \"*\" to list resources
-                                      across all partitions."
-                                    type: string
-                                  peerName:
-                                    description: "PeerName identifies which peer the
-                                      resource is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
-                                      \n When using the List and WatchList endpoints,
-                                      provide the wildcard value \"*\" to list resources
-                                      across all peers."
+                                    description: |-
+                                      Partition is the topmost administrative boundary within a cluster.
+                                      https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
+
+
+                                      When using the List and WatchList endpoints, provide the wildcard value "*"
+                                      to list resources across all partitions.
                                     type: string
                                 type: object
                               type:
                                 description: Type identifies the resource's type.
                                 properties:
                                   group:
-                                    description: Group describes the area of functionality
-                                      to which this resource type relates (e.g. "catalog",
-                                      "authorization").
+                                    description: |-
+                                      Group describes the area of functionality to which this resource type
+                                      relates (e.g. "catalog", "authorization").
                                     type: string
                                   groupVersion:
-                                    description: GroupVersion is incremented when
-                                      sweeping or backward-incompatible changes are
-                                      made to the group's resource types.
+                                    description: |-
+                                      GroupVersion is incremented when sweeping or backward-incompatible changes
+                                      are made to the group's resource types.
                                     type: string
                                   kind:
                                     description: Kind identifies the specific resource
@@ -200,8 +206,9 @@ spec:
                 description: Conditions indicate the latest available observations
                   of a resource's current state.
                 items:
-                  description: 'Conditions define a readiness condition for a Consul
-                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: |-
+                    Conditions define a readiness condition for a Consul resource.
+                    See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition

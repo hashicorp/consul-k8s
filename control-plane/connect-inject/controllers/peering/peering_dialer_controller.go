@@ -17,7 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -235,7 +235,7 @@ func (r *PeeringDialerController) updateStatus(ctx context.Context, dialerObjKey
 			return err
 		}
 		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < peeringVersion {
-			dialer.Status.LatestPeeringVersion = pointer.Uint64(peeringVersion)
+			dialer.Status.LatestPeeringVersion = ptr.To(uint64(peeringVersion))
 		}
 	}
 	err := r.Status().Update(ctx, dialer)

@@ -5,7 +5,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: httproutes.mesh.consul.hashicorp.com
 spec:
   group: mesh.consul.hashicorp.com
@@ -37,44 +37,67 @@ spec:
         description: HTTPRoute is the Schema for the HTTP Route API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            description: "NOTE: this should align to the GAMMA/gateway-api version,
-              or at least be easily translatable. \n https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.HTTPRoute
-              \n This is a Resource type."
+            description: |-
+              NOTE: this should align to the GAMMA/gateway-api version, or at least be
+              easily translatable.
+
+
+              https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.HTTPRoute
+
+
+              This is a Resource type.
             properties:
               hostnames:
-                description: "Hostnames are the hostnames for which this HTTPRoute
-                  should respond to requests. \n This is only valid for north/south."
+                description: |-
+                  Hostnames are the hostnames for which this HTTPRoute should respond to requests.
+
+
+                  This is only valid for north/south.
                 items:
                   type: string
                 type: array
               parentRefs:
-                description: "ParentRefs references the resources (usually Services)
-                  that a Route wants to be attached to. \n It is invalid to reference
-                  an identical parent more than once. It is valid to reference multiple
-                  distinct sections within the same parent resource."
+                description: |-
+                  ParentRefs references the resources (usually Services) that a Route wants
+                  to be attached to.
+
+
+                  It is invalid to reference an identical parent more than once. It is valid
+                  to reference multiple distinct sections within the same parent resource.
                 items:
                   description: 'NOTE: roughly equivalent to structs.ResourceReference'
                   properties:
                     port:
-                      description: For east/west this is the name of the Consul Service
-                        port to direct traffic to or empty to imply all. For north/south
-                        this is TBD.
+                      description: |-
+                        For east/west this is the name of the Consul Service port to direct traffic to
+                        or empty to imply all.
+                        For north/south this is TBD.
+
+
+                        For more details on potential values of this field, see documentation for
+                        Service.ServicePort.
                       type: string
                     ref:
-                      description: For east/west configuration, this should point
-                        to a Service. For north/south it should point to a Gateway.
+                      description: |-
+                        For east/west configuration, this should point to a Service.
+                        For north/south it should point to a Gateway.
                       properties:
                         name:
                           description: Name is the user-given name of the resource
@@ -85,43 +108,41 @@ spec:
                             the condition relates to.
                           type: string
                         tenancy:
-                          description: Tenancy identifies the tenancy units (i.e.
-                            partition, namespace) in which the resource resides.
+                          description: |-
+                            Tenancy identifies the tenancy units (i.e. partition, namespace) in which
+                            the resource resides.
                           properties:
                             namespace:
-                              description: "Namespace further isolates resources within
-                                a partition. https://developer.hashicorp.com/consul/docs/enterprise/namespaces
-                                \n When using the List and WatchList endpoints, provide
-                                the wildcard value \"*\" to list resources across
-                                all namespaces."
+                              description: |-
+                                Namespace further isolates resources within a partition.
+                                https://developer.hashicorp.com/consul/docs/enterprise/namespaces
+
+
+                                When using the List and WatchList endpoints, provide the wildcard value "*"
+                                to list resources across all namespaces.
                               type: string
                             partition:
-                              description: "Partition is the topmost administrative
-                                boundary within a cluster. https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
-                                \n When using the List and WatchList endpoints, provide
-                                the wildcard value \"*\" to list resources across
-                                all partitions."
-                              type: string
-                            peerName:
-                              description: "PeerName identifies which peer the resource
-                                is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
-                                \n When using the List and WatchList endpoints, provide
-                                the wildcard value \"*\" to list resources across
-                                all peers."
+                              description: |-
+                                Partition is the topmost administrative boundary within a cluster.
+                                https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
+
+
+                                When using the List and WatchList endpoints, provide the wildcard value "*"
+                                to list resources across all partitions.
                               type: string
                           type: object
                         type:
                           description: Type identifies the resource's type.
                           properties:
                             group:
-                              description: Group describes the area of functionality
-                                to which this resource type relates (e.g. "catalog",
-                                "authorization").
+                              description: |-
+                                Group describes the area of functionality to which this resource type
+                                relates (e.g. "catalog", "authorization").
                               type: string
                             groupVersion:
-                              description: GroupVersion is incremented when sweeping
-                                or backward-incompatible changes are made to the group's
-                                resource types.
+                              description: |-
+                                GroupVersion is incremented when sweeping or backward-incompatible changes
+                                are made to the group's resource types.
                               type: string
                             kind:
                               description: Kind identifies the specific resource type
@@ -132,29 +153,42 @@ spec:
                   type: object
                 type: array
               rules:
-                description: Rules are a list of HTTP-based routing rules that this
-                  route should use for constructing a routing table.
+                description: |-
+                  Rules are a list of HTTP-based routing rules that this route should
+                  use for constructing a routing table.
                 items:
-                  description: HTTPRouteRule specifies the routing rules used to determine
-                    what upstream service an HTTP request is routed to.
+                  description: |-
+                    HTTPRouteRule specifies the routing rules used to determine what upstream
+                    service an HTTP request is routed to.
                   properties:
                     backendRefs:
-                      description: "BackendRefs defines the backend(s) where matching
-                        requests should be sent. \n Failure behavior here depends
-                        on how many BackendRefs are specified and how many are invalid.
-                        \n If all entries in BackendRefs are invalid, and there are
-                        also no filters specified in this route rule, all traffic
-                        which matches this rule MUST receive a 500 status code. \n
-                        See the HTTPBackendRef definition for the rules about what
-                        makes a single HTTPBackendRef invalid. \n When a HTTPBackendRef
-                        is invalid, 500 status codes MUST be returned for requests
-                        that would have otherwise been routed to an invalid backend.
-                        If multiple backends are specified, and some are invalid,
-                        the proportion of requests that would otherwise have been
-                        routed to an invalid backend MUST receive a 500 status code.
-                        \n For example, if two backends are specified with equal weights,
-                        and one is invalid, 50 percent of traffic must receive a 500.
-                        Implementations may choose how that 50 percent is determined."
+                      description: |-
+                        BackendRefs defines the backend(s) where matching requests should be sent.
+
+
+                        Failure behavior here depends on how many BackendRefs are specified and
+                        how many are invalid.
+
+
+                        If all entries in BackendRefs are invalid, and there are also no filters
+                        specified in this route rule, all traffic which matches this rule MUST
+                        receive a 500 status code.
+
+
+                        See the HTTPBackendRef definition for the rules about what makes a single
+                        HTTPBackendRef invalid.
+
+
+                        When a HTTPBackendRef is invalid, 500 status codes MUST be returned for
+                        requests that would have otherwise been routed to an invalid backend. If
+                        multiple backends are specified, and some are invalid, the proportion of
+                        requests that would otherwise have been routed to an invalid backend MUST
+                        receive a 500 status code.
+
+
+                        For example, if two backends are specified with equal weights, and one is
+                        invalid, 50 percent of traffic must receive a 500. Implementations may
+                        choose how that 50 percent is determined.
                       items:
                         properties:
                           backendRef:
@@ -162,10 +196,14 @@ spec:
                               datacenter:
                                 type: string
                               port:
-                                description: "For east/west this is the name of the
-                                  Consul Service port to direct traffic to or empty
-                                  to imply using the same value as the parent ref.
-                                  \n For north/south this is TBD."
+                                description: |-
+                                  For east/west this is the name of the Consul Service port to direct traffic to
+                                  or empty to imply using the same value as the parent ref.
+                                  For north/south this is TBD.
+
+
+                                  For more details on potential values of this field, see documentation for
+                                  Service.ServicePort.
                                 type: string
                               ref:
                                 description: For east/west configuration, this should
@@ -180,43 +218,40 @@ spec:
                                       the resource the condition relates to.
                                     type: string
                                   tenancy:
-                                    description: Tenancy identifies the tenancy units
-                                      (i.e. partition, namespace) in which the resource
-                                      resides.
+                                    description: |-
+                                      Tenancy identifies the tenancy units (i.e. partition, namespace) in which
+                                      the resource resides.
                                     properties:
                                       namespace:
-                                        description: "Namespace further isolates resources
-                                          within a partition. https://developer.hashicorp.com/consul/docs/enterprise/namespaces
-                                          \n When using the List and WatchList endpoints,
-                                          provide the wildcard value \"*\" to list
-                                          resources across all namespaces."
+                                        description: |-
+                                          Namespace further isolates resources within a partition.
+                                          https://developer.hashicorp.com/consul/docs/enterprise/namespaces
+
+
+                                          When using the List and WatchList endpoints, provide the wildcard value "*"
+                                          to list resources across all namespaces.
                                         type: string
                                       partition:
-                                        description: "Partition is the topmost administrative
-                                          boundary within a cluster. https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
-                                          \n When using the List and WatchList endpoints,
-                                          provide the wildcard value \"*\" to list
-                                          resources across all partitions."
-                                        type: string
-                                      peerName:
-                                        description: "PeerName identifies which peer
-                                          the resource is imported from. https://developer.hashicorp.com/consul/docs/connect/cluster-peering
-                                          \n When using the List and WatchList endpoints,
-                                          provide the wildcard value \"*\" to list
-                                          resources across all peers."
+                                        description: |-
+                                          Partition is the topmost administrative boundary within a cluster.
+                                          https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
+
+
+                                          When using the List and WatchList endpoints, provide the wildcard value "*"
+                                          to list resources across all partitions.
                                         type: string
                                     type: object
                                   type:
                                     description: Type identifies the resource's type.
                                     properties:
                                       group:
-                                        description: Group describes the area of functionality
-                                          to which this resource type relates (e.g.
-                                          "catalog", "authorization").
+                                        description: |-
+                                          Group describes the area of functionality to which this resource type
+                                          relates (e.g. "catalog", "authorization").
                                         type: string
                                       groupVersion:
-                                        description: GroupVersion is incremented when
-                                          sweeping or backward-incompatible changes
+                                        description: |-
+                                          GroupVersion is incremented when sweeping or backward-incompatible changes
                                           are made to the group's resource types.
                                         type: string
                                       kind:
@@ -227,20 +262,20 @@ spec:
                                 type: object
                             type: object
                           filters:
-                            description: Filters defined at this level should be executed
-                              if and only if the request is being forwarded to the
-                              backend defined here.
+                            description: |-
+                              Filters defined at this level should be executed if and only if the
+                              request is being forwarded to the backend defined here.
                             items:
                               properties:
                                 requestHeaderModifier:
-                                  description: RequestHeaderModifier defines a schema
-                                    for a filter that modifies request headers.
+                                  description: |-
+                                    RequestHeaderModifier defines a schema for a filter that modifies request
+                                    headers.
                                   properties:
                                     add:
-                                      description: Add adds the given header(s) (name,
-                                        value) to the request before the action. It
-                                        appends to any existing values associated
-                                        with the header name.
+                                      description: |-
+                                        Add adds the given header(s) (name, value) to the request before the
+                                        action. It appends to any existing values associated with the header name.
                                       items:
                                         properties:
                                           name:
@@ -250,17 +285,17 @@ spec:
                                         type: object
                                       type: array
                                     remove:
-                                      description: Remove the given header(s) from
-                                        the HTTP request before the action. The value
-                                        of Remove is a list of HTTP header names.
-                                        Note that the header names are case-insensitive
-                                        (see https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
+                                      description: |-
+                                        Remove the given header(s) from the HTTP request before the action. The
+                                        value of Remove is a list of HTTP header names. Note that the header names
+                                        are case-insensitive (see
+                                        https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
                                       items:
                                         type: string
                                       type: array
                                     set:
-                                      description: Set overwrites the request with
-                                        the given header (name, value) before the
+                                      description: |-
+                                        Set overwrites the request with the given header (name, value) before the
                                         action.
                                       items:
                                         properties:
@@ -272,14 +307,14 @@ spec:
                                       type: array
                                   type: object
                                 responseHeaderModifier:
-                                  description: ResponseHeaderModifier defines a schema
-                                    for a filter that modifies response headers.
+                                  description: |-
+                                    ResponseHeaderModifier defines a schema for a filter that modifies
+                                    response headers.
                                   properties:
                                     add:
-                                      description: Add adds the given header(s) (name,
-                                        value) to the request before the action. It
-                                        appends to any existing values associated
-                                        with the header name.
+                                      description: |-
+                                        Add adds the given header(s) (name, value) to the request before the
+                                        action. It appends to any existing values associated with the header name.
                                       items:
                                         properties:
                                           name:
@@ -289,17 +324,17 @@ spec:
                                         type: object
                                       type: array
                                     remove:
-                                      description: Remove the given header(s) from
-                                        the HTTP request before the action. The value
-                                        of Remove is a list of HTTP header names.
-                                        Note that the header names are case-insensitive
-                                        (see https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
+                                      description: |-
+                                        Remove the given header(s) from the HTTP request before the action. The
+                                        value of Remove is a list of HTTP header names. Note that the header names
+                                        are case-insensitive (see
+                                        https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
                                       items:
                                         type: string
                                       type: array
                                     set:
-                                      description: Set overwrites the request with
-                                        the given header (name, value) before the
+                                      description: |-
+                                        Set overwrites the request with the given header (name, value) before the
                                         action.
                                       items:
                                         properties:
@@ -311,8 +346,9 @@ spec:
                                       type: array
                                   type: object
                                 urlRewrite:
-                                  description: URLRewrite defines a schema for a filter
-                                    that modifies a request during forwarding.
+                                  description: |-
+                                    URLRewrite defines a schema for a filter that modifies a request during
+                                    forwarding.
                                   properties:
                                     pathPrefix:
                                       type: string
@@ -320,18 +356,19 @@ spec:
                               type: object
                             type: array
                           weight:
-                            description: "Weight specifies the proportion of requests
-                              forwarded to the referenced backend. This is computed
-                              as weight/(sum of all weights in this BackendRefs list).
-                              For non-zero values, there may be some epsilon from
-                              the exact proportion defined here depending on the precision
-                              an implementation supports. Weight is not a percentage
-                              and the sum of weights does not need to equal 100. \n
-                              If only one backend is specified and it has a weight
-                              greater than 0, 100% of the traffic is forwarded to
-                              that backend. If weight is set to 0, no traffic should
-                              be forwarded for this entry. If unspecified, weight
-                              defaults to 1."
+                            description: |-
+                              Weight specifies the proportion of requests forwarded to the referenced
+                              backend. This is computed as weight/(sum of all weights in this
+                              BackendRefs list). For non-zero values, there may be some epsilon from the
+                              exact proportion defined here depending on the precision an implementation
+                              supports. Weight is not a percentage and the sum of weights does not need
+                              to equal 100.
+
+
+                              If only one backend is specified and it has a weight greater than 0, 100%
+                              of the traffic is forwarded to that backend. If weight is set to 0, no
+                              traffic should be forwarded for this entry. If unspecified, weight defaults
+                              to 1.
                             format: int32
                             type: integer
                         type: object
@@ -340,13 +377,14 @@ spec:
                       items:
                         properties:
                           requestHeaderModifier:
-                            description: RequestHeaderModifier defines a schema for
-                              a filter that modifies request headers.
+                            description: |-
+                              RequestHeaderModifier defines a schema for a filter that modifies request
+                              headers.
                             properties:
                               add:
-                                description: Add adds the given header(s) (name, value)
-                                  to the request before the action. It appends to
-                                  any existing values associated with the header name.
+                                description: |-
+                                  Add adds the given header(s) (name, value) to the request before the
+                                  action. It appends to any existing values associated with the header name.
                                 items:
                                   properties:
                                     name:
@@ -356,16 +394,18 @@ spec:
                                   type: object
                                 type: array
                               remove:
-                                description: Remove the given header(s) from the HTTP
-                                  request before the action. The value of Remove is
-                                  a list of HTTP header names. Note that the header
-                                  names are case-insensitive (see https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
+                                description: |-
+                                  Remove the given header(s) from the HTTP request before the action. The
+                                  value of Remove is a list of HTTP header names. Note that the header names
+                                  are case-insensitive (see
+                                  https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
                                 items:
                                   type: string
                                 type: array
                               set:
-                                description: Set overwrites the request with the given
-                                  header (name, value) before the action.
+                                description: |-
+                                  Set overwrites the request with the given header (name, value) before the
+                                  action.
                                 items:
                                   properties:
                                     name:
@@ -376,13 +416,14 @@ spec:
                                 type: array
                             type: object
                           responseHeaderModifier:
-                            description: ResponseHeaderModifier defines a schema for
-                              a filter that modifies response headers.
+                            description: |-
+                              ResponseHeaderModifier defines a schema for a filter that modifies
+                              response headers.
                             properties:
                               add:
-                                description: Add adds the given header(s) (name, value)
-                                  to the request before the action. It appends to
-                                  any existing values associated with the header name.
+                                description: |-
+                                  Add adds the given header(s) (name, value) to the request before the
+                                  action. It appends to any existing values associated with the header name.
                                 items:
                                   properties:
                                     name:
@@ -392,16 +433,18 @@ spec:
                                   type: object
                                 type: array
                               remove:
-                                description: Remove the given header(s) from the HTTP
-                                  request before the action. The value of Remove is
-                                  a list of HTTP header names. Note that the header
-                                  names are case-insensitive (see https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
+                                description: |-
+                                  Remove the given header(s) from the HTTP request before the action. The
+                                  value of Remove is a list of HTTP header names. Note that the header names
+                                  are case-insensitive (see
+                                  https://datatracker.ietf.org/doc/html/rfc2616#section-4.2).
                                 items:
                                   type: string
                                 type: array
                               set:
-                                description: Set overwrites the request with the given
-                                  header (name, value) before the action.
+                                description: |-
+                                  Set overwrites the request with the given header (name, value) before the
+                                  action.
                                 items:
                                   properties:
                                     name:
@@ -412,8 +455,9 @@ spec:
                                 type: array
                             type: object
                           urlRewrite:
-                            description: URLRewrite defines a schema for a filter
-                              that modifies a request during forwarding.
+                            description: |-
+                              URLRewrite defines a schema for a filter that modifies a request during
+                              forwarding.
                             properties:
                               pathPrefix:
                                 type: string
@@ -424,10 +468,10 @@ spec:
                       items:
                         properties:
                           headers:
-                            description: Headers specifies HTTP request header matchers.
-                              Multiple match values are ANDed together, meaning, a
-                              request must match all the specified headers to select
-                              the route.
+                            description: |-
+                              Headers specifies HTTP request header matchers. Multiple match values are
+                              ANDed together, meaning, a request must match all the specified headers to
+                              select the route.
                             items:
                               properties:
                                 invert:
@@ -435,21 +479,23 @@ spec:
                                     compat'
                                   type: boolean
                                 name:
-                                  description: "Name is the name of the HTTP Header
-                                    to be matched. Name matching MUST be case insensitive.
-                                    (See https://tools.ietf.org/html/rfc7230#section-3.2).
-                                    \n If multiple entries specify equivalent header
-                                    names, only the first entry with an equivalent
-                                    name MUST be considered for a match. Subsequent
-                                    entries with an equivalent header name MUST be
-                                    ignored. Due to the case-insensitivity of header
-                                    names, “foo” and “Foo” are considered equivalent.
-                                    \n When a header is repeated in an HTTP request,
-                                    it is implementation-specific behavior as to how
-                                    this is represented. Generally, proxies should
-                                    follow the guidance from the RFC: https://www.rfc-editor.org/rfc/rfc7230.html#section-3.2.2
-                                    regarding processing a repeated header, with special
-                                    handling for “Set-Cookie”."
+                                  description: |-
+                                    Name is the name of the HTTP Header to be matched. Name matching MUST be
+                                    case insensitive. (See https://tools.ietf.org/html/rfc7230#section-3.2).
+
+
+                                    If multiple entries specify equivalent header names, only the first entry
+                                    with an equivalent name MUST be considered for a match. Subsequent entries
+                                    with an equivalent header name MUST be ignored. Due to the
+                                    case-insensitivity of header names, “foo” and “Foo” are considered
+                                    equivalent.
+
+
+                                    When a header is repeated in an HTTP request, it is
+                                    implementation-specific behavior as to how this is represented. Generally,
+                                    proxies should follow the guidance from the RFC:
+                                    https://www.rfc-editor.org/rfc/rfc7230.html#section-3.2.2 regarding
+                                    processing a repeated header, with special handling for “Set-Cookie”.
                                   type: string
                                 type:
                                   description: Type specifies how to match against
@@ -470,14 +516,14 @@ spec:
                               type: object
                             type: array
                           method:
-                            description: Method specifies HTTP method matcher. When
-                              specified, this route will be matched only if the request
-                              has the specified method.
+                            description: |-
+                              Method specifies HTTP method matcher. When specified, this route will be
+                              matched only if the request has the specified method.
                             type: string
                           path:
-                            description: Path specifies a HTTP request path matcher.
-                              If this field is not specified, a default prefix match
-                              on the “/” path is provided.
+                            description: |-
+                              Path specifies a HTTP request path matcher. If this field is not
+                              specified, a default prefix match on the “/” path is provided.
                             properties:
                               type:
                                 description: Type specifies how to match against the
@@ -494,31 +540,33 @@ spec:
                                 type: string
                             type: object
                           queryParams:
-                            description: QueryParams specifies HTTP query parameter
-                              matchers. Multiple match values are ANDed together,
-                              meaning, a request must match all the specified query
+                            description: |-
+                              QueryParams specifies HTTP query parameter matchers. Multiple match values
+                              are ANDed together, meaning, a request must match all the specified query
                               parameters to select the route.
                             items:
                               properties:
                                 name:
-                                  description: "Name is the name of the HTTP query
-                                    param to be matched. This must be an exact string
-                                    match. (See https://tools.ietf.org/html/rfc7230#section-2.7.3).
-                                    \n If multiple entries specify equivalent query
-                                    param names, only the first entry with an equivalent
-                                    name MUST be considered for a match. Subsequent
-                                    entries with an equivalent query param name MUST
-                                    be ignored. \n If a query param is repeated in
-                                    an HTTP request, the behavior is purposely left
-                                    undefined, since different data planes have different
-                                    capabilities. However, it is recommended that
-                                    implementations should match against the first
-                                    value of the param if the data plane supports
-                                    it, as this behavior is expected in other load
-                                    balancing contexts outside of the Gateway API.
-                                    \n Users SHOULD NOT route traffic based on repeated
-                                    query params to guard themselves against potential
-                                    differences in the implementations."
+                                  description: |-
+                                    Name is the name of the HTTP query param to be matched. This must be an
+                                    exact string match. (See
+                                    https://tools.ietf.org/html/rfc7230#section-2.7.3).
+
+
+                                    If multiple entries specify equivalent query param names, only the first
+                                    entry with an equivalent name MUST be considered for a match. Subsequent
+                                    entries with an equivalent query param name MUST be ignored.
+
+
+                                    If a query param is repeated in an HTTP request, the behavior is purposely
+                                    left undefined, since different data planes have different capabilities.
+                                    However, it is recommended that implementations should match against the
+                                    first value of the param if the data plane supports it, as this behavior
+                                    is expected in other load balancing contexts outside of the Gateway API.
+
+
+                                    Users SHOULD NOT route traffic based on repeated query params to guard
+                                    themselves against potential differences in the implementations.
                                   type: string
                                 type:
                                   description: Type specifies how to match against
@@ -541,8 +589,9 @@ spec:
                     retries:
                       properties:
                         number:
-                          description: Number is the number of times to retry the
-                            request when a retryable result occurs.
+                          description: |-
+                            Number is the number of times to retry the request when a retryable
+                            result occurs.
                           properties:
                             value:
                               description: The uint32 value.
@@ -550,27 +599,30 @@ spec:
                               type: integer
                           type: object
                         onConditions:
-                          description: RetryOn allows setting envoy specific conditions
-                            when a request should be automatically retried.
+                          description: |-
+                            RetryOn allows setting envoy specific conditions when a request should
+                            be automatically retried.
                           items:
                             type: string
                           type: array
                         onConnectFailure:
-                          description: RetryOnConnectFailure allows for connection
-                            failure errors to trigger a retry.
+                          description: |-
+                            RetryOnConnectFailure allows for connection failure errors to trigger a
+                            retry.
                           type: boolean
                         onStatusCodes:
-                          description: RetryOnStatusCodes is a flat list of http response
-                            status codes that are eligible for retry. This again should
-                            be feasible in any reasonable proxy.
+                          description: |-
+                            RetryOnStatusCodes is a flat list of http response status codes that are
+                            eligible for retry. This again should be feasible in any reasonable proxy.
                           items:
                             format: int32
                             type: integer
                           type: array
                       type: object
                     timeouts:
-                      description: HTTPRouteTimeouts defines timeouts that can be
-                        configured for an HTTPRoute or GRPCRoute.
+                      description: |-
+                        HTTPRouteTimeouts defines timeouts that can be configured for an HTTPRoute
+                        or GRPCRoute.
                       properties:
                         idle:
                           description: Idle specifies the total amount of time permitted
@@ -578,44 +630,44 @@ spec:
                           format: duration
                           properties:
                             nanos:
-                              description: Signed fractions of a second at nanosecond
-                                resolution of the span of time. Durations less than
-                                one second are represented with a 0 `seconds` field
-                                and a positive or negative `nanos` field. For durations
-                                of one second or more, a non-zero value for the `nanos`
-                                field must be of the same sign as the `seconds` field.
-                                Must be from -999,999,999 to +999,999,999 inclusive.
+                              description: |-
+                                Signed fractions of a second at nanosecond resolution of the span
+                                of time. Durations less than one second are represented with a 0
+                                `seconds` field and a positive or negative `nanos` field. For durations
+                                of one second or more, a non-zero value for the `nanos` field must be
+                                of the same sign as the `seconds` field. Must be from -999,999,999
+                                to +999,999,999 inclusive.
                               format: int32
                               type: integer
                             seconds:
-                              description: 'Signed seconds of the span of time. Must
-                                be from -315,576,000,000 to +315,576,000,000 inclusive.
-                                Note: these bounds are computed from: 60 sec/min *
-                                60 min/hr * 24 hr/day * 365.25 days/year * 10000 years'
+                              description: |-
+                                Signed seconds of the span of time. Must be from -315,576,000,000
+                                to +315,576,000,000 inclusive. Note: these bounds are computed from:
+                                60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years
                               format: int64
                               type: integer
                           type: object
                         request:
-                          description: RequestTimeout is the total amount of time
-                            permitted for the entire downstream request (and retries)
-                            to be processed.
+                          description: |-
+                            RequestTimeout is the total amount of time permitted for the entire
+                            downstream request (and retries) to be processed.
                           format: duration
                           properties:
                             nanos:
-                              description: Signed fractions of a second at nanosecond
-                                resolution of the span of time. Durations less than
-                                one second are represented with a 0 `seconds` field
-                                and a positive or negative `nanos` field. For durations
-                                of one second or more, a non-zero value for the `nanos`
-                                field must be of the same sign as the `seconds` field.
-                                Must be from -999,999,999 to +999,999,999 inclusive.
+                              description: |-
+                                Signed fractions of a second at nanosecond resolution of the span
+                                of time. Durations less than one second are represented with a 0
+                                `seconds` field and a positive or negative `nanos` field. For durations
+                                of one second or more, a non-zero value for the `nanos` field must be
+                                of the same sign as the `seconds` field. Must be from -999,999,999
+                                to +999,999,999 inclusive.
                               format: int32
                               type: integer
                             seconds:
-                              description: 'Signed seconds of the span of time. Must
-                                be from -315,576,000,000 to +315,576,000,000 inclusive.
-                                Note: these bounds are computed from: 60 sec/min *
-                                60 min/hr * 24 hr/day * 365.25 days/year * 10000 years'
+                              description: |-
+                                Signed seconds of the span of time. Must be from -315,576,000,000
+                                to +315,576,000,000 inclusive. Note: these bounds are computed from:
+                                60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years
                               format: int64
                               type: integer
                           type: object
@@ -629,8 +681,9 @@ spec:
                 description: Conditions indicate the latest available observations
                   of a resource's current state.
                 items:
-                  description: 'Conditions define a readiness condition for a Consul
-                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: |-
+                    Conditions define a readiness condition for a Consul resource.
+                    See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition
