@@ -1,3 +1,26 @@
+## 1.4.5 (August 29, 2024)
+
+SECURITY:
+
+* Bump Go to 1.22.5 to address [CVE-2024-24791](https://nvd.nist.gov/vuln/detail/CVE-2024-24791) [[GH-4228](https://github.com/hashicorp/consul-k8s/issues/4228)]
+* Upgrade Docker cli to use v.27.1. This addresses CVE
+[CVE-2024-41110](https://nvd.nist.gov/vuln/detail/CVE-2024-41110) [[GH-4228](https://github.com/hashicorp/consul-k8s/issues/4228)]
+
+IMPROVEMENTS:
+
+* helm: Adds `webhookCertManager.resources` field which can be configured to override the `resource` settings for the `webhook-cert-manager` deployment.[[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
+
+* helm: Adds `connectInject.apiGateway.managedGatewayClass.resourceJob.resources` field which can be configured to override the `resource` settings for the `gateway-resources-job` job. [[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
+* config-entry: add validate_clusters to mesh config entry [[GH-4256](https://github.com/hashicorp/consul-k8s/issues/4256)]
+
+BUG FIXES:
+
+* Fixes install of Consul on GKE Autopilot where the option 'manageNonStandardCRDs' was not being used for the TCPRoute CRD. [[GH-4213](https://github.com/hashicorp/consul-k8s/issues/4213)]
+* api-gateway: fix nil pointer deref bug when the section name in a gateway policy is not specified [[GH-4247](https://github.com/hashicorp/consul-k8s/issues/4247)]
+* helm: adds imagePullSecret to the gateway-resources job and the gateway-cleanup job, would fail before if the image was in a private registry [[GH-4210](https://github.com/hashicorp/consul-k8s/issues/4210)]
+* openshift: order SecurityContextConstraint volumes alphabetically to match OpenShift behavior.
+This ensures that diff detection tools like ArgoCD consider the source and reconciled resources to be identical. [[GH-4227](https://github.com/hashicorp/consul-k8s/issues/4227)]
+
 ## 1.4.4 (July 15, 2024)
 
 SECURITY:
