@@ -1,4 +1,4 @@
-## 1.3.8- (August 29, 2024)
+## 1.3.8 (August 29, 2024)
 
 SECURITY:
 
@@ -8,7 +8,8 @@ SECURITY:
 
 IMPROVEMENTS:
 
-* * helm: Adds `webhookCertManager.resources` field which can be configured to override the `resource` settings for the `webhook-cert-manager` deployment.
+* helm: Adds `webhookCertManager.resources` field which can be configured to override the `resource` settings for the `webhook-cert-manager` deployment. [[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
+
 * helm: Adds `connectInject.apiGateway.managedGatewayClass.resourceJob.resources` field which can be configured to override the `resource` settings for the `gateway-resources-job` job. [[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
 * config-entry: add validate_clusters to mesh config entry [[GH-4256](https://github.com/hashicorp/consul-k8s/issues/4256)]
 
