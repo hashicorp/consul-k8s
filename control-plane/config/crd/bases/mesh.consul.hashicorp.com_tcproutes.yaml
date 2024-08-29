@@ -5,7 +5,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.1
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: tcproutes.mesh.consul.hashicorp.com
 spec:
   group: mesh.consul.hashicorp.com
@@ -37,39 +37,58 @@ spec:
         description: TCPRoute is the Schema for the TCP Route API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            description: "NOTE: this should align to the GAMMA/gateway-api version,
-              or at least be easily translatable. \n https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TCPRoute
-              \n This is a Resource type."
+            description: |-
+              NOTE: this should align to the GAMMA/gateway-api version, or at least be
+              easily translatable.
+
+
+              https://gateway-api.sigs.k8s.io/references/spec/#gateway.networking.k8s.io/v1alpha2.TCPRoute
+
+
+              This is a Resource type.
             properties:
               parentRefs:
-                description: "ParentRefs references the resources (usually Services)
-                  that a Route wants to be attached to. \n It is invalid to reference
-                  an identical parent more than once. It is valid to reference multiple
-                  distinct sections within the same parent resource."
+                description: |-
+                  ParentRefs references the resources (usually Services) that a Route wants
+                  to be attached to.
+
+
+                  It is invalid to reference an identical parent more than once. It is valid
+                  to reference multiple distinct sections within the same parent resource.
                 items:
                   description: 'NOTE: roughly equivalent to structs.ResourceReference'
                   properties:
                     port:
-                      description: "For east/west this is the name of the Consul Service
-                        port to direct traffic to or empty to imply all. For north/south
-                        this is TBD. \n For more details on potential values of this
-                        field, see documentation for Service.ServicePort."
+                      description: |-
+                        For east/west this is the name of the Consul Service port to direct traffic to
+                        or empty to imply all.
+                        For north/south this is TBD.
+
+
+                        For more details on potential values of this field, see documentation for
+                        Service.ServicePort.
                       type: string
                     ref:
-                      description: For east/west configuration, this should point
-                        to a Service. For north/south it should point to a Gateway.
+                      description: |-
+                        For east/west configuration, this should point to a Service.
+                        For north/south it should point to a Gateway.
                       properties:
                         name:
                           description: Name is the user-given name of the resource
@@ -80,36 +99,41 @@ spec:
                             the condition relates to.
                           type: string
                         tenancy:
-                          description: Tenancy identifies the tenancy units (i.e.
-                            partition, namespace) in which the resource resides.
+                          description: |-
+                            Tenancy identifies the tenancy units (i.e. partition, namespace) in which
+                            the resource resides.
                           properties:
                             namespace:
-                              description: "Namespace further isolates resources within
-                                a partition. https://developer.hashicorp.com/consul/docs/enterprise/namespaces
-                                \n When using the List and WatchList endpoints, provide
-                                the wildcard value \"*\" to list resources across
-                                all namespaces."
+                              description: |-
+                                Namespace further isolates resources within a partition.
+                                https://developer.hashicorp.com/consul/docs/enterprise/namespaces
+
+
+                                When using the List and WatchList endpoints, provide the wildcard value "*"
+                                to list resources across all namespaces.
                               type: string
                             partition:
-                              description: "Partition is the topmost administrative
-                                boundary within a cluster. https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
-                                \n When using the List and WatchList endpoints, provide
-                                the wildcard value \"*\" to list resources across
-                                all partitions."
+                              description: |-
+                                Partition is the topmost administrative boundary within a cluster.
+                                https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
+
+
+                                When using the List and WatchList endpoints, provide the wildcard value "*"
+                                to list resources across all partitions.
                               type: string
                           type: object
                         type:
                           description: Type identifies the resource's type.
                           properties:
                             group:
-                              description: Group describes the area of functionality
-                                to which this resource type relates (e.g. "catalog",
-                                "authorization").
+                              description: |-
+                                Group describes the area of functionality to which this resource type
+                                relates (e.g. "catalog", "authorization").
                               type: string
                             groupVersion:
-                              description: GroupVersion is incremented when sweeping
-                                or backward-incompatible changes are made to the group's
-                                resource types.
+                              description: |-
+                                GroupVersion is incremented when sweeping or backward-incompatible changes
+                                are made to the group's resource types.
                               type: string
                             kind:
                               description: Kind identifies the specific resource type
@@ -124,13 +148,13 @@ spec:
                 items:
                   properties:
                     backendRefs:
-                      description: BackendRefs defines the backend(s) where matching
-                        requests should be sent. If unspecified or invalid (refers
-                        to a non-existent resource or a Service with no endpoints),
-                        the underlying implementation MUST actively reject connection
-                        attempts to this backend. Connection rejections must respect
-                        weight; if an invalid backend is requested to have 80% of
-                        connections, then 80% of connections must be rejected instead.
+                      description: |-
+                        BackendRefs defines the backend(s) where matching requests should be sent.
+                        If unspecified or invalid (refers to a non-existent resource or a Service
+                        with no endpoints), the underlying implementation MUST actively reject
+                        connection attempts to this backend. Connection rejections must respect
+                        weight; if an invalid backend is requested to have 80% of connections,
+                        then 80% of connections must be rejected instead.
                       items:
                         properties:
                           backendRef:
@@ -138,12 +162,14 @@ spec:
                               datacenter:
                                 type: string
                               port:
-                                description: "For east/west this is the name of the
-                                  Consul Service port to direct traffic to or empty
-                                  to imply using the same value as the parent ref.
-                                  For north/south this is TBD. \n For more details
-                                  on potential values of this field, see documentation
-                                  for Service.ServicePort."
+                                description: |-
+                                  For east/west this is the name of the Consul Service port to direct traffic to
+                                  or empty to imply using the same value as the parent ref.
+                                  For north/south this is TBD.
+
+
+                                  For more details on potential values of this field, see documentation for
+                                  Service.ServicePort.
                                 type: string
                               ref:
                                 description: For east/west configuration, this should
@@ -158,36 +184,40 @@ spec:
                                       the resource the condition relates to.
                                     type: string
                                   tenancy:
-                                    description: Tenancy identifies the tenancy units
-                                      (i.e. partition, namespace) in which the resource
-                                      resides.
+                                    description: |-
+                                      Tenancy identifies the tenancy units (i.e. partition, namespace) in which
+                                      the resource resides.
                                     properties:
                                       namespace:
-                                        description: "Namespace further isolates resources
-                                          within a partition. https://developer.hashicorp.com/consul/docs/enterprise/namespaces
-                                          \n When using the List and WatchList endpoints,
-                                          provide the wildcard value \"*\" to list
-                                          resources across all namespaces."
+                                        description: |-
+                                          Namespace further isolates resources within a partition.
+                                          https://developer.hashicorp.com/consul/docs/enterprise/namespaces
+
+
+                                          When using the List and WatchList endpoints, provide the wildcard value "*"
+                                          to list resources across all namespaces.
                                         type: string
                                       partition:
-                                        description: "Partition is the topmost administrative
-                                          boundary within a cluster. https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
-                                          \n When using the List and WatchList endpoints,
-                                          provide the wildcard value \"*\" to list
-                                          resources across all partitions."
+                                        description: |-
+                                          Partition is the topmost administrative boundary within a cluster.
+                                          https://developer.hashicorp.com/consul/docs/enterprise/admin-partitions
+
+
+                                          When using the List and WatchList endpoints, provide the wildcard value "*"
+                                          to list resources across all partitions.
                                         type: string
                                     type: object
                                   type:
                                     description: Type identifies the resource's type.
                                     properties:
                                       group:
-                                        description: Group describes the area of functionality
-                                          to which this resource type relates (e.g.
-                                          "catalog", "authorization").
+                                        description: |-
+                                          Group describes the area of functionality to which this resource type
+                                          relates (e.g. "catalog", "authorization").
                                         type: string
                                       groupVersion:
-                                        description: GroupVersion is incremented when
-                                          sweeping or backward-incompatible changes
+                                        description: |-
+                                          GroupVersion is incremented when sweeping or backward-incompatible changes
                                           are made to the group's resource types.
                                         type: string
                                       kind:
@@ -198,18 +228,19 @@ spec:
                                 type: object
                             type: object
                           weight:
-                            description: "Weight specifies the proportion of requests
-                              forwarded to the referenced backend. This is computed
-                              as weight/(sum of all weights in this BackendRefs list).
-                              For non-zero values, there may be some epsilon from
-                              the exact proportion defined here depending on the precision
-                              an implementation supports. Weight is not a percentage
-                              and the sum of weights does not need to equal 100. \n
-                              If only one backend is specified and it has a weight
-                              greater than 0, 100% of the traffic is forwarded to
-                              that backend. If weight is set to 0, no traffic should
-                              be forwarded for this entry. If unspecified, weight
-                              defaults to 1."
+                            description: |-
+                              Weight specifies the proportion of requests forwarded to the referenced
+                              backend. This is computed as weight/(sum of all weights in this
+                              BackendRefs list). For non-zero values, there may be some epsilon from the
+                              exact proportion defined here depending on the precision an implementation
+                              supports. Weight is not a percentage and the sum of weights does not need
+                              to equal 100.
+
+
+                              If only one backend is specified and it has a weight greater than 0, 100%
+                              of the traffic is forwarded to that backend. If weight is set to 0, no
+                              traffic should be forwarded for this entry. If unspecified, weight defaults
+                              to 1.
                             format: int32
                             type: integer
                         type: object
@@ -223,8 +254,9 @@ spec:
                 description: Conditions indicate the latest available observations
                   of a resource's current state.
                 items:
-                  description: 'Conditions define a readiness condition for a Consul
-                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  description: |-
+                    Conditions define a readiness condition for a Consul resource.
+                    See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties
                   properties:
                     lastTransitionTime:
                       description: LastTransitionTime is the last time the condition

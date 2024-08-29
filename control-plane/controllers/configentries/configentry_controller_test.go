@@ -1750,7 +1750,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 
 			// Change the config entry so protocol is https instead of http if test case says to
 			if c.makeDifferentFromConsul {
-				svcDefaults.Spec.Protocol = "https"
+				svcDefaults.Spec.Protocol = "http2"
 			}
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)

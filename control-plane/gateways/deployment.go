@@ -4,13 +4,12 @@
 package gateways
 
 import (
+	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
-
-	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -173,7 +172,7 @@ func deploymentReplicaCount(replicas *meshv2beta1.GatewayClassReplicasConfig, cu
 	}
 
 	// otherwise use the global default
-	return pointer.Int32(globalDefaultInstances)
+	return ptr.To(int32(globalDefaultInstances))
 }
 
 // MergeDeployment is used to update an appsv1.Deployment without overwriting any

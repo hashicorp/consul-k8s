@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"strconv"
 
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -125,7 +124,7 @@ func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.Gat
 	}
 
 	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: pointer.Bool(false),
+		AllowPrivilegeEscalation: ptr.To(false),
 		// Drop any Linux capabilities you'd get other than NET_BIND_SERVICE.
 		// FUTURE: We likely require some additional capability in order to support
 		//   MeshGateway's host network option.
@@ -133,8 +132,8 @@ func (b *gatewayBuilder[T]) consulDataplaneContainer(containerConfig v2beta1.Gat
 			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
-		ReadOnlyRootFilesystem: pointer.Bool(true),
-		RunAsNonRoot:           pointer.Bool(true),
+		ReadOnlyRootFilesystem: ptr.To(true),
+		RunAsNonRoot:           ptr.To(true),
 	}
 
 	return container, nil

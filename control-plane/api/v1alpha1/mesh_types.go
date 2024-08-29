@@ -60,6 +60,13 @@ type MeshSpec struct {
 	HTTP *MeshHTTPConfig `json:"http,omitempty"`
 	// Peering defines the peering configuration for the service mesh.
 	Peering *PeeringMeshConfig `json:"peering,omitempty"`
+	// ValidateClusters controls whether the clusters the route table refers to are validated. The default value is
+	// false. When set to false and a route refers to a cluster that does not exist, the route table loads and routing
+	// to a non-existent cluster results in a 404. When set to true and the route is set to a cluster that do not exist,
+	// the route table will not load. For more information, refer to
+	// [HTTP route configuration in the Envoy docs](https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/route/v3/route.proto#envoy-v3-api-field-config-route-v3-routeconfiguration-validate-clusters)
+	// for more details.
+	ValidateClusters bool `json:"validateClusters,omitempty"`
 }
 
 // TransparentProxyMeshConfig controls configuration specific to proxies in "transparent" mode. Added in v1.10.0.
@@ -200,6 +207,7 @@ func (in *Mesh) ToConsul(datacenter string) capi.ConfigEntry {
 		TLS:                              in.Spec.TLS.toConsul(),
 		HTTP:                             in.Spec.HTTP.toConsul(),
 		Peering:                          in.Spec.Peering.toConsul(),
+		ValidateClusters:                 in.Spec.ValidateClusters,
 		Meta:                             meta(datacenter),
 	}
 }
