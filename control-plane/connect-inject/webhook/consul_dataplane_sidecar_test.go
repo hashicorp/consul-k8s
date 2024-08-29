@@ -843,8 +843,8 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
-				RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsUser:                ptr.To(int64(1000799998)),
+				RunAsGroup:               ptr.To(int64(1000799998)),
 				RunAsNonRoot:             ptr.To(true),
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
