@@ -49,6 +49,7 @@ func TestMesh_MatchesConsul(t *testing.T) {
 						MeshDestinationsOnly: true,
 					},
 					AllowEnablingPermissiveMutualTLS: true,
+					ValidateClusters:                 true,
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_0",
@@ -74,6 +75,7 @@ func TestMesh_MatchesConsul(t *testing.T) {
 					MeshDestinationsOnly: true,
 				},
 				AllowEnablingPermissiveMutualTLS: true,
+				ValidateClusters:                 true,
 				TLS: &capi.MeshTLSConfig{
 					Incoming: &capi.MeshDirectionalTLSConfig{
 						TLSMinVersion: "TLSv1_0",
@@ -151,6 +153,7 @@ func TestMesh_ToConsul(t *testing.T) {
 						MeshDestinationsOnly: true,
 					},
 					AllowEnablingPermissiveMutualTLS: true,
+					ValidateClusters:                 true,
 					TLS: &MeshTLSConfig{
 						Incoming: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_0",
@@ -176,6 +179,7 @@ func TestMesh_ToConsul(t *testing.T) {
 					MeshDestinationsOnly: true,
 				},
 				AllowEnablingPermissiveMutualTLS: true,
+				ValidateClusters:                 true,
 				TLS: &capi.MeshTLSConfig{
 					Incoming: &capi.MeshDirectionalTLSConfig{
 						TLSMinVersion: "TLSv1_0",
