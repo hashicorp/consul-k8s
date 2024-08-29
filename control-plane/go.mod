@@ -3,6 +3,7 @@ module github.com/hashicorp/consul-k8s/control-plane
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 require (
+	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.1.2
 	github.com/deckarep/golang-set v1.7.1
@@ -32,6 +33,7 @@ require (
 	github.com/mitchellh/cli v1.1.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/prometheus/client_golang v1.16.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.25.0
 	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948
@@ -64,7 +66,6 @@ require (
 	github.com/Azure/go-autorest/autorest/validation v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
-	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.44.262 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -127,7 +128,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/posener/complete v1.2.3 // indirect
-	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.10.1 // indirect

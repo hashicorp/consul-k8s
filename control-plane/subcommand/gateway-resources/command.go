@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
+	metricsutil "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -249,13 +249,13 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
-	if metricsEnabled, isSet := getMetricsEnabled(c.flagEnableMetrics); isSet {
+	if metricsEnabled, isSet := metricsutil.GetMetricsEnabled(c.flagEnableMetrics); isSet {
 		classConfig.Spec.Metrics.Enabled = &metricsEnabled
-		if port, isValid := getScrapePort(c.flagMetricsPort); isValid {
+		if port, isValid := metricsutil.ParseScrapePort(c.flagMetricsPort); isValid {
 			port32 := int32(port)
 			classConfig.Spec.Metrics.Port = &port32
 		}
-		if path, isSet := getScrapePath(c.flagMetricsPath); isSet {
+		if path, isSet := metricsutil.GetScrapePath(c.flagMetricsPath); isSet {
 			classConfig.Spec.Metrics.Path = &path
 		}
 	}
@@ -329,13 +329,13 @@ func (c *Command) validateFlags() error {
 	}
 
 	if c.flagEnableMetrics != "" {
-		if _, valid := getMetricsEnabled(c.flagEnableMetrics); !valid {
+		if _, valid := metricsutil.GetMetricsEnabled(c.flagEnableMetrics); !valid {
 			return errors.New("-enable-metrics must be either 'true' or 'false'")
 		}
 	}
 
 	if c.flagMetricsPort != "" {
-		if _, valid := getScrapePort(c.flagMetricsPort); !valid {
+		if _, valid := metricsutil.ParseScrapePort(c.flagMetricsPort); !valid {
 			return errors.New("-metrics-port must be a valid unprivileged port number")
 		}
 	}
@@ -444,35 +444,6 @@ func exponentialBackoffWithMaxIntervalAndTime() *backoff.ExponentialBackOff {
 	backoff.MaxInterval = 1 * time.Second
 	backoff.Reset()
 	return backoff
-}
-
-func getScrapePort(v string) (int, bool) {
-	port, err := strconv.Atoi(v)
-	if err != nil {
-		// we only use the port if it's actually valid
-		return 0, false
-	}
-	if port < 1024 || port > 65535 {
-		return 0, false
-	}
-	return port, true
-}
-
-func getScrapePath(v string) (string, bool) {
-	if v == "" {
-		return "", false
-	}
-	return v, true
-}
-
-func getMetricsEnabled(v string) (bool, bool) {
-	if v == "true" {
-		return true, true
-	}
-	if v == "false" {
-		return false, true
-	}
-	return false, false
 }
 
 func nonZeroOrNil(v int) *int32 {

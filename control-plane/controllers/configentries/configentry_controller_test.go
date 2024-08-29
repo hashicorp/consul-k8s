@@ -1788,7 +1788,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
-				req.Equal(err, c.expErr)
+				req.Equal(c.expErr, err)
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
