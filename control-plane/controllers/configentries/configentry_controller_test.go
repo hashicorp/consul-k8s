@@ -1748,9 +1748,9 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaults).WithStatusSubresource(svcDefaults).Build()
 
-			// Change the config entry so protocol is https instead of http if test case says to
+			// Change the config entry so protocol is http2 instead of http if test case says to
 			if c.makeDifferentFromConsul {
-				svcDefaults.Spec.Protocol = "tcp"
+				svcDefaults.Spec.Protocol = "http2"
 			}
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
