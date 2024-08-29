@@ -1925,6 +1925,17 @@ dns:
     # Port number to be used by DNS proxy
     port: 53
 
+    # Refers to a Kubernetes secret that you have created that contains
+    # an ACL token for your Consul cluster which allows the dns proxy the correct
+    # permissions. This is only needed if ACLs are managed manually within the Consul cluster, i.e. `global.acls.manageSystemACLs` is `false`.
+    aclToken:
+      # The name of the Kubernetes secret that holds the acl sync token.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the acl sync token.
+      # @type: string
+      secretKey: null
+
 # Values that configure the Consul UI.
 ui:
   # If true, the UI will be enabled. This will
