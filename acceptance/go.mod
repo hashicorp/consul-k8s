@@ -5,11 +5,11 @@ go 1.21.1
 toolchain go1.22.0
 
 require (
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.3.0
 	github.com/google/uuid v1.3.0
 	github.com/gruntwork-io/terratest v0.46.7
-	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240226161840-f3842c41cb2b
-	github.com/hashicorp/consul/api v1.10.1-0.20240820053928-ed738a6f981b
+	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240821160356-557f7c37e108
+	github.com/hashicorp/consul/api v1.29.4
 	github.com/hashicorp/consul/sdk v0.16.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-uuid v1.0.3
@@ -30,10 +30,7 @@ require (
 )
 
 // replace these so we always use the latest version of the control-plane types
-replace (
-	github.com/hashicorp/consul-k8s/control-plane => ../control-plane
-	github.com/hashicorp/consul-k8s/version => ../version
-)
+replace github.com/hashicorp/consul-k8s/version => ../version
 
 require (
 	github.com/armon/go-metrics v0.4.1 // indirect
