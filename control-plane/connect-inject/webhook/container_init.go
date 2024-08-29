@@ -10,10 +10,11 @@ import (
 	"strings"
 	"text/template"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
+
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -103,8 +104,9 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
 	container := corev1.Container{
-		Name:  initContainerName,
-		Image: w.ImageConsulK8S,
+		Name:            initContainerName,
+		Image:           w.ImageConsulK8S,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",
@@ -230,7 +232,39 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	}
 
 	if tproxyEnabled {
-		if !w.EnableCNI {
+		if w.EnableCNI {
+			// For non Openshift, we use the initContainersUserAndGroupID for the user and group id.
+			uid := int64(initContainersUserAndGroupID)
+			group := int64(initContainersUserAndGroupID)
+
+			// For Openshift with Transparent proxy + CNI, there is an annotation on the namespace that tells us what
+			// the user and group ids should be for the sidecar.
+			if w.EnableOpenShift {
+				var err error
+
+				uid, err = common.GetConnectInitUID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+				if err != nil {
+					return corev1.Container{}, err
+				}
+
+				group, err = common.GetConnectInitGroupID(namespace, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+				if err != nil {
+					return corev1.Container{}, err
+				}
+			}
+
+			container.SecurityContext = &corev1.SecurityContext{
+				RunAsUser:    ptr.To(uid),
+				RunAsGroup:   ptr.To(group),
+				RunAsNonRoot: ptr.To(true),
+				Privileged:   ptr.To(privileged),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
+			}
+		} else {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
 			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
 			if err != nil {
@@ -245,51 +279,14 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			// Running consul connect redirect-traffic with iptables
 			// requires both being a root user and having NET_ADMIN capability.
 			container.SecurityContext = &corev1.SecurityContext{
-				RunAsUser:  pointer.Int64(rootUserAndGroupID),
-				RunAsGroup: pointer.Int64(rootUserAndGroupID),
+				RunAsUser:  ptr.To(int64(rootUserAndGroupID)),
+				RunAsGroup: ptr.To(int64(rootUserAndGroupID)),
 				// RunAsNonRoot overrides any setting in the Pod so that we can still run as root here as required.
-				RunAsNonRoot: pointer.Bool(false),
-				Privileged:   pointer.Bool(privileged),
+				RunAsNonRoot: ptr.To(false),
+				Privileged:   ptr.To(privileged),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{netAdminCapability},
 				},
-			}
-		} else {
-			if !w.EnableOpenShift {
-				container.SecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-					RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(privileged),
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"ALL"},
-					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
-				}
-			} else {
-				// Transparent proxy + CNI is set in OpenShift. There is an annotation on the namespace that tells us what
-				// the user and group ids should be for the sidecar.
-				uid, err := common.GetOpenShiftUID(&namespace)
-				if err != nil {
-					return corev1.Container{}, err
-				}
-				group, err := common.GetOpenShiftGroup(&namespace)
-				if err != nil {
-					return corev1.Container{}, err
-				}
-				container.SecurityContext = &corev1.SecurityContext{
-					RunAsUser:    pointer.Int64(uid),
-					RunAsGroup:   pointer.Int64(group),
-					RunAsNonRoot: pointer.Bool(true),
-					Privileged:   pointer.Bool(false),
-					Capabilities: &corev1.Capabilities{
-						Drop: []corev1.Capability{"ALL"},
-					},
-					ReadOnlyRootFilesystem:   pointer.Bool(true),
-					AllowPrivilegeEscalation: pointer.Bool(false),
-				}
-
 			}
 		}
 	}

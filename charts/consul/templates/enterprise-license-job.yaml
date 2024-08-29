@@ -59,6 +59,7 @@ spec:
       containers:
         - name: apply-enterprise-license
           image: "{{ default .Values.global.image .Values.server.image }}"
+          {{ template "consul.imagePullPolicy" . }}
           env:
             - name: ENTERPRISE_LICENSE
               {{- if .Values.global.secretsBackend.vault.enabled }}
@@ -125,6 +126,7 @@ spec:
       initContainers:
       - name: ent-license-acl-init
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         command:
           - "/bin/sh"
           - "-ec"

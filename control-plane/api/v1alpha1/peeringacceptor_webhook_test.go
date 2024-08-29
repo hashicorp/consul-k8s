@@ -133,8 +133,7 @@ func TestValidatePeeringAcceptor(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &PeeringAcceptor{}, &PeeringAcceptorList{})
 			client := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.existingResources...).Build()
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 
 			validator := &PeeringAcceptorWebhook{
 				Client:  client,

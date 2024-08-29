@@ -160,6 +160,9 @@ spec:
       terminationGracePeriodSeconds: {{ default $defaults.terminationGracePeriodSeconds .terminationGracePeriodSeconds }}
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
+      - name: tmp
+        emptyDir:
+          medium: "Memory"
       - name: consul-service
         emptyDir:
           medium: "Memory"
@@ -181,6 +184,7 @@ spec:
       # ingress-gateway-init registers the ingress gateway service with Consul.
       - name: ingress-gateway-init
         image: {{ $root.Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" $root }}
         {{- include "consul.restrictedSecurityContext" $ | nindent 8 }}
         env:
         - name: NAMESPACE
@@ -221,6 +225,8 @@ spec:
             -log-level={{ default $root.Values.global.logLevel $root.Values.ingressGateways.logLevel }} \
             -log-json={{ $root.Values.global.logJSON }}
         volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         - name: consul-service
           mountPath: /consul/service
         {{- if $root.Values.global.tls.enabled }}
@@ -240,11 +246,14 @@ spec:
       containers:
       - name: ingress-gateway
         image: {{ $root.Values.global.imageConsulDataplane | quote }}
+        {{ template "consul.imagePullPolicy" $root }}
         {{- include "consul.restrictedSecurityContext" $ | nindent 8 }}
         {{- if (default $defaults.resources .resources) }}
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
         volumeMounts:
+        - name: tmp
+          mountPath: /tmp
         - name: consul-service
           mountPath: /consul/service
           readOnly: true

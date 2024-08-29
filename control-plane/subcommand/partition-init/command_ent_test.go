@@ -13,12 +13,8 @@ import (
 
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/proto-public/pbresource"
-	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
 	"github.com/hashicorp/consul/sdk/testutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
@@ -72,15 +68,11 @@ func TestRun_PartitionCreate(t *testing.T) {
 	partitionName := "test-partition"
 
 	type testCase struct {
-		v2tenancy               bool
-		experiments             []string
 		requirePartitionCreated func(testClient *test.TestServerClient)
 	}
 
 	testCases := map[string]testCase{
-		"v2tenancy false": {
-			v2tenancy:   false,
-			experiments: []string{},
+		"simple": {
 			requirePartitionCreated: func(testClient *test.TestServerClient) {
 				consul, err := api.NewClient(testClient.Cfg.APIClientConfig)
 				require.NoError(t, err)
@@ -91,26 +83,12 @@ func TestRun_PartitionCreate(t *testing.T) {
 				require.Equal(t, partitionName, partition.Name)
 			},
 		},
-		"v2tenancy true": {
-			v2tenancy:   true,
-			experiments: []string{"resource-apis", "v2tenancy"},
-			requirePartitionCreated: func(testClient *test.TestServerClient) {
-				_, err := testClient.ResourceClient.Read(context.Background(), &pbresource.ReadRequest{
-					Id: &pbresource.ID{
-						Name: partitionName,
-						Type: pbtenancy.PartitionType,
-					},
-				})
-				require.NoError(t, err, "expected partition to be created")
-			},
-		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			var serverCfg *testutil.TestServerConfig
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
-				c.Experiments = tc.experiments
 				serverCfg = c
 			})
 
@@ -125,7 +103,6 @@ func TestRun_PartitionCreate(t *testing.T) {
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-partition", partitionName,
 				"-timeout", "1m",
-				"-enable-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
 			}
 
 			responseCode := cmd.Run(args)
@@ -140,17 +117,12 @@ func TestRun_PartitionExists(t *testing.T) {
 	partitionDesc := "Created before test"
 
 	type testCase struct {
-		v2tenancy                  bool
-		experiments                []string
 		preCreatePartition         func(testClient *test.TestServerClient)
 		requirePartitionNotCreated func(testClient *test.TestServerClient)
 	}
 
 	testCases := map[string]testCase{
-		"v2tenancy false": {
-			v2tenancy:   false,
-			experiments: []string{},
-
+		"simple": {
 			preCreatePartition: func(testClient *test.TestServerClient) {
 				consul, err := api.NewClient(testClient.Cfg.APIClientConfig)
 				require.NoError(t, err)
@@ -172,46 +144,12 @@ func TestRun_PartitionExists(t *testing.T) {
 				require.Equal(t, partitionDesc, partition.Description)
 			},
 		},
-		"v2tenancy true": {
-			v2tenancy:   true,
-			experiments: []string{"resource-apis", "v2tenancy"},
-			preCreatePartition: func(testClient *test.TestServerClient) {
-				data, err := anypb.New(&pbtenancy.Partition{Description: partitionDesc})
-				require.NoError(t, err)
-
-				_, err = testClient.ResourceClient.Write(context.Background(), &pbresource.WriteRequest{
-					Resource: &pbresource.Resource{
-						Id: &pbresource.ID{
-							Name: partitionName,
-							Type: pbtenancy.PartitionType,
-						},
-						Data: data,
-					},
-				})
-				require.NoError(t, err)
-			},
-			requirePartitionNotCreated: func(testClient *test.TestServerClient) {
-				rsp, err := testClient.ResourceClient.Read(context.Background(), &pbresource.ReadRequest{
-					Id: &pbresource.ID{
-						Name: partitionName,
-						Type: pbtenancy.PartitionType,
-					},
-				})
-				require.NoError(t, err)
-
-				partition := &pbtenancy.Partition{}
-				err = anypb.UnmarshalTo(rsp.Resource.Data, partition, proto.UnmarshalOptions{})
-				require.NoError(t, err)
-				require.Equal(t, partitionDesc, partition.Description)
-			},
-		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			var serverCfg *testutil.TestServerConfig
 			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
-				c.Experiments = tc.experiments
 				serverCfg = c
 			})
 
@@ -228,7 +166,6 @@ func TestRun_PartitionExists(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-partition", partitionName,
-				"-enable-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
 			}
 
 			responseCode := cmd.Run(args)
@@ -243,55 +180,33 @@ func TestRun_PartitionExists(t *testing.T) {
 func TestRun_ExitsAfterTimeout(t *testing.T) {
 	partitionName := "test-partition"
 
-	type testCase struct {
-		v2tenancy   bool
-		experiments []string
+	var serverCfg *testutil.TestServerConfig
+	testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
+		serverCfg = c
+	})
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI: ui,
+	}
+	cmd.init()
+
+	timeout := 500 * time.Millisecond
+	args := []string{
+		"-addresses=" + "127.0.0.1",
+		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
+		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
+		"-timeout", timeout.String(),
+		"-partition", partitionName,
 	}
 
-	testCases := map[string]testCase{
-		"v2tenancy false": {
-			v2tenancy:   false,
-			experiments: []string{},
-		},
-		"v2tenancy true": {
-			v2tenancy:   true,
-			experiments: []string{"resource-apis", "v2tenancy"},
-		},
-	}
+	testClient.TestServer.Stop()
+	startTime := time.Now()
+	responseCode := cmd.Run(args)
+	completeTime := time.Now()
+	require.Equal(t, 1, responseCode)
 
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			var serverCfg *testutil.TestServerConfig
-			testClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
-				c.Experiments = tc.experiments
-				serverCfg = c
-			})
-
-			ui := cli.NewMockUi()
-			cmd := Command{
-				UI: ui,
-			}
-			cmd.init()
-
-			timeout := 500 * time.Millisecond
-			args := []string{
-				"-addresses=" + "127.0.0.1",
-				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
-				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
-				"-timeout", timeout.String(),
-				"-partition", partitionName,
-				"-enable-v2tenancy=" + strconv.FormatBool(tc.v2tenancy),
-			}
-
-			testClient.TestServer.Stop()
-			startTime := time.Now()
-			responseCode := cmd.Run(args)
-			completeTime := time.Now()
-			require.Equal(t, 1, responseCode)
-
-			// While the timeout is 500ms, adding a buffer of 500ms ensures we account for
-			// some buffer time required for the task to run and assignments to occur.
-			require.WithinDuration(t, completeTime, startTime, timeout+500*time.Millisecond)
-		})
-	}
+	// While the timeout is 500ms, adding a buffer of 500ms ensures we account for
+	// some buffer time required for the task to run and assignments to occur.
+	require.WithinDuration(t, completeTime, startTime, timeout+500*time.Millisecond)
 }

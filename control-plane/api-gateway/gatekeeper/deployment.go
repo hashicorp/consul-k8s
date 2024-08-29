@@ -88,7 +88,7 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.Namespac
 }
 
 func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
-	initContainer, err := initContainer(config, gateway.Name, gateway.Namespace)
+	initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,9 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 		annotations[constants.AnnotationPrometheusPort] = strconv.Itoa(metrics.Port)
 	}
 
-	container, err := consulDataplaneContainer(metrics, config, gcc, gateway.Name, gateway.Namespace)
+	volumes, mounts := volumesAndMounts(gateway)
+
+	container, err := consulDataplaneContainer(metrics, config, gcc, gateway.Name, gateway.Namespace, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -129,14 +131,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
-					Volumes: []corev1.Volume{
-						{
-							Name: volumeName,
-							VolumeSource: corev1.VolumeSource{
-								EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory},
-							},
-						},
-					},
+					Volumes: volumes,
 					InitContainers: []corev1.Container{
 						initContainer,
 					},

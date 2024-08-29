@@ -26,14 +26,9 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-	k8syaml "sigs.k8s.io/yaml"
-
-	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/gateways"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
@@ -108,7 +103,6 @@ type Command struct {
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
 	resources          corev1.ResourceRequirements
-	gatewayConfig      gateways.GatewayResources
 
 	ctx context.Context
 }
@@ -194,12 +188,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	// Load gateway config from the configmap.
-	if err := c.loadGatewayConfigs(); err != nil {
-		c.UI.Error(fmt.Sprintf("Error loading gateway config: %s", err))
-		return 1
-	}
-
 	if c.ctx == nil {
 		c.ctx = context.Background()
 	}
@@ -223,16 +211,6 @@ func (c *Command) Run(args []string) int {
 		}
 		if err := v1alpha1.AddToScheme(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add consul-k8s schema: %s", err))
-			return 1
-		}
-
-		if err := authv2beta1.AddAuthToScheme(s); err != nil {
-			c.UI.Error(fmt.Sprintf("Could not add authv2beta schema: %s", err))
-			return 1
-		}
-
-		if err := v2beta1.AddMeshToScheme(s); err != nil {
-			c.UI.Error(fmt.Sprintf("Could not add meshv2 schema: %s", err))
 			return 1
 		}
 
@@ -294,29 +272,13 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
-	if err := forceV1ClassConfig(context.Background(), c.k8sClient, classConfig); err != nil {
+	if err := forceClassConfig(context.Background(), c.k8sClient, classConfig); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
-	if err := forceV1Class(context.Background(), c.k8sClient, class); err != nil {
+	if err := forceClass(context.Background(), c.k8sClient, class); err != nil {
 		c.UI.Error(err.Error())
 		return 1
-	}
-
-	if len(c.gatewayConfig.GatewayClassConfigs) > 0 {
-		err = c.createV2GatewayClassAndClassConfigs(context.Background(), meshGatewayComponent, "consul-mesh-gateway-controller")
-		if err != nil {
-			c.UI.Error(err.Error())
-			return 1
-		}
-	}
-
-	if len(c.gatewayConfig.MeshGateways) > 0 {
-		err = c.createV2MeshGateways(context.Background(), meshGatewayComponent)
-		if err != nil {
-			c.UI.Error(err.Error())
-			return 1
-		}
 	}
 
 	return 0
@@ -409,101 +371,6 @@ func (c *Command) loadResourceConfig(filename string) (corev1.ResourceRequiremen
 	return reqs, nil
 }
 
-// loadGatewayConfigs reads and loads the configs from `/consul/config/config.yaml`, if this file does not exist nothing is done.
-func (c *Command) loadGatewayConfigs() error {
-	file, err := os.Open(c.flagGatewayConfigLocation)
-	if err != nil {
-		if os.IsNotExist(err) {
-			c.UI.Warn(fmt.Sprintf("gateway configuration file not found, skipping gateway configuration, filename: %s", c.flagGatewayConfigLocation))
-			return nil
-		}
-		c.UI.Error(fmt.Sprintf("Error opening gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
-		return err
-	}
-
-	config, err := io.ReadAll(file)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error reading gateway configuration file %s: %s", c.flagGatewayConfigLocation, err))
-		return err
-	}
-
-	err = k8syaml.Unmarshal(config, &c.gatewayConfig)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error decoding gateway config file: %s", err))
-		return err
-	}
-
-	// ensure default resources requirements are set
-	for idx := range c.gatewayConfig.MeshGateways {
-		if c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container == nil {
-			c.gatewayConfig.GatewayClassConfigs[idx].Spec.Deployment.Container = &v2beta1.GatewayClassContainerConfig{Resources: &defaultResourceRequirements}
-		}
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return nil
-}
-
-// createV2GatewayClassAndClassConfigs utilizes the configuration loaded from the gateway config file to
-// create the GatewayClassConfig and GatewayClass for the gateway.
-func (c *Command) createV2GatewayClassAndClassConfigs(ctx context.Context, component, controllerName string) error {
-	labels := map[string]string{
-		"app":       c.flagApp,
-		"chart":     c.flagChart,
-		"heritage":  c.flagHeritage,
-		"release":   c.flagRelease,
-		"component": component,
-	}
-
-	for _, cfg := range c.gatewayConfig.GatewayClassConfigs {
-		err := forceV2ClassConfig(ctx, c.k8sClient, cfg)
-		if err != nil {
-			return err
-		}
-
-		class := &v2beta1.GatewayClass{
-			ObjectMeta: metav1.ObjectMeta{Name: cfg.Name, Labels: labels},
-			TypeMeta:   metav1.TypeMeta{Kind: v2beta1.KindGatewayClass},
-			Spec: v2beta1.GatewayClassSpec{
-				ControllerName: controllerName,
-				ParametersRef: &v2beta1.ParametersReference{
-					Group:     v2beta1.MeshGroup,
-					Kind:      v2beta1.KindGatewayClassConfig,
-					Namespace: &cfg.Namespace,
-					Name:      cfg.Name,
-				},
-			},
-		}
-
-		err = forceV2Class(ctx, c.k8sClient, class)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *Command) createV2MeshGateways(ctx context.Context, component string) error {
-	labels := map[string]string{
-		"app":       c.flagApp,
-		"chart":     c.flagChart,
-		"heritage":  c.flagHeritage,
-		"release":   c.flagRelease,
-		"component": component,
-	}
-	for _, meshGw := range c.gatewayConfig.MeshGateways {
-		meshGw.Labels = labels
-		err := forceV2MeshGateway(ctx, c.k8sClient, meshGw)
-		if err != nil {
-			return err
-		}
-
-	}
-	return nil
-}
-
 func (c *Command) Synopsis() string { return synopsis }
 func (c *Command) Help() string {
 	c.once.Do(c.init)
@@ -533,7 +400,7 @@ var defaultResourceRequirements = corev1.ResourceRequirements{
 	},
 }
 
-func forceV1ClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.GatewayClassConfig) error {
+func forceClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.GatewayClassConfig) error {
 	return backoff.Retry(func() error {
 		var existing v1alpha1.GatewayClassConfig
 		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
@@ -552,7 +419,7 @@ func forceV1ClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha
 	}, exponentialBackoffWithMaxIntervalAndTime())
 }
 
-func forceV1Class(ctx context.Context, k8sClient client.Client, o *gwv1beta1.GatewayClass) error {
+func forceClass(ctx context.Context, k8sClient client.Client, o *gwv1beta1.GatewayClass) error {
 	return backoff.Retry(func() error {
 		var existing gwv1beta1.GatewayClass
 		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
@@ -565,63 +432,6 @@ func forceV1Class(ctx context.Context, k8sClient client.Client, o *gwv1beta1.Gat
 		}
 
 		existing.Spec = o.Spec
-		existing.Labels = o.Labels
-
-		return k8sClient.Update(ctx, &existing)
-	}, exponentialBackoffWithMaxIntervalAndTime())
-}
-
-func forceV2ClassConfig(ctx context.Context, k8sClient client.Client, o *v2beta1.GatewayClassConfig) error {
-	return backoff.Retry(func() error {
-		var existing v2beta1.GatewayClassConfig
-		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
-		if err != nil && !k8serrors.IsNotFound(err) {
-			return err
-		}
-
-		if k8serrors.IsNotFound(err) {
-			return k8sClient.Create(ctx, o)
-		}
-
-		existing.Spec = *o.Spec.DeepCopy()
-		existing.Labels = o.Labels
-
-		return k8sClient.Update(ctx, &existing)
-	}, exponentialBackoffWithMaxIntervalAndTime())
-}
-
-func forceV2Class(ctx context.Context, k8sClient client.Client, o *v2beta1.GatewayClass) error {
-	return backoff.Retry(func() error {
-		var existing v2beta1.GatewayClass
-		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
-		if err != nil && !k8serrors.IsNotFound(err) {
-			return err
-		}
-
-		if k8serrors.IsNotFound(err) {
-			return k8sClient.Create(ctx, o)
-		}
-
-		existing.Spec = *o.Spec.DeepCopy()
-		existing.Labels = o.Labels
-
-		return k8sClient.Update(ctx, &existing)
-	}, exponentialBackoffWithMaxIntervalAndTime())
-}
-
-func forceV2MeshGateway(ctx context.Context, k8sClient client.Client, o *v2beta1.MeshGateway) error {
-	return backoff.Retry(func() error {
-		var existing v2beta1.MeshGateway
-		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
-		if err != nil && !k8serrors.IsNotFound(err) {
-			return err
-		}
-
-		if k8serrors.IsNotFound(err) {
-			return k8sClient.Create(ctx, o)
-		}
-
-		existing.Spec = *o.Spec.DeepCopy()
 		existing.Labels = o.Labels
 
 		return k8sClient.Update(ctx, &existing)

@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy.
+```

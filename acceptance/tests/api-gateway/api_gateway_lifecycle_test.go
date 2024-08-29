@@ -27,8 +27,10 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 	helmValues := map[string]string{
-		"global.logLevel":       "trace",
-		"connectInject.enabled": "true",
+		"global.logLevel":              "trace",
+		"connectInject.enabled":        "true",
+		"global.acls.manageSystemACLs": "true",
+		"global.tls.enabled":           "true",
 	}
 
 	releaseName := helpers.RandomName()
@@ -37,7 +39,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	consulCluster.Create(t)
 
 	k8sClient := ctx.ControllerRuntimeClient(t)
-	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
 	defaultNamespace := "default"
 
@@ -141,6 +143,13 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	logger.Log(t, "creating route two")
 	routeTwo := createRoute(t, k8sClient, routeTwoName, defaultNamespace, controlledGatewayTwoName, targetName)
 
+	// Scenario: Ensure ACL roles/policies are set correctly
+	logger.Log(t, "checking that ACL roles/policies are set correctly for controlled gateway one")
+	checkACLRolesPolicies(t, consulClient, controlledGatewayOneName)
+
+	logger.Log(t, "checking that ACL roles/policies are set correctly for controlled gateway two")
+	checkACLRolesPolicies(t, consulClient, controlledGatewayTwoName)
+
 	// Scenario: Swapping a route to another controlled gateway should clean up the old parent statuses and references on Consul resources
 
 	// check that the route is bound properly and objects are reflected in Consul
@@ -210,6 +219,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	checkConsulNotExists(t, consulClient, api.HTTPRoute, routeOneName)
 
 	// Scenario: Deleting a gateway should result in routes only referencing it to get cleaned up from Consul and their statuses/finalizers cleared, but routes referencing another controlled gateway should still exist in Consul and only have their statuses cleaned up from referencing the gateway we previously controlled. Any referenced certificates should also get cleaned up.
+	// and acl roles and policies for that gateway should be cleaned up
 
 	// delete gateway two
 	logger.Log(t, "deleting gateway two in Kubernetes")
@@ -223,6 +233,12 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	// check that the Kubernetes route is cleaned up and the entries deleted from Consul
 	logger.Log(t, "checking that http route one is cleaned up in Kubernetes")
 	checkEmptyRoute(t, k8sClient, routeOneName, defaultNamespace)
+
+	logger.Log(t, "checking that ACL roles/policies are set correctly for controlled gateway one")
+	checkACLRolesPolicies(t, consulClient, controlledGatewayOneName)
+
+	logger.Log(t, "checking that ACL roles/policies are removed for controlled gateway two")
+	checkACLRolesPoliciesDontExist(t, consulClient, controlledGatewayTwoName)
 
 	// Scenario: Changing a gateway class name on a gateway to something we don’t control should have the same affect as deleting it with the addition of cleaning up our finalizer from the gateway.
 
@@ -279,7 +295,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// make sure our certificate exists
 	logger.Log(t, "checking that the certificate is synchronized to Consul")
-	checkConsulExists(t, consulClient, api.InlineCertificate, certificateName)
+	checkConsulExists(t, consulClient, api.FileSystemCertificate, certificateName)
 
 	// delete the certificate in Kubernetes
 	logger.Log(t, "deleting the certificate in Kubernetes")
@@ -288,7 +304,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// make sure the certificate no longer exists in Consul
 	logger.Log(t, "checking that the certificate is deleted from Consul")
-	checkConsulNotExists(t, consulClient, api.InlineCertificate, certificateName)
+	checkConsulNotExists(t, consulClient, api.FileSystemCertificate, certificateName)
 }
 
 func checkConsulNotExists(t *testing.T, client *api.Client, kind, name string, namespace ...string) {
@@ -441,4 +457,28 @@ func createGatewayClass(t *testing.T, client client.Client, name, controllerName
 
 	err := client.Create(context.Background(), gatewayClass)
 	require.NoError(t, err)
+}
+
+func checkACLRolesPolicies(t *testing.T, client *api.Client, gatewayName string) {
+	t.Helper()
+	retryCheck(t, 60, func(r *retry.R) {
+		role, _, err := client.ACL().RoleReadByName(fmt.Sprint("managed-gateway-acl-role-", gatewayName), nil)
+		require.NoError(r, err)
+		require.NotNil(r, role)
+		policy, _, err := client.ACL().PolicyReadByName(fmt.Sprint("api-gateway-policy-for-", gatewayName), nil)
+		require.NoError(r, err)
+		require.NotNil(r, policy)
+	})
+}
+
+func checkACLRolesPoliciesDontExist(t *testing.T, client *api.Client, gatewayName string) {
+	t.Helper()
+	retryCheck(t, 60, func(r *retry.R) {
+		role, _, err := client.ACL().RoleReadByName(fmt.Sprint("managed-gateway-acl-role-", gatewayName), nil)
+		require.NoError(r, err)
+		require.Nil(r, role)
+		policy, _, err := client.ACL().PolicyReadByName(fmt.Sprint("api-gateway-policy-for-", gatewayName), nil)
+		require.NoError(r, err)
+		require.Nil(r, policy)
+	})
 }

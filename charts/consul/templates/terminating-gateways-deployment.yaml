@@ -129,6 +129,9 @@ spec:
       terminationGracePeriodSeconds: 10
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
+      - name: tmp
+        emptyDir:
+          medium: "Memory"
       - name: consul-service
         emptyDir:
           medium: "Memory"
@@ -166,6 +169,7 @@ spec:
         # terminating-gateway-init registers the terminating gateway service with Consul.
         - name: terminating-gateway-init
           image: {{ $root.Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" $root }}
           {{- include "consul.restrictedSecurityContext" $ | nindent 10 }}
           env:
           - name: NAMESPACE
@@ -206,6 +210,8 @@ spec:
                   -log-level={{ default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel }} \
                   -log-json={{ $root.Values.global.logJSON }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             - name: consul-service
               mountPath: /consul/service
             {{- if $root.Values.global.tls.enabled }}
@@ -225,8 +231,11 @@ spec:
       containers:
         - name: terminating-gateway
           image: {{ $root.Values.global.imageConsulDataplane | quote }}
+          {{ template "consul.imagePullPolicy" $root }}
           {{- include "consul.restrictedSecurityContext" $ | nindent 10 }}
           volumeMounts:
+            - name: tmp
+              mountPath: /tmp
             - name: consul-service
               mountPath: /consul/service
               readOnly: true

@@ -183,7 +183,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	}
 
 	// Check to see if consul has config entry with the same name
-	entry, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
+	entryFromConsul, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
 		Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 	})
 	// If a config entry with this name does not exist
@@ -223,37 +223,31 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError, err)
 	}
 
-	requiresMigration := false
-	sourceDatacenter := entry.GetMeta()[common.DatacenterKey]
-
+	sourceDatacenter := entryFromConsul.GetMeta()[common.DatacenterKey]
+	managedByThisDC := sourceDatacenter == r.DatacenterName
 	// Check if the config entry is managed by our datacenter.
 	// Do not process resource if the entry was not created within our datacenter
 	// as it was created in a different cluster which will be managing that config entry.
-	if sourceDatacenter != r.DatacenterName {
+	matchesConsul := configEntry.MatchesConsul(entryFromConsul)
+	// Note that there is a special case where we will migrate a config entry
+	// that wasn't created by the controller if it has the migrate-entry annotation set to true.
+	// This functionality exists to help folks who are upgrading from older helm
+	// chart versions where they had previously created config entries themselves but
+	// now want to manage them through custom resources.
+	hasMigrationKey := configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] == common.MigrateEntryTrue
 
-		// Note that there is a special case where we will migrate a config entry
-		// that wasn't created by the controller if it has the migrate-entry annotation set to true.
-		// This functionality exists to help folks who are upgrading from older helm
-		// chart versions where they had previously created config entries themselves but
-		// now want to manage them through custom resources.
-		if configEntry.GetObjectMeta().Annotations[common.MigrateEntryKey] != common.MigrateEntryTrue {
-			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError,
-				sourceDatacenterMismatchErr(sourceDatacenter))
-		}
-
-		requiresMigration = true
-	}
-
-	if !configEntry.MatchesConsul(entry) {
-		if requiresMigration {
-			// If we're migrating this config entry but the custom resource
-			// doesn't match what's in Consul currently we error out so that
-			// it doesn't overwrite something accidentally.
-			return r.syncFailed(ctx, logger, crdCtrl, configEntry, MigrationFailedError,
-				r.nonMatchingMigrationError(configEntry, entry))
-		}
-
-		logger.Info("config entry does not match consul", "modify-index", entry.GetModifyIndex())
+	switch {
+	case !matchesConsul && !managedByThisDC && !hasMigrationKey:
+		return r.syncFailed(ctx, logger, crdCtrl, configEntry, ExternallyManagedConfigError,
+			sourceDatacenterMismatchErr(sourceDatacenter))
+	case !matchesConsul && hasMigrationKey:
+		// If we're migrating this config entry but the custom resource
+		// doesn't match what's in Consul currently we error out so that
+		// it doesn't overwrite something accidentally.
+		return r.syncFailed(ctx, logger, crdCtrl, configEntry, MigrationFailedError,
+			r.nonMatchingMigrationError(configEntry, entryFromConsul))
+	case !matchesConsul:
+		logger.Info("config entry does not match consul", "modify-index", entryFromConsul.GetModifyIndex())
 		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
 			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
 		})
@@ -263,7 +257,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 		logger.Info("config entry updated", "request-time", writeMeta.RequestTime)
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
-	} else if requiresMigration && entry.GetMeta()[common.DatacenterKey] != r.DatacenterName {
+	case hasMigrationKey && !managedByThisDC:
 		// If we get here then we're doing a migration and the entry in Consul
 		// matches the entry in Kubernetes. We just need to update the metadata
 		// of the entry in Consul to say that it's now managed by Kubernetes.
@@ -277,7 +271,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 		logger.Info("config entry migrated", "request-time", writeMeta.RequestTime)
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
-	} else if configEntry.SyncedConditionStatus() != corev1.ConditionTrue {
+	case configEntry.SyncedConditionStatus() != corev1.ConditionTrue:
 		return r.syncSuccessful(ctx, crdCtrl, configEntry)
 	}
 

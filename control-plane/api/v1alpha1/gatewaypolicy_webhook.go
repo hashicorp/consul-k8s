@@ -11,6 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -69,9 +70,9 @@ func differentPolicySameTarget(resource, policy GatewayPolicy) bool {
 		DerefStringOr(resource.Spec.TargetRef.SectionName, "") == DerefStringOr(policy.Spec.TargetRef.SectionName, "")
 }
 
-func (v *GatewayPolicyWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+func (v *GatewayPolicyWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy", &admission.Webhook{Handler: v})
 }
 
 func DerefStringOr[T ~string, U ~string](v *T, val U) string {

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +28,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 		newResource       *GatewayPolicy
 		expAllow          bool
 		expErrMessage     string
+		expReason         string
 	}{
 		"valid - no other policy targets listener": {
 			existingResources: []runtime.Object{
@@ -208,6 +210,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 			},
 			expAllow:      false,
 			expErrMessage: "policy targets gateway listener \"l1\" that is already the target of an existing policy \"my-policy\"",
+			expReason:     "Forbidden",
 		},
 	}
 	for name, tt := range tests {
@@ -230,8 +233,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				FieldSelector: fields.OneTermEqualSelector(Gatewaypolicy_GatewayIndex, gwNamespaceName.String()),
 			})
 
-			decoder, err := admission.NewDecoder(s)
-			require.NoError(t, err)
+			decoder := admission.NewDecoder(s)
 			v := &GatewayPolicyWebhook{
 				Logger:  logrtest.New(t),
 				decoder: decoder,
@@ -248,9 +250,14 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 			})
 
-			require.Equal(t, tt.expAllow, response.Allowed)
+			assert.Equal(t, tt.expAllow, response.Allowed)
 			if tt.expErrMessage != "" {
-				require.Equal(t, tt.expErrMessage, string(response.AdmissionResponse.Result.Reason))
+				require.NotNil(t, response.AdmissionResponse.Result)
+				assert.Equal(t, tt.expErrMessage, response.AdmissionResponse.Result.Message)
+			}
+			if tt.expReason != "" {
+				require.NotNil(t, response.AdmissionResponse.Result)
+				assert.EqualValues(t, tt.expReason, response.AdmissionResponse.Result.Reason)
 			}
 		})
 	}

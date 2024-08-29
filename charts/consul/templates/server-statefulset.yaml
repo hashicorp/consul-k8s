@@ -132,7 +132,7 @@ spec:
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
-        {{- if not .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+        {{- if (or (not .Values.global.metrics.datadog.enabled) (and .Values.global.metrics.datadog.enabled (.Values.global.metrics.datadog.dogstatsd.enabled))) }}
         "prometheus.io/scrape": "true"
         {{- if not (hasKey (default "" .Values.server.annotations | fromYaml) "prometheus.io/path")}}
         "prometheus.io/path": "/v1/agent/metrics"
@@ -156,12 +156,12 @@ spec:
               "instances": [
                 {
         {{- if .Values.global.tls.enabled }}
-                  "openmetrics_endpoint": "https://consul-server.{{ .Release.Namespace }}.svc:8501/v1/agent/metrics?format=prometheus",
+                  "openmetrics_endpoint": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501/v1/agent/metrics?format=prometheus",
                   "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
                   "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
                   "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
         {{- else }}
-                  "openmetrics_endpoint": "http://consul-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
+                  "openmetrics_endpoint": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
         {{- end }}
         {{- if ( .Values.global.acls.manageSystemACLs) }}
                   "headers": {
@@ -182,12 +182,12 @@ spec:
               "instances": [
                 {
         {{- if .Values.global.tls.enabled }}
-                  "url": "https://consul-server.{{ .Release.Namespace }}.svc:8501",
+                  "url": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501",
                   "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
                   "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
                   "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
         {{- else }}
-                  "url": "http://consul-server.consul.svc:8500",
+                  "url": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500",
         {{- end }}
                   "use_prometheus_endpoint": true,
         {{- if ( .Values.global.acls.manageSystemACLs) }}
@@ -226,6 +226,8 @@ spec:
         {{- toYaml .Values.server.securityContext | nindent 8 }}
       {{- end }}
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-server-config
@@ -319,6 +321,7 @@ spec:
       initContainers:
       - name: locality-init
         image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
         env:
         - name: NODE_NAME
           valueFrom:
@@ -336,6 +339,7 @@ spec:
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
+          {{ template "consul.imagePullPolicy" . }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
@@ -562,6 +566,9 @@ spec:
               mountPath: /trusted-cas
               readOnly: false
             {{- end }}
+            - name: tmp
+              mountPath: /tmp
+              readOnly: false
           ports:
             {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
             - name: http
@@ -652,6 +659,7 @@ spec:
         {{- if .Values.server.snapshotAgent.enabled }}
         - name: consul-snapshot-agent
           image: "{{ default .Values.global.image .Values.server.image }}"
+          {{ template "consul.imagePullPolicy" . }}
           env:
             {{- if .Values.server.snapshotAgent.caCert }}
             - name: SSL_CERT_DIR

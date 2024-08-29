@@ -6,8 +6,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -16,8 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 const (
@@ -129,9 +130,9 @@ func (r *GatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.GatewayClass{}).
 		// Watch for changes to GatewayClassConfig objects.
-		Watches(source.NewKindWithCache(&v1alpha1.GatewayClassConfig{}, mgr.GetCache()), r.gatewayClassConfigFieldIndexEventHandler(ctx)).
+		Watches(&v1alpha1.GatewayClassConfig{}, r.gatewayClassConfigFieldIndexEventHandler()).
 		// Watch for changes to Gateway objects that reference this GatewayClass.
-		Watches(source.NewKindWithCache(&gwv1beta1.Gateway{}, mgr.GetCache()), r.gatewayFieldIndexEventHandler(ctx)).
+		Watches(&gwv1beta1.Gateway{}, r.gatewayFieldIndexEventHandler()).
 		Complete(r)
 }
 
@@ -216,8 +217,8 @@ func (r *GatewayClassController) setCondition(gc *gwv1beta1.GatewayClass, condit
 // gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
 // reconcile.Requests for GatewayClass objects that reference the GatewayClassConfig
 // object that triggered the event.
-func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 		requests := []reconcile.Request{}
 
 		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
@@ -245,8 +246,8 @@ func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler(ctx co
 // gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
 // reconcile.Requests for GatewayClass objects from Gateways which reference the GatewayClass
 // when those Gateways are updated.
-func (r *GatewayClassController) gatewayFieldIndexEventHandler(ctx context.Context) handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(o client.Object) []reconcile.Request {
+func (r *GatewayClassController) gatewayFieldIndexEventHandler() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 		// Get the Gateway object that triggered the event.
 		g := o.(*gwv1beta1.Gateway)
 

@@ -54,18 +54,27 @@ func TestTerminatingGateway(t *testing.T) {
 			// Once the cluster is up, register the external service, then create the config entry.
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
-			// Register the external service
-			helpers.RegisterExternalService(t, consulClient, "", staticServerName, staticServerName, 80)
+			logger.Log(t, "creating terminating gateway")
+			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/bases/terminating-gateway")
+			})
 
-			// If ACLs are enabled we need to update the role of the terminating gateway
-			// with service:write permissions to the static-server service
-			// so that it can request Connect certificates for it.
-			if c.secure {
-				UpdateTerminatingGatewayRole(t, consulClient, staticServerPolicyRules)
+			k8sOpts := helpers.K8sOptions{
+				Options:             ctx.KubectlOptions(t),
+				NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
+				NoCleanup:           cfg.NoCleanup,
+				KustomizeConfigPath: "../fixtures/bases/external-service-registration",
 			}
 
-			// Create the config entry for the terminating gateway.
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerName)
+			consulOpts := helpers.ConsulOptions{
+				ConsulClient:                    consulClient,
+				ExternalServiceNameRegistration: "static-server-registration",
+			}
+
+			helpers.RegisterExternalServiceCRD(t, k8sOpts, consulOpts)
+
+			helpers.CheckExternalServiceConditions(t, "static-server-registration", k8sOpts.Options)
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")
@@ -89,7 +98,3 @@ func TestTerminatingGateway(t *testing.T) {
 		})
 	}
 }
-
-const staticServerPolicyRules = `service "static-server" {
-  policy = "write"
-}`

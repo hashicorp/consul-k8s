@@ -104,7 +104,7 @@ func TestRun_FlagValidation(t *testing.T) {
 func TestRun_Defaults(t *testing.T) {
 	t.Parallel()
 
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Run the command.
@@ -187,7 +187,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
-			k8s, testClient := completeSetup(t, false)
+			k8s, testClient := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
@@ -252,7 +252,7 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 func TestRun_ReplicationTokenPrimaryDC_WithProvidedSecretID(t *testing.T) {
 	t.Parallel()
 
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	replicationToken := "123e4567-e89b-12d3-a456-426614174000"
@@ -528,7 +528,7 @@ func TestRun_AnonymousTokenPolicy(t *testing.T) {
 				flags = append(flags, "-acl-replication-token-file", tmp.Name())
 			} else {
 				var testClient *test.TestServerClient
-				k8s, testClient = completeSetup(t, false)
+				k8s, testClient = completeSetup(t)
 				consulHTTPAddr = testClient.TestServer.HTTPAddr
 				consulGRPCAddr = testClient.TestServer.GRPCAddr
 			}
@@ -603,9 +603,8 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		flags         []string
-		expectedHost  string
-		v2BindingRule bool
+		flags        []string
+		expectedHost string
 	}{
 		"-connect-inject flag": {
 			flags:        []string{"-connect-inject"},
@@ -618,16 +617,11 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			},
 			expectedHost: "https://my-kube.com",
 		},
-		"-enable-resource-apis flag": {
-			flags:         []string{"-connect-inject", "-enable-resource-apis=true"},
-			expectedHost:  "https://kubernetes.default.svc",
-			v2BindingRule: true,
-		},
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
 
-			k8s, testClient := completeSetup(t, c.v2BindingRule)
+			k8s, testClient := completeSetup(t)
 			caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
@@ -671,14 +665,8 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, rules, 1)
 
-			if c.v2BindingRule {
-				require.Equal(t, "templated-policy", string(rules[0].BindType))
-				require.Equal(t, "builtin/workload-identity", rules[0].BindName)
-				require.Equal(t, "${serviceaccount.name}", rules[0].BindVars.Name)
-			} else {
-				require.Equal(t, "service", string(rules[0].BindType))
-				require.Equal(t, "${serviceaccount.name}", rules[0].BindName)
-			}
+			require.Equal(t, "service", string(rules[0].BindType))
+			require.Equal(t, "${serviceaccount.name}", rules[0].BindName)
 			require.Equal(t, bindingRuleSelector, rules[0].Selector)
 
 			// Test that if the same command is re-run it doesn't error.
@@ -701,7 +689,7 @@ func TestRun_ConnectInjectAuthMethod(t *testing.T) {
 func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 	t.Parallel()
 
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	caCert, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
 
 	ui := cli.NewMockUi()
@@ -782,7 +770,7 @@ func TestRun_ConnectInjectAuthMethodUpdates(t *testing.T) {
 
 // Test that ACL binding rules are updated if the rule selector changes.
 func TestRun_BindingRuleUpdates(t *testing.T) {
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	consul, err := api.NewClient(&api.Config{
@@ -854,88 +842,6 @@ func TestRun_BindingRuleUpdates(t *testing.T) {
 		require.Equal(t, "Kubernetes binding rule", aclRule.Description)
 		require.Equal(t, api.BindingRuleBindTypeService, aclRule.BindType)
 		require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
-		require.Equal(t, "serviceaccount.name!=changed", aclRule.Selector)
-	}
-}
-
-// Test that the ACL binding template is updated if the rule selector changes.
-// V2 only.
-func TestRun_TemplateBindingRuleUpdates(t *testing.T) {
-	k8s, testClient := completeSetup(t, true)
-	setUpK8sServiceAccount(t, k8s, ns)
-
-	consul, err := api.NewClient(&api.Config{
-		Address: testClient.TestServer.HTTPAddr,
-	})
-	require.NoError(t, err)
-
-	ui := cli.NewMockUi()
-	commonArgs := []string{
-		"-resource-prefix=" + resourcePrefix,
-		"-k8s-namespace=" + ns,
-		"-addresses", strings.Split(testClient.TestServer.HTTPAddr, ":")[0],
-		"-http-port", strings.Split(testClient.TestServer.HTTPAddr, ":")[1],
-		"-grpc-port", strings.Split(testClient.TestServer.GRPCAddr, ":")[1],
-		"-enable-resource-apis=true",
-		"-connect-inject",
-	}
-	firstRunArgs := append(commonArgs,
-		"-acl-binding-rule-selector=serviceaccount.name!=default",
-	)
-	// On the second run, we change the binding rule selector.
-	secondRunArgs := append(commonArgs,
-		"-acl-binding-rule-selector=serviceaccount.name!=changed",
-	)
-
-	// Run the command first to populate the binding rule.
-	cmd := Command{
-		UI:        ui,
-		clientset: k8s,
-	}
-	responseCode := cmd.Run(firstRunArgs)
-	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
-
-	// Validate the binding rule.
-	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
-		authMethodName := resourcePrefix + "-k8s-auth-method"
-		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
-		require.NoError(t, err)
-		require.Len(t, rules, 1)
-		aclRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
-		require.NoError(t, err)
-		require.NotNil(t, aclRule)
-		require.Equal(t, "Kubernetes binding rule", aclRule.Description)
-		require.Equal(t, "templated-policy", string(rules[0].BindType))
-		require.Equal(t, "builtin/workload-identity", rules[0].BindName)
-		require.Equal(t, "${serviceaccount.name}", rules[0].BindVars.Name)
-		require.Equal(t, "serviceaccount.name!=default", aclRule.Selector)
-	}
-
-	// Re-run the command with namespace flags. The policies should be updated.
-	// NOTE: We're redefining the command so that the old flag values are
-	// reset.
-	cmd = Command{
-		UI:        ui,
-		clientset: k8s,
-	}
-	responseCode = cmd.Run(secondRunArgs)
-	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
-
-	// Check the binding rule is changed expected.
-	{
-		queryOpts := &api.QueryOptions{Token: getBootToken(t, k8s, resourcePrefix, ns)}
-		authMethodName := resourcePrefix + "-k8s-auth-method"
-		rules, _, err := consul.ACL().BindingRuleList(authMethodName, queryOpts)
-		require.NoError(t, err)
-		require.Len(t, rules, 1)
-		aclRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, queryOpts)
-		require.NoError(t, err)
-		require.NotNil(t, aclRule)
-		require.Equal(t, "Kubernetes binding rule", aclRule.Description)
-		require.Equal(t, "templated-policy", string(rules[0].BindType))
-		require.Equal(t, "builtin/workload-identity", rules[0].BindName)
-		require.Equal(t, "${serviceaccount.name}", rules[0].BindVars.Name)
 		require.Equal(t, "serviceaccount.name!=changed", aclRule.Selector)
 	}
 }
@@ -943,7 +849,7 @@ func TestRun_TemplateBindingRuleUpdates(t *testing.T) {
 // Test that the catalog sync policy is updated if the Consul node name changes.
 func TestRun_SyncPolicyUpdates(t *testing.T) {
 	t.Parallel()
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	ui := cli.NewMockUi()
@@ -1867,7 +1773,7 @@ func TestRun_SkipBootstrapping_WhenServersAreDisabled(t *testing.T) {
 // Test that we exit after timeout.
 func TestRun_Timeout(t *testing.T) {
 	t.Parallel()
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	_, err := api.NewClient(&api.Config{
@@ -2019,7 +1925,7 @@ func TestRun_GatewayErrors(t *testing.T) {
 	for testName, c := range cases {
 		t.Run(testName, func(tt *testing.T) {
 
-			k8s, testClient := completeSetup(tt, false)
+			k8s, testClient := completeSetup(tt)
 			setUpK8sServiceAccount(t, k8s, ns)
 			require := require.New(tt)
 
@@ -2115,7 +2021,7 @@ func TestRun_PoliciesAndBindingRulesForACLLogin_PrimaryDatacenter(t *testing.T) 
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
-			k8s, testClient := completeSetup(t, false)
+			k8s, testClient := completeSetup(t)
 			setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
@@ -2416,7 +2322,7 @@ func TestRun_ValidateLoginToken_PrimaryDatacenter(t *testing.T) {
 				serviceAccountName = c.ServiceAccountName
 			}
 
-			k8s, testClient := completeSetup(t, false)
+			k8s, testClient := completeSetup(t)
 			_, jwtToken := setUpK8sServiceAccount(t, k8s, ns)
 
 			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2625,7 +2531,7 @@ func TestRun_ValidateLoginToken_SecondaryDatacenter(t *testing.T) {
 func TestRun_PrimaryDatacenter_ComponentAuthMethod(t *testing.T) {
 	t.Parallel()
 
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	// Run the command.
@@ -2701,15 +2607,11 @@ func TestRun_SecondaryDatacenter_ComponentAuthMethod(t *testing.T) {
 }
 
 // Set up test consul agent and kubernetes cluster.
-func completeSetup(t *testing.T, useResourceAPI bool) (*fake.Clientset, *test.TestServerClient) {
+func completeSetup(t *testing.T) (*fake.Clientset, *test.TestServerClient) {
 	k8s := fake.NewSimpleClientset()
 
 	testServerClient := test.TestServerWithMockConnMgrWatcher(t, func(c *testutil.TestServerConfig) {
 		c.ACL.Enabled = true
-
-		if useResourceAPI {
-			c.Experiments = []string{"resource-apis"}
-		}
 	})
 
 	testServerClient.TestServer.WaitForActiveCARoot(t)

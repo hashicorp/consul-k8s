@@ -1,0 +1,3 @@
+```release-note:improvement
+config-entry: add validate_clusters to mesh config entry
+```

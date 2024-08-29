@@ -1539,9 +1539,9 @@ func Test_Run(t *testing.T) {
 	tcpRoute := setupTCPRoute()
 	tcpRoutes := []*api.TCPRouteConfigEntry{tcpRoute}
 
-	// setup inline certs
-	inlineCert := setupInlineCertificate()
-	certs := []*api.InlineCertificateConfigEntry{inlineCert}
+	// setup file-system certs
+	fileSystemCert := setupFileSystemCertificate()
+	certs := []*api.FileSystemCertificateConfigEntry{fileSystemCert}
 
 	// setup jwt providers
 	jwtProvider := setupJWTProvider()
@@ -1573,7 +1573,7 @@ func Test_Run(t *testing.T) {
 				return
 			}
 			fmt.Fprintln(w, string(val))
-		case "/v1/config/inline-certificate":
+		case "/v1/config/file-system-certificate":
 			val, err := json.Marshal(certs)
 			if err != nil {
 				w.WriteHeader(500)
@@ -1627,7 +1627,7 @@ func Test_Run(t *testing.T) {
 	}
 
 	expectedCache := loadedReferenceMaps([]api.ConfigEntry{
-		gw, tcpRoute, httpRouteOne, httpRouteTwo, inlineCert, jwtProvider,
+		gw, tcpRoute, httpRouteOne, httpRouteTwo, fileSystemCert, jwtProvider,
 	})
 
 	ctx, cancelFn := context.WithCancel(context.Background())
@@ -1677,11 +1677,11 @@ func Test_Run(t *testing.T) {
 	})
 
 	certNsn := types.NamespacedName{
-		Name:      inlineCert.Name,
-		Namespace: inlineCert.Namespace,
+		Name:      fileSystemCert.Name,
+		Namespace: fileSystemCert.Namespace,
 	}
 
-	certSubscriber := c.Subscribe(ctx, api.InlineCertificate, func(cfe api.ConfigEntry) []types.NamespacedName {
+	certSubscriber := c.Subscribe(ctx, api.FileSystemCertificate, func(cfe api.ConfigEntry) []types.NamespacedName {
 		return []types.NamespacedName{
 			{Name: cfe.GetName(), Namespace: cfe.GetNamespace()},
 		}
@@ -1968,10 +1968,10 @@ func setupTCPRoute() *api.TCPRouteConfigEntry {
 	}
 }
 
-func setupInlineCertificate() *api.InlineCertificateConfigEntry {
-	return &api.InlineCertificateConfigEntry{
-		Kind:        api.InlineCertificate,
-		Name:        "inline-cert",
+func setupFileSystemCertificate() *api.FileSystemCertificateConfigEntry {
+	return &api.FileSystemCertificateConfigEntry{
+		Kind:        api.FileSystemCertificate,
+		Name:        "file-system-cert",
 		Certificate: "cert",
 		PrivateKey:  "super secret",
 		Meta: map[string]string{
@@ -2040,6 +2040,201 @@ func TestCache_Delete(t *testing.T) {
 			})
 
 			err = c.Delete(context.Background(), ref)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestCache_RemoveRoleBinding(t *testing.T) {
+	t.Parallel()
+	successFn := func(w http.ResponseWriter) {
+		w.WriteHeader(200)
+		fmt.Fprintln(w, `{deleted: true}`)
+	}
+
+	notFoundFn := func(w http.ResponseWriter) {
+		w.WriteHeader(404)
+	}
+
+	aclDisabledFn := func(w http.ResponseWriter) {
+		w.WriteHeader(401)
+		fmt.Fprintln(w, `ACL support disabled`)
+	}
+
+	errorFn := func(w http.ResponseWriter) {
+		w.WriteHeader(500)
+		fmt.Fprintln(w, `error`)
+	}
+
+	testCases := map[string]struct {
+		bindingRule       *api.ACLBindingRule
+		role              *api.ACLRole
+		policy            *api.ACLPolicy
+		bindingRuleRespFn func(w http.ResponseWriter)
+		roleRespFn        func(w http.ResponseWriter)
+		policyRespFn      func(w http.ResponseWriter)
+		expectedErr       error
+	}{
+		"delete is successful": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: successFn,
+			roleRespFn:        successFn,
+			policyRespFn:      successFn,
+			expectedErr:       nil,
+		},
+		"binding rule is not found": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: notFoundFn,
+			roleRespFn:        successFn,
+			policyRespFn:      successFn,
+			expectedErr:       nil,
+		},
+		"role is not found": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: successFn,
+			roleRespFn:        notFoundFn,
+			policyRespFn:      successFn,
+			expectedErr:       nil,
+		},
+		"policy is not found": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: successFn,
+			roleRespFn:        successFn,
+			policyRespFn:      notFoundFn,
+			expectedErr:       nil,
+		},
+		"acl support is disabled": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: aclDisabledFn,
+			expectedErr:       nil,
+		},
+		"failed to delete binding rule": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: errorFn,
+			expectedErr:       ErrFailedToDeleteBindingRule,
+		},
+		"failed to delete role": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: successFn,
+			roleRespFn:        errorFn,
+			expectedErr:       ErrFailedToDeleteRole,
+		},
+		"failed to delete policy": {
+			bindingRule: &api.ACLBindingRule{
+				ID: "binding-rule-id",
+			},
+			role: &api.ACLRole{
+				ID: "role-id",
+			},
+			policy: &api.ACLPolicy{
+				ID: "policy-id",
+			},
+			bindingRuleRespFn: successFn,
+			roleRespFn:        successFn,
+			policyRespFn:      errorFn,
+			expectedErr:       ErrFailedToDeletePolicy,
+		},
+	}
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case fmt.Sprintf("/v1/acl/binding-rule/%s", tt.bindingRule.ID):
+					tt.bindingRuleRespFn(w)
+				case fmt.Sprintf("/v1/acl/role/%s", tt.role.ID):
+					tt.roleRespFn(w)
+				case fmt.Sprintf("/v1/acl/policy/%s", tt.policy.ID):
+					tt.policyRespFn(w)
+				default:
+					w.WriteHeader(500)
+					fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+				}
+			}))
+			defer consulServer.Close()
+
+			serverURL, err := url.Parse(consulServer.URL)
+			require.NoError(t, err)
+
+			port, err := strconv.Atoi(serverURL.Port())
+			require.NoError(t, err)
+
+			c := New(Config{
+				ConsulClientConfig: &consul.Config{
+					APIClientConfig: &api.Config{},
+					HTTPPort:        port,
+					GRPCPort:        port,
+					APITimeout:      0,
+				},
+				ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+				NamespacesEnabled:   false,
+				Logger:              logrtest.NewTestLogger(t),
+			})
+
+			authMethod := "k8s-auth-method"
+			gatewayName := "my-api-gateway"
+			namespace := "ns"
+			// file the acl binding rule, acl policy, and acl role maps with the necessary data
+			c.gatewayNameToACLBindingRule[gatewayName] = tt.bindingRule
+			c.gatewayNameToACLRole[gatewayName] = tt.role
+			c.gatewayNameToACLPolicy[gatewayName] = tt.policy
+
+			err = c.RemoveRoleBinding(authMethod, gatewayName, namespace)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/google/go-cmp/cmp"
@@ -303,7 +303,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:      api.InlineCertificate,
+									Kind:      api.FileSystemCertificate,
 									Name:      listenerOneCertName,
 									Namespace: listenerOneCertConsulNamespace,
 								},
@@ -321,7 +321,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 						TLS: api.APIGatewayTLSConfiguration{
 							Certificates: []api.ResourceReference{
 								{
-									Kind:      api.InlineCertificate,
+									Kind:      api.FileSystemCertificate,
 									Name:      listenerTwoCertName,
 									Namespace: listenerTwoCertConsulNamespace,
 								},
@@ -1353,10 +1353,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							Namespace: "k8s-ns",
 						},
 						Spec: v1alpha1.RouteRetryFilterSpec{
-							NumRetries:            pointer.Uint32(3),
+							NumRetries:            ptr.To(uint32(3)),
 							RetryOn:               []string{"cancelled"},
 							RetryOnStatusCodes:    []uint32{500, 502},
-							RetryOnConnectFailure: pointer.Bool(false),
+							RetryOnConnectFailure: ptr.To(false),
 						},
 					},
 
@@ -1370,10 +1370,10 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							Namespace: "other-namespace-even-though-same-name",
 						},
 						Spec: v1alpha1.RouteRetryFilterSpec{
-							NumRetries:            pointer.Uint32(3),
+							NumRetries:            ptr.To(uint32(3)),
 							RetryOn:               []string{"don't"},
 							RetryOnStatusCodes:    []uint32{404},
-							RetryOnConnectFailure: pointer.Bool(true),
+							RetryOnConnectFailure: ptr.To(true),
 						},
 					},
 

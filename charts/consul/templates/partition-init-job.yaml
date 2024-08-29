@@ -85,6 +85,7 @@ spec:
       containers:
         - name: partition-init-job
           image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
           {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           env:
           {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 10 }}
@@ -117,9 +118,6 @@ spec:
                 -log-json={{ .Values.global.logJSON }} \
                 {{- if .Values.global.cloud.enabled }}
                 -tls-server-name=server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}} \
-                {{- end }}
-                {{- if and (mustHas "resource-apis" .Values.global.experiments) (mustHas "v2tenancy" .Values.global.experiments) }}
-                -enable-v2tenancy=true
                 {{- end }}
           resources:
             requests:

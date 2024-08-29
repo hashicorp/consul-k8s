@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	capi "github.com/hashicorp/consul/api"
 
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 //go:generate mockery --name ServerConnectionManager --inpkg

@@ -59,6 +59,10 @@ func TestController(t *testing.T) {
 				"connectInject.enabled":        "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+
+				"terminatingGateways.enabled":              "true",
+				"terminatingGateways.gateways[0].name":     "terminating-gateway",
+				"terminatingGateways.gateways[0].replicas": "1",
 			}
 
 			releaseName := helpers.RandomName()
@@ -238,7 +242,6 @@ func TestController(t *testing.T) {
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.WriteRate)
-
 				})
 			}
 

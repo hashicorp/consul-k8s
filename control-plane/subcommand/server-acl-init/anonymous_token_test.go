@@ -15,7 +15,7 @@ import (
 
 func Test_configureAnonymousPolicy(t *testing.T) {
 
-	k8s, testClient := completeSetup(t, false)
+	k8s, testClient := completeSetup(t)
 	consulHTTPAddr := testClient.TestServer.HTTPAddr
 	consulGRPCAddr := testClient.TestServer.GRPCAddr
 

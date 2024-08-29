@@ -5,15 +5,18 @@ package gatekeeper
 
 import (
 	"bytes"
+	"context"
+	"fmt"
+	"k8s.io/utils/ptr"
 	"strconv"
 	"strings"
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
-
-	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	ctrlCommon "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
@@ -35,7 +38,7 @@ type initContainerCommandData struct {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
+func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,
@@ -47,7 +50,7 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
 		{
-			Name:      volumeName,
+			Name:      volumeNameForConnectInject,
 			MountPath: "/consul/connect-inject",
 		},
 	}
@@ -69,8 +72,9 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 
 	initContainerName := injectInitContainerName
 	container := corev1.Container{
-		Name:  initContainerName,
-		Image: config.ImageConsulK8S,
+		Name:            initContainerName,
+		Image:           config.ImageConsulK8S,
+		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
 
 		Env: []corev1.EnvVar{
 			{
@@ -174,17 +178,41 @@ func initContainer(config common.HelmConfig, name, namespace string) (corev1.Con
 		container.Resources = *config.InitContainerResources
 	}
 
-	// Openshift Assigns the security context for us, do not enable if it is enabled.
-	if !config.EnableOpenShift {
-		container.SecurityContext = &corev1.SecurityContext{
-			RunAsUser:    pointer.Int64(initContainersUserAndGroupID),
-			RunAsGroup:   pointer.Int64(initContainersUserAndGroupID),
-			RunAsNonRoot: pointer.Bool(true),
-			Privileged:   pointer.Bool(false),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
+	uid := int64(initContainersUserAndGroupID)
+	gid := int64(initContainersUserAndGroupID)
+
+	// In Openshift we let Openshift set the UID and GID
+	if config.EnableOpenShift {
+		ns := &corev1.Namespace{}
+		err := g.Client.Get(context.Background(), client.ObjectKey{Name: namespace}, ns)
+		if err != nil {
+			g.Log.Error(err, "error fetching namespace metadata for deployment")
+			return corev1.Container{}, fmt.Errorf("error getting namespace metadata for deployment: %s", err)
 		}
+
+		// We need to get the userID for the init container. We do not care about what is already defined on the pod
+		// for gateways, as there is no application container that could have taken a UID.
+		uid, err = ctrlCommon.GetConnectInitUID(*ns, corev1.Pod{}, config.ImageDataplane, config.ImageConsulK8S)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+
+		gid, err = ctrlCommon.GetConnectInitGroupID(*ns, corev1.Pod{}, config.ImageDataplane, config.ImageConsulK8S)
+		if err != nil {
+			return corev1.Container{}, err
+		}
+	}
+
+	container.SecurityContext = &corev1.SecurityContext{
+		RunAsUser:    ptr.To(uid),
+		RunAsGroup:   ptr.To(gid),
+		RunAsNonRoot: ptr.To(true),
+		Privileged:   ptr.To(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
+		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   ptr.To(true),
 	}
 
 	return container, nil

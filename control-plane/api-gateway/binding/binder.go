@@ -172,10 +172,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		for secret := range gatewaySecrets.Iter() {
 			// ignore the error if the certificate cannot be processed and just don't add it into the final
 			// sync set
-			if err := b.config.Resources.TranslateInlineCertificate(secret.(types.NamespacedName)); err != nil {
-				b.config.Logger.Error(err, "error parsing referenced secret, ignoring")
-				continue
-			}
+			b.config.Resources.TranslateFileSystemCertificate(secret.(types.NamespacedName))
 		}
 	}
 

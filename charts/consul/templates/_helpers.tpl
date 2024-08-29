@@ -19,6 +19,7 @@ as well as the global.name setting.
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
   allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
   capabilities:
     drop:
     - ALL
@@ -245,6 +246,7 @@ This template is for an init container.
 {{- define "consul.getAutoEncryptClientCA" -}}
 - name: get-auto-encrypt-client-ca
   image: {{ .Values.global.imageK8S }}
+  {{ template "consul.imagePullPolicy" . }}
   command:
     - "/bin/sh"
     - "-ec"
@@ -495,51 +497,6 @@ Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
 {{/**/}}
 
 {{/*
-Fails if global.experiments.resourceAPIs is set along with any of these unsupported features.
-- global.peering.enabled
-- global.federation.enabled
-- global.cloud.enabled
-- client.enabled
-- ui.enabled
-- syncCatalog.enabled
-- meshGateway.enabled
-- ingressGateways.enabled
-- terminatingGateways.enabled
-
-Usage: {{ template "consul.validateResourceAPIs" . }}
-
-*/}}
-{{- define "consul.validateResourceAPIs" -}}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.peering.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) (not (mustHas "v2tenancy" .Values.global.experiments)) .Values.global.adminPartitions.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.experiments.v2tenancy must also be set to support global.adminPartitions.enabled."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.federation.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.cloud.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, global.cloud.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.client.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, client.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ui.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, ui.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.syncCatalog.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ingressGateways.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported."}}
-{{- end }}
-{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.terminatingGateways.enabled ) }}
-{{fail "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported."}}
-{{- end }}
-{{- end }}
-
-{{/*
 Validation for Consul Metrics configuration:
 
 Fail if metrics.enabled=true and metrics.disableAgentHostName=true, but metrics.enableAgentMetrics=false
@@ -680,5 +637,23 @@ Usage: {{ template "consul.versionInfo" }}
 {{- else }}
     {{- $sanitizedVersion = $versionInfo }}
 {{- end -}}
-{{- printf "%s" $sanitizedVersion | quote }}
+{{- printf "%s" $sanitizedVersion | trunc 63 | quote }}
+{{- end -}}
+
+{{/*
+Sets the imagePullPolicy for all Consul images (consul, consul-dataplane, consul-k8s, consul-telemetry-collector)
+Valid values are:
+    IfNotPresent
+    Always
+    Never
+    In the case of empty, see https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy for details
+
+Usage: {{ template "consul.imagePullPolicy" . }} TODO: melisa should we name this differently ?
+*/}}
+{{- define "consul.imagePullPolicy" -}}
+{{ if or (eq .Values.global.imagePullPolicy "IfNotPresent") (eq .Values.global.imagePullPolicy "Always") (eq .Values.global.imagePullPolicy "Never")}}imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+{{ else if eq .Values.global.imagePullPolicy "" }}
+{{ else }}
+{{fail "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" }}
+{{ end }}
 {{- end -}}

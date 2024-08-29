@@ -1,0 +1,3 @@
+```release-note:improvement
+Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`.
+```

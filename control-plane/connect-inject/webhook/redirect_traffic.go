@@ -31,14 +31,23 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 
 	if !w.EnableOpenShift {
 		cfg.ProxyUserID = strconv.Itoa(sidecarUserAndGroupID)
+
+		// Add init container user ID to exclude from traffic redirection.
+		cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
 	} else {
 		// When using OpenShift, the uid and group are saved as an annotation on the namespace
-		uid, err := common.GetOpenShiftUID(&ns)
+		uid, err := common.GetDataplaneUID(ns, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
 		if err != nil {
 			return "", err
 		}
 		cfg.ProxyUserID = strconv.FormatInt(uid, 10)
 
+		// Exclude the user ID for the init container from traffic redirection.
+		uid, err = common.GetConnectInitUID(ns, pod, w.ImageConsulDataplane, w.ImageConsulK8S)
+		if err != nil {
+			return "", err
+		}
+		cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.FormatInt(uid, 10))
 	}
 
 	// Set the proxy's inbound port.
@@ -109,9 +118,6 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 	// UIDs
 	excludeUIDs := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeUIDs, pod)
 	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, excludeUIDs...)
-
-	// Add init container user ID to exclude from traffic redirection.
-	cfg.ExcludeUIDs = append(cfg.ExcludeUIDs, strconv.Itoa(initContainersUserAndGroupID))
 
 	dnsEnabled, err := consulDNSEnabled(ns, pod, w.EnableConsulDNS, w.EnableTransparentProxy)
 	if err != nil {

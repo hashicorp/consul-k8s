@@ -4,6 +4,7 @@
 package common
 
 import (
+	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -109,7 +110,7 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 
 			ref := IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, namespace)
 			if resources.Certificate(ref) != nil {
-				certificates = append(certificates, t.NonNormalizedConfigEntryReference(api.InlineCertificate, ref))
+				certificates = append(certificates, t.NonNormalizedConfigEntryReference(api.FileSystemCertificate, ref))
 			}
 		}
 	}
@@ -529,31 +530,19 @@ func (t ResourceTranslator) translateTCPRouteRule(route gwv1alpha2.TCPRoute, ref
 	return api.TCPService{}, false
 }
 
-func (t ResourceTranslator) ToInlineCertificate(secret corev1.Secret) (*api.InlineCertificateConfigEntry, error) {
-	certificate, privateKey, err := ParseCertificateData(secret)
-	if err != nil {
-		return nil, err
-	}
-
-	err = ValidateKeyLength(privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	namespace := t.Namespace(secret.Namespace)
-
-	return &api.InlineCertificateConfigEntry{
-		Kind:        api.InlineCertificate,
+func (t ResourceTranslator) ToFileSystemCertificate(secret corev1.Secret) *api.FileSystemCertificateConfigEntry {
+	return &api.FileSystemCertificateConfigEntry{
+		Kind:        api.FileSystemCertificate,
 		Name:        secret.Name,
-		Namespace:   namespace,
+		Namespace:   t.Namespace(secret.Namespace),
 		Partition:   t.ConsulPartition,
-		Certificate: strings.TrimSpace(certificate),
-		PrivateKey:  strings.TrimSpace(privateKey),
+		Certificate: fmt.Sprintf("/consul/gateway-certificates/%s_%s_tls.crt", secret.Namespace, secret.Name),
+		PrivateKey:  fmt.Sprintf("/consul/gateway-certificates/%s_%s_tls.key", secret.Namespace, secret.Name),
 		Meta: t.addDatacenterToMeta(map[string]string{
 			constants.MetaKeyKubeNS:   secret.Namespace,
 			constants.MetaKeyKubeName: secret.Name,
 		}),
-	}, nil
+	}
 }
 
 func EntryToNamespacedName(entry api.ConfigEntry) types.NamespacedName {

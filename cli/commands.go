@@ -23,7 +23,7 @@ import (
 	cmdversion "github.com/hashicorp/consul-k8s/cli/cmd/version"
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
-	"github.com/hashicorp/consul-k8s/cli/version"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 )

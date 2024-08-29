@@ -61,6 +61,7 @@ spec:
       containers:
         - name: server-acl-init-cleanup
           image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
           {{- if not .Values.server.containerSecurityContext.aclInit }}
           {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           {{- end }}

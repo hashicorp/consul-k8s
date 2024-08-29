@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -269,8 +270,7 @@ func TestTransformEndpoints(t *testing.T) {
 				allowK8sNamespacesSet: allowSet,
 			}
 
-			fn := controller.transformEndpoints(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.endpoints))
+			require.ElementsMatch(t, tt.expected, controller.transformEndpoints(context.Background(), tt.endpoints))
 		})
 	}
 }
@@ -409,8 +409,7 @@ func TestTransformHTTPRoute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			controller := GatewayController{}
 
-			fn := controller.transformHTTPRoute(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.route))
+			require.ElementsMatch(t, tt.expected, controller.transformHTTPRoute(context.Background(), tt.route))
 		})
 	}
 }
@@ -549,8 +548,7 @@ func TestTransformTCPRoute(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			controller := GatewayController{}
 
-			fn := controller.transformTCPRoute(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.route))
+			require.ElementsMatch(t, tt.expected, controller.transformTCPRoute(context.Background(), tt.route))
 		})
 	}
 }
@@ -635,8 +633,7 @@ func TestTransformSecret(t *testing.T) {
 				Client: fakeClient,
 			}
 
-			fn := controller.transformSecret(context.Background())
-			require.ElementsMatch(t, tt.expected, fn(tt.secret))
+			require.ElementsMatch(t, tt.expected, controller.transformSecret(context.Background(), tt.secret))
 		})
 	}
 }

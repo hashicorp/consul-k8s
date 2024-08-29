@@ -1,3 +1,411 @@
+## 1.5.1 (July 16, 2024)
+
+SECURITY:
+
+* Upgrade go version to 1.22.5 to address [CVE-2024-24791](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24791) [[GH-4154](https://github.com/hashicorp/consul-k8s/issues/4154)]
+* Upgrade go-retryablehttp to v0.7.7 to address [GHSA-v6v8-xj6m-xwqh](https://github.com/advisories/GHSA-v6v8-xj6m-xwqh) [[GH-4169](https://github.com/hashicorp/consul-k8s/issues/4169)]
+
+IMPROVEMENTS:
+
+* api-gateways: Change security settings to make root file system read only and to not allow privilage escalation. [[GH-3959](https://github.com/hashicorp/consul-k8s/issues/3959)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
+* partition-init: Role no longer includes unnecessary access to Secrets resource. [[GH-4053](https://github.com/hashicorp/consul-k8s/issues/4053)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where API Gateway specific acl roles/policy were not being cleaned up on deletion of an api-gateway [[GH-4060](https://github.com/hashicorp/consul-k8s/issues/4060)]
+* connect-inject: add NET_BIND_SERVICE capability when injecting consul-dataplane sidecar [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
+* endpoints-controller: graceful shutdown logic should not run on a new pod with the same name. Fixes a case where statefulset rollouts could get stuck in graceful shutdown when the new pods come up. [[GH-4059](https://github.com/hashicorp/consul-k8s/issues/4059)]
+* terminating-gateway: Fix generated acl policy for external services to include the namespace and partition block if they are enabled. [[GH-4153](https://github.com/hashicorp/consul-k8s/issues/4153)]
+
+## 1.4.4 (July 15, 2024)
+
+SECURITY:
+
+* Upgrade go version to 1.22.5 to address [CVE-2024-24791](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24791) [[GH-4154](https://github.com/hashicorp/consul-k8s/issues/4154)]
+* Upgrade go-retryablehttp to v0.7.7 to address [GHSA-v6v8-xj6m-xwqh](https://github.com/advisories/GHSA-v6v8-xj6m-xwqh) [[GH-4169](https://github.com/hashicorp/consul-k8s/issues/4169)]
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.4. [[GH-4085](https://github.com/hashicorp/consul-k8s/issues/4085)]
+* api-gateways: Change security settings to make root file system read only and to not allow privilage escalation. [[GH-3959](https://github.com/hashicorp/consul-k8s/issues/3959)]
+* cni: package `consul-cni` as .deb and .rpm files [[GH-4040](https://github.com/hashicorp/consul-k8s/issues/4040)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
+* partition-init: Role no longer includes unnecessary access to Secrets resource. [[GH-4053](https://github.com/hashicorp/consul-k8s/issues/4053)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where API Gateway specific acl roles/policy were not being cleaned up on deletion of an api-gateway [[GH-4060](https://github.com/hashicorp/consul-k8s/issues/4060)]
+* cni: fix incorrect release version due to unstable submodule pinning [[GH-4091](https://github.com/hashicorp/consul-k8s/issues/4091)]
+* connect-inject: add NET_BIND_SERVICE capability when injecting consul-dataplane sidecar [[GH-4152](https://github.com/hashicorp/consul-k8s/issues/4152)]
+* endpoints-controller: graceful shutdown logic should not run on a new pod with the same name. Fixes a case where statefulset rollouts could get stuck in graceful shutdown when the new pods come up. [[GH-4059](https://github.com/hashicorp/consul-k8s/issues/4059)]
+
+## 1.3.7 (July 16, 2024)
+
+SECURITY:
+
+* Upgrade go version to 1.22.5 to address [CVE-2024-24791](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24791) [[GH-4154](https://github.com/hashicorp/consul-k8s/issues/4154)]
+* Upgrade go-retryablehttp to v0.7.7 to address [GHSA-v6v8-xj6m-xwqh](https://github.com/advisories/GHSA-v6v8-xj6m-xwqh) [[GH-4169](https://github.com/hashicorp/consul-k8s/issues/4169)]
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.4. [[GH-4085](https://github.com/hashicorp/consul-k8s/issues/4085)]
+* partition-init: Role no longer includes unnecessary access to Secrets resource. [[GH-4053](https://github.com/hashicorp/consul-k8s/issues/4053)]
+
+BUG FIXES:
+
+* api-gateway: fix issue where API Gateway specific acl roles/policy were not being cleaned up on deletion of an api-gateway [[GH-4060](https://github.com/hashicorp/consul-k8s/issues/4060)]
+* cni: fix incorrect release version due to unstable submodule pinning [[GH-4091](https://github.com/hashicorp/consul-k8s/issues/4091)]
+* endpoints-controller: graceful shutdown logic should not run on a new pod with the same name. Fixes a case where statefulset rollouts could get stuck in graceful shutdown when the new pods come up. [[GH-4059](https://github.com/hashicorp/consul-k8s/issues/4059)]
+
+## 1.1.14 (July 16, 2024)
+
+SECURITY:
+
+* Upgrade go version to 1.22.5 to address [CVE-2024-24791](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-24791) [[GH-4154](https://github.com/hashicorp/consul-k8s/issues/4154)]
+* Upgrade go-retryablehttp to v0.7.7 to address [GHSA-v6v8-xj6m-xwqh](https://github.com/advisories/GHSA-v6v8-xj6m-xwqh) [[GH-4169](https://github.com/hashicorp/consul-k8s/issues/4169)]
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.4. [[GH-4085](https://github.com/hashicorp/consul-k8s/issues/4085)]
+* partition-init: Role no longer includes unnecessary access to Secrets resource. [[GH-4053](https://github.com/hashicorp/consul-k8s/issues/4053)]
+
+BUG FIXES:
+
+* cni: fix incorrect release version due to unstable submodule pinning [[GH-4091](https://github.com/hashicorp/consul-k8s/issues/4091)]
+
+## 1.5.0 (June 13, 2024)
+
+> NOTE: Consul K8s 1.5.x is compatible with Consul 1.19.x and Consul Dataplane 1.5.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+BREAKING CHANGES:
+
+* api-gateway: The api-gateway stanza located under .Values.api-gateway was deprecated in
+1.16.0 of Consul and is being removed as of 1.19.0 in favor of connectInject.apiGateway. [[GH-3718](https://github.com/hashicorp/consul-k8s/issues/3718)]
+
+FEATURES:
+
+* control-plane: Add the ability to register services via CRD. [[GH-3943](https://github.com/hashicorp/consul-k8s/issues/3943)]
+* gateways: api-gateway now uses the Consul file-system-certificate by default for TLS [[GH-3767](https://github.com/hashicorp/consul-k8s/issues/3767)]
+* helm: adds ability to set the Image Pull Policy for all Consul images (consul, consul-k8s, consul-dataplane, consul-telemetry-collector) [[GH-3991](https://github.com/hashicorp/consul-k8s/issues/3991)]
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.4. [[GH-4085](https://github.com/hashicorp/consul-k8s/issues/4085)]
+* cni: package `consul-cni` as .deb and .rpm files [[GH-4040](https://github.com/hashicorp/consul-k8s/issues/4040)]
+* helm: Add readOnlyRootFilesystem to the default restricted security context when runnning `consul-k8s` in a restricted namespaces. [[GH-2909](https://github.com/hashicorp/consul-k8s/issues/2909)]
+
+BUG FIXES:
+
+* api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4003](https://github.com/hashicorp/consul-k8s/issues/4003)]
+* cni: fix incorrect release version due to unstable submodule pinning [[GH-4091](https://github.com/hashicorp/consul-k8s/issues/4091)]
+* helm: (datadog integration) updated `server-statefulset.yaml` templating to handle custom Unix Domain Socket paths. [[GH-3635](https://github.com/hashicorp/consul-k8s/issues/3635)]
+* helm: bug fix for `prometheus.io` annotation omission while using datadog integration with openmetrics/prometheus and consul integration checks [[GH-3685](https://github.com/hashicorp/consul-k8s/issues/3685)]
+* helm: corrected datadog openmetrics and consul-checks consul server URLs set during automation to use full consul deployment release name [[GH-3685](https://github.com/hashicorp/consul-k8s/issues/3685)]
+
+## 1.4.3 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+## 1.3.6 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+## 1.2.9 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+## 1.1.13 (May 24, 2024)
+
+IMPROVEMENTS:
+
+* upgrade go version to v1.22.3. [[GH-3994](https://github.com/hashicorp/consul-k8s/issues/3994)]
+* Bump Dockerfile base image for `consul-k8s-control-plane` to `alpine:3.19`. [[GH-4016](https://github.com/hashicorp/consul-k8s/issues/4016)]
+
+
+## 1.4.2 (May 20, 2024)
+
+SECURITY:
+
+* Upgrade Go to use 1.21.10. This addresses CVEs
+  [CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+  [CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+  [CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+  [CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+* Upgrade to use Go `1.21.9`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3893](https://github.com/hashicorp/consul-k8s/issues/3893)]
+* Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3893](https://github.com/hashicorp/consul-k8s/issues/3893)]
+
+FEATURES:
+
+* Add support for configuring graceful startup proxy lifecycle management settings. [[GH-3878](https://github.com/hashicorp/consul-k8s/issues/3878)]
+
+IMPROVEMENTS:
+
+* control-plane: support <space>, <comma> and <\n> as upstream separators. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different [[GH-3873](https://github.com/hashicorp/consul-k8s/issues/3873)]
+* control-plane: Add support for receiving iptables configuration via CNI arguments, to support Nomad transparent proxy [[GH-3795](https://github.com/hashicorp/consul-k8s/issues/3795)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-3813](https://github.com/hashicorp/consul-k8s/issues/3813)]
+* helm: only create the default Prometheus path annotation when it's not already specified within the component-specific
+  annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
+  the default value. [[GH-3846](https://github.com/hashicorp/consul-k8s/issues/3846)]
+* helm: support sync-lb-services-endpoints flag for syncCatalog [[GH-3905](https://github.com/hashicorp/consul-k8s/issues/3905)]
+* terminating-gateways: Remove unnecessary permissions from terminating gateways role [[GH-3928](https://github.com/hashicorp/consul-k8s/issues/3928)]
+
+BUG FIXES:
+
+* Create Consul service with mode transparent-proxy even when a cluster IP is not assigned to the service.. [[GH-3974](https://github.com/hashicorp/consul-k8s/issues/3974)]
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
+* api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4000](https://github.com/hashicorp/consul-k8s/issues/4000)]
+* consul-cni: Fixed a bug where the output of `-version` did not include the version of the binary [[GH-3829](https://github.com/hashicorp/consul-k8s/issues/3829)]
+* control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
+
+## 1.3.5 (May 20, 2024)
+
+SECURITY:
+
+* Upgrade Go to use 1.21.10. This addresses CVEs
+  [CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+  [CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+  [CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+  [CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+* Upgrade to use Go `1.21.9`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3902](https://github.com/hashicorp/consul-k8s/issues/3902)]
+* Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3902](https://github.com/hashicorp/consul-k8s/issues/3902)]
+
+FEATURES:
+
+* Add support for configuring graceful startup proxy lifecycle management settings. [[GH-3878](https://github.com/hashicorp/consul-k8s/issues/3878)]
+
+IMPROVEMENTS:
+
+* control-plane: support <space>, <comma> and <\n> as upstream separators. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different [[GH-3873](https://github.com/hashicorp/consul-k8s/issues/3873)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-3813](https://github.com/hashicorp/consul-k8s/issues/3813)]
+* helm: only create the default Prometheus path annotation when it's not already specified within the component-specific
+  annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
+  the default value. [[GH-3846](https://github.com/hashicorp/consul-k8s/issues/3846)]
+* helm: support sync-lb-services-endpoints flag for syncCatalog [[GH-3905](https://github.com/hashicorp/consul-k8s/issues/3905)]
+* terminating-gateways: Remove unnecessary permissions from terminating gateways role [[GH-3928](https://github.com/hashicorp/consul-k8s/issues/3928)]
+
+BUG FIXES:
+
+* Create Consul service with mode transparent-proxy even when a cluster IP is not assigned to the service.. [[GH-3974](https://github.com/hashicorp/consul-k8s/issues/3974)]
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
+* api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4001](https://github.com/hashicorp/consul-k8s/issues/4001)]
+* control-plane: fix a panic when an upstream annotation is malformed. [[GH-3956](https://github.com/hashicorp/consul-k8s/issues/3956)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
+
+## 1.2.8 (May 20, 2024)
+
+SECURITY:
+
+* Upgrade Go to use 1.21.10. This addresses CVEs
+  [CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+  [CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+  [CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+  [CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+* Upgrade to use Go `1.21.9`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3901](https://github.com/hashicorp/consul-k8s/issues/3901)]
+* Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3901](https://github.com/hashicorp/consul-k8s/issues/3901)]
+
+IMPROVEMENTS:
+
+* ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different [[GH-3873](https://github.com/hashicorp/consul-k8s/issues/3873)]
+* control-plane: Remove anyuid Security Context Constraints (SCC) requirement in OpenShift. [[GH-3813](https://github.com/hashicorp/consul-k8s/issues/3813)]
+* helm: only create the default Prometheus path annotation when it's not already specified within the component-specific
+  annotations. For example if the `client.annotations` value sets prometheus.io/path annotation, don't overwrite it with
+  the default value. [[GH-3846](https://github.com/hashicorp/consul-k8s/issues/3846)]
+* helm: support sync-lb-services-endpoints flag for syncCatalog [[GH-3905](https://github.com/hashicorp/consul-k8s/issues/3905)]
+
+BUG FIXES:
+
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul when upgrading between versions. [[GH-3918](https://github.com/hashicorp/consul-k8s/issues/3918)]
+* api-gateway: fix bug where multiple logical APIGateways would share the same ACL policy. [[GH-4002](https://github.com/hashicorp/consul-k8s/issues/4002)]
+* connect-inject: Fixed issue where on restart, if a managed-gateway-acl-role already existed the container would error [[GH-3978](https://github.com/hashicorp/consul-k8s/issues/3978)]
+
+## 1.1.12 (May 20, 2024)
+
+SECURITY:
+
+* Upgrade Go to use 1.21.10. This addresses CVEs
+  [CVE-2024-24787](https://nvd.nist.gov/vuln/detail/CVE-2024-24787) and
+  [CVE-2024-24788](https://nvd.nist.gov/vuln/detail/CVE-2024-24788) [[GH-3980](https://github.com/hashicorp/consul-k8s/issues/3980)]
+* Upgrade `helm/v3` to 3.14.4. This resolves the following security vulnerabilities:
+  [CVE-2024-25620](https://osv.dev/vulnerability/CVE-2024-25620)
+  [CVE-2024-26147](https://osv.dev/vulnerability/CVE-2024-26147) [[GH-3935](https://github.com/hashicorp/consul-k8s/issues/3935)]
+* Upgrade to use Go `1.21.9`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`http2`). [[GH-3900](https://github.com/hashicorp/consul-k8s/issues/3900)]
+* Upgrade to use golang.org/x/net `v0.24.0`. This resolves CVE
+  [CVE-2023-45288](https://nvd.nist.gov/vuln/detail/CVE-2023-45288) (`x/net`). [[GH-3900](https://github.com/hashicorp/consul-k8s/issues/3900)]
+
+IMPROVEMENTS:
+
+* ConfigEntries controller: Only error for config entries from different datacenters when the config entries are different [[GH-3873](https://github.com/hashicorp/consul-k8s/issues/3873)]
+
+## 1.4.1 (March 28, 2024)
+
+SECURITY:
+
+* Update `google.golang.org/protobuf` to v1.33.0 to address [CVE-2024-24786](https://nvd.nist.gov/vuln/detail/CVE-2024-24786). [[GH-3719](https://github.com/hashicorp/consul-k8s/issues/3719)]
+* Update the Consul Build Go base image to `alpine3.19`. This resolves CVEs
+[CVE-2023-52425](https://nvd.nist.gov/vuln/detail/CVE-2023-52425)
+[CVE-2023-52426⁠](https://nvd.nist.gov/vuln/detail/CVE-2023-52426) [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* Upgrade to use Go `1.21.8`. This resolves CVEs
+[CVE-2024-24783](https://nvd.nist.gov/vuln/detail/CVE-2024-24783) (`crypto/x509`).
+[CVE-2023-45290](https://nvd.nist.gov/vuln/detail/CVE-2023-45290) (`net/http`).
+[CVE-2023-45289](https://nvd.nist.gov/vuln/detail/CVE-2023-45289) (`net/http`, `net/http/cookiejar`).
+[CVE-2024-24785](https://nvd.nist.gov/vuln/detail/CVE-2024-24785) (`html/template`).
+[CVE-2024-24784](https://nvd.nist.gov/vuln/detail/CVE-2024-24784) (`net/mail`). [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+
+IMPROVEMENTS:
+
+* api-gateway: Expose prometheus scrape metrics on api-gateway pods. [[GH-3811](https://github.com/hashicorp/consul-k8s/issues/3811)]
+* catalog: Topology zone and region information is now read from the Kubernetes endpoints and associated node and added to registered consul services under Metadata. [[GH-3693](https://github.com/hashicorp/consul-k8s/issues/3693)]
+
+BUG FIXES:
+
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul. [[GH-3779](https://github.com/hashicorp/consul-k8s/issues/3779)]
+* control-plane: fix an issue where ACL token cleanup did not respect a pod's GracefulShutdownPeriodSeconds and
+tokens were invalidated immediately on pod entering Terminating state. [[GH-3736](https://github.com/hashicorp/consul-k8s/issues/3736)]
+* control-plane: fix an issue where ACL tokens would prematurely be deleted and services would be deregistered if there
+was a K8s API error fetching the pod. [[GH-3758](https://github.com/hashicorp/consul-k8s/issues/3758)]
+
+## 1.3.4 (March 28, 2024)
+
+SECURITY:
+
+* Update `google.golang.org/protobuf` to v1.33.0 to address [CVE-2024-24786](https://nvd.nist.gov/vuln/detail/CVE-2024-24786). [[GH-3719](https://github.com/hashicorp/consul-k8s/issues/3719)]
+* Update the Consul Build Go base image to `alpine3.19`. This resolves CVEs
+[CVE-2023-52425](https://nvd.nist.gov/vuln/detail/CVE-2023-52425)
+[CVE-2023-52426⁠](https://nvd.nist.gov/vuln/detail/CVE-2023-52426) [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* Upgrade `helm/v3` to 3.11.3. This resolves the following security vulnerabilities:
+[CVE-2023-25165](https://osv.dev/vulnerability/CVE-2023-25165)
+[CVE-2022-23524](https://osv.dev/vulnerability/CVE-2022-23524)
+[CVE-2022-23526](https://osv.dev/vulnerability/CVE-2022-23526)
+[CVE-2022-23525](https://osv.dev/vulnerability/CVE-2022-23525) [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade docker/distribution to 2.8.3+incompatible (latest) to resolve [CVE-2023-2253](https://osv.dev/vulnerability/CVE-2023-2253). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade docker/docker to 25.0.3+incompatible (latest) to resolve [GHSA-jq35-85cj-fj4p](https://osv.dev/vulnerability/GHSA-jq35-85cj-fj4p). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade filepath-securejoin to 0.2.4 (latest) to resolve [GO-2023-2048](https://osv.dev/vulnerability/GO-2023-2048). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade to use Go `1.21.8`. This resolves CVEs
+[CVE-2024-24783](https://nvd.nist.gov/vuln/detail/CVE-2024-24783) (`crypto/x509`).
+[CVE-2023-45290](https://nvd.nist.gov/vuln/detail/CVE-2023-45290) (`net/http`).
+[CVE-2023-45289](https://nvd.nist.gov/vuln/detail/CVE-2023-45289) (`net/http`, `net/http/cookiejar`).
+[CVE-2024-24785](https://nvd.nist.gov/vuln/detail/CVE-2024-24785) (`html/template`).
+[CVE-2024-24784](https://nvd.nist.gov/vuln/detail/CVE-2024-24784) (`net/mail`). [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* security: upgrade containerd to 1.7.13 (latest) to resolve [GHSA-7ww5-4wqc-m92c](https://osv.dev/vulnerability/GO-2023-2412). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+
+IMPROVEMENTS:
+
+* catalog: Topology zone and region information is now read from the Kubernetes endpoints and associated node and added to registered consul services under Metadata. [[GH-3693](https://github.com/hashicorp/consul-k8s/issues/3693)]
+* control-plane: publish `consul-k8s-control-plane` and `consul-k8s-control-plane-fips` images to official HashiCorp AWS ECR. [[GH-3668](https://github.com/hashicorp/consul-k8s/issues/3668)]
+
+BUG FIXES:
+
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul. [[GH-3779](https://github.com/hashicorp/consul-k8s/issues/3779)]
+* control-plane: fix an issue where ACL token cleanup did not respect a pod's GracefulShutdownPeriodSeconds and
+tokens were invalidated immediately on pod entering Terminating state. [[GH-3736](https://github.com/hashicorp/consul-k8s/issues/3736)]
+* control-plane: fix an issue where ACL tokens would prematurely be deleted and services would be deregistered if there
+was a K8s API error fetching the pod. [[GH-3758](https://github.com/hashicorp/consul-k8s/issues/3758)]
+
+NOTES:
+
+* build: Releases will now also be available as Debian and RPM packages for the arm64 architecture, refer to the
+[Official Packaging Guide](https://www.hashicorp.com/official-packaging-guide) for more information. [[GH-3428](https://github.com/hashicorp/consul-k8s/issues/3428)]
+
+## 1.2.7 (March 28, 2024)
+
+SECURITY:
+
+* Update `google.golang.org/protobuf` to v1.33.0 to address [CVE-2024-24786](https://nvd.nist.gov/vuln/detail/CVE-2024-24786). [[GH-3719](https://github.com/hashicorp/consul-k8s/issues/3719)]
+* Update the Consul Build Go base image to `alpine3.19`. This resolves CVEs
+[CVE-2023-52425](https://nvd.nist.gov/vuln/detail/CVE-2023-52425)
+[CVE-2023-52426⁠](https://nvd.nist.gov/vuln/detail/CVE-2023-52426) [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* Upgrade `helm/v3` to 3.11.3. This resolves the following security vulnerabilities:
+[CVE-2023-25165](https://osv.dev/vulnerability/CVE-2023-25165)
+[CVE-2022-23524](https://osv.dev/vulnerability/CVE-2022-23524)
+[CVE-2022-23526](https://osv.dev/vulnerability/CVE-2022-23526)
+[CVE-2022-23525](https://osv.dev/vulnerability/CVE-2022-23525) [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade docker/distribution to 2.8.3+incompatible (latest) to resolve [CVE-2023-2253](https://osv.dev/vulnerability/CVE-2023-2253). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade docker/docker to 25.0.3+incompatible (latest) to resolve [GHSA-jq35-85cj-fj4p](https://osv.dev/vulnerability/GHSA-jq35-85cj-fj4p). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade filepath-securejoin to 0.2.4 (latest) to resolve [GO-2023-2048](https://osv.dev/vulnerability/GO-2023-2048). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade to use Go `1.21.8`. This resolves CVEs
+[CVE-2024-24783](https://nvd.nist.gov/vuln/detail/CVE-2024-24783) (`crypto/x509`).
+[CVE-2023-45290](https://nvd.nist.gov/vuln/detail/CVE-2023-45290) (`net/http`).
+[CVE-2023-45289](https://nvd.nist.gov/vuln/detail/CVE-2023-45289) (`net/http`, `net/http/cookiejar`).
+[CVE-2024-24785](https://nvd.nist.gov/vuln/detail/CVE-2024-24785) (`html/template`).
+[CVE-2024-24784](https://nvd.nist.gov/vuln/detail/CVE-2024-24784) (`net/mail`). [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* security: upgrade containerd to 1.7.13 (latest) to resolve [GHSA-7ww5-4wqc-m92c](https://osv.dev/vulnerability/GO-2023-2412). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+
+IMPROVEMENTS:
+
+* catalog: Topology zone and region information is now read from the Kubernetes endpoints and associated node and added to registered consul services under Metadata. [[GH-3693](https://github.com/hashicorp/consul-k8s/issues/3693)]
+* control-plane: publish `consul-k8s-control-plane` and `consul-k8s-control-plane-fips` images to official HashiCorp AWS ECR. [[GH-3668](https://github.com/hashicorp/consul-k8s/issues/3668)]
+
+BUG FIXES:
+
+* api-gateway: Fix order of initialization for creating ACL role/policy to avoid error logs in consul. [[GH-3779](https://github.com/hashicorp/consul-k8s/issues/3779)]
+* control-plane: fix an issue where ACL token cleanup did not respect a pod's GracefulShutdownPeriodSeconds and
+tokens were invalidated immediately on pod entering Terminating state. [[GH-3736](https://github.com/hashicorp/consul-k8s/issues/3736)]
+* control-plane: fix an issue where ACL tokens would prematurely be deleted and services would be deregistered if there
+was a K8s API error fetching the pod. [[GH-3758](https://github.com/hashicorp/consul-k8s/issues/3758)]
+
+NOTES:
+
+* build: Releases will now also be available as Debian and RPM packages for the arm64 architecture, refer to the
+[Official Packaging Guide](https://www.hashicorp.com/official-packaging-guide) for more information. [[GH-3428](https://github.com/hashicorp/consul-k8s/issues/3428)]
+
+## 1.1.11 (March 28, 2024)
+
+SECURITY:
+
+* Update `google.golang.org/protobuf` to v1.33.0 to address [CVE-2024-24786](https://nvd.nist.gov/vuln/detail/CVE-2024-24786). [[GH-3719](https://github.com/hashicorp/consul-k8s/issues/3719)]
+* Update the Consul Build Go base image to `alpine3.19`. This resolves CVEs
+[CVE-2023-52425](https://nvd.nist.gov/vuln/detail/CVE-2023-52425)
+[CVE-2023-52426⁠](https://nvd.nist.gov/vuln/detail/CVE-2023-52426) [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* Upgrade `helm/v3` to 3.11.3. This resolves the following security vulnerabilities:
+[CVE-2023-25165](https://osv.dev/vulnerability/CVE-2023-25165)
+[CVE-2022-23524](https://osv.dev/vulnerability/CVE-2022-23524)
+[CVE-2022-23526](https://osv.dev/vulnerability/CVE-2022-23526)
+[CVE-2022-23525](https://osv.dev/vulnerability/CVE-2022-23525) [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade docker/distribution to 2.8.3+incompatible (latest) to resolve [CVE-2023-2253](https://osv.dev/vulnerability/CVE-2023-2253). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade docker/docker to 25.0.3+incompatible (latest) to resolve [GHSA-jq35-85cj-fj4p](https://osv.dev/vulnerability/GHSA-jq35-85cj-fj4p). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade filepath-securejoin to 0.2.4 (latest) to resolve [GO-2023-2048](https://osv.dev/vulnerability/GO-2023-2048). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+* Upgrade to use Go `1.21.8`. This resolves CVEs
+[CVE-2024-24783](https://nvd.nist.gov/vuln/detail/CVE-2024-24783) (`crypto/x509`).
+[CVE-2023-45290](https://nvd.nist.gov/vuln/detail/CVE-2023-45290) (`net/http`).
+[CVE-2023-45289](https://nvd.nist.gov/vuln/detail/CVE-2023-45289) (`net/http`, `net/http/cookiejar`).
+[CVE-2024-24785](https://nvd.nist.gov/vuln/detail/CVE-2024-24785) (`html/template`).
+[CVE-2024-24784](https://nvd.nist.gov/vuln/detail/CVE-2024-24784) (`net/mail`). [[GH-3741](https://github.com/hashicorp/consul-k8s/issues/3741)]
+* security: upgrade containerd to 1.7.13 (latest) to resolve [GHSA-7ww5-4wqc-m92c](https://osv.dev/vulnerability/GO-2023-2412). [[GH-3625](https://github.com/hashicorp/consul-k8s/issues/3625)]
+
+IMPROVEMENTS:
+
+* control-plane: publish `consul-k8s-control-plane` and `consul-k8s-control-plane-fips` images to official HashiCorp AWS ECR. [[GH-3668](https://github.com/hashicorp/consul-k8s/issues/3668)]
+
+BUG FIXES:
+
+* control-plane: fix an issue where ACL token cleanup did not respect a pod's GracefulShutdownPeriodSeconds and
+tokens were invalidated immediately on pod entering Terminating state. [[GH-3736](https://github.com/hashicorp/consul-k8s/issues/3736)]
+* control-plane: fix an issue where ACL tokens would prematurely be deleted and services would be deregistered if there
+was a K8s API error fetching the pod. [[GH-3758](https://github.com/hashicorp/consul-k8s/issues/3758)]
+
 ## 1.4.0 (February 29, 2024)
 
 > NOTE: Consul K8s 1.4.x is compatible with Consul 1.18.x and Consul Dataplane 1.4.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.

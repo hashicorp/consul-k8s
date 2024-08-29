@@ -9,7 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -23,10 +23,11 @@ const (
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
 	defaultEnvoyProxyConcurrency = 1
-	volumeName                   = "consul-connect-inject-data"
+	volumeNameForConnectInject   = "consul-connect-inject-data"
+	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
 )
 
-func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -53,8 +54,9 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	}
 
 	container := corev1.Container{
-		Name:  name,
-		Image: config.ImageDataplane,
+		Name:            name,
+		Image:           config.ImageDataplane,
+		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
 
 		// We need to set tmp dir to an ephemeral volume that we're mounting so that
 		// consul-dataplane can write files to it. Otherwise, it wouldn't be able to
@@ -77,12 +79,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 				Value: "$(NODE_NAME)-virtual",
 			},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      volumeName,
-				MountPath: "/consul/connect-inject",
-			},
-		},
+		VolumeMounts:   mounts,
 		Args:           args,
 		ReadinessProbe: probe,
 	}
@@ -116,7 +113,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	// If running in vanilla K8s, run as root to allow binding to privileged ports;
 	// otherwise, allow the user to be assigned by OpenShift.
 	container.SecurityContext = &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: pointer.Bool(true),
+		ReadOnlyRootFilesystem: ptr.To(true),
 		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
 		Capabilities: &corev1.Capabilities{
 			Add:  []corev1.Capability{netBindCapability},
@@ -124,7 +121,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		},
 	}
 	if !config.EnableOpenShift {
-		container.SecurityContext.RunAsUser = pointer.Int64(0)
+		container.SecurityContext.RunAsUser = ptr.To(int64(0))
 	}
 
 	return container, nil

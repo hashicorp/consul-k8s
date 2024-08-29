@@ -5,6 +5,7 @@ package configentries
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	capi "github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -542,48 +544,59 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.kubeKind, func(t *testing.T) {
-			req := require.New(t)
-			ctx := context.Background()
+		for _, secure := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s: %t", c.kubeKind, secure), func(t *testing.T) {
+				req := require.New(t)
+				ctx := context.Background()
 
-			s := runtime.NewScheme()
-			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+				s := runtime.NewScheme()
+				s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
+				fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
 
-			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-			testClient.TestServer.WaitForServiceIntentions(t)
-			consulClient := testClient.APIClient
+				var cb testutil.ServerConfigCallback
+				if secure {
+					adminToken := "123e4567-e89b-12d3-a456-426614174000"
+					cb = func(c *testutil.TestServerConfig) {
+						c.ACL.Enabled = true
+						c.ACL.Tokens.InitialManagement = adminToken
+					}
+				}
 
-			for _, configEntry := range c.consulPrereqs {
-				written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+				testClient := test.TestServerWithMockConnMgrWatcher(t, cb)
+				testClient.TestServer.WaitForServiceIntentions(t)
+				consulClient := testClient.APIClient
+
+				for _, configEntry := range c.consulPrereqs {
+					written, _, err := consulClient.ConfigEntries().Set(configEntry, nil)
+					req.NoError(err)
+					req.True(written)
+				}
+
+				r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
+				namespacedName := types.NamespacedName{
+					Namespace: kubeNS,
+					Name:      c.configEntryResource.KubernetesName(),
+				}
+				resp, err := r.Reconcile(ctx, ctrl.Request{
+					NamespacedName: namespacedName,
+				})
 				req.NoError(err)
-				req.True(written)
-			}
+				req.False(resp.Requeue)
 
-			r := c.reconciler(fakeClient, testClient.Cfg, testClient.Watcher, logrtest.New(t))
-			namespacedName := types.NamespacedName{
-				Namespace: kubeNS,
-				Name:      c.configEntryResource.KubernetesName(),
-			}
-			resp, err := r.Reconcile(ctx, ctrl.Request{
-				NamespacedName: namespacedName,
+				cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
+				req.NoError(err)
+				req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
+				c.compare(t, cfg)
+
+				// Check that the status is "synced".
+				err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
+				req.NoError(err)
+				req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
+
+				// Check that the finalizer is added.
+				req.Contains(c.configEntryResource.Finalizers(), FinalizerName)
 			})
-			req.NoError(err)
-			req.False(resp.Requeue)
-
-			cfg, _, err := consulClient.ConfigEntries().Get(c.consulKind, c.configEntryResource.ConsulName(), nil)
-			req.NoError(err)
-			req.Equal(c.configEntryResource.ConsulName(), cfg.GetName())
-			c.compare(t, cfg)
-
-			// Check that the status is "synced".
-			err = fakeClient.Get(ctx, namespacedName, c.configEntryResource)
-			req.NoError(err)
-			req.Equal(corev1.ConditionTrue, c.configEntryResource.SyncedConditionStatus())
-
-			// Check that the finalizer is added.
-			req.Contains(c.configEntryResource.Finalizers(), FinalizerName)
-		})
+		}
 	}
 }
 
@@ -1075,7 +1088,7 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1506,7 +1519,7 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(c.configEntryResourceWithDeletion).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResourceWithDeletion).WithStatusSubresource(c.configEntryResourceWithDeletion).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1567,7 +1580,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 
 	s := runtime.NewScheme()
 	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaults).WithStatusSubresource(svcDefaults).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
@@ -1640,7 +1653,7 @@ func TestConfigEntryControllers_setsSyncedToTrue(t *testing.T) {
 	s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
 
 	// The config entry exists in kube but its status will be nil.
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaults).WithStatusSubresource(svcDefaults).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
@@ -1683,16 +1696,37 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 	kubeNS := "default"
 
 	cases := []struct {
-		datacenterAnnotation string
-		expErr               string
+		name                    string
+		datacenterAnnotation    string
+		expErr                  error
+		expReason               string
+		makeDifferentFromConsul bool
 	}{
 		{
-			datacenterAnnotation: "",
-			expErr:               "config entry already exists in Consul",
+			name:                    "when dc annotation is blank and the config entry does not match consul, then error is thrown, entry is not synced and reason is it is externally managed.",
+			datacenterAnnotation:    "",
+			makeDifferentFromConsul: true,
+			expErr:                  errors.New("config entry already exists in Consul"),
+			expReason:               "ExternallyManagedConfigError",
 		},
 		{
-			datacenterAnnotation: "other-datacenter",
-			expErr:               "config entry managed in different datacenter: \"other-datacenter\"",
+			name:                    "when dc annotation is not blank and the config entry matches consul, then error is not thrown and it is marked as synced",
+			datacenterAnnotation:    "",
+			makeDifferentFromConsul: false,
+			expErr:                  nil,
+		},
+		{
+			name:                    "when dc annotation is not blank and the config entry does not match consul, then error is thrown, entry is not synced and reason is it is externally managed.",
+			datacenterAnnotation:    "other-datacenter",
+			makeDifferentFromConsul: true,
+			expErr:                  errors.New("config entry managed in different datacenter: \"other-datacenter\""),
+			expReason:               "ExternallyManagedConfigError",
+		},
+		{
+			name:                    "when dc annotation is not blank and the config entry matches consul, then error is not thrown and it is marked as synced",
+			datacenterAnnotation:    "other-datacenter",
+			makeDifferentFromConsul: false,
+			expErr:                  nil,
 		},
 	}
 
@@ -1712,7 +1746,12 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				},
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaults)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaults).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaults).WithStatusSubresource(svcDefaults).Build()
+
+			// Change the config entry so protocol is http2 instead of http if test case says to
+			if c.makeDifferentFromConsul {
+				svcDefaults.Spec.Protocol = "http2"
+			}
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1749,7 +1788,7 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				resp, err := reconciler.Reconcile(ctx, ctrl.Request{
 					NamespacedName: namespacedName,
 				})
-				req.EqualError(err, c.expErr)
+				req.Equal(err, c.expErr)
 				req.False(resp.Requeue)
 
 				// Now check that the object in Consul is as expected.
@@ -1761,9 +1800,17 @@ func TestConfigEntryControllers_doesNotCreateUnownedConfigEntry(t *testing.T) {
 				err = fakeClient.Get(ctx, namespacedName, svcDefaults)
 				req.NoError(err)
 				status, reason, errMsg := svcDefaults.SyncedCondition()
-				req.Equal(corev1.ConditionFalse, status)
-				req.Equal("ExternallyManagedConfigError", reason)
-				req.Equal(errMsg, c.expErr)
+				expectedStatus := corev1.ConditionFalse
+				if !c.makeDifferentFromConsul {
+					expectedStatus = corev1.ConditionTrue
+				}
+				req.Equal(expectedStatus, status)
+				if !c.makeDifferentFromConsul {
+					req.Equal(c.expReason, reason)
+				}
+				if c.expErr != nil {
+					req.Equal(errMsg, c.expErr.Error())
+				}
 			}
 		})
 	}
@@ -1796,7 +1843,7 @@ func TestConfigEntryControllers_doesNotDeleteUnownedConfig(t *testing.T) {
 				},
 			}
 			s.AddKnownTypes(v1alpha1.GroupVersion, svcDefaultsWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(svcDefaultsWithDeletion).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(svcDefaultsWithDeletion).WithStatusSubresource(svcDefaultsWithDeletion).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1878,7 +1925,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 		},
 	}
 
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(defaults, splitter).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(defaults, splitter).WithStatusSubresource(defaults, splitter).Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
@@ -1927,8 +1974,7 @@ func TestConfigEntryControllers_updatesStatusWhenDeleteFails(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update service-defaults with deletion timestamp so that it attempts deletion on reconcile.
-	defaults.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-	err = fakeClient.Update(ctx, defaults)
+	err = fakeClient.Delete(ctx, defaults)
 	require.NoError(t, err)
 
 	// Reconcile should fail as the service-splitter still required the service-defaults causing the delete operation on Consul to fail.
@@ -2010,7 +2056,7 @@ func TestConfigEntryController_Migration(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, &v1alpha1.ServiceDefaults{})
 
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(&c.KubeResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(&c.KubeResource).WithStatusSubresource(&c.KubeResource).Build()
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
 			consulClient := testClient.APIClient
@@ -2291,7 +2337,7 @@ func TestConfigEntryControllers_assignServiceVirtualIP(t *testing.T) {
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
 			s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Service{})
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(&c.service, c.configEntryResource).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(&c.service, c.configEntryResource).WithStatusSubresource(&c.service, c.configEntryResource).Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForLeader(t)

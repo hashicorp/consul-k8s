@@ -1,0 +1,7 @@
+```release-note:bug
+control-plane: fix a panic when an upstream annotation is malformed.
+```
+
+```release-note:enhancement
+control-plane: support <space>, <comma> and <\n> as upstream separators.
+```

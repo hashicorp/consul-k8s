@@ -1,0 +1,3 @@
+```release-note:bug
+endpoints-controller: graceful shutdown logic should not run on a new pod with the same name. Fixes a case where statefulset rollouts could get stuck in graceful shutdown when the new pods come up.
+```

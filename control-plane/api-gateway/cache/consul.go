@@ -6,6 +6,7 @@ package cache
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -59,7 +60,7 @@ const (
 	apiTimeout        = 5 * time.Minute
 )
 
-var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.InlineCertificate, api.JWTProvider}
+var Kinds = []string{api.APIGateway, api.HTTPRoute, api.TCPRoute, api.FileSystemCertificate, api.JWTProvider}
 
 type Config struct {
 	ConsulClientConfig      *consul.Config
@@ -83,11 +84,14 @@ type Cache struct {
 	subscribers     map[string][]*Subscription
 	subscriberMutex *sync.Mutex
 
-	gatewayNameToPolicy map[string]*api.ACLPolicy
-	policyMutex         *sync.Mutex
+	gatewayNameToACLPolicy map[string]*api.ACLPolicy
+	policyMutex            *sync.Mutex
 
-	gatewayNameToRole map[string]*api.ACLRole
-	aclRoleMutex      *sync.Mutex
+	gatewayNameToACLRole map[string]*api.ACLRole
+	aclRoleMutex         *sync.Mutex
+
+	gatewayNameToACLBindingRule map[string]*api.ACLBindingRule
+	bindingRuleMutex            *sync.Mutex
 
 	namespacesEnabled       bool
 	crossNamespaceACLPolicy string
@@ -108,22 +112,24 @@ func New(config Config) *Cache {
 	config.ConsulClientConfig.APITimeout = apiTimeout
 
 	return &Cache{
-		config:                  config.ConsulClientConfig,
-		serverMgr:               config.ConsulServerConnMgr,
-		namespacesEnabled:       config.NamespacesEnabled,
-		cache:                   cache,
-		cacheMutex:              &sync.Mutex{},
-		subscribers:             make(map[string][]*Subscription),
-		subscriberMutex:         &sync.Mutex{},
-		gatewayNameToPolicy:     make(map[string]*api.ACLPolicy),
-		policyMutex:             &sync.Mutex{},
-		gatewayNameToRole:       make(map[string]*api.ACLRole),
-		aclRoleMutex:            &sync.Mutex{},
-		kinds:                   Kinds,
-		synced:                  make(chan struct{}, len(Kinds)),
-		logger:                  config.Logger,
-		crossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
-		datacenter:              config.Datacenter,
+		config:                      config.ConsulClientConfig,
+		serverMgr:                   config.ConsulServerConnMgr,
+		namespacesEnabled:           config.NamespacesEnabled,
+		cache:                       cache,
+		cacheMutex:                  &sync.Mutex{},
+		subscribers:                 make(map[string][]*Subscription),
+		subscriberMutex:             &sync.Mutex{},
+		gatewayNameToACLPolicy:      make(map[string]*api.ACLPolicy),
+		policyMutex:                 &sync.Mutex{},
+		gatewayNameToACLRole:        make(map[string]*api.ACLRole),
+		aclRoleMutex:                &sync.Mutex{},
+		gatewayNameToACLBindingRule: make(map[string]*api.ACLBindingRule),
+		bindingRuleMutex:            &sync.Mutex{},
+		kinds:                       Kinds,
+		synced:                      make(chan struct{}, len(Kinds)),
+		logger:                      config.Logger,
+		crossNamespaceACLPolicy:     config.CrossNamespaceACLPolicy,
+		datacenter:                  config.Datacenter,
 	}
 }
 
@@ -362,6 +368,9 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			if err != nil {
 				return "", err
 			}
+
+			// on an upgrade the cache will be empty so we need to write the policy to the cache
+			c.gatewayNameToACLPolicy[gatewayName] = existing
 			return existing.ID, nil
 		}
 
@@ -369,11 +378,11 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			return "", err
 		}
 
-		c.gatewayNameToPolicy[gatewayName] = created
+		c.gatewayNameToACLPolicy[gatewayName] = created
 		return created.ID, nil
 	}
 
-	cachedPolicy, found := c.gatewayNameToPolicy[gatewayName]
+	cachedPolicy, found := c.gatewayNameToACLPolicy[gatewayName]
 
 	if !found {
 		return createPolicy()
@@ -389,7 +398,13 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 		return "", err
 	}
 
+	// update cache with existing policy
+	c.gatewayNameToACLPolicy[gatewayName] = existing
 	return existing.ID, nil
+}
+
+func getACLRoleName(gatewayName string) string {
+	return fmt.Sprint("managed-gateway-acl-role-", gatewayName)
 }
 
 func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, error) {
@@ -402,7 +417,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	defer c.aclRoleMutex.Unlock()
 
 	createRole := func() (string, error) {
-		aclRoleName := fmt.Sprint("managed-gateway-acl-role-", gatewayName)
+		aclRoleName := getACLRoleName(gatewayName)
 		role := &api.ACLRole{
 			Name:        aclRoleName,
 			Description: "ACL Role for Managed API Gateways",
@@ -410,14 +425,32 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 		}
 
 		_, _, err = client.ACL().RoleCreate(role, &api.WriteOptions{})
-		if err != nil {
+		if err != nil && !isRoleExistsErr(err, aclRoleName) {
+			// don't error out in the case that the role already exists.
 			return "", err
 		}
-		c.gatewayNameToRole[gatewayName] = role
-		return aclRoleName, err
+
+		if err != nil && isRoleExistsErr(err, aclRoleName) {
+			role, _, err := client.ACL().RoleReadByName(role.Name, &api.QueryOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			role.Policies = []*api.ACLLink{{ID: policyID}}
+			role, _, err = client.ACL().RoleUpdate(role, &api.WriteOptions{})
+			if err != nil {
+				return "", err
+			}
+
+			c.gatewayNameToACLRole[gatewayName] = role
+			return aclRoleName, err
+		}
+
+		c.gatewayNameToACLRole[gatewayName] = role
+		return aclRoleName, nil
 	}
 
-	cachedRole, found := c.gatewayNameToRole[gatewayName]
+	cachedRole, found := c.gatewayNameToACLRole[gatewayName]
 
 	if !found {
 		return createRole()
@@ -429,7 +462,8 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 	}
 
 	if aclRole != nil {
-		return cachedRole.Name, nil
+		c.gatewayNameToACLRole[gatewayName] = aclRole
+		return aclRole.Name, nil
 	}
 
 	return createRole()
@@ -541,10 +575,140 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 
 	if bindingRule.ID == "" {
 		_, _, err := client.ACL().BindingRuleCreate(bindingRule, &api.WriteOptions{})
-		return err
+		if err != nil {
+			return err
+		}
+
+		c.bindingRuleMutex.Lock()
+		defer c.bindingRuleMutex.Unlock()
+		c.gatewayNameToACLBindingRule[service] = bindingRule
+
+		return nil
 	}
 	_, _, err = client.ACL().BindingRuleUpdate(bindingRule, &api.WriteOptions{})
-	return err
+	if err != nil {
+		return err
+	}
+
+	c.bindingRuleMutex.Lock()
+	defer c.bindingRuleMutex.Unlock()
+	c.gatewayNameToACLBindingRule[service] = bindingRule
+
+	return nil
+}
+
+var (
+	ErrFailedToDeleteBindingRule = errors.New("failed to delete ACLBindingRule")
+	ErrFailedToDeleteRole        = errors.New("failed to delete ACLRole")
+	ErrFailedToDeletePolicy      = errors.New("failed to delete ACLPolicy")
+	ErrACLSDisabled              = errors.New("ACLs are disabled")
+)
+
+func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
+	client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
+	if err != nil {
+		return err
+	}
+
+	// acquire locks
+	c.bindingRuleMutex.Lock()
+	defer c.bindingRuleMutex.Unlock()
+
+	c.aclRoleMutex.Lock()
+	defer c.aclRoleMutex.Unlock()
+
+	c.policyMutex.Lock()
+	defer c.policyMutex.Unlock()
+
+	deleteFns := make([]func() error, 0, 3)
+
+	if rule, ok := c.gatewayNameToACLBindingRule[service]; ok {
+		deleteFns = append(deleteFns, c.bindingRuleDelete(client, rule, service))
+	}
+
+	if role, ok := c.gatewayNameToACLRole[service]; ok {
+		deleteFns = append(deleteFns, c.roleDelete(client, role, service))
+	}
+
+	if policy, ok := c.gatewayNameToACLPolicy[service]; ok {
+		deleteFns = append(deleteFns, c.policyDelete(client, policy, service))
+	}
+
+	for _, fn := range deleteFns {
+		err := fn()
+		if errors.Is(err, ErrACLSDisabled) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Cache) bindingRuleDelete(client *api.Client, rule *api.ACLBindingRule, service string) func() error {
+	return func() error {
+		_, err := client.ACL().BindingRuleDelete(rule.ID, &api.WriteOptions{})
+		if err != nil {
+			if ignoreNotFound(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return nil
+			}
+
+			if ignoreACLsDisabled(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return ErrACLSDisabled
+			}
+			return fmt.Errorf("%w: %s", ErrFailedToDeleteBindingRule, err)
+		}
+
+		delete(c.gatewayNameToACLBindingRule, service)
+
+		return nil
+	}
+}
+
+func (c *Cache) roleDelete(client *api.Client, role *api.ACLRole, service string) func() error {
+	return func() error {
+		_, err := client.ACL().RoleDelete(role.ID, &api.WriteOptions{})
+		if err != nil {
+			if ignoreNotFound(err) == nil {
+				delete(c.gatewayNameToACLRole, service)
+				return nil
+			}
+
+			if ignoreACLsDisabled(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return ErrACLSDisabled
+			}
+			return fmt.Errorf("%w: %s", ErrFailedToDeleteRole, err)
+		}
+		delete(c.gatewayNameToACLRole, service)
+
+		return nil
+	}
+}
+
+func (c *Cache) policyDelete(client *api.Client, policy *api.ACLPolicy, service string) func() error {
+	return func() error {
+		_, err := client.ACL().PolicyDelete(policy.ID, &api.WriteOptions{})
+		if err != nil {
+			if ignoreNotFound(err) == nil {
+				delete(c.gatewayNameToACLPolicy, service)
+				return nil
+			}
+
+			if ignoreACLsDisabled(err) == nil {
+				delete(c.gatewayNameToACLBindingRule, service)
+				return ErrACLSDisabled
+			}
+			return fmt.Errorf("%w: %s", ErrFailedToDeletePolicy, err)
+		}
+		delete(c.gatewayNameToACLPolicy, service)
+
+		return nil
+	}
 }
 
 // Register registers a service in Consul.
@@ -573,6 +737,17 @@ func (c *Cache) Deregister(ctx context.Context, deregistration api.CatalogDeregi
 	return err
 }
 
+func ignoreNotFound(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "Unexpected response code: 404") {
+		return nil
+	}
+
+	return err
+}
+
 func ignoreACLsDisabled(err error) error {
 	if err == nil {
 		return nil
@@ -586,7 +761,18 @@ func ignoreACLsDisabled(err error) error {
 // isPolicyExistsErr returns true if err is due to trying to call the
 // policy create API when the policy already exists.
 func isPolicyExistsErr(err error, policyName string) bool {
+	return isExistsErr(err, "Policy", policyName)
+}
+
+// isExistsErr returns true if err is due to trying to call an API for a given type and it already exists.
+func isExistsErr(err error, typeName, name string) bool {
 	return err != nil &&
 		strings.Contains(err.Error(), "Unexpected response code: 500") &&
-		strings.Contains(err.Error(), fmt.Sprintf("Invalid Policy: A Policy with Name %q already exists", policyName))
+		strings.Contains(err.Error(), fmt.Sprintf("Invalid %s: A %s with Name %q already exists", typeName, typeName, name))
+}
+
+// isRoleExistsErr returns true if err is due to trying to call the
+// role create API when the role already exists.
+func isRoleExistsErr(err error, roleName string) bool {
+	return isExistsErr(err, "Role", roleName)
 }

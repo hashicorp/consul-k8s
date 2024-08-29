@@ -13,8 +13,6 @@ import (
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -28,7 +26,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -158,7 +155,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
-
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
@@ -220,6 +216,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
 		// we don't care that they're stopped gracefully.
@@ -240,9 +237,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, deployment := range deployments.Items {
 			if strings.Contains(deployment.Name, h.releaseName) {
-				err := h.kubernetesClient.AppsV1().
-					Deployments(h.helmOptions.KubectlOptions.Namespace).
-					Delete(context.Background(), deployment.Name, metav1.DeleteOptions{})
+				err := h.kubernetesClient.AppsV1().Deployments(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), deployment.Name, metav1.DeleteOptions{})
 				if !errors.IsNotFound(err) {
 					require.NoError(r, err)
 				}
@@ -487,26 +482,6 @@ func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, rele
 	}
 	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
 	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
-}
-
-// ResourceClient returns a resource service grpc client for the given helm release.
-func (h *HelmCluster) ResourceClient(t *testing.T, secure bool, release ...string) (client pbresource.ResourceServiceClient) {
-	if secure {
-		panic("TODO: add support for secure resource client")
-	}
-	releaseName := h.releaseName
-	if len(release) > 0 {
-		releaseName = release[0]
-	}
-
-	// TODO: get grpc port from somewhere
-	localTunnelAddr := h.CreatePortForwardTunnel(t, 8502, releaseName)
-
-	// Create a grpc connection to the server pod.
-	grpcConn, err := grpc.Dial(localTunnelAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	require.NoError(t, err)
-	resourceClient := pbresource.NewResourceServiceClient(grpcConn)
-	return resourceClient
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...string) (client *api.Client, configAddress string) {

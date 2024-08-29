@@ -168,7 +168,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// we only sync validly referenced certificates over, so check to make sure it is not created.
-			checkConsulNotExists(t, consulClient, api.InlineCertificate, "certificate", namespaceForConsul(c.namespaceMirroring, certificateNamespace))
+			checkConsulNotExists(t, consulClient, api.FileSystemCertificate, "certificate", namespaceForConsul(c.namespaceMirroring, certificateNamespace))
 
 			// now create reference grants
 			createReferenceGrant(t, k8sClient, "gateway-certificate", gatewayNamespace, certificateNamespace)
@@ -237,11 +237,11 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// and check to make sure that the certificate exists
 			retryCheck(t, 30, func(r *retry.R) {
-				entry, _, err := consulClient.ConfigEntries().Get(api.InlineCertificate, "certificate", &api.QueryOptions{
+				entry, _, err := consulClient.ConfigEntries().Get(api.FileSystemCertificate, "certificate", &api.QueryOptions{
 					Namespace: namespaceForConsul(c.namespaceMirroring, certificateNamespace),
 				})
 				require.NoError(r, err)
-				certificate := entry.(*api.InlineCertificateConfigEntry)
+				certificate := entry.(*api.FileSystemCertificateConfigEntry)
 
 				require.EqualValues(r, "certificate", certificate.Meta["k8s-name"])
 				require.EqualValues(r, certificateNamespace, certificate.Meta["k8s-namespace"])

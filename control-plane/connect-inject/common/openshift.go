@@ -1,10 +1,6 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-// Function copied from:
-// https://github.com/openshift/apiserver-library-go/blob/release-4.17/pkg/securitycontextconstraints/sccmatching/matcher.go
-// Apache 2.0 license: https://github.com/openshift/apiserver-library-go/blob/release-4.17/LICENSE
-
 // A namespace in OpenShift has the following annotations:
 // Annotations:  openshift.io/sa.scc.mcs: s0:c27,c4
 //               openshift.io/sa.scc.uid-range: 1000710000/10000
@@ -20,111 +16,167 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
-// GetOpenShiftUID gets the user id from the OpenShift annotation 'openshift.io/sa.scc.uid-range'.
-func GetOpenShiftUID(ns *corev1.Namespace) (int64, error) {
-	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftUIDRange]
-	if !ok {
-		return 0, fmt.Errorf("unable to find annotation %s", constants.AnnotationOpenShiftUIDRange)
-	}
-	if len(annotation) == 0 {
-		return 0, fmt.Errorf("found annotation %s but it was empty", constants.AnnotationOpenShiftUIDRange)
-	}
-
-	uid, err := parseOpenShiftUID(annotation)
+// GetDataplaneUID returns the UID to use for the Dataplane container in the given namespace.
+// The UID is based on the namespace annotation and avoids conflicting with any application container UIDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetDataplaneUID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange, dataplaneImage, k8sImage)
 	if err != nil {
 		return 0, err
 	}
 
-	return uid, nil
+	if len(availableUIDs) < 2 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-2], nil
 }
 
-// parseOpenShiftUID parses the UID "range" from the annotation string. The annotation can either have a '/' or '-'
-// as a separator. '-' is the old style of UID from when it used to be an actual range.
-// Example annotation value: "1000700000/100000".
-func parseOpenShiftUID(val string) (int64, error) {
-	var uid int64
-	var err error
-	if strings.Contains(val, "/") {
-		str := strings.Split(val, "/")
-		uid, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
-		}
-	}
-	if strings.Contains(val, "-") {
-		str := strings.Split(val, "-")
-		uid, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	if !strings.Contains(val, "/") && !strings.Contains(val, "-") {
-		return 0, fmt.Errorf(
-			"annotation %s contains an invalid format for value %s",
-			constants.AnnotationOpenShiftUIDRange,
-			val,
-		)
-	}
-
-	return uid, nil
-}
-
-// GetOpenShiftGroup gets the group from OpenShift annotation 'openshift.io/sa.scc.supplemental-groups'
-// Fall back to the UID annotation if the group annotation does not exist. The values should
-// be the same.
-func GetOpenShiftGroup(ns *corev1.Namespace) (int64, error) {
-	annotation, ok := ns.Annotations[constants.AnnotationOpenShiftGroups]
-	if !ok {
-		// fall back to UID annotation
-		annotation, ok = ns.Annotations[constants.AnnotationOpenShiftUIDRange]
-		if !ok {
-			return 0, fmt.Errorf(
-				"unable to find annotation %s or %s",
-				constants.AnnotationOpenShiftGroups,
-				constants.AnnotationOpenShiftUIDRange,
-			)
-		}
-	}
-	if len(annotation) == 0 {
-		return 0, fmt.Errorf("found annotation %s but it was empty", constants.AnnotationOpenShiftGroups)
-	}
-
-	uid, err := parseOpenShiftGroup(annotation)
+// GetDataplaneGroupID returns the group ID to use for the Dataplane container in the given namespace.
+// The UID is based on the namespace annotation and avoids conflicting with any application container group IDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetDataplaneGroupID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups, dataplaneImage, k8sImage)
 	if err != nil {
 		return 0, err
 	}
 
-	return uid, nil
+	if len(availableUIDs) < 2 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-2], nil
 }
 
-// parseOpenShiftGroup parses the group from the annotation string. The annotation can either have a '/' or ','
-// as a separator. ',' is the old style of UID from when it used to be an actual range.
-func parseOpenShiftGroup(val string) (int64, error) {
-	var group int64
-	var err error
-	if strings.Contains(val, "/") {
-		str := strings.Split(val, "/")
-		group, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
+// GetConnectInitUID returns the UID to use for the connect init container in the given namespace.
+// The UID is based on the namespace annotation and avoids conflicting with any application container UIDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetConnectInitUID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftUIDRange, dataplaneImage, k8sImage)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(availableUIDs) < 1 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-1], nil
+}
+
+// GetConnectInitGroupID returns the group ID to use for the connect init container in the given namespace.
+// The group ID is based on the namespace annotation and avoids conflicting with any application container group IDs.
+// Containers with dataplaneImage and k8sImage are not considered application containers.
+func GetConnectInitGroupID(namespace corev1.Namespace, pod corev1.Pod, dataplaneImage, k8sImage string) (int64, error) {
+	availableUIDs, err := getAvailableIDs(namespace, pod, constants.AnnotationOpenShiftGroups, dataplaneImage, k8sImage)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(availableUIDs) < 2 {
+		return 0, fmt.Errorf("namespace does not have enough available UIDs")
+	}
+
+	return availableUIDs[len(availableUIDs)-1], nil
+}
+
+// getAvailableIDs enumerates the entire list of available UIDs in the namespace based on the
+// OpenShift annotationName provided. It then removes the UIDs that are already in use by application
+// containers. Containers with dataplaneImage and k8sImage are not considered application containers.
+func getAvailableIDs(namespace corev1.Namespace, pod corev1.Pod, annotationName, dataplaneImage, k8sImage string) ([]int64, error) {
+	// Collect the list of IDs designated in the Pod for application containers
+	appUIDs := make([]int64, 0)
+	if pod.Spec.SecurityContext != nil {
+		if pod.Spec.SecurityContext.RunAsUser != nil {
+			appUIDs = append(appUIDs, *pod.Spec.SecurityContext.RunAsUser)
 		}
 	}
-	if strings.Contains(val, ",") {
-		str := strings.Split(val, ",")
-		group, err = strconv.ParseInt(str[0], 10, 64)
-		if err != nil {
-			return 0, err
+	for _, c := range pod.Spec.Containers {
+		if c.Image == dataplaneImage || c.Image == k8sImage {
+			continue
+		}
+
+		if c.SecurityContext != nil && c.SecurityContext.RunAsUser != nil {
+			appUIDs = append(appUIDs, *c.SecurityContext.RunAsUser)
 		}
 	}
 
-	if !strings.Contains(val, "/") && !strings.Contains(val, ",") {
-		return 0, fmt.Errorf("annotation %s contains an invalid format for value %s", constants.AnnotationOpenShiftGroups, val)
+	annotationValue := namespace.Annotations[annotationName]
+
+	// Groups can be comma separated ranges, i.e. 100/2,101/2
+	// https://docs.openshift.com/container-platform/4.16/authentication/managing-security-context-constraints.html#security-context-constraints-pre-allocated-values_configuring-internal-oauth
+	ranges := make([]string, 0)
+	validIDs := make([]int64, 0)
+	// Collect the list of valid IDs from the namespace annotation
+	if annotationName == constants.AnnotationOpenShiftGroups {
+		// Fall back to UID range if Group annotation is not present
+		if annotationValue == "" {
+			annotationName = constants.AnnotationOpenShiftUIDRange
+			annotationValue = namespace.Annotations[annotationName]
+		}
+		ranges = strings.Split(annotationValue, ",")
+	} else {
+		ranges = append(ranges, annotationValue)
 	}
 
-	return group, nil
+	for _, r := range ranges {
+		rangeIDs, err := getIDsInRange(r)
+		// call based on length of ranges and merge for groups
+		if err != nil {
+			return nil, fmt.Errorf("unable to get valid userIDs from namespace annotation: %w", err)
+		}
+		validIDs = append(validIDs, rangeIDs...)
+	}
+
+	// Subtract the list of application container UIDs from the list of valid userIDs
+	availableUIDs := make(map[int64]struct{})
+	for _, uid := range validIDs {
+		availableUIDs[uid] = struct{}{}
+	}
+	for _, uid := range appUIDs {
+		delete(availableUIDs, uid)
+	}
+
+	// Return the second to last (sorted) valid UID from the available UIDs
+	keys := maps.Keys(availableUIDs)
+	slices.Sort(keys)
+
+	return keys, nil
+}
+
+// getIDsInRange enumerates the entire list of available IDs given the value of the
+// OpenShift annotation. This can be the group or user ID range.
+func getIDsInRange(annotation string) ([]int64, error) {
+	// Add comma and group fallback
+	parts := strings.Split(annotation, "/")
+	if len(parts) != 2 {
+		parts = strings.Split(annotation, "-")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid range format: %s", annotation)
+		}
+	}
+
+	start, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid range format: %s", parts[0])
+	}
+
+	length, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid range format: %s", parts[1])
+	}
+
+	userIDs := make([]int64, length)
+	for i := 0; i < length; i++ {
+		userIDs[i] = int64(start + i)
+	}
+
+	return userIDs, nil
 }

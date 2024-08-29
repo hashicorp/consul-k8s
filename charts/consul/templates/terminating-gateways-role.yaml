@@ -16,25 +16,14 @@ metadata:
     release: {{ $root.Release.Name }}
     component: terminating-gateway
     terminating-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
-{{- if (or $root.Values.global.acls.manageSystemACLs $root.Values.global.enablePodSecurityPolicies) }}
-rules:
 {{- if $root.Values.global.enablePodSecurityPolicies }}
+rules:
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
     resourceNames:
       -  {{ template "consul.fullname" $root }}-{{ .name }}
     verbs:
       - use
-{{- end }}
-{{- if $root.Values.global.acls.manageSystemACLs }}
-  - apiGroups: [""]
-    resources:
-      - secrets
-    resourceNames:
-      -  {{ template "consul.fullname" $root }}-{{ .name }}-acl-token
-    verbs:
-      - get
-{{- end }}
 {{- else }}
 rules: []
 {{- end }}

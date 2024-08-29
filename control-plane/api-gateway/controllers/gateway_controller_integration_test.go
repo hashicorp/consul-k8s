@@ -113,7 +113,9 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			k8sClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s)).Build()
+			fakeClient := fake.NewClientBuilder().WithScheme(s).
+				WithStatusSubresource(&gwv1beta1.Gateway{}, &gwv1beta1.HTTPRoute{}, &gwv1alpha2.TCPRoute{}, &v1alpha1.RouteAuthFilter{})
+			k8sClient := registerFieldIndexersForTest(fakeClient).Build()
 			consulTestServerClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -151,7 +153,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			gwSub := resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
 			httpRouteSub := resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
 			tcpRouteSub := resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
-			inlineCertSub := resourceCache.Subscribe(ctx, api.InlineCertificate, gwCtrl.transformConsulInlineCertificate(ctx))
+			fileSystemCertSub := resourceCache.Subscribe(ctx, api.FileSystemCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
 
 			cert := tc.certFn(t, ctx, k8sClient, tc.namespace)
 			k8sGWObj := tc.gwFn(t, ctx, k8sClient, tc.namespace)
@@ -225,7 +227,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 							tcpRouteDone = true
 							w.Done()
 						}
-					case <-inlineCertSub.Events():
+					case <-fileSystemCertSub.Events():
 					}
 				}
 			}(wg)
@@ -255,7 +257,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			gwRef := gwCtrl.Translator.ConfigEntryReference(api.APIGateway, gwNamespaceName)
 			httpRouteRef := gwCtrl.Translator.ConfigEntryReference(api.HTTPRoute, httpRouteNamespaceName)
 			tcpRouteRef := gwCtrl.Translator.ConfigEntryReference(api.TCPRoute, tcpRouteNamespaceName)
-			certRef := gwCtrl.Translator.ConfigEntryReference(api.InlineCertificate, certNamespaceName)
+			certRef := gwCtrl.Translator.ConfigEntryReference(api.FileSystemCertificate, certNamespaceName)
 
 			curGWModifyIndex := resourceCache.Get(gwRef).GetModifyIndex()
 			curHTTPRouteModifyIndex := resourceCache.Get(httpRouteRef).GetModifyIndex()

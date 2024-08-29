@@ -236,8 +236,19 @@ func TestPeering_Gateway(t *testing.T) {
 		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
 	})
 
+	// Create certificate secret, we do this separately since
+	// applying the secret will make an invalid certificate that breaks other tests
+	logger.Log(t, "creating certificate secret")
+	out, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+	require.NoError(t, err, out)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		// Ignore errors here because if the test ran as expected
+		// the custom resources will have been deleted.
+		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+	})
+
 	logger.Log(t, "creating api-gateway resources in client peer")
-	out, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
+	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected

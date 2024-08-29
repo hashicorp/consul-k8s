@@ -1,4 +1,4 @@
-VERSION = $(shell ./control-plane/build-support/scripts/version.sh control-plane/version/version.go)
+VERSION = $(shell ./control-plane/build-support/scripts/version.sh version/version.go)
 GOLANG_VERSION?=$(shell head -n 1 .go-version)
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
 CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
@@ -8,6 +8,8 @@ KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.
 KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
 GO_MODULES := $(shell find . -name go.mod -exec dirname {} \; | sort)
+
+GOTESTSUM_PATH?=$(shell command -v gotestsum)
 
 ##@ Helm Targets
 
@@ -97,11 +99,32 @@ control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker
 
 .PHONY: control-plane-test
 control-plane-test: ## Run go test for the control plane.
-	cd control-plane; go test ./...
+ifeq ("$(GOTESTSUM_PATH)","")
+	cd control-plane && go test ./...
+else
+	cd control-plane && \
+	gotestsum \
+		--format=short-verbose \
+		--debug \
+		--rerun-fails=3 \
+		--packages="./..."
+endif
+
 
 .PHONY: control-plane-ent-test
 control-plane-ent-test: ## Run go test with Consul enterprise tests. The consul binary in your PATH must be Consul Enterprise.
-	cd control-plane; go test ./... -tags=enterprise
+ifeq ("$(GOTESTSUM_PATH)","")
+	cd control-plane && go test ./... -tags=enterprise
+else
+	cd control-plane && \
+	gotestsum \
+		--format=short-verbose \
+		--debug \
+		--rerun-fails=3 \
+		--packages="./..." \
+		-- \
+		--tags enterprise
+endif
 
 .PHONY: control-plane-cov
 control-plane-cov: ## Run go test with code coverage.
@@ -231,7 +254,7 @@ ifeq (, $(shell which controller-gen))
 	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
 	cd $$CONTROLLER_GEN_TMP_DIR ;\
 	go mod init tmp ;\
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.1 ;\
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0 ;\
 	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
 	}
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
@@ -240,12 +263,12 @@ CONTROLLER_GEN=$(shell which controller-gen)
 endif
 
 .PHONY: ensure-controller-gen-version
-ensure-controller-gen-version: ## Ensure controller-gen version is v0.12.1.
+ensure-controller-gen-version: ## Ensure controller-gen version is v0.14.0.
 ifeq (, $(shell which $(CONTROLLER_GEN)))
 	@echo "You don't have $(CONTROLLER_GEN), please install it first."
 else
-ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.12.1))
-	@echo "controller-gen version is not v0.12.1, uninstall the binary and install the correct version with 'make get-controller-gen'."
+ifeq (, $(shell $(CONTROLLER_GEN) --version | grep v0.14.0))
+	@echo "controller-gen version is not v0.14.0, uninstall the binary and install the correct version with 'make get-controller-gen'."
 	@echo "Found version: $(shell $(CONTROLLER_GEN) --version)"
 	@exit 1
 else
@@ -404,7 +427,7 @@ ifndef CONSUL_K8S_RELEASE_DATE
 	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
 ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
-	$(error CONSUL_K8S_RELEASE_VERSION is required)
+	$(error CONSUL_K8S_NEXT_RELEASE_VERSION is required)
 endif
 ifndef CONSUL_K8S_CONSUL_VERSION
 	$(error CONSUL_K8S_CONSUL_VERSION is required)

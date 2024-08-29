@@ -27,12 +27,11 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	authv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/auth/v2beta1"
-	meshv2beta1 "github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
-	multiclusterv2 "github.com/hashicorp/consul-k8s/control-plane/api/multicluster/v2"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -52,13 +51,12 @@ type Command struct {
 	flagConsulImage           string // Docker image for Consul
 	flagConsulDataplaneImage  string // Docker image for Envoy
 	flagConsulK8sImage        string // Docker image for consul-k8s
+	flagGlobalImagePullPolicy string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
 	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
 	flagEnableWebhookCAUpdate bool
 	flagLogLevel              string
 	flagLogJSON               bool
-	flagResourceAPIs          bool // Use V2 APIs
-	flagV2Tenancy             bool // Use V2 partitions (ent only) and namespaces instead of V1 counterparts
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -170,11 +168,6 @@ func init() {
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
 
-	// V2 resources
-	utilruntime.Must(authv2beta1.AddAuthToScheme(scheme))
-	utilruntime.Must(meshv2beta1.AddMeshToScheme(scheme))
-	utilruntime.Must(multiclusterv2.AddMultiClusterToScheme(scheme))
-
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -192,6 +185,8 @@ func (c *Command) init() {
 		"Docker image for Consul Dataplane.")
 	c.flagSet.StringVar(&c.flagConsulK8sImage, "consul-k8s-image", "",
 		"Docker image for consul-k8s. Used for the connect sidecar.")
+	c.flagSet.StringVar(&c.flagGlobalImagePullPolicy, "global-image-pull-policy", "",
+		"ImagePullPolicy for all images used by Consul (consul, consul-dataplane, consul-k8s).")
 	c.flagSet.BoolVar(&c.flagEnablePeering, "enable-peering", false, "Enable cluster peering controllers.")
 	c.flagSet.BoolVar(&c.flagEnableFederation, "enable-federation", false, "Enable Consul WAN Federation.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
@@ -241,10 +236,6 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flagSet.BoolVar(&c.flagResourceAPIs, "enable-resource-apis", false,
-		"Enable or disable Consul V2 Resource APIs.")
-	c.flagSet.BoolVar(&c.flagV2Tenancy, "enable-v2tenancy", false,
-		"Enable or disable Consul V2 tenancy.")
 
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
@@ -390,27 +381,26 @@ func (c *Command) Run(args []string) int {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		LeaderElection:         true,
-		LeaderElectionID:       "consul-controller-lock",
-		Host:                   listenSplits[0],
-		Port:                   port,
-		Logger:                 zapLogger,
-		MetricsBindAddress:     "0.0.0.0:9444",
+		Scheme:           scheme,
+		LeaderElection:   true,
+		LeaderElectionID: "consul-controller-lock",
+		Logger:           zapLogger,
+		Metrics: metricsserver.Options{
+			BindAddress: "0.0.0.0:9444",
+		},
 		HealthProbeBindAddress: "0.0.0.0:9445",
+		WebhookServer: webhook.NewServer(webhook.Options{
+			CertDir: c.flagCertDir,
+			Host:    listenSplits[0],
+			Port:    port,
+		}),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		return 1
 	}
 
-	// Right now we exclusively start controllers for V1 or V2.
-	// In the future we might add a flag to pick and choose from both.
-	if c.flagResourceAPIs {
-		err = c.configureV2Controllers(ctx, mgr, watcher)
-	} else {
-		err = c.configureV1Controllers(ctx, mgr, watcher)
-	}
+	err = c.configureControllers(ctx, mgr, watcher)
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1
@@ -435,17 +425,14 @@ func (c *Command) validateFlags() error {
 		return errors.New("-consul-dataplane-image must be set")
 	}
 
-	// In Consul 1.17, multiport beta shipped with v2 catalog + mesh resources backed by v1 tenancy
-	// and acls (experiments=[resource-apis]).
-	//
-	// With Consul 1.18, we built out v2 tenancy with no support for acls, hence need to be explicit
-	// about which combination of v1 + v2 features are enabled.
-	//
-	// To summarize:
-	// - experiments=[resource-apis] => v2 catalog and mesh + v1 tenancy and acls
-	// - experiments=[resource-apis, v2tenancy] => v2 catalog and mesh + v2 tenancy + acls disabled
-	if c.flagV2Tenancy && !c.flagResourceAPIs {
-		return errors.New("-enable-resource-apis must be set to 'true' if -enable-v2tenancy is set")
+	switch corev1.PullPolicy(c.flagGlobalImagePullPolicy) {
+	case corev1.PullAlways:
+	case corev1.PullNever:
+	case corev1.PullIfNotPresent:
+	case "":
+		break
+	default:
+		return errors.New("-global-image-pull-policy must be `IfNotPresent`, `Always`, `Never`, or `` ")
 	}
 
 	if c.flagEnablePartitions && c.consul.Partition == "" {

@@ -1,0 +1,60 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fake-intake
+  namespace: datadog
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fake-intake
+  namespace: datadog
+spec:
+  selector:
+    app: fake-intake
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fake-intake
+  namespace: datadog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fake-intake
+  template:
+    metadata:
+      name: fake-intake
+      namespace: datadog
+      labels:
+        app: fake-intake
+        tags.datadoghq.com/env: "dev"
+        tags.datadoghq.com/service: "fake-intake"
+        tags.datadoghq.com/version: "latest"
+      annotations:
+        'consul.hashicorp.com/connect-inject': 'false'
+        'consul.hashicorp.com/transparent-proxy': 'false'
+        'consul.hashicorp.com/enable-metrics-merging': 'false'
+        'consul.hashicorp.com/transparent-proxy-overwrite-probes': 'false'
+    spec:
+      serviceAccountName: fake-intake
+      containers:
+        - name: fake-intake
+          image: datadog/fakeintake:latest
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          securityContext:
+            privileged: true
+            runAsUser: 0

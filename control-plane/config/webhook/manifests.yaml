@@ -14,90 +14,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-v2beta1-grpcroute
-  failurePolicy: Fail
-  name: mutate-grpcroute.auth.consul.hashicorp.com
-  rules:
-  - apiGroups:
-    - auth.consul.hashicorp.com
-    apiVersions:
-    - v2beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - grpcroute
-  sideEffects: None
-- admissionReviewVersions:
-  - v1beta1
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-v2beta1-httproute
-  failurePolicy: Fail
-  name: mutate-httproute.auth.consul.hashicorp.com
-  rules:
-  - apiGroups:
-    - auth.consul.hashicorp.com
-    apiVersions:
-    - v2beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - httproute
-  sideEffects: None
-- admissionReviewVersions:
-  - v1beta1
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-v2beta1-proxyconfiguration
-  failurePolicy: Fail
-  name: mutate-proxyconfiguration.auth.consul.hashicorp.com
-  rules:
-  - apiGroups:
-    - auth.consul.hashicorp.com
-    apiVersions:
-    - v2beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - proxyconfiguration
-  sideEffects: None
-- admissionReviewVersions:
-  - v1beta1
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-v2beta1-tcproute
-  failurePolicy: Fail
-  name: mutate-tcproute.auth.consul.hashicorp.com
-  rules:
-  - apiGroups:
-    - auth.consul.hashicorp.com
-    apiVersions:
-    - v2beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - tcproute
-  sideEffects: None
-- admissionReviewVersions:
-  - v1beta1
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /mutate-v1alpha1-controlplanerequestlimits
   failurePolicy: Fail
   name: mutate-controlplanerequestlimits.consul.hashicorp.com
@@ -406,27 +322,6 @@ webhooks:
     resources:
     - terminatinggateways
   sideEffects: None
-- admissionReviewVersions:
-  - v1beta1
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-v2beta1-trafficpermissions
-  failurePolicy: Fail
-  name: mutate-trafficpermissions.auth.consul.hashicorp.com
-  rules:
-  - apiGroups:
-    - auth.consul.hashicorp.com
-    apiVersions:
-    - v2beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - trafficpermissions
-  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -453,4 +348,25 @@ webhooks:
     - UPDATE
     resources:
     - gatewaypolicies
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-v1alpha1-registration
+  failurePolicy: Fail
+  name: validate-registration.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - registrations
   sideEffects: None

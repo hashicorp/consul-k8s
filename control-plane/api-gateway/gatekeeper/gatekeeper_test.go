@@ -29,6 +29,13 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
+const (
+	designatedOpenShiftUIDRange       = "1000700000/100000"
+	designatedOpenShiftGIDRange       = "1000700000/100000"
+	expectedOpenShiftInitContainerUID = 1000799999
+	expectedOpenShiftInitContainerGID = 1000799999
+)
+
 var (
 	createdAtLabelKey   = "gateway.consul.hashicorp.com/created"
 	createdAtLabelValue = "101010"
@@ -93,8 +100,10 @@ type testCase struct {
 
 type resources struct {
 	deployments     []*appsv1.Deployment
+	namespaces      []*corev1.Namespace
 	roles           []*rbac.Role
 	roleBindings    []*rbac.RoleBinding
+	secrets         []*corev1.Secret
 	services        []*corev1.Service
 	serviceAccounts []*corev1.ServiceAccount
 }
@@ -146,6 +155,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -195,6 +205,9 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -247,6 +260,9 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
 				},
 				roles: []*rbac.Role{},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -305,6 +321,9 @@ func TestUpsert(t *testing.T) {
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
 				},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -359,6 +378,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -396,6 +416,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 2, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -438,6 +459,9 @@ func TestUpsert(t *testing.T) {
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
 				},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -460,6 +484,9 @@ func TestUpsert(t *testing.T) {
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
+				},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -523,6 +550,9 @@ func TestUpsert(t *testing.T) {
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
 				},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
+				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -550,6 +580,9 @@ func TestUpsert(t *testing.T) {
 				},
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
+				},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
 				},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
@@ -604,6 +637,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -657,6 +691,7 @@ func TestUpsert(t *testing.T) {
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{},
 				roles:       []*rbac.Role{},
+				secrets:     []*corev1.Secret{},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, externalAndCopyAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -726,6 +761,7 @@ func TestUpsert(t *testing.T) {
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{},
 				roles:       []*rbac.Role{},
+				secrets:     []*corev1.Secret{},
 				services: []*corev1.Service{
 					configureService(name, namespace, labels, copyAnnotations, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
 						{
@@ -783,6 +819,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 8, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -824,6 +861,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 2, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -865,6 +903,7 @@ func TestUpsert(t *testing.T) {
 					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
 				services:        []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
@@ -897,7 +936,23 @@ func TestUpsert(t *testing.T) {
 				EnableOpenShift: true,
 				ImageDataplane:  "hashicorp/consul-dataplane",
 			},
-			initialResources: resources{},
+			initialResources: resources{
+				namespaces: []*corev1.Namespace{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Namespace",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "default",
+							Annotations: map[string]string{
+								constants.AnnotationOpenShiftUIDRange: designatedOpenShiftUIDRange,
+								constants.AnnotationOpenShiftGroups:   designatedOpenShiftGIDRange,
+							},
+						},
+					},
+				},
+			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
 					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
@@ -908,10 +963,176 @@ func TestUpsert(t *testing.T) {
 				roleBindings: []*rbac.RoleBinding{
 					configureRoleBinding(name, namespace, labels, "1"),
 				},
+				secrets:  []*corev1.Secret{},
 				services: []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{
 					configureServiceAccount(name, namespace, labels, "1"),
 				},
+			},
+		},
+		"create a new gateway with TLS certificate reference in the same namespace": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "Listener 1",
+							Port:     443,
+							Protocol: "TCP",
+							TLS: &gwv1beta1.GatewayTLSConfig{
+								CertificateRefs: []gwv1beta1.SecretObjectReference{
+									{
+										Namespace: common.PointerTo(gwv1beta1.Namespace(namespace)),
+										Name:      "tls-cert",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations:  v1alpha1.CopyAnnotationsSpec{},
+					OpenshiftSCCName: "test-api-gateway",
+				},
+			},
+			helmConfig: common.HelmConfig{
+				EnableOpenShift: false,
+				ImageDataplane:  "hashicorp/consul-dataplane",
+			},
+			initialResources: resources{
+				secrets: []*corev1.Secret{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Secret",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "tls-cert",
+							Namespace: namespace,
+						},
+						Data: map[string][]byte{
+							corev1.TLSCertKey:       []byte("cert"),
+							corev1.TLSPrivateKeyKey: []byte("key"),
+						},
+						Type: corev1.SecretTypeTLS,
+					},
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:        []*rbac.Role{},
+				roleBindings: []*rbac.RoleBinding{},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", map[string][]byte{
+						"default_tls-cert_tls.crt": []byte("cert"),
+						"default_tls-cert_tls.key": []byte("key"),
+					}),
+				},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
+		"create a new gateway with TLS certificate reference in a different namespace": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name:     "Listener 1",
+							Port:     443,
+							Protocol: "TCP",
+							TLS: &gwv1beta1.GatewayTLSConfig{
+								CertificateRefs: []gwv1beta1.SecretObjectReference{
+									{
+										Namespace: common.PointerTo(gwv1beta1.Namespace("non-default")),
+										Name:      "tls-cert",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations:  v1alpha1.CopyAnnotationsSpec{},
+					OpenshiftSCCName: "test-api-gateway",
+				},
+			},
+			helmConfig: common.HelmConfig{
+				EnableOpenShift: false,
+				ImageDataplane:  "hashicorp/consul-dataplane",
+			},
+			initialResources: resources{
+				namespaces: []*corev1.Namespace{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Namespace",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "non-default",
+						},
+					},
+				},
+				secrets: []*corev1.Secret{
+					{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Secret",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "tls-cert",
+							Namespace: "non-default",
+						},
+						Data: map[string][]byte{
+							corev1.TLSCertKey:       []byte("cert"),
+							corev1.TLSPrivateKeyKey: []byte("key"),
+						},
+						Type: corev1.SecretTypeTLS,
+					},
+				},
+			},
+			finalResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles:        []*rbac.Role{},
+				roleBindings: []*rbac.RoleBinding{},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", map[string][]byte{
+						"non-default_tls-cert_tls.crt": []byte("cert"),
+						"non-default_tls-cert_tls.key": []byte("key"),
+					}),
+				},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
 			},
 		},
 	}
@@ -1100,6 +1321,73 @@ func TestDelete(t *testing.T) {
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
 		},
+		"delete a gateway deployment with a Secret": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			},
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(3)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			helmConfig: common.HelmConfig{
+				AuthMethod:     "method",
+				ImageDataplane: dataplaneImage,
+			},
+			initialResources: resources{
+				deployments: []*appsv1.Deployment{
+					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+				},
+				roles: []*rbac.Role{
+					configureRole(name, namespace, labels, "1", false),
+				},
+				roleBindings: []*rbac.RoleBinding{
+					configureRoleBinding(name, namespace, labels, "1"),
+				},
+				secrets: []*corev1.Secret{
+					configureSecret(name, namespace, labels, "1", nil),
+				},
+				services: []*corev1.Service{
+					configureService(name, namespace, labels, nil, (corev1.ServiceType)("NodePort"), []corev1.ServicePort{
+						{
+							Name:     "Listener 1",
+							Protocol: "TCP",
+							Port:     8080,
+						},
+						{
+							Name:     "Listener 2",
+							Protocol: "TCP",
+							Port:     8081,
+						},
+					}, "1", true, false),
+				},
+				serviceAccounts: []*corev1.ServiceAccount{
+					configureServiceAccount(name, namespace, labels, "1"),
+				},
+			},
+			finalResources: resources{
+				deployments:     []*appsv1.Deployment{},
+				roles:           []*rbac.Role{},
+				secrets:         []*corev1.Secret{},
+				services:        []*corev1.Service{},
+				serviceAccounts: []*corev1.ServiceAccount{},
+			},
+		},
 	}
 
 	for name, tc := range cases {
@@ -1118,10 +1406,7 @@ func TestDelete(t *testing.T) {
 
 			gatekeeper := New(log, client)
 
-			err := gatekeeper.Delete(context.Background(), types.NamespacedName{
-				Namespace: tc.gateway.Namespace,
-				Name:      tc.gateway.Name,
-			})
+			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)
 			require.NoError(t, validateResourcesExist(t, client, tc.helmConfig, tc.finalResources, false))
 			require.NoError(t, validateResourcesAreDeleted(t, client, tc.initialResources))
@@ -1134,12 +1419,20 @@ func joinResources(resources resources) (objs []client.Object) {
 		objs = append(objs, deployment)
 	}
 
+	for _, namespace := range resources.namespaces {
+		objs = append(objs, namespace)
+	}
+
 	for _, role := range resources.roles {
 		objs = append(objs, role)
 	}
 
 	for _, roleBinding := range resources.roleBindings {
 		objs = append(objs, roleBinding)
+	}
+
+	for _, secret := range resources.secrets {
+		objs = append(objs, secret)
 	}
 
 	for _, service := range resources.services {
@@ -1193,6 +1486,16 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 					assert.Equal(t, helmConfig.InitContainerResources.Limits, container.Resources.Limits)
 					assert.Equal(t, helmConfig.InitContainerResources.Requests, container.Resources.Requests)
 				}
+
+				require.NotNil(t, container.SecurityContext.RunAsUser)
+				require.NotNil(t, container.SecurityContext.RunAsGroup)
+				if helmConfig.EnableOpenShift {
+					assert.EqualValues(t, *container.SecurityContext.RunAsUser, expectedOpenShiftInitContainerUID)
+					assert.EqualValues(t, *container.SecurityContext.RunAsGroup, expectedOpenShiftInitContainerGID)
+				} else {
+					assert.EqualValues(t, *container.SecurityContext.RunAsUser, initContainersUserAndGroupID)
+					assert.EqualValues(t, *container.SecurityContext.RunAsGroup, initContainersUserAndGroupID)
+				}
 			}
 		}
 		assert.True(t, hasInitContainer)
@@ -1212,6 +1515,35 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 			}
 		}
 		assert.True(t, hasDataplaneContainer)
+	}
+
+	for _, namespace := range resources.namespaces {
+		actual := &corev1.Namespace{}
+		err := client.Get(context.Background(), types.NamespacedName{Name: namespace.Name}, actual)
+		if err != nil {
+			return err
+		}
+
+		// Patch the createdAt label
+		actual.Labels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, namespace, actual)
+	}
+
+	for _, expected := range resources.secrets {
+		actual := &corev1.Secret{}
+		err := client.Get(context.Background(), types.NamespacedName{
+			Name:      expected.Name,
+			Namespace: expected.Namespace,
+		}, actual)
+		if err != nil {
+			return err
+		}
+
+		// Patch the createdAt label
+		actual.Labels[createdAtLabelKey] = createdAtLabelValue
+
+		require.Equal(t, expected, actual)
 	}
 
 	for _, expected := range resources.roles {
@@ -1409,6 +1741,31 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 				},
 			},
 		},
+	}
+}
+
+func configureSecret(name, namespace string, labels map[string]string, resourceVersion string, data map[string][]byte) *corev1.Secret {
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			Namespace:       namespace,
+			Labels:          labels,
+			ResourceVersion: resourceVersion,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					Kind:               "Gateway",
+					Name:               name,
+					Controller:         common.PointerTo(true),
+					BlockOwnerDeletion: common.PointerTo(true),
+				},
+			},
+		},
+		Data: data,
 	}
 }
 

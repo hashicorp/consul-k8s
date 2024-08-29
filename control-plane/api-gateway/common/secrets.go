@@ -13,7 +13,7 @@ import (
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 var (

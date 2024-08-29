@@ -11,16 +11,13 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,7 +25,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 // PeeringDialerController reconciles a PeeringDialer object.
@@ -235,7 +235,7 @@ func (r *PeeringDialerController) updateStatus(ctx context.Context, dialerObjKey
 			return err
 		}
 		if dialer.Status.LatestPeeringVersion == nil || *dialer.Status.LatestPeeringVersion < peeringVersion {
-			dialer.Status.LatestPeeringVersion = pointer.Uint64(peeringVersion)
+			dialer.Status.LatestPeeringVersion = ptr.To(uint64(peeringVersion))
 		}
 	}
 	err := r.Status().Update(ctx, dialer)
@@ -272,7 +272,7 @@ func (r *PeeringDialerController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&consulv1alpha1.PeeringDialer{}).
 		Watches(
-			&source.Kind{Type: &corev1.Secret{}},
+			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.requestsForPeeringTokens),
 			builder.WithPredicates(predicate.NewPredicateFuncs(r.filterPeeringDialers)),
 		).Complete(r)
@@ -320,12 +320,12 @@ func (r *PeeringDialerController) versionAnnotationUpdated(dialer *consulv1alpha
 // the list of dialers and creates a request for the dialer that has the same secret as it's
 // secret and that of the updated secret that is being watched.
 // We compare it to the secret in the spec as the resource is dependent on the secret.
-func (r *PeeringDialerController) requestsForPeeringTokens(object client.Object) []reconcile.Request {
+func (r *PeeringDialerController) requestsForPeeringTokens(ctx context.Context, object client.Object) []reconcile.Request {
 	r.Log.Info("received update for Peering Token Secret", "name", object.GetName(), "namespace", object.GetNamespace())
 
 	// Get the list of all dialers.
 	var dialerList consulv1alpha1.PeeringDialerList
-	if err := r.Client.List(r.Context, &dialerList); err != nil {
+	if err := r.Client.List(ctx, &dialerList); err != nil {
 		r.Log.Error(err, "failed to list PeeringDialers")
 		return []ctrl.Request{}
 	}

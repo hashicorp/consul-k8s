@@ -30,7 +30,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 func TestHandlerHandle(t *testing.T) {
@@ -47,8 +47,7 @@ func TestHandlerHandle(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name    string
@@ -1189,8 +1188,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 		Group:   "",
 		Version: "v1",
 	}, &corev1.Pod{})
-	decoder, err := admission.NewDecoder(s)
-	require.NoError(t, err)
+	decoder := admission.NewDecoder(s)
 
 	cases := []struct {
 		Name    string

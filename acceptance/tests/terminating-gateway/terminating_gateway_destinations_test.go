@@ -78,6 +78,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			// with service:write permissions to the static-server service
 			// so that it can request Connect certificates for it.
 			if c.secure {
+				logger.Log(t, "updating acl role")
 				UpdateTerminatingGatewayRole(t, consulClient, terminatingGatewayRules)
 			}
 
@@ -86,7 +87,11 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			CreateMeshConfigEntry(t, consulClient, "")
 
 			// Create the config entry for the terminating gateway.
-			CreateTerminatingGatewayConfigEntry(t, consulClient, "", "", staticServerHostnameID, staticServerIPID)
+			logger.Log(t, "creating terminating gateway")
+			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-destinations")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-destinations")
+			})
 
 			// Deploy the static client
 			logger.Log(t, "deploying static client")

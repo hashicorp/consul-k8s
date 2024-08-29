@@ -582,7 +582,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 
 	if tproxyEnabled {
 		var k8sService corev1.Service
-
+		proxyService.Proxy.Mode = api.ProxyModeTransparent
 		err = r.Client.Get(r.Context, types.NamespacedName{Name: serviceEndpoints.Name, Namespace: serviceEndpoints.Namespace}, &k8sService)
 		if err != nil {
 			return nil, nil, err
@@ -625,7 +625,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 			service.TaggedAddresses = taggedAddresses
 			proxyService.TaggedAddresses = taggedAddresses
 
-			proxyService.Proxy.Mode = api.ProxyModeTransparent
 		} else {
 			r.Log.Info("skipping syncing service cluster IP to Consul", "name", k8sService.Name, "ns", k8sService.Namespace, "ip", k8sService.Spec.ClusterIP)
 		}
@@ -1048,6 +1047,14 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		return 0, fmt.Errorf("failed to get terminating pod %s/%s: %w", k8sNamespace, podName, err)
 	}
 
+	// In a statefulset rollout, pods can go down and a new pod will come back up with the same name but a different uid
+	// or node name. In older consul-k8s patches, the pod uid may not be set, so to account for that we also check if
+	// the node changed, since newer service instances should exist for the new node. In that case, it's not the old pod
+	// that is gracefully shutting down; the old pod is gone and we should deregister that old instance from Consul.
+	if string(pod.UID) != svc.ServiceMeta[constants.MetaKeyPodUID] || common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName) != svc.Node {
+		return 0, nil
+	}
+
 	shutdownSeconds, err := r.getGracefulShutdownPeriodSecondsForPod(pod)
 	if err != nil {
 		r.Log.Error(err, "failed to get graceful shutdown period for pod", "name", pod, "k8sNamespace", k8sNamespace)
@@ -1058,7 +1065,7 @@ func (r *Controller) getGracefulShutdownAndUpdatePodCheck(ctx context.Context, a
 		// Update the health status of the service to critical so that we can drain inbound traffic.
 		// We don't need to handle the proxy service since that will be reconciled looping through all the service instances.
 		serviceRegistration := &api.CatalogRegistration{
-			Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
+			Node:    svc.Node,
 			Address: pod.Status.HostIP,
 			// Service is nil since we are patching the health status
 			Check: &api.AgentCheck{

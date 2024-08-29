@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.19-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.20-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -86,7 +86,12 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.5-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.6-dev
+
+  # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
+  # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
+  # @default: ""
+  imagePullPolicy: ""
 
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
@@ -788,7 +793,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.5-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.6-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -808,7 +813,7 @@ global:
     # This can either be used to [configure a new cluster](https://developer.hashicorp.com/hcp/docs/consul/self-managed/new)
     # or [link an existing one](https://developer.hashicorp.com/hcp/docs/consul/self-managed/existing).
     #
-    # Note: this setting should not be enabled for [HashiCorp-managed clusters](https://developer.hashicorp.com/hcp/docs/consul/hcp-managed).
+    # Note: this setting should not be enabled for [HCP Consul Dedicated clusters](/hcp/docs/consul/dedicated).
     # It is strictly for linking self-managed clusters.
     enabled: false
 
@@ -902,25 +907,15 @@ global:
 
   # Consul feature flags that will be enabled across components.
   # Supported feature flags:
-  # - `resource-apis`:
-  #   _**Warning**_! This feature is under active development. It is not
-  #   recommended for production use. Setting this flag during an
-  #   upgrade could risk breaking your Consul cluster.
-  #   If this flag is set, Consul components will use the
-  #   V2 resources APIs for all operations.
-  # - `v2tenancy`:
-  #   _**Warning**_! This feature is under active development. It is not
-  #   recommended for production use. Setting this flag during an
-  #   upgrade could risk breaking your Consul cluster.
-  #   If this flag is set, Consul V2 resources (catalog, mesh, auth, etc)
-  #   will use V2 implementations for tenancy (partitions and namesapces)
-  #   instead of bridging to the existing V1 implementations. The
-  #   `resource-apis` feature flag must also be set.
+  #
+  # - `v1dns`:
+  #   When this flag is set, Consul agents use the legacy DNS implementation.
+  #   This setting exists in the case a DNS bug is found after the refactoring introduced in v1.19.0.
   #
   # Example:
   #
   # ```yaml
-  # experiments: [ "resource-apis" ]
+  # experiments: [ "v1dns" ]
   # ```
   # @type: array<string>
   experiments: []
@@ -1919,6 +1914,17 @@ dns:
   # @type: string
   additionalSpec: null
 
+  # Configures dns-proxy deployment.
+  proxy:
+    # True if you want to enable dns-proxy
+    enabled: false
+
+    # The number of deployment replicas.
+    replicas: 1
+
+    # Port number to be used by DNS proxy
+    port: 53
+
 # Values that configure the Consul UI.
 ui:
   # If true, the UI will be enabled. This will
@@ -2311,6 +2317,8 @@ syncCatalog:
   # @type: string
   annotations: null
 
+
+
 # Configures the automatic Connect sidecar injector.
 connectInject:
   # True if you want to enable connect injection. Set to "-" to inherit from
@@ -2461,6 +2469,35 @@ connectInject:
       # Example: The gateway listener is defined on port 80, but the underlying value of the port on the container
       # will be the 80 + the number defined below.
       mapPrivilegedContainerPorts: 0
+
+      # This value contains settings related to the gateway_resources_job that runs on helm install
+      resourceJob:
+        # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+        # This should be a YAML map corresponding to a Kubernetes
+        # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+        # object.
+        #
+        # Example:
+        #
+        # ```yaml
+        # resources:
+        #   requests:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        #   limits:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        # ```
+        #
+        # @recurse: false
+        # @type: map
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
 
     # Configuration for the ServiceAccount created for the api-gateway component
     serviceAccount:
@@ -3472,6 +3509,33 @@ webhookCertManager:
   # @type: string
   nodeSelector: null
 
+  # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+  # This should be a YAML map corresponding to a Kubernetes
+  # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+  # object.
+  #
+  # Example:
+  #
+  # ```yaml
+  # resources:
+  #   requests:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  #   limits:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  # ```
+  #
+  # @recurse: false
+  # @type: map
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "100m"
+    limits:
+      memory: "50Mi"
+      cpu: "100m"
+
 # Configures a demo Prometheus installation.
 prometheus:
   # When true, the Helm chart will install a demo Prometheus server instance
@@ -3553,8 +3617,8 @@ telemetryCollector:
     # The resource id of the HCP Consul Central cluster to push metrics for. Eg:
     # `organization/27109cd4-a309-4bf3-9986-e1d071914b18/project/fcef6c24-259d-4510-bb8d-1d812e120e34/hashicorp.consul.global-network-manager.cluster/consul-cluster`
     #
-    # This is used for HCP Consul Central-linked or managed clusters where global.cloud.resourceId is unset. For example, when using externalServers
-    # with HCP Consul-managed clusters or HCP Consul Central-linked clusters in a different admin partition.
+    # This is used for HCP Consul Central-linked or HCP Consul Dedicated clusters where global.cloud.resourceId is unset. For example, when using externalServers
+    # with HCP Consul Dedicated clusters or HCP Consul Central-linked clusters in a different admin partition.
     #
     # If global.cloud.resourceId is set, this should either be unset (defaulting to global.cloud.resourceId) or be the same as global.cloud.resourceId.
     #

@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -30,7 +31,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul-k8s/control-plane/version"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 const (
@@ -57,7 +58,7 @@ var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.Name
 type MeshWebhook struct {
 	Clientset kubernetes.Interface
 
-	// ConsulClientConfig is the config to create a Consul API client.
+	// ConsulConfig is the config to create a Consul API client.
 	ConsulConfig *consul.Config
 
 	// ConsulServerConnMgr is the watcher for the Consul server addresses.
@@ -73,6 +74,9 @@ type MeshWebhook struct {
 	// ImageConsulK8S is the container image for consul-k8s to use.
 	// This image is used for the consul-sidecar container.
 	ImageConsulK8S string
+
+	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
+	GlobalImagePullPolicy string
 
 	// Optional: set when you need extra options to be set when running envoy
 	// See a list of args here: https://www.envoyproxy.io/docs/envoy/latest/operations/cli
@@ -727,9 +731,9 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 	return nil
 }
 
-func (w *MeshWebhook) InjectDecoder(d *admission.Decoder) error {
-	w.decoder = d
-	return nil
+func (w *MeshWebhook) SetupWithManager(mgr ctrl.Manager) {
+	w.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate", &admission.Webhook{Handler: w})
 }
 
 func sliceContains(slice []string, entry string) bool {

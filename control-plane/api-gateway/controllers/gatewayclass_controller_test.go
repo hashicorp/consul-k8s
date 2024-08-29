@@ -243,7 +243,10 @@ func TestGatewayClassReconciler(t *testing.T) {
 				objs = append(objs, tc.gatewayClass)
 			}
 
-			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...)).Build()
+			fakeClient := registerFieldIndexersForTest(
+				fake.NewClientBuilder().WithScheme(s).
+					WithRuntimeObjects(objs...).
+					WithStatusSubresource(&gwv1beta1.GatewayClass{})).Build()
 
 			r := &GatewayClassController{
 				Client:         fakeClient,

@@ -4332,6 +4332,120 @@ func TestReconcileDeleteEndpoint(t *testing.T) {
 			enableACLs:   true,
 		},
 		{
+			name:          "When pod is part of statefulset and comes up with new uid, the old service instance should be deleted",
+			consulSvcName: "service-deleted",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "default",
+					UID:       "new-pod-uid", // different from the original uid the initial instances were registered with
+					Annotations: map[string]string{
+						constants.AnnotationEnableSidecarProxyLifecycle:                     "true",
+						constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds: "5",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: nodeName,
+					// We don't need any other fields for this test
+				},
+			},
+			consulPodUid:              "123",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "pod1-service-deleted",
+					Service: "service-deleted",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						metaKeyKubeServiceName:   "service-deleted",
+						constants.MetaKeyKubeNS:  "default",
+						metaKeyManagedBy:         constants.ManagedByValue,
+						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-deleted-sidecar-proxy",
+					Service: "service-deleted-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-deleted",
+						DestinationServiceID:   "pod1-service-deleted",
+					},
+					Meta: map[string]string{
+						metaKeyKubeServiceName:   "service-deleted",
+						constants.MetaKeyKubeNS:  "default",
+						metaKeyManagedBy:         constants.ManagedByValue,
+						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
+					},
+				},
+			},
+			enableACLs: true,
+		},
+		{
+			name:          "When pod is part of statefulset and comes up with new node, the old service instance should be deleted",
+			consulSvcName: "service-deleted",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod1",
+					Namespace: "default",
+					UID:       "123",
+					Annotations: map[string]string{
+						constants.AnnotationEnableSidecarProxyLifecycle:                     "true",
+						constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds: "5",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: nodeName + "-different", // new node name
+					// We don't need any other fields for this test
+				},
+			},
+			consulPodUid:              "123",
+			expectServicesToBeDeleted: true,
+			initialConsulSvcs: []*api.AgentService{
+				{
+					ID:      "pod1-service-deleted",
+					Service: "service-deleted",
+					Port:    80,
+					Address: "1.2.3.4",
+					Meta: map[string]string{
+						metaKeyKubeServiceName:   "service-deleted",
+						constants.MetaKeyKubeNS:  "default",
+						metaKeyManagedBy:         constants.ManagedByValue,
+						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
+					},
+				},
+				{
+					Kind:    api.ServiceKindConnectProxy,
+					ID:      "pod1-service-deleted-sidecar-proxy",
+					Service: "service-deleted-sidecar-proxy",
+					Port:    20000,
+					Address: "1.2.3.4",
+					Proxy: &api.AgentServiceConnectProxyConfig{
+						DestinationServiceName: "service-deleted",
+						DestinationServiceID:   "pod1-service-deleted",
+					},
+					Meta: map[string]string{
+						metaKeyKubeServiceName:   "service-deleted",
+						constants.MetaKeyKubeNS:  "default",
+						metaKeyManagedBy:         constants.ManagedByValue,
+						metaKeySyntheticNode:     "true",
+						constants.MetaKeyPodName: "pod1",
+						constants.MetaKeyPodUID:  "123",
+					},
+				},
+			},
+			enableACLs: true,
+		},
+		{
 			name:                      "Mesh Gateway",
 			consulSvcName:             "service-deleted",
 			expectServicesToBeDeleted: true,
@@ -5547,7 +5661,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 					},
 				},
 			},
-			expProxyMode:       api.ProxyModeDefault,
+			expProxyMode:       api.ProxyModeTransparent,
 			expTaggedAddresses: nil,
 			expErr:             "",
 		},
@@ -5567,7 +5681,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 					},
 				},
 			},
-			expProxyMode:       api.ProxyModeDefault,
+			expProxyMode:       api.ProxyModeTransparent,
 			expTaggedAddresses: nil,
 			expErr:             "",
 		},
@@ -5588,7 +5702,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				},
 			},
 			expTaggedAddresses: nil,
-			expProxyMode:       api.ProxyModeDefault,
+			expProxyMode:       api.ProxyModeTransparent,
 			expErr:             "",
 		},
 		"service with an IPv6 clusterIP": {

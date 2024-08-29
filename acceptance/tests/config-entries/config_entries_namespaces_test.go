@@ -90,6 +90,10 @@ func TestControllerNamespaces(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
+
+				"terminatingGateways.enabled":              "true",
+				"terminatingGateways.gateways[0].name":     "terminating-gateway",
+				"terminatingGateways.gateways[0].replicas": "1",
 			}
 
 			releaseName := helpers.RandomName()

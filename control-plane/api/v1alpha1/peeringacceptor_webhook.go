@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	admissionv1 "k8s.io/api/admission/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
@@ -63,7 +64,7 @@ func (v *PeeringAcceptorWebhook) Handle(ctx context.Context, req admission.Reque
 	return admission.Allowed(fmt.Sprintf("valid %s request", acceptor.KubeKind()))
 }
 
-func (v *PeeringAcceptorWebhook) InjectDecoder(d *admission.Decoder) error {
-	v.decoder = d
-	return nil
+func (v *PeeringAcceptorWebhook) SetupWithManager(mgr ctrl.Manager) {
+	v.decoder = admission.NewDecoder(mgr.GetScheme())
+	mgr.GetWebhookServer().Register("/mutate-v1alpha1-peeringacceptors", &admission.Webhook{Handler: v})
 }
