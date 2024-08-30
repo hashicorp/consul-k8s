@@ -1,3 +1,9 @@
+## 1.6.0 
+
+FEATURES:
+
+* helm: Add Support for global rbac flag to decouple Consul-RBAC installation.
+
 ## 1.5.1 (July 16, 2024)
 
 SECURITY:
