@@ -17,8 +17,10 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics/prometheus"
+	"github.com/davecgh/go-spew/spew"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -396,7 +398,7 @@ func (c *Command) Run(args []string) int {
 	// Start metrics handler
 	go func() {
 		mux := http.NewServeMux()
-		mux.Handle(c.flagMetricsPath, c.authorizeMiddleware()(promhttp.Handler()))
+		mux.Handle(c.flagMetricsPath, c.authorizeMiddleware(consulConfig)(promhttp.Handler()))
 		var handler http.Handler = mux
 
 		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagMetricsPort))
@@ -523,11 +525,38 @@ func (c *Command) recordMetrics() (*prometheus.PrometheusSink, error) {
 	return sink, nil
 }
 
+func (c *Command) validateToken(token string, consulConfig *consul.Config) bool {
+	if token == "" {
+		return false
+	}
+
+	// Create a new consul client.
+	consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+	if err != nil {
+		c.logger.Error("failed to create Consul API client", "err", err)
+		return false
+	}
+
+	tok, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: token})
+	if err != nil && tok != nil {
+		c.logger.Error("failed to validate ACL token", "err", err)
+		return false
+	}
+
+	spew.Dump(tok)
+	c.logger.Info("ACL token validated", "token", tok)
+
+	return true
+}
+
 // authorizeMiddleware validates the token and returns http handler.
-func (c *Command) authorizeMiddleware() func(http.Handler) http.Handler {
+func (c *Command) authorizeMiddleware(consulConfig *consul.Config) func(http.Handler) http.Handler {
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// TO-DO: Validate the token and proceed to the next handler
+			token := r.Header.Get("X-Consul-Token")
+			c.validateToken(token, consulConfig)
 			next.ServeHTTP(w, r)
 		})
 	}
