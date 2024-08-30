@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/api"
 	"github.com/armon/go-metrics/prometheus"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -608,7 +608,7 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 	})
 	defer stopCommand(t, &cmd, longRunningChan)
 
-	// check that the name of the service is namespaced
+	// check that the two K8s services have been synced into Consul
 	retry.Run(t, func(r *retry.R) {
 		svc, _, err := consulClient.Catalog().Service("foo-bar", "k8s", nil)
 		require.NoError(r, err)

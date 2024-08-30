@@ -4,7 +4,6 @@
 package synccatalog
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -19,6 +18,7 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics/prometheus"
+	"github.com/cenkalti/backoff"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
@@ -156,9 +156,10 @@ func (c *Command) init() {
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 	c.flags.StringVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", "",
-		"Purge all K8S services registered in Consul under the node name.")
+		"Specifies the name of the Consul node for which to deregister synced Kubernetes services.")
 	c.flags.StringVar(&c.flagFilter, "filter", "",
-		"Specifies the expression used to filter the queries results for the node.")
+		"Specifies the expression used to filter the services on the Consul node that will be deregistered, "+
+			"the syntax here is the same as the syntax used in the List Services for Node API in the Consul catalog.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
@@ -283,7 +284,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
 			return 1
 		}
-		if err := c.removeAllK8SServicesFromConsulNode(consulClient, c.flagPurgeK8SServicesFromNode); err != nil {
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient); err != nil {
 			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
 			return 1
 		}
@@ -459,8 +460,8 @@ func (c *Command) Run(args []string) int {
 }
 
 // remove all k8s services from Consul.
-func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, nodeName string) error {
-	node, _, err := consulClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: c.flagFilter})
+func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client) error {
+	node, _, err := consulClient.Catalog().NodeServiceList(c.flagPurgeK8SServicesFromNode, &api.QueryOptions{Filter: c.flagFilter})
 	if err != nil {
 		return err
 	}
@@ -472,15 +473,14 @@ func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, n
 	maxRetries := 2
 	retryDelay := 200 * time.Millisecond
 
-	// Ask for user confirmation
-	reader := bufio.NewReader(os.Stdin)
+	// Ask for user confirmation before purging services
 	for {
-		c.UI.Info(fmt.Sprintf("Are you sure you want to delete %v K8S services from %v? (y/n): ", len(services), nodeName))
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		if input == "y" || input == "Y" {
+		c.UI.Info(fmt.Sprintf("Are you sure you want to delete %v K8S services from %v? (y/n): ", len(services), c.flagPurgeK8SServicesFromNode))
+		var input string
+		fmt.Scanln(&input)
+		if input = strings.ToLower(input); input == "y" {
 			break
-		} else if input == "n" || input == "N" {
+		} else if input == "n" {
 			return nil
 		} else {
 			c.UI.Info("Invalid input. Please enter 'y' or 'n'.")
@@ -498,20 +498,22 @@ func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, n
 			defer wg.Done()
 
 			for _, service := range batch {
-				err := retryOps(func() error {
+				var b backoff.BackOff = backoff.NewConstantBackOff(retryDelay)
+				b = backoff.WithMaxRetries(b, uint64(maxRetries))
+				err := backoff.Retry(func() error {
 					_, err := consulClient.Catalog().Deregister(&api.CatalogDeregistration{
-						Node:      nodeName,
+						Node:      c.flagPurgeK8SServicesFromNode,
 						ServiceID: service.ID,
 					}, nil)
 					return err
-				}, maxRetries, retryDelay, c.logger)
+				}, b)
 				if err != nil {
 					if len(errChan) == 0 {
 						errChan <- err
 					}
 				}
 			}
-			c.UI.Info(fmt.Sprintf("Processed %v K8S services from %v", len(batch), nodeName))
+			c.UI.Info(fmt.Sprintf("Processed %v K8S services from %v", len(batch), c.flagPurgeK8SServicesFromNode))
 		}(services[i:end])
 		wg.Wait()
 	}
@@ -522,19 +524,6 @@ func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, n
 	}
 	c.UI.Info("All K8S services were deregistered from Consul")
 	return nil
-}
-
-func retryOps(operation func() error, maxRetries int, retryDelay time.Duration, logger hclog.Logger) error {
-	var err error
-	for i := 0; i < maxRetries; i++ {
-		err = operation()
-		if err == nil {
-			return nil
-		}
-		logger.Warn("Operation failed: %v. Retrying in %v millisecond...", err, retryDelay)
-		time.Sleep(retryDelay)
-	}
-	return err
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {
