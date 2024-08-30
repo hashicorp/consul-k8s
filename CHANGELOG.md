@@ -1,3 +1,25 @@
+## 1.1.16 (August 28, 2024)
+
+SECURITY:
+
+* Bump Go to 1.22.5 to address [CVE-2024-24791](https://nvd.nist.gov/vuln/detail/CVE-2024-24791) [[GH-4228](https://github.com/hashicorp/consul-k8s/issues/4228)]
+* Upgrade Docker cli to use v.27.1. This addresses CVE
+[CVE-2024-41110](https://nvd.nist.gov/vuln/detail/CVE-2024-41110) [[GH-4228](https://github.com/hashicorp/consul-k8s/issues/4228)]
+
+IMPROVEMENTS:
+
+* docker: update go-discover binary [[GH-4287](https://github.com/hashicorp/consul-k8s/issues/4287)]
+* docker: update ubi base image to `ubi9-minimal:9.4`. [[GH-4287](https://github.com/hashicorp/consul-k8s/issues/4287)]
+* helm: Adds `webhookCertManager.resources` field which can be configured to override the `resource` settings for the `webhook-cert-manager` deployment. [[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
+* helm: Adds `connectInject.apiGateway.managedGatewayClass.resourceJob.resources` field which can be configured to override the `resource` settings for the `gateway-resources-job` job. [[GH-4184](https://github.com/hashicorp/consul-k8s/issues/4184)]
+* config-entry: add validate_clusters to mesh config entry [[GH-4256](https://github.com/hashicorp/consul-k8s/issues/4256)]
+
+BUG FIXES:
+
+* openshift: order SecurityContextConstraint volumes alphabetically to match OpenShift behavior.
+This ensures that diff detection tools like ArgoCD consider the source and reconciled resources to be identical. [[GH-4227](https://github.com/hashicorp/consul-k8s/issues/4227)]
+* sync-catalog: fix infinite retry loop when the catalog fails to connect to consul-server during the sync process [[GH-4266](https://github.com/hashicorp/consul-k8s/issues/4266)]
+
 ## 1.1.14 (July 16, 2024)
 
 SECURITY:
