@@ -159,8 +159,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", "",
 		"Specifies the name of the Consul node for which to deregister synced Kubernetes services.")
 	c.flags.StringVar(&c.flagFilter, "filter", "",
-		"Specifies the expression used to filter the services on the Consul node that will be deregistered, "+
-			"the syntax here is the same as the syntax used in the List Services for Node API in the Consul catalog.")
+		"Specifies the expression used to filter the services on the Consul node that will be deregistered. "+
+			"The syntax for this filter is the same as the syntax used in the List Services for Node API in the Consul catalog.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
