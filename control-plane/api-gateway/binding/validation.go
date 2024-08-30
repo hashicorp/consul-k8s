@@ -4,6 +4,7 @@
 package binding
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -165,6 +166,13 @@ func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway
 	return result
 }
 
+func stringOrEmtpy(s *gwv1beta1.SectionName) string {
+	if s == nil {
+		return ""
+	}
+	return string(*s)
+}
+
 func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
 	results := make(gatewayPolicyValidationResults, 0, len(policies))
 
@@ -175,7 +183,7 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 
 		exists := listenerExistsForPolicy(gateway, policy)
 		if !exists {
-			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingListener(policy.Spec.TargetRef.Name, string(*policy.Spec.TargetRef.SectionName)))
+			result.resolvedRefsErrs = append(result.resolvedRefsErrs, errorForMissingListener(policy.Spec.TargetRef.Name, stringOrEmtpy(policy.Spec.TargetRef.SectionName)))
 		}
 
 		missingJWTProviders := make(map[string]struct{})
@@ -211,6 +219,10 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 }
 
 func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
+	if policy.Spec.TargetRef.SectionName == nil {
+		return false
+	}
+
 	return gateway.Name == policy.Spec.TargetRef.Name &&
 		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1beta1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
 }
@@ -322,9 +334,18 @@ func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resourc
 
 func validateCertificateRefs(gateway gwv1beta1.Gateway, refs []gwv1beta1.SecretObjectReference, resources *common.ResourceMap) error {
 	for _, cert := range refs {
+		var mErr error
 		// Verify that the reference has a group and kind that we support
-		if !common.NilOrEqual(cert.Group, "") || !common.NilOrEqual(cert.Kind, common.KindSecret) {
-			return errListenerInvalidCertificateRef_NotSupported
+		if !common.NilOrEqual(cert.Group, "") {
+			mErr = errors.Join(mErr, fmt.Errorf("group is not supported: %q, supported Groups are \"\"", common.DerefStringOr(cert.Group, "")))
+		}
+
+		if !common.NilOrEqual(cert.Kind, common.KindSecret) {
+			mErr = errors.Join(mErr, fmt.Errorf("kind is not supported: %q, supported Kinds are %q", common.DerefStringOr(cert.Kind, ""), common.KindSecret))
+		}
+
+		if mErr != nil {
+			return fmt.Errorf("%w: %s", errListenerInvalidCertificateRef_NotSupported, mErr.Error())
 		}
 
 		// Verify that the reference is within the namespace or,

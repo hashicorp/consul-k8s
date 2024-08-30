@@ -5,6 +5,7 @@ package synccatalog
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -15,20 +16,24 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/armon/go-metrics/prometheus"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/control-plane/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
+	metricsutil "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -68,6 +73,12 @@ type Command struct {
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
+	// Metrics settings.
+	flagEnableMetrics        bool
+	flagMetricsPort          string
+	flagMetricsPath          string
+	flagMetricsRetentionTime string
+
 	// Flags to support Kubernetes Ingress resources
 	flagEnableIngress   bool // Register services using the hostname from an ingress resource
 	flagLoadBalancerIPs bool // Use the load balancer IP of an ingress resource instead of the hostname
@@ -78,11 +89,12 @@ type Command struct {
 	// consul-server-connection-manager has finished initial initialization.
 	ready bool
 
-	once    sync.Once
-	sigCh   chan os.Signal
-	help    string
-	logger  hclog.Logger
-	connMgr consul.ServerConnectionManager
+	once           sync.Once
+	sigCh          chan os.Signal
+	help           string
+	logger         hclog.Logger
+	connMgr        consul.ServerConnectionManager
+	prometheusSink *prometheus.PrometheusSink
 }
 
 func (c *Command) init() {
@@ -155,6 +167,11 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
+
+	c.flags.BoolVar(&c.flagEnableMetrics, "enable-metrics", false, "set this flag to enable metrics collection")
+	c.flags.StringVar(&c.flagMetricsPath, "metrics-path", "/metrics", "specify to set the path used for metrics scraping")
+	c.flags.StringVar(&c.flagMetricsPort, "metrics-port", "20300", "specify to set the port used for metrics scraping")
+	c.flags.StringVar(&c.flagMetricsRetentionTime, "prometheus-retention-time", "1m", "configures the retention time for metrics in the Prometheus sink")
 
 	c.flags.BoolVar(&c.flagEnableIngress, "enable-ingress", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
@@ -259,6 +276,17 @@ func (c *Command) Run(args []string) int {
 		// it will be the only allowed namespace
 		allowSet = mapset.NewSet(c.flagK8SSourceNamespace)
 	}
+
+	metricsConfig := metrics.SyncCatalogMetricsConfig(c.flagEnableMetrics, c.flagMetricsPort, c.flagMetricsPath)
+	metricsConfig.PrometheusMetricsRetentionTime = c.flagMetricsRetentionTime
+
+	// Create the metrics sink
+	sink, err := c.recordMetrics()
+	if err != nil {
+		c.logger.Error("Prometheus sink not initialized, metrics cannot be displayed", "error", err)
+	}
+	c.prometheusSink = sink
+
 	c.logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
 		"k8s namespaces denied from syncing", denySet)
 
@@ -279,6 +307,7 @@ func (c *Command) Run(args []string) int {
 			ServicePollPeriod:       c.flagConsulWritePeriod * 2,
 			ConsulK8STag:            c.flagConsulK8STag,
 			ConsulNodeName:          c.flagConsulNodeName,
+			PrometheusSink:          c.prometheusSink,
 		}
 		go syncer.Run(ctx)
 
@@ -306,6 +335,7 @@ func (c *Command) Run(args []string) int {
 				ConsulNodeName:             c.flagConsulNodeName,
 				EnableIngress:              c.flagEnableIngress,
 				SyncLoadBalancerIPs:        c.flagLoadBalancerIPs,
+				MetricsConfig:              metricsConfig,
 			},
 		}
 
@@ -320,10 +350,11 @@ func (c *Command) Run(args []string) int {
 	var toK8SCh chan struct{}
 	if c.flagToK8S {
 		sink := &catalogtok8s.K8SSink{
-			Client:    c.clientset,
-			Namespace: c.flagK8SWriteNamespace,
-			Log:       c.logger.Named("to-k8s/sink"),
-			Ctx:       ctx,
+			Client:         c.clientset,
+			Namespace:      c.flagK8SWriteNamespace,
+			Log:            c.logger.Named("to-k8s/sink"),
+			Ctx:            ctx,
+			PrometheusSink: c.prometheusSink,
 		}
 
 		source := &catalogtok8s.Source{
@@ -358,6 +389,18 @@ func (c *Command) Run(args []string) int {
 
 		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagListen))
 		if err := http.ListenAndServe(c.flagListen, handler); err != nil {
+			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
+		}
+	}()
+
+	// Start metrics handler
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle(c.flagMetricsPath, c.authorizeMiddleware()(promhttp.Handler()))
+		var handler http.Handler = mux
+
+		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagMetricsPort))
+		if err := http.ListenAndServe(fmt.Sprintf(":%s", c.flagMetricsPort), handler); err != nil {
 			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
 		}
 	}()
@@ -438,7 +481,56 @@ func (c *Command) validateFlags() error {
 		)
 	}
 
+	if c.flagMetricsPort != "" {
+		if _, valid := metricsutil.ParseScrapePort(c.flagMetricsPort); !valid {
+			return errors.New("-metrics-port must be a valid unprivileged port number")
+		}
+	}
+
 	return nil
+}
+
+func (c *Command) recordMetrics() (*prometheus.PrometheusSink, error) {
+	var err error
+
+	duration, err := time.ParseDuration(c.flagMetricsRetentionTime)
+	if err != nil {
+		return &prometheus.PrometheusSink{}, err
+	}
+
+	var counters = [][]prometheus.CounterDefinition{
+		catalogtoconsul.SyncToConsulCounters,
+		catalogtok8s.SyncToK8sCounters,
+	}
+
+	var counterDefs []prometheus.CounterDefinition
+
+	for _, counter := range counters {
+		counterDefs = append(counterDefs, counter...)
+	}
+
+	opts := prometheus.PrometheusOpts{
+		Expiration:         duration,
+		CounterDefinitions: counterDefs,
+		GaugeDefinitions:   catalogtoconsul.SyncCatalogGauge,
+	}
+
+	sink, err := prometheus.NewPrometheusSinkFrom(opts)
+	if err != nil {
+		return &prometheus.PrometheusSink{}, err
+	}
+
+	return sink, nil
+}
+
+// authorizeMiddleware validates the token and returns http handler.
+func (c *Command) authorizeMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// TO-DO: Validate the token and proceed to the next handler
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 const synopsis = "Sync Kubernetes services and Consul services."

@@ -44,12 +44,12 @@ type RegistrationsController struct {
 	Log    logr.Logger
 }
 
-// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=servicerouters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=registration,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=registration/status,verbs=get;update;patch
 
 func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.V(1).WithValues("registration", req.NamespacedName)
-	log.Info("Reconciling Registaration")
+	log.Info("Reconciling Registration")
 
 	registration := &v1alpha1.Registration{}
 	// get the registration
@@ -59,18 +59,6 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
-	cachedRegistration, ok := r.Cache.get(registration.Spec.Service.Name)
-	if slices.ContainsFunc(registration.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Type == ConditionDeregistered }) {
-		if ok && registration.EqualExceptStatus(cachedRegistration) {
-			log.Info("Registration is in sync")
-			// registration is already in sync so we do nothing, this happens when consul deregisters a service
-			// and we update the status to show that consul deregistered it
-			return ctrl.Result{}, nil
-		}
-	}
-
-	log.Info("need to reconcile")
 
 	// deletion request
 	if !registration.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -85,6 +73,19 @@ func (r *RegistrationsController) Reconcile(ctx context.Context, req ctrl.Reques
 		}
 		return ctrl.Result{}, nil
 	}
+
+	cachedRegistration, ok := r.Cache.get(registration.Spec.Service.Name)
+	if slices.ContainsFunc(registration.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Type == ConditionDeregistered }) {
+		// registration is already in sync so we do nothing, this happens when consul deregisters a service
+		// and we update the status to show that consul deregistered it
+		if ok && registration.EqualExceptStatus(cachedRegistration) {
+			r.Cache.set(registration.Spec.Service.Name, registration)
+			log.Info("Registration is in sync")
+			return ctrl.Result{}, nil
+		}
+	}
+
+	log.Info("need to reconcile")
 
 	// registration request
 	result := r.handleRegistration(ctx, log, registration)
@@ -113,7 +114,6 @@ func (c *RegistrationsController) watchForDeregistrations(ctx context.Context) {
 				continue
 			}
 			for _, reg := range regList.Items {
-
 				err := c.UpdateStatus(context.Background(), c.Log, &reg, Result{Registering: false, ConsulDeregistered: true})
 				if err != nil {
 					c.Log.Error(err, "failed to update Registration status", "name", reg.Name, "namespace", reg.Namespace)
@@ -143,46 +143,7 @@ func (r *RegistrationsController) handleRegistration(ctx context.Context, log lo
 		return result
 	}
 
-	if r.Cache.aclsEnabled() {
-		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)
-			return result
-		}
-
-		err = r.Cache.updateTermGWACLRole(log, registration, termGWsToUpdate)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrUpdatingACLRoles, err)
-			return result
-		}
-	}
 	return result
-}
-
-func (r *RegistrationsController) terminatingGatewaysToUpdate(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration) ([]v1alpha1.TerminatingGateway, error) {
-	termGWList := &v1alpha1.TerminatingGatewayList{}
-	err := r.Client.List(ctx, termGWList)
-	if err != nil {
-		log.Error(err, "error listing terminating gateways")
-		return nil, err
-	}
-
-	termGWsToUpdate := make([]v1alpha1.TerminatingGateway, 0, len(termGWList.Items))
-	for _, termGW := range termGWList.Items {
-		if slices.ContainsFunc(termGW.Spec.Services, termGWContainsService(registration)) {
-			termGWsToUpdate = append(termGWsToUpdate, termGW)
-		}
-	}
-
-	return termGWsToUpdate, nil
-}
-
-func termGWContainsService(registration *v1alpha1.Registration) func(v1alpha1.LinkedService) bool {
-	return func(svc v1alpha1.LinkedService) bool {
-		return svc.Name == registration.Spec.Service.Name
-	}
 }
 
 func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.Logger, registration *v1alpha1.Registration) Result {
@@ -193,22 +154,6 @@ func (r *RegistrationsController) handleDeletion(ctx context.Context, log logr.L
 		result.Sync = err
 		result.Deregistration = fmt.Errorf("%w: %s", ErrDeregisteringService, err)
 		return result
-	}
-
-	if r.Cache.aclsEnabled() {
-		termGWsToUpdate, err := r.terminatingGatewaysToUpdate(ctx, log, registration)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)
-			return result
-		}
-
-		err = r.Cache.removeTermGWACLRole(log, registration, termGWsToUpdate)
-		if err != nil {
-			result.Sync = err
-			result.ACLUpdate = fmt.Errorf("%w: %s", ErrRemovingACLRoles, err)
-			return result
-		}
 	}
 
 	patch := r.RemoveFinalizersPatch(registration, RegistrationFinalizer)
@@ -231,10 +176,6 @@ func (r *RegistrationsController) UpdateStatus(ctx context.Context, log logr.Log
 		registration.Status.Conditions = append(registration.Status.Conditions, registrationCondition(result))
 	} else {
 		registration.Status.Conditions = append(registration.Status.Conditions, deregistrationCondition(result))
-	}
-
-	if r.Cache.aclsEnabled() {
-		registration.Status.Conditions = append(registration.Status.Conditions, aclCondition(result))
 	}
 
 	err := r.Status().Update(ctx, registration)

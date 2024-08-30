@@ -2207,6 +2207,19 @@ syncCatalog:
   # If false, LoadBalancer endpoints are not synced to Consul.
   syncLoadBalancerEndpoints: false
 
+  # Metrics settings for syncCatalog
+  metrics:
+    # This value enables or disables metrics collection for registered services, overriding the global metrics collection settings.
+    # @type: boolean
+    enabled: false
+    # This value sets the port to use for scraping syncCatalog metrics via prometheus, defaults to 20300 if not set. Must be in the port
+    # range of 1024-65535.
+    # @type: int
+    port: null
+    # This value sets the path to use for scraping syncCatalog metrics via prometheus, defaults to /metrics if not set.
+    # @type: string
+    path: null
+
   ingress:
     # Syncs the hostname from a Kubernetes Ingress resource to service registrations
     # when a rule matched a service. Currently only supports host based routing and
@@ -2473,6 +2486,35 @@ connectInject:
       # Example: The gateway listener is defined on port 80, but the underlying value of the port on the container
       # will be the 80 + the number defined below.
       mapPrivilegedContainerPorts: 0
+
+      # This value contains settings related to the gateway_resources_job that runs on helm install
+      resourceJob:
+        # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+        # This should be a YAML map corresponding to a Kubernetes
+        # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+        # object.
+        #
+        # Example:
+        #
+        # ```yaml
+        # resources:
+        #   requests:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        #   limits:
+        #     memory: '200Mi'
+        #     cpu: '100m'
+        # ```
+        #
+        # @recurse: false
+        # @type: map
+        resources:
+          requests:
+            memory: "50Mi"
+            cpu: "50m"
+          limits:
+            memory: "50Mi"
+            cpu: "50m"
 
     # Configuration for the ServiceAccount created for the api-gateway component
     serviceAccount:
@@ -3483,6 +3525,33 @@ webhookCertManager:
   #
   # @type: string
   nodeSelector: null
+
+  # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+  # This should be a YAML map corresponding to a Kubernetes
+  # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
+  # object.
+  #
+  # Example:
+  #
+  # ```yaml
+  # resources:
+  #   requests:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  #   limits:
+  #     memory: '200Mi'
+  #     cpu: '100m'
+  # ```
+  #
+  # @recurse: false
+  # @type: map
+  resources:
+    requests:
+      memory: "50Mi"
+      cpu: "100m"
+    limits:
+      memory: "50Mi"
+      cpu: "100m"
 
 # Configures a demo Prometheus installation.
 prometheus:

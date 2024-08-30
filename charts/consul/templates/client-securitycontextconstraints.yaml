@@ -14,6 +14,7 @@ metadata:
   annotations:
     kubernetes.io/description: {{ template "consul.fullname" . }}-client are the security context constraints required
       to run the consul client.
+# Iff. allowHostDirVolumePlugin is true, hostPath must be included in volumes (see below).
 {{- if .Values.client.dataDirectoryHostPath }}
 allowHostDirVolumePlugin: true
 {{- else }}
@@ -45,14 +46,18 @@ supplementalGroups:
   type: MustRunAs
 users: []
 volumes:
+# This list must be in alphabetical order to match the post-reconcile order enforced by OpenShift admission hooks.
+# Furthermore, hostPath must be included explicitly if allowHostDirVolumePlugin is true, as it will otherwise be
+# added by OpenShift. It must be excluded if allowHostDirVolumePlugin is false per OpenShift requirements.
+# This avoids false positives in change detection by third-party diff tools (e.g. ArgoCD) that respect list order.
 - configMap
 - downwardAPI
 - emptyDir
-- persistentVolumeClaim
-- projected
-- secret
 {{- if .Values.client.dataDirectoryHostPath }}
 - hostPath
 {{- end }}
+- persistentVolumeClaim
+- projected
+- secret
 {{- end}}
 {{- end }}
