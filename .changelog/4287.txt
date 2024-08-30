@@ -1,0 +1,7 @@
+```release-note:enhancement
+docker: update go-discover binary
+```
+
+```release-note:enhancement
+docker: update ubi base image to `ubi9-minimal:9.4`.
+```
