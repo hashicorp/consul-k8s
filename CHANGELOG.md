@@ -1,4 +1,4 @@
-## 1.5.3 (August 29, 2024)
+## 1.5.3 (August 30, 2024)
 
 SECURITY:
 
@@ -24,6 +24,10 @@ BUG FIXES:
 This ensures that diff detection tools like ArgoCD consider the source and reconciled resources to be identical. [[GH-4227](https://github.com/hashicorp/consul-k8s/issues/4227)]
 * sync-catalog: fix infinite retry loop when the catalog fails to connect to consul-server during the sync process [[GH-4266](https://github.com/hashicorp/consul-k8s/issues/4266)]
 * terminating-gateways: Fix bug where namespace field was not correctly set on ACL policies if using the `Registration` CRD with the service's namespace unset. [[GH-4224](https://github.com/hashicorp/consul-k8s/issues/4224)]
+
+## 1.5.2 (August 29, 2024)
+
+Release redacted, use `1.5.3`
 
 ## 1.5.1 (July 16, 2024)
 
