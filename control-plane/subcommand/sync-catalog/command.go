@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics/prometheus"
-	"github.com/davecgh/go-spew/spew"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
@@ -533,18 +532,15 @@ func (c *Command) validateToken(token string, consulConfig *consul.Config) bool 
 	// Create a new consul client.
 	consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
 	if err != nil {
-		c.logger.Error("failed to create Consul API client", "err", err)
+		c.logger.Error("failed to create Consul API client", "error", err)
 		return false
 	}
 
 	tok, _, err := consulClient.ACL().TokenReadSelf(&api.QueryOptions{Token: token})
-	if err != nil && tok != nil {
-		c.logger.Error("failed to validate ACL token", "err", err)
+	if err != nil || tok == nil {
+		c.logger.Error("failed to validate ACL token", "error", err)
 		return false
 	}
-
-	spew.Dump(tok)
-	c.logger.Info("ACL token validated", "token", tok)
 
 	return true
 }
@@ -554,9 +550,11 @@ func (c *Command) authorizeMiddleware(consulConfig *consul.Config) func(http.Han
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// TO-DO: Validate the token and proceed to the next handler
 			token := r.Header.Get("X-Consul-Token")
-			c.validateToken(token, consulConfig)
+			if !c.validateToken(token, consulConfig) {
+				http.Error(w, "invalid token", http.StatusInternalServerError)
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}
