@@ -68,6 +68,8 @@ func TestConsulDNS(t *testing.T) {
 				"global.logLevel":              "debug",
 			}
 
+			// If ACLs are enabled and we are not managing system ACLs, we need to
+			// set the initial management token in the server.extraConfig.
 			const initialManagementToken = "b1gs33cr3t"
 			if c.aclsEnabled && !c.manageSystemACLs {
 				helmValues["server.extraConfig"] = fmt.Sprintf(`"{\"acl\": {\"enabled\": true\, \"default_policy\": \"deny\"\, \"tokens\": {\"initial_management\": \"%s\"}}}"`,
@@ -75,20 +77,21 @@ func TestConsulDNS(t *testing.T) {
 			}
 
 			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
+
+			// attach the initial management token to the cluster so it is tied to the client requests when minting a dns proxy ACL token.
 			if c.aclsEnabled && !c.manageSystemACLs {
 				cluster.ACLToken = initialManagementToken
 			}
 			cluster.Create(t)
 
+			// If ACLs are enabled and we are not managing system ACLs, we need to
+			// create a policy and token for the DNS proxy that need to be in
+			// place before the DNS proxy is started.
 			if c.aclsEnabled && c.enableDNSProxy && !c.manageSystemACLs {
-				consulClient, configAddress := cluster.SetupConsulClient(t, c.tlsEnabled)
-				_, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{}, &api.WriteOptions{
-					Token: initialManagementToken,
-				})
-				require.NoError(t, err)
+				secretName := "consul-dns-proxy-token"
 
-				// Create the policy and token _before_ we enable dns proxy and upgrade the cluster.
-				dnsProxyRules := `
+				consulClient, configAddress := cluster.SetupConsulClient(t, c.tlsEnabled)
+				dnsProxyPolicy := `
 					node_prefix "" {
 					  policy = "read"
 					}
@@ -96,26 +99,10 @@ func TestConsulDNS(t *testing.T) {
 					  policy = "read"
 					}
 				`
+				err, dnsProxyToken := createACLTokenWithGivenPolicy(t, consulClient, dnsProxyPolicy, initialManagementToken, configAddress)
 				require.NoError(t, err)
-				policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
-					Name:        "dns-proxy-token",
-					Description: "DNS Proxy Policy",
-					Rules:       dnsProxyRules,
-				}, nil)
-				require.NoError(t, err)
-				dnsProxyToken, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{
-					Description: fmt.Sprintf("DNS Proxy Token for %s", strings.Split(configAddress, ":")[0]),
-					Policies: []*api.ACLTokenPolicyLink{
-						{
-							Name: policy.Name,
-						},
-					},
-				}, nil)
-				require.NoError(t, err)
-				logger.Log(t, "created DNS Proxy token", "token", dnsProxyToken)
-				secretName := "consul-dns-proxy-token"
 
-				// TODO: check for existence and update
+				// Create a secret with the token to be used by the DNS proxy.
 				_, err = ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(context.Background(), &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: secretName,
@@ -129,14 +116,18 @@ func TestConsulDNS(t *testing.T) {
 					require.NoError(t, ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{}))
 				})
 
+				// Update the helm values to include the secret name and key.
 				helmValues["dns.proxy.aclToken.secretName"] = secretName
 				helmValues["dns.proxy.aclToken.secretKey"] = common.ACLTokenSecretKey
 			}
 
+			// If DNS proxy is enabled, we need to set the enableDNSProxy flag in the helm values.
 			if c.enableDNSProxy {
 				helmValues["dns.proxy.enabled"] = strconv.FormatBool(c.enableDNSProxy)
 			}
-			// Upgrade the cluster to apply the changes for DNS cluster
+			// Upgrade the cluster to apply the changes created above.  This will
+			// also start the DNS proxy if it is enabled and it will pick up the ACL token
+			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
 
 			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
@@ -144,6 +135,33 @@ func TestConsulDNS(t *testing.T) {
 				"consul.service.consul", true, 0)
 		})
 	}
+}
+
+func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, policyRules string, initialManagementToken string, configAddress string) (error, *api.ACLToken) {
+	_, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{}, &api.WriteOptions{
+		Token: initialManagementToken,
+	})
+	require.NoError(t, err)
+
+	// Create the policy and token _before_ we enable dns proxy and upgrade the cluster.
+	require.NoError(t, err)
+	policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
+		Name:        "dns-proxy-token",
+		Description: "DNS Proxy Policy",
+		Rules:       policyRules,
+	}, nil)
+	require.NoError(t, err)
+	dnsProxyToken, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{
+		Description: fmt.Sprintf("DNS Proxy Token for %s", strings.Split(configAddress, ":")[0]),
+		Policies: []*api.ACLTokenPolicyLink{
+			{
+				Name: policy.Name,
+			},
+		},
+	}, nil)
+	require.NoError(t, err)
+	logger.Log(t, "created DNS Proxy token", "token", dnsProxyToken)
+	return err, dnsProxyToken
 }
 
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
