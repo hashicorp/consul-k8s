@@ -114,6 +114,8 @@ func TestConsulDNS(t *testing.T) {
 				require.NoError(t, err)
 				logger.Log(t, "created DNS Proxy token", "token", dnsProxyToken)
 				secretName := "consul-dns-proxy-token"
+
+				// TODO: check for existence and update
 				_, err = ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(context.Background(), &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: secretName,
@@ -123,6 +125,9 @@ func TestConsulDNS(t *testing.T) {
 					},
 					Type: corev1.SecretTypeOpaque,
 				}, metav1.CreateOptions{})
+				t.Cleanup(func() {
+					require.NoError(t, ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{}))
+				})
 
 				helmValues["dns.proxy.aclToken.secretName"] = secretName
 				helmValues["dns.proxy.aclToken.secretKey"] = common.ACLTokenSecretKey
