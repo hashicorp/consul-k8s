@@ -1,4 +1,4 @@
-## 1.4.6 (August 29, 2024)
+## 1.4.6 (August 30, 2024)
 
 SECURITY:
 
@@ -23,6 +23,10 @@ BUG FIXES:
 * openshift: order SecurityContextConstraint volumes alphabetically to match OpenShift behavior.
 This ensures that diff detection tools like ArgoCD consider the source and reconciled resources to be identical. [[GH-4227](https://github.com/hashicorp/consul-k8s/issues/4227)]
 * sync-catalog: fix infinite retry loop when the catalog fails to connect to consul-server during the sync process [[GH-4266](https://github.com/hashicorp/consul-k8s/issues/4266)]
+
+## 1.4.5 (August 29, 2024)
+
+Release redacted, use `1.4.6`
 
 ## 1.4.4 (July 15, 2024)
 
