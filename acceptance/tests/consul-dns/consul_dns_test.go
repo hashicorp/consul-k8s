@@ -111,6 +111,8 @@ func TestConsulDNS(t *testing.T) {
 					},
 					Type: corev1.SecretTypeOpaque,
 				}, metav1.CreateOptions{})
+				require.NoError(t, err)
+
 				t.Cleanup(func() {
 					require.NoError(t, ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{}))
 				})
