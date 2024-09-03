@@ -235,6 +235,67 @@ load _helpers
 
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
+
+@test "dnsProxy/Deployment: sets DP_CREDENTIAL_LOGIN_META1 and DP_CREDENTIAL_LOGIN_META2 when managedSystemACLs is true" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_LOGIN_META1") | .value' | tee /dev/stderr)
+    [ "${actual}" = 'pod=$(NAMESPACE)/$(POD_NAME)' ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_LOGIN_META2") | .value' | tee /dev/stderr)
+    [ "${actual}" = 'component=dns-proxy' ]
+}
+
+@test "dnsProxy/Deployment: does not set DP_CREDENTIAL_LOGIN_META1 and DP_CREDENTIAL_LOGIN_META2 when managedSystemACLs is false" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'global.acls.manageSystemACLs=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_LOGIN_META1")' | tee /dev/stderr)
+    [ "${actual}" = '' ]
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_LOGIN_META2")' | tee /dev/stderr)
+    [ "${actual}" = '' ]
+}
+
+@test "dnsProxy/Deployment: sets DP_CREDENTIAL_STATIC_TOKEN when managedSystemACLs is false and dns.proxy.aclToken.secretName and dns.proxy.aclToken.secretKey are set" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'global.acls.manageSystemACLs=false' \
+      --set 'dns.proxy.aclToken.secretName=foo' \
+      --set 'dns.proxy.aclToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_STATIC_TOKEN") | .valueFrom.secretKeyRef.name' | tee /dev/stderr)
+    [ "${actual}" = 'foo' ]
+}
+
+@test "dnsProxy/Deployment: does not set DP_CREDENTIAL_STATIC_TOKEN when managedSystemACLs is true or dns.proxy.aclToken.secretName or dns.proxy.aclToken.secretKey are not set" {
+  cd `chart_dir`
+  local env=$(helm template \
+      -s templates/dns-proxy-deployment.yaml \
+      --set 'dns.proxy.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_STATIC_TOKEN")' | tee /dev/stderr)
+    [ "${actual}" = '' ]
+}
+
 @test "dnsProxy/Deployment: sets global auth method and primary datacenter when federation and acls" {
   cd `chart_dir`
   local actual=$(helm template \
