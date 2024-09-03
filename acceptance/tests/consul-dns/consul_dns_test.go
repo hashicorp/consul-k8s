@@ -6,7 +6,6 @@ package consuldns
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 	"os"
@@ -108,7 +107,7 @@ func TestConsulDNS(t *testing.T) {
 						Name: secretName,
 					},
 					StringData: map[string]string{
-						common.ACLTokenSecretKey: dnsProxyToken.SecretID,
+						"token": dnsProxyToken.SecretID,
 					},
 					Type: corev1.SecretTypeOpaque,
 				}, metav1.CreateOptions{})
@@ -118,7 +117,7 @@ func TestConsulDNS(t *testing.T) {
 
 				// Update the helm values to include the secret name and key.
 				helmValues["dns.proxy.aclToken.secretName"] = secretName
-				helmValues["dns.proxy.aclToken.secretKey"] = common.ACLTokenSecretKey
+				helmValues["dns.proxy.aclToken.secretKey"] = "token"
 			}
 
 			// If DNS proxy is enabled, we need to set the enableDNSProxy flag in the helm values.
