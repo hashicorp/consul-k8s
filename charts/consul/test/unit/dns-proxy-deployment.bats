@@ -82,7 +82,30 @@ load _helpers
 
 
 #--------------------------------------------------------------------
-# authMethod
+# credentials
+
+@test "dnsProxy/Deployment: -credential-type is login by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml  \
+      --set 'dns.proxy.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0] | any(.args[]; . == "-credential-type=login")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "dnsProxy/Deployment: -credential-type is static when manageSystemACLs is false and dns.proxy.aclToken.secretName and dns.proxy.aclToken.secretKey are set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/dns-proxy-deployment.yaml  \
+      --set 'dns.proxy.enabled=true' \
+      --set 'dns.proxy.aclToken.secretName=foo' \
+      --set 'dns.proxy.aclToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0] | any(.args[]; . == "-credential-type=static")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
 
 @test "dnsProxy/Deployment: -login-auth-method is not set by default" {
   cd `chart_dir`
