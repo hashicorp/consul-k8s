@@ -4,6 +4,7 @@
 package synccatalog
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
@@ -11,12 +12,14 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,27 +40,29 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                     *flag.FlagSet
-	consul                    *flags.ConsulFlags
-	k8s                       *flags.K8SFlags
-	flagListen                string
-	flagToConsul              bool
-	flagToK8S                 bool
-	flagConsulDomain          string
-	flagConsulK8STag          string
-	flagConsulNodeName        string
-	flagK8SDefault            bool
-	flagK8SServicePrefix      string
-	flagConsulServicePrefix   string
-	flagK8SSourceNamespace    string
-	flagK8SWriteNamespace     string
-	flagConsulWritePeriod     time.Duration
-	flagSyncClusterIPServices bool
-	flagSyncLBEndpoints       bool
-	flagNodePortSyncType      string
-	flagAddK8SNamespaceSuffix bool
-	flagLogLevel              string
-	flagLogJSON               bool
+	flags                        *flag.FlagSet
+	consul                       *flags.ConsulFlags
+	k8s                          *flags.K8SFlags
+	flagListen                   string
+	flagToConsul                 bool
+	flagToK8S                    bool
+	flagConsulDomain             string
+	flagConsulK8STag             string
+	flagConsulNodeName           string
+	flagK8SDefault               bool
+	flagK8SServicePrefix         string
+	flagConsulServicePrefix      string
+	flagK8SSourceNamespace       string
+	flagK8SWriteNamespace        string
+	flagConsulWritePeriod        time.Duration
+	flagSyncClusterIPServices    bool
+	flagSyncLBEndpoints          bool
+	flagNodePortSyncType         string
+	flagAddK8SNamespaceSuffix    bool
+	flagLogLevel                 string
+	flagLogJSON                  bool
+	flagPurgeK8SServicesFromNode string
+	flagFilter                   string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -138,6 +143,10 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+	c.flags.StringVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", "",
+		"Purge all K8S services registered in Consul under the node name.")
+	c.flags.StringVar(&c.flagFilter, "filter", "",
+		"Specifies the expression used to filter the queries results for the node.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
@@ -250,6 +259,19 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	c.ready = true
+
+	if c.flagPurgeK8SServicesFromNode != "" {
+		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
+			return 1
+		}
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient, c.flagPurgeK8SServicesFromNode); err != nil {
+			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
+			return 1
+		}
+		return 0
+	}
 
 	// Convert allow/deny lists to sets
 	allowSet := flags.ToSet(c.flagAllowK8sNamespacesList)
@@ -391,6 +413,85 @@ func (c *Command) Run(args []string) int {
 		}
 		return 0
 	}
+}
+
+// remove all k8s services from Consul.
+func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, nodeName string) error {
+	node, _, err := consulClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: c.flagFilter})
+	if err != nil {
+		return err
+	}
+
+	var wg sync.WaitGroup
+	services := node.Services
+	errChan := make(chan error, 1)
+	batchSize := 300
+	maxRetries := 2
+	retryDelay := 200 * time.Millisecond
+
+	// Ask for user confirmation
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		c.UI.Info(fmt.Sprintf("Are you sure you want to delete %v K8S services from %v? (y/n): ", len(services), nodeName))
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input == "y" || input == "Y" {
+			break
+		} else if input == "n" || input == "N" {
+			return nil
+		} else {
+			c.UI.Info("Invalid input. Please enter 'y' or 'n'.")
+		}
+	}
+
+	for i := 0; i < len(services); i += batchSize {
+		end := i + batchSize
+		if end > len(services) {
+			end = len(services)
+		}
+
+		wg.Add(1)
+		go func(batch []*api.AgentService) {
+			defer wg.Done()
+
+			for _, service := range batch {
+				err := retryOps(func() error {
+					_, err := consulClient.Catalog().Deregister(&api.CatalogDeregistration{
+						Node:      nodeName,
+						ServiceID: service.ID,
+					}, nil)
+					return err
+				}, maxRetries, retryDelay, c.logger)
+				if err != nil {
+					if len(errChan) == 0 {
+						errChan <- err
+					}
+				}
+			}
+			c.UI.Info(fmt.Sprintf("Processed %v K8S services from %v", len(batch), nodeName))
+		}(services[i:end])
+		wg.Wait()
+	}
+
+	close(errChan)
+	if err = <-errChan; err != nil {
+		return err
+	}
+	c.UI.Info("All K8S services were deregistered from Consul")
+	return nil
+}
+
+func retryOps(operation func() error, maxRetries int, retryDelay time.Duration, logger hclog.Logger) error {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = operation()
+		if err == nil {
+			return nil
+		}
+		logger.Warn("Operation failed: %v. Retrying in %v millisecond...", err, retryDelay)
+		time.Sleep(retryDelay)
+	}
+	return err
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {
