@@ -859,6 +859,8 @@ func TestServiceResource_nodePort(t *testing.T) {
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
 		require.Equal(r, 30000, actual[2].Service.Port)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
+		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
