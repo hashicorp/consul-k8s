@@ -1,0 +1,3 @@
+```release-note:enhancement
+dns-proxy: add the ability to deploy a DNS proxy within the kubernetes cluster that forwards DNS requests to the consul server and can be configured with an ACL token and make partition aware DNS requests.
+```
