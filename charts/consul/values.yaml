@@ -1922,6 +1922,7 @@ dns:
     # The number of deployment replicas.
     replicas: 1
 
+    # Port number to be used by DNS proxy
     port: 53
 
     # Refers to a Kubernetes secret that you have created that contains
