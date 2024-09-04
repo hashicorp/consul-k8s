@@ -34,7 +34,7 @@ load _helpers
 #--------------------------------------------------------------------
 # rules
 
-@test "connectInject/ClusterRole: sets get, list, and watch access to endpoints, services, namespaces and nodes in all api groups" {
+@test "connectInject/ClusterRole: sets get, list, watch, delete, create, and update access to secrets, serviceaccounts and services in core api group" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/connect-inject-clusterrole.yaml  \
@@ -44,10 +44,48 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.rules[2]' | tee /dev/stderr)
 
-  local actual=$(echo $object | yq -r '.resources[| index("endpoints")' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.resources[| index("secrets")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.resources[| index("serviceaccounts")' | tee /dev/stderr)
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.resources[| index("services")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.apiGroups[0]' | tee /dev/stderr)
+  [ "${actual}" = "" ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("get")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("list")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("watch")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("delete")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("create")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+
+  local actual=$(echo $object | yq -r '.verbs | index("update")' | tee /dev/stderr)
+  [ "${actual}" != null ]
+}
+
+@test "connectInject/ClusterRole: sets get, list, and watch access to endpoints, namespaces and nodes in core api group" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/connect-inject-clusterrole.yaml  \
+      --set 'global.enabled=false' \
+      --set 'client.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.rules[3]' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '.resources[| index("endpoints")' | tee /dev/stderr)
   [ "${actual}" != null ]
 
   local actual=$(echo $object | yq -r '.resources[| index("namespaces")' | tee /dev/stderr)
