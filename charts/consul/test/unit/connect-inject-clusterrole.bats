@@ -235,7 +235,7 @@ load _helpers
       --set 'global.secretsBackend.vault.consulServerRole=bar' \
       --set 'global.secretsBackend.vault.consulCARole=test2' \
       . | tee /dev/stderr |
-      yq -r '.rules[6]' | tee /dev/stderr)
+      yq -r '.rules[7]' | tee /dev/stderr)
 
   local actual=$(echo $object | yq -r '.resources[0]' | tee /dev/stderr)
   [ "${actual}" = "mutatingwebhookconfigurations" ]
