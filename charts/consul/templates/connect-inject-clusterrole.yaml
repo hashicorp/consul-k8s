@@ -156,15 +156,21 @@ rules:
     - update
     - watch
 {{- end }}
-- apiGroups: [ "" ]
-  resources: [ "secrets", "serviceaccounts", "endpoints", "services", "namespaces", "nodes" ]
+- apiGroups: [""]
+  resources: ["secrets", "serviceaccounts", "services"]
   verbs:
-  - create
+    - get
+    - list
+    - watch
+    - delete
+    - create
+    - update
+- apiGroups: [ "" ]
+  resources: ["endpoints", "namespaces", "nodes"]
+  verbs:
   - get
   - list
   - watch
-  - delete
-  - update
 - apiGroups: [ "rbac.authorization.k8s.io" ]
   resources: [ "roles", "rolebindings" ]
   verbs:
