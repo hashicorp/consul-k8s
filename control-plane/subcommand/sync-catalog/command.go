@@ -12,16 +12,20 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/armon/go-metrics/prometheus"
+	"github.com/cenkalti/backoff"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -42,27 +46,29 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                     *flag.FlagSet
-	consul                    *flags.ConsulFlags
-	k8s                       *flags.K8SFlags
-	flagListen                string
-	flagToConsul              bool
-	flagToK8S                 bool
-	flagConsulDomain          string
-	flagConsulK8STag          string
-	flagConsulNodeName        string
-	flagK8SDefault            bool
-	flagK8SServicePrefix      string
-	flagConsulServicePrefix   string
-	flagK8SSourceNamespace    string
-	flagK8SWriteNamespace     string
-	flagConsulWritePeriod     time.Duration
-	flagSyncClusterIPServices bool
-	flagSyncLBEndpoints       bool
-	flagNodePortSyncType      string
-	flagAddK8SNamespaceSuffix bool
-	flagLogLevel              string
-	flagLogJSON               bool
+	flags                        *flag.FlagSet
+	consul                       *flags.ConsulFlags
+	k8s                          *flags.K8SFlags
+	flagListen                   string
+	flagToConsul                 bool
+	flagToK8S                    bool
+	flagConsulDomain             string
+	flagConsulK8STag             string
+	flagConsulNodeName           string
+	flagK8SDefault               bool
+	flagK8SServicePrefix         string
+	flagConsulServicePrefix      string
+	flagK8SSourceNamespace       string
+	flagK8SWriteNamespace        string
+	flagConsulWritePeriod        time.Duration
+	flagSyncClusterIPServices    bool
+	flagSyncLBEndpoints          bool
+	flagNodePortSyncType         string
+	flagAddK8SNamespaceSuffix    bool
+	flagLogLevel                 string
+	flagLogJSON                  bool
+	flagPurgeK8SServicesFromNode string
+	flagFilter                   string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -150,6 +156,11 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+	c.flags.StringVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", "",
+		"Specifies the name of the Consul node for which to deregister synced Kubernetes services.")
+	c.flags.StringVar(&c.flagFilter, "filter", "",
+		"Specifies the expression used to filter the services on the Consul node that will be deregistered. "+
+			"The syntax for this filter is the same as the syntax used in the List Services for Node API in the Consul catalog.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
@@ -267,6 +278,19 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	c.ready = true
+
+	if c.flagPurgeK8SServicesFromNode != "" {
+		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
+			return 1
+		}
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient); err != nil {
+			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
+			return 1
+		}
+		return 0
+	}
 
 	// Convert allow/deny lists to sets
 	allowSet := flags.ToSet(c.flagAllowK8sNamespacesList)
@@ -434,6 +458,70 @@ func (c *Command) Run(args []string) int {
 		}
 		return 0
 	}
+}
+
+// remove all k8s services from Consul.
+func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client) error {
+	node, _, err := consulClient.Catalog().NodeServiceList(c.flagPurgeK8SServicesFromNode, &api.QueryOptions{Filter: c.flagFilter})
+	if err != nil {
+		return err
+	}
+
+	var firstErr error
+	services := node.Services
+	batchSize := 300
+	maxRetries := 2
+	retryDelay := 200 * time.Millisecond
+
+	// Ask for user confirmation before purging services
+	for {
+		c.UI.Info(fmt.Sprintf("Are you sure you want to delete %v K8S services from %v? (y/n): ", len(services), c.flagPurgeK8SServicesFromNode))
+		var input string
+		fmt.Scanln(&input)
+		if input = strings.ToLower(input); input == "y" {
+			break
+		} else if input == "n" {
+			return nil
+		} else {
+			c.UI.Info("Invalid input. Please enter 'y' or 'n'.")
+		}
+	}
+
+	for i := 0; i < len(services); i += batchSize {
+		end := i + batchSize
+		if end > len(services) {
+			end = len(services)
+		}
+
+		var eg errgroup.Group
+		for _, service := range services[i:end] {
+			s := service
+			eg.Go(func() error {
+				var b backoff.BackOff = backoff.NewConstantBackOff(retryDelay)
+				b = backoff.WithMaxRetries(b, uint64(maxRetries))
+				return backoff.Retry(func() error {
+					_, err := consulClient.Catalog().Deregister(&api.CatalogDeregistration{
+						Node:      c.flagPurgeK8SServicesFromNode,
+						ServiceID: s.ID,
+					}, nil)
+					return err
+				}, b)
+			})
+		}
+		if err := eg.Wait(); err != nil {
+			if firstErr == nil {
+				c.UI.Info("Some K8S services were not deregistered from Consul")
+				firstErr = err
+			}
+		}
+		c.UI.Info(fmt.Sprintf("Processed %v K8S services from %v", end-i, c.flagPurgeK8SServicesFromNode))
+	}
+
+	if firstErr != nil {
+		return firstErr
+	}
+	c.UI.Info("All K8S services were deregistered from Consul")
+	return nil
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {

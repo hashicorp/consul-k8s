@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics/prometheus"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
@@ -555,6 +556,164 @@ func TestRun_ToConsulChangingFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test services could be de-registered from Consul.
+func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
+	t.Parallel()
+
+	k8s, testClient := completeSetup(t)
+	consulClient := testClient.APIClient
+
+	// Create a mock reader to simulate user input
+	input := "y\n"
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	oldStdin := os.Stdin
+	os.Stdin = reader
+	defer func() { os.Stdin = oldStdin }()
+
+	// Write the simulated user input to the mock reader
+	go func() {
+		defer writer.Close()
+		_, err := writer.WriteString(input)
+		require.NoError(t, err)
+	}()
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+		logger: hclog.New(&hclog.LoggerOptions{
+			Name:  t.Name(),
+			Level: hclog.Debug,
+		}),
+		flagAllowK8sNamespacesList: []string{"*"},
+		connMgr:                    testClient.Watcher,
+	}
+
+	// create two services in k8s
+	_, err = k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = k8s.CoreV1().Services("baz").Create(context.Background(), lbService("foo", "2.2.2.2"), metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	longRunningChan := runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
+		"-consul-write-interval", "100ms",
+		"-add-k8s-namespace-suffix",
+	})
+	defer stopCommand(t, &cmd, longRunningChan)
+
+	// check that the two K8s services have been synced into Consul
+	retry.Run(t, func(r *retry.R) {
+		svc, _, err := consulClient.Catalog().Service("foo-bar", "k8s", nil)
+		require.NoError(r, err)
+		require.Len(r, svc, 1)
+		require.Equal(r, "1.1.1.1", svc[0].ServiceAddress)
+		svc, _, err = consulClient.Catalog().Service("foo-baz", "k8s", nil)
+		require.NoError(r, err)
+		require.Len(r, svc, 1)
+		require.Equal(r, "2.2.2.2", svc[0].ServiceAddress)
+	})
+
+	exitChan := runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
+		"-purge-k8s-services-from-node=k8s-sync",
+	})
+	stopCommand(t, &cmd, exitChan)
+
+	retry.Run(t, func(r *retry.R) {
+		serviceList, _, err := consulClient.Catalog().NodeServiceList("k8s-sync", &api.QueryOptions{AllowStale: false})
+		require.NoError(r, err)
+		require.Len(r, serviceList.Services, 0)
+	})
+}
+
+// Test services could be de-registered from Consul with filter.
+func TestRemoveAllK8SServicesFromConsulWithFilter(t *testing.T) {
+	t.Parallel()
+
+	k8s, testClient := completeSetup(t)
+	consulClient := testClient.APIClient
+
+	// Create a mock reader to simulate user input
+	input := "y\n"
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	oldStdin := os.Stdin
+	os.Stdin = reader
+	defer func() { os.Stdin = oldStdin }()
+
+	// Write the simulated user input to the mock reader
+	go func() {
+		defer writer.Close()
+		_, err := writer.WriteString(input)
+		require.NoError(t, err)
+	}()
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+		logger: hclog.New(&hclog.LoggerOptions{
+			Name:  t.Name(),
+			Level: hclog.Debug,
+		}),
+		flagAllowK8sNamespacesList: []string{"*"},
+		connMgr:                    testClient.Watcher,
+	}
+
+	// create two services in k8s
+	_, err = k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = k8s.CoreV1().Services("baz").Create(context.Background(), lbService("foo", "2.2.2.2"), metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = k8s.CoreV1().Services("bat").Create(context.Background(), lbService("foo", "3.3.3.3"), metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	longRunningChan := runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
+		"-consul-write-interval", "100ms",
+		"-add-k8s-namespace-suffix",
+	})
+	defer stopCommand(t, &cmd, longRunningChan)
+
+	// check that the name of the service is namespaced
+	retry.Run(t, func(r *retry.R) {
+		svc, _, err := consulClient.Catalog().Service("foo-bar", "k8s", nil)
+		require.NoError(r, err)
+		require.Len(r, svc, 1)
+		require.Equal(r, "1.1.1.1", svc[0].ServiceAddress)
+		svc, _, err = consulClient.Catalog().Service("foo-baz", "k8s", nil)
+		require.NoError(r, err)
+		require.Len(r, svc, 1)
+		require.Equal(r, "2.2.2.2", svc[0].ServiceAddress)
+		svc, _, err = consulClient.Catalog().Service("foo-bat", "k8s", nil)
+		require.NoError(r, err)
+		require.Len(r, svc, 1)
+		require.Equal(r, "3.3.3.3", svc[0].ServiceAddress)
+	})
+
+	exitChan := runCommandAsynchronously(&cmd, []string{
+		"-addresses", "127.0.0.1",
+		"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
+		"-purge-k8s-services-from-node=k8s-sync",
+		"-filter=baz in ID",
+	})
+	stopCommand(t, &cmd, exitChan)
+
+	retry.Run(t, func(r *retry.R) {
+		serviceList, _, err := consulClient.Catalog().NodeServiceList("k8s-sync", &api.QueryOptions{AllowStale: false})
+		require.NoError(r, err)
+		require.Len(r, serviceList.Services, 2)
+	})
 }
 
 // Set up test consul agent and fake kubernetes cluster client.
