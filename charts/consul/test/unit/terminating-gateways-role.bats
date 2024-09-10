@@ -20,6 +20,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "terminatingGateways/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/terminating-gateways-role.yaml   \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.rbac.create=false'  \
+      .
+}
+
 @test "terminatingGateways/Role: rules for PodSecurityPolicy" {
   cd `chart_dir`
   local actual=$(helm template \

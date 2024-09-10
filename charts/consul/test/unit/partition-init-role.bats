@@ -20,7 +20,16 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
+@test "partitionInit/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/partition-init-role.yaml  \
+        --set 'global.adminPartitions.enabled=true' \
+        --set 'global.enableConsulNamespaces=true' \
+        --set 'server.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "partitionInit/Role: disabled with global.adminPartitions.enabled=true and server.enabled=true" {
   cd `chart_dir`
   assert_empty helm template \

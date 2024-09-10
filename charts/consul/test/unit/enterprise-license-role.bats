@@ -8,7 +8,15 @@ load _helpers
       -s templates/enterprise-license-role.yaml  \
       .
 }
-
+@test "enterpriseLicense/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/enterprise-license-role.yaml \
+        --set 'global.enterpriseLicense.secretName=foo' \
+        --set 'global.enterpriseLicense.secretKey=bar' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "enterpriseLicense/Role: disabled if autoload is true (default)" {
   cd `chart_dir`
   assert_empty helm template \

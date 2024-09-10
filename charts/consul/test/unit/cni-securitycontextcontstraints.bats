@@ -8,6 +8,15 @@ load _helpers
       -s templates/cni-securitycontextconstraints.yaml  \
       .
 }
+@test "cni/SecurityContextConstraints: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/cni-securitycontextconstraints.yaml \
+        --set 'connectInject.cni.enabled=true' \
+        --set 'connectInject.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 
 @test "cni/SecurityContextConstraints: disabled when cni disabled and global.openshift.enabled=true" {
   cd `chart_dir`

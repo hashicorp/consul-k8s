@@ -1,4 +1,5 @@
 {{- if (or (and (ne (.Values.dns.proxy.enabled | toString) "-") .Values.dns.proxy.enabled) (and (eq (.Values.dns.proxy.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -31,4 +32,5 @@ rules:
   {{- else }}
 rules: []
   {{- end }}
+{{- end }}
 {{- end }}

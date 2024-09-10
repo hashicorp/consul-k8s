@@ -19,6 +19,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "serverACLInitCleanup/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/server-acl-init-cleanup-role.yaml  \
+        --set 'global.acls.manageSystemACLs=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
+
 @test "serverACLInitCleanup/Role: disabled with server=false and global.acls.manageSystemACLs=true" {
   cd `chart_dir`
   assert_empty helm template \

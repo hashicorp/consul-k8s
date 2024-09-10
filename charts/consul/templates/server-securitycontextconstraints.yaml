@@ -1,4 +1,5 @@
 {{- if (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled))) }}
+{{- if .Values.global.rbac.create }}
 apiVersion: security.openshift.io/v1
 kind: SecurityContextConstraints
 metadata:
@@ -47,3 +48,4 @@ volumes:
 - projected
 - secret
 {{- end -}}
+{{- end }}

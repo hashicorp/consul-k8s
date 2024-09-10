@@ -1,4 +1,5 @@
 {{- if or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -17,4 +18,5 @@ subjects:
 - kind: ServiceAccount
   name: {{ template "consul.fullname" . }}-connect-injector
   namespace: {{ .Release.Namespace }}
+{{- end }}
 {{- end }}

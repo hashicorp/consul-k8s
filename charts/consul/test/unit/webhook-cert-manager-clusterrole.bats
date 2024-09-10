@@ -11,6 +11,13 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "webhookCertManager/ClusterRole: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/webhook-cert-manager-clusterrole.yaml  \
+      --set 'global.rbac.create=false'  \
+      .
+}
 @test "webhookCertManager/ClusterRole: enabled with connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \

@@ -28,3 +28,12 @@ load _helpers
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+@test "server/SecurityContextConstraints: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/server-securitycontextconstraints.yaml  \
+        --set 'global.openshift.enabled=true' \
+        --set 'server.exposeGossipAndRPCPorts=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}

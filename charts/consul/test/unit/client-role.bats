@@ -28,6 +28,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "client/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/client-role.yaml  \
+        --set 'client.enabled=true' \
+        --set 'global.rbac.create=false' \
+        .
+
+}
+
 @test "client/Role: disabled with client.enabled=false" {
   cd `chart_dir`
   assert_empty helm template \

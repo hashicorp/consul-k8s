@@ -49,6 +49,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "tlsInit/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/tls-init-role.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      --set 'global.rbac.create=false'  \
+      .
+}
 @test "tlsInit/Role: enabled with global.tls.enabled" {
   cd `chart_dir`
   local actual=$(helm template \

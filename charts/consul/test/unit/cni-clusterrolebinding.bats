@@ -8,7 +8,15 @@ load _helpers
       -s templates/cni-clusterrolebinding.yaml  \
       .
 }
-
+@test "cni/ClusterRoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/cni-clusterrolebinding.yaml \
+        --set 'connectInject.cni.enabled=true' \
+        --set 'connectInject.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "cni/ClusterRoleBinding: enabled with connectInject.cni.enabled=true and connectInject.enabled=true" {
   cd `chart_dir`
   local actual=$(helm template \

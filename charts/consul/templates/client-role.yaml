@@ -1,4 +1,5 @@
 {{- if (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -39,5 +40,6 @@ rules:
 {{- end}}
 {{- else}}
 rules: []
+{{- end }}
 {{- end }}
 {{- end }}

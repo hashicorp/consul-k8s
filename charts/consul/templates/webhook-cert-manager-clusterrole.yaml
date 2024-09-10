@@ -1,5 +1,6 @@
 {{ $hasConfiguredWebhookCertsUsingVault := (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName) -}}
 {{- if (and .Values.connectInject.enabled (not $hasConfiguredWebhookCertsUsingVault)) }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -50,5 +51,6 @@ rules:
   - {{ template "consul.fullname" . }}-webhook-cert-manager
   verbs:
   - use
+{{- end }}
 {{- end }}
 {{- end }}

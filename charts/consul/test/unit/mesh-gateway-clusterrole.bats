@@ -20,6 +20,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "meshGateway/ClusterRole: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/mesh-gateway-clusterrole.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.rbac.create=false'  \
+        .
+}
 @test "meshGateway/ClusterRole: rules for PodSecurityPolicy" {
   cd `chart_dir`
   local actual=$(helm template \

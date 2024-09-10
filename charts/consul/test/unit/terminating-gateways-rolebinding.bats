@@ -20,6 +20,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "terminatingGateways/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/terminating-gateways-rolebinding.yaml   \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.rbac.create=false'  \
+      .
+}
+
 @test "terminatingGateways/RoleBinding: multiple gateways" {
   cd `chart_dir`
   local object=$(helm template \

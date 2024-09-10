@@ -11,6 +11,14 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/ClusterRoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/connect-inject-clusterrolebinding.yaml \
+        --set 'global.rbac.create=false'  \
+        .
+}
+
 @test "connectInject/ClusterRoleBinding: enabled with global.enabled false" {
   cd `chart_dir`
   local actual=$(helm template \

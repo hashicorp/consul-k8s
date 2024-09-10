@@ -21,6 +21,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "partitionInit/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/partition-init-rolebinding.yaml  \
+        --set 'global.adminPartitions.enabled=true' \
+        --set 'global.enableConsulNamespaces=true' \
+        --set 'server.enabled=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "partitionInit/RoleBinding: disabled with global.adminPartitions.enabled=true and servers = true" {
   cd `chart_dir`
   assert_empty helm template \

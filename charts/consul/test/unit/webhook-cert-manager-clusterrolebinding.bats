@@ -20,7 +20,13 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
+@test "webhookCertManager/ClusterRoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/webhook-cert-manager-clusterrolebinding.yaml  \
+      --set 'global.rbac.create=false'  \
+      .
+}
 #--------------------------------------------------------------------
 # Vault
 

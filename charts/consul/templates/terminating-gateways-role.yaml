@@ -1,5 +1,5 @@
 {{- if .Values.terminatingGateways.enabled }}
-
+{{- if .Values.global.rbac.create }}
 {{- $root := . }}
 {{- $defaults := .Values.terminatingGateways.defaults }}
 
@@ -28,5 +28,6 @@ rules:
 rules: []
 {{- end }}
 ---
+{{- end }}
 {{- end }}
 {{- end }}

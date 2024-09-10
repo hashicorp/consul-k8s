@@ -20,4 +20,10 @@ target=templates/gateway-cleanup-clusterrolebinding.yaml
         --set 'connectInject.enabled=false' \
         . 
 }
-
+@test "gatewaycleanup/ClusterRoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s $target \
+        --set 'global.rbac.create=false'  \
+        .
+}

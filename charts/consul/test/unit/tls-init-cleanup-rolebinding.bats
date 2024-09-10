@@ -59,6 +59,15 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "tlsInitCleanup/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/tls-init-cleanup-rolebinding.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'server.enabled=true' \
+      --set 'global.rbac.create=false'  \
+      .
+}
 #--------------------------------------------------------------------
 # Vault
 

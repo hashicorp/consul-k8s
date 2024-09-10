@@ -9,7 +9,15 @@ load _helpers
       --set 'global.enabled=false' \
       .
 }
+@test "client/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/client-rolebinding.yaml  \
+        --set 'client.enabled=true' \
+        --set 'global.rbac.create=false' \
+        .
 
+}
 @test "client/RoleBinding: disabled with client disabled" {
   cd `chart_dir`
   assert_empty helm template \

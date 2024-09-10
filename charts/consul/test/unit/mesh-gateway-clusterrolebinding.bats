@@ -20,6 +20,16 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "meshGateway/ClusterRoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/mesh-gateway-clusterrolebinding.yaml  \
+      --set 'meshGateway.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.rbac.create=false'  \
+        .
+}
+
 @test "meshGateway/ClusterRoleBinding: subject name is correct" {
   cd `chart_dir`
   local actual=$(helm template \

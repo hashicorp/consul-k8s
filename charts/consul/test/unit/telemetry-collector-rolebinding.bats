@@ -19,3 +19,13 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "telemetryCollector/RoleBinding: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+      -s templates/telemetry-collector-rolebinding.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.enablePodSecurityPolicies=true' \
+      --set 'global.rbac.create=false'  \
+      .
+}

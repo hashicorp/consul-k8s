@@ -13,6 +13,13 @@ target=templates/gateway-resources-clusterrole.yaml
     [ "$actual" = "true" ]
 }
 
+@test "gatewayresources/ClusterRole: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s $target \
+        --set 'global.rbac.create=false'  \
+        .
+}
 @test "gatewayresources/ClusterRole: disabled with connectInject.enabled=false" {
     cd `chart_dir`
     assert_empty helm template \

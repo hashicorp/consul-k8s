@@ -1,4 +1,5 @@
 {{- if or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) }}
+{{- if .Values.global.rbac.create }}
 # The ClusterRole to enable the Connect injector to get, list, watch and patch MutatingWebhookConfiguration.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -212,4 +213,5 @@ rules:
   verbs:
     - use
   {{- end }}
+{{- end }}
 {{- end }}

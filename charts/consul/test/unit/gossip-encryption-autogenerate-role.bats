@@ -26,3 +26,12 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "gossipEncryptionAutogenerate/Role: enabled with global.rbac.create false" {
+  cd `chart_dir`
+    assert_empty helm template \
+        -s templates/gossip-encryption-autogenerate-role.yaml  \
+        --set 'global.gossipEncryption.autoGenerate=true' \
+        --set 'global.rbac.create=false'  \
+        .
+}

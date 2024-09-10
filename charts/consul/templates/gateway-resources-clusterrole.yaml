@@ -1,4 +1,5 @@
 {{- if .Values.connectInject.enabled }}
+{{- if .Values.global.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -33,5 +34,6 @@ rules:
       - {{ template "consul.fullname" . }}-gateway-resources
     verbs:
       - use
+{{- end }}
 {{- end }}
 {{- end }}
