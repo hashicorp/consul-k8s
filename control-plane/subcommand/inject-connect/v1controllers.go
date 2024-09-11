@@ -5,10 +5,12 @@ package connectinject
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	v1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -30,6 +32,21 @@ import (
 func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
+
+	type FileConfig struct {
+		ImagePullSecrets []v1.LocalObjectReference `json:"image_pull_secrets"`
+	}
+
+	var cfgFile FileConfig
+	if file, err := os.ReadFile("/consul/config/config.json"); err != nil {
+		setupLog.Info("Failed to read config file, may not be present", "error", err)
+	} else {
+		if err := json.Unmarshal(file, &cfgFile); err != nil {
+			setupLog.Error(err, "Config file present but could not be deserialized, will use defaults")
+		} else {
+			setupLog.Info("Config file present and deserialized", "config", cfgFile)
+		}
+	}
 
 	// Convert allow/deny lists to sets.
 	allowK8sNamespaces := flags.ToSet(c.flagAllowK8sNamespacesList)
@@ -118,6 +135,7 @@ func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manage
 			},
 			ImageDataplane:              c.flagConsulDataplaneImage,
 			ImageConsulK8S:              c.flagConsulK8sImage,
+			ImagePullSecrets:            cfgFile.ImagePullSecrets,
 			GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
 			ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
 			NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
