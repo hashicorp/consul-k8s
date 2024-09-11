@@ -10,12 +10,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
-	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func (g *Gatekeeper) upsertRoleBinding(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
@@ -65,7 +66,7 @@ func (g *Gatekeeper) deleteRoleBinding(ctx context.Context, gwName types.Namespa
 
 func (g *Gatekeeper) roleBinding(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) *rbac.RoleBinding {
 	// Create resources for reference. This avoids bugs if naming patterns change.
-	serviceAccount := g.serviceAccount(gateway)
+	serviceAccount := g.serviceAccount(gateway, config)
 	role := g.role(gateway, gcc, config)
 
 	return &rbac.RoleBinding{
