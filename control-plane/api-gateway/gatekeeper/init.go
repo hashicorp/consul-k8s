@@ -36,9 +36,9 @@ type initContainerCommandData struct {
 	LogJSON  bool
 }
 
-// containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
+// initContainer returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
+func (g *Gatekeeper) initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,
