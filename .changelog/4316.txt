@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: `global.imagePullSecrets` are now configured on the `ServiceAccount` for `Gateways`
+```
