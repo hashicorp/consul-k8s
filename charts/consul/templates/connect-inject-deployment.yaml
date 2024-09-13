@@ -142,6 +142,7 @@ spec:
             - "-ec"
             - |
               exec consul-k8s-control-plane inject-connect \
+                -config-file=/consul/config/config.json \
                 {{- if .Values.global.federation.enabled }}
                 -enable-federation \
                 {{- end }}
