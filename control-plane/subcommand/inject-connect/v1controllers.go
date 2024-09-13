@@ -38,13 +38,15 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}
 
 	var cfgFile FileConfig
-	if file, err := os.ReadFile("/consul/config/config.json"); err != nil {
-		setupLog.Info("Failed to read config file, may not be present", "error", err)
-	} else {
-		if err := json.Unmarshal(file, &cfgFile); err != nil {
-			setupLog.Error(err, "Config file present but could not be deserialized, will use defaults")
+	if c.flagConfigFile != "" {
+		if file, err := os.ReadFile(c.flagConfigFile); err != nil {
+			setupLog.Info("Failed to read specified -config-file", "file", c.flagConfigFile, "error", err)
 		} else {
-			setupLog.Info("Config file present and deserialized", "config", cfgFile)
+			if err := json.Unmarshal(file, &cfgFile); err != nil {
+				setupLog.Error(err, "Config file present but could not be deserialized, will use defaults", "file", c.flagConfigFile)
+			} else {
+				setupLog.Info("Config file present and deserialized", "file", c.flagConfigFile, "config", cfgFile)
+			}
 		}
 	}
 
