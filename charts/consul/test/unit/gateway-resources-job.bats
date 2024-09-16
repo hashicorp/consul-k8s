@@ -155,7 +155,7 @@ target=templates/gateway-resources-job.yaml
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
   echo "cupcakes"
   echo $tolerations
-  local actual=$(echo "$tolerations" | yq '.args.[13] | contains("\"operator\": ")' | tee /dev/stderr)
+  local actual=$(echo "$tolerations" | yq '.args.[13] | contains("operator")' | tee /dev/stderr)
   echo "if fails-----------------------------------------------------------"
   echo $actual
   echo $actual >&3
