@@ -151,12 +151,12 @@ target=templates/gateway-resources-job.yaml
 "effect": "NoSchedule" \
 "key": "node2" \
 "value": "clients2"' \
-      .| tee /dev/stderr |
+      . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
-  echo "cupcakes"
-  echo $tolerations
-  local actual=$(echo "$tolerations" | yq '.args.[13] | contains("operator")' | tee /dev/stderr)
+
+  local actual=$(echo "$tolerations" | yq '.args.[13] | contains("blah")' | tee /dev/stderr)
   echo "if fails-----------------------------------------------------------"
+  echo $tolerations
   echo $actual
   echo $actual >&3
   [ "${actual}" = true ]
