@@ -157,6 +157,7 @@ target=templates/gateway-resources-job.yaml
   local actual=$(echo "$tolerations" | yq '.args.[13] | contains("blah")' | tee /dev/stderr)
   echo "if fails-----------------------------------------------------------"
   echo $tolerations
+  echo "$tolerations" | yq '.args.[13]'
   echo $actual
   echo $actual >&3
   [ "${actual}" = true ]
