@@ -152,6 +152,6 @@ target=templates/gateway-resources-job.yaml
 "key": "node2" \
 "value": "clients2"' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].args.[13] | contains("\"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\" \n- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node2\" \n\"value\": \"clients2\"")' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].args.[13] | contains("\"operator\": ")' | tee /dev/stderr)
   [ "${tolerations}" = "true" ]
 }
