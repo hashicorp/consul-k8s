@@ -9,6 +9,9 @@ on:
     branches:
       - main
       - release/**
+    paths-ignore:
+      - 'assets/**'
+      - '.changelog/**'
 
 # cancel existing runs of the same workflow on the same ref
 concurrency:
@@ -16,13 +19,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  conditional-skip:
-    uses: ./.github/workflows/reusable-conditional-skip.yml
 
   get-go-version:
     # Cascades down to test jobs
-    needs: [ conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci != 'true'
     uses: ./.github/workflows/reusable-get-go-version.yml
 
   scan:
@@ -46,7 +45,7 @@ jobs:
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           repository: hashicorp/security-scanner
-          token: ${{ secrets.HASHIBOT_PRODSEC_GITHUB_TOKEN }}
+          token: ${{ secrets.PRODSEC_SCANNER_READ_ONLY }}
           path: security-scanner
           ref: main
 
