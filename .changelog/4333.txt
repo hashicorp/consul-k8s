@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Exclude gke namespaces from being connect-injected when the connect-inject: default: true value is set.
+```
