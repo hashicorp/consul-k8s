@@ -24,10 +24,11 @@ function contains() {
 #
 # ... `git merge-base origin/$SKIP_CHECK_BRANCH HEAD` would return commit `D`
 # `...HEAD` specifies from the common ancestor to the latest commit on the current branch (HEAD)..
-files_to_check=$(git diff --name-only "$(git merge-base origin/$SKIP_CHECK_BRANCH HEAD~)"...HEAD)
+skip_check_branch=${SKIP_CHECK_BRANCH:?SKIP_CHECK_BRANCH is required}
+files_to_check=$(git diff --name-only "$(git merge-base origin/$skip_check_branch HEAD~)"...HEAD)
 
 # Define the directories to check
-skipped_directories=("assets" ".changelog/", "version")
+skipped_directories=("assets" ".changelog" "version")
 
 files_to_skip=("LICENSE" ".copywrite.hcl" ".gitignore")
 
@@ -43,7 +44,7 @@ for file_to_check in "${files_to_check_array[@]}"; do
   # - Markdown files
   for dir in "${skipped_directories[@]}"; do
     if [[ "$file_to_check" == */check_skip_ci.sh ]] ||
-      [[ "$file_to_check" == "$dir"* ]] ||
+      [[ "$file_to_check" == "$dir/"* ]] ||
       [[ "$file_to_check" == *.md ]] ||
       contains "${files_to_skip[*]}" "$file_to_check"; then
       file_is_skipped=true
