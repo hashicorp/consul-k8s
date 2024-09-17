@@ -1,3 +1,6 @@
+```release-note:breaking-change
+control-plane: All policies managed by consul-k8s will now be updated on upgrade. If you previously edited the policies after install, your changes will be overwritten.
+```
 ```release-note:bug
-helm: fix issue where the API Gateway GatewayClassConfig tolerations can not be parsed by the Helm chart.
+control-plane: Always update ACL policies upon upgrade.
 ```
