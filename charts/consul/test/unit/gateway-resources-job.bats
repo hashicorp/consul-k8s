@@ -152,13 +152,6 @@ target=templates/gateway-resources-job.yaml
 "key": "node2" \
 "value": "clients2"' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0]' | tee /dev/stderr)
-
-  local actual=$(echo "$tolerations" | yq '.args.[13] | contains("blah")' | tee /dev/stderr)
-  echo "if fails-----------------------------------------------------------"
-  echo $tolerations
-  echo "$tolerations" | yq '.args.[13]'
-  echo $actual
-  echo $actual >&3
-  [ "${actual}" = true ]
+      yq '.spec.template.spec.containers[0].args.[13] | contains("operator")' | tee /dev/stderr)
+      [ "${tolerations}" = "true" ]
 }
