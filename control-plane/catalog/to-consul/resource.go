@@ -650,6 +650,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				}
 
 				for _, endpointAddr := range endpoint.Addresses {
+
 					// Find the ip address for the node and
 					// create the Consul service using it
 					var found bool
@@ -745,6 +746,7 @@ func (t *ServiceResource) registerServiceInstance(
 		}
 		for _, endpoint := range endpointSlice.Endpoints {
 			for _, endpointAddr := range endpoint.Addresses {
+
 				var addr string
 				// Use the address and port from the Ingress resource if
 				// ingress-sync is enabled and the service has an ingress
