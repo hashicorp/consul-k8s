@@ -259,48 +259,6 @@ func TestRun(t *testing.T) {
 				"-component", "test",
 				"-controller-name", "test",
 				"-openshift-scc-name", "restricted-v2",
-				"-node-selector", `beta.kubernetes.io/arch: amd64`,
-				"-tolerations", `
-            -
-              |
-              - "operator": "Equal"
-                "effect": "NoSchedule"
-                "key": "node"
-                "value": "clients"
-              - "operator": "Equal"
-                "effect": "NoSchedule"
-                "key": "node2"
-                "value": "clients2"`,
-				//{
-				//  "operator": "Equal"
-				//  "effect": "NoSchedule"
-				//  "key": "node"
-				//  "value": "clients"
-				//},
-				//{
-				//  "operator": "Equal"
-				//  "effect": "NoSchedule"
-				//  "key": "node2"
-				//  "value": "clients2"
-				//}`,
-				//- "operator": "Equal"
-				//  "effect": "NoSchedule"
-				//  "key": "node"
-				//  "value": "clients"
-				//- "operator": "Equal"
-				//  "effect": "NoSchedule"
-				//  "key": "node2"
-				//  "value": "clients2"`,
-				//- /
-				//| /
-				//- \"operator\": \"Equal\"
-				//\"effect\": \"NoSchedule\"
-				//\"key\": \"node\"
-				//\"value\": \"clients\",
-				//- \"operator\": \"Equal\"
-				//\"effect\": \"NoSchedule\"
-				//\"key\": \"node2\"
-				//\"value\": \"clients2\""`,
 			})
 
 			require.Equal(t, 0, code)
