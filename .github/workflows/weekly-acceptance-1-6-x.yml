@@ -1,7 +1,7 @@
 # Dispatch to the consul-k8s-workflows with a weekly cron
 #
 # A separate file is needed for each release because the cron schedules are different for each release.
-name: weekly-acceptance-1-5-x
+name: weekly-acceptance-1-6-x
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
