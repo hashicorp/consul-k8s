@@ -804,9 +804,7 @@ func (t *ServiceResource) registerServiceInstance(
 				}
 
 				// Consider endpoint health state for registered consul service
-				// nil represents an unknown state that can be interpreted as a non-terminating endpoint (assume ready or at least a state we shouldn't ignore)
-				// Ref: https://github.com/kubernetes/api/blob/5147c1a32f6a0b9b155bb84e59f933e0ff8a3792/discovery/v1/types.go#L128-L151
-				if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
+				if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
 					r.Check.Status = consulapi.HealthPassing
 					r.Check.Output = kubernetesSuccessReasonMsg
 				} else {
