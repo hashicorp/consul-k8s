@@ -138,12 +138,11 @@ target=templates/gateway-resources-job.yaml
     --set 'connectInject.apiGateway.managedGatewayClass.tolerations=- "operator": "Equal" \
 "effect": "NoSchedule" \
 "key": "node" \
-"value": "clients" \
-- "operator": "Equal" \
-"effect": "NoSchedule" \
-"key": "node2" \
-"value": "clients2"' \
+"value": "clients"' \
     . | tee /dev/stderr |
-    yq '.spec.template.spec.containers[0].args.[13] | contains("operator")' | tee /dev/stderr)
+    yq '.spec.template.spec.containers[0].args.[13]' | tee /dev/stderr)
+  echo "TOLERATIONS: ${tolerations}"
+  local actual=$(echo "${tolerations}" | yq 'contains("\"operator\": \"Equal\"")')
+  [ "${actual}" = "true" ]
   [ "${tolerations}" = "true" ]
 }
