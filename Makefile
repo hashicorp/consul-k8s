@@ -30,13 +30,10 @@ generate-external-crds: ## Generate CRDs for externally defined CRDs and copy th
 	@cd ./control-plane/config/crd/external; \
 		kustomize build | yq --split-exp '.metadata.name + ".yaml"' --no-doc
 
-.PHONY: build-helm-docker
-build-helm-docker:
-	@docker build -t consul-helm-test:local -f $(CURDIR)/charts/consul/test/docker/Test.dockerfile .
 
 .PHONY: bats-tests
-bats-tests: build-helm-docker ## Run Helm chart bats tests.
-	docker run -it -v $(CURDIR):/consul-k8s consul-helm-test:local bats --jobs 4 /consul-k8s/charts/consul/test/unit -f "$(TEST_NAME)"
+bats-tests: ## Run Helm chart bats tests.
+	docker run -it -v $(CURDIR):/consul-k8s hashicorpdev/consul-helm-test:latest bats --jobs 4 /consul-k8s/charts/consul/test/unit -f "$(TEST_NAME)"
 
 ##@ Control Plane Targets
 
