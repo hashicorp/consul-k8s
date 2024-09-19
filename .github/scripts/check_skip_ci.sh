@@ -28,7 +28,7 @@ skip_check_branch=${SKIP_CHECK_BRANCH:?SKIP_CHECK_BRANCH is required}
 files_to_check=$(git diff --name-only "$(git merge-base origin/$skip_check_branch HEAD~)"...HEAD)
 
 # Define the directories to check
-skipped_directories=("assets" ".changelog" "version")
+skipped_directories=("assets" ".changelog")
 
 files_to_skip=("LICENSE" ".copywrite.hcl" ".gitignore")
 
