@@ -152,6 +152,8 @@ target=templates/gateway-resources-job.yaml
 "key": "node2" \
 "value": "clients2"' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].args.[13] | contains("operator")' | tee /dev/stderr)
-      [ "${tolerations}" = "true" ]
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  echo "TOLERATIONS: ${tolerations}"
+  local actual=$(echo $tolerations | yq 'contains(["tolerations","- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\"" ])')
 }
