@@ -142,7 +142,7 @@ target=templates/gateway-resources-job.yaml
 @test "apiGateway/GatewayClassConfig: tolerations" {
   cd `chart_dir`
   local tolerations=$(helm template \
-      -s templates/gateway-resources-job.yaml  \
+      -s $target  \
       --set 'connectInject.apiGateway.managedGatewayClass.tolerations=- "operator": "Equal" \
 "effect": "NoSchedule" \
 "key": "node" \
@@ -155,5 +155,5 @@ target=templates/gateway-resources-job.yaml
       yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
   echo "TOLERATIONS: ${tolerations}"
-  local actual=$(echo $tolerations | yq 'contains(["tolerations","- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\"" ])')
+  local actual=$(echo $tolerations | yq 'contains(["tolerations","- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\" - \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node2\" \n\"value\": \"clients2\"" ])')
 }
