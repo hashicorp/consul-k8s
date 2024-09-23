@@ -69,7 +69,8 @@ spec:
             - {{- toYaml .Values.connectInject.apiGateway.managedGatewayClass.nodeSelector | nindent 14 -}}
             {{- end }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
-            - -tolerations={{ .Values.connectInject.apiGateway.managedGatewayClass.tolerations }}
+            - -tolerations
+            - {{- toYaml .Values.connectInject.apiGateway.managedGatewayClass.tolerations | nindent 14  -}}
             {{- end }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.copyAnnotations.service }}
             - -service-annotations
