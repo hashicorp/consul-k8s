@@ -63,10 +63,10 @@ target=templates/gateway-resources-job.yaml
   [ "${actual}" = "true" ]
 }
 
-@test "apiGateway/GatewayClassConfig: custom configuration blah" {
+@test "apiGateway/GatewayClassConfig: custom configuration" {
   cd `chart_dir`
   local spec=$(helm template \
-      -s templates/gateway-resources-job.yaml  \
+      -s $target  \
       --set 'connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances=2' \
       --set 'connectInject.apiGateway.managedGatewayClass.deployment.minInstances=1' \
       --set 'connectInject.apiGateway.managedGatewayClass.deployment.maxInstances=3' \
@@ -145,6 +145,6 @@ target=templates/gateway-resources-job.yaml
       . | tee /dev/stderr |
       yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  local actual=$(echo $tolerations | yq 'contains(["tolerations","- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\" - \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node2\" \n\"value\": \"clients2\"" ])')
+  local actual=$(echo $tolerations | yq 'contains(["tolerations","- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\" \n- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node2\" \n\"value\": \"clients2\"" ])')
   [ "${actual}" = "true" ]
 }
