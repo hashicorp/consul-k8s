@@ -158,9 +158,14 @@ func TestRun_flagValidation(t *testing.T) {
 				flagNodeSelector: `
 foo: 1
 bar: 2`,
-				flagTolerations: `
-- value: foo
-- value: bar`,
+				flagTolerations: `- "operator": "Equal"
+  "effect": "NoSchedule"
+  "key": "node"
+  "value": "clients"
+- "operator": "Equal"
+  "effect": "NoSchedule"
+  "key": "node2"
+  "value": "clients2"`,
 				flagServiceAnnotations: `
 - foo
 - bar`,

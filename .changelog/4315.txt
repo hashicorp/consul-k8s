@@ -1,0 +1,3 @@
+```release-note:bug
+helm: fix issue where the API Gateway GatewayClassConfig tolerations can not be parsed by the Helm chart.
+```

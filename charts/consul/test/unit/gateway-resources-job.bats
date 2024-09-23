@@ -89,7 +89,6 @@ target=templates/gateway-resources-job.yaml
       --set 'connectInject.apiGateway.managedGatewayClass.deployment.minInstances=1' \
       --set 'connectInject.apiGateway.managedGatewayClass.deployment.maxInstances=3' \
       --set 'connectInject.apiGateway.managedGatewayClass.nodeSelector=foo: bar' \
-      --set 'connectInject.apiGateway.managedGatewayClass.tolerations=- key: bar' \
       --set 'connectInject.apiGateway.managedGatewayClass.copyAnnotations.service.annotations=- bingo' \
       --set 'connectInject.apiGateway.managedGatewayClass.serviceType=Foo' \
       --set 'connectInject.apiGateway.managedGatewayClass.openshiftSCCName=hello' \
@@ -108,23 +107,11 @@ target=templates/gateway-resources-job.yaml
   local actual=$(echo "$spec" | jq 'any(index("-service-type=Foo"))')
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "$spec" | jq '.[12]')
-  [ "${actual}" = "\"-node-selector\"" ]
+  local actual=$(echo $spec | yq 'contains(["-node-selector", "foo: bar"])')
+  [ "${actual}" = "true" ]
 
-  local actual=$(echo "$spec" | jq '.[13]')
-  [ "${actual}" = "\"foo: bar\"" ]
-
-  local actual=$(echo "$spec" | jq '.[14] | ."-tolerations=- key"')
-  [ "${actual}" = "\"bar\"" ]
-
-  local actual=$(echo "$spec" | jq '.[15]')
-  [ "${actual}" = "\"-service-annotations\"" ]
-
-  local actual=$(echo "$spec" | jq '.[16]')
-  [ "${actual}" = "\"- bingo\"" ]
-
-  local actual=$(echo "$spec" | jq '.[17]')
-  [ "${actual}" = "\"-service-type=Foo\"" ]
+  local actual=$(echo $spec | yq 'contains(["-service-annotations", "- bingo"])')
+  [ "${actual}" = "true" ]
 }
 
 @test "apiGateway/GatewayClassConfig: custom configuration openshift enabled" {
@@ -155,4 +142,27 @@ target=templates/gateway-resources-job.yaml
         del(."consul.hashicorp.com/config-checksum")' |
         tee /dev/stderr)
     [ "${actual}" = "{}" ]
+}
+
+
+#--------------------------------------------------------------------
+# tolerations
+
+@test "apiGateway/GatewayClassConfig: tolerations" {
+  cd `chart_dir`
+  local tolerations=$(helm template \
+      -s $target  \
+      --set 'connectInject.apiGateway.managedGatewayClass.tolerations=- "operator": "Equal" \
+"effect": "NoSchedule" \
+"key": "node" \
+"value": "clients" \
+- "operator": "Equal" \
+"effect": "NoSchedule" \
+"key": "node2" \
+"value": "clients2"' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo $tolerations | yq 'contains(["tolerations","- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node\" \n\"value\": \"clients\" \n- \"operator\": \"Equal\" \n\"effect\": \"NoSchedule\" \n\"key\": \"node2\" \n\"value\": \"clients2\"" ])')
+  [ "${actual}" = "true" ]
 }
