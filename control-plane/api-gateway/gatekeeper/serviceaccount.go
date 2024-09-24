@@ -18,7 +18,7 @@ import (
 )
 
 func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config common.HelmConfig) error {
-	if config.AuthMethod == "" && !config.EnableOpenShift {
+	if config.AuthMethod == "" && !config.EnableOpenShift && len(config.ImagePullSecrets) == 0 {
 		return g.deleteServiceAccount(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
 
