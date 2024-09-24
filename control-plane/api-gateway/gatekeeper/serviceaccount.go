@@ -18,6 +18,8 @@ import (
 )
 
 func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config common.HelmConfig) error {
+	// We only create a ServiceAccount if it's needed for RBAC or image pull secrets;
+	// otherwise, we clean up if one was previously created.
 	if config.AuthMethod == "" && !config.EnableOpenShift && len(config.ImagePullSecrets) == 0 {
 		return g.deleteServiceAccount(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
@@ -51,11 +53,8 @@ func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1
 	if err := ctrl.SetControllerReference(&gateway, serviceAccount, g.Client.Scheme()); err != nil {
 		return err
 	}
-	if err := g.Client.Create(ctx, serviceAccount); err != nil {
-		return err
-	}
 
-	return nil
+	return g.Client.Create(ctx, serviceAccount)
 }
 
 func (g *Gatekeeper) deleteServiceAccount(ctx context.Context, gwName types.NamespacedName) error {
