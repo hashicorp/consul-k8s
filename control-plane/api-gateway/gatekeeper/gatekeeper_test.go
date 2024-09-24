@@ -197,7 +197,8 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				ImageDataplane: dataplaneImage,
+				ImageDataplane:   dataplaneImage,
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: "my-secret"}},
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -224,7 +225,9 @@ func TestUpsert(t *testing.T) {
 						},
 					}, "1", false, false),
 				},
-				serviceAccounts: []*corev1.ServiceAccount{},
+				serviceAccounts: []*corev1.ServiceAccount{
+					configureServiceAccount(name, namespace, labels, "1", []corev1.LocalObjectReference{{Name: "my-secret"}}),
+				},
 			},
 		},
 		"create a new gateway deployment with managed Service": {
@@ -279,7 +282,6 @@ func TestUpsert(t *testing.T) {
 						},
 					}, "1", false, false),
 				},
-				serviceAccounts: []*corev1.ServiceAccount{},
 			},
 		},
 		"create a new gateway deployment with managed Service and ACLs": {
@@ -307,8 +309,9 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				AuthMethod:     "method",
-				ImageDataplane: dataplaneImage,
+				AuthMethod:       "method",
+				ImageDataplane:   dataplaneImage,
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: "my-secret"}},
 			},
 			initialResources: resources{},
 			finalResources: resources{
@@ -341,7 +344,7 @@ func TestUpsert(t *testing.T) {
 					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", []corev1.LocalObjectReference{{Name: "my-secret"}}),
 				},
 			},
 		},
@@ -472,7 +475,7 @@ func TestUpsert(t *testing.T) {
 					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			finalResources: resources{
@@ -505,7 +508,7 @@ func TestUpsert(t *testing.T) {
 					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			ignoreTimestampOnService: true,
@@ -568,7 +571,7 @@ func TestUpsert(t *testing.T) {
 					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			finalResources: resources{
@@ -595,7 +598,7 @@ func TestUpsert(t *testing.T) {
 					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			ignoreTimestampOnService: true,
@@ -966,7 +969,7 @@ func TestUpsert(t *testing.T) {
 				secrets:  []*corev1.Secret{},
 				services: []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 		},
@@ -1311,7 +1314,7 @@ func TestDelete(t *testing.T) {
 					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			finalResources: resources{
@@ -1377,7 +1380,7 @@ func TestDelete(t *testing.T) {
 					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			finalResources: resources{
@@ -1886,7 +1889,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 	return &service
 }
 
-func configureServiceAccount(name, namespace string, labels map[string]string, resourceVersion string) *corev1.ServiceAccount {
+func configureServiceAccount(name, namespace string, labels map[string]string, resourceVersion string, pullSecrets []corev1.LocalObjectReference) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -1907,6 +1910,7 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 				},
 			},
 		},
+		ImagePullSecrets: pullSecrets,
 	}
 }
 
