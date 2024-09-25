@@ -203,7 +203,7 @@ func TestUpsert(t *testing.T) {
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{},
 				secrets: []*corev1.Secret{
@@ -316,7 +316,7 @@ func TestUpsert(t *testing.T) {
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -454,7 +454,7 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -480,7 +480,7 @@ func TestUpsert(t *testing.T) {
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "2"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -545,7 +545,7 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -576,7 +576,7 @@ func TestUpsert(t *testing.T) {
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "2"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -958,7 +958,7 @@ func TestUpsert(t *testing.T) {
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", true),
@@ -1478,6 +1478,9 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		require.Equal(t, expected.Spec.Template.ObjectMeta.Annotations, actual.Spec.Template.ObjectMeta.Annotations)
 		require.Equal(t, expected.Spec.Template.ObjectMeta.Labels, actual.Spec.Template.Labels)
 
+		// Ensure the service account is assigned
+		require.Equal(t, expected.Spec.Template.Spec.ServiceAccountName, actual.Spec.Template.Spec.ServiceAccountName)
+
 		// Ensure there is an init container
 		hasInitContainer := false
 		for _, container := range actual.Spec.Template.Spec.InitContainers {
@@ -1687,7 +1690,7 @@ func validateResourcesAreDeleted(t *testing.T, k8sClient client.Client, resource
 	return nil
 }
 
-func configureDeployment(name, namespace string, labels map[string]string, replicas int32, nodeSelector map[string]string, tolerations []corev1.Toleration, serviceAccoutName, resourceVersion string) *appsv1.Deployment {
+func configureDeployment(name, namespace string, labels map[string]string, replicas int32, nodeSelector map[string]string, tolerations []corev1.Toleration, serviceAccountName, resourceVersion string) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -1740,7 +1743,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 					},
 					NodeSelector:       nodeSelector,
 					Tolerations:        tolerations,
-					ServiceAccountName: serviceAccoutName,
+					ServiceAccountName: serviceAccountName,
 				},
 			},
 		},
