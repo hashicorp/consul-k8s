@@ -106,7 +106,7 @@ func (g *Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedN
 }
 
 func (g *Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common.HelmConfig) string {
-	if config.AuthMethod == "" && !config.EnableOpenShift {
+	if config.AuthMethod == "" && !config.EnableOpenShift && len(config.ImagePullSecrets) == 0 {
 		return ""
 	}
 	return gateway.Name
