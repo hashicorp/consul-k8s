@@ -106,6 +106,8 @@ func (g *Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedN
 }
 
 func (g *Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common.HelmConfig) string {
+	// We only create a ServiceAccount if it's needed for RBAC or image pull secrets;
+	// otherwise, we clean up if one was previously created.
 	if config.AuthMethod == "" && !config.EnableOpenShift && len(config.ImagePullSecrets) == 0 {
 		return ""
 	}
