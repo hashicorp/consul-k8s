@@ -37,44 +37,48 @@ jobs:
           curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | sudo tar -xz -C /usr/local/bin
           sudo chmod +x /usr/local/bin/oc /usr/local/bin/kubectl
 
-      - name: Install and Run MicroShift cluster
+      - name: Download and Install Microshift
         run: |
-          sudo podman run -d --name microshift \
-              --privileged \
-              -v microshift-data:/var/lib \
-              -p 6443:6443 \
-              quay.io/microshift/microshift-aio:latest
+          # Download the latest Microshift binary
+          curl -L -o microshift https://github.com/redhat-et/microshift/releases/latest/download/microshift-linux-amd64
+          chmod +x microshift
+          sudo mv microshift /usr/local/bin/microshift
 
-          # Wait for MicroShift cluster to be ready (may need to be increased)
-          sleep 60
+          # Set up directories for Microshift
+          sudo mkdir -p /etc/microshift /var/lib/microshift
 
-          # Set up kubeconfig
-          mkdir -p ${HOME}/.kube
-          sudo podman cp \
-              microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig \
-              ${HOME}/.kube/config
-          sudo chown $(id -u):$(id -g) ${HOME}/.kube/config
-          chmod 600 ${HOME}/.kube/config
+          # Start MicroShift in the background
+          sudo microshift run &
 
-          # Display cluster info
-          kubectl cluster-info
+          # Wait for Microshift to become ready
+          echo "Waiting for Microshift to be ready..."
+          timeout=300  # 5 minutes
+          start_time=$(date +%s)
+          while true; do
+            if sudo kubectl get --raw='/readyz' &> /dev/null; then
+              echo "Microshift is ready!"
+              break
+            fi
+            current_time=$(date +%s)
+            elapsed=$((current_time - start_time))
+            if [ $elapsed -ge $timeout ]; then
+              echo "Timeout reached. Microshift is not ready after 5 minutes."
+              exit 1
+            fi
+            sleep 5
+          done
 
-      # - name: Install OVN-Kubernetes-MicroShift
-      #   run: |
-      #     # Clone the OVN-Kubernetes-MicroShift repository
-      #     git clone https://github.com/openshift/ovn-kubernetes-microshift.git
-      #     cd ovn-kubernetes-microshift
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          sudo cp /var/lib/microshift/resources/kubeadmin/kubeconfig ~/.kube/config
+          sudo chown $(whoami):$(whoami) ~/.kube/config
+          kubectl get nodes
 
-      #     kubectl apply -f manifests/
-
-      #     # Wait for OVN-Kubernetes pods to be ready
-      #     kubectl rollout status daemonset/ovnkube-node -n openshift-ovn-kubernetes --timeout=300s
-
-      - name: Install Consul on MicroShift
+      - name: Install Consul on Microshift
         run: |
           helm repo add hashicorp https://helm.releases.hashicorp.com
           helm repo update
-
           kubectl create namespace consul
           helm install consul hashicorp/consul --namespace consul --set global.name=consul
           kubectl rollout status statefulset/consul-server -n consul --timeout=300s
