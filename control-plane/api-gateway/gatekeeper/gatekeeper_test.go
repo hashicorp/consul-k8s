@@ -195,12 +195,13 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				ImageDataplane: dataplaneImage,
+				ImageDataplane:   dataplaneImage,
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: "my-secret"}},
 			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{},
 				services: []*corev1.Service{
@@ -219,7 +220,9 @@ func TestUpsert(t *testing.T) {
 						},
 					}, "1", false, false),
 				},
-				serviceAccounts: []*corev1.ServiceAccount{},
+				serviceAccounts: []*corev1.ServiceAccount{
+					configureServiceAccount(name, namespace, labels, "1", []corev1.LocalObjectReference{{Name: "my-secret"}}),
+				},
 			},
 		},
 		"create a new gateway deployment with managed Service": {
@@ -271,7 +274,6 @@ func TestUpsert(t *testing.T) {
 						},
 					}, "1", false, false),
 				},
-				serviceAccounts: []*corev1.ServiceAccount{},
 			},
 		},
 		"create a new gateway deployment with managed Service and ACLs": {
@@ -299,13 +301,14 @@ func TestUpsert(t *testing.T) {
 				},
 			},
 			helmConfig: common.HelmConfig{
-				AuthMethod:     "method",
-				ImageDataplane: dataplaneImage,
+				AuthMethod:       "method",
+				ImageDataplane:   dataplaneImage,
+				ImagePullSecrets: []corev1.LocalObjectReference{{Name: "my-secret"}},
 			},
 			initialResources: resources{},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -330,7 +333,7 @@ func TestUpsert(t *testing.T) {
 					}, "1", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", []corev1.LocalObjectReference{{Name: "my-secret"}}),
 				},
 			},
 		},
@@ -438,7 +441,7 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -456,12 +459,12 @@ func TestUpsert(t *testing.T) {
 					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "2"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -486,7 +489,7 @@ func TestUpsert(t *testing.T) {
 					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			ignoreTimestampOnService: true,
@@ -523,7 +526,7 @@ func TestUpsert(t *testing.T) {
 			},
 			initialResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -546,12 +549,12 @@ func TestUpsert(t *testing.T) {
 					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "2"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "2"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", false),
@@ -570,7 +573,7 @@ func TestUpsert(t *testing.T) {
 					}, "2", false, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			ignoreTimestampOnService: true,
@@ -924,7 +927,7 @@ func TestUpsert(t *testing.T) {
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 3, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 3, nil, nil, name, "1"),
 				},
 				roles: []*rbac.Role{
 					configureRole(name, namespace, labels, "1", true),
@@ -934,7 +937,7 @@ func TestUpsert(t *testing.T) {
 				},
 				services: []*corev1.Service{},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 		},
@@ -1114,7 +1117,7 @@ func TestDelete(t *testing.T) {
 					}, "1", true, false),
 				},
 				serviceAccounts: []*corev1.ServiceAccount{
-					configureServiceAccount(name, namespace, labels, "1"),
+					configureServiceAccount(name, namespace, labels, "1", nil),
 				},
 			},
 			finalResources: resources{
@@ -1209,6 +1212,9 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		}
 		require.Equal(t, expected.Spec.Template.ObjectMeta.Annotations, actual.Spec.Template.ObjectMeta.Annotations)
 		require.Equal(t, expected.Spec.Template.ObjectMeta.Labels, actual.Spec.Template.Labels)
+
+		// Ensure the service account is assigned
+		require.Equal(t, expected.Spec.Template.Spec.ServiceAccountName, actual.Spec.Template.Spec.ServiceAccountName)
 
 		// Ensure there is an init container
 		hasInitContainer := false
@@ -1403,7 +1409,7 @@ func validateResourcesAreDeleted(t *testing.T, k8sClient client.Client, resource
 	return nil
 }
 
-func configureDeployment(name, namespace string, labels map[string]string, replicas int32, nodeSelector map[string]string, tolerations []corev1.Toleration, serviceAccoutName, resourceVersion string) *appsv1.Deployment {
+func configureDeployment(name, namespace string, labels map[string]string, replicas int32, nodeSelector map[string]string, tolerations []corev1.Toleration, serviceAccountName, resourceVersion string) *appsv1.Deployment {
 	return &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -1456,7 +1462,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 					},
 					NodeSelector:       nodeSelector,
 					Tolerations:        tolerations,
-					ServiceAccountName: serviceAccoutName,
+					ServiceAccountName: serviceAccountName,
 				},
 			},
 		},
@@ -1580,7 +1586,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 	return &service
 }
 
-func configureServiceAccount(name, namespace string, labels map[string]string, resourceVersion string) *corev1.ServiceAccount {
+func configureServiceAccount(name, namespace string, labels map[string]string, resourceVersion string, pullSecrets []corev1.LocalObjectReference) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -1601,6 +1607,7 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 				},
 			},
 		},
+		ImagePullSecrets: pullSecrets,
 	}
 }
 
