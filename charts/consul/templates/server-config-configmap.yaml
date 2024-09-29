@@ -29,6 +29,7 @@ data:
       {{- if .Values.server.logLevel }}
       "log_level": "{{ .Values.server.logLevel | upper }}",
       {{- end }}
+      "enable_debug": {{ .Values.server.enableAgentDebug }},
       "domain": "{{ .Values.global.domain }}",
       "ports": {
         {{- if not .Values.global.tls.enabled }}
@@ -179,7 +180,13 @@ data:
   telemetry-config.json: |-
     {
       "telemetry": {
-        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}"
+        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}",
+        "disable_hostname": {{ .Values.global.metrics.disableAgentHostName }},{{ template "consul.prefixFilter" . }}
+        "enable_host_metrics": {{ .Values.global.metrics.enableHostMetrics }}{{- if .Values.global.metrics.datadog.dogstatsd.enabled }},{{ template "consul.dogstatsdAaddressInfo" . }}
+        {{- if .Values.global.metrics.datadog.dogstatsd.enabled }}
+        "dogstatsd_tags": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson }}
+        {{- end }}
+        {{- end }}
       }
     }
   {{- end }}

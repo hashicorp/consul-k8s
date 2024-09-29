@@ -1357,3 +1357,82 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   local actual=$(echo $object | jq -r '.[1].args | any(contains("-service-namespace=fakenamespace"))' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 }
+
+#--------------------------------------------------------------------
+# global.metrics.datadog.otlp
+
+@test "telemetryCollector/Deployment: DataDog OTLP Collector HTTP protocol verification" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.cloud.enabled=false' \
+      --set 'global.metrics.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="http" \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo "$object" |
+      yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
+  [ "${actual}" = 'http://$(HOST_IP):4318' ]
+}
+
+@test "telemetryCollector/Deployment: DataDog OTLP Collector HTTP protocol verification, case-insensitive" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.cloud.enabled=false' \
+      --set 'global.metrics.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="HTTP" \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo "$object" |
+      yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
+  [ "${actual}" = 'http://$(HOST_IP):4318' ]
+}
+
+@test "telemetryCollector/Deployment: DataDog OTLP Collector gRPC protocol verification" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.cloud.enabled=false' \
+      --set 'global.metrics.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="grpc" \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo "$object" |
+      yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
+  [ "${actual}" = 'grpc://$(HOST_IP):4317' ]
+}
+
+@test "telemetryCollector/Deployment: DataDog OTLP Collector gRPC protocol verification, case-insensitive" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.cloud.enabled=false' \
+      --set 'global.metrics.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true' \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.otlp.enabled=true' \
+      --set 'global.metrics.datadog.otlp.protocol'="gRPC" \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+
+  local actual=$(echo "$object" |
+      yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
+  [ "${actual}" = 'grpc://$(HOST_IP):4317' ]
+}
