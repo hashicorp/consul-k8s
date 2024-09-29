@@ -45,7 +45,8 @@ const (
 	consulKubernetesCheckType = "kubernetes-readiness"
 	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckName  = "Kubernetes Readiness Check"
-	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
+	kubernetesSuccessReasonMsg = "Kubernetes Endpoint Ready"
+	kubernetesCriticalReasonMsg = "Kubernetes Endpoint Not Ready"
 )
 
 type NodePortSyncType string
@@ -795,14 +796,24 @@ func (t *ServiceResource) registerServiceInstance(
 					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
 				}
 
+				var status = consulapi.HealthPassing
+				var output = kubernetesSuccessReasonMsg
+				// Set critical state for not-ready endpoints
+				// k8s doc: A nil value indicates an unknown state. In most cases consumers should interpret this unknown state as ready.
+				// https://github.com/kubernetes/api/blob/5147c1a32f6a0b9b155bb84e59f933e0ff8a3792/discovery/v1/types.go#L129-L137
+				if ! (endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready) {
+					status = consulapi.HealthCritical
+					output = kubernetesCriticalReasonMsg
+				}
+
 				r.Check = &consulapi.AgentCheck{
 					CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, addr)),
 					Name:      consulKubernetesCheckName,
 					Namespace: baseService.Namespace,
 					Type:      consulKubernetesCheckType,
-					Status:    consulapi.HealthPassing,
+					Status:    status,
 					ServiceID: serviceID(r.Service.Service, addr),
-					Output:    kubernetesSuccessReasonMsg,
+					Output:    output,
 				}
 
 				t.consulMap[key] = append(t.consulMap[key], &r)

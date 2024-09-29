@@ -1,0 +1,3 @@
+```release-note:breaking-change
+control-plane: to-consul synchronization will reflect kubernetes endpoints/pods readiness state, setting not-ready pods as critical
+```
