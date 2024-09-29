@@ -23,6 +23,10 @@ type TestFlags struct {
 	flagEnableEnterprise  bool
 	flagEnterpriseLicense string
 
+	flagEnableDatadog bool
+	flagDatadogAPIKey string
+	flagDatadogAppKey string
+
 	flagEnableOpenshift bool
 
 	flagEnablePodSecurityPolicies bool
@@ -109,6 +113,15 @@ func (t *TestFlags) init() {
 	flag.StringVar(&t.flagEnterpriseLicense, "enterprise-license", "",
 		"The enterprise license for Consul.")
 
+	flag.BoolVar(&t.flagEnableDatadog, "enable-datadog", false,
+		"If true, the test suite will run tests for datadog integration features. "+
+			"Note that some features will require setting the Datadog API and Application keys using the 'dd-api-key' and 'dd-app-key' flag below"+
+			"or the env vars DATADOG_API_KEY and DATADOG_APP_KEY")
+	flag.StringVar(&t.flagDatadogAPIKey, "dd-api-key", "",
+		"The Datadog Agent API Key used for datadog metrics tests.")
+	flag.StringVar(&t.flagDatadogAppKey, "dd-app-key", "",
+		"The Datadog Agent Application Key used for datadog metrics tests.")
+
 	flag.BoolVar(&t.flagEnableOpenshift, "enable-openshift", false,
 		"If true, the tests will automatically add Openshift Helm value for each Helm install.")
 
@@ -158,6 +171,14 @@ func (t *TestFlags) init() {
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
 	}
+
+	if t.flagDatadogAPIKey == "" {
+		t.flagDatadogAPIKey = os.Getenv("DATADOG_API_KEY")
+	}
+
+	if t.flagDatadogAppKey == "" {
+		t.flagDatadogAppKey = os.Getenv("DATADOG_APP_KEY")
+	}
 }
 
 func (t *TestFlags) Validate() error {
@@ -204,6 +225,10 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 	c := &config.TestConfig{
 		EnableEnterprise:  t.flagEnableEnterprise,
 		EnterpriseLicense: t.flagEnterpriseLicense,
+
+		EnableDatadog: t.flagEnableDatadog,
+		DatadogAPIKey: t.flagDatadogAPIKey,
+		DatadogAppKey: t.flagDatadogAppKey,
 
 		KubeEnvs:           kubeEnvs,
 		EnableMultiCluster: t.flagEnableMultiCluster,

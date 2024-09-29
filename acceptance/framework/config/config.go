@@ -22,6 +22,9 @@ const (
 	HelmChartPath     = "../../../charts/consul"
 	LicenseSecretName = "license"
 	LicenseSecretKey  = "key"
+	DatadogSecretName = "datadog-secret"
+	DatadogAPIKey     = "api-key"
+	DatadogAppKey     = "app-key"
 )
 
 type KubeTestConfig struct {
@@ -69,6 +72,10 @@ type TestConfig struct {
 
 	EnableEnterprise  bool
 	EnterpriseLicense string
+
+	EnableDatadog bool
+	DatadogAPIKey string
+	DatadogAppKey string
 
 	EnableOpenshift bool
 
