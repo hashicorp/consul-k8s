@@ -45,7 +45,6 @@ jobs:
           # for usage, options, and more details on match syntax.
           files: |
             .github/workflows/reusable-conditional-skip.yml
-            .github/workflows/openshift-acceptance.yml
             LICENSE
             .copywrite.hcl
             .gitignore
