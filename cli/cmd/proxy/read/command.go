@@ -144,7 +144,7 @@ func (c *ReadCommand) init() {
 		Default: -1,
 	})
 
-	f = c.set.NewSet("GlobalOptions")
+	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameKubeConfig,
 		Aliases: []string{"c"},
