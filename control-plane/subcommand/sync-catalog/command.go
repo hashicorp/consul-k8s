@@ -275,7 +275,7 @@ func (c *Command) Run(args []string) int {
 	}
 	c.ready = true
 
-	if c.flagPurgeK8SServicesFromNode != "" {
+	if c.flagPurgeK8SServicesFromNode {
 		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
