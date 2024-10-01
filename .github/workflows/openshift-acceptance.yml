@@ -18,10 +18,45 @@ jobs:
         with:
           fetch-depth: 0
 
+      # - name: Install dependencies
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils 
+
+      # - name: Set up OpenShift Local
+      #   run: |
+      #     CRC_URL="https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz"
+      #     curl -sL ${CRC_URL} | tar -xJf - -C /tmp
+      #     sudo mv /tmp/crc-linux-*-amd64/crc /usr/local/bin/
+      #     crc version
+      #     crc setup
+      #     crc start --memory 12288 --cpus 4
+
+      # - name: Set up OpenShift Local
+      #   run: |
+      #     CRC_URL=$(curl -s https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/sha256sum.txt | grep linux-amd64 | cut -d' ' -f2)
+      #     curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/$CRC_URL -o crc-linux-amd64.tar.xz
+      #     tar -xvf crc-linux-amd64.tar.xz
+      #     sudo mv crc-linux-*-amd64/crc /usr/local/bin/
+      #     crc version
+      #     crc setup
+      #     crc config set consent-telemetry no
+      #     crc start --memory 13312 --cpus 4 --yes
+
+      # - name: Set up OpenShift CLI
+      #   run: |
+      #     eval $(crc oc-env)
+      #     oc version
+    
+      # - name: Login to OpenShift
+      #   run: |
+      #     eval $(crc oc-env)
+      #     oc login -u developer -p developer https://api.crc.testing:6443 --insecure-skip-tls-verify=true
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils xz-utils
 
       - name: Add user to libvirt group
         run: |
@@ -31,11 +66,38 @@ jobs:
 
       - name: Set up OpenShift Local
         run: |
-          CRC_URL=$(curl -s https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/sha256sum.txt | grep linux-amd64 | cut -d' ' -f2)
-          curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/$CRC_URL -o crc-linux-amd64.tar.xz
-          tar -xvf crc-linux-amd64.tar.xz
+          # Get the latest CRC version and URL
+          CRC_VERSION=$(curl -s https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/release-info.json | jq -r .version.crcVersion)
+          CRC_FILENAME="crc-linux-amd64.tar.xz"
+          CRC_URL="https://mirror.openshift.com/pub/openshift-v4/clients/crc/${CRC_VERSION}/${CRC_FILENAME}"
+          
+          # Download CRC
+          echo "Downloading CRC version ${CRC_VERSION}"
+          curl -L ${CRC_URL} -o ${CRC_FILENAME}
+          
+          # Verify download
+          if [ ! -f ${CRC_FILENAME} ]; then
+            echo "Failed to download CRC"
+            exit 1
+          fi
+          
+          # Extract CRC
+          echo "Extracting CRC"
+          tar -xvf ${CRC_FILENAME}
+          
+          # Verify extraction
+          if [ ! -d crc-linux-*-amd64 ]; then
+            echo "Failed to extract CRC"
+            exit 1
+          fi
+          
+          # Move CRC binary to /usr/local/bin
           sudo mv crc-linux-*-amd64/crc /usr/local/bin/
+          
+          # Verify CRC installation
           crc version
+          
+          # Setup and start CRC
           sudo -E env "PATH=$PATH" crc setup
           sudo -E env "PATH=$PATH" crc config set consent-telemetry no
           sudo -E env "PATH=$PATH" crc start --memory 13312 --cpus 4 --yes
@@ -49,8 +111,8 @@ jobs:
         run: |
           eval $(sudo -E env "PATH=$PATH" crc oc-env)
           oc login -u developer -p developer https://api.crc.testing:6443 --insecure-skip-tls-verify=true
-      
-      - name: Install helm
+
+      - name: Setup helm
         uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
         with:
           version: 'v3.9.4'
