@@ -156,8 +156,6 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	// c.flags.StringVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", "",
-	// "Specifies the name of the Consul node for which to deregister synced Kubernetes services.")
 	c.flags.StringVar(&c.flagFilter, "filter", "",
 		"Specifies the expression used to filter the services on the Consul node that will be deregistered. "+
 			"The syntax for this filter is the same as the syntax used in the List Services for Node API in the Consul catalog.")
