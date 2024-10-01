@@ -26,6 +26,8 @@ jobs:
       - name: Add user to libvirt group
         run: |
           sudo usermod -a -G libvirt $USER
+          sudo systemctl enable libvirtd
+          sudo systemctl start libvirtd
           echo "User added to libvirt group"
           id
 
@@ -37,9 +39,9 @@ jobs:
           crc version
           
           # Setup and start CRC
-          sudo -E env "PATH=$PATH" crc setup
-          sudo -E env "PATH=$PATH" crc config set consent-telemetry no
-          sudo -E env "PATH=$PATH" crc start --memory 13312 --cpus 4 --yes
+          sg libvirt -c "crc setup"
+          sg libvirt -c "crc config set consent-telemetry no"
+          sg libvirt -c "crc start --memory 13312 --cpus 4 --yes"
 
       - name: Set up OpenShift CLI
         run: |
