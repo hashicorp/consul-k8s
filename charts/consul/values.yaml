@@ -2090,6 +2090,10 @@ syncCatalog:
   # global.enabled.
   enabled: false
 
+  # True if you want to deregister all services in this cluster from consul that have been registered by the catalog sync when the `enabled` flag is set to false.
+  # @type: boolean
+  purgeServicesOnDisable: false
+
   # The name of the Docker image (including any tag) for consul-k8s-control-plane
   # to run the sync program.
   # @type: string
