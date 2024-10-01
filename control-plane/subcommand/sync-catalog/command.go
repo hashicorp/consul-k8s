@@ -275,6 +275,19 @@ func (c *Command) Run(args []string) int {
 	}
 	c.ready = true
 
+	if c.flagPurgeK8SServicesFromNode {
+		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
+			return 1
+		}
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient); err != nil {
+			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
+			return 1
+		}
+		return 0
+	}
+
 	// Convert allow/deny lists to sets
 	allowSet := flags.ToSet(c.flagAllowK8sNamespacesList)
 	denySet := flags.ToSet(c.flagDenyK8sNamespacesList)
