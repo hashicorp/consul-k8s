@@ -33,15 +33,27 @@ jobs:
 
       - name: Set up OpenShift Local
         run: |
+          # Get the latest CRC version and URL
           CRC_URL="https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz"
-          curl -sL ${CRC_URL} | tar -xJf - -C /tmp
+          curl -sL ${CRC_URL} | sudo tar -xJf - -C /tmp
           sudo mv /tmp/crc-linux-*-amd64/crc /usr/local/bin/
           crc version
           
           # Setup and start CRC
-          sg libvirt -c "crc setup"
-          sg libvirt -c "crc config set consent-telemetry no"
-          sg libvirt -c "crc start --memory 13312 --cpus 4 --yes"
+          bash -c "newgrp libvirt << EOF
+          crc setup
+          crc config set consent-telemetry no
+          crc start --memory 13312 --cpus 4 --yes
+          EOF"
+# CRC_URL="https://mirror.openshift.com/pub/openshift-v4/clients/crc/latest/crc-linux-amd64.tar.xz"
+# curl -sL ${CRC_URL} | tar -xJf - -C /tmp
+# sudo mv /tmp/crc-linux-*-amd64/crc /usr/local/bin/
+# crc version
+
+# # Setup and start CRC
+# sg libvirt -c "crc setup"
+# sg libvirt -c "crc config set consent-telemetry no"
+# sg libvirt -c "crc start --memory 13312 --cpus 4 --yes"
 
       - name: Set up OpenShift CLI
         run: |
