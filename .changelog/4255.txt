@@ -1,3 +1,0 @@
-```release-note:bug
-sync-catalog: Enable the user to purge the registered services by passing parent node and necessary filters.
-```
