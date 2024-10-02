@@ -1,3 +1,0 @@
-```release-note:bug-fix
-sync-catalog: rollback changes for command to purge services from a node in the catalog.
-```
