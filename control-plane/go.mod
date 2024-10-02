@@ -2,6 +2,11 @@ module github.com/hashicorp/consul-k8s/control-plane
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
+// temporary for local dev
+replace (
+	github.com/hashicorp/consul/api => ../../consul-enterprise/api
+)
+
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
