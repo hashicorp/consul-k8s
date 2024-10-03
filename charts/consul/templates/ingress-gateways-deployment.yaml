@@ -293,7 +293,7 @@ spec:
           value: $(NODE_NAME)-virtual
         {{- if $root.Values.ingressGateways.supportPrivilegedPorts }}
         command:
-        - consul-dataplane
+        - privileged-consul-dataplane
         args:
         - -envoy-executable-path=/usr/local/bin/privileged-envoy
         {{- else }}
