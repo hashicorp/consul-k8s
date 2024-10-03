@@ -292,8 +292,9 @@ spec:
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
         command:
-        - consul-dataplane
+        - privileged-consul-dataplane
         args:
+        - -privileged
         - -envoy-ready-bind-port=21000
         {{- if $root.Values.externalServers.enabled }}
         - -addresses={{ $root.Values.externalServers.hosts | first }}
