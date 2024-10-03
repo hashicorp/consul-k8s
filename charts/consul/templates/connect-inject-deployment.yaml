@@ -141,6 +141,7 @@ spec:
             - "-ec"
             - |
               exec consul-k8s-control-plane inject-connect \
+                -config-file=/consul/config/config.json \
                 {{- if .Values.global.federation.enabled }}
                 -enable-federation \
                 {{- end }}
@@ -317,6 +318,9 @@ spec:
             successThreshold: 1
             timeoutSeconds: 5
           volumeMounts:
+            - name: config
+              mountPath: /consul/config
+              readOnly: true
           {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
             - name: certs
               mountPath: /etc/connect-injector/certs
@@ -332,6 +336,9 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
       volumes:
+        - name: config
+          configMap:
+            name: {{ template "consul.fullname" . }}-connect-inject-config
       {{- if not (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName) }}
         - name: certs
           secret:
