@@ -294,7 +294,7 @@ spec:
         command:
         - privileged-consul-dataplane
         args:
-        - -privileged
+        - -envoy-executable-path=/usr/local/bin/privileged-envoy
         - -envoy-ready-bind-port=21000
         {{- if $root.Values.externalServers.enabled }}
         - -addresses={{ $root.Values.externalServers.hosts | first }}
