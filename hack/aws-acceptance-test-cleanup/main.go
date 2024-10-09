@@ -14,6 +14,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -78,6 +79,11 @@ func realMain(ctx context.Context) error {
 
 	// Find volumes and delete
 	if err := cleanupPersistentVolumes(ctx, ec2Client); err != nil {
+		return err
+	}
+
+	// Find IAM roles and delete
+	if err := cleanupIAMRoles(ctx, iamClient); err != nil {
 		return err
 	}
 
@@ -757,6 +763,61 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 		}
 		return err
 	}, backoff.WithContext(expoBackoff, ctx))
+}
+
+func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
+	// Find roles to delete.
+	var roles []*iam.Role
+	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
+		func(page *iam.ListRolesOutput, lastPage bool) bool {
+			roles = append(roles, page.Roles...)
+			return !lastPage
+		})
+	if err != nil {
+		return fmt.Errorf("failed to list roles: %v", err)
+	}
+	// Delete roles with the specified prefix
+	prefix := "consul-k8s-" // Prefix of roles to delete
+	for _, role := range roles {
+		if aws.StringValue(role.RoleName)[:len(prefix)] == prefix {
+			err := detachRolePolicies(iamClient, role.RoleName)
+			if err != nil {
+				log.Printf("Failed to detach policies for role %s: %v", *role.RoleName, err)
+				continue
+			}
+
+			// Then delete the role
+			_, err = iamClient.DeleteRole(&iam.DeleteRoleInput{
+				RoleName: role.RoleName,
+			})
+			if err != nil {
+				log.Printf("Failed to delete role %s: %v", *role.RoleName, err)
+			} else {
+				log.Printf("Deleted role: %s", *role.RoleName)
+			}
+		}
+	}
+	return nil
+}
+
+// detachRolePolicies detaches all policies from the specified role.
+func detachRolePolicies(iamClient *iam.IAM, roleName *string) error {
+	// List attached role policies
+	err := iamClient.ListAttachedRolePoliciesPages(&iam.ListAttachedRolePoliciesInput{
+		RoleName: roleName,
+	}, func(page *iam.ListAttachedRolePoliciesOutput, lastPage bool) bool {
+		for _, policy := range page.AttachedPolicies {
+			_, err := iamClient.DetachRolePolicy(&iam.DetachRolePolicyInput{
+				RoleName:  roleName,
+				PolicyArn: policy.PolicyArn,
+			})
+			if err != nil {
+				log.Printf("Failed to detach policy %s from role %s: %v", *policy.PolicyArn, *roleName, err)
+			}
+		}
+		return !lastPage
+	})
+	return err
 }
 
 func cleanupPersistentVolumes(ctx context.Context, ec2Client *ec2.EC2) error {
