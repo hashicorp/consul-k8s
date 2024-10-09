@@ -14,7 +14,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -782,7 +781,7 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 		if aws.StringValue(role.RoleName)[:len(prefix)] == prefix {
 			err := detachRolePolicies(iamClient, role.RoleName)
 			if err != nil {
-				log.Printf("Failed to detach policies for role %s: %v", *role.RoleName, err)
+				fmt.Printf("Failed to detach policies for role %s: %v", *role.RoleName, err)
 				continue
 			}
 
@@ -791,9 +790,9 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 				RoleName: role.RoleName,
 			})
 			if err != nil {
-				log.Printf("Failed to delete role %s: %v", *role.RoleName, err)
+				fmt.Printf("Failed to delete role %s: %v", *role.RoleName, err)
 			} else {
-				log.Printf("Deleted role: %s", *role.RoleName)
+				fmt.Printf("Deleted role: %s", *role.RoleName)
 			}
 		}
 	}
@@ -812,7 +811,7 @@ func detachRolePolicies(iamClient *iam.IAM, roleName *string) error {
 				PolicyArn: policy.PolicyArn,
 			})
 			if err != nil {
-				log.Printf("Failed to detach policy %s from role %s: %v", *policy.PolicyArn, *roleName, err)
+				fmt.Printf("Failed to detach policy %s from role %s: %v", *policy.PolicyArn, *roleName, err)
 			}
 		}
 		return !lastPage
