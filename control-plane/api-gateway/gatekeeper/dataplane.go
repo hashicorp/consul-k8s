@@ -19,7 +19,6 @@ import (
 
 const (
 	allCapabilities              = "ALL"
-	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
 	defaultEnvoyProxyConcurrency = 1
@@ -114,9 +113,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	// otherwise, allow the user to be assigned by OpenShift.
 	container.SecurityContext = &corev1.SecurityContext{
 		ReadOnlyRootFilesystem: ptr.To(true),
-		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
 	}
