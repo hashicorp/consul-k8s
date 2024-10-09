@@ -765,43 +765,50 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 }
 
 func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
-	// Find roles to delete.
-	var roles []*iam.Role
+	var rolesToDelete []*iam.Role
+	rolePrefix := "consul-k8s-"
 	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
 		func(page *iam.ListRolesOutput, lastPage bool) bool {
-			roles = append(roles, page.Roles...)
+			for _, role := range page.Roles {
+				roleName := aws.StringValue(role.RoleName)
+				if strings.HasPrefix(roleName, rolePrefix) {
+					rolesToDelete = append(rolesToDelete, role)
+				}
+			}
 			return !lastPage
 		})
 	if err != nil {
 		return fmt.Errorf("failed to list roles: %v", err)
 	}
-	// Delete roles with the specified prefix
-	prefix := "consul-k8s-" // Prefix of roles to delete
-	for _, role := range roles {
-		if aws.StringValue(role.RoleName)[:len(prefix)] == prefix {
-			err := detachRolePolicies(iamClient, role.RoleName)
-			if err != nil {
-				fmt.Printf("Failed to detach policies for role %s: %v", *role.RoleName, err)
-				continue
-			}
 
-			// Then delete the role
-			_, err = iamClient.DeleteRole(&iam.DeleteRoleInput{
-				RoleName: role.RoleName,
-			})
-			if err != nil {
-				fmt.Printf("Failed to delete role %s: %v", *role.RoleName, err)
-			} else {
-				fmt.Printf("Deleted role: %s", *role.RoleName)
-			}
+	if len(rolesToDelete) == 0 {
+		fmt.Println("Found no iamRoles to clean up")
+		return nil
+	}
+
+	// Delete filtered roles
+	for _, role := range rolesToDelete {
+		roleName := aws.StringValue(role.RoleName)
+		err := detachRolePolicies(iamClient, role.RoleName)
+		if err != nil {
+			fmt.Printf("Failed to detach policies for role %s: %v", roleName, err)
+			continue
+		}
+
+		_, err = iamClient.DeleteRole(&iam.DeleteRoleInput{
+			RoleName: role.RoleName,
+		})
+		if err != nil {
+			fmt.Printf("Failed to delete role %s: %v", roleName, err)
+		} else {
+			fmt.Printf("Deleted role: %s", roleName)
 		}
 	}
+
 	return nil
 }
 
-// detachRolePolicies detaches all policies from the specified role.
 func detachRolePolicies(iamClient *iam.IAM, roleName *string) error {
-	// List attached role policies
 	err := iamClient.ListAttachedRolePoliciesPages(&iam.ListAttachedRolePoliciesInput{
 		RoleName: roleName,
 	}, func(page *iam.ListAttachedRolePoliciesOutput, lastPage bool) bool {
