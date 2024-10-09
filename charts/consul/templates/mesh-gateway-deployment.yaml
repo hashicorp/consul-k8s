@@ -187,14 +187,12 @@ spec:
       - name: mesh-gateway
         image: {{ .Values.global.imageConsulDataplane | quote }}
         {{ template "consul.imagePullPolicy" . }}
+        {{ if not .Values.meshGateway.hostNetwork}}
         securityContext:
           capabilities:
-            {{ if not .Values.meshGateway.hostNetwork}}
             drop:
               - ALL
-            {{- end }}
-            add:
-              - NET_BIND_SERVICE
+        {{- end }}
         {{- if .Values.meshGateway.resources }}
         resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
