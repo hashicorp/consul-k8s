@@ -1383,7 +1383,6 @@ load _helpers
     "allowPrivilegeEscalation": false,
     "capabilities": {
       "drop": ["ALL"],
-      "add": ["NET_BIND_SERVICE"]
     },
     "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
@@ -1416,7 +1415,6 @@ load _helpers
     "allowPrivilegeEscalation": false,
     "capabilities": {
       "drop": ["ALL"],
-      "add": ["NET_BIND_SERVICE"]
     },
     "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,

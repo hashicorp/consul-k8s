@@ -20,7 +20,6 @@ import (
 
 const (
 	allCapabilities              = "ALL"
-	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
 	defaultEnvoyProxyConcurrency = 1
@@ -124,17 +123,8 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	}
 
 	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(usingPrivilegedPorts),
-		ReadOnlyRootFilesystem:   ptr.To(true),
-		RunAsNonRoot:             ptr.To(true),
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
-		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
-		// NET_BIND_SERVICE is a requirement for consul-dataplane, even though we don't
-		// bind to privileged ports.
+		ReadOnlyRootFilesystem: ptr.To(true),
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
 	}
