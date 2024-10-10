@@ -5,8 +5,8 @@ package catalog
 
 import (
 	"context"
-	"reflect"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -186,9 +186,9 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 	for ns, services := range s.namespaces {
 		for _, svc := range services {
 			// Make sure the namespace exists before we run checks against it
-			if _, ok := serviceNames[ns]; ok {
+			if _, ok := s.serviceNames[ns]; ok {
 				// If the service is valid and its info isn't nil, we don't deregister it
-				if serviceNames[ns].Contains(svc.Service.Service) && namespaces[ns][svc.Service.ID] != nil {
+				if s.serviceNames[ns].Contains(svc.Service.Service) && s.namespaces[ns][svc.Service.ID] != nil {
 					continue
 				}
 			}
@@ -564,7 +564,6 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 				continue
 			}
 
-
 			// metric count and service metadata syncing k8s services to Consul
 			labels := []metrics.Label{
 				{Name: "id", Value: r.Service.ID},
@@ -608,34 +607,34 @@ func (s *ConsulSyncer) syncOne(ctx context.Context, r *api.CatalogRegistration) 
 }
 
 func (s *ConsulSyncer) deregOne(ctx context.Context, r *api.CatalogDeregistration) {
-		s.Log.Info("deregistering service",
+	s.Log.Info("deregistering service",
+		"node-name", r.Node,
+		"service-id", r.ServiceID,
+		"service-consul-namespace", r.Namespace)
+
+	_, err = consulClient.Catalog().Deregister(r, nil)
+	if err != nil {
+		// metric count for error deregistering k8s services from Consul
+		labels := []metrics.Label{
+			{Name: "error", Value: err.Error()},
+		}
+		s.PrometheusSink.IncrCounterWithLabels(deregisterErrorName, 1, labels)
+
+		s.Log.Warn("error deregistering service",
 			"node-name", r.Node,
 			"service-id", r.ServiceID,
-			"service-consul-namespace", r.Namespace)
+			"service-consul-namespace", r.Namespace,
+			"err", err)
+		continue
+	}
 
-		_, err = consulClient.Catalog().Deregister(r, nil)
-		if err != nil {
-			// metric count for error deregistering k8s services from Consul
-			labels := []metrics.Label{
-				{Name: "error", Value: err.Error()},
-			}
-			s.PrometheusSink.IncrCounterWithLabels(deregisterErrorName, 1, labels)
-
-			s.Log.Warn("error deregistering service",
-				"node-name", r.Node,
-				"service-id", r.ServiceID,
-				"service-consul-namespace", r.Namespace,
-				"err", err)
-			continue
-		}
-
-		// metric count for deregistering k8s services from Consul
-		labels := []metrics.Label{
-			{Name: "id", Value: r.ServiceID},
-			{Name: "node", Value: r.Node},
-			{Name: "namespace", Value: r.Namespace},
-		}
-		s.PrometheusSink.IncrCounterWithLabels(deregisterName, 1, labels)
+	// metric count for deregistering k8s services from Consul
+	labels := []metrics.Label{
+		{Name: "id", Value: r.ServiceID},
+		{Name: "node", Value: r.Node},
+		{Name: "namespace", Value: r.Namespace},
+	}
+	s.PrometheusSink.IncrCounterWithLabels(deregisterName, 1, labels)
 }
 
 func (s *ConsulSyncer) shouldSync(r *api.CatalogRegistration) bool {
