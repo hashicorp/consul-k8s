@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"context"
+	"reflect"
 	"fmt"
 	"sync"
 	"time"
@@ -58,7 +59,7 @@ var SyncCatalogGauge = []prometheus.GaugeDefinition{
 const (
 	// ConsulSyncPeriod is how often the syncer will attempt to
 	// reconcile the expected service states with the remote Consul server.
-	ConsulSyncPeriod = 30 * time.Second
+	ConsulSyncPeriod = 2 * time.Second
 
 	// ConsulServicePollPeriod is how often a service is checked for
 	// whether it has instances to reap.
@@ -171,8 +172,44 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 		}
 		s.namespaces[ns][r.Service.ID] = r
 		s.Log.Debug("[Sync] adding service to namespaces map", "service", r.Service)
+		// Sync immediately if the registration is new or changed
+		if s.shouldSync(r) {
+			s.Log.Info("syncing service", "node-name", r.Node, "service-name", r.Service.Service)
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			s.syncOne(ctx, r)
+		}
 	}
 
+	// Deregister any services that are no longer present
+	for ns, services := range s.namespaces {
+		for _, svc := range services {
+			// Make sure the namespace exists before we run checks against it
+			if _, ok := serviceNames[ns]; ok {
+				// If the service is valid and its info isn't nil, we don't deregister it
+				if serviceNames[ns].Contains(svc.Service.Service) && namespaces[ns][svc.Service.ID] != nil {
+					continue
+				}
+			}
+
+			// Create deregistration object with optional namespace
+			dereg := api.CatalogDeregistration{
+				Node:      svc.Node,
+				ServiceID: svc.Service.ID,
+			}
+			if s.EnableNamespaces {
+				dereg.Namespace = ns
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			s.deregOne(ctx, &dereg)
+		}
+	}
+
+	s.serviceNames = serviceNames
+	s.namespaces = namespaces
 	// Signal that the initial sync is complete and our maps have been populated.
 	// We can now safely reap untracked services.
 	s.initialSyncOnce.Do(func() { close(s.initialSync) })
@@ -485,34 +522,7 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 
 	// Do all deregistrations first.
 	for _, r := range s.deregs {
-		s.Log.Info("deregistering service",
-			"node-name", r.Node,
-			"service-id", r.ServiceID,
-			"service-consul-namespace", r.Namespace)
-
-		_, err = consulClient.Catalog().Deregister(r, nil)
-		if err != nil {
-			// metric count for error deregistering k8s services from Consul
-			labels := []metrics.Label{
-				{Name: "error", Value: err.Error()},
-			}
-			s.PrometheusSink.IncrCounterWithLabels(deregisterErrorName, 1, labels)
-
-			s.Log.Warn("error deregistering service",
-				"node-name", r.Node,
-				"service-id", r.ServiceID,
-				"service-consul-namespace", r.Namespace,
-				"err", err)
-			continue
-		}
-
-		// metric count for deregistering k8s services from Consul
-		labels := []metrics.Label{
-			{Name: "id", Value: r.ServiceID},
-			{Name: "node", Value: r.Node},
-			{Name: "namespace", Value: r.Namespace},
-		}
-		s.PrometheusSink.IncrCounterWithLabels(deregisterName, 1, labels)
+		s.deregOne(ctx, r)
 	}
 
 	// Always clear deregistrations, they'll repopulate if we had errors
@@ -522,6 +532,7 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 	// may have been made to the registered services.
 	for _, services := range s.namespaces {
 		for _, r := range services {
+			s.syncOne(ctx, r)
 			if s.EnableNamespaces {
 				_, err = namespaces.EnsureExists(consulClient, r.Service.Namespace, s.CrossNamespaceACLPolicy)
 				if err != nil {
@@ -553,11 +564,6 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 				continue
 			}
 
-			s.Log.Debug("registered service instance",
-				"node-name", r.Node,
-				"service-name", r.Service.Service,
-				"consul-namespace-name", r.Service.Namespace,
-				"service", r.Service)
 
 			// metric count and service metadata syncing k8s services to Consul
 			labels := []metrics.Label{
@@ -579,6 +585,72 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 			s.PrometheusSink.SetGauge(syncCatalogStatus, 1)
 		}
 	}
+}
+
+func (s *ConsulSyncer) syncOne(ctx context.Context, r *api.CatalogRegistration) {
+
+	// Register the service
+	wopt := (&api.WriteOptions{}).WithContext(ctx)
+	_, err := s.Client.Catalog().Register(r, wopt)
+	if err != nil {
+		s.Log.Warn("error registering service",
+			"node-name", r.Node,
+			"service-name", r.Service.Service,
+			"err", err)
+		return
+	}
+
+	s.Log.Debug("registered service instance",
+		"node-name", r.Node,
+		"service-name", r.Service.Service,
+		"consul-namespace-name", r.Service.Namespace,
+		"service", r.Service)
+}
+
+func (s *ConsulSyncer) deregOne(ctx context.Context, r *api.CatalogDeregistration) {
+		s.Log.Info("deregistering service",
+			"node-name", r.Node,
+			"service-id", r.ServiceID,
+			"service-consul-namespace", r.Namespace)
+
+		_, err = consulClient.Catalog().Deregister(r, nil)
+		if err != nil {
+			// metric count for error deregistering k8s services from Consul
+			labels := []metrics.Label{
+				{Name: "error", Value: err.Error()},
+			}
+			s.PrometheusSink.IncrCounterWithLabels(deregisterErrorName, 1, labels)
+
+			s.Log.Warn("error deregistering service",
+				"node-name", r.Node,
+				"service-id", r.ServiceID,
+				"service-consul-namespace", r.Namespace,
+				"err", err)
+			continue
+		}
+
+		// metric count for deregistering k8s services from Consul
+		labels := []metrics.Label{
+			{Name: "id", Value: r.ServiceID},
+			{Name: "node", Value: r.Node},
+			{Name: "namespace", Value: r.Namespace},
+		}
+		s.PrometheusSink.IncrCounterWithLabels(deregisterName, 1, labels)
+}
+
+func (s *ConsulSyncer) shouldSync(r *api.CatalogRegistration) bool {
+	// If the namespace doesn't exist, this service will
+	// definitely need to be registered
+	_, ok := s.namespaces[r.Service.Namespace]
+	if !ok {
+		return true
+	}
+	reg, ok := s.namespaces[r.Service.Namespace][r.Service.ID]
+	if !ok {
+		return true
+	}
+
+	return !reflect.DeepEqual(reg, r)
 }
 
 func (s *ConsulSyncer) init() {
