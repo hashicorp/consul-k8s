@@ -766,18 +766,16 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 
 func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 	var rolesToDelete []*iam.Role
-	rolePrefix := "consul-k8s-"
-	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
-		func(page *iam.ListRolesOutput, lastPage bool) bool {
-			return filterRolesWithPrefix(page, lastPage, &rolesToDelete, rolePrefix)
-		})
+	rolesToDelete, err := filterIAMRolesWithPrefix(ctx, iamClient, "consul-k8s-")
 	if err != nil {
-		return fmt.Errorf("failed to list roles: %v", err)
+		return fmt.Errorf("failed to list roles: %w", err)
 	}
 
 	if len(rolesToDelete) == 0 {
 		fmt.Println("Found no iamRoles to clean up")
 		return nil
+	} else {
+		fmt.Printf("Found %d IAM roles to clean up\n", len(rolesToDelete))
 	}
 
 	// Delete filtered roles
@@ -802,7 +800,7 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 	return nil
 }
 
-// filterRolesWithPrefix is a callback function used with ListRolesPages.
+// filterIAMRolesWithPrefix is a callback function used with ListRolesPages.
 // It filters roles based on specified prefix and appends matching roles to rolesToDelete.
 //
 // Parameters:
@@ -810,16 +808,25 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 // - lastPage: A boolean indicating whether this is the last page of results
 // - rolesToDelete: A pointer to the slice where matching roles are accumulated
 // - rolePrefix: The prefix to filter roles by
-func filterRolesWithPrefix(page *iam.ListRolesOutput, lastPage bool, rolesToDelete *[]*iam.Role, rolePrefix string) bool {
-	for _, role := range page.Roles {
-		roleName := aws.StringValue(role.RoleName)
-		if strings.HasPrefix(roleName, rolePrefix) {
-			*rolesToDelete = append(*rolesToDelete, role)
-		}
+func filterIAMRolesWithPrefix(ctx context.Context, iamClient *iam.IAM, prefix string) ([]*iam.Role, error) {
+	var roles []*iam.Role
+
+	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
+		func(page *iam.ListRolesOutput, lastPage bool) bool {
+			for _, role := range page.Roles {
+				name := aws.StringValue(role.RoleName)
+				if strings.HasPrefix(name, prefix) {
+					roles = append(roles, role)
+				}
+			}
+
+			return true
+		})
+	if err != nil {
+		return nil, err
 	}
-	// Indicates whether to continue pagination (true) or stop (false) until the last page is reached.
-	// When lastPage is true, returning false stops the pagination.
-	return !lastPage
+
+	return roles, nil
 }
 
 func detachRolePolicies(iamClient *iam.IAM, roleName *string) error {
