@@ -87,7 +87,7 @@ type MeshTLSConfig struct {
 }
 
 type MeshHTTPConfig struct {
-	SanitizeXForwardedClientCert bool `json:"sanitizeXForwardedClientCert"`
+	SanitizeXForwardedClientCert bool `json:"sanitizeXForwardedClientCert,omitempty"`
 	// Incoming configures settings for incoming HTTP traffic to mesh proxies.
 	Incoming *MeshDirectionalHTTPConfig `json:"incoming,omitempty"`
 	// There is not currently an outgoing MeshDirectionalHTTPConfig, as

@@ -116,8 +116,6 @@ spec:
                     type: object
                   sanitizeXForwardedClientCert:
                     type: boolean
-                required:
-                - sanitizeXForwardedClientCert
                 type: object
               peering:
                 description: Peering defines the peering configuration for the service
