@@ -1,4 +1,5 @@
-{{- if (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
+{{- $syncCatalogEnabled := (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if $syncCatalogEnabled }}
 {{- template "consul.reservedNamesFailer" (list .Values.syncCatalog.consulNamespaces.consulDestinationNamespace "syncCatalog.consulNamespaces.consulDestinationNamespace") }}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
