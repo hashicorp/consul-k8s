@@ -769,13 +769,7 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 	rolePrefix := "consul-k8s-"
 	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
 		func(page *iam.ListRolesOutput, lastPage bool) bool {
-			for _, role := range page.Roles {
-				roleName := aws.StringValue(role.RoleName)
-				if strings.HasPrefix(roleName, rolePrefix) {
-					rolesToDelete = append(rolesToDelete, role)
-				}
-			}
-			return !lastPage
+			return filterRolesWithPrefix(page, lastPage, &rolesToDelete, rolePrefix)
 		})
 	if err != nil {
 		return fmt.Errorf("failed to list roles: %v", err)
@@ -808,22 +802,71 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 	return nil
 }
 
+// filterRolesWithPrefix is a callback function used with ListRolesPages.
+// It filters roles based on specified prefix and appends matching roles to rolesToDelete.
+//
+// Parameters:
+// - page: A single page of IAM roles returned by the AWS API
+// - lastPage: A boolean indicating whether this is the last page of results
+// - rolesToDelete: A pointer to the slice where matching roles are accumulated
+// - rolePrefix: The prefix to filter roles by
+func filterRolesWithPrefix(page *iam.ListRolesOutput, lastPage bool, rolesToDelete *[]*iam.Role, rolePrefix string) bool {
+	for _, role := range page.Roles {
+		roleName := aws.StringValue(role.RoleName)
+		if strings.HasPrefix(roleName, rolePrefix) {
+			*rolesToDelete = append(*rolesToDelete, role)
+		}
+	}
+	// Indicates whether to continue pagination (true) or stop (false) until the last page is reached.
+	// When lastPage is true, returning false stops the pagination.
+	return !lastPage
+}
+
 func detachRolePolicies(iamClient *iam.IAM, roleName *string) error {
+	if roleName == nil {
+		return fmt.Errorf("roleName is nil")
+	}
+
 	err := iamClient.ListAttachedRolePoliciesPages(&iam.ListAttachedRolePoliciesInput{
 		RoleName: roleName,
 	}, func(page *iam.ListAttachedRolePoliciesOutput, lastPage bool) bool {
-		for _, policy := range page.AttachedPolicies {
-			_, err := iamClient.DetachRolePolicy(&iam.DetachRolePolicyInput{
-				RoleName:  roleName,
-				PolicyArn: policy.PolicyArn,
-			})
-			if err != nil {
-				fmt.Printf("Failed to detach policy %s from role %s: %v", *policy.PolicyArn, *roleName, err)
-			}
+		err := detachPoliciesFromRole(iamClient, roleName, page)
+		if err != nil {
+			fmt.Printf("Error detaching policies from role %s: %v", *roleName, err)
 		}
 		return !lastPage
 	})
-	return err
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// detachPoliciesFromRole detaches all policies from a given role.
+//
+// Parameters:
+// - iamClient: The IAM service client
+// - roleName: Pointer to the name of the role
+// - page: A single page of attached policies returned by the AWS API
+func detachPoliciesFromRole(iamClient *iam.IAM, roleName *string, page *iam.ListAttachedRolePoliciesOutput) error {
+	for _, policy := range page.AttachedPolicies {
+		if policy.PolicyArn == nil {
+			fmt.Printf("Warning: PolicyArn is nil for a policy attached to: %s", *roleName)
+			continue
+		}
+
+		_, err := iamClient.DetachRolePolicy(&iam.DetachRolePolicyInput{
+			RoleName:  roleName,
+			PolicyArn: policy.PolicyArn,
+		})
+		if err != nil {
+			fmt.Printf("Failed to detach policy %s from role %s: %v\n", aws.StringValue(policy.PolicyArn), *roleName, err)
+		}
+	}
+
+	return nil
 }
 
 func cleanupPersistentVolumes(ctx context.Context, ec2Client *ec2.EC2) error {
