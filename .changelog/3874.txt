@@ -1,0 +1,3 @@
+```release-note:sync-catalog
+Add Endpoint health state to registered consul service
+```
