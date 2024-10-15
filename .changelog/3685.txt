@@ -1,0 +1,6 @@
+```release-note:bug
+helm: corrected datadog openmetrics and consul-checks consul server URLs set during automation to use full consul deployment release name
+```
+```release-note:bug
+helm: bug fix for `prometheus.io` annotation omission while using datadog integration with openmetrics/prometheus and consul integration checks
+```
