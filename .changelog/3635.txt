@@ -1,0 +1,3 @@
+```release-note:bug
+helm: (datadog integration) updated `server-statefulset.yaml` templating to handle custom Unix Domain Socket paths.
+```
