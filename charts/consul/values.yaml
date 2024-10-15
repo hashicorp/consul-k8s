@@ -1875,6 +1875,26 @@ client:
   # @type: string
   updateStrategy: null
 
+  # Override the default livenessProbe and readinessProbe for the DaemonSet consul-client container.
+  # Refer to the Kubernetes documentation on how to [Configure Liveness, Readiness and Startup Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+  #
+  # This should be a multi-line string
+  #
+  # Example:
+  #
+  # ```yaml
+  # readinessProbe:
+  #     exec:
+  #       command:
+  #       - /bin/sh
+  #       - -ec
+  #       - "curl http://127.0.0.1:8500/v1/status/leader 2>/dev/null | grep -E '\".+\"' \n"
+  # ```
+  #
+  # @type: string
+  livenessProbe: {}
+  readinessProbe: {}
+
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
 # for serving DNS requests. This DOES NOT automatically configure kube-dns
