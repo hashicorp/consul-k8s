@@ -34,7 +34,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-kvm libvirt-daemon libvirt-daemon-system network-manager
           newgrp libvirt
-          virt-manager
+          sudo virt-manager
 
       - name: Setup and start CRC
         run: |
