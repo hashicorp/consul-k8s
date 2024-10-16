@@ -23,9 +23,9 @@ jobs:
           oc: "latest"
       - name: Configure CRC
         run: |
-          sudo crc config set kubeadmin-password citest
-          sudo crc setup
-          sudo crc start
+          crc config set kubeadmin-password citest
+          crc setup
+          crc start
 
 #    runs-on: custom-linux-xl
 #    steps:
