@@ -8,8 +8,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: MicroShift OpenShift Cluster
-        uses: container-tools/microshift-action@v0.3
+      - name: Install CLI tools from OpenShift Mirror
+        uses: redhat-actions/openshift-tools-installer@v1.13.1
+        with:
+          # "mirror" is the default source, so this is optional.
+          source: "mirror"
+
+          crc: "latest"
+
+          # Installs the latest release of oc with the major version 3.
+          # This is equivalent to "3.x" or "^3".
+          oc: "3"
+
 #    runs-on: custom-linux-xl
 #    steps:
 #      - uses: actions/checkout@v2
