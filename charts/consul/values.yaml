@@ -1922,8 +1922,25 @@ dns:
     # The number of deployment replicas.
     replicas: 1
 
-    # Port number to be used by DNS proxy
     port: 53
+
+    # Refers to an existing Kubernetes secret that contains an ACL token
+    # for your Consul cluster. This token provides permissions for the DNS
+    # proxy. This field is required when `global.acls.manageSystemACLs` 
+    # is set to `false` to enable manual ACL management in a Consul cluster.
+    # node_prefix "" {
+    #   policy = "read"
+    # }
+    # service_prefix "" {
+    #   policy = "read"
+    # }
+    aclToken:
+      # The name of the Kubernetes secret that holds the ACL token.
+      # @type: string
+      secretName: null
+      # The key within the Kubernetes secret that holds the ACL token.
+      # @type: string
+      secretKey: null
 
 # Values that configure the Consul UI.
 ui:
@@ -2202,6 +2219,19 @@ syncCatalog:
   # If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul. 
   # If false, LoadBalancer endpoints are not synced to Consul.
   syncLoadBalancerEndpoints: false
+
+  # Metrics settings for syncCatalog
+  metrics:
+    # This value enables or disables metrics collection for registered services, overriding the global metrics collection settings.
+    # @type: boolean
+    enabled: false
+    # This value sets the port to use for scraping syncCatalog metrics via prometheus, defaults to 20300 if not set. Must be in the port
+    # range of 1024-65535.
+    # @type: int
+    port: null
+    # This value sets the path to use for scraping syncCatalog metrics via prometheus, defaults to /metrics if not set.
+    # @type: string
+    path: null
 
   ingress:
     # Syncs the hostname from a Kubernetes Ingress resource to service registrations
@@ -2741,6 +2771,7 @@ connectInject:
   # By default, we exclude kube-system since usually users won't
   # want those pods injected and local-path-storage and openebs so that
   # Kind (Kubernetes In Docker) and [OpenEBS](https://openebs.io/) respectively can provision Pods used to create PVCs.
+  # We also exclude gmp-system and gke-managed-cim namespaces that are used by GKE for managing the cluster.
   # Note that this exclusion is only supported in Kubernetes v1.21.1+.
   #
   # Example:
@@ -2755,7 +2786,7 @@ connectInject:
     matchExpressions:
       - key: "kubernetes.io/metadata.name"
         operator: "NotIn"
-        values: ["kube-system","local-path-storage","openebs"]
+        values: ["kube-system","local-path-storage","openebs","gmp-system","gke-managed-cim"]
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,

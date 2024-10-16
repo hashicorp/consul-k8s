@@ -12,7 +12,7 @@ import (
 	"text/template"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -36,9 +36,9 @@ type initContainerCommandData struct {
 	LogJSON  bool
 }
 
-// containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
+// initContainer returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
+func (g *Gatekeeper) initContainer(config common.HelmConfig, name, namespace string) (corev1.Container, error) {
 	data := initContainerCommandData{
 		AuthMethod:         config.AuthMethod,
 		LogLevel:           config.LogLevel,
@@ -204,15 +204,15 @@ func (g Gatekeeper) initContainer(config common.HelmConfig, name, namespace stri
 	}
 
 	container.SecurityContext = &corev1.SecurityContext{
-		RunAsUser:    pointer.Int64(uid),
-		RunAsGroup:   pointer.Int64(gid),
-		RunAsNonRoot: pointer.Bool(true),
-		Privileged:   pointer.Bool(false),
+		RunAsUser:    ptr.To(uid),
+		RunAsGroup:   ptr.To(gid),
+		RunAsNonRoot: ptr.To(true),
+		Privileged:   ptr.To(false),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		AllowPrivilegeEscalation: pointer.Bool(false),
-		ReadOnlyRootFilesystem:   pointer.Bool(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		ReadOnlyRootFilesystem:   ptr.To(true),
 	}
 
 	return container, nil

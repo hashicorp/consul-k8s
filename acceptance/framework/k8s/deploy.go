@@ -165,10 +165,10 @@ func CheckStaticServerConnectionSuccessfulWithMessage(t *testing.T, options *k8s
 
 // CheckStaticServerConnectionSuccessful is just like CheckStaticServerConnection
 // but it always expects a successful connection.
-func CheckStaticServerConnectionSuccessful(t *testing.T, options *k8s.KubectlOptions, sourceApp string, curlArgs ...string) {
+func CheckStaticServerConnectionSuccessful(t *testing.T, sourceAppOpts *k8s.KubectlOptions, sourceApp string, curlArgs ...string) {
 	t.Helper()
 	start := time.Now()
-	CheckStaticServerConnection(t, options, sourceApp, true, nil, "", curlArgs...)
+	CheckStaticServerConnection(t, sourceAppOpts, sourceApp, true, nil, "", curlArgs...)
 	logger.Logf(t, "Took %s to check if static server connection was successful", time.Since(start))
 }
 

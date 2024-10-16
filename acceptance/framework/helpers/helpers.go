@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -22,10 +23,12 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/gruntwork-io/terratest/modules/random"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -157,22 +160,23 @@ func MergeMaps(a, b map[string]string) {
 }
 
 type K8sOptions struct {
-	Options            *k8s.KubectlOptions
-	NoCleanupOnFailure bool
-	NoCleanup          bool
-	ConfigPath         string
+	Options             *k8s.KubectlOptions
+	NoCleanupOnFailure  bool
+	NoCleanup           bool
+	KustomizeConfigPath string
 }
 
 type ConsulOptions struct {
-	ConsulClient *api.Client
-	Namespace    string
+	ConsulClient                    *api.Client
+	Namespace                       string
+	ExternalServiceNameRegistration string
 }
 
 func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptions ConsulOptions) {
 	t.Helper()
-	t.Logf("Registering external service %s", k8sOptions.ConfigPath)
+	t.Logf("Registering external service %s", k8sOptions.KustomizeConfigPath)
 
-	if consulOptions.Namespace != "" {
+	if consulOptions.Namespace != "" && consulOptions.Namespace != "default" {
 		logger.Logf(t, "creating the %s namespace in Consul", consulOptions.Namespace)
 		_, _, err := consulOptions.ConsulClient.Namespaces().Create(&api.Namespace{
 			Name: consulOptions.Namespace,
@@ -181,52 +185,34 @@ func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptio
 	}
 
 	// Register the external service
-	k8s.KubectlApply(t, k8sOptions.Options, k8sOptions.ConfigPath)
-
+	k8s.KubectlApplyFromKustomize(t, k8sOptions.Options, k8sOptions.KustomizeConfigPath)
 	Cleanup(t, k8sOptions.NoCleanupOnFailure, k8sOptions.NoCleanup, func() {
-		// Note: this delete command won't wait for pods to be fully terminated.
-		// This shouldn't cause any test pollution because the underlying
-		// objects are deployments, and so when other tests create these
-		// they should have different pod names.
-		k8s.KubectlDelete(t, k8sOptions.Options, k8sOptions.ConfigPath)
+		k8s.KubectlDeleteFromKustomize(t, k8sOptions.Options, k8sOptions.KustomizeConfigPath)
 	})
+
+	CheckExternalServiceConditions(t, consulOptions.ExternalServiceNameRegistration, k8sOptions.Options)
 }
 
-// RegisterExternalService registers an external service to a virtual node in Consul for testing purposes.
-// This function takes a testing.T object, a Consul client, service namespace, service name, address, and port as
-// parameters. It registers the service with Consul, and if a namespace is provided, it also creates the namespace
-// in Consul. It uses the provided testing.T object to log registration details and verify the registration process.
-// If the registration fails, the test calling the function will fail.
-// DEPRECATED: Use RegisterExternalServiceCRD instead.
-func RegisterExternalService(t *testing.T, consulClient *api.Client, namespace, name, address string, port int) {
+func CheckExternalServiceConditions(t *testing.T, registrationName string, opts *k8s.KubectlOptions) {
 	t.Helper()
-	t.Log("RegisterExternalService is DEPRECATED, use RegisterExternalServiceCRD instead")
 
-	service := &api.AgentService{
-		ID:      name,
-		Service: name,
-		Port:    port,
-	}
+	ogLogger := opts.Logger
+	defer func() {
+		opts.Logger = ogLogger
+	}()
 
-	if namespace != "" {
-		address = fmt.Sprintf("%s.%s", name, namespace)
-		service.Namespace = namespace
-
-		logger.Logf(t, "creating the %s namespace in Consul", namespace)
-		_, _, err := consulClient.Namespaces().Create(&api.Namespace{
-			Name: namespace,
-		}, nil)
-		require.NoError(t, err)
-	}
-
-	logger.Log(t, fmt.Sprintf("registering the external service %s", name))
-	_, err := consulClient.Catalog().Register(&api.CatalogRegistration{
-		Node:     "external",
-		Address:  address,
-		NodeMeta: map[string]string{"external-node": "true", "external-probe": "true"},
-		Service:  service,
-	}, nil)
-	require.NoError(t, err)
+	opts.Logger = terratestLogger.Discard
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
+		var err error
+		out, err := k8s.RunKubectlAndGetOutputE(r, opts, "get", "-o=json", "registrations.consul.hashicorp.com", registrationName)
+		require.NoError(r, err)
+		reg := v1alpha1.Registration{}
+		err = json.Unmarshal([]byte(out), &reg)
+		require.NoError(r, err)
+		require.NotEmpty(r, reg.Status.Conditions, "conditions should not be empty, retrying")
+		// ensure all statuses are true which means that the registration is successful
+		require.True(r, !slices.ContainsFunc(reg.Status.Conditions, func(c v1alpha1.Condition) bool { return c.Status == corev1.ConditionFalse }), "registration failed because of %v", reg.Status.Conditions)
+	})
 }
 
 type Command struct {
@@ -382,26 +368,27 @@ func WaitForInput(t *testing.T) {
 	}
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			err := r.Body.Close()
-			if err != nil {
-				t.Logf("error closing request body: %v", err)
-			}
-		}()
-
 		w.WriteHeader(http.StatusOK)
 
 		_, err := w.Write([]byte("input received\n"))
 		if err != nil {
-			t.Logf("writing body: %v", err)
+			t.Logf("error writing body: %v", err)
+			err = nil
 		}
 
-		err = srv.Shutdown(context.Background())
+		err = r.Body.Close()
 		if err != nil {
-			t.Logf("error closing listener: %v", err)
+			t.Logf("error closing request body: %v", err)
+			err = nil
 		}
 
 		t.Log("input received, continuing test")
+		go func() {
+			err = srv.Shutdown(context.Background())
+			if err != nil {
+				t.Logf("error closing listener: %v", err)
+			}
+		}()
 	})
 
 	t.Logf("Waiting for input on http://localhost:%s", listenerPort)

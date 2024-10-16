@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/armon/go-metrics/prometheus"
+	metricsutil "github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/coalesce"
 	"github.com/hashicorp/go-hclog"
 	apiv1 "k8s.io/api/core/v1"
@@ -18,6 +21,33 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 )
+
+var (
+	baseName            = []string{"consul", "sync_catalog", "to_k8s"}
+	registerName        = append(baseName, "register")
+	deregisterName      = append(baseName, "deregister")
+	registerErrorName   = append(baseName, "register", "error")
+	deregisterErrorName = append(baseName, "deregister", "error")
+)
+
+var SyncToK8sCounters = []prometheus.CounterDefinition{
+	{
+		Name: registerName,
+		Help: "Increments for each Consul service registered to kubernetes via catalog sync",
+	},
+	{
+		Name: deregisterName,
+		Help: "Increments for each Consul service deregistered from kubernetes via catalog sync",
+	},
+	{
+		Name: registerErrorName,
+		Help: "Increments whenever a Consul API client returns an error for a catalog sync register request",
+	},
+	{
+		Name: deregisterErrorName,
+		Help: "Increments whenever a Consul API client returns an error for a catalog sync deregister request request",
+	},
+}
 
 const (
 	// K8SQuietPeriod is the time to wait for no service changes before syncing.
@@ -83,6 +113,8 @@ type K8SSink struct {
 	// It's populated from Kubernetes data.
 	serviceMapConsul map[string]*apiv1.Service
 	triggerCh        chan struct{}
+
+	PrometheusSink *prometheus.PrometheusSink
 }
 
 // SetServices implements Sink.
@@ -232,7 +264,15 @@ func (s *K8SSink) Run(ch <-chan struct{}) {
 		for _, name := range delete {
 			if err := svcClient.Delete(s.Ctx, name, metav1.DeleteOptions{}); err != nil {
 				s.Log.Warn("error deleting service", "name", name, "error", err)
+
+				// metric count for error syncing Consul services to K8s
+				labels := []metrics.Label{
+					{Name: "error", Value: err.Error()},
+				}
+				s.PrometheusSink.IncrCounterWithLabels(deregisterErrorName, 1, labels)
 			}
+			// metric count for deregistering Consul services from k8s
+			s.PrometheusSink.IncrCounterWithLabels(deregisterName, 1, metricsutil.ServiceNameLabel(name))
 		}
 
 		for _, svc := range update {
@@ -246,7 +286,13 @@ func (s *K8SSink) Run(ch <-chan struct{}) {
 			_, err := svcClient.Create(s.Ctx, svc, metav1.CreateOptions{})
 			if err != nil {
 				s.Log.Warn("error creating service", "name", svc.Name, "error", err)
+				labels := []metrics.Label{
+					{Name: "error", Value: err.Error()},
+				}
+				s.PrometheusSink.IncrCounterWithLabels(registerErrorName, 1, labels)
 			}
+			// metric count for registering Consul services to k8s
+			s.PrometheusSink.IncrCounterWithLabels(registerName, 1, metricsutil.ServiceNameLabel(svc.Name))
 		}
 	}
 }

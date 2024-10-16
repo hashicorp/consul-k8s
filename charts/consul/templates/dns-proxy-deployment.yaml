@@ -1,5 +1,4 @@
 {{- if (or (and (ne (.Values.dns.proxy.enabled | toString) "-") .Values.dns.proxy.enabled) (and (eq (.Values.dns.proxy.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if not .Values.connectInject.enabled }}{{ fail "connectInject.enabled must be true" }}{{ end -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
 
@@ -110,12 +109,20 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+            - name: DP_SERVICE_NODE_NAME
+              value: $(NODE_NAME)-virtual
+      {{- if .Values.global.acls.manageSystemACLs }}
             - name: DP_CREDENTIAL_LOGIN_META1
               value: pod=$(NAMESPACE)/$(POD_NAME)
             - name: DP_CREDENTIAL_LOGIN_META2
               value: component=dns-proxy
-            - name: DP_SERVICE_NODE_NAME
-              value: $(NODE_NAME)-virtual
+      {{- else if (and .Values.dns.proxy.aclToken.secretName .Values.dns.proxy.aclToken.secretKey) }}
+            - name: DP_CREDENTIAL_STATIC_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.dns.proxy.aclToken.secretName }}
+                  key: {{ .Values.dns.proxy.aclToken.secretKey }}
+      {{- end }}
           command:
             - consul-dataplane
           args:
@@ -159,6 +166,8 @@ spec:
         {{- if .Values.global.adminPartitions.enabled }}
             - -login-partition={{ .Values.global.adminPartitions.name }}
         {{- end }}
+        {{- else }}
+            - -credential-type=static
         {{- end }}
         {{- if .Values.global.adminPartitions.enabled }}
             - -service-partition={{ .Values.global.adminPartitions.name }}

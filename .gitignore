@@ -11,3 +11,4 @@ pkg/
 .vscode
 .bob/
 control-plane/cni/cni
+acceptance/tests/consul-dns/coredns-custom.yaml

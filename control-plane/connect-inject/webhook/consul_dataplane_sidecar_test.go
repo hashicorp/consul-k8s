@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -221,7 +221,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 9)
+			require.Len(t, container.Env, 10)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/connect-inject")
 			require.Equal(t, container.Env[2].Name, "DP_SERVICE_NODE_NAME")
@@ -235,6 +235,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.Equal(t, container.Env[7].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
 			require.Equal(t, container.Env[8].Name, "DP_CREDENTIAL_LOGIN_META2")
 			require.Equal(t, container.Env[8].Value, "pod-uid=$(POD_UID)")
+			require.Equal(t, container.Env[9].Name, "HOST_IP")
 		})
 	}
 }
@@ -801,11 +802,11 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{"NET_BIND_SERVICE"},
 				},
@@ -815,11 +816,11 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: false,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(sidecarUserAndGroupID),
-				RunAsGroup:               pointer.Int64(sidecarUserAndGroupID),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{"NET_BIND_SERVICE"},
 				},
@@ -829,11 +830,11 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    false,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(1000799998),
-				RunAsGroup:               pointer.Int64(1000799998),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:                ptr.To(int64(1000799998)),
+				RunAsGroup:               ptr.To(int64(1000799998)),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{"NET_BIND_SERVICE"},
 				},
@@ -843,11 +844,11 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 			tproxyEnabled:    true,
 			openShiftEnabled: true,
 			expSecurityContext: &corev1.SecurityContext{
-				RunAsUser:                pointer.Int64(1000799998),
-				RunAsGroup:               pointer.Int64(1000799998),
-				RunAsNonRoot:             pointer.Bool(true),
-				ReadOnlyRootFilesystem:   pointer.Bool(true),
-				AllowPrivilegeEscalation: pointer.Bool(false),
+				RunAsUser:                ptr.To(int64(1000799998)),
+				RunAsGroup:               ptr.To(int64(1000799998)),
+				RunAsNonRoot:             ptr.To(true),
+				ReadOnlyRootFilesystem:   ptr.To(true),
+				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
 					Add: []corev1.Capability{"NET_BIND_SERVICE"},
 				},
@@ -912,7 +913,7 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t
 				},
 			},
 			SecurityContext: &corev1.PodSecurityContext{
-				RunAsUser: pointer.Int64(sidecarUserAndGroupID),
+				RunAsUser: ptr.To(int64(sidecarUserAndGroupID)),
 			},
 		},
 	}
@@ -943,14 +944,14 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 							Name: "web",
 							// Setting RunAsUser: 1 should succeed.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(1),
+								RunAsUser: ptr.To(int64(1)),
 							},
 						},
 						{
 							Name: "app",
 							// Setting RunAsUser: 5995 should fail.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(sidecarUserAndGroupID),
+								RunAsUser: ptr.To(int64(sidecarUserAndGroupID)),
 							},
 							Image: "not-consul-dataplane",
 						},
@@ -973,14 +974,14 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 							Name: "web",
 							// Setting RunAsUser: 1 should succeed.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(1),
+								RunAsUser: ptr.To(int64(1)),
 							},
 						},
 						{
 							Name: "sidecar",
 							// Setting RunAsUser: 5995 should succeed if the image matches h.ImageConsulDataplane.
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: pointer.Int64(sidecarUserAndGroupID),
+								RunAsUser: ptr.To(int64(sidecarUserAndGroupID)),
 							},
 							Image: "envoy",
 						},

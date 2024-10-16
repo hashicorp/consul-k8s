@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -45,6 +46,7 @@ const (
 	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckName  = "Kubernetes Readiness Check"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
+	kubernetesFailureReasonMsg = "Kubernetes health checks failing"
 )
 
 type NodePortSyncType string
@@ -101,6 +103,11 @@ type ServiceResource struct {
 
 	// LoadBalancerEndpointsSync set to true (default false) will sync ServiceTypeLoadBalancer endpoints.
 	LoadBalancerEndpointsSync bool
+
+	// MetricsConfig contains metrics configuration and has methods to determine whether
+	// configuration should come from the default flags or annotations. The syncCatalog uses this to configure prometheus
+	// annotations.
+	MetricsConfig metrics.Config
 
 	// NodeExternalIPSync set to true (the default) syncs NodePort services
 	// using the node's external ip address. When false, the node's internal
@@ -687,7 +694,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							}
 						}
 					}
-
 				}
 			}
 		}
@@ -794,11 +800,17 @@ func (t *ServiceResource) registerServiceInstance(
 					Name:      consulKubernetesCheckName,
 					Namespace: baseService.Namespace,
 					Type:      consulKubernetesCheckType,
-					Status:    consulapi.HealthPassing,
 					ServiceID: serviceID(r.Service.Service, addr),
-					Output:    kubernetesSuccessReasonMsg,
 				}
 
+				// Consider endpoint health state for registered consul service
+				if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
+					r.Check.Status = consulapi.HealthPassing
+					r.Check.Output = kubernetesSuccessReasonMsg
+				} else {
+					r.Check.Status = consulapi.HealthCritical
+					r.Check.Output = kubernetesFailureReasonMsg
+				}
 				t.consulMap[key] = append(t.consulMap[key], &r)
 			}
 		}

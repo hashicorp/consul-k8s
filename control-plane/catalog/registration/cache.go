@@ -4,59 +4,19 @@
 package registration
 
 import (
-	"bytes"
 	"context"
-	"errors"
-	"fmt"
-	"slices"
 	"strings"
 	"sync"
-	"text/template"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	capi "github.com/hashicorp/consul/api"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const NotInServiceMeshFilter = "ServiceMeta[\"managed-by\"] != \"consul-k8s-endpoints-controller\""
-
-func init() {
-	gatewayTpl = template.Must(template.New("root").Parse(strings.TrimSpace(gatewayRulesTpl)))
-}
-
-type templateArgs struct {
-	EnablePartitions bool
-	Partition        string
-	EnableNamespaces bool
-	Namespace        string
-	ServiceName      string
-}
-
-var (
-	gatewayTpl      *template.Template
-	gatewayRulesTpl = `
-{{ if .EnablePartitions }}
-partition "{{.Partition}}" {
-{{- end }}
-  {{- if .EnableNamespaces }}
-  namespace "{{.Namespace}}" {
-  {{- end }}
-    service "{{.ServiceName}}" { 
-      policy = "write" 
-    }
-  {{- if .EnableNamespaces }}
-  }
-  {{- end }}
-{{- if .EnablePartitions }}
-}
-{{- end }}
-`
-)
 
 type RegistrationCache struct {
 	// we include the context here so that we can use it for cancellation of `run` invocations that are scheduled after the cache is started
@@ -115,12 +75,12 @@ func (c *RegistrationCache) run(log logr.Logger, namespace string) {
 			return
 		default:
 
-			client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
+			consulClient, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
 			if err != nil {
 				log.Error(err, "error initializing consul client")
 				continue
 			}
-			entries, meta, err := client.Catalog().Services(opts.WithContext(c.ctx))
+			entries, meta, err := consulClient.Catalog().Services(opts.WithContext(c.ctx))
 			if err != nil {
 				// if we timeout we don't care about the error message because it's expected to happen on long polls
 				// any other error we want to alert on
@@ -135,14 +95,17 @@ func (c *RegistrationCache) run(log logr.Logger, namespace string) {
 			servicesToRemove := mapset.NewSet[string]()
 			servicesToAdd := mapset.NewSet[string]()
 			c.serviceMtx.Lock()
+
+			// Remove any services in the cache that are no longer in consul
 			for svc := range c.Services {
 				if _, ok := entries[svc]; !ok {
 					servicesToRemove.Add(svc)
 				}
 			}
 
+			// Add any services to the cache that are in consul but not in the cache (we expect to hit this loop on a reboot)
 			for svc := range entries {
-				if _, ok := c.Services[svc]; !ok {
+				if _, ok := c.Services[svc]; !ok && svc != "consul" {
 					servicesToAdd.Add(svc)
 				}
 			}
@@ -154,17 +117,27 @@ func (c *RegistrationCache) run(log logr.Logger, namespace string) {
 			}
 
 			for _, svc := range servicesToAdd.ToSlice() {
-				registration := &v1alpha1.Registration{}
+				log.Info("consul registered service", "svcName", svc)
+				registrationList := &v1alpha1.RegistrationList{}
 
-				if err := c.k8sClient.Get(c.ctx, types.NamespacedName{Name: svc, Namespace: namespace}, registration); err != nil {
-					if !k8serrors.IsNotFound(err) {
-						log.Error(err, "unable to get registration", "svcName", svc, "namespace", namespace)
-					}
-					continue
+				if err := c.k8sClient.List(context.Background(), registrationList, client.MatchingFields{registrationByServiceNameIndex: svc}); err != nil {
+					log.Error(err, "error listing registrations", "svcName", svc)
 				}
 
-				c.Services[svc] = registration
+				found := false
+				for _, reg := range registrationList.Items {
+					if reg.Spec.Service.Name == svc {
+						found = true
+						c.set(svc, &reg)
+					}
+				}
+
+				if !found {
+					log.Info("registration not found in k8s", "svcName", svc)
+				}
 			}
+
+			log.Info("synced registrations with consul")
 
 			opts.WaitIndex = meta.LastIndex
 			once.Do(func() {
@@ -182,11 +155,20 @@ func (c *RegistrationCache) get(svcName string) (*v1alpha1.Registration, bool) {
 	return val, ok
 }
 
-func (c *RegistrationCache) aclsEnabled() bool {
-	return c.ConsulClientConfig.APIClientConfig.Token != "" || c.ConsulClientConfig.APIClientConfig.TokenFile != ""
+func (c *RegistrationCache) set(name string, reg *v1alpha1.Registration) {
+	c.serviceMtx.Lock()
+	defer c.serviceMtx.Unlock()
+	c.Services[name] = reg
 }
 
 func (c *RegistrationCache) registerService(log logr.Logger, reg *v1alpha1.Registration) error {
+	if svc, ok := c.get(reg.Spec.Service.Name); ok {
+		if reg.EqualExceptStatus(svc) {
+			log.Info("service already registered", "svcName", reg.Spec.Service.Name)
+			return nil
+		}
+	}
+
 	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
 	if err != nil {
 		return err
@@ -213,94 +195,6 @@ func (c *RegistrationCache) registerService(log logr.Logger, reg *v1alpha1.Regis
 	return nil
 }
 
-func emptyOrDefault(s string) bool {
-	return s == "" || s == "default"
-}
-
-func (c *RegistrationCache) updateTermGWACLRole(log logr.Logger, registration *v1alpha1.Registration, termGWsToUpdate []v1alpha1.TerminatingGateway) error {
-	if len(termGWsToUpdate) == 0 {
-		log.Info("terminating gateway not found")
-		return nil
-	}
-
-	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
-	if err != nil {
-		return err
-	}
-
-	var data bytes.Buffer
-	if err := gatewayTpl.Execute(&data, templateArgs{
-		EnablePartitions: c.partitionsEnabled,
-		Partition:        registration.Spec.Service.Partition,
-		EnableNamespaces: c.namespacesEnabled,
-		Namespace:        registration.Spec.Service.Namespace,
-		ServiceName:      registration.Spec.Service.Name,
-	}); err != nil {
-		// just panic if we can't compile the simple template
-		// as it means something else is going severly wrong.
-		panic(err)
-	}
-
-	var mErr error
-	for _, termGW := range termGWsToUpdate {
-		// the terminating gateway role is _always_ in the default namespace
-		roles, _, err := client.ACL().RoleList(&capi.QueryOptions{})
-		if err != nil {
-			log.Error(err, "error reading role list")
-			return err
-		}
-
-		policy := &capi.ACLPolicy{
-			Name:        servicePolicyName(registration.Spec.Service.Name),
-			Description: "Write policy for terminating gateways for external service",
-			Rules:       data.String(),
-			Datacenters: []string{registration.Spec.Datacenter},
-		}
-
-		existingPolicy, _, err := client.ACL().PolicyReadByName(policy.Name, &capi.QueryOptions{})
-		if err != nil {
-			log.Error(err, "error reading policy")
-			return err
-		}
-
-		// we don't need to include the namespace/partition here because all roles and policies are created in the default namespace for consul-k8s managed resources.
-		writeOpts := &capi.WriteOptions{}
-
-		if existingPolicy == nil {
-			policy, _, err = client.ACL().PolicyCreate(policy, writeOpts)
-			if err != nil {
-				return fmt.Errorf("error creating policy: %w", err)
-			}
-		} else {
-			policy = existingPolicy
-		}
-		var role *capi.ACLRole
-		for _, r := range roles {
-			if strings.HasSuffix(r.Name, fmt.Sprintf("-%s-acl-role", termGW.Name)) {
-				role = r
-				break
-			}
-		}
-
-		if role == nil {
-			log.Info("terminating gateway role not found", "terminatingGatewayName", termGW.Name)
-			mErr = errors.Join(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
-			continue
-		}
-
-		role.Policies = append(role.Policies, &capi.ACLRolePolicyLink{Name: policy.Name, ID: policy.ID})
-
-		_, _, err = client.ACL().RoleUpdate(role, writeOpts)
-		if err != nil {
-			log.Error(err, "error updating role", "roleName", role.Name)
-			mErr = errors.Join(mErr, fmt.Errorf("error updating role %q", role.Name))
-			continue
-		}
-	}
-
-	return mErr
-}
-
 func (c *RegistrationCache) deregisterService(log logr.Logger, reg *v1alpha1.Registration) error {
 	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
 	if err != nil {
@@ -322,76 +216,6 @@ func (c *RegistrationCache) deregisterService(log logr.Logger, reg *v1alpha1.Reg
 	return nil
 }
 
-func (c *RegistrationCache) removeTermGWACLRole(log logr.Logger, registration *v1alpha1.Registration, termGWsToUpdate []v1alpha1.TerminatingGateway) error {
-	if len(termGWsToUpdate) == 0 {
-		log.Info("terminating gateway not found")
-		return nil
-	}
-
-	client, err := consul.NewClientFromConnMgr(c.ConsulClientConfig, c.ConsulServerConnMgr)
-	if err != nil {
-		return err
-	}
-
-	var mErr error
-	for _, termGW := range termGWsToUpdate {
-
-		// we don't need to include the namespace/partition here because all roles and policies are created in the default namespace for consul-k8s managed resources.
-		queryOpts := &capi.QueryOptions{}
-		writeOpts := &capi.WriteOptions{}
-
-		roles, _, err := client.ACL().RoleList(queryOpts)
-		if err != nil {
-			return err
-		}
-		var role *capi.ACLRole
-		for _, r := range roles {
-			if strings.HasSuffix(r.Name, fmt.Sprintf("-%s-acl-role", termGW.Name)) {
-				role = r
-				break
-			}
-		}
-
-		if role == nil {
-			log.Info("terminating gateway role not found", "terminatingGatewayName", termGW.Name)
-			mErr = errors.Join(mErr, fmt.Errorf("terminating gateway role not found for %q", termGW.Name))
-			continue
-		}
-
-		var policyID string
-
-		expectedPolicyName := servicePolicyName(registration.Spec.Service.Name)
-		role.Policies = slices.DeleteFunc(role.Policies, func(i *capi.ACLRolePolicyLink) bool {
-			if i.Name == expectedPolicyName {
-				policyID = i.ID
-				return true
-			}
-			return false
-		})
-
-		if policyID == "" {
-			log.Info("policy not found on terminating gateway role", "policyName", expectedPolicyName, "terminatingGatewayName", termGW.Name)
-			continue
-		}
-
-		_, _, err = client.ACL().RoleUpdate(role, writeOpts)
-		if err != nil {
-			log.Error(err, "error updating role", "roleName", role.Name)
-			mErr = errors.Join(mErr, fmt.Errorf("error updating role %q", role.Name))
-			continue
-		}
-
-		_, err = client.ACL().PolicyDelete(policyID, writeOpts)
-		if err != nil {
-			log.Error(err, "error deleting service policy", "policyID", policyID, "policyName", expectedPolicyName)
-			mErr = errors.Join(mErr, fmt.Errorf("error deleting service ACL policy %q", policyID))
-			continue
-		}
-	}
-
-	return mErr
-}
-
-func servicePolicyName(name string) string {
-	return fmt.Sprintf("%s-write-policy", name)
+func emptyOrDefault(s string) bool {
+	return s == "" || s == "default"
 }
