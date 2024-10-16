@@ -3,6 +3,7 @@ name: weekly-openshift-1-5-x
 on:
   pull_request:
   workflow_dispatch:
+  push:
 
 jobs:
   build:
