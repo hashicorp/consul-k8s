@@ -48,6 +48,7 @@ type Command struct {
 	flagListen                string
 	flagCertDir               string // Directory with TLS certs for listening (PEM)
 	flagDefaultInject         bool   // True to inject by default
+	flagConfigFile            string // Path to a config file in JSON format
 	flagConsulImage           string // Docker image for Consul
 	flagConsulDataplaneImage  string // Docker image for Envoy
 	flagConsulK8sImage        string // Docker image for consul-k8s
@@ -174,6 +175,7 @@ func init() {
 func (c *Command) init() {
 	c.flagSet = flag.NewFlagSet("", flag.ContinueOnError)
 	c.flagSet.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
+	c.flagSet.StringVar(&c.flagConfigFile, "config-file", "", "Path to a JSON config file.")
 	c.flagSet.Var((*flags.FlagMapValue)(&c.flagNodeMeta), "node-meta",
 		"Metadata to set on the node, formatted as key=value. This flag may be specified multiple times to set multiple meta fields.")
 	c.flagSet.BoolVar(&c.flagDefaultInject, "default-inject", true, "Inject by default.")

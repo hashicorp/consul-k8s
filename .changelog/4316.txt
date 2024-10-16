@@ -1,0 +1,5 @@
+```release-note:bug
+api-gateway: `global.imagePullSecrets` are now configured on the `ServiceAccount` for `Gateways`.
+
+Note: the referenced image pull Secret(s) must be present in the same namespace the `Gateway` is deployed to.
+```
