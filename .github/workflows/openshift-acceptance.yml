@@ -23,7 +23,6 @@ jobs:
           oc: "latest"
       - name: Configure CRC
         run: |
-          crc config set skip-check-root-user true
           crc config set kubeadmin-password citest
           crc setup
           crc start
