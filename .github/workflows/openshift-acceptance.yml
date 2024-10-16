@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-          
+
       - name: Install CLI tools from OpenShift Mirror
         uses: redhat-actions/openshift-tools-installer@v1.13.1
         with:
@@ -20,29 +20,19 @@ jobs:
 
           # Installs the latest release of oc with the major version 3.
           # This is equivalent to "3.x" or "^3".
-          oc: "3"
+          oc: "latest"
+      - name: Configure CRC
+        run: |
+          crc config set skip-check-root-user true
+          crc config set kubeadmin-password citest
+          crc setup
+          crc start
 
 #    runs-on: custom-linux-xl
 #    steps:
 #
-#
-#      - name: Cache CRC binary
-#        id: cache-crc-binary
-#        uses: actions/cache@v2
-#        with:
-#          path: crc
-#          key: ${{ runner.os }}-okd-crc
-#
-#      - name: Download CRC binary
-#        run: |
-#          curl -LO https://dl.fedoraproject.org/pub/alt/okd-crc/macos-amd64/crc
-#          chmod +x crc
-#          sudo cp crc /usr/local/bin/crc
-#          crc version
-#
-#      - name: Configure CRC
-#        run: |
-#          crc config set skip-check-root-user true
+
+
 #
 #      - name: Setup CRC
 #        run: |
