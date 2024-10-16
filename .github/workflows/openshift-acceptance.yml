@@ -1,8 +1,7 @@
-name: weekly-openshift-1-5-x
+# Consul acceptance tests running against OpenShift cluster
+name: OpenShift Acceptance Tests
 
 on:
-  pull_request:
-  workflow_dispatch:
   push:
 
 jobs:
