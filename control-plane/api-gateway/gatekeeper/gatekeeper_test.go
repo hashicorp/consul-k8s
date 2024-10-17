@@ -1516,7 +1516,6 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 				require.NotNil(t, container.SecurityContext.Capabilities)
 				require.NotNil(t, container.SecurityContext.ReadOnlyRootFilesystem)
 				assert.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)
-				assert.Equal(t, []corev1.Capability{netBindCapability}, container.SecurityContext.Capabilities.Add)
 				assert.Equal(t, []corev1.Capability{allCapabilities}, container.SecurityContext.Capabilities.Drop)
 			}
 		}
@@ -1849,7 +1848,6 @@ func configureRoleBinding(name, namespace string, labels map[string]string, reso
 }
 
 func configureService(name, namespace string, labels, annotations map[string]string, serviceType corev1.ServiceType, ports []corev1.ServicePort, resourceVersion string, isInitialResource, addExternalLabel bool) *corev1.Service {
-
 	// This is used only to test that any external labels added to the service
 	// are not removed on reconcile
 	combinedLabels := labels

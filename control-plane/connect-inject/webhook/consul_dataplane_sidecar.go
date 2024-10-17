@@ -264,12 +264,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		RunAsGroup:               ptr.To(group),
 		RunAsNonRoot:             ptr.To(true),
 		AllowPrivilegeEscalation: ptr.To(false),
-		// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
-		// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
-		Capabilities: &corev1.Capabilities{
-			Add: []corev1.Capability{"NET_BIND_SERVICE"},
-		},
-		ReadOnlyRootFilesystem: ptr.To(true),
+		ReadOnlyRootFilesystem:   ptr.To(true),
 	}
 	return container, nil
 }
