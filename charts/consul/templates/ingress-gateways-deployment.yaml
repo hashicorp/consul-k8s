@@ -247,7 +247,7 @@ spec:
       - name: ingress-gateway
         image: {{ $root.Values.global.imageConsulDataplane | quote }}
         {{ template "consul.imagePullPolicy" $root }}
-        {{- include "consul.restrictedSecurityContext" $ | nindent 8 }}
+        {{- include "consul.restrictedSecurityContextWithNetBindService" $ | nindent 8 }}
         {{- if (default $defaults.resources .resources) }}
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
