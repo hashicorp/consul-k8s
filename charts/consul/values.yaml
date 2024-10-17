@@ -3292,6 +3292,11 @@ ingressGateways:
   # @type: string
   logLevel: ""
 
+  # When set, ingress-gateway containers use a privileged entrypoint in consul-dataplane which requires the
+  # NET_BIND_SERVICE capability at runtime. Disabling this setting will use the non-privileged entrypoint and
+  # drop the requirement for NET_BIND_SERVICE. Only disable this if you are *not* using privileged ports (< 1024).
+  supportPrivilegedPorts: true
+
   # Defaults sets default values for all gateway fields. With the exception
   # of annotations, defining any of these values in the `gateways` list
   # will override the default values provided here. Annotations will
