@@ -211,7 +211,7 @@ function verify_release_build {
 
    local sdir="$1"
 
-   local vers="$(get_version ${sdir} true false)"
+   local vers="$(get_version ${sdir})"
    if test -n "$2"
    then
       vers="$2"
@@ -265,7 +265,7 @@ function publish_release {
       pub_hc_releases=1
    fi
 
-   local vers="$(get_version ${sdir} true false)"
+   local vers="$(get_version ${sdir})"
    if test $? -ne 0
    then
       err "Please specify a version (couldn't parse one from the source)."
