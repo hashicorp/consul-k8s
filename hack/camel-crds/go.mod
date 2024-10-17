@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/hack/copy-crds-to-chart
 
-go 1.25.1
+go 1.24.5
 
 require (
 	github.com/iancoleman/strcase v0.3.0

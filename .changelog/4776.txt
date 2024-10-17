@@ -1,3 +1,0 @@
-```release-note:feature
-helm: add dual stack flag for IPv6 support.
-```

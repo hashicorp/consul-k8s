@@ -4,7 +4,6 @@
 package installcni
 
 import (
-	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,36 +19,22 @@ func TestKubeConfigYaml(t *testing.T) {
 	cases := []struct {
 		name                     string
 		server                   string
-		cfg                      *config.CNIConfig
+		token                    string
 		certificateAuthorityData []byte
 		goldenFile               string // Golden file that our output should look like.
-		tokenInfo                *TokenInfo
 	}{
 		{
 			name:                     "valid kubeconfig file",
 			server:                   "https://[172.30.0.1]:443",
+			token:                    "eyJhbGciOiJSUzI1NiIsImtp",
 			certificateAuthorityData: []byte("LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0"),
 			goldenFile:               "ZZZ-consul-cni-kubeconfig.golden",
-			tokenInfo: &TokenInfo{
-				TokenInfoType: TokenTypeRaw,
-				TokenInfo:     "eyJhbGciOiJSUzI1NiIsImtp",
-			},
-		},
-		{
-			name:                     "valid kubeconfig file",
-			server:                   "https://[172.30.0.1]:443",
-			certificateAuthorityData: []byte("LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0"),
-			goldenFile:               "ZZZ-consul-cni-kubeconfig-tokenautorotate.golden",
-			tokenInfo: &TokenInfo{
-				TokenInfoType: TokenTypeFile,
-				TokenInfo:     "/etc/cni/net.d/consul-cni-token",
-			},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			actual, err := kubeConfigYaml(c.server, c.tokenInfo, c.certificateAuthorityData)
+			actual, err := kubeConfigYaml(c.server, c.token, c.certificateAuthorityData)
 			if err != nil {
 				t.Fatal(err)
 			}

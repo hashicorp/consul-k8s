@@ -1,5 +1,0 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
-# Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-- {runner: 0, test-packages: "openshift"}

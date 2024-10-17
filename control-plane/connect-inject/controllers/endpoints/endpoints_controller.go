@@ -312,7 +312,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 
 		// Register the service instance with Consul.
 		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
-			"id", serviceRegistration.Service.ID, "health", healthStatus)
+			"id", serviceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(serviceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register service", "name", serviceRegistration.Service.Service)
@@ -328,7 +328,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 		}
 
 		// Register the proxy service instance with Consul.
-		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service, "id", proxyServiceRegistration.Service.ID, "health", healthStatus)
+		r.Log.Info("registering proxy service with Consul", "name", proxyServiceRegistration.Service.Service, "id", proxyServiceRegistration.Service.ID)
 		_, err = apiClient.Catalog().Register(proxyServiceRegistration, nil)
 		if err != nil {
 			r.Log.Error(err, "failed to register proxy service", "name", proxyServiceRegistration.Service.Service)

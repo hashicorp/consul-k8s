@@ -28,8 +28,3 @@ variable "tags" {
   default     = {}
   description = "Tags to attach to the created resources."
 }
-
-variable "kubernetes_version" {
-  default     = "1.32"
-  description = "Kubernetes version supported on EKS"
-}

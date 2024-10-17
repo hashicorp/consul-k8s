@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/cli
 
-go 1.25.1
+go 1.24.5
 
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.12.0
@@ -14,7 +14,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul/troubleshoot v0.7.5
+	github.com/hashicorp/consul/troubleshoot v0.7.4
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/hcp-sdk-go v0.62.1-0.20230913154003-cf69c0370c54
 	github.com/kr/text v0.2.0

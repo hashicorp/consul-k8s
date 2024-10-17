@@ -1,3 +1,0 @@
-```release-note:improvement
-control-plane: Shows the health status of the services being registered/updates by endpoints controller
-```

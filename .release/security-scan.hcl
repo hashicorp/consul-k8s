@@ -19,6 +19,13 @@ container {
   secrets {
     all = true
   }
+
+  triage {
+    suppress {
+      vulnerabilites = [
+      ]
+    }
+  }
 }
 
 binary {

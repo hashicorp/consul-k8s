@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.22.0-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.20-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -86,7 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.7-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.6-dev
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -793,7 +793,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.7-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.6-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -919,9 +919,6 @@ global:
   # ```
   # @type: array<string>
   experiments: []
-
-  dualStack:
-    defaultEnabled: false
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
@@ -1907,26 +1904,6 @@ client:
   # @type: string
   updateStrategy: null
 
-  # Override the default livenessProbe and readinessProbe for the DaemonSet consul-client container.
-  # Refer to the Kubernetes documentation on how to [Configure Liveness, Readiness and Startup Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
-  #
-  # This should be a multi-line string
-  #
-  # Example:
-  #
-  # ```yaml
-  # readinessProbe:
-  #     exec:
-  #       command:
-  #       - /bin/sh
-  #       - -ec
-  #       - "curl http://127.0.0.1:8500/v1/status/leader 2>/dev/null | grep -E '\".+\"' \n"
-  # ```
-  #
-  # @type: string
-  livenessProbe: {}
-  readinessProbe: {}
-
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
 # for serving DNS requests. This DOES NOT automatically configure kube-dns
@@ -2606,18 +2583,7 @@ connectInject:
     # @type: boolean
     enabled: false
 
-    # If true, then use projected service account tokens for the CNI plugin and
-    # Uses auto-rotated projected token everytime when interacting with Kubernetes API.
-    # @type: boolean
-    autorotateToken: false
-
-    # Set the CNI plugin ServiceAccount token validity period. Applicable only when autorotateToken is true.
-    # In some environments this may not work(eg. azure 1.30+ with oidc enabled)  as providers may have native expiration limits.
-    # Optional and setup to 1 hour by default. Value is in seconds.
-    # @type: Integer
-    tokenExpiration: 3600
-
-    # Log level for the installer and plugin. Overrides global.logLevel. One of "trace", "debug", "info", "warn", or "error".
+    # Log level for the installer and plugin. Overrides global.logLevel
     # @type: string
     logLevel: null
 
@@ -2678,6 +2644,23 @@ connectInject:
       runAsNonRoot: false
       runAsGroup: 0
       runAsUser: 0
+
+    # updateStrategy for the CNI installer DaemonSet.
+    # Refer to the Kubernetes [Daemonset upgrade strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy)
+    # documentation.
+    # This should be a multi-line string mapping directly to the updateStrategy
+    #
+    # Example:
+    #
+    # ```yaml
+    # updateStrategy: |
+    #   rollingUpdate:
+    #     maxUnavailable: 5
+    #   type: RollingUpdate
+    # ```
+    #
+    # @type: string
+    updateStrategy: null
 
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.
@@ -3787,4 +3770,3 @@ telemetryCollector:
   # it could be used to configure custom consul parameters.
   # @type: map
   extraEnvironmentVars: {}
-

@@ -9,27 +9,19 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-type TokenInfo struct {
-	TokenInfoType TokenInfoType
-	TokenInfo     string
-}
-
-type TokenInfoType string
-
 const (
-	TokenTypeFile TokenInfoType = "TokenFile"
-	TokenTypeRaw  TokenInfoType = "Token"
+	// Default location of the service account token on a kubernetes host.
+	defaultTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
 // createKubeConfig creates the kubeconfig file that the consul-cni plugin will use to communicate with the
 // kubernetes API.
-func createKubeConfig(destDir string, cfg *config.CNIConfig) error {
+func createKubeConfig(cniNetDir, kubeconfigFile string) error {
 	var restCfg *rest.Config
 
 	// TODO: Move clientset out of this method and put it in 'Run'
@@ -49,28 +41,18 @@ func createKubeConfig(destDir string, cfg *config.CNIConfig) error {
 		return err
 	}
 
-	tokenInfo := TokenInfo{}
-	if cfg.AutorotateToken {
-		tokenInfo.TokenInfoType = TokenTypeFile
-		tokenInfo.TokenInfo = cfg.CNIHostTokenPath
-	} else {
-		// This is the older flow which runs in the cni pod so
-		// this will find token on the default CNITokenPath at the time of creation of kubeconfig
-		token, err := serviceAccountToken(cfg.CNITokenPath)
-		if err != nil {
-			return err
-		}
-		tokenInfo.TokenInfoType = TokenTypeRaw
-		tokenInfo.TokenInfo = token
+	token, err := serviceAccountToken(defaultTokenPath)
+	if err != nil {
+		return err
 	}
 
-	data, err := kubeConfigYaml(server, &tokenInfo, restCfg.CAData)
+	data, err := kubeConfigYaml(server, token, restCfg.CAData)
 	if err != nil {
 		return err
 	}
 
 	// Write the kubeconfig file to the host.
-	destFile := filepath.Join(destDir, cfg.Kubeconfig)
+	destFile := filepath.Join(cniNetDir, kubeconfigFile)
 	err = os.WriteFile(destFile, data, os.FileMode(0o644))
 	if err != nil {
 		return fmt.Errorf("error writing kube config file %s: %w", destFile, err)
@@ -80,18 +62,8 @@ func createKubeConfig(destDir string, cfg *config.CNIConfig) error {
 }
 
 // kubeConfigYaml creates the kubeconfig in yaml format using kubectl packages.
-func kubeConfigYaml(server string, tokenInfo *TokenInfo, certificateAuthorityData []byte) ([]byte, error) {
+func kubeConfigYaml(server, token string, certificateAuthorityData []byte) ([]byte, error) {
 	// Use the same struct that kubectl uses to create the kubeconfig file.
-	var consulCNIAuthInfo *clientcmdapi.AuthInfo
-	if tokenInfo.TokenInfoType == TokenTypeFile {
-		consulCNIAuthInfo = &clientcmdapi.AuthInfo{
-			TokenFile: tokenInfo.TokenInfo,
-		}
-	} else if tokenInfo.TokenInfoType == TokenTypeRaw {
-		consulCNIAuthInfo = &clientcmdapi.AuthInfo{
-			Token: tokenInfo.TokenInfo,
-		}
-	}
 	kubeconfig := clientcmdapi.Config{
 		APIVersion: "v1",
 		Kind:       "Config",
@@ -102,7 +74,9 @@ func kubeConfigYaml(server string, tokenInfo *TokenInfo, certificateAuthorityDat
 			},
 		},
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"consul-cni": consulCNIAuthInfo,
+			"consul-cni": {
+				Token: token,
+			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
 			"consul-cni-context": {

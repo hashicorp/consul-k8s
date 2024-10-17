@@ -47,8 +47,7 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
-	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
-	   --no-cache \
+	@docker build -t '$(DEV_IMAGE)' \
        --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
@@ -105,7 +104,7 @@ ifeq ("$(GOTESTSUM_PATH)","")
 else
 	cd control-plane && \
 	gotestsum \
-		--format=pkgname \
+		--format=short-verbose \
 		--debug \
 		--rerun-fails=3 \
 		--packages="./..."
@@ -119,7 +118,7 @@ ifeq ("$(GOTESTSUM_PATH)","")
 else
 	cd control-plane && \
 	gotestsum \
-		--format=pkgname \
+		--format=short-verbose \
 		--debug \
 		--rerun-fails=3 \
 		--packages="./..." \
@@ -136,9 +135,6 @@ control-plane-clean: ## Delete bin and pkg dirs.
 	@rm -rf \
 		$(CURDIR)/control-plane/bin \
 		$(CURDIR)/control-plane/pkg
-	@rm -rf \
-		$(CURDIR)/control-plane/cni/bin \
-		$(CURDIR)/control-plane/cni/pkg
 
 .PHONY: control-plane-lint
 control-plane-lint: cni-plugin-lint ## Run linter in the control-plane directory.
@@ -337,11 +333,6 @@ eks-test-packages: ## eks test packages
 .PHONY: aks-test-packages
 aks-test-packages: ## aks test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
-
-
-.PHONY: openshift-test-packages
-openshift-test-packages: ## openshift test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/openshift_acceptance_test_packages.yaml"
 
 .PHONY: go-mod-tidy
 go-mod-tidy: ## Recursively run go mod tidy on all subdirectories

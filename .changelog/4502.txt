@@ -1,4 +1,0 @@
-```release-note:security
-updated golang.org/x/net dependency to 0.37.0 to fix vulnerability [[GO-2025-3503](https://pkg.go.dev/vuln/GO-2025-3503)] in CLI, CNI, acceptance and control-plane submodule.
-[[PR-4502](https://github.com/hashicorp/consul-k8s/pull/4502)]
-```

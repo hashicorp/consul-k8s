@@ -9,13 +9,13 @@ spec:
   gatewayClassName: gateway-class
   listeners:
   - protocol: HTTP
-    port: 83
+    port: 8081
     name: http-auth
     allowedRoutes:
       namespaces:
         from: "All"
   - protocol: HTTP
-    port: 84
+    port: 8082
     name: http-invalid-attach
     allowedRoutes:
       namespaces:

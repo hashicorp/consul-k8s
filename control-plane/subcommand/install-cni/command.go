@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
@@ -28,7 +27,6 @@ const (
 	defaultCNIBinSourceDir = "/bin"
 	consulCNIName          = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
 	defaultLogJSON         = false
-	gracePeriodTimeout     = 100 * time.Second
 )
 
 // Command flags and structure.
@@ -44,18 +42,12 @@ type Command struct {
 	// flageKubeconfig is the filename of the generated kubeconfig that the plugin will use to communicate with
 	// the kubernetes api.
 	flagKubeconfig string
-	// flagK8sAutorotateToken is a boolean flag for token autorotate feature.
-	flagK8sAutorotateToken bool
 	// flagLogLevel is the logging level.
 	flagLogLevel string
 	// flagLogJson is a boolean flag for json logging  format.
 	flagLogJSON bool
 	// flagMultus is a boolean flag for multus support.
 	flagMultus bool
-	// flagInstallationID is a unique identifier for this installation instance.
-	flagInstallationID string
-	// flagCNITokenPath is the path to the CNI token file for testing purposes.
-	flagCNITokenPath string
 
 	flagSet *flag.FlagSet
 
@@ -74,11 +66,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", config.DefaultLogLevel,
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
-	c.flagSet.BoolVar(&c.flagK8sAutorotateToken, "autorotate-token", config.DefaultAutorotateToken, "Enable or disable token autorotate feature.")
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", defaultLogJSON, "Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagMultus, "multus", config.DefaultMultus, "If the plugin is a multus plugin (default = false)")
-	c.flagSet.StringVar(&c.flagInstallationID, "installation-id", "", "Unique identifier for this installation instance (auto-generated if not provided)")
-	c.flagSet.StringVar(&c.flagCNITokenPath, "cni-token-path", "", "Path to the CNI token file for testing purposes.")
 
 	c.help = flags.Usage(help, c.flagSet)
 
@@ -94,6 +83,7 @@ func (c *Command) init() {
 // Run runs the command.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
@@ -108,37 +98,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	// Generate or use provided installation ID
-	var installationID string
-	if c.flagInstallationID != "" {
-		installationID = c.flagInstallationID
-	} else {
-		installationID = fmt.Sprintf("%d", time.Now().UnixNano())
-	}
-
 	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
-		Name: config.DefaultPluginName,
-		Type: config.DefaultPluginType,
-		CNITokenPath: func() string {
-			dir := c.flagCNITokenPath
-			if dir == "" {
-				dir = config.DefaultCNITokenDir
-			}
-			return filepath.Join(dir, config.DefaultCNITokenFilename)
-		}(),
-		CNIHostTokenPath: func() string {
-			if c.flagK8sAutorotateToken {
-				return filepath.Join(c.flagCNINetDir, config.DefaultCNIHostTokenFilename+"-"+installationID)
-			}
-			return ""
-		}(),
-		AutorotateToken: c.flagK8sAutorotateToken,
-		CNIBinDir:       c.flagCNIBinDir,
-		CNINetDir:       c.flagCNINetDir,
-		Kubeconfig:      config.DefaultKubeconfig + "-" + installationID,
-		LogLevel:        c.flagLogLevel,
-		Multus:          c.flagMultus,
+		Name:       config.DefaultPluginName,
+		Type:       config.DefaultPluginType,
+		CNIBinDir:  c.flagCNIBinDir,
+		CNINetDir:  c.flagCNINetDir,
+		Kubeconfig: c.flagKubeconfig,
+		LogLevel:   c.flagLogLevel,
+		Multus:     c.flagMultus,
 	}
 
 	c.logger.Info("Running CNI install with configuration",
@@ -148,21 +116,25 @@ func (c *Command) Run(args []string) int {
 		"cni_net_dir", cfg.CNINetDir,
 		"multus", cfg.Multus,
 		"kubeconfig", cfg.Kubeconfig,
-		"log_level", cfg.LogLevel,
-		"cni_token_path:", cfg.CNITokenPath,
-		"cni_host_token_path", cfg.CNIHostTokenPath,
-		"autorotate_token:", cfg.AutorotateToken,
-	)
+		"log_level", cfg.LogLevel)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Generate the kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
+	c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
+	err := createKubeConfig(cfg.CNINetDir, cfg.Kubeconfig)
+	if err != nil {
+		c.logger.Error("could not create kube config", "error", err)
+		return 1
+	}
+
 	// Copy the consul-cni binary from the installer container to the host.
 	c.logger.Info("Copying consul-cni binary", "destination", cfg.CNIBinDir)
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
-	// Watch for changes in the binary file and copy it to the destination when updates occur.
-	if err := c.binWatcher(ctx, srcFile, cfg.CNIBinDir, cfg.Type); err != nil {
-		c.logger.Error("Binary watcher failed", "error", err)
+	err = copyFile(srcFile, cfg.CNIBinDir)
+	if err != nil {
+		c.logger.Error("could not copy consul-cni binary", "error", err)
 		return 1
 	}
 
@@ -213,166 +185,27 @@ func (c *Command) Run(args []string) int {
 		c.logger.Info("Multus enabled, using multus NetworkAttachementDefinition for configuration")
 	}
 
-	errCh := make(chan error, 2)
-	var wg sync.WaitGroup
-	// watch for changes in the default cni serviceaccount token directory
-	if cfg.AutorotateToken {
-		// if autorotate-token is enabled, we need to watch the token file for changes and copy it to the host
-		// as newly rotated projected tokens are only available in the cni-pod and not on the host
-		sourceTokenPath := cfg.CNITokenPath
-		hostTokenPath := cfg.CNIHostTokenPath
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := c.tokenFileWatcher(ctx, sourceTokenPath, hostTokenPath); err != nil {
-				c.logger.Error("Token file watcher failed", "error", err)
-				errCh <- err
-			}
-		}()
-	}
-
-	// Watch for changes in the cniNetDir directory and fix/install the config files if need be.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := c.directoryWatcher(ctx, cfg, cfg.CNINetDir, cfgFile); err != nil {
-			c.logger.Error("error with directory watcher", "error", err)
-			errCh <- err
-		}
-	}()
-
-	// Wait for either a shutdown signal or an error from watchers
-	var responseCode = 0
-	select {
-	case sig := <-c.sigCh:
-		c.logger.Info("Received shutdown signal", "signal", sig)
-
-	case err := <-errCh:
-		c.logger.Error("Received error from watcher", "error", err)
-		responseCode = 1
-	}
-	cancel()
-	wg.Wait()
-	// wait for watchers to finish as they regenerate pluginconfs/tokens/kubeconfigs
-	c.cleanup(cfg, cfgFile)
-	return responseCode
-}
-
-// binWatcher watches for changes in the source CNI binary file and re-copies it to the destination when updates occur.
-// This is useful for scenarios where the CNI binary might be updated during runtime.
-func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, destBinName string) error {
-	destBinWatcher, err := fsnotify.NewWatcher()
+	// Watch for changes in the cniNetDir directory and fix/install the config file if need be.
+	err = c.directoryWatcher(ctx, cfg, cfg.CNINetDir, cfgFile)
 	if err != nil {
-		return fmt.Errorf("could not create sourceBinWatcher: %w", err)
+		c.logger.Error("error with directory watcher", "error", err)
+		return 1
 	}
-	defer func() {
-		_ = destBinWatcher.Close()
-	}()
-
-	destBinPath := filepath.Join(destBinDir, destBinName)
-	c.logger.Info("Creating destBinWatcher for", "file", destBinPath)
-	for i := 1; i <= 5; i++ {
-		if _, err := os.Stat(destBinPath); err != nil && os.IsNotExist(err) {
-			// previous pod might have cleaned it up
-			err = copyFileWithName(sourceBinPath, destBinDir, destBinName)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-		err = destBinWatcher.Add(destBinPath)
-		if err != nil {
-			//probably the file is not present as previous pod deleted it after fileCheck as race condition
-			c.logger.Error("could not watch binary file %s: %w", sourceBinPath, err)
-			time.Sleep(time.Second * time.Duration(i))
-		} else {
-			break
-		}
-		c.logger.Info("Created destBinWatcher for", "file", destBinPath)
-	}
-	//older pods who dont cleanup so wont fire remove event for race conditions if
-	// we added the bin watcher for older binary
-	gracePeriodAlarm := time.NewTimer(gracePeriodTimeout)
-	defer gracePeriodAlarm.Stop()
-	// post this watcher is created, but it might be that previous pod removes it later
-	// so we listen to remove events and copy once and end watching
-
-	for {
-		select {
-		case event, ok := <-destBinWatcher.Events:
-			if !ok {
-				c.logger.Error("Binary destBinWatcher event is not ok", "event", event)
-				break
-			}
-
-			// Only handle events for the specific binary file
-			c.logger.Info("Received binary file event",
-				"event_type", event.Op.String(),
-				"file", event.Name)
-
-			// Handle Remove event that might indicate binary removal
-			if event.Op&(fsnotify.Remove) != 0 {
-				// Re-copy the binary file
-				if err := copyFileWithName(sourceBinPath, destBinDir, destBinName); err != nil {
-					c.logger.Error("Failed to copy binary after update", "error", err)
-					return err
-				} else {
-					c.logger.Info("Successfully copied updated binary from source")
-				}
-				return nil
-			}
-		case <-gracePeriodAlarm.C:
-			c.logger.Info("Grace period timeout reached, older pod may not have cleaned up binary, proceeding with copy")
-			// Copy the binary and proceed since older pod didn't clean up within grace period
-			if err := copyFileWithName(sourceBinPath, destBinDir, destBinName); err != nil {
-				c.logger.Error("Failed to copy binary after grace period timeout", "error", err)
-				return err
-			} else {
-				c.logger.Info("Successfully copied binary after grace period timeout")
-			}
-			return nil
-		case err, ok := <-destBinWatcher.Errors:
-			if !ok {
-				c.logger.Error("SourceBinWatcher error channel closed")
-				return nil
-			}
-			c.logger.Error("SourceBinWatcher error", "error", err)
-
-		case <-ctx.Done():
-			return nil
-		}
-	}
+	return 0
 }
 
-// cleanup removes the consul-cni configuration, kubeconfig and cni-host-token-<uid> file from cniNetDir and cniBinDir.
+// cleanup removes the consul-cni configuration and kubeconfig file from cniNetDir and cniBinDir.
 func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 	var err error
 	c.logger.Info("Shutdown received, cleaning up")
-	// Its important to cleanup in this order as plugin conf binds cni in the workflow
 	if cfgFile != "" {
 		err = removeCNIConfig(cfgFile)
-		c.logger.Info("Removed CNI Config", "file", cfgFile)
 		if err != nil {
 			c.logger.Error("Unable to cleanup CNI Config: %w", err)
 		}
 	}
 
-	cniBinaryPath := filepath.Join(cfg.CNIBinDir, cfg.Type)
-	c.logger.Info("Removing file", "file", cniBinaryPath)
-	err = removeFile(cniBinaryPath)
-	if err != nil {
-		c.logger.Error("Unable to remove %s file: %w", cniBinaryPath, err)
-	}
-
-	c.logger.Info("Removing file", "file", cfg.CNIHostTokenPath)
-	err = removeFile(cfg.CNIHostTokenPath)
-	if err != nil {
-		c.logger.Error("Unable to remove %s file: %w", cfg.CNIHostTokenPath, err)
-	}
-
 	kubeconfig := filepath.Join(cfg.CNINetDir, cfg.Kubeconfig)
-	c.logger.Info("Removing file", "file", kubeconfig)
-
 	err = removeFile(kubeconfig)
 	if err != nil {
 		c.logger.Error("Unable to remove %s file: %w", kubeconfig, err)
@@ -385,24 +218,20 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, dir, cfgFile string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("could not create dirwatcher: %w", err)
+		return fmt.Errorf("could not create watcher: %w", err)
 	}
+
 	c.logger.Info("Creating directory watcher for", "directory", dir)
 	err = watcher.Add(dir)
 	if err != nil {
 		return fmt.Errorf("could not watch %s directory: %w", dir, err)
 	}
+	//}
+
+	// Cannot do "_ = defer watcher.Close()".
 	defer func() {
 		_ = watcher.Close()
 	}()
-
-	// Generate the initial kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
-	c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
-	kubeConfigFile := filepath.Join(dir, cfg.Kubeconfig)
-	err = createKubeConfig(dir, cfg)
-	if err != nil {
-		c.logger.Error("could not create kube config", "error", err)
-	}
 
 	for {
 		select {
@@ -414,27 +243,6 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 			// config file is available, do nothing. This can happen if the consul-cni daemonset was
 			// created before other CNI plugins were installed.
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0 {
-				// Separate tokenFileWatcher updates the token file in the host path
-				// older daemonset can delete this token on SIGTERM as cleanup
-				if event.Name == cfg.CNIHostTokenPath {
-					c.logger.Info("Token file updated", "file", event.Name)
-					break
-				}
-				// older daemonset can delete this kubeconfig on SIGTERM as cleanup
-				// new pod should listen to remove and regenerate it.
-				// currently this is not unit-testable as createKubeConfig is not mockable
-				if event.Name == kubeConfigFile {
-					if event.Op&fsnotify.Remove != 0 {
-						c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
-						err := createKubeConfig(dir, cfg)
-						if err != nil {
-							c.logger.Error("could not create kube config", "error", err)
-							return err
-						}
-					}
-					break
-				}
-
 				// Only repair things if this is a non-multus setup. Multus config is handled differently
 				// than chained plugins
 				if !cfg.Multus {
@@ -444,14 +252,14 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 					cfgFile, err = defaultCNIConfigFile(dir)
 					if err != nil {
 						c.logger.Error("Unable get default config file", "error", err)
-						return err
+						break
 					}
 
 					if strings.HasSuffix(cfgFile, ".conf") {
 						cfgFile, err = confListFileFromConfFile(cfgFile)
 						if err != nil {
 							c.logger.Error("could convert .conf file to .conflist file", "error", err)
-							return err
+							break
 						}
 					}
 
@@ -469,147 +277,23 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 							}
 						} else {
 							c.logger.Info("Valid config file detected, nothing to do")
+							break
 						}
 					}
 				}
 			}
-
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				c.logger.Error("Event watcher event is not ok", "error", err)
 			}
 		case <-ctx.Done():
+			c.cleanup(cfg, cfgFile)
+			return nil
+		case <-c.sigCh:
+			c.cleanup(cfg, cfgFile)
 			return nil
 		}
 	}
-}
-
-// In case of autorotate-token, we are using projected tokens which doesn't support hostpath mount,
-// we need to watch the token file for changes and copy it to the host.
-func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTokenPath string) error {
-	sourceTokenWatcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return fmt.Errorf("could not create sourcetokenWatcher: %w", err)
-	}
-	if err != nil {
-		return fmt.Errorf("could not create desttokenWatcher: %w", err)
-	}
-	defer func() {
-		_ = sourceTokenWatcher.Close()
-	}()
-
-	c.logger.Info("Creating sourceTokenWatcher for", "file", sourceTokenPath)
-	if err := sourceTokenWatcher.Add(sourceTokenPath); err != nil {
-		return fmt.Errorf("could not watch token file %s: %w", sourceTokenPath, err)
-	}
-
-	if err := copyToken(sourceTokenPath, hostTokenPath); err != nil {
-		c.logger.Info("Failed to perform initial copy token", "error", err)
-	}
-
-	for {
-		select {
-		case event, ok := <-sourceTokenWatcher.Events:
-			if !ok {
-				c.logger.Error("Token sourceTokenWatcher event is not ok", "event", event)
-				return fmt.Errorf("token sourceTokenWatcher event channel closed unexpectedly")
-			}
-
-			// Only handle events for the specific token file
-			c.logger.Info("Received file event",
-				"event_type", event.Op.String(),
-				"file", event.Name)
-
-			// Handle Write event on symlink update to point to a new file
-			// but the symlink's creation timestamp changes on doing such update as well.
-
-			if event.Op&(fsnotify.Remove|fsnotify.Chmod) != 0 {
-				// Re-add sourceTokenWatcher after remove/chmod
-				backoff := time.Second
-				waitCount := 5
-				for i := 1; i <= waitCount; i++ {
-					if err := sourceTokenWatcher.Add(sourceTokenPath); err != nil {
-						c.logger.Error("Failed to re-add sourceTokenWatcher after remove/chmod", "error", err, "attempt", i+1)
-						time.Sleep(backoff)
-						backoff *= 2
-						if waitCount == i {
-							return fmt.Errorf("failed to re-add sourceTokenWatcher after remove/chmod after %d attempts", waitCount)
-						}
-					}
-				}
-
-				if err := copyToken(sourceTokenPath, hostTokenPath); err != nil {
-					c.logger.Error("Failed to copy token after symlink update", "error", err)
-				} else {
-					c.logger.Info("Successfully copied new token from source")
-				}
-			}
-
-		case err, ok := <-sourceTokenWatcher.Errors:
-			if !ok {
-				c.logger.Error("SourceTokenWatcher error channel closed")
-				return fmt.Errorf("SourceTokenWatcher error channel closed unexpectedly")
-			}
-			c.logger.Error("SourceTokenWatcher error", "error", err)
-
-		case <-ctx.Done():
-			return nil
-		}
-	}
-}
-
-func copyFileWithName(srcFile, destDir, destFileName string) error {
-	// if destFile is not passed we use the srcFile basepath
-	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
-		return err
-	}
-	if destFileName == "" {
-		destFileName = filepath.Base(srcFile)
-	}
-	// If the destDir does not exist then the incorrect command line argument was used or
-	// the CNI settings for the kubelet are not correct.
-	info, err := os.Stat(destDir)
-	if os.IsNotExist(err) {
-		return err
-	}
-
-	if !info.IsDir() {
-		return fmt.Errorf("destination directory %s is not a directory", destDir)
-	}
-
-	// Check if the user bit is enabled in folder permission.
-	if info.Mode().Perm()&(1<<(uint(7))) == 0 {
-		return fmt.Errorf("cannot write to destination directory %s", destDir)
-	}
-
-	srcBytes, err := os.ReadFile(srcFile)
-	if err != nil {
-		return fmt.Errorf("could not read %s file", srcFile)
-	}
-
-	err = os.WriteFile(filepath.Join(destDir, destFileName), srcBytes, info.Mode())
-	if err != nil {
-		return fmt.Errorf("error copying %s binary to %s", destFileName, destDir)
-	}
-	return nil
-}
-
-func copyToken(src, dst string) error {
-	// Read source token
-	if _, err := os.Stat(src); err != nil {
-		return err
-	}
-	content, err := os.ReadFile(src)
-	if err != nil {
-		return fmt.Errorf("failed to read source token: %w", err)
-	}
-
-	// Write to destination with correct permissions
-	if err := os.WriteFile(dst, content, 0644); err != nil {
-		return fmt.Errorf("failed to write destination token: %w", err)
-	}
-
-	return nil
 }
 
 // Synopsis returns the summary of the cni install command.

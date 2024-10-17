@@ -67,7 +67,7 @@ func TestInstall(t *testing.T) {
 			}
 
 			// Run proxy read and check that the connection is present in the output.
-			retrier := &retry.Timer{Timeout: 10 * time.Minute, Wait: 20 * time.Second}
+			retrier := &retry.Timer{Timeout: 160 * time.Second, Wait: 2 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
 					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName)
@@ -88,62 +88,37 @@ func TestInstall(t *testing.T) {
 				}
 			})
 
-			var upstreamsOut []byte
-			var clientPodName string
-			retrier = &retry.Timer{Timeout: 10 * time.Minute, Wait: 20 * time.Second}
-			retry.RunWith(retrier, t, func(r *retry.R) {
-				// Troubleshoot: Get the client pod so we can portForward to it and get the 'troubleshoot upstreams' output
-				clientPod, err := connHelper.Ctx.KubernetesClient(r).CoreV1().Pods(connHelper.Ctx.KubectlOptions(r).Namespace).List(context.Background(), metav1.ListOptions{
-					LabelSelector: "app=static-client",
-				})
-				require.NoError(r, err)
-
-				clientPodName = clientPod.Items[0].Name
-				upstreamsOut, err = cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "upstreams", "-pod", clientPodName)
-				logger.Log(r, string(upstreamsOut))
-				require.NoError(r, err)
+			// Troubleshoot: Get the client pod so we can portForward to it and get the 'troubleshoot upstreams' output
+			clientPod, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Pods(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: "app=static-client",
 			})
+			require.NoError(t, err)
+
+			clientPodName := clientPod.Items[0].Name
+			upstreamsOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "upstreams", "-pod", clientPodName)
+			logger.Log(t, string(upstreamsOut))
+			require.NoError(t, err)
 
 			if cfg.EnableTransparentProxy {
-				retrier = &retry.Timer{Timeout: 20 * time.Minute, Wait: 1 * time.Minute}
-				retry.RunWith(retrier, t, func(r *retry.R) {
-					// If tproxy is enabled we are looking for the upstream ip which is the ClusterIP of the Kubernetes Service
-					serverService, err := connHelper.Ctx.KubernetesClient(r).CoreV1().Services(
-						connHelper.Ctx.KubectlOptions(r).Namespace,
-					).List(
-						context.Background(),
-						metav1.ListOptions{
-							FieldSelector: "metadata.name=static-server",
-						},
-					)
-					require.NoError(r, err)
-					serverIP := serverService.Items[0].Spec.ClusterIP
-					proxyOut, err := cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
-					require.NoError(r, err)
-					require.Regexp(r, "Upstream resources are valid", string(proxyOut))
-					logger.Log(r, string(proxyOut))
+				// If tproxy is enabled we are looking for the upstream ip which is the ClusterIP of the Kubernetes Service
+				serverService, err := connHelper.Ctx.KubernetesClient(t).CoreV1().Services(connHelper.Ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+					FieldSelector: "metadata.name=static-server",
 				})
+				require.NoError(t, err)
+				serverIP := serverService.Items[0].Spec.ClusterIP
 
+				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
+				require.NoError(t, err)
+				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
+				logger.Log(t, string(proxyOut))
 			} else {
-				retrier = &retry.Timer{Timeout: 20 * time.Minute, Wait: 1 * time.Minute}
-				retry.RunWith(retrier, t, func(r *retry.R) {
-					// With tproxy disabled and explicit upstreams we need the envoy-id of the server
-					require.Regexp(r, "static-server", string(upstreamsOut))
-					proxyOut, err := cli.Run(
-						r,
-						ctx.KubectlOptions(r),
-						"troubleshoot",
-						"proxy",
-						"-pod",
-						clientPodName,
-						"-upstream-envoy-id",
-						"static-server",
-					)
-					require.NoError(r, err)
-					require.Regexp(r, "Upstream resources are valid", string(proxyOut))
-					logger.Log(r, string(proxyOut))
-				})
+				// With tproxy disabled and explicit upstreams we need the envoy-id of the server
+				require.Regexp(t, "static-server", string(upstreamsOut))
 
+				proxyOut, err := cli.Run(t, ctx.KubectlOptions(t), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-envoy-id", "static-server")
+				require.NoError(t, err)
+				require.Regexp(t, "Upstream resources are valid", string(proxyOut))
+				logger.Log(t, string(proxyOut))
 			}
 
 			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})

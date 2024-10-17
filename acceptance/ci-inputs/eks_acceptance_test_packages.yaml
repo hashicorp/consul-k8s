@@ -2,20 +2,6 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-- {runner: 0, test-packages: "connect"}
-- {runner: 1, test-packages: "peering"}
-- {runner: 2, test-packages: "snapshot-agent"}
-- {runner: 3, test-packages: "wan-federation"}
-- {runner: 4, test-packages: "consul-dns"}
-- {runner: 5, test-packages: "example"}
-- {runner: 6, test-packages: "partitions"}
-- {runner: 7, test-packages: "metrics"}
-- {runner: 8, test-packages: "sync"}
-- {runner: 9, test-packages: "basic"}
-- {runner: 10, test-packages: "cli"}
-- {runner: 11, test-packages: "config-entries"}
-- {runner: 12, test-packages: "api-gateway"}
-- {runner: 13, test-packages: "ingress-gateway"}
-- {runner: 14, test-packages: "terminating-gateway"}
-- {runner: 15, test-packages: "vault"}
-- {runner: 16, test-packages: "server"}
+- {runner: 0, test-packages: "connect peering snapshot-agent wan-federation"}
+- {runner: 1, test-packages: "consul-dns example partitions metrics sync"}
+- {runner: 2, test-packages: "basic cli config-entries api-gateway ingress-gateway terminating-gateway vault server"}

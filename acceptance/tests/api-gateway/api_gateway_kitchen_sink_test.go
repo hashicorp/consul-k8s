@@ -7,10 +7,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"testing"
 	"time"
-
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -91,13 +90,8 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	if runWithEnterpriseOnlyFeatures {
 		fixturePath += "-ent"
 	}
-
-	counter := &retry.Counter{Count: 60, Wait: 10 * time.Second}
-	retry.RunWith(counter, t, func(r *retry.R) {
-		out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(r), "apply", "-k", fixturePath)
-		require.NoError(r, err, out)
-	})
-
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", fixturePath)
+	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -133,7 +127,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		httpRoute      gwv1beta1.HTTPRoute
 	)
 
-	counter = &retry.Counter{Count: 60, Wait: 5 * time.Minute}
+	counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
@@ -149,11 +143,8 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		require.Len(r, gateway.Status.Listeners, 2)
 
 		// http route checks
-		counter = &retry.Counter{Count: 60, Wait: 5 * time.Minute}
-		retry.RunWith(counter, t, func(r *retry.R) {
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
-			require.NoError(r, err)
-		})
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
+		require.NoError(r, err)
 
 		require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
 		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
@@ -196,7 +187,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 	// finally we check that we can actually route to the service(s) via the gateway
 	k8sOptions := ctx.KubectlOptions(t)
-	targetHTTPAddress := fmt.Sprintf("http://%s:8080/v1", gatewayAddress)
+	targetHTTPAddress := fmt.Sprintf("http://%s/v1", gatewayAddress)
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{

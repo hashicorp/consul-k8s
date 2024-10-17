@@ -46,7 +46,6 @@ const (
 	// consulKubernetesCheckName is the name of health check in Consul for Kubernetes readiness status.
 	consulKubernetesCheckName  = "Kubernetes Readiness Check"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
-	kubernetesFailureReasonMsg = "Kubernetes health checks failing"
 )
 
 type NodePortSyncType string
@@ -458,71 +457,58 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	var overridePortName string
 	var overridePortNumber int
 	if len(svc.Spec.Ports) > 0 {
-
-		servicePorts := make(consulapi.ServicePorts, 0)
-		var defaultPort consulapi.ServicePort
-
+		var port int
 		isNodePort := svc.Spec.Type == corev1.ServiceTypeNodePort
 
 		// If a specific port is specified, then use that port value
 		portAnnotation, ok := svc.Annotations[annotationServicePort]
 		if ok {
 			if v, err := strconv.ParseInt(portAnnotation, 0, 0); err == nil {
-				port := int(v)
-				defaultPort = consulapi.ServicePort{
-					Port:    port,
-					Name:    "default",
-					Default: true,
-				}
+				port = int(v)
 				overridePortNumber = port
 			} else {
 				overridePortName = portAnnotation
 			}
 		}
 
-		for idx, p := range svc.Spec.Ports {
-			var port int
-			if overridePortName != "" && p.Name == overridePortName {
-				if isNodePort && p.NodePort > 0 {
-					port = int(p.NodePort)
-				} else {
-					port = int(p.Port)
-					// NOTE: for cluster IP services we always use the endpoint
-					// ports so this will be overridden.
+		// For when the port was a name instead of an int
+		if overridePortName != "" {
+			// Find the named port
+			for _, p := range svc.Spec.Ports {
+				if p.Name == overridePortName {
+					if isNodePort && p.NodePort > 0 {
+						port = int(p.NodePort)
+					} else {
+						port = int(p.Port)
+						// NOTE: for cluster IP services we always use the endpoint
+						// ports so this will be overridden.
+					}
+					break
 				}
-				defaultPort = consulapi.ServicePort{
-					Port:    port,
-					Name:    getPortName(p.Name, idx+1),
-					Default: true,
-				}
-			} else {
-				if isNodePort && p.NodePort > 0 {
-					port = int(p.NodePort)
-				} else {
-					port = int(p.Port)
-				}
-
-				servicePorts = append(servicePorts, consulapi.ServicePort{
-					Port:    port,
-					Name:    getPortName(p.Name, idx+1),
-					Default: false,
-				})
 			}
 		}
 
-		if defaultPort.Port > 0 {
-			servicePorts = append(consulapi.ServicePorts{defaultPort}, servicePorts...)
+		// If the port was not set above, set it with the first port
+		// based on the service type.
+		if port == 0 {
+			if isNodePort {
+				// Find first defined NodePort
+				for _, p := range svc.Spec.Ports {
+					if p.NodePort > 0 {
+						port = int(p.NodePort)
+						break
+					}
+				}
+			} else {
+				port = int(svc.Spec.Ports[0].Port)
+				// NOTE: for cluster IP services we always use the endpoint
+				// ports so this will be overridden.
+			}
 		}
 
-		// If there are no default ports, make first port as default
-		if len(servicePorts) > 0 && !servicePorts.HasDefault() {
-			servicePorts[0].Default = true
-		}
-
-		baseService.Ports = servicePorts
+		baseService.Port = port
 
 		// Add all the ports as annotations
-		// We keep this for backward compatibility
 		for _, p := range svc.Spec.Ports {
 			// Set the tag
 			baseService.Meta["port-"+p.Name] = strconv.FormatInt(int64(p.Port), 10)
@@ -675,7 +661,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service = &rs
 							r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 							r.Service.Address = address.Address
-							r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
+
 							t.consulMap[key] = append(t.consulMap[key], &r)
 							// Only consider the first address that matches. In some cases
 							// there will be multiple addresses like when using AWS CNI.
@@ -696,7 +682,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 								r.Service = &rs
 								r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 								r.Service.Address = address.Address
-								r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
+
 								t.consulMap[key] = append(t.consulMap[key], &r)
 								// Only consider the first address that matches. In some cases
 								// there will be multiple addresses like when using AWS CNI.
@@ -707,6 +693,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							}
 						}
 					}
+
 				}
 			}
 		}
@@ -740,45 +727,23 @@ func (t *ServiceResource) registerServiceInstance(
 		// For ClusterIP services and if LoadBalancerEndpointsSync is true, we use the endpoint port instead
 		// of the service port because we're registering each endpoint
 		// as a separate service instance.
-		epPorts := make(consulapi.ServicePorts, 0)
-
-		if overridePortNumber > 0 {
-			// Make this as default port
-			epPorts = append(epPorts, consulapi.ServicePort{
-				Port:    overridePortNumber,
-				Name:    "default",
-				Default: true,
-			})
-		}
-
-		for idx, p := range endpointSlice.Ports {
-			if overridePortName != "" && p.Name != nil && overridePortName == *p.Name {
-				// This will only trigger if overridePortNumber = 0 since the annotation can only have either port or name
-				epPort := int(*p.Port)
-				defaultPort := consulapi.ServicePort{
-					Port:    epPort,
-					Name:    getPortName(*p.Name, idx+1),
-					Default: true,
+		epPort := baseService.Port
+		if overridePortName != "" {
+			// If we're supposed to use a specific named port, find it.
+			for _, p := range endpointSlice.Ports {
+				if overridePortName == *p.Name {
+					epPort = int(*p.Port)
+					break
 				}
-
-				// We keep default port as first just for convinience and consistency
-				epPorts = append(consulapi.ServicePorts{defaultPort}, epPorts...)
-			} else {
-				epPorts = append(epPorts, consulapi.ServicePort{
-					Port:    int(*p.Port),
-					Name:    getPortName(*p.Name, idx+1),
-					Default: false,
-				})
+			}
+		} else if overridePortNumber == 0 {
+			// Otherwise we'll just use the first port in the list
+			// (unless the port number was overridden by an annotation).
+			for _, p := range endpointSlice.Ports {
+				epPort = int(*p.Port)
+				break
 			}
 		}
-
-		if len(epPorts) > 0 && !epPorts.HasDefault() {
-			// If there is no default port, make the first one the default
-			epPorts[0].Default = true
-		}
-
-		var epPort int
-
 		for _, endpoint := range endpointSlice.Endpoints {
 			for _, endpointAddr := range endpoint.Addresses {
 
@@ -812,34 +777,34 @@ func (t *ServiceResource) registerServiceInstance(
 				r.Service = &rs
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
-
-				// We don't support multi port for ingress sync
-				if epPort > 0 {
-					r.Service.Port = epPort
-					// We need to reset Ports since service registration will error out if both `Port` and `Ports` are set.
-					r.Service.Ports = make(consulapi.ServicePorts, 0)
-				} else {
-					r.Service.Ports = epPorts
-					r.Service.Port = 0
+				r.Service.Port = epPort
+				r.Service.Meta = make(map[string]string)
+				// Deepcopy baseService.Meta into r.Service.Meta as baseService is shared
+				// between all nodes of a service
+				for k, v := range baseService.Meta {
+					r.Service.Meta[k] = v
+				}
+				if endpoint.TargetRef != nil {
+					r.Service.Meta[ConsulK8SRefValue] = endpoint.TargetRef.Name
+					r.Service.Meta[ConsulK8SRefKind] = endpoint.TargetRef.Kind
+				}
+				if endpoint.NodeName != nil {
+					r.Service.Meta[ConsulK8SNodeName] = *endpoint.NodeName
+				}
+				if endpoint.Zone != nil {
+					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
 				}
 
-				r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
 				r.Check = &consulapi.AgentCheck{
 					CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, addr)),
 					Name:      consulKubernetesCheckName,
 					Namespace: baseService.Namespace,
 					Type:      consulKubernetesCheckType,
+					Status:    consulapi.HealthPassing,
 					ServiceID: serviceID(r.Service.Service, addr),
+					Output:    kubernetesSuccessReasonMsg,
 				}
 
-				// Consider endpoint health state for registered consul service
-				if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
-					r.Check.Status = consulapi.HealthPassing
-					r.Check.Output = kubernetesSuccessReasonMsg
-				} else {
-					r.Check.Status = consulapi.HealthCritical
-					r.Check.Output = kubernetesFailureReasonMsg
-				}
 				t.consulMap[key] = append(t.consulMap[key], &r)
 			}
 		}
@@ -1138,34 +1103,4 @@ func getServiceWeight(weight string) (int, error) {
 	}
 
 	return weightI, nil
-}
-
-// deepcopy baseService.Meta into r.Service.Meta as baseService is shared between all nodes of a service.
-// update service meta with k8s topology info.
-func updateServiceMeta(baseServiceMeta map[string]string, endpoint discoveryv1.Endpoint) map[string]string {
-
-	serviceMeta := make(map[string]string)
-
-	for k, v := range baseServiceMeta {
-		serviceMeta[k] = v
-	}
-	if endpoint.TargetRef != nil {
-		serviceMeta[ConsulK8SRefValue] = endpoint.TargetRef.Name
-		serviceMeta[ConsulK8SRefKind] = endpoint.TargetRef.Kind
-	}
-	if endpoint.NodeName != nil {
-		serviceMeta[ConsulK8SNodeName] = *endpoint.NodeName
-	}
-	if endpoint.Zone != nil {
-		serviceMeta[ConsulK8STopologyZone] = *endpoint.Zone
-	}
-	return serviceMeta
-}
-
-func getPortName(name string, idx int) string {
-	if strings.TrimSpace(name) == "" {
-		return fmt.Sprintf("port%d", idx)
-	}
-
-	return name
 }

@@ -107,7 +107,6 @@ type TestConfig struct {
 	UseGKE          bool
 	UseGKEAutopilot bool
 	UseKind         bool
-	UseOpenshift    bool
 
 	helmChartPath string
 }

@@ -683,11 +683,7 @@ spec:
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.defaultEnabled }}
-              value: https://[::1]:8501
-              {{- else }}
               value: https://127.0.0.1:8501
-              {{- end }}
             - name: CONSUL_CACERT
               {{- if .Values.global.secretsBackend.vault.enabled }}
               value: /vault/secrets/serverca.crt
@@ -696,11 +692,7 @@ spec:
               {{- end }}
             {{- else }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.defaultEnabled }}
-              value: http://[::1]:8500
-              {{- else }}
               value: http://127.0.0.1:8500
-              {{- end }}
             {{- end }}
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
             - name: CONSUL_LICENSE_PATH

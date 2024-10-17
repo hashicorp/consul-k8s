@@ -1,4 +1,0 @@
-```release-note:improvement
-cni: fixed race conditions with older versions where no cleanup was done for binary
-cni: cleanup of cni binary on previous pod deletion to improve security posture
-```
