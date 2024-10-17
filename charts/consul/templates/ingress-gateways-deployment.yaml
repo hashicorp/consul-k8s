@@ -291,9 +291,17 @@ spec:
           value: component=ingress-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
+        {{- if $root.Values.ingressGateways.supportPrivilegedPorts }}
         command:
         - consul-dataplane
         args:
+<<<<<<< HEAD
+=======
+        - -envoy-executable-path=/usr/local/bin/privileged-envoy
+        {{- else }}
+        args:
+        {{- end }}
+>>>>>>> ece21310d (Allow ingress gateway users who do not bind to privileged ports to opt out of NET_BIND_SERVICE)
         - -envoy-ready-bind-port=21000
         {{- if $root.Values.externalServers.enabled }}
         - -addresses={{ $root.Values.externalServers.hosts | first }}
