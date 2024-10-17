@@ -84,7 +84,18 @@ type MeshTLSConfig struct {
 }
 
 type MeshHTTPConfig struct {
-	SanitizeXForwardedClientCert bool `json:"sanitizeXForwardedClientCert"`
+	SanitizeXForwardedClientCert bool `json:"sanitizeXForwardedClientCert,omitempty"`
+	// Incoming configures settings for incoming HTTP traffic to mesh proxies.
+	Incoming *MeshDirectionalHTTPConfig `json:"incoming,omitempty"`
+	// There is not currently an outgoing MeshDirectionalHTTPConfig, as
+	// the only required config for either direction at present is inbound
+	// request normalization.
+}
+
+// MeshDirectionalHTTPConfig holds mesh configuration specific to HTTP
+// requests for a given traffic direction.
+type MeshDirectionalHTTPConfig struct {
+	RequestNormalization *RequestNormalizationMeshConfig `json:"requestNormalization,omitempty"`
 }
 
 type PeeringMeshConfig struct {
@@ -113,6 +124,61 @@ type MeshDirectionalTLSConfig struct {
 	// and future releases of Consul may add new supported cipher suites if any are added to Envoy.
 	CipherSuites []string `json:"cipherSuites,omitempty"`
 }
+
+// RequestNormalizationMeshConfig contains options pertaining to the
+// normalization of HTTP requests processed by mesh proxies.
+type RequestNormalizationMeshConfig struct {
+	// InsecureDisablePathNormalization sets the value of the \`normalize_path\` option in the Envoy listener's
+	// `HttpConnectionManager`. The default value is \`false\`. When set to \`true\` in Consul, \`normalize_path\` is
+	// set to \`false\` for the Envoy proxy. This parameter disables the normalization of request URL paths according to
+	// RFC 3986, conversion of \`\\\` to \`/\`, and decoding non-reserved %-encoded characters. When using L7 intentions
+	// with path match rules, we recommend enabling path normalization in order to avoid match rule circumvention with
+	// non-normalized path values.
+	InsecureDisablePathNormalization bool `json:"insecureDisablePathNormalization,omitempty"`
+	// MergeSlashes sets the value of the \`merge_slashes\` option in the Envoy listener's \`HttpConnectionManager\`.
+	// The default value is \`false\`. This option controls the normalization of request URL paths by merging
+	// consecutive \`/\` characters. This normalization is not part of RFC 3986. When using L7 intentions with path
+	// match rules, we recommend enabling this setting to avoid match rule circumvention through non-normalized path
+	// values, unless legitimate service traffic depends on allowing for repeat \`/\` characters, or upstream services
+	// are configured to differentiate between single and multiple slashes.
+	MergeSlashes bool `json:"mergeSlashes,omitempty"`
+	// PathWithEscapedSlashesAction sets the value of the \`path_with_escaped_slashes_action\` option in the Envoy
+	// listener's \`HttpConnectionManager\`. The default value of this option is empty, which is equivalent to
+	// \`IMPLEMENTATION_SPECIFIC_DEFAULT\`. This parameter controls the action taken in response to request URL paths
+	// with escaped slashes in the path. When using L7 intentions with path match rules, we recommend enabling this
+	// setting to avoid match rule circumvention through non-normalized path values, unless legitimate service traffic
+	// depends on allowing for escaped \`/\` or \`\\\` characters, or upstream services are configured to differentiate
+	// between escaped and unescaped slashes. Refer to the Envoy documentation for more information on available
+	// options.
+	PathWithEscapedSlashesAction string `json:"pathWithEscapedSlashesAction,omitempty"`
+	// HeadersWithUnderscoresAction sets the value of the \`headers_with_underscores_action\` option in the Envoy
+	// listener's \`HttpConnectionManager\` under \`common_http_protocol_options\`. The default value of this option is
+	// empty, which is equivalent to \`ALLOW\`. Refer to the Envoy documentation for more information on available
+	// options.
+	HeadersWithUnderscoresAction string `json:"headersWithUnderscoresAction,omitempty"`
+}
+
+// PathWithEscapedSlashesAction is an enum that defines the action to take when
+// a request path contains escaped slashes. It mirrors exactly the set of options
+// in Envoy's UriPathNormalizationOptions.PathWithEscapedSlashesAction enum.
+// See github.com/envoyproxy/go-control-plane envoy_http_v3.HttpConnectionManager_PathWithEscapedSlashesAction.
+const (
+	PathWithEscapedSlashesActionDefault             = "IMPLEMENTATION_SPECIFIC_DEFAULT"
+	PathWithEscapedSlashesActionKeep                = "KEEP_UNCHANGED"
+	PathWithEscapedSlashesActionReject              = "REJECT_REQUEST"
+	PathWithEscapedSlashesActionUnescapeAndRedirect = "UNESCAPE_AND_REDIRECT"
+	PathWithEscapedSlashesActionUnescapeAndForward  = "UNESCAPE_AND_FORWARD"
+)
+
+// HeadersWithUnderscoresAction is an enum that defines the action to take when
+// a request contains headers with underscores. It mirrors exactly the set of
+// options in Envoy's HttpProtocolOptions.HeadersWithUnderscoresAction enum.
+// See github.com/envoyproxy/go-control-plane envoy_core_v3.HttpProtocolOptions_HeadersWithUnderscoresAction.
+const (
+	HeadersWithUnderscoresActionAllow         = "ALLOW"
+	HeadersWithUnderscoresActionRejectRequest = "REJECT_REQUEST"
+	HeadersWithUnderscoresActionDropHeader    = "DROP_HEADER"
+)
 
 func (in *TransparentProxyMeshConfig) toConsul() capi.TransparentProxyMeshConfig {
 	return capi.TransparentProxyMeshConfig{MeshDestinationsOnly: in.MeshDestinationsOnly}
@@ -223,6 +289,11 @@ func (in *Mesh) Validate(consulMeta common.ConsulMeta) error {
 
 	errs = append(errs, in.Spec.TLS.validate(path.Child("tls"))...)
 	errs = append(errs, in.Spec.Peering.validate(path.Child("peering"), consulMeta.PartitionsEnabled, consulMeta.Partition)...)
+	if in.Spec.HTTP != nil &&
+		in.Spec.HTTP.Incoming != nil &&
+		in.Spec.HTTP.Incoming.RequestNormalization != nil {
+		errs = append(errs, in.Spec.HTTP.Incoming.RequestNormalization.validate(path.Child("http", "incoming", "requestNormalization"))...)
+	}
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -248,6 +319,28 @@ func (in *MeshHTTPConfig) toConsul() *capi.MeshHTTPConfig {
 	}
 	return &capi.MeshHTTPConfig{
 		SanitizeXForwardedClientCert: in.SanitizeXForwardedClientCert,
+		Incoming:                     in.Incoming.toConsul(),
+	}
+}
+
+func (in *MeshDirectionalHTTPConfig) toConsul() *capi.MeshDirectionalHTTPConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.MeshDirectionalHTTPConfig{
+		RequestNormalization: in.RequestNormalization.toConsul(),
+	}
+}
+
+func (in *RequestNormalizationMeshConfig) toConsul() *capi.RequestNormalizationMeshConfig {
+	if in == nil {
+		return nil
+	}
+	return &capi.RequestNormalizationMeshConfig{
+		InsecureDisablePathNormalization: in.InsecureDisablePathNormalization,
+		MergeSlashes:                     in.MergeSlashes,
+		PathWithEscapedSlashesAction:     in.PathWithEscapedSlashesAction,
+		HeadersWithUnderscoresAction:     in.HeadersWithUnderscoresAction,
 	}
 }
 
@@ -309,6 +402,36 @@ func (in *PeeringMeshConfig) validate(path *field.Path, partitionsEnabled bool, 
 			"\"peerThroughMeshGateways\" is only valid in the \"default\" partition"))
 	}
 
+	return errs
+}
+
+func (in *RequestNormalizationMeshConfig) validate(path *field.Path) field.ErrorList {
+	if in == nil {
+		return nil
+	}
+
+	var errs field.ErrorList
+	pathWithEscapedSlashesActions := []string{
+		PathWithEscapedSlashesActionDefault,
+		PathWithEscapedSlashesActionKeep,
+		PathWithEscapedSlashesActionReject,
+		PathWithEscapedSlashesActionUnescapeAndRedirect,
+		PathWithEscapedSlashesActionUnescapeAndForward,
+		"",
+	}
+	headersWithUnderscoresActions := []string{
+		HeadersWithUnderscoresActionAllow,
+		HeadersWithUnderscoresActionRejectRequest,
+		HeadersWithUnderscoresActionDropHeader,
+		"",
+	}
+
+	if !sliceContains(pathWithEscapedSlashesActions, in.PathWithEscapedSlashesAction) {
+		errs = append(errs, field.Invalid(path.Child("pathWithEscapedSlashesAction"), in.PathWithEscapedSlashesAction, notInSliceMessage(pathWithEscapedSlashesActions)))
+	}
+	if !sliceContains(headersWithUnderscoresActions, in.HeadersWithUnderscoresAction) {
+		errs = append(errs, field.Invalid(path.Child("headersWithUnderscoresAction"), in.HeadersWithUnderscoresAction, notInSliceMessage(headersWithUnderscoresActions)))
+	}
 	return errs
 }
 

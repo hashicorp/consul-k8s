@@ -63,6 +63,14 @@ func TestMesh_MatchesConsul(t *testing.T) {
 					},
 					HTTP: &MeshHTTPConfig{
 						SanitizeXForwardedClientCert: true,
+						Incoming: &MeshDirectionalHTTPConfig{
+							RequestNormalization: &RequestNormalizationMeshConfig{
+								InsecureDisablePathNormalization: true, // note: this is the opposite of the recommended default
+								MergeSlashes:                     true,
+								PathWithEscapedSlashesAction:     "REJECT_REQUEST",
+								HeadersWithUnderscoresAction:     "DROP_HEADER",
+							},
+						},
 					},
 					Peering: &PeeringMeshConfig{
 						PeerThroughMeshGateways: true,
@@ -88,6 +96,14 @@ func TestMesh_MatchesConsul(t *testing.T) {
 				},
 				HTTP: &capi.MeshHTTPConfig{
 					SanitizeXForwardedClientCert: true,
+					Incoming: &capi.MeshDirectionalHTTPConfig{
+						RequestNormalization: &capi.RequestNormalizationMeshConfig{
+							InsecureDisablePathNormalization: true, // note: this is the opposite of the recommended default
+							MergeSlashes:                     true,
+							PathWithEscapedSlashesAction:     "REJECT_REQUEST",
+							HeadersWithUnderscoresAction:     "DROP_HEADER",
+						},
+					},
 				},
 				Peering: &capi.PeeringMeshConfig{
 					PeerThroughMeshGateways: true,
@@ -165,6 +181,14 @@ func TestMesh_ToConsul(t *testing.T) {
 					},
 					HTTP: &MeshHTTPConfig{
 						SanitizeXForwardedClientCert: true,
+						Incoming: &MeshDirectionalHTTPConfig{
+							RequestNormalization: &RequestNormalizationMeshConfig{
+								InsecureDisablePathNormalization: true, // note: this is the opposite of the recommended default
+								MergeSlashes:                     true,
+								PathWithEscapedSlashesAction:     "REJECT_REQUEST",
+								HeadersWithUnderscoresAction:     "DROP_HEADER",
+							},
+						},
 					},
 					Peering: &PeeringMeshConfig{
 						PeerThroughMeshGateways: true,
@@ -190,6 +214,14 @@ func TestMesh_ToConsul(t *testing.T) {
 				},
 				HTTP: &capi.MeshHTTPConfig{
 					SanitizeXForwardedClientCert: true,
+					Incoming: &capi.MeshDirectionalHTTPConfig{
+						RequestNormalization: &capi.RequestNormalizationMeshConfig{
+							InsecureDisablePathNormalization: true, // note: this is the opposite of the recommended default
+							MergeSlashes:                     true,
+							PathWithEscapedSlashesAction:     "REJECT_REQUEST",
+							HeadersWithUnderscoresAction:     "DROP_HEADER",
+						},
+					},
 				},
 				Peering: &capi.PeeringMeshConfig{
 					PeerThroughMeshGateways: true,
@@ -363,6 +395,76 @@ func TestMesh_Validate(t *testing.T) {
 				},
 			},
 		},
+		"http.incoming.requestNormalization.pathWithEscapedSlashesAction valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					HTTP: &MeshHTTPConfig{
+						Incoming: &MeshDirectionalHTTPConfig{
+							RequestNormalization: &RequestNormalizationMeshConfig{
+								PathWithEscapedSlashesAction: "UNESCAPE_AND_FORWARD",
+							},
+						},
+					},
+				},
+			},
+		},
+		"http.incoming.requestNormalization.pathWithEscapedSlashesAction invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					HTTP: &MeshHTTPConfig{
+						Incoming: &MeshDirectionalHTTPConfig{
+							RequestNormalization: &RequestNormalizationMeshConfig{
+								PathWithEscapedSlashesAction: "foo",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.http.incoming.requestNormalization.pathWithEscapedSlashesAction: Invalid value: "foo": must be one of "IMPLEMENTATION_SPECIFIC_DEFAULT", "KEEP_UNCHANGED", "REJECT_REQUEST", "UNESCAPE_AND_REDIRECT", "UNESCAPE_AND_FORWARD", ""`,
+			},
+		},
+		"http.incoming.requestNormalization.headerWithUnderscoresAction valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					HTTP: &MeshHTTPConfig{
+						Incoming: &MeshDirectionalHTTPConfig{
+							RequestNormalization: &RequestNormalizationMeshConfig{
+								HeadersWithUnderscoresAction: "REJECT_REQUEST",
+							},
+						},
+					},
+				},
+			},
+		},
+		"http.incoming.requestNormalization.headersWithUnderscoresAction invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					HTTP: &MeshHTTPConfig{
+						Incoming: &MeshDirectionalHTTPConfig{
+							RequestNormalization: &RequestNormalizationMeshConfig{
+								HeadersWithUnderscoresAction: "bar",
+							},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.http.incoming.requestNormalization.headersWithUnderscoresAction: Invalid value: "bar": must be one of "ALLOW", "REJECT_REQUEST", "DROP_HEADER", ""`,
+			},
+		},
 		"multiple errors": {
 			input: &Mesh{
 				ObjectMeta: metav1.ObjectMeta{
@@ -382,6 +484,14 @@ func TestMesh_Validate(t *testing.T) {
 					Peering: &PeeringMeshConfig{
 						PeerThroughMeshGateways: true,
 					},
+					HTTP: &MeshHTTPConfig{
+						Incoming: &MeshDirectionalHTTPConfig{
+							RequestNormalization: &RequestNormalizationMeshConfig{
+								PathWithEscapedSlashesAction: "foo",
+								HeadersWithUnderscoresAction: "bar",
+							},
+						},
+					},
 				},
 			},
 			consulMeta: common.ConsulMeta{
@@ -394,6 +504,8 @@ func TestMesh_Validate(t *testing.T) {
 				`spec.tls.outgoing.tlsMinVersion: Invalid value: "foo": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
 				`spec.tls.outgoing.tlsMaxVersion: Invalid value: "bar": must be one of "TLS_AUTO", "TLSv1_0", "TLSv1_1", "TLSv1_2", "TLSv1_3", ""`,
 				`spec.peering.peerThroughMeshGateways: Forbidden: "peerThroughMeshGateways" is only valid in the "default" partition`,
+				`spec.http.incoming.requestNormalization.pathWithEscapedSlashesAction: Invalid value: "foo": must be one of "IMPLEMENTATION_SPECIFIC_DEFAULT", "KEEP_UNCHANGED", "REJECT_REQUEST", "UNESCAPE_AND_REDIRECT", "UNESCAPE_AND_FORWARD", ""`,
+				`spec.http.incoming.requestNormalization.headersWithUnderscoresAction: Invalid value: "bar": must be one of "ALLOW", "REJECT_REQUEST", "DROP_HEADER", ""`,
 			},
 		},
 	}
