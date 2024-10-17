@@ -609,6 +609,8 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 
 			// create another partition and register 2 services there to the same node to show that we won't delete them
 			_, _, err = consulClient.Partitions().Create(context.Background(), &api.Partition{Name: otherPartitionName}, nil)
+			require.NoError(t, err)
+
 			_, err = consulClient.Catalog().Register(
 				&api.CatalogRegistration{
 					Node:    tc.nodeName,
