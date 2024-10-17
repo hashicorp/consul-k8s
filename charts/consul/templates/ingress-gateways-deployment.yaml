@@ -254,8 +254,10 @@ spec:
           capabilities:
             drop:
               - ALL
+            {{- if $root.Values.ingressGateways.supportPrivilegedPorts }}
             add:
               - NET_BIND_SERVICE
+            {{- end }}
           runAsNonRoot: true
           seccompProfile:
             type: RuntimeDefault
@@ -313,10 +315,14 @@ spec:
           value: component=ingress-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
+        {{- if $root.Values.ingressGateways.supportPrivilegedPorts }}
         command:
         - privileged-consul-dataplane
         args:
         - -envoy-executable-path=/usr/local/bin/privileged-envoy
+        {{- else }}
+        args:
+        {{- end }}
         - -envoy-ready-bind-port=21000
         {{- if $root.Values.externalServers.enabled }}
         - -addresses={{ $root.Values.externalServers.hosts | first }}
