@@ -294,7 +294,7 @@ func SetupK8sAuthMethodWithNamespaces(t *testing.T, consulClient *api.Client, se
 			Description: "Kubernetes binding rule",
 			AuthMethod:  AuthMethod,
 			BindType:    api.BindingRuleBindTypeTemplatedPolicy,
-			BindName:    api.ACLTemplatedPolicyWorkloadIdentityName,
+			BindName:    "", //api.ACLTemplatedPolicyWorkloadIdentityName, TODO: remove w/ v2 code
 			BindVars: &api.ACLTemplatedPolicyVariables{
 				Name: "${serviceaccount.name}",
 			},
