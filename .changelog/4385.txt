@@ -1,0 +1,6 @@
+```release-note:security
+crd: Add `http.incoming.requestNormalization` to the Mesh CRD to support configuring service traffic request normalization.
+```
+```release-note:security
+crd: Add `contains` and `ignoreCase` to the Intentions CRD to support configuring L7 Header intentions resilient to variable casing and multiple header values.
+```
