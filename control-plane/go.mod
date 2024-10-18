@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
-	github.com/hashicorp/consul/api v1.29.4
+	github.com/hashicorp/consul/api v1.29.6
 	github.com/hashicorp/consul/proto-public v0.6.2
 	github.com/hashicorp/consul/sdk v0.16.1
 	github.com/hashicorp/go-bexpr v0.1.11
