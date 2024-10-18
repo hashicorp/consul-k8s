@@ -164,10 +164,19 @@ spec:
                                   If more than one is configured all must match for the overall match to apply.
                                 items:
                                   properties:
+                                    contains:
+                                      description: Contains matches if the header
+                                        with the given name contains this value.
+                                      type: string
                                     exact:
                                       description: Exact matches if the header with
                                         the given name is this value.
                                       type: string
+                                    ignoreCase:
+                                      description: IgnoreCase ignores the case of
+                                        the header value when matching with exact,
+                                        prefix, suffix, or contains.
+                                      type: boolean
                                     invert:
                                       description: Invert inverts the logic of the
                                         match.
