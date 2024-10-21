@@ -208,8 +208,8 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 		}
 	}
 
-	s.serviceNames = serviceNames
-	s.namespaces = namespaces
+	//s.serviceNames = serviceNames
+	//s.namespaces = namespaces
 	// Signal that the initial sync is complete and our maps have been populated.
 	// We can now safely reap untracked services.
 	s.initialSyncOnce.Do(func() { close(s.initialSync) })
@@ -588,9 +588,16 @@ func (s *ConsulSyncer) syncFull(ctx context.Context) {
 
 func (s *ConsulSyncer) syncOne(ctx context.Context, r *api.CatalogRegistration) {
 
+	// Create a new consul client.
+	consulClient, err := consul.NewClientFromConnMgr(s.ConsulClientConfig, s.ConsulServerConnMgr)
+	if err != nil {
+		s.Log.Error("failed to create Consul API client", "err", err)
+		return
+	}
+
 	// Register the service
 	wopt := (&api.WriteOptions{}).WithContext(ctx)
-	_, err := s.Client.Catalog().Register(r, wopt)
+	_, err = consulClient.Catalog().Register(r, wopt)
 	if err != nil {
 		s.Log.Warn("error registering service",
 			"node-name", r.Node,
@@ -612,6 +619,13 @@ func (s *ConsulSyncer) deregOne(ctx context.Context, r *api.CatalogDeregistratio
 		"service-id", r.ServiceID,
 		"service-consul-namespace", r.Namespace)
 
+	// Create a new consul client.
+	consulClient, err := consul.NewClientFromConnMgr(s.ConsulClientConfig, s.ConsulServerConnMgr)
+	if err != nil {
+		s.Log.Error("failed to create Consul API client", "err", err)
+		return
+	}
+
 	_, err = consulClient.Catalog().Deregister(r, nil)
 	if err != nil {
 		// metric count for error deregistering k8s services from Consul
@@ -625,7 +639,6 @@ func (s *ConsulSyncer) deregOne(ctx context.Context, r *api.CatalogDeregistratio
 			"service-id", r.ServiceID,
 			"service-consul-namespace", r.Namespace,
 			"err", err)
-		continue
 	}
 
 	// metric count for deregistering k8s services from Consul
