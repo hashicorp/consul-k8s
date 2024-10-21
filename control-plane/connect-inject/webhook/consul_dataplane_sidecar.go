@@ -265,7 +265,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		RunAsGroup:               ptr.To(group),
 		RunAsNonRoot:             ptr.To(true),
 		AllowPrivilegeEscalation: ptr.To(false),
-		ReadOnlyRootFilesystem: ptr.To(true),
+		ReadOnlyRootFilesystem:   ptr.To(true),
 	}
 	return container, nil
 }
