@@ -140,8 +140,12 @@ type IntentionHTTPHeaderPermission struct {
 	Prefix string `json:"prefix,omitempty"`
 	// Suffix matches if the header with the given name has this suffix.
 	Suffix string `json:"suffix,omitempty"`
+	// Contains matches if the header with the given name contains this value.
+	Contains string `json:"contains,omitempty"`
 	// Regex matches if the header with the given name matches this pattern.
 	Regex string `json:"regex,omitempty"`
+	// IgnoreCase ignores the case of the header value when matching with exact, prefix, suffix, or contains.
+	IgnoreCase bool `json:"ignoreCase,omitempty"`
 	// Invert inverts the logic of the match.
 	Invert bool `json:"invert,omitempty"`
 }
@@ -448,13 +452,15 @@ func (in IntentionHTTPHeaderPermissions) toConsul() []capi.IntentionHTTPHeaderPe
 	var headerPermissions []capi.IntentionHTTPHeaderPermission
 	for _, permission := range in {
 		headerPermissions = append(headerPermissions, capi.IntentionHTTPHeaderPermission{
-			Name:    permission.Name,
-			Present: permission.Present,
-			Exact:   permission.Exact,
-			Prefix:  permission.Prefix,
-			Suffix:  permission.Suffix,
-			Regex:   permission.Regex,
-			Invert:  permission.Invert,
+			Name:       permission.Name,
+			Present:    permission.Present,
+			Exact:      permission.Exact,
+			Prefix:     permission.Prefix,
+			Suffix:     permission.Suffix,
+			Contains:   permission.Contains,
+			Regex:      permission.Regex,
+			Invert:     permission.Invert,
+			IgnoreCase: permission.IgnoreCase,
 		})
 	}
 
@@ -568,10 +574,14 @@ func (in IntentionHTTPHeaderPermissions) validate(path *field.Path) field.ErrorL
 		if permission.Present {
 			hdrParts++
 		}
-		hdrParts += numNotEmpty(permission.Exact, permission.Regex, permission.Prefix, permission.Suffix)
+		hdrParts += numNotEmpty(permission.Exact, permission.Regex, permission.Prefix, permission.Suffix, permission.Contains)
 		if hdrParts > 1 {
 			asJson, _ := json.Marshal(in[i])
-			errs = append(errs, field.Invalid(path.Index(i), string(asJson), `at most only one of exact, prefix, suffix, regex, or present may be configured.`))
+			errs = append(errs, field.Invalid(path.Index(i), string(asJson), `at most only one of exact, prefix, suffix, contains, regex, or present may be configured.`))
+		}
+		if permission.IgnoreCase && (permission.Present || permission.Regex != "") {
+			asJson, _ := json.Marshal(in[i])
+			errs = append(errs, field.Invalid(path.Index(i), string(asJson), `should set one of exact, prefix, suffix, or contains when using ignoreCase.`))
 		}
 	}
 	return errs
