@@ -1,4 +1,4 @@
-{{- if and .Values.syncCatalog.purgeServicesOnDisable .Values.global.enablePodSecurityPolicies }}
+{{- if and .Values.syncCatalog.cleanupNodeOnRemoval }}
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:

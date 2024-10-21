@@ -1,5 +1,5 @@
 {{- $syncCatalogEnabled := (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if and (not $syncCatalogEnabled) .Values.syncCatalog.purgeServicesOnDisable }}
+{{- if and (not $syncCatalogEnabled) .Values.syncCatalog.cleanupNodeOnRemoval }}
 apiVersion: batch/v1
 kind: Job
 metadata:

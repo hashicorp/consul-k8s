@@ -1,4 +1,4 @@
-{{- if .Values.syncCatalog.purgeServicesOnDisable }}
+{{- if .Values.syncCatalog.cleanupNodeOnRemoval }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -98,9 +98,7 @@ spec:
             -metrics-port={{ .Values.syncCatalog.metrics.port }} \
             {{- end }}
             -prometheus-retention-time={{ .Values.global.metrics.agentMetricsRetentionTime }} \
-            {{- if .Release.IsUpgrade }}
             -purge-k8s-services-from-node
-            {{- end }}
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
