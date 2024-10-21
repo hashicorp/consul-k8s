@@ -1,5 +1,5 @@
 {{- $syncCatalogEnabled := (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if and (not $syncCatalogEnabled) .Values.syncCatalog.cleanupNodeOnRemoval }}
+{{- if and (not $syncCatalogEnabled) .Values.syncCatalog.cleanupNodeOnRemoval .Release.IsUpgrade }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -27,12 +27,42 @@ spec:
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
         component: sync-catalog-cleanup
+        {{- if .Values.syncCatalog.extraLabels }}
+          {{- toYaml .Values.syncCatalog.extraLabels | nindent 8 }}
+        {{- end }}
         {{- if .Values.global.extraLabels }}
           {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
       annotations:
         "consul.hashicorp.com/connect-inject": "false"
         "consul.hashicorp.com/mesh-inject": "false"
+        {{- if .Values.syncCatalog.annotations }}
+        {{- tpl .Values.syncCatalog.annotations . | nindent 8 }}
+        {{- end }}
+        {{- if (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) }}
+        "vault.hashicorp.com/agent-init-first": "true"
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": {{ .Values.global.secretsBackend.vault.consulCARole }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ template "consul.serverTLSCATemplate" . }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": "{{ .Values.global.secretsBackend.vault.ca.secretName }}"
+        "vault.hashicorp.com/ca-cert": "/vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}"
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.syncCatalog.metrics.enabled | default .Values.global.metrics.enabled }}
+        "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.syncCatalog.annotations | fromYaml) "prometheus.io/path")}}
+        "prometheus.io/path": {{ default "/metrics" .Values.syncCatalog.metrics.path }} 
+        {{- end }}
+        "prometheus.io/port": {{ .Values.syncCatalog.metrics.port | default "20300" | quote }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog-cleanup
@@ -89,6 +119,9 @@ spec:
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}
+            {{- if .Values.syncCatalog.consulNodeName }}
+            -consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
+            {{- end }}
             {{- if .Values.syncCatalog.metrics.enabled | default .Values.global.metrics.enabled }}
             -enable-metrics \
             {{- end }}
@@ -99,12 +132,30 @@ spec:
             -metrics-port={{ .Values.syncCatalog.metrics.port }} \
             {{- end }}
             -prometheus-retention-time={{ .Values.global.metrics.agentMetricsRetentionTime }} \
-            {{- if .Release.IsUpgrade }}
             -purge-k8s-services-from-node
-            {{- end }}
-      {{- if .Values.global.acls.tolerations }}
+        {{- with .Values.syncCatalog.resources }}
+        resources:
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if or (eq (.Values.syncCatalog.metrics.enabled | toString) "-") .Values.syncCatalog.metrics.enabled .Values.global.metrics.enabled }}
+        ports:
+        - name: prometheus
+          containerPort: {{ .Values.syncCatalog.metrics.port | default "20300" | int }}
+        {{- end }}
+      {{- if .Values.syncCatalog.priorityClassName }}
+      priorityClassName: {{ .Values.syncCatalog.priorityClassName | quote }}
+      {{- end }}
+      {{- if .Values.syncCatalog.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.syncCatalog.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.syncCatalog.affinity }}
+      affinity:
+        {{ tpl .Values.syncCatalog.affinity . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.syncCatalog.tolerations }}
       tolerations:
-        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+        {{ tpl .Values.syncCatalog.tolerations . | indent 8 | trim }}
       {{- end }}
       volumes:
       {{- if .Values.global.tls.enabled }}
