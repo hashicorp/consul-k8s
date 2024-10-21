@@ -1,38 +1,32 @@
 {{- $syncCatalogEnabled := (or (and (ne (.Values.syncCatalog.enabled | toString) "-") .Values.syncCatalog.enabled) (and (eq (.Values.syncCatalog.enabled | toString) "-") .Values.global.enabled)) }}
-{{- if $syncCatalogEnabled }}
-{{- template "consul.reservedNamesFailer" (list .Values.syncCatalog.consulNamespaces.consulDestinationNamespace "syncCatalog.consulNamespaces.consulDestinationNamespace") }}
-{{ template "consul.validateRequiredCloudSecretsExist" . }}
-{{ template "consul.validateCloudSecretKeys" . }}
-# The deployment for running the sync-catalog pod
-apiVersion: apps/v1
-kind: Deployment
+{{- if and (not $syncCatalogEnabled) .Values.syncCatalog.cleanupNodeOnRemoval .Release.IsUpgrade }}
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: {{ template "consul.fullname" . }}-sync-catalog
+  name: {{ template "consul.fullname" . }}-sync-catalog-cleanup-on-upgrade
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: sync-catalog
+    component: sync-catalog-cleanup
     {{- if .Values.global.extraLabels }}
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: {{ template "consul.name" . }}
-      chart: {{ template "consul.chart" . }}
-      release: {{ .Release.Name }}
-      component: sync-catalog
   template:
     metadata:
+      name: {{ template "consul.fullname" . }}-sync-catalog-cleanup-on-upgrade
       labels:
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
-        component: sync-catalog
+        component: sync-catalog-cleanup
         {{- if .Values.syncCatalog.extraLabels }}
           {{- toYaml .Values.syncCatalog.extraLabels | nindent 8 }}
         {{- end }}
@@ -70,24 +64,10 @@ spec:
         "prometheus.io/port": {{ .Values.syncCatalog.metrics.port | default "20300" | quote }}
         {{- end }}
     spec:
-      serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog
-      volumes:
-      {{- if .Values.global.tls.enabled }}
-      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
-      - name: consul-ca-cert
-        secret:
-          {{- if .Values.global.tls.caCert.secretName }}
-          secretName: {{ .Values.global.tls.caCert.secretName }}
-          {{- else }}
-          secretName: {{ template "consul.fullname" . }}-ca-cert
-          {{- end }}
-          items:
-          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
-            path: tls.crt
-      {{- end }}
-      {{- end }}
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-sync-catalog-cleanup
       containers:
-      - name: sync-catalog
+      - name: sync-catalog-cleanup-job
         image: "{{ default .Values.global.imageK8S .Values.syncCatalog.image }}"
         {{ template "consul.imagePullPolicy" . }}
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
@@ -136,73 +116,11 @@ spec:
             -log-level={{ default .Values.global.logLevel .Values.syncCatalog.logLevel }} \
             -log-json={{ .Values.global.logJSON }} \
             -k8s-default-sync={{ .Values.syncCatalog.default }} \
-            {{- if (not .Values.syncCatalog.toConsul) }}
-            -to-consul=false \
-            {{- end }}
-            {{- if (not .Values.syncCatalog.toK8S) }}
-            -to-k8s=false \
-            {{- end }}
-            -consul-domain={{ .Values.global.domain }} \
-            {{- if .Values.syncCatalog.k8sPrefix }}
-            -k8s-service-prefix="{{ .Values.syncCatalog.k8sPrefix}}" \
-            {{- end }}
-            {{- if .Values.syncCatalog.k8sSourceNamespace }}
-            -k8s-source-namespace="{{ .Values.syncCatalog.k8sSourceNamespace}}" \
-            {{- end }}
-            {{- range $value := .Values.syncCatalog.k8sAllowNamespaces }}
-            -allow-k8s-namespace="{{ $value }}" \
-            {{- end }}
-            {{- range $value := .Values.syncCatalog.k8sDenyNamespaces }}
-            -deny-k8s-namespace="{{ $value }}" \
-            {{- end }}
-            -k8s-write-namespace=${NAMESPACE} \
-            {{- if (not .Values.syncCatalog.syncClusterIPServices) }}
-            -sync-clusterip-services=false \
-            {{- end }}
-            {{- if .Values.syncCatalog.nodePortSyncType }}
-            -node-port-sync-type={{ .Values.syncCatalog.nodePortSyncType }} \
-            {{- end }}
-            {{- if .Values.syncCatalog.consulWriteInterval }}
-            -consul-write-interval={{ .Values.syncCatalog.consulWriteInterval }} \
-            {{- end }}
-            {{- if .Values.syncCatalog.k8sTag }}
-            -consul-k8s-tag={{ .Values.syncCatalog.k8sTag }} \
-            {{- end }}
-            {{- if .Values.syncCatalog.consulNodeName }}
-            -consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
-            {{- end }}
             {{- if .Values.global.adminPartitions.enabled }}
             -partition={{ .Values.global.adminPartitions.name }} \
             {{- end }}
-            {{- if .Values.syncCatalog.consulPrefix}}
-            -consul-service-prefix="{{ .Values.syncCatalog.consulPrefix}}" \
-            {{- end}}
-            {{- if .Values.syncCatalog.addK8SNamespaceSuffix}}
-            -add-k8s-namespace-suffix \
-            {{- end}}
-            {{- if .Values.global.enableConsulNamespaces }}
-            -enable-namespaces=true \
-            {{- if .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }}
-            -consul-destination-namespace={{ .Values.syncCatalog.consulNamespaces.consulDestinationNamespace }} \
-            {{- end }}
-            {{- if .Values.syncCatalog.consulNamespaces.mirroringK8S }}
-            -enable-k8s-namespace-mirroring=true \
-            {{- if .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }}
-            -k8s-namespace-mirroring-prefix={{ .Values.syncCatalog.consulNamespaces.mirroringK8SPrefix }} \
-            {{- end }}
-            {{- end }}
-            {{- if .Values.global.acls.manageSystemACLs }}
-            -consul-cross-namespace-acl-policy=cross-namespace-policy \
-            {{- end }}
-            {{- end }}
-            {{- if .Values.syncCatalog.ingress.enabled }}
-            -enable-ingress=true \
-            {{- if .Values.syncCatalog.ingress.loadBalancerIPs }}
-            -loadBalancer-ips=true \
-            {{- end }}
-            {{- end }}
-            {{- if .Values.syncCatalog.syncLoadBalancerEndpoints }}
-            -sync-lb-services-endpoints=true \
+            {{- if .Values.syncCatalog.consulNodeName }}
+            -consul-node-name={{ .Values.syncCatalog.consulNodeName }} \
             {{- end }}
             {{- if .Values.syncCatalog.metrics.enabled | default .Values.global.metrics.enabled }}
             -enable-metrics \
@@ -214,26 +132,7 @@ spec:
             -metrics-port={{ .Values.syncCatalog.metrics.port }} \
             {{- end }}
             -prometheus-retention-time={{ .Values.global.metrics.agentMetricsRetentionTime }} \
-        livenessProbe:
-          httpGet:
-            path: /health/ready
-            port: 8080
-            scheme: HTTP
-          failureThreshold: 3
-          initialDelaySeconds: 30
-          periodSeconds: 5
-          successThreshold: 1
-          timeoutSeconds: 5
-        readinessProbe:
-          httpGet:
-            path: /health/ready
-            port: 8080
-            scheme: HTTP
-          failureThreshold: 5
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          successThreshold: 1
-          timeoutSeconds: 5
+            -purge-k8s-services-from-node
         {{- with .Values.syncCatalog.resources }}
         resources:
         {{- toYaml . | nindent 10 }}
@@ -257,5 +156,20 @@ spec:
       {{- if .Values.syncCatalog.tolerations }}
       tolerations:
         {{ tpl .Values.syncCatalog.tolerations . | indent 8 | trim }}
+      {{- end }}
+      volumes:
+      {{- if .Values.global.tls.enabled }}
+      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+      - name: consul-ca-cert
+        secret:
+          {{- if .Values.global.tls.caCert.secretName }}
+          secretName: {{ .Values.global.tls.caCert.secretName }}
+          {{- else }}
+          secretName: {{ template "consul.fullname" . }}-ca-cert
+          {{- end }}
+          items:
+          - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+            path: tls.crt
+      {{- end }}
       {{- end }}
 {{- end }}
