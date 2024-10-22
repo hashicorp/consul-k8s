@@ -19,6 +19,7 @@ import (
 	"github.com/armon/go-metrics/prometheus"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -33,7 +34,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
-	metricsutil "github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -42,27 +42,29 @@ import (
 type Command struct {
 	UI cli.Ui
 
-	flags                     *flag.FlagSet
-	consul                    *flags.ConsulFlags
-	k8s                       *flags.K8SFlags
-	flagListen                string
-	flagToConsul              bool
-	flagToK8S                 bool
-	flagConsulDomain          string
-	flagConsulK8STag          string
-	flagConsulNodeName        string
-	flagK8SDefault            bool
-	flagK8SServicePrefix      string
-	flagConsulServicePrefix   string
-	flagK8SSourceNamespace    string
-	flagK8SWriteNamespace     string
-	flagConsulWritePeriod     time.Duration
-	flagSyncClusterIPServices bool
-	flagSyncLBEndpoints       bool
-	flagNodePortSyncType      string
-	flagAddK8SNamespaceSuffix bool
-	flagLogLevel              string
-	flagLogJSON               bool
+	flags                        *flag.FlagSet
+	consul                       *flags.ConsulFlags
+	k8s                          *flags.K8SFlags
+	flagListen                   string
+	flagToConsul                 bool
+	flagToK8S                    bool
+	flagConsulDomain             string
+	flagConsulK8STag             string
+	flagConsulNodeName           string
+	flagK8SDefault               bool
+	flagK8SServicePrefix         string
+	flagConsulServicePrefix      string
+	flagK8SSourceNamespace       string
+	flagK8SWriteNamespace        string
+	flagConsulWritePeriod        time.Duration
+	flagSyncClusterIPServices    bool
+	flagSyncLBEndpoints          bool
+	flagNodePortSyncType         string
+	flagAddK8SNamespaceSuffix    bool
+	flagLogLevel                 string
+	flagLogJSON                  bool
+	flagPurgeK8SServicesFromNode bool
+	flagFilter                   string
 
 	// Flags to support namespaces
 	flagEnableNamespaces           bool     // Use namespacing on all components
@@ -150,6 +152,11 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+	c.flags.BoolVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", false,
+		"Specifies if services should be purged from the Consul node. If set, all K8S services will be removed from the Consul node.")
+	c.flags.StringVar(&c.flagFilter, "filter", "",
+		"Specifies the expression used to filter the services on the Consul node that will be deregistered. "+
+			"The syntax for this filter is the same as the syntax used in the List Services for Node API in the Consul catalog.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
@@ -267,6 +274,19 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	c.ready = true
+
+	if c.flagPurgeK8SServicesFromNode {
+		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
+		if err != nil {
+			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
+			return 1
+		}
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient); err != nil {
+			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
+			return 1
+		}
+		return 0
+	}
 
 	// Convert allow/deny lists to sets
 	allowSet := flags.ToSet(c.flagAllowK8sNamespacesList)
@@ -436,6 +456,21 @@ func (c *Command) Run(args []string) int {
 	}
 }
 
+// remove all k8s services from Consul.
+func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client) error {
+	_, err := consulClient.Catalog().Deregister(&api.CatalogDeregistration{
+		Node:      c.flagConsulNodeName,
+		Partition: c.consul.Partition,
+	}, nil)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to deregister all K8S services from Consul: %s", err))
+		return err
+	}
+
+	c.UI.Info("All K8S services were deregistered from Consul")
+	return nil
+}
+
 func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {
 	if !c.ready {
 		c.UI.Error("[GET /health/ready] sync catalog controller is not yet ready")
@@ -482,7 +517,7 @@ func (c *Command) validateFlags() error {
 	}
 
 	if c.flagMetricsPort != "" {
-		if _, valid := metricsutil.ParseScrapePort(c.flagMetricsPort); !valid {
+		if _, valid := common.ParseScrapePort(c.flagMetricsPort); !valid {
 			return errors.New("-metrics-port must be a valid unprivileged port number")
 		}
 	}
