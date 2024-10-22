@@ -208,8 +208,6 @@ func (s *ConsulSyncer) Sync(rs []*api.CatalogRegistration) {
 		}
 	}
 
-	//s.serviceNames = serviceNames
-	//s.namespaces = namespaces
 	// Signal that the initial sync is complete and our maps have been populated.
 	// We can now safely reap untracked services.
 	s.initialSyncOnce.Do(func() { close(s.initialSync) })
