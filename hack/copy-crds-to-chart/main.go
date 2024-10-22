@@ -91,12 +91,7 @@ func realMain(helmPath string) error {
 				`    release: {{ .Release.Name }}`,
 				`    component: crd`,
 			}
-			var split int
-			if dir == "bases" {
-				split = 6
-			} else {
-				split = 9
-			}
+			split := findSplit(splitOnNewlines, []string{"metadata", "name"})
 			withLabels := append(splitOnNewlines[0:split], append(labelLines, splitOnNewlines[split:]...)...)
 			contents = strings.Join(withLabels, "\n")
 
@@ -126,6 +121,33 @@ func realMain(helmPath string) error {
 		}
 	}
 	return nil
+}
+
+// findSplit finds the line number immediately following the given yamlPath elements.
+// It assumes the first match of each element is the correct one (i.e. it will not attempt
+// further path traversals after a partial match). This is a quick and dirty substitute for
+// YAML parsing so we can insert content after known fields.
+func findSplit(lines []string, yamlPath []string) int {
+	yamlPathIdx := 0
+	getIndent := func(line string) int {
+		return len(line) - len(strings.TrimLeft(line, " "))
+	}
+	minIndent := getIndent(lines[0])
+	for i, line := range lines {
+		if strings.Contains(line, yamlPath[yamlPathIdx]) &&
+			strings.HasPrefix(line, strings.Repeat(" ", minIndent)) {
+			if yamlPathIdx < len(yamlPath)-1 {
+				yamlPathIdx++
+				// Ensure we don't leave the current search path by increasing the
+				// minimum expected indent to match the next line.
+				minIndent = max(minIndent, getIndent(lines[i+1]))
+			} else {
+				// We found it! Return next line number.
+				return i + 1
+			}
+		}
+	}
+	panic("could not find YAML field: " + strings.Join(yamlPath, "."))
 }
 
 func printf(format string, args ...interface{}) {
