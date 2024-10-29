@@ -47,6 +47,8 @@ const (
 	consulKubernetesCheckName  = "Kubernetes Readiness Check"
 	kubernetesSuccessReasonMsg = "Kubernetes health checks passing"
 	kubernetesFailureReasonMsg = "Kubernetes health checks failing"
+
+	endpointServiceIndexName = "metadata.labels[" + discoveryv1.LabelServiceName + "]"
 )
 
 type NodePortSyncType string
@@ -145,6 +147,10 @@ type ServiceResource struct {
 	// The Consul node name to register service with.
 	ConsulNodeName string
 
+	// endpointsController holds a reference to the serviceEndpointsResource
+	// controller so that we can query its cache on new discovered services.
+	endpointsController *controller.Controller
+
 	// serviceLock must be held for any read/write to these maps.
 	serviceLock sync.RWMutex
 
@@ -239,44 +245,25 @@ func (t *ServiceResource) Upsert(key string, raw interface{}) error {
 	// If we care about endpoints, we should load the associated endpoint slices.
 	if t.shouldTrackEndpoints(key) {
 		allEndpointSlices := make(map[string]*discoveryv1.EndpointSlice)
-		labelSelector := fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, service.Name)
-		continueToken := ""
-		limit := int64(100)
 
-		for {
-			opts := metav1.ListOptions{
-				LabelSelector: labelSelector,
-				Limit:         limit,
-				Continue:      continueToken,
-			}
-			endpointSliceList, err := t.Client.DiscoveryV1().
-				EndpointSlices(service.Namespace).
-				List(t.Ctx, opts)
-
-			if err != nil {
-				t.Log.Warn("error loading endpoint slices list",
-					"key", key,
-					"err", err)
-				break
-			}
-
-			for _, endpointSlice := range endpointSliceList.Items {
+		endpointSliceList, err := t.endpointsController.GetByIndex(endpointServiceIndexName, key)
+		if err != nil {
+			t.Log.Warn("error loading endpoint slices list",
+				"key", key,
+				"err", err)
+		} else {
+			for _, item := range endpointSliceList {
+				endpointSlice := item.(*discoveryv1.EndpointSlice)
 				endptKey := service.Namespace + "/" + endpointSlice.Name
-				allEndpointSlices[endptKey] = &endpointSlice
+				allEndpointSlices[endptKey] = endpointSlice
 			}
 
-			if endpointSliceList.Continue != "" {
-				continueToken = endpointSliceList.Continue
-			} else {
-				break
+			if t.endpointSlicesMap == nil {
+				t.endpointSlicesMap = make(map[string]map[string]*discoveryv1.EndpointSlice)
 			}
+			t.endpointSlicesMap[key] = allEndpointSlices
+			t.Log.Debug("[ServiceResource.Upsert] adding service's endpoint slices to endpointSlicesMap", "key", key, "service", service, "endpointSlices", allEndpointSlices)
 		}
-
-		if t.endpointSlicesMap == nil {
-			t.endpointSlicesMap = make(map[string]map[string]*discoveryv1.EndpointSlice)
-		}
-		t.endpointSlicesMap[key] = allEndpointSlices
-		t.Log.Debug("[ServiceResource.Upsert] adding service's endpoint slices to endpointSlicesMap", "key", key, "service", service, "endpointSlices", allEndpointSlices)
 	}
 
 	// Update the registration and trigger a sync
@@ -316,7 +303,7 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 	t.Log.Info("starting runner for endpoints")
 	// Register a controller for Endpoints which subsequently registers a
 	// controller for the Ingress resource.
-	(&controller.Controller{
+	t.endpointsController = &controller.Controller{
 		Resource: &serviceEndpointsResource{
 			Service: t,
 			Ctx:     t.Ctx,
@@ -329,7 +316,9 @@ func (t *ServiceResource) Run(ch <-chan struct{}) {
 			},
 		},
 		Log: t.Log.Named("controller/service"),
-	}).Run(ch)
+	}
+
+	t.endpointsController.Run(ch)
 }
 
 // shouldSync returns true if resyncing should be enabled for the given service.
@@ -874,7 +863,17 @@ func (t *serviceEndpointsResource) Informer() cache.SharedIndexInformer {
 		},
 		&discoveryv1.EndpointSlice{},
 		0,
-		cache.Indexers{},
+		cache.Indexers{
+			endpointServiceIndexName: func(obj interface{}) ([]string, error) {
+				endpointSlice := obj.(*discoveryv1.EndpointSlice)
+
+				if serviceName, ok := endpointSlice.Labels[discoveryv1.LabelServiceName]; ok {
+					return []string{endpointSlice.Namespace + "/" + serviceName}, nil
+				}
+
+				return nil, nil
+			},
+		},
 	)
 }
 
