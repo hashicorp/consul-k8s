@@ -1,3 +1,21 @@
+## 1.6.1 (November 4, 2023)
+
+SECURITY:
+
+* crd: Add `contains` and `ignoreCase` to the Intentions CRD to support configuring L7 Header intentions resilient to variable casing and multiple header values. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
+* crd: Add `http.incoming.requestNormalization` to the Mesh CRD to support configuring service traffic request normalization. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
+
+IMPROVEMENTS:
+
+* catalog-sync: Added field to helm chart to purge all services registered with catalog-sync from consul on disabling of catalog-sync. [[GH-4378](https://github.com/hashicorp/consul-k8s/issues/4378)]
+
+BUG FIXES:
+
+* api-gateway: `global.imagePullSecrets` are now configured on the `ServiceAccount` for `Gateways`.
+
+Note: the referenced image pull Secret(s) must be present in the same namespace the `Gateway` is deployed to. [[GH-4316](https://github.com/hashicorp/consul-k8s/issues/4316)]
+* helm: fix issue where the API Gateway GatewayClassConfig tolerations can not be parsed by the Helm chart. [[GH-4315](https://github.com/hashicorp/consul-k8s/issues/4315)]
+
 ## 1.6.0 (October 16, 2024)
 
 > NOTE: Consul K8s 1.6.x is compatible with Consul 1.20.x and Consul Dataplane 1.6.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
