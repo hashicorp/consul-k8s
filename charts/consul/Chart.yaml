@@ -3,7 +3,7 @@
 
 apiVersion: v2
 name: consul
-version: 1.4.3-dev
+version: 1.4.8-dev
 appVersion: 1.18-dev
 kubeVersion: ">=1.22.0-0"
 description: Official HashiCorp Consul Chart
@@ -18,7 +18,7 @@ annotations:
     - name: consul
       image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.18-dev
     - name: consul-k8s-control-plane
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.4-dev
+      image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.4.8-dev
     - name: consul-dataplane
       image: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.4-dev
     - name: envoy
