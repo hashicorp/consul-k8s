@@ -272,7 +272,6 @@ func TestRun_ToConsulMirroringNamespaces(t *testing.T) {
 					}
 
 				}
-
 			})
 		})
 	}
@@ -702,6 +701,155 @@ func TestRun_ToConsulNamespacesACLs(t *testing.T) {
 					}
 
 				}
+			})
+		})
+	}
+}
+
+// Test services could be de-registered from Consul.
+func TestRemoveAllK8SServicesFromConsulWithPartitions(t *testing.T) {
+	testCases := map[string]struct {
+		nodeName      string
+		partitionName string
+	}{
+		"default Node name in default partition": {
+			nodeName:      "k8s-sync",
+			partitionName: "default",
+		},
+		"non-default Node name in default partition": {
+			nodeName:      "custom-node",
+			partitionName: "default",
+		},
+		"default Node name in non-default partition": {
+			nodeName:      "k8s-sync",
+			partitionName: "part-1",
+		},
+		"non-default Node name in non-default partition": {
+			nodeName:      "custom-node",
+			partitionName: "part-1",
+		},
+	}
+
+	for name, tc := range testCases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var err error
+
+			k8s, testClient := completeSetup(t)
+			consulClient := testClient.APIClient
+
+			// Create a mock reader to simulate user input
+			// Run the command.
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:        ui,
+				clientset: k8s,
+				logger: hclog.New(&hclog.LoggerOptions{
+					Name:  t.Name(),
+					Level: hclog.Debug,
+				}),
+				flagAllowK8sNamespacesList: []string{"*"},
+				connMgr:                    testClient.Watcher,
+			}
+
+			otherPartitionName := "the-other-one"
+
+			// create another partition and register 2 services there to the same node to show that we won't delete them
+			_, _, err = consulClient.Partitions().Create(context.Background(), &api.Partition{Name: otherPartitionName}, nil)
+			require.NoError(t, err)
+
+			_, err = consulClient.Catalog().Register(
+				&api.CatalogRegistration{
+					Node:    tc.nodeName,
+					Address: "5.5.5.5",
+					Service: &api.AgentService{
+						ID:        "other-service-1",
+						Service:   "other-service-1",
+						Tags:      []string{"other-k8s-cluster"},
+						Meta:      map[string]string{},
+						Port:      0,
+						Address:   "5.5.5.5",
+						Partition: otherPartitionName,
+					},
+					Partition: otherPartitionName,
+				},
+				&api.WriteOptions{Partition: otherPartitionName},
+			)
+			require.NoError(t, err)
+
+			_, err = consulClient.Catalog().Register(
+				&api.CatalogRegistration{
+					Node:    tc.nodeName,
+					Address: "6.6.6.6",
+					Service: &api.AgentService{
+						ID:        "other-service-2",
+						Service:   "other-service-2",
+						Tags:      []string{"other-k8s-cluster"},
+						Meta:      map[string]string{},
+						Port:      0,
+						Address:   "6.6.6.6",
+						Partition: otherPartitionName,
+					},
+					Partition: otherPartitionName,
+				},
+				&api.WriteOptions{Partition: otherPartitionName},
+			)
+			require.NoError(t, err)
+
+			// create partition if it does not exist
+			if tc.partitionName != "default" {
+				p, _, err := consulClient.Partitions().Create(context.Background(), &api.Partition{Name: tc.partitionName}, nil)
+				require.NoError(t, err)
+				require.NotNil(t, p)
+			}
+
+			// create two services in k8s
+			_, err = k8s.CoreV1().Services("bar").Create(context.Background(), lbService("foo", "1.1.1.1"), metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			_, err = k8s.CoreV1().Services("baz").Create(context.Background(), lbService("foo", "2.2.2.2"), metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			longRunningChan := runCommandAsynchronously(&cmd, []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
+				"-consul-write-interval", "100ms",
+				"-partition", tc.partitionName,
+				"-consul-node-name", tc.nodeName,
+				"-add-k8s-namespace-suffix",
+			})
+
+			// check that the two K8s services have been synced into Consul
+			retry.Run(t, func(r *retry.R) {
+				svc, _, err := consulClient.Catalog().Service("foo-bar", "k8s", &api.QueryOptions{Partition: tc.partitionName})
+				require.NoError(r, err)
+				require.Len(r, svc, 1)
+				require.Equal(r, "1.1.1.1", svc[0].ServiceAddress)
+				svc, _, err = consulClient.Catalog().Service("foo-baz", "k8s", &api.QueryOptions{Partition: tc.partitionName})
+				require.NoError(r, err)
+				require.Len(r, svc, 1)
+				require.Equal(r, "2.2.2.2", svc[0].ServiceAddress)
+			})
+
+			defer stopCommand(t, &cmd, longRunningChan)
+
+			exitChan := runCommandAsynchronously(&cmd, []string{
+				"-addresses", "127.0.0.1",
+				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
+				"-purge-k8s-services-from-node=true",
+				"-partition", tc.partitionName,
+				"-consul-node-name", tc.nodeName,
+			})
+			stopCommand(t, &cmd, exitChan)
+
+			retry.Run(t, func(r *retry.R) {
+				serviceList, _, err := consulClient.Catalog().NodeServiceList(tc.nodeName, &api.QueryOptions{AllowStale: false, Partition: tc.partitionName})
+				require.NoError(r, err)
+				require.Len(r, serviceList.Services, 0)
+				otherPartitionServiceList, _, err := consulClient.Catalog().NodeServiceList(tc.nodeName, &api.QueryOptions{AllowStale: false, Partition: otherPartitionName})
+				require.NoError(r, err)
+				require.Len(r, otherPartitionServiceList.Services, 2)
 			})
 		})
 	}
