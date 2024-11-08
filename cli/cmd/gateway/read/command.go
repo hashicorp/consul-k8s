@@ -138,17 +138,76 @@ func (c *Command) fetchCRDs() error {
 	//}
 
 	// Fetch HTTPRoutes that reference the Gateway
-	// TODO Filter to those referencing the Gateway instead of listing all
 	var httpRoutes gwv1beta1.HTTPRouteList
 	if err := c.kubernetes.List(context.Background(), &httpRoutes); err != nil {
 		return fmt.Errorf("error fetching HTTPRoute CRDs: %w", err)
 	}
 
 	// Fetch TCPRoutes that reference the Gateway
-	// TODO Filter to those referencing the Gateway instead of listing all
 	var tcpRoutes gwv1alpha2.TCPRouteList
 	if err := c.kubernetes.List(context.Background(), &tcpRoutes); err != nil {
 		return fmt.Errorf("error fetching TCPRoute CRDs: %w", err)
+	}
+
+	gatewayWithRoutes := struct {
+		Gateway      gwv1beta1.Gateway      `json:"gateway"`
+		GatewayClass gwv1beta1.GatewayClass `json:"gatewayClass"`
+		HTTPRoutes   []gwv1beta1.HTTPRoute  `json:"httpRoutes"`
+		TCPRoutes    []gwv1alpha2.TCPRoute  `json:"tcpRoutes"`
+	}{
+		Gateway:      gateway,
+		GatewayClass: gatewayClass,
+		HTTPRoutes:   make([]gwv1beta1.HTTPRoute, 0, len(httpRoutes.Items)),
+		TCPRoutes:    make([]gwv1alpha2.TCPRoute, 0, len(tcpRoutes.Items)),
+	}
+
+	var orphanedHTTPRoutes []gwv1beta1.HTTPRoute
+	var orphanedTCPRoutes []gwv1alpha2.TCPRoute
+
+nextHTTPRoute:
+	for _, route := range httpRoutes.Items {
+		for _, ref := range route.Spec.ParentRefs {
+			switch {
+			case string(ref.Name) != gateway.Name:
+				// Route parent references gateway with different name
+				c.Log.Warn("Route parent references gateway with different name: %s", ref.Name)
+				continue
+			case ref.Namespace != nil && string(*ref.Namespace) == gateway.Namespace:
+				gatewayWithRoutes.HTTPRoutes = append(gatewayWithRoutes.HTTPRoutes, route)
+				c.Log.Info("Route parent references gateway with same name and namespace", "route", route.Name)
+				break nextHTTPRoute
+			case ref.Namespace == nil && route.Namespace == gateway.Namespace:
+				gatewayWithRoutes.HTTPRoutes = append(gatewayWithRoutes.HTTPRoutes, route)
+				c.Log.Info("Route parent references gateway with same name and no namespace", "route", route.Name)
+				break nextHTTPRoute
+			}
+		}
+
+		// Route had no parent matching gateway
+		orphanedHTTPRoutes = append(orphanedHTTPRoutes, route)
+	}
+
+nextTCPRoute:
+	for _, route := range tcpRoutes.Items {
+		for _, ref := range route.Spec.ParentRefs {
+			switch {
+			case string(ref.Name) != gateway.Name:
+				// Route parent references gateway with different name
+				c.Log.Warn("Route parent references gateway with different name: %s", ref.Name)
+				continue
+			case ref.Namespace != nil && string(*ref.Namespace) == gateway.Namespace:
+				gatewayWithRoutes.TCPRoutes = append(gatewayWithRoutes.TCPRoutes, route)
+				c.Log.Info("Route parent references gateway with same name and namespace", "route", route.Name)
+				break nextTCPRoute
+			case ref.Namespace == nil && route.Namespace == gateway.Namespace:
+				gatewayWithRoutes.TCPRoutes = append(gatewayWithRoutes.TCPRoutes, route)
+				c.Log.Info("Route parent references gateway with same name and no namespace", "route", route.Name)
+				break nextTCPRoute
+			}
+		}
+
+		// Route had no parent matching gateway
+		orphanedTCPRoutes = append(orphanedTCPRoutes, route)
 	}
 
 	//// Fetch MeshServices referenced by HTTPRoutes or TCPRoutes
@@ -159,11 +218,22 @@ func (c *Command) fetchCRDs() error {
 	//}
 	var eg errgroup.Group
 	eg.SetLimit(1)
-	eg.Go(func() error { return writeYamlFile(zipw, "gateway.yaml", gateway) })
-	eg.Go(func() error { return writeYamlFile(zipw, "gatewayclass.yaml", gatewayClass) })
-	//eg.Go(func() error { return writeYamlFile(zipw, "gatewayclassconfig.yaml", gatewayClassConfig) })
-	eg.Go(func() error { return writeYamlFile(zipw, "httproutes.yaml", httpRoutes) })
-	eg.Go(func() error { return writeYamlFile(zipw, "tcproutes.yaml", tcpRoutes) })
+
+	eg.Go(func() error { return writeYamlFile(zipw, c.gatewayName+".yaml", gatewayWithRoutes) })
+
+	if len(orphanedHTTPRoutes) > 0 {
+		eg.Go(func() error { return writeYamlFile(zipw, "orphaned-http-routes.yaml", orphanedHTTPRoutes) })
+	}
+
+	if len(orphanedTCPRoutes) > 0 {
+		eg.Go(func() error { return writeYamlFile(zipw, "orphaned-tcp-routes.yaml", orphanedTCPRoutes) })
+	}
+
+	//eg.Go(func() error { return writeYamlFile(zipw, "gateway.yaml", gateway) })
+	//eg.Go(func() error { return writeYamlFile(zipw, "gatewayclass.yaml", gatewayClass) })
+	////eg.Go(func() error { return writeYamlFile(zipw, "gatewayclassconfig.yaml", gatewayClassConfig) })
+	//eg.Go(func() error { return writeYamlFile(zipw, "httproutes.yaml", httpRoutes) })
+	//eg.Go(func() error { return writeYamlFile(zipw, "tcproutes.yaml", tcpRoutes) })
 	//eg.Go(func() error { return writeYamlFile(zipw, "meshservices.yaml", meshServices) })
 
 	if err := eg.Wait(); err != nil {
