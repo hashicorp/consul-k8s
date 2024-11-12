@@ -4,14 +4,22 @@
 package openshift
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
-	"strconv"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
+	"k8s.io/apimachinery/pkg/types"
+	"log"
+	"net/http"
+	"os/exec"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,67 +44,103 @@ func TestOpenshift_Basic(t *testing.T) {
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t", c.secure)
 		t.Run(name, func(t *testing.T) {
-			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
-			helmValues := map[string]string{
-				"connectInject.enabled":                                                    "true",
-				"connectInject.transparentProxy.defaultEnabled":                            "false",
-				"connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts": "8000",
-				"global.acls.manageSystemACLs":                                             strconv.FormatBool(c.secure),
-				"global.tls.enabled":                                                       strconv.FormatBool(c.secure),
-				"global.tls.enableAutoEncrypt":                                             strconv.FormatBool(c.secure),
-				"global.logLevel":                                                          "trace",
-				"global.openshift.enabled":                                                 "true",
+
+			//namespaceName := helpers.RandomName()
+			//TODO for some reason NewHelmCluster creates consul server pod that runs as root which
+			// isn't allowed in openshift. In order to test openshift properly we have to call helm and k8s directly to bypass
+			// but ideally we would just fix the helper function running the pod as root
+			cmd := exec.Command("helm", "upgrade", "--install", "consul", "hashicorp/consul", "--create-namespace",
+				"--namespace", "consul",
+				"--set", "connectInject.enabled=true",
+				"--set", "connectInject.transparentProxy.defaultEnabled=false",
+				"--set", "connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts=8000",
+				"--set", "global.acls.manageSystemACLs=true",
+				"--set", "global.tls.enabled=true",
+				"--set", "global.tls.enableAutoEncrypt=true",
+				"--set", "global.openshift.enabled=true",
+				"--set", "global.image=docker.mirror.hashicorp.services/hashicorppreview/consul:1.21-dev",
+				"--set", "global.imageK8S=docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.7-dev",
+			)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				log.Fatal(string(output))
+				require.NoError(t, err)
 			}
 
-			releaseName := helpers.RandomName()
-			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-			consulCluster.Create(t)
-
-			// Override the default proxy config settings for this test
-			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
-			_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
-				Kind: api.ProxyDefaults,
-				Name: api.ProxyConfigGlobal,
-				Config: map[string]interface{}{
-					"protocol": "http",
-				},
-			}, nil)
-			require.NoError(t, err)
-
-			logger.Log(t, "creating api-gateway resources")
-			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/openshift/basic")
-			require.NoError(t, err, out)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				// Ignore errors here because if the test ran as expected
-				// the custom resources will have been deleted.
-				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/openshift/basic")
+				cmd := exec.Command("helm", "uninstall", "consul",
+					"--namespace", "consul",
+				)
+				output, err := cmd.CombinedOutput()
+				if err != nil {
+					log.Fatal(string(output))
+				}
+				kubectlCmd := exec.Command("kubectl", "delete", "namespace", "consul")
+
+				output, err = kubectlCmd.CombinedOutput()
+				if err != nil {
+					log.Fatal(string(output))
+					require.NoError(t, err)
+				}
+			})
+			//this is normally called by the environment, but because we have to bypass we have to call it explicitly
+			logf.SetLogger(logr.New(nil))
+			logger.Log(t, "creating api-gateway resources")
+
+			kubectlCmd := exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
+
+			output, err = kubectlCmd.CombinedOutput()
+			if err != nil {
+				log.Fatal(string(output))
+				require.NoError(t, err)
+			}
+
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				kubectlCmd := exec.Command("kubectl", "delete", "-f", "../fixtures/cases/openshift/basic")
+
+				output, err := kubectlCmd.CombinedOutput()
+				if err != nil {
+					log.Fatal(string(output))
+					require.NoError(t, err)
+				}
 			})
 
 			//// Grab a kubernetes client so that we can verify binding
 			//// behavior prior to issuing requests through the gateway.
-			//k8sClient := ctx.ControllerRuntimeClient(t)
+			ctx := suite.Environment().DefaultContext(t)
+			k8sClient := ctx.ControllerRuntimeClient(t)
 			//
 			//// On startup, the controller can take upwards of 1m to perform
 			//// leader election so we may need to wait a long time for
 			//// the reconcile loop to run (hence the timeout here).
-			//var gatewayAddress string
-			//counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
+			var gatewayAddress string
+			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
+			retry.RunWith(counter, t, func(r *retry.R) {
+				var gateway gwv1beta1.Gateway
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "api-gateway", Namespace: "consul"}, &gateway)
+				require.NoError(r, err)
+
+				// check that we have an address to use
+				require.Len(r, gateway.Status.Addresses, 1)
+				// now we know we have an address, set it so we can use it
+				gatewayAddress = gateway.Status.Addresses[0].Value
+			})
+			fmt.Println(gatewayAddress)
 
 			// now that we've satisfied those assertions, we know reconciliation is done
 			// so we can run assertions on the routes and the other objects
 
 			//// finally we check that we can actually route to the service via the gateway
 			//k8sOptions := ctx.KubectlOptions(t)
-			//targetHTTPAddress := fmt.Sprintf("http://%s", gatewayAddress)
-			//targetHTTPSAddress := fmt.Sprintf("https://%s", gatewayAddress)
-			//targetTCPAddress := fmt.Sprintf("http://%s:81", gatewayAddress)
-
-			//// Test that we can make a call to the api gateway
-			//// via the static-client pod. It should route to the static-server pod.
-			//logger.Log(t, "trying calls to api gateway http")
-			//k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetHTTPAddress)
-
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := &http.Client{Transport: tr}
+			targetHTTPSAddress := fmt.Sprintf("https://%s", gatewayAddress)
+			resp, err := client.Get(targetHTTPSAddress)
+			require.NoError(t, err)
+			require.Equal(t, resp.StatusCode, http.StatusOK)
 		})
 	}
 }
