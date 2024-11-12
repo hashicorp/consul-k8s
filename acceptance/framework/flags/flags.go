@@ -6,12 +6,12 @@ package flags
 import (
 	"errors"
 	"flag"
+	"github.com/hashicorp/go-version"
 	"os"
 	"strings"
 	"sync"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
-	"github.com/hashicorp/go-version"
 )
 
 type TestFlags struct {
@@ -57,6 +57,7 @@ type TestFlags struct {
 	flagUseGKE          bool
 	flagUseGKEAutopilot bool
 	flagUseKind         bool
+	flagUseOpenshift    bool
 
 	flagDisablePeering bool
 
@@ -154,6 +155,9 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagUseKind, "use-kind", false,
 		"If true, the tests will assume they are running against a local kind cluster(s).")
 
+	flag.BoolVar(&t.flagUseOpenshift, "use-openshift", false,
+		"If true, the tests will assume they are running against a openshift cluster(s).")
+
 	flag.BoolVar(&t.flagDisablePeering, "disable-peering", false,
 		"If true, the peering tests will not run.")
 
@@ -246,6 +250,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		UseGKE:             t.flagUseGKE,
 		UseGKEAutopilot:    t.flagUseGKEAutopilot,
 		UseKind:            t.flagUseKind,
+		UseOpenshift:       t.flagUseOpenshift,
 	}
 
 	return c
