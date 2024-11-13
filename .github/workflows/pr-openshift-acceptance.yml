@@ -1,0 +1,26 @@
+# Dispatch to the consul-k8s-workflows with a nightly cron
+name: nightly-api-gateway-conformance
+on:
+  pull_request:
+    branches:
+      - main
+
+
+# these should be the only settings that you will ever need to change
+env:
+  BRANCH: ${{ github.ref_name }}
+  CONTEXT: "pr"
+
+jobs:
+  api-gateway-conformance:
+    name: openshift-acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+        name: cloud
+        with:
+          workflow: cloud.yml
+          repo: hashicorp/consul-k8s-workflows
+          ref: openshift-nightly-test
+          token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
