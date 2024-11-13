@@ -1,5 +1,5 @@
 # Dispatch to the consul-k8s-workflows with a nightly cron
-name: nightly-api-gateway-conformance
+name: pr-openshift-acceptance
 on:
   pull_request:
     branches:
