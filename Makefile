@@ -336,7 +336,7 @@ aks-test-packages: ## aks test packages
 
 
 .PHONY: openshift-test-packages
-aks-test-packages: ## openshift test packages
+openshift-test-packages: ## openshift test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/openshift_acceptance_test_packages.yaml"
 
 .PHONY: go-mod-tidy
