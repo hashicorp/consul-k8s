@@ -157,7 +157,7 @@ func (t *TestFlags) init() {
 		"If true, the tests will assume they are running against a local kind cluster(s).")
 
 	flag.BoolVar(&t.flagUseOpenshift, "use-openshift", false,
-		"If true, the tests will assume they are running against a openshift cluster(s).")
+		"If true, the tests will assume they are running against an openshift cluster(s).")
 
 	flag.BoolVar(&t.flagDisablePeering, "disable-peering", false,
 		"If true, the peering tests will not run.")
