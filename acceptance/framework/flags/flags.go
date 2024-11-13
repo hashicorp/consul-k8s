@@ -6,10 +6,11 @@ package flags
 import (
 	"errors"
 	"flag"
-	"github.com/hashicorp/go-version"
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/hashicorp/go-version"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 )
