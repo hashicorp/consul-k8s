@@ -36,7 +36,7 @@ func TestOpenshift_Basic(t *testing.T) {
 	// FUTURE for some reason NewHelmCluster creates a consul server pod that runs as root which
 	//   isn't allowed in OpenShift. In order to test OpenShift properly, we have to call helm and k8s
 	//   directly to bypass. Ideally we would just fix the framework that is running the pod as root.
-	cmd := exec.Command("helm", "upgrade", "--install", "consul", "./charts/consul/",
+	cmd := exec.Command("helm", "upgrade", "--install", "consul", "$GITHUB_WORKSPACE/charts/consul/",
 		"--namespace", "consul", "--create-namespace",
 		"--set", "global.name=consul",
 		"--set", "connectInject.enabled=true",
