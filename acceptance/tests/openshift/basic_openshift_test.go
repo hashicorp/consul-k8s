@@ -32,11 +32,15 @@ import (
 func TestOpenshift_Basic(t *testing.T) {
 	cfg := suite.Config()
 
+	cmd := exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
+	output, err := cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to add hashicorp helm repo: %s", string(output))
+
 	// namespaceName := helpers.RandomName()
 	// FUTURE for some reason NewHelmCluster creates a consul server pod that runs as root which
 	//   isn't allowed in OpenShift. In order to test OpenShift properly, we have to call helm and k8s
 	//   directly to bypass. Ideally we would just fix the framework that is running the pod as root.
-	cmd := exec.Command("helm", "upgrade", "--install", "consul", "$GITHUB_WORKSPACE/charts/consul/",
+	cmd = exec.Command("helm", "upgrade", "--install", "consul", "hashicorp/consul",
 		"--namespace", "consul", "--create-namespace",
 		"--set", "global.name=consul",
 		"--set", "connectInject.enabled=true",
@@ -49,11 +53,8 @@ func TestOpenshift_Basic(t *testing.T) {
 		"--set", "global.image=docker.mirror.hashicorp.services/hashicorppreview/consul:1.21-dev",
 		"--set", "global.imageK8S=docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.7-dev",
 	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Fatal(string(output))
-		require.NoError(t, err)
-	}
+	output, err = cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to install consul: %s", string(output))
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		cmd := exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
