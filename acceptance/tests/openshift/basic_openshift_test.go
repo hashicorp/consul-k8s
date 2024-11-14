@@ -46,12 +46,11 @@ func TestOpenshift_Basic(t *testing.T) {
 		"--set", "global.tls.enabled=true",
 		"--set", "global.tls.enableAutoEncrypt=true",
 		"--set", "global.openshift.enabled=true",
-		"--set", "global.image=docker.mirror.hashicorp.services/hashicorppreview/consul:1.21-dev",
-		"--set", "global.imageK8S=docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.7-dev",
+		"--set", "global.image="+cfg.ConsulImage,
+		"--set", "global.imageK8S="+cfg.ConsulK8SImage,
+		"--set", "global.imageConsulDataplane="+cfg.ConsulDataplaneImage,
 	)
 	output, err = cmd.CombinedOutput()
-	require.NoErrorf(t, err, "failed to install consul: %s", string(output))
-
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		cmd := exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
 		output, err := cmd.CombinedOutput()
@@ -62,19 +61,21 @@ func TestOpenshift_Basic(t *testing.T) {
 		assert.NoErrorf(t, err, "failed to delete namespace: %s", string(output))
 	})
 
+	require.NoErrorf(t, err, "failed to install consul: %s", string(output))
+
 	// this is normally called by the environment, but because we have to bypass we have to call it explicitly
 	logf.SetLogger(logr.New(nil))
 	logger.Log(t, "creating resources for OpenShift test")
 
 	cmd = exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
 	output, err = cmd.CombinedOutput()
-	require.NoErrorf(t, err, "failed to create resources: %s", string(output))
-
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		cmd := exec.Command("kubectl", "delete", "-f", "../fixtures/cases/openshift/basic")
 		output, err := cmd.CombinedOutput()
 		assert.NoErrorf(t, err, "failed to delete resources: %s", string(output))
 	})
+
+	require.NoErrorf(t, err, "failed to create resources: %s", string(output))
 
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
