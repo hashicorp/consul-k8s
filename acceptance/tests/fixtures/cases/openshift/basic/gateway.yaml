@@ -11,5 +11,5 @@ spec:
     port: 443
     tls:
       certificateRefs:
-      - name: consul-server-cert
+      - name: consul-consul-server-cert
         namespace: consul
