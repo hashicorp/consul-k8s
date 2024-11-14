@@ -7,25 +7,21 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"log"
 	"net/http"
 	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
-
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
@@ -36,7 +32,6 @@ func TestOpenshift_Basic(t *testing.T) {
 	output, err := cmd.CombinedOutput()
 	require.NoErrorf(t, err, "failed to add hashicorp helm repo: %s", string(output))
 
-	// namespaceName := helpers.RandomName()
 	// FUTURE for some reason NewHelmCluster creates a consul server pod that runs as root which
 	//   isn't allowed in OpenShift. In order to test OpenShift properly, we have to call helm and k8s
 	//   directly to bypass. Ideally we would just fix the framework that is running the pod as root.
@@ -71,13 +66,9 @@ func TestOpenshift_Basic(t *testing.T) {
 	logf.SetLogger(logr.New(nil))
 	logger.Log(t, "creating resources for OpenShift test")
 
-	kubectlCmd := exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
-
-	output, err = kubectlCmd.CombinedOutput()
-	if err != nil {
-		log.Fatal(string(output))
-		require.NoError(t, err)
-	}
+	cmd = exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
+	output, err = cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to create resources: %s", string(output))
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		cmd := exec.Command("kubectl", "delete", "-f", "../fixtures/cases/openshift/basic")
@@ -114,9 +105,13 @@ func TestOpenshift_Basic(t *testing.T) {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}}
 
-	resp, err := client.Get("https://" + gatewayIP)
-	require.NoError(t, err)
-	assert.Equal(t, resp.StatusCode, http.StatusOK)
+	var resp *http.Response
+	counter = &retry.Counter{Count: 120, Wait: 2 * time.Second}
+	retry.RunWith(counter, t, func(r *retry.R) {
+		resp, err = client.Get("https://" + gatewayIP)
+		require.NoErrorf(r, err, "request to API gateway failed: %s", err)
+		assert.Equalf(r, resp.StatusCode, http.StatusOK, "request to API gateway returned failure code: %d", resp.StatusCode)
+	})
 
 	var body struct {
 		Body          string `json:"body"`
@@ -143,52 +138,4 @@ func TestOpenshift_Basic(t *testing.T) {
 	assert.Equal(t, "Hello World", body.Body)
 	assert.Equal(t, 200, backend.Code)
 	assert.Equal(t, "backend", backend.Name)
-}
-
-func checkStatusCondition(t require.TestingT, conditions []metav1.Condition, toCheck metav1.Condition) {
-	for _, c := range conditions {
-		if c.Type == toCheck.Type {
-			require.EqualValues(t, toCheck.Reason, c.Reason)
-			require.EqualValues(t, toCheck.Status, c.Status)
-			return
-		}
-	}
-
-	t.Errorf("expected condition not found: %s", toCheck.Type)
-}
-
-func trueCondition(conditionType, reason string) metav1.Condition {
-	return metav1.Condition{
-		Type:   conditionType,
-		Reason: reason,
-		Status: metav1.ConditionTrue,
-	}
-}
-
-func falseCondition(conditionType, reason string) metav1.Condition {
-	return metav1.Condition{
-		Type:   conditionType,
-		Reason: reason,
-		Status: metav1.ConditionFalse,
-	}
-}
-
-func checkConsulStatusCondition(t require.TestingT, conditions []api.Condition, toCheck api.Condition) {
-	for _, c := range conditions {
-		if c.Type == toCheck.Type {
-			require.EqualValues(t, toCheck.Reason, c.Reason)
-			require.EqualValues(t, toCheck.Status, c.Status)
-			return
-		}
-	}
-
-	t.Errorf("expected condition not found: %s", toCheck.Type)
-}
-
-func trueConsulCondition(conditionType, reason string) api.Condition {
-	return api.Condition{
-		Type:   conditionType,
-		Reason: reason,
-		Status: "True",
-	}
 }
