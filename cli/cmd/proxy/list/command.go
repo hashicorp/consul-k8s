@@ -7,14 +7,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/posener/complete"
+	"golang.org/x/exp/maps"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -206,66 +209,66 @@ func (c *ListCommand) namespace() string {
 	}
 }
 
-// fetchPods fetches all pods in flagNamespace which run Consul proxies.
+// fetchPods fetches all pods in flagNamespace which run Consul proxies,
+// making sure to return each pod only once even if multiple label selectors may
+// return the same pod. The pods in the resulting list are grouped by proxy type
+// and then sorted by namespace + name within each group.
 func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
-	var pods []v1.Pod
+	var (
+		apiGateways         = make(map[types.NamespacedName]v1.Pod)
+		ingressGateways     = make(map[types.NamespacedName]v1.Pod)
+		meshGateways        = make(map[types.NamespacedName]v1.Pod)
+		terminatingGateways = make(map[types.NamespacedName]v1.Pod)
+		sidecars            = make(map[types.NamespacedName]v1.Pod)
+	)
 
-	// Fetch all pods in the namespace with labels matching the gateway component names.
-	gatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
-		LabelSelector: "component in (api-gateway, ingress-gateway, mesh-gateway, terminating-gateway), chart=consul-helm",
-	})
-	if err != nil {
-		return nil, err
+	// Map target map for each proxy type. Note that some proxy types
+	// require multiple selectors and thus target the same map.
+	proxySelectors := []struct {
+		Target   map[types.NamespacedName]v1.Pod
+		Selector string
+	}{
+		{Target: apiGateways, Selector: "component=api-gateway, gateway.consul.hashicorp.com/managed=true"},
+		{Target: apiGateways, Selector: "api-gateway.consul.hashicorp.com/managed=true"}, // Legacy API gateways
+		{Target: ingressGateways, Selector: "component=ingress-gateway, chart=consul-helm"},
+		{Target: meshGateways, Selector: "component=mesh-gateway, chart=consul-helm"},
+		{Target: terminatingGateways, Selector: "component=terminating-gateway, chart=consul-helm"},
+		{Target: sidecars, Selector: "consul.hashicorp.com/connect-inject-status=injected"},
 	}
-	pods = append(pods, gatewaypods.Items...)
 
-	// Fetch API Gateway pods with deprecated label and append if they aren't already in the list
-	// TODO this block can be deleted if and when we decide we are ok with no longer listing pods of people using previous API Gateway
-	// versions.
-	apigatewaypods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
-		LabelSelector: "api-gateway.consul.hashicorp.com/managed=true",
-	})
+	// Query all proxy types into their appropriate maps.
+	for _, selector := range proxySelectors {
+		pods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
+			LabelSelector: selector.Selector,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	namespacedName := func(pod v1.Pod) string {
-		return pod.Namespace + pod.Name
-	}
-	if err != nil {
-		return nil, err
-	}
-	if len(apigatewaypods.Items) > 0 {
-		//Deduplicated pod list
-		seenPods := map[string]struct{}{}
-		for _, pod := range apigatewaypods.Items {
-			if _, ok := seenPods[namespacedName(pod)]; ok {
-				continue
-			}
-			found := false
-			for _, gatewayPod := range gatewaypods.Items {
-				//note that we already have this pod in the list so we can exit early.
-				seenPods[namespacedName(gatewayPod)] = struct{}{}
-
-				if (namespacedName(gatewayPod)) == namespacedName(pod) {
-					found = true
-					break
-				}
-			}
-			//pod isn't in the list already, we can add it.
-			if !found {
-				pods = append(pods, pod)
-			}
-
+		for _, pod := range pods.Items {
+			name := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
+			selector.Target[name] = pod
 		}
 	}
-	//---
 
-	// Fetch all pods in the namespace with a label indicating they are a service networked by Consul.
-	sidecarpods, err := c.kubernetes.CoreV1().Pods(c.namespace()).List(c.Ctx, metav1.ListOptions{
-		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
-	})
-	if err != nil {
-		return nil, err
+	// Collect all proxies into a single list of Pods, ordered by proxy type.
+	// Within each proxy type subgroup, order by namespace and then name for output readability.
+	var pods []v1.Pod
+	var podSources = []map[types.NamespacedName]v1.Pod{
+		apiGateways, ingressGateways, meshGateways, terminatingGateways, sidecars,
 	}
-	pods = append(pods, sidecarpods.Items...)
+	for _, podSource := range podSources {
+		names := maps.Keys(podSource)
+
+		// Insert Pods ordered by their NamespacedName which amounts to "<namespace>/<name>".
+		sort.SliceStable(names, func(i, j int) bool {
+			return strings.Compare(names[i].String(), names[j].String()) < 0
+		})
+
+		for _, name := range names {
+			pods = append(pods, podSource[name])
+		}
+	}
 
 	return pods, nil
 }
@@ -281,12 +284,6 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		return
 	}
 
-	if c.flagAllNamespaces {
-		c.UI.Output("Namespace: all namespaces\n")
-	} else {
-		c.UI.Output("Namespace: %s\n", c.namespace())
-	}
-
 	var tbl *terminal.Table
 	if c.flagAllNamespaces {
 		tbl = terminal.NewTable("Namespace", "Name", "Type")
@@ -297,7 +294,7 @@ func (c *ListCommand) output(pods []v1.Pod) {
 	for _, pod := range pods {
 		var proxyType string
 
-		// Get the type for ingress, mesh, and terminating gateways.
+		// Get the type for api, ingress, mesh, and terminating gateways + sidecars.
 		switch pod.Labels["component"] {
 		case "api-gateway":
 			proxyType = "API Gateway"
@@ -333,6 +330,10 @@ func (c *ListCommand) output(pods []v1.Pod) {
 			c.UI.Output(string(jsonSt))
 		}
 	} else {
+		if !c.flagAllNamespaces {
+			c.UI.Output("Namespace: %s\n", c.namespace())
+		}
+
 		c.UI.Table(tbl)
 	}
 

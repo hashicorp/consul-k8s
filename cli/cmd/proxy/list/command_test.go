@@ -6,15 +6,13 @@ package list
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +20,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
 
 func TestFlagParsing(t *testing.T) {
@@ -229,6 +231,9 @@ func TestFetchPods(t *testing.T) {
 	}
 }
 
+// TestListCommandOutput tests the output of the list command. The output must
+// contain the expected regular expressions and not contain the not expected
+// regular expressions.
 func TestListCommandOutput(t *testing.T) {
 	// These regular expressions must be present in the output.
 	expected := []string{
@@ -340,11 +345,10 @@ func TestListCommandOutput(t *testing.T) {
 	}
 }
 
+// TestListCommandOutputInJsonFormat tests the output of the list command when
+// the output format is set to JSON. The proxies must be presented in the appropriate
+// order and format.
 func TestListCommandOutputInJsonFormat(t *testing.T) {
-	// These regular expressions must be present in the output.
-	expected := ".*Name.*api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*both-labels-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*mesh-gateway.*\n.*Namespace.*consul.*\n.*Type.*Mesh Gateway.*\n.*\n.*\n.*Name.*terminating-gateway.*\n.*Namespace.*consul.*\n.*Type.*Terminating Gateway.*\n.*\n.*\n.*Name.*ingress-gateway.*\n.*Namespace.*default.*\n.*Type.*Ingress Gateway.*\n.*\n.*\n.*Name.*deprecated-api-gateway.*\n.*Namespace.*consul.*\n.*Type.*API Gateway.*\n.*\n.*\n.*Name.*pod1.*\n.*Namespace.*default.*\n.*Type.*Sidecar.*"
-	notExpected := "default.*dont-fetch.*Sidecar"
-
 	pods := []v1.Pod{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -381,8 +385,8 @@ func TestListCommandOutputInJsonFormat(t *testing.T) {
 				Name:      "api-gateway",
 				Namespace: "consul",
 				Labels: map[string]string{
-					"component": "api-gateway",
-					"chart":     "consul-helm",
+					"component":                            "api-gateway",
+					"gateway.consul.hashicorp.com/managed": "true",
 				},
 			},
 		},
@@ -432,12 +436,21 @@ func TestListCommandOutputInJsonFormat(t *testing.T) {
 	out := c.Run([]string{"-A", "-o", "json"})
 	require.Equal(t, 0, out)
 
-	actual := buf.String()
-
-	require.Regexp(t, expected, actual)
-	for _, expression := range notExpected {
-		require.NotRegexp(t, expression, actual)
+	var actual []struct {
+		Name      string `json:"Name"`
+		Namespace string `json:"Namespace"`
+		Type      string `json:"Type"`
 	}
+	require.NoErrorf(t, json.Unmarshal(buf.Bytes(), &actual), "failed to parse json output: %s", buf.String())
+
+	require.Len(t, actual, 7)
+	assert.Equal(t, "api-gateway", actual[0].Name)
+	assert.Equal(t, "both-labels-api-gateway", actual[1].Name)
+	assert.Equal(t, "deprecated-api-gateway", actual[2].Name)
+	assert.Equal(t, "ingress-gateway", actual[3].Name)
+	assert.Equal(t, "mesh-gateway", actual[4].Name)
+	assert.Equal(t, "terminating-gateway", actual[5].Name)
+	assert.Equal(t, "pod1", actual[6].Name)
 }
 
 func TestNoPodsFound(t *testing.T) {
