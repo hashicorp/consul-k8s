@@ -3,6 +3,7 @@ package read
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -32,6 +33,7 @@ type Command struct {
 	flagGatewayNamespace string
 	flagKubeConfig       string
 	flagKubeContext      string
+	flagOutput           string
 
 	gatewayName string
 
@@ -57,6 +59,13 @@ func (c *Command) init() {
 		Target:  &c.flagGatewayNamespace,
 		Usage:   "The namespace of the Gateway to read",
 		Aliases: []string{"n"},
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    "output",
+		Target:  &c.flagOutput,
+		Usage:   "Output the Envoy configuration as 'table', 'json', or 'raw'.",
+		Default: "archive",
+		Aliases: []string{"o"},
 	})
 
 	f = c.set.NewSet("Global Options")
@@ -94,7 +103,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	c.gatewayName = args[0]
-	c.UI.Output("Reading Gateway CRDs: %s/%s", c.flagGatewayNamespace, c.gatewayName)
 
 	if err := c.initKubernetes(); err != nil {
 		c.UI.Output(err.Error(), terminal.WithErrorStyle())
@@ -141,14 +149,12 @@ func (c *Command) fetchCRDs() error {
 	if err := c.kubernetes.List(context.Background(), &httpRoutes); err != nil {
 		return fmt.Errorf("error fetching HTTPRoute CRDs: %w", err)
 	}
-	c.Log.Info(fmt.Sprintf("Found %d http routes total", len(httpRoutes.Items)))
 
 	// Fetch TCPRoutes that reference the Gateway
 	var tcpRoutes gwv1alpha2.TCPRouteList
 	if err := c.kubernetes.List(context.Background(), &tcpRoutes); err != nil {
 		return fmt.Errorf("error fetching TCPRoute CRDs: %w", err)
 	}
-	c.Log.Info(fmt.Sprintf("Found %d tcp routes total", len(tcpRoutes.Items)))
 
 	// Fetch MeshServices referenced by HTTPRoutes or TCPRoutes
 	// FUTURE Filter to those referenced by HTTPRoutes or TCPRoutes instead of listing all
@@ -201,14 +207,32 @@ func (c *Command) fetchCRDs() error {
 		}
 	}
 
-	if err := writeYamlFile(zipw, c.gatewayName+".yaml", gatewayWithRoutes); err != nil {
-		return fmt.Errorf("error writing CRDs to zip archive: %w", err)
+	switch strings.ToLower(c.flagOutput) {
+	case "json":
+		if err := c.writeJSONOutput(gatewayWithRoutes); err != nil {
+			return fmt.Errorf("error writing CRDs as JSON: %w", err)
+		}
+	default:
+		if err := c.writeArchive(zipw, c.gatewayName+".yaml", gatewayWithRoutes); err != nil {
+			return fmt.Errorf("error writing CRDs to zip archive: %w", err)
+		}
+		return zipw.Close()
 	}
 
-	return zipw.Close()
+	return nil
 }
 
-func writeYamlFile(zipw *zip.Writer, name string, obj interface{}) error {
+func (c *Command) writeJSONOutput(obj interface{}) error {
+	output, err := json.MarshalIndent(obj, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	c.UI.Output(string(output))
+	return nil
+}
+
+func (c *Command) writeArchive(zipw *zip.Writer, name string, obj interface{}) error {
 	w, err := zipw.Create(name)
 	if err != nil {
 		return fmt.Errorf("error creating zip entry for %s: %w", name, err)
@@ -223,6 +247,8 @@ func writeYamlFile(zipw *zip.Writer, name string, obj interface{}) error {
 	if err != nil {
 		return fmt.Errorf("error writing %s to zip archive: %w", name, err)
 	}
+
+	c.UI.Output("Wrote to zip archive " + name)
 
 	return nil
 }
