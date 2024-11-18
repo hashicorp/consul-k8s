@@ -284,12 +284,6 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		return
 	}
 
-	if c.flagAllNamespaces {
-		c.UI.Output("Namespace: all namespaces\n")
-	} else {
-		c.UI.Output("Namespace: %s\n", c.namespace())
-	}
-
 	var tbl *terminal.Table
 	if c.flagAllNamespaces {
 		tbl = terminal.NewTable("Namespace", "Name", "Type")
@@ -336,6 +330,10 @@ func (c *ListCommand) output(pods []v1.Pod) {
 			c.UI.Output(string(jsonSt))
 		}
 	} else {
+		if !c.flagAllNamespaces {
+			c.UI.Output("Namespace: %s\n", c.namespace())
+		}
+
 		c.UI.Table(tbl)
 	}
 
