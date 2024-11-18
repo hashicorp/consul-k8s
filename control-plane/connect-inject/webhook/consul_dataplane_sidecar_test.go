@@ -219,7 +219,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			}
 			require.Equal(t, expectedProbe, container.ReadinessProbe)
 			require.Nil(t, container.StartupProbe)
-			require.Len(t, container.Env, 9)
+			require.Len(t, container.Env, 10)
 			require.Equal(t, container.Env[0].Name, "TMPDIR")
 			require.Equal(t, container.Env[0].Value, "/consul/connect-inject")
 			require.Equal(t, container.Env[2].Name, "DP_SERVICE_NODE_NAME")
@@ -233,6 +233,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.Equal(t, container.Env[7].Value, "pod=$(POD_NAMESPACE)/$(POD_NAME)")
 			require.Equal(t, container.Env[8].Name, "DP_CREDENTIAL_LOGIN_META2")
 			require.Equal(t, container.Env[8].Value, "pod-uid=$(POD_UID)")
+			require.Equal(t, container.Env[9].Name, "HOST_IP")
 		})
 	}
 }
