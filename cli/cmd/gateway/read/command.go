@@ -42,7 +42,8 @@ type Command struct {
 }
 
 func (c *Command) Help() string {
-	return "TODO"
+	c.initOnce.Do(c.init)
+	return fmt.Sprintf("%s\n\nUsage: consul-k8s gateway read <gateway-name> [flags]\n\n%s", c.Synopsis(), c.help)
 }
 
 func (c *Command) Synopsis() string {
@@ -63,7 +64,7 @@ func (c *Command) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    "output",
 		Target:  &c.flagOutput,
-		Usage:   "Output the Envoy configuration as 'table', 'json', or 'raw'.",
+		Usage:   "Output the Gateway configuration as 'json' or 'archive'.",
 		Default: "archive",
 		Aliases: []string{"o"},
 	})
