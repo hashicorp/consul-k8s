@@ -119,14 +119,6 @@ func (c *Command) Run(args []string) int {
 }
 
 func (c *Command) fetchCRDs() error {
-	file, err := os.Create(fmt.Sprintf("./%s.zip", c.gatewayName))
-	if err != nil {
-		return fmt.Errorf("error creating output file: %w", err)
-	}
-
-	zipw := zip.NewWriter(file)
-	defer zipw.Close()
-
 	// Fetch Gateway
 	var gateway gwv1beta1.Gateway
 	if err := c.kubernetes.Get(context.Background(), client.ObjectKey{Namespace: c.flagGatewayNamespace, Name: c.gatewayName}, &gateway); err != nil {
@@ -214,6 +206,14 @@ func (c *Command) fetchCRDs() error {
 			return fmt.Errorf("error writing CRDs as JSON: %w", err)
 		}
 	default:
+		file, err := os.Create(fmt.Sprintf("./%s.zip", c.gatewayName))
+		if err != nil {
+			return fmt.Errorf("error creating output file: %w", err)
+		}
+
+		zipw := zip.NewWriter(file)
+		defer zipw.Close()
+
 		if err := c.writeArchive(zipw, c.gatewayName+".yaml", gatewayWithRoutes); err != nil {
 			return fmt.Errorf("error writing CRDs to zip archive: %w", err)
 		}
