@@ -131,7 +131,8 @@ func (c *Command) fetchCRDs() error {
 		return fmt.Errorf("error fetching GatewayClass CRD: %w", err)
 	}
 
-	//// Fetch GatewayClassConfig referenced by GatewayClass
+	// FUTURE Fetch GatewayClassConfig referenced by GatewayClass
+	// This import requires resolving hairy dependency discrepancies between modules in this repo
 	//var gatewayClassConfig v1alpha1.GatewayClassConfig
 	//if err := c.kubernetes.Get(context.Background(), client.ObjectKey{Namespace: "", Name: gatewayClass.Spec.ParametersRef.Name}, &gatewayClassConfig); err != nil {
 	//	return fmt.Errorf("error fetching GatewayClassConfig CRD: %w", err)
@@ -149,8 +150,8 @@ func (c *Command) fetchCRDs() error {
 		return fmt.Errorf("error fetching TCPRoute CRDs: %w", err)
 	}
 
-	// Fetch MeshServices referenced by HTTPRoutes or TCPRoutes
-	// FUTURE Filter to those referenced by HTTPRoutes or TCPRoutes instead of listing all
+	// FUTURE Fetch MeshServices referenced by HTTPRoutes or TCPRoutes
+	// This import requires resolving hairy dependency discrepancies between modules in this repo
 	// var meshServices v1alpha1.MeshServiceList
 	// if err := c.kubernetes.List(context.Background(), &meshServices); err != nil {
 	//   return fmt.Errorf("error fetching MeshService CRDs: %w", err)
@@ -280,15 +281,17 @@ func (c *Command) initKubernetes() (err error) {
 		if c.kubernetes, err = client.New(c.restConfig, client.Options{}); err != nil {
 			return fmt.Errorf("error creating controller-runtime client: %w", err)
 		}
-		// TODO Fix dependency issues introduced by registering v1alpha1
-		// _ = v1alpha1.AddToScheme(c.kubernetes.Scheme())
+		// FUTURE Fix dependency discrepancies between modules in this repo so that this scheme can be added (see above)
+		//_ = v1alpha1.AddToScheme(c.kubernetes.Scheme())
 		_ = gwv1alpha2.AddToScheme(c.kubernetes.Scheme())
 		_ = gwv1beta1.AddToScheme(c.kubernetes.Scheme())
 	}
 
 	// If no namespace was specified, use the one from the kube context
 	if c.flagGatewayNamespace == "" {
-		c.UI.Output("No namespace specified, using current kube context namespace: %s", settings.Namespace())
+		if c.flagOutput != "json" {
+			c.UI.Output("No namespace specified, using current kube context namespace: %s", settings.Namespace())
+		}
 		c.flagGatewayNamespace = settings.Namespace()
 	}
 
