@@ -47,7 +47,7 @@ func (c *Command) Help() string {
 }
 
 func (c *Command) Synopsis() string {
-	return "TODO"
+	return "Inspect the configuration for a given Gateway."
 }
 
 // init establishes the flags for Command
@@ -64,7 +64,7 @@ func (c *Command) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    "output",
 		Target:  &c.flagOutput,
-		Usage:   "Output the Gateway configuration as 'json' or 'archive'.",
+		Usage:   "Output the Gateway configuration as 'json' in the terminal or 'archive' as a zip archive in the current directory named after the Gateway.",
 		Default: "archive",
 		Aliases: []string{"o"},
 	})
