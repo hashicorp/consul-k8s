@@ -1,0 +1,3 @@
+```release-note:enhancement
+cli: Introduce `gateway read` for collecting multiple components of a gateway's configuration by running a single command.
+```
