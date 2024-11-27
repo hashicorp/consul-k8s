@@ -917,7 +917,31 @@ func TestInjectRules(t *testing.T) {
   }`,
 		},
 		{
-			EnableNamespaces: true,
+			EnableNamespaces: false,
+			EnablePartitions: true,
+			EnablePeering:    false,
+			PartitionName:    "part-1",
+			Expected: `
+partition "part-1" {
+  mesh = "write"
+  acl = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+    policy = "write"
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+}`,
+		},
+		{
+			EnableNamespaces: false,
 			EnablePartitions: false,
 			EnablePeering:    true,
 			Expected: `
@@ -928,7 +952,6 @@ func TestInjectRules(t *testing.T) {
   node_prefix "" {
     policy = "write"
   }
-  namespace_prefix "" {
     acl = "write"
     service_prefix "" {
       policy = "write"
@@ -937,8 +960,7 @@ func TestInjectRules(t *testing.T) {
     identity_prefix "" {
       policy = "write"
       intentions = "write"
-    }
-  }`,
+    }`,
 		},
 		{
 			EnableNamespaces: true,
@@ -964,6 +986,55 @@ partition "part-1" {
       intentions = "write"
     }
   }
+}`,
+		},
+		{
+			EnableNamespaces: true,
+			EnablePartitions: false,
+			EnablePeering:    true,
+			Expected: `
+  mesh = "write"
+  operator = "write"
+  acl = "write"
+  peering = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+  namespace_prefix "" {
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+  }`,
+		},
+		{
+			EnableNamespaces: false,
+			EnablePartitions: true,
+			EnablePeering:    true,
+			PartitionName:    "part-1",
+			Expected: `
+partition "part-1" {
+  mesh = "write"
+  acl = "write"
+  peering = "write"
+  node_prefix "" {
+    policy = "write"
+  }
+    policy = "write"
+    acl = "write"
+    service_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
+    identity_prefix "" {
+      policy = "write"
+      intentions = "write"
+    }
 }`,
 		},
 		{
