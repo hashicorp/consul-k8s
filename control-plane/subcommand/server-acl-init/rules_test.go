@@ -960,7 +960,6 @@ func TestInjectRules(t *testing.T) {
   node_prefix "" {
     policy = "write"
   }
-    acl = "write"
     service_prefix "" {
       policy = "write"
       intentions = "write"
@@ -1006,7 +1005,6 @@ partition "part-1" {
     policy = "write"
   }
     policy = "write"
-    acl = "write"
     service_prefix "" {
       policy = "write"
       intentions = "write"
@@ -1029,7 +1027,6 @@ partition "part-1" {
   node_prefix "" {
     policy = "write"
   }
-    acl = "write"
     service_prefix "" {
       policy = "write"
       intentions = "write"
@@ -1052,8 +1049,8 @@ partition "part-1" {
     policy = "write"
   }
   namespace_prefix "" {
-    policy = "write"
     acl = "write"
+    policy = "write"
     service_prefix "" {
       policy = "write"
       intentions = "write"
@@ -1103,7 +1100,6 @@ partition "part-1" {
     policy = "write"
   }
     policy = "write"
-    acl = "write"
     service_prefix "" {
       policy = "write"
       intentions = "write"
@@ -1128,8 +1124,8 @@ partition "part-1" {
     policy = "write"
   }
   namespace_prefix "" {
-    policy = "write"
     acl = "write"
+    policy = "write"
     service_prefix "" {
       policy = "write"
       intentions = "write"
