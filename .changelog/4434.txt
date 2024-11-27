@@ -1,0 +1,3 @@
+```release-note:bug
+connect-inject: fix issue where the ACL policy for the connect-injector included the `acl = "write"` rule twice when namespaces were not enabled.
+```
