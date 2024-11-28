@@ -58,7 +58,7 @@ func (c *Command) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    "namespace",
 		Target:  &c.flagGatewayNamespace,
-		Usage:   "The namespace of the Gateway to read",
+		Usage:   "The Kubernetes namespace of the Gateway to read",
 		Aliases: []string{"n"},
 	})
 	f.StringVar(&flag.StringVar{
