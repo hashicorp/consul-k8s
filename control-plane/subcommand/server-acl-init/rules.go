@@ -342,11 +342,11 @@ partition "{{ .PartitionName }}" {
   }
 {{- if .EnableNamespaces }}
   namespace_prefix "" {
+    acl = "write"
 {{- end }}
 {{- if .EnablePartitions }}
     policy = "write"
 {{- end }}
-    acl = "write"
     service_prefix "" {
       policy = "write"
       intentions = "write"
