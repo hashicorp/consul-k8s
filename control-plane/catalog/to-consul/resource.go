@@ -649,18 +649,37 @@ func (t *ServiceResource) generateRegistrations(key string) {
 					expectedType = corev1.NodeExternalIP
 				}
 
-				for _, endpointAddr := range endpoint.Addresses {
+				// Find the ip address for the node and
+				// create the Consul service using it
+				var found bool
+				for _, address := range node.Status.Addresses {
+					if address.Type == expectedType {
+						found = true
+						r := baseNode
+						rs := baseService
+						r.Service = &rs
+						r.Service.ID = fmt.Sprintf("_k8s-node-%s-%s", endpoint.NodeName, r.Service.Service)
+						r.Service.Address = address.Address
 
-					// Find the ip address for the node and
-					// create the Consul service using it
-					var found bool
+						t.consulMap[key] = append(t.consulMap[key], &r)
+						// Only consider the first address that matches. In some cases
+						// there will be multiple addresses like when using AWS CNI.
+						// In those cases, Kubernetes will ensure eth0 is always the first
+						// address in the list.
+						// See https://github.com/kubernetes/kubernetes/blob/b559434c02f903dbcd46ee7d6c78b216d3f0aca0/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1462-L1464
+						break
+					}
+				}
+
+				// If an ExternalIP wasn't found, and ExternalFirst is set,
+				// use an InternalIP
+				if t.NodePortSync == ExternalFirst && !found {
 					for _, address := range node.Status.Addresses {
-						if address.Type == expectedType {
-							found = true
+						if address.Type == corev1.NodeInternalIP {
 							r := baseNode
 							rs := baseService
 							r.Service = &rs
-							r.Service.ID = serviceID(r.Service.Service, endpointAddr)
+							r.Service.ID = fmt.Sprintf("_k8s-node-%s-%s", endpoint.NodeName, r.Service.Service)
 							r.Service.Address = address.Address
 
 							t.consulMap[key] = append(t.consulMap[key], &r)
@@ -670,28 +689,6 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							// address in the list.
 							// See https://github.com/kubernetes/kubernetes/blob/b559434c02f903dbcd46ee7d6c78b216d3f0aca0/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1462-L1464
 							break
-						}
-					}
-
-					// If an ExternalIP wasn't found, and ExternalFirst is set,
-					// use an InternalIP
-					if t.NodePortSync == ExternalFirst && !found {
-						for _, address := range node.Status.Addresses {
-							if address.Type == corev1.NodeInternalIP {
-								r := baseNode
-								rs := baseService
-								r.Service = &rs
-								r.Service.ID = serviceID(r.Service.Service, endpointAddr)
-								r.Service.Address = address.Address
-
-								t.consulMap[key] = append(t.consulMap[key], &r)
-								// Only consider the first address that matches. In some cases
-								// there will be multiple addresses like when using AWS CNI.
-								// In those cases, Kubernetes will ensure eth0 is always the first
-								// address in the list.
-								// See https://github.com/kubernetes/kubernetes/blob/b559434c02f903dbcd46ee7d6c78b216d3f0aca0/staging/src/k8s.io/legacy-cloud-providers/aws/aws.go#L1462-L1464
-								break
-							}
 						}
 					}
 				}
@@ -775,7 +772,8 @@ func (t *ServiceResource) registerServiceInstance(
 				r := baseNode
 				rs := baseService
 				r.Service = &rs
-				r.Service.ID = serviceID(r.Service.Service, addr)
+				var podServiceId = fmt.Sprintf("_k8s-pod-%s-%s", endpoint.TargetRef.UID, r.Service.Service)
+				r.Service.ID = podServiceId
 				r.Service.Address = addr
 				r.Service.Port = epPort
 				r.Service.Meta = make(map[string]string)
@@ -796,11 +794,11 @@ func (t *ServiceResource) registerServiceInstance(
 				}
 
 				r.Check = &consulapi.AgentCheck{
-					CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, addr)),
+					CheckID:   consulHealthCheckID(endpointSlice.Namespace, podServiceId),
 					Name:      consulKubernetesCheckName,
 					Namespace: baseService.Namespace,
 					Type:      consulKubernetesCheckType,
-					ServiceID: serviceID(r.Service.Service, addr),
+					ServiceID: podServiceId,
 				}
 
 				// Consider endpoint health state for registered consul service
