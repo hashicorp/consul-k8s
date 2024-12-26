@@ -13,7 +13,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul/troubleshoot v0.7.1
+	github.com/hashicorp/consul/troubleshoot v0.7.4
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/hcp-sdk-go v0.62.1-0.20230913154003-cf69c0370c54
 	github.com/kr/text v0.2.0
@@ -101,8 +101,8 @@ require (
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 // indirect
-	github.com/hashicorp/consul/api v1.30.0 // indirect
-	github.com/hashicorp/consul/envoyextensions v0.7.3 // indirect
+	github.com/hashicorp/consul/api v1.31.0 // indirect
+	github.com/hashicorp/consul/envoyextensions v0.7.7 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
