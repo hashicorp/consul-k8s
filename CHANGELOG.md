@@ -1,3 +1,15 @@
+## 1.6.2 (January 7, 2025)
+
+IMPROVEMENTS:
+
+* cli: Introduce `gateway list` for collecting multiple components of all gateways' configuration by running a single command. [[GH-4433](https://github.com/hashicorp/consul-k8s/issues/4433)]
+* cli: Introduce `gateway read` for collecting multiple components of a gateway's configuration by running a single command. [[GH-4432](https://github.com/hashicorp/consul-k8s/issues/4432)]
+
+BUG FIXES:
+
+* cli: fix issue where the `consul-k8s proxy list` command does not include API gateways. [[GH-4426](https://github.com/hashicorp/consul-k8s/issues/4426)]
+* connect-inject: fix issue where the ACL policy for the connect-injector included the `acl = "write"` rule twice when namespaces were not enabled. [[GH-4434](https://github.com/hashicorp/consul-k8s/issues/4434)]
+
 ## 1.6.1 (November 4, 2023)
 
 SECURITY:
