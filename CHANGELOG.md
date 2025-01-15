@@ -1,3 +1,9 @@
+## 1.1.18 (January 15, 2025)
+
+SECURITY:
+
+* updated golang.org/x/net dependency to 0.34.0 to fix vulnerability [[GO-2024-3333](https://pkg.go.dev/vuln/GO-2024-3333)] in CLI, CNI, acceptance and control-plane submodule.[[PR-4459](https://github.com/hashicorp/consul-k8s/pull/4459)]
+
 ## 1.1.17 (November 4, 2023)
 
 SECURITY:
