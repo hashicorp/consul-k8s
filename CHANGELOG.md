@@ -7,7 +7,7 @@ BUG FIXES:
 
 SECURITY:
 
-* updated golang.org/x/net dependency to 0.34.0 to fix vulnerability [[GO-2024-3333](https://pkg.go.dev/vuln/GO-2024-3333)] in CLI, CNI, acceptance and control-plane submodule.[[PR-4452](https://github.com/hashicorp/consul-k8s/pull/4452)]
+* updated golang.org/x/net dependency to 0.34.0 to fix vulnerability [[GO-2024-3333](https://pkg.go.dev/vuln/GO-2024-3333)] in CLI, CNI, acceptance and control-plane submodule.[[PR-4458](https://github.com/hashicorp/consul-k8s/pull/4458)]
 
 
 ## 1.4.7 (November 4, 2023)
