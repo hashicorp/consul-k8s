@@ -27,6 +27,8 @@ const (
 	// create-federation-secret commands and so lives in this common package.
 	ACLReplicationTokenName = "acl-replication"
 
+	DatadogAgentTokenName = "datadog-agent-metrics"
+
 	// ACLTokenSecretKey is the key that we store the ACL tokens in when we
 	// create Kubernetes secrets.
 	ACLTokenSecretKey = "token"

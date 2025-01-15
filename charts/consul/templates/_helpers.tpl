@@ -168,6 +168,29 @@ is passed to consul as a -config-file param on command line.
 {{- end -}}
 
 {{/*
+Cleanup server.extraConfig entries to avoid conflicting entries:
+    - server.enableAgentDebug:
+      - `enable_debug` should not exist in extraConfig
+    - metrics.disableAgentHostName:
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `disable_hostname` should not exist in extraConfig
+    - metrics.enableHostMetrics:
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `enable_host_metrics` should not exist in extraConfig
+    - metrics.prefixFilter
+      - if global.metrics.enabled and global.metrics.enableAgentMetrics are enabled, `prefix_filter` should not exist in extraConfig
+    - metrics.datadog.enabled:
+      - if global.metrics.datadog.enabled and global.metrics.datadog.dogstatsd.enabled, `dogstatsd_tags` and `dogstatsd_addr` should not exist in extraConfig
+
+Usage: {{ template "consul.validateExtraConfig" . }}
+*/}}
+{{- define "consul.validateExtraConfig" -}}
+{{- if (contains "enable_debug" .Values.server.extraConfig) }}{{ fail "The enable_debug key is present in extra-from-values.json. Use server.enableAgentDebug to set this value." }}{{- end }}
+{{- if (contains "disable_hostname" .Values.server.extraConfig) }}{{ fail "The disable_hostname key is present in extra-from-values.json. Use global.metrics.disableAgentHostName to set this value." }}{{- end }}
+{{- if (contains "enable_host_metrics" .Values.server.extraConfig) }}{{ fail "The enable_host_metrics key is present in extra-from-values.json. Use global.metrics.enableHostMetrics to set this value." }}{{- end }}
+{{- if (contains "prefix_filter" .Values.server.extraConfig) }}{{ fail "The prefix_filter key is present in extra-from-values.json. Use global.metrics.prefix_filter to set this value." }}{{- end }}
+{{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}{{- if (contains "dogstatsd_tags" .Values.server.extraConfig) }}{{ fail "The dogstatsd_tags key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsdTags to set this value." }}{{- end }}{{- end }}{{- if (and .Values.global.metrics.datadog.dogstatsd.enabled) }}{{- if (contains "dogstatsd_addr" .Values.server.extraConfig) }}{{ fail "The dogstatsd_addr key is present in extra-from-values.json. Use global.metrics.datadog.dogstatsd.dogstatsd_addr to set this value." }}{{- end }}{{- end }}{{- end }}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "consul.chart" -}}
@@ -376,7 +399,7 @@ Consul server environment variables for consul-k8s commands.
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
-  value: "true" 
+  value: "true"
 {{- end }}
 {{- end -}}
 
@@ -407,7 +430,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
 {{- define "consul.validateCloudSecretKeys" -}}
-{{- if and .Values.global.cloud.enabled }} 
+{{- if and .Values.global.cloud.enabled }}
 {{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
 {{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
 {{- end }}
@@ -483,3 +506,147 @@ Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
 {{- end }}
 
 {{/**/}}
+
+{{/*
+Validation for Consul Metrics configuration:
+
+Fail if metrics.enabled=true and metrics.disableAgentHostName=true, but metrics.enableAgentMetrics=false
+    - metrics.enabled = true
+    - metrics.enableAgentMetrics = false
+    - metrics.disableAgentHostName = true
+
+Fail if metrics.enableAgentMetrics=true and metrics.disableAgentHostName=true, but metrics.enabled=false
+    - metrics.enabled = false
+    - metrics.enableAgentMetrics = true
+    - metrics.disableAgentHostName = true
+
+Fail if metrics.enabled=true and metrics.enableHostMetrics=true, but metrics.enableAgentMetrics=false
+    - metrics.enabled = true
+    - metrics.enableAgentMetrics = false
+    - metrics.enableHostMetrics = true
+
+Fail if metrics.enableAgentMetrics=true and metrics.enableHostMetrics=true, but metrics.enabled=false
+    - metrics.enabled = false
+    - metrics.enableAgentMetrics = true
+    - metrics.enableHostMetrics = true
+
+Usage: {{ template "consul.validateMetricsConfig" . }}
+
+*/}}
+
+{{- define "consul.validateMetricsConfig" -}}
+{{- if and (not .Values.global.metrics.enableAgentMetrics) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enabled )}}
+{{fail "When enabling metrics (global.metrics.enabled) and disabling hostname emission from metrics (global.metrics.disableAgentHostName), global.metrics.enableAgentMetrics must be set to true"}}
+{{- end }}
+{{- if and (not .Values.global.metrics) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enableAgentMetrics )}}
+{{fail "When enabling Consul agent metrics (global.metrics.enableAgentMetrics) and disabling hostname emission from metrics (global.metrics.disableAgentHostName), global metrics enablement (global.metrics.enabled) must be set to true"}}
+{{- end }}
+{{- if and (not .Values.global.metrics.enableAgentMetrics) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enabled )}}
+{{fail "When disabling hostname emission from metrics (global.metrics.disableAgentHostName) and enabling global metrics (global.metrics.enabled), Consul agent metrics must be enabled(global.metrics.enableAgentMetrics=true)"}}
+{{- end }}
+{{- if and (not .Values.global.metrics.enabled) (and .Values.global.metrics.disableAgentHostName .Values.global.metrics.enableAgentMetrics)}}
+{{fail "When enabling Consul agent metrics (global.metrics.enableAgentMetrics) and disabling hostname metrics emission (global.metrics.disableAgentHostName), global metrics must be enabled (global.metrics.enabled)."}}
+{{- end }}
+{{- end -}}
+
+{{/*
+Validation for Consul Datadog Integration deployment:
+
+Fail if Datadog integration enabled and Consul server agent telemetry is not enabled.
+    - global.metrics.datadog.enabled=true
+    - global.metrics.enableAgentMetrics=false || global.metrics.enabled=false
+
+Fail if Consul OpenMetrics (Prometheus) and DogStatsD metrics are both enabled and configured.
+    - global.metrics.datadog.dogstatsd.enabled (scrapes `/v1/agent/metrics?format=prometheus` via the `use_prometheus_endpoint` option)
+    - global.metrics.datadog.openMetricsPrometheus.enabled (scrapes `/v1/agent/metrics?format=prometheus`)
+    - see https://docs.datadoghq.com/integrations/consul/?tab=host#host for recommendation to not have both
+
+Fail if Datadog OTLP forwarding is enabled and Consul Telemetry Collection is not enabled.
+    - global.metrics.datadog.otlp.enabled=true
+    - telemetryCollector.enabled=false
+
+Fail if Consul Open Telemetry collector forwarding protocol is not one of either "http" or "grpc"
+    - global.metrics.datadog.otlp.protocol!="http" || global.metrics.datadog.otlp.protocol!="grpc"
+
+Usage: {{ template "consul.validateDatadogConfiguration" . }}
+
+*/}}
+
+{{- define "consul.validateDatadogConfiguration" -}}
+{{- if and .Values.global.metrics.datadog.enabled (or (not .Values.global.metrics.enableAgentMetrics) (not .Values.global.metrics.enabled) )}}
+{{fail "When enabling datadog metrics collection, the /v1/agent/metrics is required to be accessible, therefore global.metrics.enableAgentMetrics and global.metrics.enabled must be also be enabled."}}
+{{- end }}
+{{- if and .Values.global.metrics.datadog.dogstatsd.enabled .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+{{fail "You must have one of DogStatsD (global.metrics.datadog.dogstatsd.enabled) or OpenMetrics (global.metrics.datadog.openMetricsPrometheus.enabled) enabled, not both as this is an unsupported configuration." }}
+{{- end }}
+{{- if and .Values.global.metrics.datadog.otlp.enabled (not .Values.telemetryCollector.enabled) }}
+{{fail "Cannot enable Datadog OTLP metrics collection (global.metrics.datadog.otlp.enabled) without consul-telemetry-collector. Ensure Consul OTLP collection is enabled (telemetryCollector.enabled) and configured." }}
+{{- end }}
+{{- if and (ne ( lower .Values.global.metrics.datadog.otlp.protocol) "http") (ne ( lower .Values.global.metrics.datadog.otlp.protocol) "grpc") }}
+{{fail "Valid values for global.metrics.datadog.otlp.protocol must be one of either \"http\" or \"grpc\"." }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Sets the dogstatsd_addr field of the agent configuration dependent on the
+socket transport type being used:
+  - "UDS" (Unix Domain Socket): prefixes "unix://" to URL and appends path to socket (i.e., unix:///var/run/datadog/dsd.socket)
+  - "UDP" (User Datagram Protocol): adds no prefix and appends dogstatsd port number to hostname/IP (i.e., 172.20.180.10:8125)
+- global.metrics.enableDatadogIntegration.dogstatsd configuration
+
+Usage: {{ template "consul.dogstatsdAaddressInfo" . }}
+*/}}
+
+{{- define "consul.dogstatsdAaddressInfo" -}}
+{{- if (and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled) }}
+        "dogstatsd_addr": "{{- if eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" }}unix://{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr }}{{- else }}{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}{{- if ne ( .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | int ) 0 }}:{{ .Values.global.metrics.datadog.dogstatsd.dogstatsdPort | toString }}{{- end }}{{- end }}",{{- end }}
+{{- end -}}
+
+{{/*
+Configures the metrics prefixing that's required to either allow or dissallow certaing RPC or gRPC server calls:
+
+Usage: {{ template "consul.prefixFilter" . }}
+*/}}
+{{- define "consul.prefixFilter" -}}
+{{- $allowList := .Values.global.metrics.prefixFilter.allowList }}
+{{- $blockList := .Values.global.metrics.prefixFilter.blockList }}
+{{- if and (not (empty $allowList)) (not (empty $blockList)) }}
+        "prefix_filter": [{{- range $index, $value := concat $allowList $blockList -}}
+    "{{- if (has $value $allowList) }}{{ printf "+%s" ($value | trimAll "\"") }}{{- else }}{{ printf "-%s" ($value | trimAll "\"") }}{{- end }}"{{- if lt $index (sub (len (concat $allowList $blockList)) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- else if not (empty $allowList) }}
+        "prefix_filter": [{{- range $index, $value := $allowList -}}
+    "{{ printf "+%s" ($value | trimAll "\"") }}"{{- if lt $index (sub (len $allowList) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- else if not (empty $blockList) }}
+        "prefix_filter": [{{- range $index, $value := $blockList -}}
+    "{{ printf "-%s" ($value | trimAll "\"") }}"{{- if lt $index (sub (len $blockList) 1) -}},{{- end -}}
+  {{- end -}}],
+{{- end }}
+{{- end -}}
+
+{{/*
+Retrieves the global consul/consul-enterprise version string for use with labels or tags.
+Requirements for valid labels:
+ -  a valid label must be an empty string or consist of
+    =>  alphanumeric characters
+    =>  '-', '_' or '.'
+    =>  must start and end with an alphanumeric character
+        (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is
+        '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')
+
+Usage: {{ template "consul.versionInfo" }}
+*/}}
+{{- define "consul.versionInfo" -}}
+{{- $imageVersion := regexSplit ":" .Values.global.image -1 }}
+{{- $versionInfo := printf "%s" (index $imageVersion 1 ) | trimSuffix "\"" }}
+{{- $sanitizedVersion := "" }}
+{{- $pattern := "^([A-Za-z0-9][-A-Za-z0-9_.]*[A-Za-z0-9])?$" }}
+{{- if not (regexMatch $pattern $versionInfo) -}}
+    {{- $sanitizedVersion = regexReplaceAll "[^A-Za-z0-9-_.]|sha256" $versionInfo "" }}
+    {{- $sanitizedVersion = printf "%s" (trimSuffix "-" (trimPrefix "-" $sanitizedVersion)) -}}
+{{- else }}
+    {{- $sanitizedVersion = $versionInfo }}
+{{- end -}}
+{{- printf "%s" $sanitizedVersion | quote }}
+{{- end -}}

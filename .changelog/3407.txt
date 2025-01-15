@@ -1,0 +1,13 @@
+```release-note:feature
+helm: introduces `global.metrics.datadog` overrides to streamline consul-k8s datadog integration.
+helm: introduces `server.enableAgentDebug` to expose agent [`enable_debug`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#enable_debug) configuration.
+helm: introduces `global.metrics.disableAgentHostName` to expose agent [`telemetry.disable_hostname`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-disable_hostname) configuration.
+helm: introduces `global.metrics.enableHostMetrics` to expose agent [`telemetry.enable_host_metrics`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-enable_host_metrics) configuration.
+helm: introduces `global.metrics.prefixFilter` to expose agent [`telemetry.prefix_filter`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-prefix_filter) configuration.
+helm: introduces `global.metrics.datadog.dogstatsd.dogstatsdAddr` to expose agent [`telemetry.dogstatsd_addr`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-dogstatsd_addr) configuration.
+helm: introduces `global.metrics.datadog.dogstatsd.dogstatsdTags` to expose agent [`telemetry.dogstatsd_tags`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#telemetry-dogstatsd_tags) configuration.
+helm: introduces required `ad.datadoghq.com/` annotations and `tags.datadoghq.com/` labels for integration with [Datadog Autodiscovery](https://docs.datadoghq.com/integrations/consul/?tab=containerized) and [Datadog Unified Service Tagging](https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging/?tab=kubernetes#serverless-environment) for Consul.
+helm: introduces automated unix domain socket hostPath mounting for containerized integration with datadog within consul-server statefulset.
+helm: introduces `global.metrics.datadog.otlp` override options to allow OTLP metrics forwarding to Datadog Agent.
+control-plane: adds `server-acl-init` datadog agent token creation for datadog integration.
+```

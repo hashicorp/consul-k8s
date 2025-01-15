@@ -175,6 +175,14 @@ func TestRun_TokensPrimaryDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
 			LocalToken:  false,
 		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token"},
+			PolicyDCs:   []string{"dc1"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -324,6 +332,14 @@ func TestRun_TokensReplicatedDC(t *testing.T) {
 			SecretNames: []string{resourcePrefix + "-enterprise-license-acl-token"},
 			LocalToken:  true,
 		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token-dc2"},
+			PolicyDCs:   []string{"dc2"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
+			LocalToken:  true,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
@@ -399,6 +415,12 @@ func TestRun_TokensWithProvidedBootstrapToken(t *testing.T) {
 			TokenFlags:  []string{"-create-acl-replication-token"},
 			PolicyNames: []string{"acl-replication-token"},
 			SecretNames: []string{resourcePrefix + "-acl-replication-acl-token"},
+		},
+		{
+			TestName:    "Datadog Agent Token",
+			TokenFlags:  []string{"-create-dd-agent-token"},
+			PolicyNames: []string{"datadog-agent-metrics-token"},
+			SecretNames: []string{resourcePrefix + "-datadog-agent-metrics-acl-token"},
 		},
 	}
 	for _, c := range cases {

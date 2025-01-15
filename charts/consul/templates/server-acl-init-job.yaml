@@ -268,6 +268,10 @@ spec:
             -create-enterprise-license-token=true \
             {{- end }}
 
+            {{- if (and (not .Values.global.metrics.datadog.dogstatsd.enabled) .Values.global.metrics.datadog.enabled .Values.global.acls.manageSystemACLs) }}
+            -create-dd-agent-token=true \
+            {{- end }}
+
             {{- if .Values.server.snapshotAgent.enabled }}
             -snapshot-agent=true \
             {{- end }}

@@ -19,6 +19,9 @@
 {{- end -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
 {{ template "consul.validateCloudSecretKeys" . }}
+{{ template "consul.validateMetricsConfig" . }}
+{{ template "consul.validateDatadogConfiguration" . }}
+{{ template "consul.validateExtraConfig" . }}
 # StatefulSet to run the actual Consul server cluster.
 apiVersion: apps/v1
 kind: StatefulSet
@@ -62,6 +65,11 @@ spec:
         release: {{ .Release.Name }}
         component: server
         hasDNS: "true"
+        {{- if .Values.global.metrics.datadog.enabled }}
+        "tags.datadoghq.com/version": {{ template "consul.versionInfo" . }}
+        "tags.datadoghq.com/env": {{ template "consul.name" . }}
+        "tags.datadoghq.com/service": "consul-server"
+        {{- end }}
         {{- if .Values.server.extraLabels }}
           {{- toYaml .Values.server.extraLabels | nindent 8 }}
         {{- end }}
@@ -123,6 +131,7 @@ spec:
           {{- tpl .Values.server.annotations . | nindent 8 }}
         {{- end }}
         {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+        {{- if not .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
         "prometheus.io/scrape": "true"
         "prometheus.io/path": "/v1/agent/metrics"
         {{- if .Values.global.tls.enabled }}
@@ -131,6 +140,67 @@ spec:
         {{- else }}
         "prometheus.io/port": "8500"
         "prometheus.io/scheme": "http"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.metrics.datadog.enabled }}
+        "ad.datadoghq.com/tolerate-unready": "true"
+        "ad.datadoghq.com/consul.logs": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson | replace "[" "[{" | replace "]" "}]" | replace ":" "\": \"" | join "\",\"" | squote }}
+        {{- if .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+        "ad.datadoghq.com/consul.checks": |
+          {
+            "openmetrics": {
+              "init_config": {},
+              "instances": [
+                {
+        {{- if .Values.global.tls.enabled }}
+                  "openmetrics_endpoint": "https://consul-server.{{ .Release.Namespace }}.svc:8501/v1/agent/metrics?format=prometheus",
+                  "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
+                  "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
+                  "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
+        {{- else }}
+                  "openmetrics_endpoint": "http://consul-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
+        {{- end }}
+        {{- if ( .Values.global.acls.manageSystemACLs) }}
+                  "headers": {
+                    "X-Consul-Token": "ENC[k8s_secret@{{ .Release.Namespace }}/{{ .Release.Namespace }}-datadog-agent-metrics-acl-token/token]"
+                  },
+        {{- end }}
+                  "namespace": "{{ .Release.Namespace }}",
+                  "metrics": [ ".*" ]
+                }
+              ]
+            }
+          }
+        {{- else if (not .Values.global.metrics.datadog.dogstatsd.enabled) }}
+        "ad.datadoghq.com/consul.checks": |
+          {
+            "consul": {
+              "init_config": {},
+              "instances": [
+                {
+        {{- if .Values.global.tls.enabled }}
+                  "url": "https://consul-server.{{ .Release.Namespace }}.svc:8501",
+                  "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
+                  "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
+                  "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
+        {{- else }}
+                  "url": "http://consul-server.consul.svc:8500",
+        {{- end }}
+                  "use_prometheus_endpoint": true,
+        {{- if ( .Values.global.acls.manageSystemACLs) }}
+                  "acl_token": "ENC[k8s_secret@{{ .Release.Namespace }}/{{ .Release.Namespace }}-datadog-agent-metrics-acl-token/token]",
+        {{- end }}
+                  "new_leader_checks": true,
+                  "network_latency_checks": true,
+                  "catalog_checks": true,
+                  "auth_type": "basic"
+                }
+              ]
+            }
+          }
+        {{- else }}
+        "ad.datadoghq.com/consul.metrics_exclude": "true"
+        {{- end }}
         {{- end }}
         {{- end }}
     spec:
@@ -217,6 +287,12 @@ spec:
         - name: trusted-cas
           emptyDir:
             medium: "Memory"
+        {{- end }}
+        {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
+        - name: dsdsocket
+          hostPath:
+            path: /var/run/datadog
+            type: DirectoryOrCreate
         {{- end }}
         {{- range .Values.server.extraVolumes }}
         - name: userconfig-{{ .name }}
@@ -431,6 +507,11 @@ spec:
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
             - name: consul-license
               mountPath: /consul/license
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
+            - name: dsdsocket
+              mountPath: /var/run/datadog
               readOnly: true
             {{- end }}
             {{- range .Values.server.extraVolumes }}
