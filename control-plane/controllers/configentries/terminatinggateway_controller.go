@@ -61,6 +61,7 @@ var (
 	servicePolicyRulesTpl = `
 {{- if .EnablePartitions }}
 partition "{{.Partition}}" {
+{{- end }}
 {{- if .EnableNamespaces }}
   namespace "{{.Namespace}}" {
 {{- end }}
@@ -71,6 +72,7 @@ partition "{{.Partition}}" {
 {{- if .EnableNamespaces }}
   }
 {{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
@@ -79,6 +81,7 @@ partition "{{.Partition}}" {
 	wildcardPolicyRulesTpl = `
 {{- if .EnablePartitions }}
 partition "{{.Partition}}" {
+{{- end }}
 {{- if .EnableNamespaces }}
   namespace "{{.Namespace}}" {
 {{- end }}
@@ -89,6 +92,7 @@ partition "{{.Partition}}" {
 {{- if .EnableNamespaces }}
   }
 {{- end }}
+{{- if .EnablePartitions }}
 }
 {{- end }}
 `
