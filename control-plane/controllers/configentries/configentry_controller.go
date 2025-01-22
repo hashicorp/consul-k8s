@@ -90,6 +90,10 @@ type ConfigEntryController struct {
 	// `k8s-default` namespace.
 	NSMirroringPrefix string
 
+	// ConsulPartition indicates the Consul Admin Partition name the controller is
+	// operating in. Adds this value as metadata on managed resources.
+	ConsulPartition string
+
 	// CrossNSACLPolicy is the name of the ACL policy to attach to
 	// any created Consul namespaces to allow cross namespace service discovery.
 	// Only necessary if ACLs are enabled.
