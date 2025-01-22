@@ -36,6 +36,7 @@ type TerminatingGatewayController struct {
 	FinalizerPatcher
 
 	NamespacesEnabled bool
+	PartitionsEnabled bool
 
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
@@ -49,33 +50,45 @@ func init() {
 
 type templateArgs struct {
 	Namespace        string
+	Partition        string
 	ServiceName      string
 	EnableNamespaces bool
+	EnablePartitions bool
 }
 
 var (
 	servicePolicyTpl      *template.Template
 	servicePolicyRulesTpl = `
+{{- if .EnablePartitions }}
+partition "{{.Partition}}" {
 {{- if .EnableNamespaces }}
-namespace "{{.Namespace}}" {
+  namespace "{{.Namespace}}" {
 {{- end }}
-  service "{{.ServiceName}}" {
-    policy = "write"
-  }
+    service "{{.ServiceName}}" {
+      policy    = "write"
+      intention = "read"
+    }
 {{- if .EnableNamespaces }}
+  }
+{{- end }}
 }
 {{- end }}
 `
 
 	wildcardPolicyTpl      *template.Template
 	wildcardPolicyRulesTpl = `
+{{- if .EnablePartitions }}
+partition "{{.Partition}}" {
 {{- if .EnableNamespaces }}
-namespace "{{.Namespace}}" {
+  namespace "{{.Namespace}}" {
 {{- end }}
-  service_prefix "" {
-    policy = "write"
-  }
+    service_prefix "" {
+      policy    = "write"
+      intention = "read"
+    }
 {{- if .EnableNamespaces }}
+  }
+{{- end }}
 }
 {{- end }}
 `
@@ -165,13 +178,21 @@ func (r *TerminatingGatewayController) aclsEnabled() (bool, error) {
 	return state.Token != "", nil
 }
 
+func (r *TerminatingGatewayController) partitionsEnabled() (bool, error) {
+	state, err := r.ConfigEntryController.ConsulServerConnMgr.State()
+	if err != nil {
+		return false, err
+	}
+	return state.Token != "", nil
+}
+
 func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consulv1alpha1.TerminatingGateway) error {
-	client, err := consul.NewClientFromConnMgr(r.ConfigEntryController.ConsulClientConfig, r.ConfigEntryController.ConsulServerConnMgr)
+	connMgrClient, err := consul.NewClientFromConnMgr(r.ConfigEntryController.ConsulClientConfig, r.ConfigEntryController.ConsulServerConnMgr)
 	if err != nil {
 		return err
 	}
 
-	roles, _, err := client.ACL().RoleList(nil)
+	roles, _, err := connMgrClient.ACL().RoleList(nil)
 	if err != nil {
 		return err
 	}
@@ -189,7 +210,7 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		return errors.New("terminating gateway role not found")
 	}
 
-	terminatingGatewayRole, _, err := client.ACL().RoleRead(terminatingGatewayRoleID, nil)
+	terminatingGatewayRole, _, err := connMgrClient.ACL().RoleRead(terminatingGatewayRoleID, nil)
 	if err != nil {
 		return err
 	}
@@ -214,7 +235,7 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 	}
 
 	if termGW.ObjectMeta.DeletionTimestamp.IsZero() {
-		termGWPoliciesToKeep, termGWPoliciesToRemove, err = r.handleModificationForPolicies(log, client, existingTermGWPolicies, termGW.Spec.Services)
+		termGWPoliciesToKeep, termGWPoliciesToRemove, err = r.handleModificationForPolicies(log, connMgrClient, existingTermGWPolicies, termGW.Spec.Services)
 		if err != nil {
 			return err
 		}
@@ -225,12 +246,12 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 	termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
 	terminatingGatewayRole.Policies = termGWPoliciesToKeep
 
-	_, _, err = client.ACL().RoleUpdate(terminatingGatewayRole, nil)
+	_, _, err = connMgrClient.ACL().RoleUpdate(terminatingGatewayRole, nil)
 	if err != nil {
 		return err
 	}
 
-	err = r.conditionallyDeletePolicies(log, client, termGWPoliciesToRemove, termGW.Name)
+	err = r.conditionallyDeletePolicies(log, connMgrClient, termGWPoliciesToRemove, termGW.Name)
 	if err != nil {
 		return err
 	}
@@ -264,7 +285,9 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 			var data bytes.Buffer
 			if err := policyTemplate.Execute(&data, templateArgs{
 				EnableNamespaces: r.NamespacesEnabled,
+				EnablePartitions: r.PartitionsEnabled,
 				Namespace:        defaultIfEmpty(service.Namespace),
+				Partition:        defaultIfEmpty(r.ConfigEntryController.ConsulPartition),
 				ServiceName:      service.Name,
 			}); err != nil {
 				// just panic if we can't compile the simple template
