@@ -9,10 +9,14 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
+	pbcatalog "github.com/hashicorp/consul/proto-public/pbcatalog/v2beta1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
@@ -69,6 +73,20 @@ func PortValue(pod corev1.Pod, value string) (int32, error) {
 	return int32(raw), err
 }
 
+// WorkloadPortName returns the container port's name if it has one, and if not, constructs a name from the port number
+// and adds a constant prefix. The port name must be 1-15 characters and must have at least 1 alpha character.
+func WorkloadPortName(port *corev1.ContainerPort) string {
+	name := port.Name
+	var isNum bool
+	if _, err := strconv.Atoi(name); err == nil {
+		isNum = true
+	}
+	if name == "" || isNum {
+		name = constants.UnnamedWorkloadPortNamePrefix + strconv.Itoa(int(port.ContainerPort))
+	}
+	return name
+}
+
 // TransparentProxyEnabled returns true if transparent proxy should be enabled for this pod.
 // It returns an error when the annotation value cannot be parsed by strconv.ParseBool or if we are unable
 // to read the pod's namespace label when it exists.
@@ -117,6 +135,85 @@ func ShouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 
 func ConsulNodeNameFromK8sNode(nodeName string) string {
 	return fmt.Sprintf("%s-virtual", nodeName)
+}
+
+// ********************
+// V2 Exclusive Common Code
+// ********************
+
+// ToProtoAny is a convenience function for converting proto.Message values to anypb.Any without error handling.
+// This should _only_ be used in cases where a nil or valid proto.Message value is _guaranteed_, else it will panic.
+// If the type of m is *anypb.Any, that value will be returned unmodified.
+func ToProtoAny(m proto.Message) *anypb.Any {
+	switch v := m.(type) {
+	case nil:
+		return nil
+	case *anypb.Any:
+		return v
+	}
+	a, err := anypb.New(m)
+	if err != nil {
+		panic(fmt.Errorf("unexpected error: failed to convert proto message to anypb.Any: %w", err))
+	}
+	return a
+}
+
+// GetPortProtocol matches the Kubernetes EndpointPort.AppProtocol or ServicePort.AppProtocol (*string) to a supported
+// Consul catalog port protocol. If nil or unrecognized, the default of `PROTOCOL_UNSPECIFIED` is returned.
+func GetPortProtocol(appProtocol *string) pbcatalog.Protocol {
+	if appProtocol == nil {
+		return pbcatalog.Protocol_PROTOCOL_UNSPECIFIED
+	}
+	switch *appProtocol {
+	case "tcp":
+		return pbcatalog.Protocol_PROTOCOL_TCP
+	case "http":
+		return pbcatalog.Protocol_PROTOCOL_HTTP
+	case "http2":
+		return pbcatalog.Protocol_PROTOCOL_HTTP2
+	case "grpc":
+		return pbcatalog.Protocol_PROTOCOL_GRPC
+	}
+	// If unrecognized or empty string, return default
+	return pbcatalog.Protocol_PROTOCOL_UNSPECIFIED
+}
+
+// PortValueFromIntOrString returns the integer port value from the port that can be
+// a named port, an integer string (e.g. "80"), or an integer. If the port is a named port,
+// this function will attempt to find the value from the containers of the pod.
+func PortValueFromIntOrString(pod corev1.Pod, port intstr.IntOrString) (uint32, error) {
+	if port.Type == intstr.Int {
+		return uint32(port.IntValue()), nil
+	}
+
+	// Otherwise, find named port or try to parse the string as an int.
+	portVal, err := PortValue(pod, port.StrVal)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(portVal), nil
+}
+
+// HasBeenMeshInjected checks the value of the status annotation and returns true if the Pod has been injected.
+// Does not apply to V1 pods, which use a different key (`constants.KeyInjectStatus`).
+func HasBeenMeshInjected(pod corev1.Pod) bool {
+	if pod.Annotations == nil {
+		return false
+	}
+	if anno, ok := pod.Annotations[constants.KeyMeshInjectStatus]; ok && anno == constants.Injected {
+		return true
+	}
+	return false
+}
+
+func IsGateway(pod corev1.Pod) bool {
+	if pod.Annotations == nil {
+		return false
+	}
+	if anno, ok := pod.Annotations[constants.AnnotationGatewayKind]; ok && anno != "" {
+		return true
+	}
+	return false
 }
 
 // ConsulNamespaceIsNotFound checks the gRPC error code and message to determine

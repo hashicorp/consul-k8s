@@ -333,6 +333,29 @@ webhooks:
       resources:
         - samenessgroups
   sideEffects: None
+{{- if (mustHas "resource-apis" .Values.global.experiments) }}
+- admissionReviewVersions:
+    - v1beta1
+    - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v2beta1-trafficpermissions
+  failurePolicy: Fail
+  name: mutate-trafficpermissions.auth.consul.hashicorp.com
+  rules:
+    - apiGroups:
+        - auth.consul.hashicorp.com
+      apiVersions:
+        - v2beta1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - trafficpermissions
+  sideEffects: None
+{{- end }}
 {{- end }}
 - admissionReviewVersions:
   - v1beta1

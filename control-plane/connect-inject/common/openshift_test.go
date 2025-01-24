@@ -4,13 +4,13 @@ package common
 
 import (
 	"fmt"
+	"k8s.io/utils/ptr"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
 )
 
 func TestGetConnectInitIDs(t *testing.T) {

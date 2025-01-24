@@ -32,11 +32,6 @@ metadata:
     {{- if .Values.global.extraLabels }}
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
-  {{- if .Values.global.argocd.enabled }}
-  annotations:
-    "argocd.argoproj.io/hook": "Sync"
-    "argocd.argoproj.io/hook-delete-policy": "HookSucceeded"
-  {{- end }}
 spec:
   template:
     metadata:
@@ -55,7 +50,12 @@ spec:
         {{- if .Values.global.acls.annotations }}
           {{- tpl .Values.global.acls.annotations . | nindent 8 }}
         {{- end }}
+        {{- if .Values.global.argocd.enabled }}
+        "argocd.argoproj.io/hook": "Sync"
+        "argocd.argoproj.io/hook-delete-policy": "HookSucceeded"
+        {{- end }}
         {{- if .Values.global.secretsBackend.vault.enabled }}
+
         {{- /* Run the Vault agent as both an init container and sidecar.
         The Vault agent sidecar is needed when server-acl-init bootstraps ACLs
         and writes the bootstrap token back to Vault.
@@ -193,6 +193,10 @@ spec:
             {{- else }}
             -secrets-backend=kubernetes \
             {{- end }}
+          
+            {{- if (mustHas "resource-apis" .Values.global.experiments) }}
+            -enable-resource-apis=true \
+            {{- end }}
 
             {{- if .Values.global.acls.bootstrapToken.secretName }}
             -bootstrap-token-secret-name={{ .Values.global.acls.bootstrapToken.secretName }} \
@@ -227,9 +231,7 @@ spec:
             {{- if .Values.meshGateway.enabled }}
             -mesh-gateway=true \
             {{- end }}
-            {{- if .Values.dns.proxy.enabled }}
-              -dns-proxy=true \
-            {{- end }}
+
             {{- if .Values.ingressGateways.enabled }}
             {{- if .Values.global.enableConsulNamespaces }}
             {{- $root := . }}

@@ -1,3 +1,0 @@
-```release-note:enhancement
-cli: Introduce `gateway list` for collecting multiple components of all gateways' configuration by running a single command.
-```

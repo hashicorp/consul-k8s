@@ -5,20 +5,15 @@ package main
 
 import (
 	"context"
-
-	"github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/cli"
+	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/stats"
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/config"
 	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
-	gwlist "github.com/hashicorp/consul-k8s/cli/cmd/gateway/list"
-	gwread "github.com/hashicorp/consul-k8s/cli/cmd/gateway/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/list"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/loglevel"
 	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/read"
-	"github.com/hashicorp/consul-k8s/cli/cmd/proxy/stats"
 	"github.com/hashicorp/consul-k8s/cli/cmd/status"
 	"github.com/hashicorp/consul-k8s/cli/cmd/troubleshoot"
 	troubleshoot_proxy "github.com/hashicorp/consul-k8s/cli/cmd/troubleshoot/proxy"
@@ -29,6 +24,8 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/version"
+	"github.com/hashicorp/go-hclog"
+	"github.com/mitchellh/cli"
 )
 
 func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseCommand, map[string]cli.CommandFactory) {
@@ -63,16 +60,6 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 			return &cmdversion.Command{
 				BaseCommand: baseCommand,
 				Version:     version.GetHumanVersion(),
-			}, nil
-		},
-		"gateway list": func() (cli.Command, error) {
-			return &gwlist.Command{
-				BaseCommand: baseCommand,
-			}, nil
-		},
-		"gateway read": func() (cli.Command, error) {
-			return &gwread.Command{
-				BaseCommand: baseCommand,
 			}, nil
 		},
 		"proxy": func() (cli.Command, error) {

@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
@@ -399,10 +398,9 @@ func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 
 func testSink(t *testing.T, client kubernetes.Interface) (*K8SSink, func()) {
 	sink := &K8SSink{
-		Client:         client,
-		Log:            hclog.Default(),
-		Ctx:            context.Background(),
-		PrometheusSink: &prometheus.PrometheusSink{},
+		Client: client,
+		Log:    hclog.Default(),
+		Ctx:    context.Background(),
 	}
 
 	closer := controller.TestControllerRun(sink)

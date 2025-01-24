@@ -100,7 +100,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	})
 
 	// Create a certificate to reference in listeners.
-	certInfo := generateCertificate(t, nil, "certificate.consul.local")
+	certificateInfo := generateCertificate(t, nil, "certificate.consul.local")
 	certificateName := "certificate"
 	certificate := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -112,8 +112,8 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		},
 		Type: corev1.SecretTypeTLS,
 		Data: map[string][]byte{
-			corev1.TLSCertKey:       certInfo.CertPEM,
-			corev1.TLSPrivateKeyKey: certInfo.PrivateKeyPEM,
+			corev1.TLSCertKey:       certificateInfo.CertPEM,
+			corev1.TLSPrivateKeyKey: certificateInfo.PrivateKeyPEM,
 		},
 	}
 	logger.Log(t, "creating certificate")

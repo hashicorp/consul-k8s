@@ -10,13 +10,12 @@ import (
 	"strings"
 
 	"github.com/google/shlex"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 const (
@@ -154,12 +153,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 				Name:  "DP_CREDENTIAL_LOGIN_META2",
 				Value: "pod-uid=$(POD_UID)",
 			},
-			{
-				Name: "HOST_IP",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
-				},
-			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -265,14 +258,10 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		RunAsGroup:               ptr.To(group),
 		RunAsNonRoot:             ptr.To(true),
 		AllowPrivilegeEscalation: ptr.To(false),
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
 		// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
 		// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-			Drop: []corev1.Capability{"ALL"},
+			Add: []corev1.Capability{"NET_BIND_SERVICE"},
 		},
 		ReadOnlyRootFilesystem: ptr.To(true),
 	}

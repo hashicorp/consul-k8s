@@ -13,6 +13,8 @@ import (
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	corev1 "k8s.io/api/core/v1"
 	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -26,6 +28,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/proto-public/pbresource"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -481,15 +484,27 @@ func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, rele
 		releaseName = release[0]
 	}
 	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
-	if releaseName == "" {
-		serverPod = "consul-server-0"
-	}
 	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
 }
 
-// For instances when namespace is being manually set by the test and needs to be overridden.
-func (h *HelmCluster) SetNamespace(ns string) {
-	h.helmOptions.KubectlOptions.Namespace = ns
+// ResourceClient returns a resource service grpc client for the given helm release.
+func (h *HelmCluster) ResourceClient(t *testing.T, secure bool, release ...string) (client pbresource.ResourceServiceClient) {
+	if secure {
+		panic("TODO: add support for secure resource client")
+	}
+	releaseName := h.releaseName
+	if len(release) > 0 {
+		releaseName = release[0]
+	}
+
+	// TODO: get grpc port from somewhere
+	localTunnelAddr := h.CreatePortForwardTunnel(t, 8502, releaseName)
+
+	// Create a grpc connection to the server pod.
+	grpcConn, err := grpc.Dial(localTunnelAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	resourceClient := pbresource.NewResourceServiceClient(grpcConn)
+	return resourceClient
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...string) (client *api.Client, configAddress string) {
@@ -522,17 +537,10 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 				// and will try to read the replication token from the federation secret.
 				// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
 				// Instead, we provide a replication token that serves the role of the bootstrap token.
-				aclSecretName := releaseName + "-consul-bootstrap-acl-token"
-				if releaseName == "" {
-					aclSecretName = "consul-bootstrap-acl-token"
-				}
-				aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), aclSecretName, metav1.GetOptions{})
+				aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
 				if err != nil && errors.IsNotFound(err) {
-					federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
-					if releaseName == "" {
-						federationSecretName = "consul-federation"
-					}
-					aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
+					federationSecret := fmt.Sprintf("%s-consul-federation", releaseName)
+					aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
 					require.NoError(r, err)
 					config.Token = string(aclSecret.Data["replicationToken"])
 				} else if err == nil {

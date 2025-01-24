@@ -26,6 +26,26 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - auth.consul.hashicorp.com
+  resources:
+  - trafficpermissions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - auth.consul.hashicorp.com
+  resources:
+  - trafficpermissions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - consul.hashicorp.com
   resources:
   - controlplanerequestlimits
@@ -341,6 +361,186 @@ rules:
   - consul.hashicorp.com
   resources:
   - terminatinggateways/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - gatewayclass
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - gatewayclass/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - gatewayclassconfig
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - gatewayclassconfig/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - grpcroute
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - grpcroute/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - httproute
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - httproute/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - meshconfiguration
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - meshconfiguration/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - meshgateway
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - meshgateway/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - proxyconfiguration
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - proxyconfiguration/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - tcproute
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - mesh.consul.hashicorp.com
+  resources:
+  - tcproute/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - multicluster.consul.hashicorp.com
+  resources:
+  - exportedservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - multicluster.consul.hashicorp.com
+  resources:
+  - exportedservices/status
   verbs:
   - get
   - patch

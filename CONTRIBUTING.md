@@ -961,23 +961,17 @@ The tests are organized like this :
 ```shell
 demo $ tree -L 1 -d acceptance/tests
 acceptance/tests
-├── api-gateway
 ├── basic
 ├── cli
-├── cloud
 ├── config-entries
 ├── connect
 ├── consul-dns
-├── datadog
 ├── example
 ├── fixtures
 ├── ingress-gateway
 ├── metrics
 ├── partitions
 ├── peering
-├── sameness
-├── segments
-├── server
 ├── snapshot-agent
 ├── sync
 ├── terminating-gateway
@@ -1015,9 +1009,7 @@ $ kind create cluster --name=dc1 && kind create cluster --name=dc2
   `-consul-k8s-image=<your-custom-image>` && `-consul-image=<your-custom-image>`
 * You can set custom helm flags by modifying the test file directly in the respective directory.
 
-Finally, you have two options on how you can run your test:
-1. Take the following steps, this will run the test through to completion but not teardown any resources created by the test so you can inspect the state of the cluster
-at that point. You will be responsible for cleaning up the resources or deleting the cluster entirely when you're done.
+Finally, run the test like shown above:
 ```shell
 $ cd acceptance/tests
 $ go test -run Vault_WANFederationViaGateways ./vault/... -p 1 -timeout 2h -failfast -use-kind -no-cleanup-on-failure -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-multi-cluster -debug-directory=/tmp/debug
@@ -1025,36 +1017,6 @@ $ go test -run Vault_WANFederationViaGateways ./vault/... -p 1 -timeout 2h -fail
 You can interact with the running kubernetes clusters now using `kubectl [COMMAND] --context=<kind-dc1/kind-dc2>`
 
 * `kind delete clusters --all` is helpful for cleanup!
-
-2. The other option is to use the helper method in the framework: `helpers.WaitForInput(t)` at the spot in your acceptance test where you would like to pause execution to inspect the cluster. This will pause the test execution until you execute a request to `localhost:38501` which tells the test to continue running, you can override the port value used by setting the `CONSUL_K8S_TEST_PAUSE_PORT` environment variable to a port of your choosing. When running the tests with the `-v` flag you will see a log output of the endpoint that the test is waiting on.
-
-First you'll want to add the helper method to your test file:
-
-```go
-import "github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-
-func TestSomeTest(t *testing.T) {
-  // stuff to setup
-
-  // test execution will pause here until the endpoint is hit
-  helpers.WaitForInput(t)
-
-  // rest of test
-}
-```
-
-Then run the tests (note the removal of the `-no-cleanup-on-failure` flag):
-```shell
-$ cd acceptance/tests
-$ go test -run Vault_WANFederationViaGateways ./vault/... -p 1 -timeout 2h -failfast -use-kind -kubecontext=kind-dc1 -secondary-kubecontext=kind-dc2 -enable-multi-cluster -debug-directory=/tmp/debug
-```
-
-You can interact with the running kubernetes clusters now using `kubectl [COMMAND] --context=<kind-dc1/kind-dc2>`
-
-When you're done interacting you can tell the test to continue by issuing a curl command to the endpoint (if you are using a non-default port for this test then replace the `38501` port value with the value you have set):
-```shell
-curl localhost:38501
-```
 
 ### Example Debugging session using the acceptance test framework to bootstrap and debug a Vault backed federated Consul installation:
 This test utilizes the `consul-k8s` acceptance test framework, with a custom consul-k8s branch which:

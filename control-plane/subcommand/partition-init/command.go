@@ -13,9 +13,14 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/proto-public/pbresource"
+	pbtenancy "github.com/hashicorp/consul/proto-public/pbtenancy/v2beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
@@ -28,9 +33,10 @@ type Command struct {
 	flags  *flag.FlagSet
 	consul *flags.ConsulFlags
 
-	flagLogLevel string
-	flagLogJSON  bool
-	flagTimeout  time.Duration
+	flagLogLevel  string
+	flagLogJSON   bool
+	flagTimeout   time.Duration
+	flagV2Tenancy bool
 
 	// ctx is cancelled when the command timeout is reached.
 	ctx           context.Context
@@ -53,6 +59,8 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+	c.flags.BoolVar(&c.flagV2Tenancy, "enable-v2tenancy", false,
+		"Enable V2 tenancy.")
 
 	c.consul = &flags.ConsulFlags{}
 	flags.Merge(c.flags, c.consul.Flags())
@@ -71,7 +79,61 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-func (c *Command) ensurePartition(scm consul.ServerConnectionManager) error {
+func (c *Command) ensureV2Partition(scm consul.ServerConnectionManager) error {
+	client, err := consul.NewResourceServiceClient(scm)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("unable to create grpc client: %s", err))
+		return err
+	}
+
+	for {
+		id := &pbresource.ID{
+			Name: c.consul.Partition,
+			Type: pbtenancy.PartitionType,
+		}
+
+		_, err = client.Read(c.ctx, &pbresource.ReadRequest{Id: id})
+		switch {
+
+		// found -> done
+		case err == nil:
+			c.log.Info("Admin Partition already exists", "name", c.consul.Partition)
+			return nil
+
+		// not found -> create
+		case status.Code(err) == codes.NotFound:
+			data, err := anypb.New(&pbtenancy.Partition{Description: "Created by Helm installation"})
+			if err != nil {
+				continue
+			}
+			_, err = client.Write(c.ctx, &pbresource.WriteRequest{Resource: &pbresource.Resource{
+				Id:   id,
+				Data: data,
+			}})
+			if err == nil {
+				c.log.Info("Successfully created Admin Partition", "name", c.consul.Partition)
+				return nil
+			}
+
+		// unexpected error -> retry
+		default:
+			c.log.Error("Error reading Partition from Consul", "name", c.consul.Partition, "error", err.Error())
+		}
+
+		// Wait on either the retry duration (in which case we continue) or the
+		// overall command timeout.
+		c.log.Info("Retrying in " + c.retryDuration.String())
+		select {
+		case <-time.After(c.retryDuration):
+			continue
+		case <-c.ctx.Done():
+			c.log.Error("Timed out attempting to ensure partition exists", "name", c.consul.Partition)
+			return err
+		}
+	}
+}
+
+func (c *Command) ensureV1Partition(scm consul.ServerConnectionManager) error {
 	state, err := scm.State()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("unable to get Consul server addresses from watcher: %s", err))
@@ -162,7 +224,11 @@ func (c *Command) Run(args []string) int {
 	go watcher.Run()
 	defer watcher.Stop()
 
-	err = c.ensurePartition(watcher)
+	if c.flagV2Tenancy {
+		err = c.ensureV2Partition(watcher)
+	} else {
+		err = c.ensureV1Partition(watcher)
+	}
 	if err != nil {
 		return 1
 	}

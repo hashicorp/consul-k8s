@@ -1,0 +1,10 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: mesh.consul.hashicorp.com/v2beta1
+kind: TCPRoute
+metadata:
+  name: tcp-route
+spec:
+  parentRefs:
+  - name: gateway

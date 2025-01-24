@@ -29,7 +29,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
-func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
+func (c *Command) configureV1Controllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
 

@@ -4,7 +4,6 @@
 package binding
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -334,18 +333,9 @@ func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resourc
 
 func validateCertificateRefs(gateway gwv1beta1.Gateway, refs []gwv1beta1.SecretObjectReference, resources *common.ResourceMap) error {
 	for _, cert := range refs {
-		var mErr error
 		// Verify that the reference has a group and kind that we support
-		if !common.NilOrEqual(cert.Group, "") {
-			mErr = errors.Join(mErr, fmt.Errorf("group is not supported: %q, supported Groups are \"\"", common.DerefStringOr(cert.Group, "")))
-		}
-
-		if !common.NilOrEqual(cert.Kind, common.KindSecret) {
-			mErr = errors.Join(mErr, fmt.Errorf("kind is not supported: %q, supported Kinds are %q", common.DerefStringOr(cert.Kind, ""), common.KindSecret))
-		}
-
-		if mErr != nil {
-			return fmt.Errorf("%w: %s", errListenerInvalidCertificateRef_NotSupported, mErr.Error())
+		if !common.NilOrEqual(cert.Group, "") || !common.NilOrEqual(cert.Kind, common.KindSecret) {
+			return errListenerInvalidCertificateRef_NotSupported
 		}
 
 		// Verify that the reference is within the namespace or,

@@ -497,6 +497,51 @@ Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
 {{/**/}}
 
 {{/*
+Fails if global.experiments.resourceAPIs is set along with any of these unsupported features.
+- global.peering.enabled
+- global.federation.enabled
+- global.cloud.enabled
+- client.enabled
+- ui.enabled
+- syncCatalog.enabled
+- meshGateway.enabled
+- ingressGateways.enabled
+- terminatingGateways.enabled
+
+Usage: {{ template "consul.validateResourceAPIs" . }}
+
+*/}}
+{{- define "consul.validateResourceAPIs" -}}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.peering.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.peering.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) (not (mustHas "v2tenancy" .Values.global.experiments)) .Values.global.adminPartitions.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.experiments.v2tenancy must also be set to support global.adminPartitions.enabled."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.federation.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.federation.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.global.cloud.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, global.cloud.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.client.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, client.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ui.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, ui.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.syncCatalog.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, syncCatalog.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.ingressGateways.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, ingressGateways.enabled is currently unsupported."}}
+{{- end }}
+{{- if (and (mustHas "resource-apis" .Values.global.experiments) .Values.terminatingGateways.enabled ) }}
+{{fail "When the value global.experiments.resourceAPIs is set, terminatingGateways.enabled is currently unsupported."}}
+{{- end }}
+{{- end }}
+
+{{/*
 Validation for Consul Metrics configuration:
 
 Fail if metrics.enabled=true and metrics.disableAgentHostName=true, but metrics.enableAgentMetrics=false

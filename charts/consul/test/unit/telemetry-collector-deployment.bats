@@ -1316,6 +1316,20 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 }
 
 #--------------------------------------------------------------------
+# global.experiments=["resource-apis"]
+
+@test "telemetryCollector/Deployment: disabled when V2 is enabled" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'telemetryCollector.image=bar' \
+      --set 'ui.enabled=false' \
+      --set 'global.experiments[0]=resource-apis' \
+      .
+}
+
+#--------------------------------------------------------------------
 # Namespaces
 
 @test "telemetryCollector/Deployment: namespace flags when mirroringK8S" {

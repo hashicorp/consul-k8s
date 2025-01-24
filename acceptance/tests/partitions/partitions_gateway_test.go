@@ -259,7 +259,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", gatewayAddress)
 
 	// This section of the tests runs the in-partition networking tests.
 	t.Run("in-partition", func(t *testing.T) {

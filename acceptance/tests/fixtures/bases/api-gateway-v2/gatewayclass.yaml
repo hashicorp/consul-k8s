@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: mesh.consul.hashicorp.com/v2beta1
+kind: GatewayClass
+metadata:
+  name: gateway-class
+spec:
+  controllerName: "consul.hashicorp.com/gateway-controller"
+  parametersRef:
+    group: consul.hashicorp.com
+    kind: GatewayClassConfig
+    name: gateway-class-config

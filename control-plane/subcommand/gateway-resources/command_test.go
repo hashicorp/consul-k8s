@@ -17,6 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	meshv2beta1 "github.com/hashicorp/consul/proto-public/pbmesh/v2beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/mesh/v2beta1"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
@@ -201,6 +204,7 @@ func TestRun(t *testing.T) {
 	for name, tt := range map[string]struct {
 		existingGatewayClass       bool
 		existingGatewayClassConfig bool
+		meshGWConfigFileExists     bool
 	}{
 		"both exist": {
 			existingGatewayClass:       true,
@@ -213,6 +217,9 @@ func TestRun(t *testing.T) {
 			existingGatewayClassConfig: true,
 		},
 		"neither exist": {},
+		"mesh gw config file exists": {
+			meshGWConfigFileExists: true,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tt := tt
@@ -231,6 +238,9 @@ func TestRun(t *testing.T) {
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			configFileName := gatewayConfigFilename
+			if tt.meshGWConfigFileExists {
+				configFileName = createGatewayConfigFile(t, validGWConfigurationKitchenSink, "config.yaml")
+			}
 
 			objs := []client.Object{}
 			if tt.existingGatewayClass {
@@ -358,6 +368,269 @@ func TestRun_loadResourceConfigFileWhenConfigFileDoesNotExist(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, resources, defaultResourceRequirements) // should be using defaults
 	require.Contains(t, string(ui.OutputWriter.Bytes()), "No resources.json found, using defaults")
+}
+
+var validGWConfigurationKitchenSink = `gatewayClassConfigs:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: GatewayClassConfig
+  metadata:
+    name: consul-mesh-gateway
+  spec:
+    deployment:
+      hostNetwork: true
+      dnsPolicy: ClusterFirst
+      replicas:
+        min: 3
+        default: 3
+        max: 3
+      nodeSelector:
+        beta.kubernetes.io/arch: amd64
+        beta.kubernetes.io/os: linux
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: consul
+                  release: consul-helm
+                  component: mesh-gateway
+              topologyKey: kubernetes.io/hostname
+      tolerations:
+        - key: "key1"
+          operator: "Equal"
+          value: "value1"
+          effect: "NoSchedule"
+      container:
+        portModifier: 8000
+        resources:
+          requests:
+            cpu: 200m
+            memory: 200Mi
+          limits:
+            cpu: 200m
+            memory: 200Mi
+meshGateways:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: MeshGateway
+  metadata:
+    name: mesh-gateway
+    namespace: consul
+  spec:
+    gatewayClassName: consul-mesh-gateway
+`
+
+var validGWConfigurationMinimal = `gatewayClassConfigs:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: GatewayClassConfig
+  metadata:
+    name: consul-mesh-gateway
+  spec:
+    deployment:
+meshGateways:
+- apiVersion: mesh.consul.hashicorp.com/v2beta1
+  kind: MeshGateway
+  metadata:
+    name: mesh-gateway
+    namespace: consul
+  spec:
+    gatewayClassName: consul-mesh-gateway
+`
+
+var invalidGWConfiguration = `
+gatewayClassConfigs:
+iVersion= mesh.consul.hashicorp.com/v2beta1
+  kind: gatewayClassConfig
+  metadata:
+    name: consul-mesh-gateway
+    namespace: namespace
+  spec:
+    deployment:
+      resources:
+        requests:
+          cpu: 100m
+meshGateways:
+- name: mesh-gateway
+  spec:
+    gatewayClassName: consul-mesh-gateway
+`
+
+func TestRun_loadGatewayConfigs(t *testing.T) {
+	var replicasCount int32 = 3
+	testCases := map[string]struct {
+		config             string
+		filename           string
+		expectedDeployment v2beta1.GatewayClassDeploymentConfig
+	}{
+		"kitchen sink": {
+			config:   validGWConfigurationKitchenSink,
+			filename: "kitchenSinkConfig.yaml",
+			expectedDeployment: v2beta1.GatewayClassDeploymentConfig{
+				HostNetwork: true,
+				DNSPolicy:   "ClusterFirst",
+				NodeSelector: map[string]string{
+					"beta.kubernetes.io/arch": "amd64",
+					"beta.kubernetes.io/os":   "linux",
+				},
+				Replicas: &v2beta1.GatewayClassReplicasConfig{
+					Default: &replicasCount,
+					Min:     &replicasCount,
+					Max:     &replicasCount,
+				},
+				Tolerations: []corev1.Toleration{
+					{
+						Key:      "key1",
+						Operator: "Equal",
+						Value:    "value1",
+						Effect:   "NoSchedule",
+					},
+				},
+
+				Affinity: &corev1.Affinity{
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"app":       "consul",
+										"release":   "consul-helm",
+										"component": "mesh-gateway",
+									},
+								},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
+					},
+				},
+				Container: &v2beta1.GatewayClassContainerConfig{
+					Resources: &corev1.ResourceRequirements{
+						Requests: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("200Mi"),
+							corev1.ResourceCPU:    resource.MustParse("200m"),
+						},
+						Limits: corev1.ResourceList{
+							corev1.ResourceMemory: resource.MustParse("200Mi"),
+							corev1.ResourceCPU:    resource.MustParse("200m"),
+						},
+					},
+					PortModifier: 8000,
+				},
+			},
+		},
+		"minimal configuration": {
+			config:   validGWConfigurationMinimal,
+			filename: "minimalConfig.yaml",
+			expectedDeployment: v2beta1.GatewayClassDeploymentConfig{
+				Container: &v2beta1.GatewayClassContainerConfig{
+					Resources: &defaultResourceRequirements,
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			filename := createGatewayConfigFile(t, tc.config, tc.filename)
+			// setup k8s client
+			s := runtime.NewScheme()
+			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
+
+			client := fake.NewClientBuilder().WithScheme(s).Build()
+
+			ui := cli.NewMockUi()
+			cmd := Command{
+				UI:                        ui,
+				k8sClient:                 client,
+				flagGatewayConfigLocation: filename,
+			}
+
+			err := cmd.loadGatewayConfigs()
+			require.NoError(t, err)
+			require.NotEmpty(t, cmd.gatewayConfig.GatewayClassConfigs)
+			require.NotEmpty(t, cmd.gatewayConfig.MeshGateways)
+
+			// we only created one class config
+			classConfig := cmd.gatewayConfig.GatewayClassConfigs[0].DeepCopy()
+
+			expectedClassConfig := v2beta1.GatewayClassConfig{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: v2beta1.MeshGroupVersion.String(),
+					Kind:       v2beta1.KindGatewayClassConfig,
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-mesh-gateway",
+				},
+				Spec: v2beta1.GatewayClassConfigSpec{
+					Deployment: tc.expectedDeployment,
+				},
+				Status: v2beta1.Status{},
+			}
+			require.Equal(t, expectedClassConfig.DeepCopy(), classConfig)
+
+			// check mesh gateway, we only created one of these
+			actualMeshGateway := cmd.gatewayConfig.MeshGateways[0]
+
+			expectedMeshGateway := &v2beta1.MeshGateway{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "MeshGateway",
+					APIVersion: v2beta1.MeshGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mesh-gateway",
+					Namespace: "consul",
+				},
+				Spec: meshv2beta1.MeshGateway{
+					GatewayClassName: "consul-mesh-gateway",
+				},
+			}
+
+			require.Equal(t, expectedMeshGateway.DeepCopy(), actualMeshGateway)
+		})
+	}
+}
+
+func TestRun_loadGatewayConfigsWithInvalidFile(t *testing.T) {
+	filename := createGatewayConfigFile(t, invalidGWConfiguration, "config.yaml")
+	// setup k8s client
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                        ui,
+		k8sClient:                 client,
+		flagGatewayConfigLocation: filename,
+	}
+
+	err := cmd.loadGatewayConfigs()
+	require.Error(t, err)
+	require.Empty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.Empty(t, cmd.gatewayConfig.MeshGateways)
+}
+
+func TestRun_loadGatewayConfigsWhenConfigFileDoesNotExist(t *testing.T) {
+	filename := "./consul/config/config.yaml"
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+
+	client := fake.NewClientBuilder().WithScheme(s).Build()
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:                        ui,
+		k8sClient:                 client,
+		flagGatewayConfigLocation: filename,
+	}
+
+	err := cmd.loadGatewayConfigs()
+	require.NoError(t, err)
+	require.Empty(t, cmd.gatewayConfig.GatewayClassConfigs)
+	require.Empty(t, cmd.gatewayConfig.MeshGateways)
+	require.Contains(t, string(ui.ErrorWriter.Bytes()), "gateway configuration file not found, skipping gateway configuration")
 }
 
 func createGatewayConfigFile(t *testing.T, fileContent, filename string) string {

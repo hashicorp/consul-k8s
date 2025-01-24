@@ -1,4 +1,5 @@
 {{- if .Values.meshGateway.enabled }}
+{{- if not (mustHas "resource-apis" .Values.global.experiments) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -17,4 +18,5 @@ subjects:
   - kind: ServiceAccount
     name: {{ template "consul.fullname" . }}-mesh-gateway
     namespace: {{ .Release.Namespace }}
+{{- end }}
 {{- end }}

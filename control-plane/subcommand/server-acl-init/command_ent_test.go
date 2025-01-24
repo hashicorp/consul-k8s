@@ -35,7 +35,9 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		Destination string
+		Destination   string
+		ExtraFlags    []string
+		V2BindingRule bool
 	}{
 		"consul default ns": {
 			Destination: "default",
@@ -43,11 +45,16 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 		"consul non-default ns": {
 			Destination: "destination",
 		},
+		"consul non-default ns w/ resource-apis": {
+			Destination:   "destination",
+			ExtraFlags:    []string{"-enable-resource-apis=true"},
+			V2BindingRule: true,
+		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeSetup(tt)
+			k8s, testAgent := completeSetup(tt, false)
 			setUpK8sServiceAccount(tt, k8s, ns)
 
 			ui := cli.NewMockUi()
@@ -67,6 +74,10 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 				"-enable-namespaces",
 				"-consul-inject-destination-namespace", c.Destination,
 				"-acl-binding-rule-selector=serviceaccount.name!=default",
+			}
+
+			if len(c.ExtraFlags) > 0 {
+				args = append(args, c.ExtraFlags...)
 			}
 
 			responseCode := cmd.Run(args)
@@ -110,8 +121,14 @@ func TestRun_ConnectInject_SingleDestinationNamespace(t *testing.T) {
 			aclRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, namespaceQuery)
 			require.NoError(t, err)
 			require.NotNil(t, aclRule)
-			require.Equal(t, api.BindingRuleBindTypeService, aclRule.BindType)
-			require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
+			if c.V2BindingRule {
+				require.Equal(t, api.BindingRuleBindTypeTemplatedPolicy, aclRule.BindType)
+				require.Equal(t, "builtin/workload-identity", aclRule.BindName)
+				require.Equal(t, "${serviceaccount.name}", aclRule.BindVars.Name)
+			} else {
+				require.Equal(t, api.BindingRuleBindTypeService, aclRule.BindType)
+				require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
+			}
 			require.Equal(t, "Kubernetes binding rule", aclRule.Description)
 			require.Equal(t, "serviceaccount.name!=default", aclRule.Selector)
 
@@ -154,6 +171,7 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 	cases := map[string]struct {
 		MirroringPrefix string
 		ExtraFlags      []string
+		V2BindingRule   bool
 	}{
 		"no prefix": {
 			MirroringPrefix: "",
@@ -169,11 +187,16 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			// effect.
 			ExtraFlags: []string{"-consul-inject-destination-namespace=dest"},
 		},
+		"no prefix w/ resource-apis": {
+			MirroringPrefix: "",
+			ExtraFlags:      []string{"-enable-resource-apis=true"},
+			V2BindingRule:   true,
+		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeSetup(tt)
+			k8s, testAgent := completeSetup(tt, false)
 			setUpK8sServiceAccount(tt, k8s, ns)
 
 			ui := cli.NewMockUi()
@@ -225,8 +248,14 @@ func TestRun_ConnectInject_NamespaceMirroring(t *testing.T) {
 			aclRule, _, err := consul.ACL().BindingRuleRead(rules[0].ID, nil)
 			require.NoError(t, err)
 			require.NotNil(t, aclRule)
-			require.Equal(t, api.BindingRuleBindTypeService, aclRule.BindType)
-			require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
+			if c.V2BindingRule {
+				require.Equal(t, api.BindingRuleBindTypeTemplatedPolicy, aclRule.BindType)
+				require.Equal(t, "builtin/workload-identity", aclRule.BindName)
+				require.Equal(t, "${serviceaccount.name}", aclRule.BindVars.Name)
+			} else {
+				require.Equal(t, api.BindingRuleBindTypeService, aclRule.BindType)
+				require.Equal(t, "${serviceaccount.name}", aclRule.BindName)
+			}
 			require.Equal(t, "Kubernetes binding rule", aclRule.Description)
 			require.Equal(t, "serviceaccount.name!=default", aclRule.Selector)
 		})
@@ -286,7 +315,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 	k8sNamespaceFlags := []string{"default", "other"}
 	for _, k8sNamespaceFlag := range k8sNamespaceFlags {
 		t.Run(k8sNamespaceFlag, func(t *testing.T) {
-			k8s, testAgent := completeSetup(t)
+			k8s, testAgent := completeSetup(t, false)
 			setUpK8sServiceAccount(t, k8s, k8sNamespaceFlag)
 
 			ui := cli.NewMockUi()
@@ -460,6 +489,8 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 		AuthMethodExpectedNamespacePrefixConfig string
 		// Expected namespace for the binding rule.
 		BindingRuleExpectedNS string
+		// UseV2API, tests the bindingrule is compatible with workloadIdentites.
+		UseV2API bool
 	}{
 		"no ns => mirroring ns, no prefix": {
 			FirstRunArgs: nil,
@@ -589,11 +620,148 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			AuthMethodExpectedNamespacePrefixConfig: "",
 			BindingRuleExpectedNS:                   "default",
 		},
+		"(v2) no ns => mirroring ns, no prefix": {
+			FirstRunArgs: nil,
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+			},
+			AuthMethodExpectedNS:                    "default",
+			AuthMethodExpectMapNamespacesConfig:     true,
+			AuthMethodExpectedNamespacePrefixConfig: "",
+			BindingRuleExpectedNS:                   "default",
+			UseV2API:                                true,
+		},
+		"(v2) no ns => mirroring ns, prefix": {
+			FirstRunArgs: nil,
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=prefix-",
+			},
+			AuthMethodExpectedNS:                    "default",
+			AuthMethodExpectMapNamespacesConfig:     true,
+			AuthMethodExpectedNamespacePrefixConfig: "prefix-",
+			BindingRuleExpectedNS:                   "default",
+			UseV2API:                                true,
+		},
+		"(v2) no ns => single dest ns": {
+			FirstRunArgs: nil,
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace=dest",
+			},
+			AuthMethodExpectedNS:                    "dest",
+			AuthMethodExpectMapNamespacesConfig:     false,
+			AuthMethodExpectedNamespacePrefixConfig: "",
+			BindingRuleExpectedNS:                   "dest",
+			UseV2API:                                true,
+		},
+		"(v2) mirroring ns => single dest ns": {
+			FirstRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=prefix-",
+			},
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace=dest",
+			},
+			AuthMethodExpectedNS:                    "dest",
+			AuthMethodExpectMapNamespacesConfig:     false,
+			AuthMethodExpectedNamespacePrefixConfig: "",
+			BindingRuleExpectedNS:                   "dest",
+			UseV2API:                                true,
+		},
+		"(v2) single dest ns => mirroring ns": {
+			FirstRunArgs: []string{
+				"-enable-namespaces",
+				"-consul-inject-destination-namespace=dest",
+			},
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=prefix-",
+			},
+			AuthMethodExpectedNS:                    "default",
+			AuthMethodExpectMapNamespacesConfig:     true,
+			AuthMethodExpectedNamespacePrefixConfig: "prefix-",
+			BindingRuleExpectedNS:                   "default",
+			UseV2API:                                true,
+		},
+		"(v2) mirroring ns (no prefix) => mirroring ns (no prefix)": {
+			FirstRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=",
+			},
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=",
+			},
+			AuthMethodExpectedNS:                    "default",
+			AuthMethodExpectMapNamespacesConfig:     true,
+			AuthMethodExpectedNamespacePrefixConfig: "",
+			BindingRuleExpectedNS:                   "default",
+			UseV2API:                                true,
+		},
+		"(v2) mirroring ns => mirroring ns (same prefix)": {
+			FirstRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=prefix-",
+			},
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=prefix-",
+			},
+			AuthMethodExpectedNS:                    "default",
+			AuthMethodExpectMapNamespacesConfig:     true,
+			AuthMethodExpectedNamespacePrefixConfig: "prefix-",
+			BindingRuleExpectedNS:                   "default",
+			UseV2API:                                true,
+		},
+		"(v2) mirroring ns (no prefix) => mirroring ns (prefix)": {
+			FirstRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=",
+			},
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=prefix-",
+			},
+			AuthMethodExpectedNS:                    "default",
+			AuthMethodExpectMapNamespacesConfig:     true,
+			AuthMethodExpectedNamespacePrefixConfig: "prefix-",
+			BindingRuleExpectedNS:                   "default",
+			UseV2API:                                true,
+		},
+		"(v2) mirroring ns (prefix) => mirroring ns (no prefix)": {
+			FirstRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=prefix-",
+			},
+			SecondRunArgs: []string{
+				"-enable-namespaces",
+				"-enable-inject-k8s-namespace-mirroring",
+				"-inject-k8s-namespace-mirroring-prefix=",
+			},
+			AuthMethodExpectedNS:                    "default",
+			AuthMethodExpectMapNamespacesConfig:     true,
+			AuthMethodExpectedNamespacePrefixConfig: "",
+			BindingRuleExpectedNS:                   "default",
+			UseV2API:                                true,
+		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			k8s, testAgent := completeSetup(tt)
+			k8s, testAgent := completeSetup(tt, c.UseV2API)
 			setUpK8sServiceAccount(tt, k8s, ns)
 
 			ui := cli.NewMockUi()
@@ -605,6 +773,10 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 				"-k8s-namespace=" + ns,
 				"-partition=default",
 				"-connect-inject",
+			}
+
+			if c.UseV2API {
+				defaultArgs = append(defaultArgs, "-enable-resource-apis=true")
 			}
 
 			// First run. NOTE: we don't assert anything here since we've
@@ -658,7 +830,11 @@ func TestRun_ConnectInject_Updates(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Len(t, rules, 1)
-			require.Equal(tt, api.BindingRuleBindTypeService, rules[0].BindType)
+			if c.UseV2API {
+				require.Equal(tt, api.BindingRuleBindTypeTemplatedPolicy, rules[0].BindType)
+			} else {
+				require.Equal(tt, api.BindingRuleBindTypeService, rules[0].BindType)
+			}
 		})
 	}
 }
@@ -698,7 +874,7 @@ func TestRun_TokensWithNamespacesEnabled(t *testing.T) {
 	}
 	for testName, c := range cases {
 		t.Run(testName, func(t *testing.T) {
-			k8s, testSvr := completeSetup(t)
+			k8s, testSvr := completeSetup(t, false)
 			setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
@@ -952,7 +1128,7 @@ partition "default" {
 	}
 	for _, c := range cases {
 		t.Run(c.TestName, func(t *testing.T) {
-			k8s, testSvr := completeSetup(t)
+			k8s, testSvr := completeSetup(t, false)
 			setUpK8sServiceAccount(t, k8s, ns)
 
 			// Run the command.
@@ -1039,7 +1215,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_PrimaryDatacenter(t *testing.T)
 			authMethodName := fmt.Sprintf("%s-%s", resourcePrefix, componentAuthMethod)
 			serviceAccountName := fmt.Sprintf("%s-%s", resourcePrefix, c.ComponentName)
 
-			k8s, testSvr := completeSetup(t)
+			k8s, testSvr := completeSetup(t, false)
 			_, jwtToken := setUpK8sServiceAccount(t, k8s, c.Namespace)
 
 			k8sMockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1199,7 +1375,7 @@ func TestRun_NamespaceEnabled_ValidateLoginToken_SecondaryDatacenter(t *testing.
 func TestRun_PartitionTokenDefaultPartition_WithProvidedSecretID(t *testing.T) {
 	t.Parallel()
 
-	k8s, testSvr := completeSetup(t)
+	k8s, testSvr := completeSetup(t, false)
 	setUpK8sServiceAccount(t, k8s, ns)
 
 	partitionToken := "123e4567-e89b-12d3-a456-426614174000"

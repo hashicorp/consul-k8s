@@ -4,30 +4,28 @@
 package synccatalog
 
 import (
+	"bufio"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/armon/go-metrics/prometheus"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 
-	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
 	catalogtoconsul "github.com/hashicorp/consul-k8s/control-plane/catalog/to-consul"
 	catalogtok8s "github.com/hashicorp/consul-k8s/control-plane/catalog/to-k8s"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -63,7 +61,7 @@ type Command struct {
 	flagAddK8SNamespaceSuffix    bool
 	flagLogLevel                 string
 	flagLogJSON                  bool
-	flagPurgeK8SServicesFromNode bool
+	flagPurgeK8SServicesFromNode string
 	flagFilter                   string
 
 	// Flags to support namespaces
@@ -75,12 +73,6 @@ type Command struct {
 	flagK8SNSMirroringPrefix       string   // Prefix added to Consul namespaces created when mirroring
 	flagCrossNamespaceACLPolicy    string   // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
-	// Metrics settings.
-	flagEnableMetrics        bool
-	flagMetricsPort          string
-	flagMetricsPath          string
-	flagMetricsRetentionTime string
-
 	// Flags to support Kubernetes Ingress resources
 	flagEnableIngress   bool // Register services using the hostname from an ingress resource
 	flagLoadBalancerIPs bool // Use the load balancer IP of an ingress resource instead of the hostname
@@ -91,12 +83,11 @@ type Command struct {
 	// consul-server-connection-manager has finished initial initialization.
 	ready bool
 
-	once           sync.Once
-	sigCh          chan os.Signal
-	help           string
-	logger         hclog.Logger
-	connMgr        consul.ServerConnectionManager
-	prometheusSink *prometheus.PrometheusSink
+	once    sync.Once
+	sigCh   chan os.Signal
+	help    string
+	logger  hclog.Logger
+	connMgr consul.ServerConnectionManager
 }
 
 func (c *Command) init() {
@@ -152,11 +143,10 @@ func (c *Command) init() {
 			"\"debug\", \"info\", \"warn\", and \"error\".")
 	c.flags.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
-	c.flags.BoolVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", false,
-		"Specifies if services should be purged from the Consul node. If set, all K8S services will be removed from the Consul node.")
+	c.flags.StringVar(&c.flagPurgeK8SServicesFromNode, "purge-k8s-services-from-node", "",
+		"Purge all K8S services registered in Consul under the node name.")
 	c.flags.StringVar(&c.flagFilter, "filter", "",
-		"Specifies the expression used to filter the services on the Consul node that will be deregistered. "+
-			"The syntax for this filter is the same as the syntax used in the List Services for Node API in the Consul catalog.")
+		"Specifies the expression used to filter the queries results for the node.")
 
 	c.flags.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
@@ -174,11 +164,6 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagCrossNamespaceACLPolicy, "consul-cross-namespace-acl-policy", "",
 		"[Enterprise Only] Name of the ACL policy to attach to all created Consul namespaces to allow service "+
 			"discovery across Consul namespaces. Only necessary if ACLs are enabled.")
-
-	c.flags.BoolVar(&c.flagEnableMetrics, "enable-metrics", false, "set this flag to enable metrics collection")
-	c.flags.StringVar(&c.flagMetricsPath, "metrics-path", "/metrics", "specify to set the path used for metrics scraping")
-	c.flags.StringVar(&c.flagMetricsPort, "metrics-port", "20300", "specify to set the port used for metrics scraping")
-	c.flags.StringVar(&c.flagMetricsRetentionTime, "prometheus-retention-time", "1m", "configures the retention time for metrics in the Prometheus sink")
 
 	c.flags.BoolVar(&c.flagEnableIngress, "enable-ingress", false,
 		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
@@ -275,13 +260,13 @@ func (c *Command) Run(args []string) int {
 	}
 	c.ready = true
 
-	if c.flagPurgeK8SServicesFromNode {
+	if c.flagPurgeK8SServicesFromNode != "" {
 		consulClient, err := consul.NewClientFromConnMgr(consulConfig, c.connMgr)
 		if err != nil {
 			c.UI.Error(fmt.Sprintf("unable to instantiate consul client: %s", err))
 			return 1
 		}
-		if err := c.removeAllK8SServicesFromConsulNode(consulClient); err != nil {
+		if err := c.removeAllK8SServicesFromConsulNode(consulClient, c.flagPurgeK8SServicesFromNode); err != nil {
 			c.UI.Error(fmt.Sprintf("unable to remove all K8S services: %s", err))
 			return 1
 		}
@@ -296,17 +281,6 @@ func (c *Command) Run(args []string) int {
 		// it will be the only allowed namespace
 		allowSet = mapset.NewSet(c.flagK8SSourceNamespace)
 	}
-
-	metricsConfig := metrics.SyncCatalogMetricsConfig(c.flagEnableMetrics, c.flagMetricsPort, c.flagMetricsPath)
-	metricsConfig.PrometheusMetricsRetentionTime = c.flagMetricsRetentionTime
-
-	// Create the metrics sink
-	sink, err := c.recordMetrics()
-	if err != nil {
-		c.logger.Error("Prometheus sink not initialized, metrics cannot be displayed", "error", err)
-	}
-	c.prometheusSink = sink
-
 	c.logger.Info("K8s namespace syncing configuration", "k8s namespaces allowed to be synced", allowSet,
 		"k8s namespaces denied from syncing", denySet)
 
@@ -327,7 +301,6 @@ func (c *Command) Run(args []string) int {
 			ServicePollPeriod:       c.flagConsulWritePeriod * 2,
 			ConsulK8STag:            c.flagConsulK8STag,
 			ConsulNodeName:          c.flagConsulNodeName,
-			PrometheusSink:          c.prometheusSink,
 		}
 		go syncer.Run(ctx)
 
@@ -355,7 +328,6 @@ func (c *Command) Run(args []string) int {
 				ConsulNodeName:             c.flagConsulNodeName,
 				EnableIngress:              c.flagEnableIngress,
 				SyncLoadBalancerIPs:        c.flagLoadBalancerIPs,
-				MetricsConfig:              metricsConfig,
 			},
 		}
 
@@ -370,11 +342,10 @@ func (c *Command) Run(args []string) int {
 	var toK8SCh chan struct{}
 	if c.flagToK8S {
 		sink := &catalogtok8s.K8SSink{
-			Client:         c.clientset,
-			Namespace:      c.flagK8SWriteNamespace,
-			Log:            c.logger.Named("to-k8s/sink"),
-			Ctx:            ctx,
-			PrometheusSink: c.prometheusSink,
+			Client:    c.clientset,
+			Namespace: c.flagK8SWriteNamespace,
+			Log:       c.logger.Named("to-k8s/sink"),
+			Ctx:       ctx,
 		}
 
 		source := &catalogtok8s.Source{
@@ -413,18 +384,6 @@ func (c *Command) Run(args []string) int {
 		}
 	}()
 
-	// Start metrics handler
-	go func() {
-		mux := http.NewServeMux()
-		mux.Handle(c.flagMetricsPath, c.authorizeMiddleware()(promhttp.Handler()))
-		var handler http.Handler = mux
-
-		c.UI.Info(fmt.Sprintf("Listening on %q...", c.flagMetricsPort))
-		if err := http.ListenAndServe(fmt.Sprintf(":%s", c.flagMetricsPort), handler); err != nil {
-			c.UI.Error(fmt.Sprintf("Error listening: %s", err))
-		}
-	}()
-
 	select {
 	// Unexpected exit
 	case <-toConsulCh:
@@ -457,18 +416,82 @@ func (c *Command) Run(args []string) int {
 }
 
 // remove all k8s services from Consul.
-func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client) error {
-	_, err := consulClient.Catalog().Deregister(&api.CatalogDeregistration{
-		Node:      c.flagConsulNodeName,
-		Partition: c.consul.Partition,
-	}, nil)
+func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client, nodeName string) error {
+	node, _, err := consulClient.Catalog().NodeServiceList(nodeName, &api.QueryOptions{Filter: c.flagFilter})
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("unable to deregister all K8S services from Consul: %s", err))
 		return err
 	}
 
+	var wg sync.WaitGroup
+	services := node.Services
+	errChan := make(chan error, 1)
+	batchSize := 300
+	maxRetries := 2
+	retryDelay := 200 * time.Millisecond
+
+	// Ask for user confirmation
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		c.UI.Info(fmt.Sprintf("Are you sure you want to delete %v K8S services from %v? (y/n): ", len(services), nodeName))
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input == "y" || input == "Y" {
+			break
+		} else if input == "n" || input == "N" {
+			return nil
+		} else {
+			c.UI.Info("Invalid input. Please enter 'y' or 'n'.")
+		}
+	}
+
+	for i := 0; i < len(services); i += batchSize {
+		end := i + batchSize
+		if end > len(services) {
+			end = len(services)
+		}
+
+		wg.Add(1)
+		go func(batch []*api.AgentService) {
+			defer wg.Done()
+
+			for _, service := range batch {
+				err := retryOps(func() error {
+					_, err := consulClient.Catalog().Deregister(&api.CatalogDeregistration{
+						Node:      nodeName,
+						ServiceID: service.ID,
+					}, nil)
+					return err
+				}, maxRetries, retryDelay, c.logger)
+				if err != nil {
+					if len(errChan) == 0 {
+						errChan <- err
+					}
+				}
+			}
+			c.UI.Info(fmt.Sprintf("Processed %v K8S services from %v", len(batch), nodeName))
+		}(services[i:end])
+		wg.Wait()
+	}
+
+	close(errChan)
+	if err = <-errChan; err != nil {
+		return err
+	}
 	c.UI.Info("All K8S services were deregistered from Consul")
 	return nil
+}
+
+func retryOps(operation func() error, maxRetries int, retryDelay time.Duration, logger hclog.Logger) error {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = operation()
+		if err == nil {
+			return nil
+		}
+		logger.Warn("Operation failed: %v. Retrying in %v millisecond...", err, retryDelay)
+		time.Sleep(retryDelay)
+	}
+	return err
 }
 
 func (c *Command) handleReady(rw http.ResponseWriter, _ *http.Request) {
@@ -500,7 +523,7 @@ func (c *Command) validateFlags() error {
 	// For the Consul node name to be discoverable via DNS, it must contain only
 	// dashes and alphanumeric characters. Length is also constrained.
 	// These restrictions match those defined in Consul's agent definition.
-	invalidDnsRe := regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
+	var invalidDnsRe = regexp.MustCompile(`[^A-Za-z0-9\\-]+`)
 	const maxDNSLabelLength = 63
 
 	if invalidDnsRe.MatchString(c.flagConsulNodeName) {
@@ -516,61 +539,11 @@ func (c *Command) validateFlags() error {
 		)
 	}
 
-	if c.flagMetricsPort != "" {
-		if _, valid := common.ParseScrapePort(c.flagMetricsPort); !valid {
-			return errors.New("-metrics-port must be a valid unprivileged port number")
-		}
-	}
-
 	return nil
 }
 
-func (c *Command) recordMetrics() (*prometheus.PrometheusSink, error) {
-	var err error
-
-	duration, err := time.ParseDuration(c.flagMetricsRetentionTime)
-	if err != nil {
-		return &prometheus.PrometheusSink{}, err
-	}
-
-	counters := [][]prometheus.CounterDefinition{
-		catalogtoconsul.SyncToConsulCounters,
-		catalogtok8s.SyncToK8sCounters,
-	}
-
-	var counterDefs []prometheus.CounterDefinition
-
-	for _, counter := range counters {
-		counterDefs = append(counterDefs, counter...)
-	}
-
-	opts := prometheus.PrometheusOpts{
-		Expiration:         duration,
-		CounterDefinitions: counterDefs,
-		GaugeDefinitions:   catalogtoconsul.SyncCatalogGauge,
-	}
-
-	sink, err := prometheus.NewPrometheusSinkFrom(opts)
-	if err != nil {
-		return &prometheus.PrometheusSink{}, err
-	}
-
-	return sink, nil
-}
-
-// authorizeMiddleware validates the token and returns http handler.
-func (c *Command) authorizeMiddleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// TO-DO: Validate the token and proceed to the next handler
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-const (
-	synopsis = "Sync Kubernetes services and Consul services."
-	help     = `
+const synopsis = "Sync Kubernetes services and Consul services."
+const help = `
 Usage: consul-k8s-control-plane sync-catalog [options]
 
   Sync K8S pods, services, and more with the Consul service catalog.
@@ -579,4 +552,3 @@ Usage: consul-k8s-control-plane sync-catalog [options]
   K8S services.
 
 `
-)

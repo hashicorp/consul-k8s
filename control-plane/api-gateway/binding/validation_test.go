@@ -563,8 +563,8 @@ func TestValidateTLS(t *testing.T) {
 			}
 
 			actualAcceptedError, actualResolvedRefsError := validateTLS(tt.gateway, tt.tls, resources)
-			require.ErrorIs(t, actualResolvedRefsError, tt.expectedResolvedRefsErr)
-			require.ErrorIs(t, actualAcceptedError, tt.expectedAcceptedErr)
+			require.Equal(t, tt.expectedResolvedRefsErr, actualResolvedRefsError)
+			require.Equal(t, tt.expectedAcceptedErr, actualAcceptedError)
 		})
 	}
 }

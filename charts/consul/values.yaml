@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.21.1-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.19-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -86,7 +86,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.7-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.5-dev
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -793,7 +793,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.7-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.5-dev
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
@@ -907,7 +907,6 @@ global:
 
   # Consul feature flags that will be enabled across components.
   # Supported feature flags:
-  #
   # - `v1dns`:
   #   When this flag is set, Consul agents use the legacy DNS implementation.
   #   This setting exists in the case a DNS bug is found after the refactoring introduced in v1.19.0.
@@ -1943,34 +1942,6 @@ dns:
   # @type: string
   additionalSpec: null
 
-  # Configures dns-proxy deployment.
-  proxy:
-    # True if you want to enable dns-proxy
-    enabled: false
-
-    # The number of deployment replicas.
-    replicas: 1
-
-    port: 53
-
-    # Refers to an existing Kubernetes secret that contains an ACL token
-    # for your Consul cluster. This token provides permissions for the DNS
-    # proxy. This field is required when `global.acls.manageSystemACLs` 
-    # is set to `false` to enable manual ACL management in a Consul cluster.
-    # node_prefix "" {
-    #   policy = "read"
-    # }
-    # service_prefix "" {
-    #   policy = "read"
-    # }
-    aclToken:
-      # The name of the Kubernetes secret that holds the ACL token.
-      # @type: string
-      secretName: null
-      # The key within the Kubernetes secret that holds the ACL token.
-      # @type: string
-      secretKey: null
-
 # Values that configure the Consul UI.
 ui:
   # If true, the UI will be enabled. This will
@@ -2119,10 +2090,6 @@ syncCatalog:
   # global.enabled.
   enabled: false
 
-  # True if you want to deregister all services in this cluster from consul that have been registered by the catalog sync when the `enabled` flag is set to false.
-  # @type: boolean
-  cleanupNodeOnRemoval: false
-
   # The name of the Docker image (including any tag) for consul-k8s-control-plane
   # to run the sync program.
   # @type: string
@@ -2253,19 +2220,6 @@ syncCatalog:
   # If false, LoadBalancer endpoints are not synced to Consul.
   syncLoadBalancerEndpoints: false
 
-  # Metrics settings for syncCatalog
-  metrics:
-    # This value enables or disables metrics collection for registered services, overriding the global metrics collection settings.
-    # @type: boolean
-    enabled: false
-    # This value sets the port to use for scraping syncCatalog metrics via prometheus, defaults to 20300 if not set. Must be in the port
-    # range of 1024-65535.
-    # @type: int
-    port: null
-    # This value sets the path to use for scraping syncCatalog metrics via prometheus, defaults to /metrics if not set.
-    # @type: string
-    path: null
-
   ingress:
     # Syncs the hostname from a Kubernetes Ingress resource to service registrations
     # when a rule matched a service. Currently only supports host based routing and
@@ -2379,8 +2333,6 @@ syncCatalog:
   #
   # @type: string
   annotations: null
-
-
 
 # Configures the automatic Connect sidecar injector.
 connectInject:
@@ -2583,18 +2535,7 @@ connectInject:
     # @type: boolean
     enabled: false
 
-    # If true, then use projected service account tokens for the CNI plugin and
-    # Uses auto-rotated projected token everytime when interacting with Kubernetes API.
-    # @type: boolean
-    autorotateToken: false
-
-    # Set the CNI plugin ServiceAccount token validity period. Applicable only when autorotateToken is true.
-    # In some environments this may not work(eg. azure 1.30+ with oidc enabled)  as providers may have native expiration limits.
-    # Optional and setup to 1 hour by default. Value is in seconds.
-    # @type: Integer
-    tokenExpiration: 3600
-
-    # Log level for the installer and plugin. Overrides global.logLevel. One of "trace", "debug", "info", "warn", or "error".
+    # Log level for the installer and plugin. Overrides global.logLevel
     # @type: string
     logLevel: null
 
@@ -2655,6 +2596,23 @@ connectInject:
       runAsNonRoot: false
       runAsGroup: 0
       runAsUser: 0
+
+    # updateStrategy for the CNI installer DaemonSet.
+    # Refer to the Kubernetes [Daemonset upgrade strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy)
+    # documentation.
+    # This should be a multi-line string mapping directly to the updateStrategy
+    #
+    # Example:
+    #
+    # ```yaml
+    # updateStrategy: |
+    #   rollingUpdate:
+    #     maxUnavailable: 5
+    #   type: RollingUpdate
+    # ```
+    #
+    # @type: string
+    updateStrategy: null
 
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.

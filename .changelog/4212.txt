@@ -1,3 +1,0 @@
-```release-note:enhancement
-sync-catalog: expose prometheus scrape metrics on sync-catalog pods
-```

@@ -1,3 +1,0 @@
-```release-note:enhancement
-catalog-sync: Added field to helm chart to purge all services registered with catalog-sync from consul on disabling of catalog-sync.
-```

@@ -69,12 +69,7 @@ func realMain(helmPath string) error {
 				// Add {{- if and .Values.connectInject.enabled .Values.global.peering.enabled  }} {{- end }} wrapper.
 				contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.global.peering.enabled }}\n%s{{- end }}\n", contents)
 			} else if dir == "external" {
-				// TCP Route is special, as it isn't installed onto GKE Autopilot, so it needs to have the option for `manageNonStandardCRDs`.
-				if info.Name() == "tcproutes.gateway.networking.k8s.io.yaml" {
-					contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled (or .Values.connectInject.apiGateway.manageExternalCRDs .Values.connectInject.apiGateway.manageNonStandardCRDs ) }}\n%s{{- end }}\n", contents)
-				} else {
-					contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}\n%s{{- end }}\n", contents)
-				}
+				contents = fmt.Sprintf("{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}\n%s{{- end }}\n", contents)
 			} else {
 				// Add {{- if .Values.connectInject.enabled }} {{- end }} wrapper.
 				contents = fmt.Sprintf("{{- if .Values.connectInject.enabled }}\n%s{{- end }}\n", contents)

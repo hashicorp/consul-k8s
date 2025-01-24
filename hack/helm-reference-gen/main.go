@@ -65,11 +65,11 @@ var (
 	// format. We then do the replace from $ => `.
 	docNodeTmpl = template.Must(
 		template.New("").Funcs(funcMap).Parse(
-			strings.ReplaceAll(
+			strings.Replace(
 				`{{- if eq .Column 1 }}### {{ .Key }} ((#h-{{ .Key | ToLower }}))
 
 {{ end }}{{ .LeadingIndent }}- ${{ .Key }}$ ((#v{{ .HTMLAnchor }})){{ if ne .FormattedKind "" }} (${{ .FormattedKind }}{{ if .FormattedDefault }}: {{ .FormattedDefault }}{{ end }}$){{ end }}{{ if .FormattedDocumentation}} - {{ .FormattedDocumentation }}{{ end }}`,
-				"$", "`")),
+				"$", "`", -1)),
 	)
 )
 

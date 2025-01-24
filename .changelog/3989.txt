@@ -1,3 +1,0 @@
-```release-note:bug
-helm: Fix ArgoCD hooks related annotations on server-acl-init Job, they must be added at Job definition and not template level.
-```

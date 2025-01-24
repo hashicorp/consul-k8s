@@ -26,7 +26,7 @@ jobs:
         repo: hashicorp/consul-k8s-workflows
         ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+        inputs: '{ "test-ce": false, "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
 
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
@@ -45,6 +45,7 @@ jobs:
           - check-name: Unit test control plane
           - check-name: Unit test cli
           - check-name: Unit test acceptance
+          - check-name: Unit test helm gen
     steps:
     - name: Update final status
       uses: docker://ghcr.io/curtbushko/commit-status-action:e1d661c757934ab35c74210b4b70c44099ec747a

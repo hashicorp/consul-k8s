@@ -9,8 +9,6 @@ KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.
 
 GO_MODULES := $(shell find . -name go.mod -exec dirname {} \; | sort)
 
-GOTESTSUM_PATH?=$(shell command -v gotestsum)
-
 ##@ Helm Targets
 
 .PHONY: gen-helm-docs
@@ -32,7 +30,7 @@ generate-external-crds: ## Generate CRDs for externally defined CRDs and copy th
 
 .PHONY: bats-tests
 bats-tests: ## Run Helm chart bats tests.
-	docker run -it -v $(CURDIR):/consul-k8s hashicorpdev/consul-helm-test:latest bats --jobs 4 /consul-k8s/charts/consul/test/unit -f "$(TEST_NAME)"
+	 bats --jobs 4 charts/consul/test/unit
 
 ##@ Control Plane Targets
 
@@ -47,8 +45,7 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
-	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
-	   --no-cache \
+	@docker build -t '$(DEV_IMAGE)' \
        --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
@@ -100,32 +97,11 @@ control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker
 
 .PHONY: control-plane-test
 control-plane-test: ## Run go test for the control plane.
-ifeq ("$(GOTESTSUM_PATH)","")
-	cd control-plane && go test ./...
-else
-	cd control-plane && \
-	gotestsum \
-		--format=pkgname \
-		--debug \
-		--rerun-fails=3 \
-		--packages="./..."
-endif
-
+	cd control-plane; go test ./...
 
 .PHONY: control-plane-ent-test
 control-plane-ent-test: ## Run go test with Consul enterprise tests. The consul binary in your PATH must be Consul Enterprise.
-ifeq ("$(GOTESTSUM_PATH)","")
-	cd control-plane && go test ./... -tags=enterprise
-else
-	cd control-plane && \
-	gotestsum \
-		--format=pkgname \
-		--debug \
-		--rerun-fails=3 \
-		--packages="./..." \
-		-- \
-		--tags enterprise
-endif
+	cd control-plane; go test ./... -tags=enterprise
 
 .PHONY: control-plane-cov
 control-plane-cov: ## Run go test with code coverage.
@@ -136,9 +112,6 @@ control-plane-clean: ## Delete bin and pkg dirs.
 	@rm -rf \
 		$(CURDIR)/control-plane/bin \
 		$(CURDIR)/control-plane/pkg
-	@rm -rf \
-		$(CURDIR)/control-plane/cni/bin \
-		$(CURDIR)/control-plane/cni/pkg
 
 .PHONY: control-plane-lint
 control-plane-lint: cni-plugin-lint ## Run linter in the control-plane directory.
@@ -338,11 +311,6 @@ eks-test-packages: ## eks test packages
 aks-test-packages: ## aks test packages
 	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
 
-
-.PHONY: openshift-test-packages
-openshift-test-packages: ## openshift test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/openshift_acceptance_test_packages.yaml"
-
 .PHONY: go-mod-tidy
 go-mod-tidy: ## Recursively run go mod tidy on all subdirectories
 	@./control-plane/build-support/scripts/mod_tidy.sh
@@ -436,7 +404,7 @@ ifndef CONSUL_K8S_RELEASE_DATE
 	$(error CONSUL_K8S_RELEASE_DATE is required, use format <Month> <Day>, <Year> (ex. October 4, 2022))
 endif
 ifndef CONSUL_K8S_NEXT_RELEASE_VERSION
-	$(error CONSUL_K8S_NEXT_RELEASE_VERSION is required)
+	$(error CONSUL_K8S_RELEASE_VERSION is required)
 endif
 ifndef CONSUL_K8S_CONSUL_VERSION
 	$(error CONSUL_K8S_CONSUL_VERSION is required)
