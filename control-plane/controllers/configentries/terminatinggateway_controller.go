@@ -121,7 +121,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if enabled {
-		err := r.updateACls(log, termGW)
+		err = r.updateACls(log, termGW)
 		if err != nil {
 			log.Error(err, "error updating terminating-gateway roles")
 			r.UpdateStatusFailedToSetACLs(ctx, termGW, err)
@@ -182,12 +182,8 @@ func (r *TerminatingGatewayController) aclsEnabled() (bool, error) {
 	return state.Token != "", nil
 }
 
-func (r *TerminatingGatewayController) partitionsEnabled() (bool, error) {
-	state, err := r.ConfigEntryController.ConsulServerConnMgr.State()
-	if err != nil {
-		return false, err
-	}
-	return state.Token != "", nil
+func (r *TerminatingGatewayController) adminPartition() string {
+	return defaultIfEmpty(r.ConfigEntryController.ConsulPartition)
 }
 
 func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consulv1alpha1.TerminatingGateway) error {
@@ -278,20 +274,29 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 
 	termGWPoliciesToKeepNames := mapset.NewSet[string]()
 	for _, service := range services {
+		log.Info("Checking for existing policies", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
 		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)), &capi.QueryOptions{})
 		if err != nil {
 			log.Error(err, "error reading policy")
 			return nil, nil, err
 		}
+		if existingPolicy != nil {
+			log.Info("Found for existing policies", "policy", existingPolicy.Name, "ID", existingPolicy.ID)
+		} else {
+			log.Info("Did not find for existing policies", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
+		}
 
 		if existingPolicy == nil {
 			policyTemplate := getPolicyTemplateFor(service.Name)
+			policyNamespace := defaultIfEmpty(service.Namespace)
+			policyAdminPartition := r.adminPartition()
+			log.Info("Templating new ACL Policy", "Service", service.Name, "Namespace", policyNamespace, "Partition", policyAdminPartition)
 			var data bytes.Buffer
 			if err := policyTemplate.Execute(&data, templateArgs{
 				EnableNamespaces: r.NamespacesEnabled,
 				EnablePartitions: r.PartitionsEnabled,
-				Namespace:        defaultIfEmpty(service.Namespace),
-				Partition:        defaultIfEmpty(r.ConfigEntryController.ConsulPartition),
+				Namespace:        policyNamespace,
+				Partition:        policyAdminPartition,
 				ServiceName:      service.Name,
 			}); err != nil {
 				// just panic if we can't compile the simple template
@@ -304,7 +309,10 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 				Rules: data.String(),
 			}, nil)
 			if err != nil {
+				log.Error(err, "error creating policy")
 				return nil, nil, err
+			} else {
+				log.Info("Created new ACL Policy", "Service", service.Name, "Namespace", policyNamespace, "Partition", policyAdminPartition)
 			}
 		}
 
