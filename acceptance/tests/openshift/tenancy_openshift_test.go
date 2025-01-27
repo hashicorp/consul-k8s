@@ -50,7 +50,7 @@ var (
 	gatewayClassControllerName = "consul.hashicorp.com/gateway-controller"
 )
 
-// This is a light copy of api_gateway_tenancy_test with modifications to run on openshift
+// This is a light copy of api_gateway_tenancy_test with modifications to run on openshift.
 func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 	cases := []struct {
 		secure             bool

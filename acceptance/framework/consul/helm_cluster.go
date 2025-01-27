@@ -482,12 +482,12 @@ func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, rele
 	}
 	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
 	if releaseName == "" {
-		serverPod = fmt.Sprintf("consul-server-0")
+		serverPod = "consul-server-0"
 	}
 	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
 }
 
-// for instances when namespace is being manually set by the test and needs to be overridden
+// For instances when namespace is being manually set by the test and needs to be overridden.
 func (h *HelmCluster) SetNamespace(ns string) {
 	h.helmOptions.KubectlOptions.Namespace = ns
 }
