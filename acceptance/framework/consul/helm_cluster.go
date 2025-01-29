@@ -156,7 +156,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 1}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
