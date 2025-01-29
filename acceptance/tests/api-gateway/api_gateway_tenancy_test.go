@@ -87,11 +87,6 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				"global.logLevel":                             "trace",
 				"connectInject.enabled":                       "true",
 				"connectInject.consulNamespaces.mirroringK8S": strconv.FormatBool(c.namespaceMirroring),
-
-				"connectInject.transparentProxy.defaultEnabled":                            "false",
-				"connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts": "8000",
-				"global.tls.enableAutoEncrypt":                                             "true",
-				"global.openshift.enabled":                                                 "true",
 			}
 
 			releaseName := helpers.RandomName()
