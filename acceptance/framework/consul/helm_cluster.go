@@ -481,7 +481,15 @@ func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, rele
 		releaseName = release[0]
 	}
 	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
+	if releaseName == "" {
+		serverPod = "consul-server-0"
+	}
 	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
+}
+
+// For instances when namespace is being manually set by the test and needs to be overridden.
+func (h *HelmCluster) SetNamespace(ns string) {
+	h.helmOptions.KubectlOptions.Namespace = ns
 }
 
 func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...string) (client *api.Client, configAddress string) {
@@ -514,10 +522,17 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 				// and will try to read the replication token from the federation secret.
 				// In secondary servers, we don't create a bootstrap token since ACLs are only bootstrapped in the primary.
 				// Instead, we provide a replication token that serves the role of the bootstrap token.
-				aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), releaseName+"-consul-bootstrap-acl-token", metav1.GetOptions{})
+				aclSecretName := releaseName + "-consul-bootstrap-acl-token"
+				if releaseName == "" {
+					aclSecretName = "consul-bootstrap-acl-token"
+				}
+				aclSecret, err := h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), aclSecretName, metav1.GetOptions{})
 				if err != nil && errors.IsNotFound(err) {
-					federationSecret := fmt.Sprintf("%s-consul-federation", releaseName)
-					aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecret, metav1.GetOptions{})
+					federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
+					if releaseName == "" {
+						federationSecretName = "consul-federation"
+					}
+					aclSecret, err = h.kubernetesClient.CoreV1().Secrets(namespace).Get(context.Background(), federationSecretName, metav1.GetOptions{})
 					require.NoError(r, err)
 					config.Token = string(aclSecret.Data["replicationToken"])
 				} else if err == nil {
