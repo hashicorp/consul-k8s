@@ -234,6 +234,22 @@ spec:
             {{- end }}
             {{- end }}
         {{- end }}
+        {{- range .Values.server.snapshotAgent.extraVolumes }}
+        - name: userconfig-snapshot-{{ .name }}
+          {{ .type }}:
+            {{- if (eq .type "configMap") }}
+            name: {{ .name }}
+            {{- else if (eq .type "secret") }}
+            secretName: {{ .name }}
+            {{- end }}
+            {{- with .items }}
+            items:
+            {{- range . }}
+            - key: {{.key}}
+              path: {{.path}}
+            {{- end }}
+            {{- end }}
+        {{- end }}
       {{- if .Values.server.priorityClassName }}
       priorityClassName: {{ .Values.server.priorityClassName | quote }}
       {{- end }}
@@ -564,6 +580,7 @@ spec:
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
               {{- end }}
             {{- end }}
+            {{- include "consul.extraEnvironmentVars" .Values.server.snapshotAgent | nindent 12 }}
           command:
             - "/bin/sh"
             - "-ec"
@@ -610,6 +627,11 @@ spec:
             - name: consul-ca-cert
               mountPath: /consul/tls/ca
               readOnly: true
+            {{- end }}
+            {{- range .Values.server.snapshotAgent.extraVolumes }}
+            - name: userconfig-snapshot-{{ .name }}
+              readOnly: true
+              mountPath: /consul/userconfig/{{ .name }}
             {{- end }}
           {{- with .Values.server.snapshotAgent.resources }}
           resources:

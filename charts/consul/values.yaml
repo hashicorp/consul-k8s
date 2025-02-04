@@ -1257,6 +1257,35 @@ server:
     # @type: string
     caCert: null
 
+    # A list of extra environment variables to set on the snapshot agent specifically
+    # This could be used to configure credentials that the rest of the
+    # stateful set would not need access to, like GOOGLE_APPLICATION_CREDENTIALS
+    # @type: map
+    extraEnvironmentVars: { }
+
+    # A list of extra volumes to mount onto the snapshot agent. This
+    # is useful for bringing in extra data that only the snapshot agent needs access
+    # to. Like storage credentials. The value of this should be a list of objects.
+    #
+    # Example:
+    #
+    # ```yaml
+    # extraVolumes:
+    #   - type: secret
+    #     name: storage-credentials
+    # ```
+    #
+    # Each object supports the following keys:
+    #
+    # - `type` - Type of the volume, must be one of "configMap" or "secret". Case sensitive.
+    #
+    # - `name` - Name of the configMap or secret to be mounted. This also controls
+    #   the path that it is mounted to. The volume will be mounted to `/consul/userconfig/<name>`.
+    #
+    # The snapshot agent will not attempt to load any volumes passed in this stanza
+    # @type: array<map>
+    extraVolumes: [ ]
+
   # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
   # and configure a sink and filters for their audit logs. Please refer to
   # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
