@@ -1,0 +1,3 @@
+```release-note:enhancement
+helm: Add support for `server.snapshotAgent.extraVolumes` and `server.snapshotAgent.extraEnvironmentVars` so privileged credentials can be configured for the snapshot agent.
+```
