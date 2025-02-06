@@ -662,7 +662,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service = &rs
 							r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 							r.Service.Address = address.Address
-
+							r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
 							t.consulMap[key] = append(t.consulMap[key], &r)
 							// Only consider the first address that matches. In some cases
 							// there will be multiple addresses like when using AWS CNI.
@@ -683,7 +683,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 								r.Service = &rs
 								r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 								r.Service.Address = address.Address
-
+								r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
 								t.consulMap[key] = append(t.consulMap[key], &r)
 								// Only consider the first address that matches. In some cases
 								// there will be multiple addresses like when using AWS CNI.
@@ -778,23 +778,7 @@ func (t *ServiceResource) registerServiceInstance(
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
 				r.Service.Port = epPort
-				r.Service.Meta = make(map[string]string)
-				// Deepcopy baseService.Meta into r.Service.Meta as baseService is shared
-				// between all nodes of a service
-				for k, v := range baseService.Meta {
-					r.Service.Meta[k] = v
-				}
-				if endpoint.TargetRef != nil {
-					r.Service.Meta[ConsulK8SRefValue] = endpoint.TargetRef.Name
-					r.Service.Meta[ConsulK8SRefKind] = endpoint.TargetRef.Kind
-				}
-				if endpoint.NodeName != nil {
-					r.Service.Meta[ConsulK8SNodeName] = *endpoint.NodeName
-				}
-				if endpoint.Zone != nil {
-					r.Service.Meta[ConsulK8STopologyZone] = *endpoint.Zone
-				}
-
+				r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
 				r.Check = &consulapi.AgentCheck{
 					CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, addr)),
 					Name:      consulKubernetesCheckName,
@@ -1109,4 +1093,26 @@ func getServiceWeight(weight string) (int, error) {
 	}
 
 	return weightI, nil
+}
+
+// deepcopy baseService.Meta into r.Service.Meta as baseService is shared between all nodes of a service.
+// update service meta with k8s topology info.
+func updateServiceMeta(baseServiceMeta map[string]string, endpoint discoveryv1.Endpoint) map[string]string {
+
+	serviceMeta := make(map[string]string)
+
+	for k, v := range baseServiceMeta {
+		serviceMeta[k] = v
+	}
+	if endpoint.TargetRef != nil {
+		serviceMeta[ConsulK8SRefValue] = endpoint.TargetRef.Name
+		serviceMeta[ConsulK8SRefKind] = endpoint.TargetRef.Kind
+	}
+	if endpoint.NodeName != nil {
+		serviceMeta[ConsulK8SNodeName] = *endpoint.NodeName
+	}
+	if endpoint.Zone != nil {
+		serviceMeta[ConsulK8STopologyZone] = *endpoint.Zone
+	}
+	return serviceMeta
 }

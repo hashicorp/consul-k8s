@@ -1,0 +1,3 @@
+```release-note:bug
+cli: fix issue where the `consul-k8s proxy list` command does not include API gateways.
+```
