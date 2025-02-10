@@ -110,18 +110,20 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		container.Resources = *gcc.Spec.DeploymentSpec.Resources
 	}
 
-	// If running in vanilla K8s, run as root to allow binding to privileged ports;
-	// otherwise, allow the user to be assigned by OpenShift.
 	container.SecurityContext = &corev1.SecurityContext{
+		AllowPrivilegeEscalation: ptr.To(false),
 		ReadOnlyRootFilesystem: ptr.To(true),
+		RunAsNonRoot: 		 ptr.To(true),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
+		// NET_BIND_SERVICE is a requirement for consul-dataplane, even though we don't
+		// bind to privileged ports.
 		Capabilities: &corev1.Capabilities{
 			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
-	}
-	if !config.EnableOpenShift {
-		container.SecurityContext.RunAsUser = ptr.To(int64(0))
 	}
 
 	return container, nil
