@@ -2977,6 +2977,8 @@ connectInject:
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-port`
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path`
     # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-startup-path`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-startup-grace-period-seconds`
+    # - `consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-startup-path`
     # @type: map
     lifecycle:
       # @type: boolean

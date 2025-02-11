@@ -259,6 +259,8 @@ spec:
                 -default-sidecar-proxy-lifecycle-graceful-port={{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulPort }} \
                 -default-sidecar-proxy-lifecycle-graceful-shutdown-path="{{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulShutdownPath }}" \
                 -default-sidecar-proxy-lifecycle-graceful-startup-path="{{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulStartupPath }}" \
+                -default-sidecar-proxy-lifecycle-startup-grace-period-seconds={{ .Values.connectInject.sidecarProxy.lifecycle.defaultStartupGracePeriodSeconds }} \
+                -default-sidecar-proxy-lifecycle-graceful-startup-path={{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulStartupPath | quote }} \
                 -default-sidecar-proxy-startup-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultStartupFailureSeconds }} \
                 -default-sidecar-proxy-liveness-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultLivenessFailureSeconds }} \
                 {{- if .Values.connectInject.initContainer }}

@@ -65,6 +65,9 @@ const (
 	// DefaultGracefulStartupPath is the default path that consul-dataplane uses for graceful startup.
 	DefaultGracefulStartupPath = "/graceful_startup"
 
+	// DefaultStartupGracePeriodSeconds is the default number of seconds to block containers waiting for dataplane to start.
+	DefaultStartupGracePeriodSeconds = 0
+
 	// DefaultWANPort is the default port that consul-dataplane uses for WAN.
 	DefaultWANPort = 8443
 

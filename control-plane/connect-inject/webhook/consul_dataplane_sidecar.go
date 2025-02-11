@@ -172,6 +172,19 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		LivenessProbe:  livenessProbe,
 	}
 
+	if lifecycleEnabled, err := w.LifecycleConfig.EnableProxyLifecycle(pod); lifecycleEnabled && err == nil {
+		// gracefulPort, _ := w.LifecycleConfig.GracefulPort(pod)
+		container.Lifecycle = &corev1.Lifecycle{
+			PostStart: &corev1.LifecycleHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						"/usr/local/bin/consul-dataplane", "graceful-startup",
+					},
+				},
+			},
+		}
+	}
+
 	if w.AuthMethod != "" {
 		container.VolumeMounts = append(container.VolumeMounts, saTokenVolumeMount)
 	}

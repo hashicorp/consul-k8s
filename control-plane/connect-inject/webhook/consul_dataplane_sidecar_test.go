@@ -1532,7 +1532,7 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				},
 			},
 			annotations: nil,
-			expCmdArgs:  "graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -startup-grace-period-seconds=10 -graceful-startup-path=/start",
+			expCmdArgs:  "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -graceful-startup-path=/start -startup-grace-period-seconds=10",
 		},
 		{
 			name:    "no defaults, all annotations",
@@ -1546,7 +1546,7 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         gracefulShutdownPath,
 				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          gracefulStartupPath,
 			},
-			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -startup-grace-period-seconds=10 -graceful-startup-path=/start",
+			expCmdArgs: "-graceful-port=20307 -shutdown-drain-listeners -shutdown-grace-period-seconds=10 -graceful-shutdown-path=/exit -graceful-startup-path=/start -startup-grace-period-seconds=10",
 		},
 		{
 			name: "annotations override defaults",
@@ -1570,7 +1570,7 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationSidecarProxyLifecycleGracefulShutdownPath:         "/foo",
 				constants.AnnotationSidecarProxyLifecycleGracefulStartupPath:          "/bar",
 			},
-			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo -startup-grace-period-seconds=15 -graceful-startup-path=/bar",
+			expCmdArgs: "-graceful-port=20317 -shutdown-grace-period-seconds=15 -graceful-shutdown-path=/foo -graceful-startup-path=/bar -startup-grace-period-seconds=15",
 		},
 		{
 			name: "lifecycle disabled, no annotations",
@@ -1629,6 +1629,18 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 				constants.AnnotationEnableSidecarProxyLifecycle:                       "false",
 				constants.AnnotationEnableSidecarProxyLifecycleShutdownDrainListeners: "false",
 				constants.AnnotationSidecarProxyLifecycleShutdownGracePeriodSeconds:   "0",
+			},
+			expCmdArgs: "",
+		},
+		{
+			name: "annotations skip graceful startup",
+			webhook: MeshWebhook{
+				LifecycleConfig: lifecycle.Config{
+					DefaultEnableProxyLifecycle: false,
+				},
+			},
+			annotations: map[string]string{
+				constants.AnnotationEnableSidecarProxyLifecycle: "false",
 			},
 			expCmdArgs: "",
 		},
