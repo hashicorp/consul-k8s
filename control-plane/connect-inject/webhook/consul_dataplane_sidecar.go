@@ -272,6 +272,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
 		Capabilities: &corev1.Capabilities{
 			Add: []corev1.Capability{"NET_BIND_SERVICE"},
+			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: ptr.To(true),
 	}
