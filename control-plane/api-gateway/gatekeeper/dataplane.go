@@ -112,8 +112,8 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 
 	container.SecurityContext = &corev1.SecurityContext{
 		AllowPrivilegeEscalation: ptr.To(false),
-		ReadOnlyRootFilesystem: ptr.To(true),
-		RunAsNonRoot: 		 ptr.To(true),
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		RunAsNonRoot:             ptr.To(true),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
