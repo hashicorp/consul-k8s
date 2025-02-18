@@ -1,0 +1,7 @@
+```release-note:feature
+control-plane: Allow to inject consul-dataplane as native sidecar.
+```
+
+```release-note:feature
+helm: allow to set the flag to inject consul-dataplane as native sidecar.
+```
