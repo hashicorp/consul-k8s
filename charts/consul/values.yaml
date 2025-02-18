@@ -3001,6 +3001,9 @@ connectInject:
     # A value of zero disables the probe.
     defaultLivenessFailureSeconds: 0
 
+    # Use native Sidecars to inject consul dataplane
+    nativeSidecarsEnabled: false
+
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
   # Kubernetes, however they should be tweaked with the recommended defaults as shown below to speed up service registration times.

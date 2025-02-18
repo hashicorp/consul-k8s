@@ -176,6 +176,11 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		container.VolumeMounts = append(container.VolumeMounts, saTokenVolumeMount)
 	}
 
+	if w.NativeSidecarsEnabled {
+		restartPolicy := corev1.ContainerRestartPolicyAlways
+		container.RestartPolicy = &restartPolicy
+	}
+
 	if useProxyHealthCheck(pod) {
 		// Configure the Readiness Address for the proxy's health check to be the Pod IP.
 		container.Env = append(container.Env, corev1.EnvVar{
@@ -608,6 +613,20 @@ func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
 		return int32(seconds)
 	}
 	return 0
+}
+
+// getNativeSidecarsEnabled returns whether native sidecars is enabled either via the default value in the meshWebhook, or if it's been
+// overridden via the annotation.
+func (w *MeshWebhook) getNativeSidecarsEnabled(pod corev1.Pod) bool {
+	enabled := w.NativeSidecarsEnabled
+	if v, ok := pod.Annotations[constants.AnnotationNativeSidecarsEnabled]; ok {
+		nativeSidecarsEnabled, err := strconv.ParseBool(v)
+		if err != nil {
+			return enabled
+		}
+		return nativeSidecarsEnabled
+	}
+	return enabled
 }
 
 // getMetricsPorts creates container ports for exposing services such as prometheus.

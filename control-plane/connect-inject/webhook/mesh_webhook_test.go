@@ -1153,6 +1153,107 @@ func TestHandlerHandle(t *testing.T) {
 				// Note: no DNS policy/config additions.
 			},
 		},
+
+		{
+			"empty pod basic with native sidecars",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+				NativeSidecarsEnabled: true,
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+			},
+		},
+
+		{
+			"empty pod basic with native sidecars annotation",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             defaultTestClientWithNamespace(),
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{},
+							Annotations: map[string]string{
+								constants.AnnotationNativeSidecarsEnabled: "true",
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name: "web",
+								},
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+			},
+		},
 	}
 
 	for _, tt := range cases {

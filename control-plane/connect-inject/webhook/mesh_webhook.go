@@ -164,6 +164,9 @@ type MeshWebhook struct {
 	// configuration should come from the default flags or annotations. The meshWebhook uses this to configure container sidecar proxy args.
 	LifecycleConfig lifecycle.Config
 
+	// Use native Sidecars to inject consul dataplane.
+	NativeSidecarsEnabled bool
+
 	// Default Envoy concurrency flag, this is the number of worker threads to be used by the proxy.
 	DefaultEnvoyProxyConcurrency int
 
@@ -322,12 +325,17 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
-		//Append the Envoy sidecar before the application container only if lifecycle enabled.
 
-		if lifecycleEnabled && ok == nil {
-			pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
+		// Append the Envoy sidecar before the application container only if lifecycle enabled.
+		// Use Kubernetes Native Sidecars if nativeSidecars enabled
+		if w.getNativeSidecarsEnabled(pod) {
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
 		} else {
-			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+			if lifecycleEnabled && ok == nil {
+				pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
+			} else {
+				pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+			}
 		}
 
 	} else {
@@ -405,11 +413,15 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 			// If Lifecycle is enabled, add to the list of sidecar containers to be added
 			// to pod containers at the end in order to preserve relative ordering.
-			if lifecycleEnabled {
-				sidecarContainers = append(sidecarContainers, envoySidecar)
+			if w.getNativeSidecarsEnabled(pod) {
+				pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
 			} else {
-				pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+				if lifecycleEnabled {
+					sidecarContainers = append(sidecarContainers, envoySidecar)
+				} else {
+					pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 
+				}
 			}
 
 		}

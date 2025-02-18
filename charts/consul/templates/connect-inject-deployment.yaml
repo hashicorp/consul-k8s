@@ -261,6 +261,11 @@ spec:
                 -default-sidecar-proxy-lifecycle-graceful-startup-path="{{ .Values.connectInject.sidecarProxy.lifecycle.defaultGracefulStartupPath }}" \
                 -default-sidecar-proxy-startup-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultStartupFailureSeconds }} \
                 -default-sidecar-proxy-liveness-failure-seconds={{ .Values.connectInject.sidecarProxy.defaultLivenessFailureSeconds }} \
+                {{- if .Values.connectInject.sidecarProxy.nativeSidecarsEnabled }}
+                -native-sidecars-enabled=true \
+                {{- else }}
+                -native-sidecars-enabled=false \
+                {{- end }}
                 {{- if .Values.connectInject.initContainer }}
                 {{- $initResources := .Values.connectInject.initContainer.resources }}
                 {{- if not (kindIs "invalid" $initResources.limits.memory) }}
