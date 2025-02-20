@@ -126,6 +126,15 @@ spec:
       {{- end }}
       initContainers:
       - name: mesh-gateway-init
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
         image: {{ .Values.global.imageK8S }}
         {{ template "consul.imagePullPolicy" . }}
         env:
