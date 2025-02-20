@@ -2531,7 +2531,7 @@ connectInject:
       # This is useful if you don't want to give your containers extra permissions to run privileged ports.
       # Example: The gateway listener is defined on port 80, but the underlying value of the port on the container
       # will be the 80 + the number defined below.
-      mapPrivilegedContainerPorts: 0
+      mapPrivilegedContainerPorts: 8000
 
       # This value contains settings related to the gateway_resources_job that runs on helm install
       resourceJob:
