@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -27,7 +28,7 @@ const (
 	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
 )
 
-func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string, mounts []corev1.VolumeMount) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -38,7 +39,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(metrics, namespace, config, bearerTokenFile, name)
+	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -54,7 +55,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	}
 
 	container := corev1.Container{
-		Name:            name,
+		Name:            gateway.Name,
 		Image:           config.ImageDataplane,
 		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
 
@@ -110,8 +111,20 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		container.Resources = *gcc.Spec.DeploymentSpec.Resources
 	}
 
+	// For backwards-compatibility, we allow privilege escalation if port mapping
+	// is disabled and the Gateway utilizes a privileged port (< 1024).
+	usingPrivilegedPorts := false
+	if gcc.Spec.MapPrivilegedContainerPorts == 0 {
+		for _, listener := range gateway.Spec.Listeners {
+			if listener.Port < 1024 {
+				usingPrivilegedPorts = true
+				break
+			}
+		}
+	}
+
 	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(false),
+		AllowPrivilegeEscalation: ptr.To(usingPrivilegedPorts),
 		ReadOnlyRootFilesystem:   ptr.To(true),
 		RunAsNonRoot:             ptr.To(true),
 		SeccompProfile: &corev1.SeccompProfile{
