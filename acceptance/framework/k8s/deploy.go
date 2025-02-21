@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
-	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
 // Deploy creates a Kubernetes deployment by applying configuration stored at filepath,
@@ -141,7 +142,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 			require.Contains(r, output, expectedOutput)
 		} else {
 			require.Error(r, err)
-			require.Condition(r, func() bool {
+			require.Conditionf(r, func() bool {
 				exists := false
 				for _, msg := range failureMessages {
 					if strings.Contains(output, msg) {
@@ -149,7 +150,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 					}
 				}
 				return exists
-			})
+			}, "expected failure messages %q but got %q", failureMessages, output)
 		}
 	})
 }
