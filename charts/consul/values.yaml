@@ -1955,7 +1955,7 @@ dns:
 
     # Refers to an existing Kubernetes secret that contains an ACL token
     # for your Consul cluster. This token provides permissions for the DNS
-    # proxy. This field is required when `global.acls.manageSystemACLs` 
+    # proxy. This field is required when `global.acls.manageSystemACLs`
     # is set to `false` to enable manual ACL management in a Consul cluster.
     # node_prefix "" {
     #   policy = "read"
@@ -2099,6 +2099,15 @@ ui:
     # This value is only used if `ui.enabled` is set to true.
     # @type: string
     baseURL: http://prometheus-server
+
+    # pathAllowlist specifies the paths that may be proxied to when appended to
+    # baseURL. This limits exposure of the metrics backend to consul.
+    # Refer to [`path_allowlist`](https://developer.hashicorp.com/consul/docs/connect/observability/ui-visualization#path-allowlist)
+    # This value is only used if `ui.enabled` is set to true.
+    # @type: string
+    pathAllowlist:
+      - /api/v1/query_range
+      - /api/v1/query
 
   # Corresponds to [`dashboard_url_templates`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates)
   # configuration.
@@ -2249,7 +2258,7 @@ syncCatalog:
   # Set this to false to skip syncing ClusterIP services.
   syncClusterIPServices: true
 
-  # If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul. 
+  # If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul.
   # If false, LoadBalancer endpoints are not synced to Consul.
   syncLoadBalancerEndpoints: false
 
@@ -2504,7 +2513,7 @@ connectInject:
         # This value sets the path to use for scraping gateway metrics via prometheus, defaults to /metrics if not set.
         # @type: string
         path: null
-        
+
       # The resource settings for Pods handling traffic for Gateway API.
       # @recurse: false
       # @type: map
