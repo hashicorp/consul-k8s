@@ -151,7 +151,7 @@ func TestHandlerContainerInit(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
-					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),container=consul-connect-inject-init",
 				},
 			},
 		},
@@ -645,7 +645,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
-					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),container=consul-connect-inject-init",
 				},
 				{
 					Name:  "CONSUL_LOGIN_NAMESPACE",
@@ -716,7 +716,7 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				},
 				{
 					Name:  "CONSUL_LOGIN_META",
-					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME)",
+					Value: "pod=$(POD_NAMESPACE)/$(POD_NAME),container=consul-connect-inject-init",
 				},
 				{
 					Name:  "CONSUL_LOGIN_NAMESPACE",
