@@ -93,6 +93,9 @@ global:
   # @default: ""
   imagePullPolicy: ""
 
+  # The name (and tag) of the Docker image used for side scripts
+  imageSideScript: docker.io/library/busybox:1.36.1-musl
+
   # The name of the datacenter that the agents should
   # register as. This can't be changed once the Consul cluster is up and running
   # since Consul doesn't support an automatic way to change this value currently:
@@ -1064,6 +1067,9 @@ server:
   # If you change this setting, you must restart the agent for the change to take effect. Default is false.
   # @type: boolean
   enableAgentDebug: false
+
+  # When set to true, adds an initContainer in the Consul server statefull set to fix the ownership of the folder containing the consul data.
+  enableConsulDataDirectoryOwnership: false
 
   serviceAccount:
     # This value defines additional annotations for the server service account. This should be formatted as a multi-line
