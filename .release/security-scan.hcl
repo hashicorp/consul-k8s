@@ -15,6 +15,7 @@
 container {
   dependencies = true
   alpine_secdb = true
+  osv = true
 
   secrets {
     all = true
