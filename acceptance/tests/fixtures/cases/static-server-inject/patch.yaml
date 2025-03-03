@@ -13,10 +13,12 @@ spec:
     spec:
       containers:
         - name: static-server
+          image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: true
+            runAsUser: 1000
             seccompProfile:
               type: RuntimeDefault
             capabilities:
@@ -24,7 +26,6 @@ spec:
                 - "NET_BIND_SERVICE"
               drop:
                 - ALL
-          image: docker.mirror.hashicorp.services/hashicorp/http-echo:latest
           args:
             - -text="hello world"
             - -listen=:8080
@@ -44,11 +45,8 @@ spec:
             failureThreshold: 30
             periodSeconds: 1
           readinessProbe:
-            httpGet:
-              path: /
-              port: 8080
-#            exec:
-#              command: ['sh', '-c', 'test ! -f /tmp/unhealthy']
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy']
             initialDelaySeconds: 1
             failureThreshold: 1
             periodSeconds: 1
