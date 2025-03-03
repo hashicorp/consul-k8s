@@ -5,3 +5,6 @@ apiVersion: consul.hashicorp.com/v1alpha1
 kind: GatewayClassConfig
 metadata:
   name: gateway-class-config
+spec:
+  #Gateways won't work in a PSA environment without this value set
+  mapPrivilegedContainerPorts: 8000

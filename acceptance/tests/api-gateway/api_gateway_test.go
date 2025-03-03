@@ -38,6 +38,7 @@ const (
 func TestAPIGateway_Basic(t *testing.T) {
 	cases := []struct {
 		secure bool
+		psa    bool
 	}{
 		{
 			secure: false,
@@ -45,17 +46,28 @@ func TestAPIGateway_Basic(t *testing.T) {
 		{
 			secure: true,
 		},
+		{
+			secure: true,
+			psa:    true,
+		},
+		//{
+		//	secure: false,
+		//	psa:    true,
+		//},
 	}
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t", c.secure)
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
+			//enable PSA enforcment for some tests
+			cfg.EnableRestrictedPSAEnforcement = c.psa
 			helmValues := map[string]string{
 				"connectInject.enabled":        "true",
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.logLevel":              "trace",
+				"connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts": "8000",
 			}
 
 			releaseName := helpers.RandomName()
@@ -239,9 +251,10 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			// finally we check that we can actually route to the service via the gateway
 			k8sOptions := ctx.KubectlOptions(t)
-			targetHTTPAddress := fmt.Sprintf("http://%s", gatewayAddress)
-			targetHTTPSAddress := fmt.Sprintf("https://%s", gatewayAddress)
-			targetTCPAddress := fmt.Sprintf("http://%s:81", gatewayAddress)
+			//we have to account for port mapping inside the cluster.
+			targetHTTPAddress := fmt.Sprintf("http://%s:8080", gatewayAddress)
+			targetHTTPSAddress := fmt.Sprintf("https://%s:8443", gatewayAddress)
+			targetTCPAddress := fmt.Sprintf("http://%s:8081", gatewayAddress)
 
 			if c.secure {
 				// check that intentions keep our connection from happening
