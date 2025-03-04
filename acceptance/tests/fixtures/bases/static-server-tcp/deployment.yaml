@@ -24,7 +24,6 @@ spec:
           image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             runAsNonRoot: true
             runAsUser: 1000
             seccompProfile:
