@@ -6,6 +6,8 @@ kind: GatewayClassConfig
 metadata:
   name: gateway-class-config
 spec:
+  #explicitly setting to 0
+  mapPrivilegedContainerPorts: 0
   deployment:
     defaultInstances: 2
     maxInstances: 3
