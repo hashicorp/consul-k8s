@@ -20,7 +20,6 @@ spec:
         - name: static-client
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             runAsNonRoot: true
             runAsUser: 1000
             seccompProfile:

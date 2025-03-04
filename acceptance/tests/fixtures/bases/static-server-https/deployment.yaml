@@ -20,7 +20,6 @@ spec:
           image: caddy:latest
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             runAsNonRoot: true
             runAsUser: 1000
             seccompProfile:
