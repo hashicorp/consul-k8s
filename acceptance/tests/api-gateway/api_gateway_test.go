@@ -37,8 +37,8 @@ const (
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestAPIGateway_Basic(t *testing.T) {
 	cases := []struct {
-		secure bool
-		psa    bool
+		secure                   bool
+		restrictedPSAEnforcement bool
 	}{
 		{
 			secure: false,
@@ -46,22 +46,24 @@ func TestAPIGateway_Basic(t *testing.T) {
 		{
 			secure: true,
 		},
+		// There is an argument that all tests should be run in a restricted PSA namespace
+		// However we are on a time crunch and don't want to make sweeping changes to the test suite
 		{
-			secure: true,
-			psa:    true,
+			secure:                   true,
+			restrictedPSAEnforcement: true,
 		},
 		{
-			secure: false,
-			psa:    true,
+			secure:                   false,
+			restrictedPSAEnforcement: true,
 		},
 	}
 	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t", c.secure)
+		name := fmt.Sprintf("secure: %t restrictedPSAEnforcement: %t", c.secure, c.restrictedPSAEnforcement)
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
 			//enable PSA enforcment for some tests
-			cfg.EnableRestrictedPSAEnforcement = c.psa
+			cfg.EnableRestrictedPSAEnforcement = c.restrictedPSAEnforcement
 			helmValues := map[string]string{
 				"connectInject.enabled":        "true",
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
@@ -74,11 +76,10 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			consulCluster.Create(t)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				if c.psa {
+				if c.restrictedPSAEnforcement {
 					//reset namespace
 					k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "--overwrite", "ns", ctx.KubectlOptions(t).Namespace,
 						"pod-security.kubernetes.io/enforce=privileged",
-						"pod-security.kubernetes.io/enforce-version=v1.24",
 					)
 				}
 			})
