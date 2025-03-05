@@ -6,5 +6,5 @@ kind: GatewayClassConfig
 metadata:
   name: gateway-class-config
 spec:
-  #Gateways won't work in a PSA environment without this value set
+  # In order for Gateways to work whether or not we're enforcing the "restricted" pod security policy, they must not used privileged ports
   mapPrivilegedContainerPorts: 8000
