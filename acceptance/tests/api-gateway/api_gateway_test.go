@@ -573,13 +573,13 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	// finally we check that we can actually route to the service(s) via the gateway
 	k8sOptions := ctx.KubectlOptions(t)
-	targetHTTPAddress := fmt.Sprintf("http://%s/v1", gatewayAddress)
-	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8081/admin", gatewayAddress)
-	targetHTTPAddressPet := fmt.Sprintf("http://%s:8081/pet", gatewayAddress)
-	targetHTTPAddressAdmin2 := fmt.Sprintf("http://%s:8081/admin-2", gatewayAddress)
-	targetHTTPAddressPet2 := fmt.Sprintf("http://%s:8081/pet-2", gatewayAddress)
-	targetHTTPAddressAdminNoAuthOnRoute := fmt.Sprintf("http://%s:8081/admin-no-auth", gatewayAddress)
-	targetHTTPAddressPetNotAuthOnRoute := fmt.Sprintf("http://%s:8081/pet-no-auth", gatewayAddress)
+	targetHTTPAddress := fmt.Sprintf("http://%s:8080/v1", gatewayAddress)
+	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8083/admin", gatewayAddress)
+	targetHTTPAddressPet := fmt.Sprintf("http://%s:8083/pet", gatewayAddress)
+	targetHTTPAddressAdmin2 := fmt.Sprintf("http://%s:8083/admin-2", gatewayAddress)
+	targetHTTPAddressPet2 := fmt.Sprintf("http://%s:8083/pet-2", gatewayAddress)
+	targetHTTPAddressAdminNoAuthOnRoute := fmt.Sprintf("http://%s:8083/admin-no-auth", gatewayAddress)
+	targetHTTPAddressPetNotAuthOnRoute := fmt.Sprintf("http://%s:8083/pet-no-auth", gatewayAddress)
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
