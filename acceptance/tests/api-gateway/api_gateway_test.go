@@ -152,7 +152,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// leader election so we may need to wait a long time for
 			// the reconcile loop to run (hence the timeout here).
 			var gatewayAddress string
-			counter := &retry.Counter{Count: 120, Wait: 3 * time.Second}
+			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
