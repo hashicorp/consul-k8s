@@ -58,6 +58,10 @@ func TestAPIGateway_Basic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
+			if cfg.EnableCNI && c.restrictedPSAEnforcement {
+				t.Skipf("skipping because -enable-cni is set and restrictedPSAEnforcement is already tested with regular tproxy")
+			}
+
 			//enable PSA enforcment for some tests
 			cfg.EnableRestrictedPSAEnforcement = c.restrictedPSAEnforcement
 			helmValues := map[string]string{
