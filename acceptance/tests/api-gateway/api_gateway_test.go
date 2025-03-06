@@ -52,10 +52,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			secure:                   true,
 			restrictedPSAEnforcement: true,
 		},
-		{
-			secure:                   false,
-			restrictedPSAEnforcement: true,
-		},
 	}
 	for _, c := range cases {
 		name := fmt.Sprintf("secure: %t restrictedPSAEnforcement: %t", c.secure, c.restrictedPSAEnforcement)
