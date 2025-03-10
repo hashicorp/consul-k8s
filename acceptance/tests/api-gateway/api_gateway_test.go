@@ -63,7 +63,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
 			if cfg.EnableTransparentProxy && c.restrictedPSAEnforcement && !cfg.EnableCNI {
-				t.Skipf("skipping because -enable-tproxy is set and tproxy cannot run in restrictedPSA without CNI enabled")
+				t.Skipf("skipping because -enable-transparent-proxy is set and -enable-cni is not and tproxy cannot run in restrictedPSA without CNI enabled")
 			}
 
 			helmValues := map[string]string{
