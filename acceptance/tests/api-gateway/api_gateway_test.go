@@ -40,16 +40,20 @@ func TestAPIGateway_Basic(t *testing.T) {
 		secure                   bool
 		restrictedPSAEnforcement bool
 	}{
-		//{
-		//	secure: false,
-		//},
-		//{
-		//	secure: true,
-		//},
+		{
+			secure: false,
+		},
+		{
+			secure: true,
+		},
 		// There is an argument that all tests should be run in a restricted PSA namespace
 		// However we are on a time crunch and don't want to make sweeping changes to the test suite
 		{
 			secure:                   true,
+			restrictedPSAEnforcement: true,
+		},
+		{
+			secure:                   false,
 			restrictedPSAEnforcement: true,
 		},
 	}
