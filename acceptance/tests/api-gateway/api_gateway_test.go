@@ -62,8 +62,8 @@ func TestAPIGateway_Basic(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
-			if cfg.EnableCNI && c.restrictedPSAEnforcement {
-				t.Skipf("skipping because -enable-cni is set and restrictedPSAEnforcement is already tested with regular tproxy")
+			if cfg.EnableTransparentProxy && c.restrictedPSAEnforcement {
+				t.Skipf("skipping because -enable-tproxy is set and tproxy cannot run in restrictedPSA without CNI enabled")
 			}
 
 			helmValues := map[string]string{
@@ -83,6 +83,12 @@ func TestAPIGateway_Basic(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "--overwrite", "ns", ctx.KubectlOptions(t).Namespace,
 					"pod-security.kubernetes.io/enforce=restricted",
 				)
+
+				if cfg.EnableCNI {
+					helmValues["connectInject.cni.namespace"] = "cni-namespace"
+					//create namespace for CNI
+					k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "namespace", "cni-namespace")
+				}
 			}
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				if c.restrictedPSAEnforcement {
@@ -90,6 +96,9 @@ func TestAPIGateway_Basic(t *testing.T) {
 					k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "--overwrite", "ns", ctx.KubectlOptions(t).Namespace,
 						"pod-security.kubernetes.io/enforce=privileged",
 					)
+					if cfg.EnableCNI {
+						k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "namespace", "cni-namespace")
+					}
 				}
 			})
 
