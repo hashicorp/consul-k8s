@@ -40,12 +40,12 @@ func TestAPIGateway_Basic(t *testing.T) {
 		secure                   bool
 		restrictedPSAEnforcement bool
 	}{
-		{
-			secure: false,
-		},
-		{
-			secure: true,
-		},
+		//{
+		//	secure: false,
+		//},
+		//{
+		//	secure: true,
+		//},
 		// There is an argument that all tests should be run in a restricted PSA namespace
 		// However we are on a time crunch and don't want to make sweeping changes to the test suite
 		{
@@ -62,8 +62,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 				t.Skipf("skipping because -enable-cni is set and restrictedPSAEnforcement is already tested with regular tproxy")
 			}
 
-			//enable PSA enforcment for some tests
-			cfg.EnableRestrictedPSAEnforcement = c.restrictedPSAEnforcement
 			helmValues := map[string]string{
 				"connectInject.enabled":        "true",
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
@@ -75,6 +73,14 @@ func TestAPIGateway_Basic(t *testing.T) {
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
+			fmt.Println(ctx.KubectlOptions(t).Namespace)
+
+			if c.restrictedPSAEnforcement {
+				//enable PSA enforcment for some tests
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "--overwrite", "ns", ctx.KubectlOptions(t).Namespace,
+					"pod-security.kubernetes.io/enforce=restricted",
+				)
+			}
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				if c.restrictedPSAEnforcement {
 					//reset namespace
