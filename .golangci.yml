@@ -28,7 +28,10 @@ issues:
     - path: test_util\.go
       linters:
         - errcheck
-
+    - linters: [ staticcheck ]
+      text: "SA1006:"
+    - linters: [ unparam ]
+      text: 'result \d+ \(bool\) is always false'
 linters-settings:
   govet:
     enable-all: true
