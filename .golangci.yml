@@ -30,6 +30,14 @@ issues:
         - errcheck
 
 linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+      - nilness
+      - shadow
+      - unusedwrite
+      - printf
   gofmt:
     simplify: true
 
