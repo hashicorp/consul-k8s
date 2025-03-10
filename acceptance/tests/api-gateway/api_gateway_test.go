@@ -77,7 +77,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
-			
+
 			if c.restrictedPSAEnforcement {
 				//enable PSA enforcment for some tests
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "--overwrite", "ns", ctx.KubectlOptions(t).Namespace,
