@@ -59,6 +59,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-go 1.21
-
-toolchain go1.22.6
+go 1.23.6
