@@ -32,6 +32,8 @@ issues:
       text: "SA1006:"
     - linters: [ unparam ]
       text: 'result \d+ \(bool\) is always false'
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Fprintf` is not checked'
 linters-settings:
   govet:
     enable-all: true
