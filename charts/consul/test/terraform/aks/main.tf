@@ -4,13 +4,18 @@
 terraform {
   required_providers {
     azurerm = {
-      version = "3.40.0"
+      version = "~> 3.95.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5.0"
     }
   }
 }
 
 provider "azurerm" {
   features {}
+  skip_provider_registration = true
 }
 
 provider "local" {}

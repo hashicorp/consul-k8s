@@ -2,5 +2,6 @@
 # SPDX-License-Identifier: MPL-2.0
 
 kindVersion: v0.23.0
-kindNodeImage: kindest/node:v1.30.2@sha256:ecfe5841b9bee4fe9690f49c118c33629fa345e3350a0c67a5a34482a99d6bba
-kubectlVersion: v1.30.2
+# digest for kindest/node:v1.30.0
+kindNodeImage: kindest/node:v1.30.0
+kubectlVersion: v1.30.0

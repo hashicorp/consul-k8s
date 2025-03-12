@@ -2,6 +2,8 @@
 name: pr
 on:
   pull_request:
+    branches:
+      - release/1.7.0-rc1
 
 # these should be the only settings that you will ever need to change
 env:
@@ -24,7 +26,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: mukul/testing-ocp-compatibility
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
 
