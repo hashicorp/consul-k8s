@@ -86,7 +86,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 				if cfg.EnableCNI {
 					helmValues["connectInject.cni.namespace"] = "cni-namespace"
-					//create namespace for CNI
+					//create namespace for CNI. CNI pods require NET_ADMIN so the need to run in a non PSA restricted namespace.
 					k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "namespace", "cni-namespace")
 				}
 			}
@@ -231,12 +231,9 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.EqualValues(t, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
 			require.EqualValues(t, "gateway", httproute.Status.Parents[0].ParentRef.Name)
 			counter = &retry.Counter{Count: 120, Wait: 2 * time.Second}
-			retry.RunWith(counter, t, func(r *retry.R) {
-				checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-				checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-				//This check is particularly flaky and leads to a lot of false failures.
-				//checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
-			})
+			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 
 			// tcp route checks
 			var tcpRoute gwv1alpha2.TCPRoute
@@ -253,12 +250,9 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.EqualValues(t, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
 			counter = &retry.Counter{Count: 120, Wait: 2 * time.Second}
 
-			retry.RunWith(counter, t, func(r *retry.R) {
-				checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-				checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-				//This check is particularly flaky and leads to a lot of false failures.
-				//checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
-			})
+			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 
 			// check that the Consul entries were created
 			var gateway *api.APIGatewayConfigEntry
