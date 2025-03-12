@@ -7,7 +7,7 @@ variable "location" {
 }
 
 variable "kubernetes_version" {
-  default     = "1.28"
+  default     = "1.29"
   description = "Kubernetes version supported on AKS"
 }
 
