@@ -120,7 +120,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	k8sOptions := ctx.KubectlOptions(t)
-	targetAddress := fmt.Sprintf("http://%s/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
 
 	// check that intentions keep our connection from happening
 	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)
