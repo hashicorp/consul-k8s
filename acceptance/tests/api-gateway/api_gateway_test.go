@@ -230,7 +230,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.Len(t, httproute.Status.Parents, 1)
 			require.EqualValues(t, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
 			require.EqualValues(t, "gateway", httproute.Status.Parents[0].ParentRef.Name)
-			counter = &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
@@ -248,7 +247,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.Len(t, tcpRoute.Status.Parents, 1)
 			require.EqualValues(t, gatewayClassControllerName, tcpRoute.Status.Parents[0].ControllerName)
 			require.EqualValues(t, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
-			counter = &retry.Counter{Count: 120, Wait: 2 * time.Second}
 
 			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
