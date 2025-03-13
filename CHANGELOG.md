@@ -1,3 +1,9 @@
+## 1.5.6 (March 15, 2025)
+
+IMPROVEMENTS:
+
+* helm: Add support for `server.snapshotAgent.extraVolumes` and `server.snapshotAgent.extraEnvironmentVars` so privileged credentials can be configured for the snapshot agent. [[GH-4471](https://github.com/hashicorp/consul-k8s/issues/4471)]
+
 ## 1.5.5 (January 10, 2025)
 
 IMPROVEMENTS:
