@@ -997,7 +997,7 @@ func (t *serviceIngressResource) Upsert(key string, raw interface{}) error {
 			}
 			hostName = ingress.Status.LoadBalancer.Ingress[0].IP
 		} else {
-			hostName = rule.Host
+			hostName = ingress.Status.LoadBalancer.Ingress[0].Hostname
 		}
 		for _, ingressTLS := range ingress.Spec.TLS {
 			for _, host := range ingressTLS.Hosts {
