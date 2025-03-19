@@ -163,7 +163,8 @@ data:
         {{- if (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString)))) }}
         "metrics_provider": "{{ .Values.ui.metrics.provider }}",
         "metrics_proxy": {
-          "base_url": "{{ .Values.ui.metrics.baseURL }}"
+          "base_url": "{{ .Values.ui.metrics.baseURL }}",
+          "path_allowlist": {{ .Values.ui.metrics.pathAllowlist | toJson }}
         },
         {{- end }}
         {{- if .Values.ui.dashboardURLTemplates.service }}
