@@ -28,6 +28,8 @@ issues:
     - path: test_util\.go
       linters:
         - errcheck
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Fprintf` is not checked'
 
 linters-settings:
   gofmt:
