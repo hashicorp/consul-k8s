@@ -2,8 +2,6 @@ module github.com/hashicorp/consul-k8s/acceptance
 
 go 1.23.0
 
-toolchain go1.24.1
-
 require (
 	github.com/go-logr/logr v1.3.0
 	github.com/google/uuid v1.3.0

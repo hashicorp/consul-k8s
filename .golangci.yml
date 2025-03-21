@@ -28,8 +28,24 @@ issues:
     - path: test_util\.go
       linters:
         - errcheck
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Fprintf` is not checked'
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Fprintln` is not checked'
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Fprint` is not checked'
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Sscanf` is not checked'
 
 linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
+      - unusedwrite
+      - nilness
+      - printf
   gofmt:
     simplify: true
 
