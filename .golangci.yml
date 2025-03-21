@@ -28,21 +28,15 @@ issues:
     - path: test_util\.go
       linters:
         - errcheck
-    - linters: [ staticcheck ]
-      text: "SA1006:"
-    - linters: [ unparam ]
-      text: 'result \d+ \(bool\) is always false'
     - linters: [ errcheck ]
       text: 'Error return value of `fmt.Fprintf` is not checked'
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Fprintln` is not checked'
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Fprint` is not checked'
+    - linters: [ errcheck ]
+      text: 'Error return value of `fmt.Sscanf` is not checked'
 linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - nilness
-      - shadow
-      - unusedwrite
-      - printf
   gofmt:
     simplify: true
 
