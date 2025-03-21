@@ -2,8 +2,6 @@ module github.com/hashicorp/consul-k8s/cli
 
 go 1.23.6
 
-toolchain go1.24.1
-
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 require (
