@@ -264,7 +264,7 @@ func requireEventuallyAccepted(t *testing.T, resourceClient pbresource.ResourceS
 			if err != nil {
 				return false
 			}
-			if rsp.Resource.Status == nil || len(rsp.Resource.Status) == 0 {
+			if len(rsp.Resource.Status) == 0 {
 				return false
 			}
 
