@@ -43,3 +43,8 @@ variable "subnet" {
   default     = "default"
   description = "Subnet to create the cluster in. Currently all clusters use the default subnet and we are running out of IPs"
 }
+
+variable "kubernetes_version_prefix" {
+  default     = "1.30."
+  description = "Kubernetes version supported on EKS"
+}
