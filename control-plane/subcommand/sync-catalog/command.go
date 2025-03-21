@@ -434,7 +434,10 @@ func (c *Command) removeAllK8SServicesFromConsulNode(consulClient *api.Client) e
 	for {
 		c.UI.Info(fmt.Sprintf("Are you sure you want to delete %v K8S services from %v? (y/n): ", len(services), c.flagPurgeK8SServicesFromNode))
 		var input string
-		fmt.Scanln(&input)
+		_, err = fmt.Scanln(&input)
+		if err != nil {
+			return err
+		}
 		if input = strings.ToLower(input); input == "y" {
 			break
 		} else if input == "n" {

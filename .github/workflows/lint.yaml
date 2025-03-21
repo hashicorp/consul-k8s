@@ -28,7 +28,7 @@ jobs:
         - name: golangci-lint-helm-gen
           uses: golangci/golangci-lint-action@a4f60bb28d35aeee14e6880718e0c85ff1882e64 # v6.0.1
           with:
-            version: "v1.55.2"
+            version: "v1.62.0"
             working-directory: hack/helm-reference-gen
             skip-cache: true  # We have seen sticky timeout bugs crop up with caching enabled, so disabling for now
             args: "--no-config --disable-all --enable gofmt,govet"
@@ -36,20 +36,20 @@ jobs:
         - name: golangci-lint-control-plane
           uses: golangci/golangci-lint-action@a4f60bb28d35aeee14e6880718e0c85ff1882e64 # v6.0.1
           with:
-            version: "v1.55.2"
+            version: "v1.62.0"
             working-directory: control-plane
             skip-cache: true  # We have seen sticky timeout bugs crop up with caching enabled, so disabling for now
 
         - name: golangci-lint-acceptance
           uses: golangci/golangci-lint-action@a4f60bb28d35aeee14e6880718e0c85ff1882e64 # v6.0.1
           with:
-            version: "v1.55.2"
+            version: "v1.62.0"
             working-directory: acceptance
             skip-cache: true  # We have seen sticky timeout bugs crop up with caching enabled, so disabling for now
 
         - name: golangci-lint-cli
           uses: golangci/golangci-lint-action@a4f60bb28d35aeee14e6880718e0c85ff1882e64 # v6.0.1
           with:
-            version: "v1.55.2"
+            version: "v1.62.0"
             working-directory: acceptance
             skip-cache: true  # We have seen sticky timeout bugs crop up with caching enabled, so disabling for now
