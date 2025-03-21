@@ -28,8 +28,47 @@ issues:
     - path: test_util\.go
       linters:
         - errcheck
+        # An argument that always receives the same value is often not a problem.
+    - linters: [ unparam ]
+      text: "always receives"
+
+    - linters: [ unparam ]
+      text: 'result \d+ \(bool\) is always false'
+
+    # Often functions will implement an interface that returns an error without
+    # needing to return an error. Sometimes the error return value is unnecessary
+    # but a linter can not tell the difference.
+    - linters: [ unparam ]
+      text: 'result \d+ \(error\) is always nil'
+
+    # Allow unused parameters to start with an underscore. Arguments with a name
+    # of '_' are already ignored.
+    # Ignoring longer names that start with underscore allow for better
+    # self-documentation than a single underscore by itself.  Underscore arguments
+    # should generally only be used when a function is implementing an interface.
+    - linters: [ unparam ]
+      text: "`_[^`]*` is unused"
+
+    # Temp ignore some common unused parameters so that unparam can be added
+    # incrementally.
+    - linters: [ unparam ]
+      text: "`(t|resp|req|entMeta)` is unused"
+
+    # Temp ignore everything in _ce(_test).go and _ent(_test).go. Many of these
+    # could use underscore to ignore the unused arguments, but the "always returns"
+    # issue will likely remain in CE, and will need to be excluded.
+    - linters: [ unparam ]
+      path: "(_ce.go|_ce_test.go|_ent.go|_ent_test.go)"
 
 linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+      - nilness
+      - shadow
+      - unusedwrite
+      - printf
   gofmt:
     simplify: true
 
