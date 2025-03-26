@@ -9,6 +9,8 @@ KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.
 
 GO_MODULES := $(shell find . -name go.mod -exec dirname {} \; | sort)
 
+GOTESTSUM_PATH?=$(shell command -v gotestsum)
+
 ##@ Helm Targets
 
 .PHONY: gen-helm-docs
@@ -97,11 +99,32 @@ control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker
 
 .PHONY: control-plane-test
 control-plane-test: ## Run go test for the control plane.
-	cd control-plane; go test ./...
+ifeq ("$(GOTESTSUM_PATH)","")
+	cd control-plane && go test ./...
+else
+	cd control-plane && \
+	gotestsum \
+		--format=short-verbose \
+		--debug \
+		--rerun-fails=3 \
+		--packages="./..."
+endif
+
 
 .PHONY: control-plane-ent-test
 control-plane-ent-test: ## Run go test with Consul enterprise tests. The consul binary in your PATH must be Consul Enterprise.
-	cd control-plane; go test ./... -tags=enterprise
+ifeq ("$(GOTESTSUM_PATH)","")
+	cd control-plane && go test ./... -tags=enterprise
+else
+	cd control-plane && \
+	gotestsum \
+		--format=short-verbose \
+		--debug \
+		--rerun-fails=3 \
+		--packages="./..." \
+		-- \
+		--tags enterprise
+endif
 
 .PHONY: control-plane-cov
 control-plane-cov: ## Run go test with code coverage.
