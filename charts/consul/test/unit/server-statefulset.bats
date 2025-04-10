@@ -99,7 +99,7 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}' ]
+  [ "${actual}" = '{"limits":{"cpu":null,"memory":"200Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}' ]
 }
 
 @test "server/StatefulSet: resources can be overridden" {
