@@ -345,7 +345,7 @@ key2: value2' \
   [ $(echo "${actual}" | yq -r '.requests.memory') = "100Mi" ]
   [ $(echo "${actual}" | yq -r '.requests.cpu') = "100m" ]
   [ $(echo "${actual}" | yq -r '.limits.memory') = "100Mi" ]
-  [ $(echo "${actual}" | yq -r '.limits.cpu') = "100m" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = null ]
 }
 
 @test "meshGateway/Deployment: resources can be overridden" {
