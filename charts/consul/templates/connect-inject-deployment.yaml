@@ -330,20 +330,20 @@ spec:
             {{- if .Values.connectInject.resources.requests }}
             requests:
               {{- if .Values.connectInject.resources.requests.cpu }}
-              cpu: "{{ .Values.connectInject.resources.requests.cpu }}"
+              cpu: "{{ .Values.connectInject.resources.requests.cpu | toString | trim }}"
               {{- end }}
               {{- if .Values.connectInject.resources.requests.memory }}
-              memory: "{{ .Values.connectInject.resources.requests.memory }}"
+              memory: "{{ .Values.connectInject.resources.requests.memory | toString | trim }}"
               {{- end }}
             {{- end }}
 
             {{- if .Values.connectInject.resources.limits }}
             limits:
               {{- if .Values.connectInject.resources.limits.cpu }}
-              cpu: "{{ .Values.connectInject.resources.limits.cpu }}"
+              cpu: "{{ .Values.connectInject.resources.limits.cpu | toString | trim }}"
               {{- end }}
               {{- if .Values.connectInject.resources.limits.memory }}
-              memory: "{{ .Values.connectInject.resources.limits.memory }}"
+              memory: "{{ .Values.connectInject.resources.limits.memory | toString | trim }}"
               {{- end }}
             {{- end }}
           {{- end }}
