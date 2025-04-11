@@ -657,10 +657,24 @@ spec:
             timeoutSeconds: 5
           {{- if .Values.server.resources }}
           resources:
-            {{- if eq (typeOf .Values.server.resources) "string" }}
-            {{ tpl .Values.server.resources . | nindent 12 | trim }}
-            {{- else }}
-            {{- toYaml .Values.server.resources | nindent 12 }}
+            {{- if .Values.server.resources.requests }}
+            requests:
+              {{- if .Values.server.resources.requests.cpu }}
+              cpu: "{{ .Values.server.resources.requests.cpu }}"
+              {{- end }}
+              {{- if .Values.server.resources.requests.memory }}
+              memory: "{{ .Values.server.resources.requests.memory }}"
+              {{- end }}
+            {{- end }}
+
+            {{- if .Values.server.resources.limits }}
+            limits:
+              {{- if .Values.server.resources.limits.cpu }}
+              cpu: "{{ .Values.server.resources.limits.cpu }}"
+              {{- end }}
+              {{- if .Values.server.resources.limits.memory }}
+              memory: "{{ .Values.server.resources.limits.memory }}"
+              {{- end }}
             {{- end }}
           {{- end }}
           {{- if .Values.server.containerSecurityContext.server }}
