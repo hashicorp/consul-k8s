@@ -1,3 +1,3 @@
-```release-note:improvement
-helm: updated resource entry documentation to recommend "null" CPU limits for service mesh components in production, and added reference-architecture CPU/memory guidelines for Consul servers.
+```release-note:breaking-change
+helm: updated resource entry documentation to recommend "null" CPU limits for service mesh components in production, and added reference-architecture CPU/memory guidelines for Consul servers. Please update Helm values overrides for CPU limits if local policies dictate mandatory setting of Kubernetes/OpenShift resource settings for any components affected in update. Consul Components Affected by [PR #4518](https://github.com/hashicorp/consul-k8s/pull/4518) by Helm value override: server.resources, meshGateway.resources, terminatingGateway.defaults.resources, ingressGateway.defaults.resources, connectInject.resources, connectInject.sidecarProxy.resources, connectInject.apiGateway.resources
 ```
