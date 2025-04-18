@@ -1,0 +1,5 @@
+```release-note:security
+Update `golang.org/x/net` to v0.38.0 to address [GHSA-vvgc-356p-c3xw](https://github.com/advisories/GHSA-vvgc-356p-c3xw).
+Update `github.com/golang-jwt/jwt/v4` to v4.5.2 to address [GHSA-mh63-6h87-95cp](https://github.com/advisories/GHSA-mh63-6h87-95cp).
+Upgrade to Go 1.23.8 to fix CVE
+```
