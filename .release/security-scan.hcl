@@ -40,7 +40,10 @@ binary {
         "GHSA-r53h-jv2g-vpx6", 
         "CVE-2024-26147", # alias
         "GHSA-jw44-4f3j-q396", # Tracked in NET-8174
-        "CVE-2019-25210" # alias
+        "CVE-2019-25210",
+        "GO-2022-0635",
+        "CVE-2025-46394",
+        "CVE-2024-58251"
       ]
     }
   }
