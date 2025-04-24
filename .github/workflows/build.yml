@@ -18,7 +18,14 @@ env:
 
 jobs:
   conditional-skip:
-    uses: ./.github/workflows/reusable-conditional-skip.yml
+    # TODO: temporary for testing, remove after testing
+    # uses: ./.github/workflows/reusable-conditional-skip.yml
+    runs-on: ubuntu-latest
+    outputs:
+      skip-ci: "false"
+    steps:
+      - name: Always return false
+        run: echo "skip-ci=false" >> $GITHUB_OUTPUT
 
   get-go-version:
     # Cascades down to test jobs
