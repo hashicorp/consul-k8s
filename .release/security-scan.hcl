@@ -19,6 +19,15 @@ container {
   secrets {
     all = true
   }
+
+  triage {
+    suppress {
+      vulnerabilites = [
+        "CVE-2025-46394",
+        "CVE-2024-58251"
+      ]
+    }
+  }
 }
 
 binary {
@@ -42,8 +51,10 @@ binary {
         "GHSA-jw44-4f3j-q396", # Tracked in NET-8174
         "CVE-2019-25210",
         "GO-2022-0635",
-        "CVE-2025-46394",
-        "CVE-2024-58251"
+        "GHSA-4hfp-h4cw-hj8p",
+        "GHSA-5xqw-8hwv-wg92",
+        "GO-2025-3601",
+        "GO-2025-3602"
       ]
     }
   }
