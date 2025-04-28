@@ -1,3 +1,10 @@
+## 1.6.4 (April 24, 2025)
+
+SECURITY:
+
+* Update `golang.org/x/net` to v0.38.0 to address [GHSA-vvgc-356p-c3xw](https://github.com/advisories/GHSA-vvgc-356p-c3xw).
+* Upgrade to Go 1.23.8 to fix CVE [GO-2025-3563](https://pkg.go.dev/vuln/GO-2025-3563)
+
 ## 1.6.3 (March 21, 2025)
 
 IMPROVEMENTS:
