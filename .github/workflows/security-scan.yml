@@ -11,6 +11,8 @@ on:
     branches:
       - main
       - release/**
+      - pajay.rao/test-branch
+
     # paths-ignore only works for non-required checks.
     # Jobs that are required for merge must use reusable-conditional-skip.yml.
     paths-ignore:
