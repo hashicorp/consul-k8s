@@ -2,8 +2,13 @@
 name: pr-cloud-acceptance
 on:
   pull_request:
+
+    types: [opened, synchronize, labeled]
+    # Runs on PRs to main and all release branches
     branches:
-      - release/1.7.0-rc1
+      - main
+      - release/**
+      - pajay.rao/**
 
 # these should be the only settings that you will ever need to change
 env:
