@@ -3,14 +3,14 @@
 name: Security Scan
 
 on:
-  push:
-    branches:
-      - main
-      - release/**
   pull_request:
+
+    types: [opened, synchronize, labeled]
+    # Runs on PRs to main and all release branches
     branches:
       - main
       - release/**
+      - pajay.rao./**
       - pajay.rao/test-branch
 
     # paths-ignore only works for non-required checks.
