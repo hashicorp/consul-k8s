@@ -296,6 +296,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			var expectedSecurityContext *corev1.SecurityContext
 			if c.cniEnabled && !c.openShiftEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
 					RunAsUser:    ptr.To(int64(initContainersUserAndGroupID)),
 					RunAsGroup:   ptr.To(int64(initContainersUserAndGroupID)),
 					RunAsNonRoot: ptr.To(true),
@@ -319,6 +322,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			} else if c.cniEnabled && c.openShiftEnabled {
 				// When cni + openShift
 				expectedSecurityContext = &corev1.SecurityContext{
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
 					RunAsUser:    ptr.To(int64(1000799999)),
 					RunAsGroup:   ptr.To(int64(1000799999)),
 					RunAsNonRoot: ptr.To(true),

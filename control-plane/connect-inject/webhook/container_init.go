@@ -254,6 +254,9 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			}
 
 			container.SecurityContext = &corev1.SecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
 				RunAsUser:    ptr.To(uid),
 				RunAsGroup:   ptr.To(group),
 				RunAsNonRoot: ptr.To(true),
