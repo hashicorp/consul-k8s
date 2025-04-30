@@ -9,7 +9,7 @@ on:
       - main
       - release/**
       - pajay.rao./**
-      - - pajay.rao/test-branch
+      - pajay.rao/test-branch
 
 # these should be the only settings that you will ever need to change
 env:
