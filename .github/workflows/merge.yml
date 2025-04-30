@@ -1,13 +1,15 @@
 # Dispatch to the consul-k8s-workflows when a PR is created and on merges to main/release*
 name: merge
 on:
-  push:
-    # Sequence of patterns matched against refs/heads
+  pull_request:
+
+    types: [opened, synchronize, labeled]
+    # Runs on PRs to main and all release branches
     branches:
-      # Push events on main branch
       - main
-      # Push events to branches matching refs/heads/release/**
-      - "release/**"
+      - release/**
+      - pajay.rao/test-branch
+      - pajay.rao./**
 
 # these should be the only settings that you will ever need to change
 env:
