@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - release/**
+      - pajay.rao/test-branch
       - pajay.rao./**
 
 # these should be the only settings that you will ever need to change
