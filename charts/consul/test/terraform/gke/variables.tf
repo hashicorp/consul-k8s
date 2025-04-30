@@ -45,6 +45,6 @@ variable "subnet" {
 }
 
 variable "kubernetes_version_prefix" {
-  default     = "1.30."
+  default     = "1.32."
   description = "Kubernetes version supported on EKS"
 }

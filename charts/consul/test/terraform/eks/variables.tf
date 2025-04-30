@@ -30,6 +30,6 @@ variable "tags" {
 }
 
 variable "kubernetes_version" {
-  default     = "1.30"
+  default     = "1.32"
   description = "Kubernetes version supported on EKS"
 }
