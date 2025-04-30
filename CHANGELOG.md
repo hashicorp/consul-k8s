@@ -1,3 +1,31 @@
+## 1.7.0-rc2 (April 25, 2025)
+SECURITY:
+
+* Update `golang.org/x/net` to v0.38.0 to address [GHSA-vvgc-356p-c3xw](https://github.com/advisories/GHSA-vvgc-356p-c3xw).
+* Update `github.com/go-jose/go-jose/v3` to v3.0.4 to address [GO-2025-3485](https://osv.dev/vulnerability/GO-2025-3485).
+* Update `github.com/containerd/containerd` to v1.7.27 to address [GHSA-265r-hfxg-fhmg](https://github.com/containerd/containerd/security/advisories/GHSA-265r-hfxg-fhmg).
+* Upgrade to Go 1.23.8 to fix CVE [GO-2025-3563](https://pkg.go.dev/vuln/GO-2025-3563)
+
+## 1.7.0-rc1 (March 11, 2025)
+
+> NOTE: Consul K8s 1.7.x is compatible with Consul 1.21.x and Consul Dataplane 1.7.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+FEATURES:
+
+* control-plane: Add available Zone Kubernetes Topology Metadata for NodePort Service when Syncing Kubernetes Services. [[GH-4470](https://github.com/hashicorp/consul-k8s/issues/4470)]
+
+IMPROVEMENTS:
+
+* helm: Add support for `server.snapshotAgent.extraVolumes` and `server.snapshotAgent.extraEnvironmentVars` so privileged credentials can be configured for the snapshot agent. [[GH-4471](https://github.com/hashicorp/consul-k8s/issues/4471)]
+* security: Support running Consul under Pod Security Admissions (PSA) restricted mode. [[GH-4478](https://github.com/hashicorp/consul-k8s/issues/4478)]
+* Upgrade to use Go 1.23.6 [[GH-4486](https://github.com/hashicorp/consul-k8s/issues/4486)]
+
+BUG FIXES:
+
+* sync-catalog: Enable the user to purge the registered services by passing parent node and necessary filters. [[GH-4255](https://github.com/hashicorp/consul-k8s/issues/4255)]
+
+
 ## 1.6.1 (November 4, 2023)
 
 SECURITY:
