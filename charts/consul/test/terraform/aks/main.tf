@@ -42,7 +42,7 @@ resource "azurerm_virtual_network" "default" {
 
   subnet {
     name           = "consul-k8s-${random_id.suffix[count.index].dec}-subnet"
-    address_prefix = "192.${count.index + 168}.1.0/24"
+    address_prefixes = ["192.${count.index + 168}.1.0/24"]
   }
 }
 
