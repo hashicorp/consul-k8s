@@ -127,7 +127,7 @@ resource "aws_eks_addon" "csi-driver" {
   count                       = var.cluster_count
   cluster_name                = module.eks[count.index].cluster_id
   addon_name                  = "aws-ebs-csi-driver"
-  addon_version               = "v1.15.0-eksbuild.1"
+  # addon_version               = "v1.15.0-eksbuild.1"
   service_account_role_arn    = aws_iam_role.csi-driver-role[count.index].arn
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
