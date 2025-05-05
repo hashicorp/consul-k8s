@@ -26,6 +26,6 @@ jobs:
         with:
           workflow: cloud.yml
           repo: hashicorp/consul-k8s-workflows
-          ref: main
+          ref: pajay.rao/release-test
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
           inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
