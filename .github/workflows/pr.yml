@@ -3,6 +3,14 @@ name: pr
 on:
   pull_request:
 
+    types: [opened, synchronize, labeled]
+    # Runs on PRs to main and all release branches
+    branches:
+      - main
+      - release/**
+      - pajay.rao./**
+      - pajay.rao/test-branch
+
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -24,13 +32,13 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: pajay.rao./job-status-update-fixes
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
 
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci == 'true'
+#    if: needs.conditional-skip.outputs.skip-ci == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
