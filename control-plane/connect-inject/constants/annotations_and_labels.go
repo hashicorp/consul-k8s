@@ -123,6 +123,9 @@ const (
 	AnnotationSidecarProxyLifecycleGracefulShutdownPath         = "consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-shutdown-path"
 	AnnotationSidecarProxyLifecycleGracefulStartupPath          = "consul.hashicorp.com/sidecar-proxy-lifecycle-graceful-startup-path"
 
+	// annotation for injecting consul dataplane as native sidecar.
+	AnnotationNativeSidecarsEnabled = "consul.hashicorp.com/native-sidecars-enabled"
+
 	// annotations for sidecar volumes.
 	AnnotationConsulSidecarUserVolume      = "consul.hashicorp.com/consul-sidecar-user-volume"
 	AnnotationConsulSidecarUserVolumeMount = "consul.hashicorp.com/consul-sidecar-user-volume-mount"
