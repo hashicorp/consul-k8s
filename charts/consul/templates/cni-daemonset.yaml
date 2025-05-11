@@ -72,6 +72,9 @@ spec:
             - -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }}
             - -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
             - -multus={{ .Values.connectInject.cni.multus }}
+            {{- if .Values.connectInject.cni.autorotateToken }}
+            - -autorotate-token={{ .Values.connectInject.cni.autorotateToken }}
+            {{- end }}
           {{- with .Values.connectInject.cni.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -81,6 +84,10 @@ spec:
               name: cni-bin-dir
             - mountPath: {{ .Values.connectInject.cni.cniNetDir }}
               name: cni-net-dir
+          {{- if .Values.connectInject.cni.autorotateToken }}
+            - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              name: cni-sa-token
+          {{- end }}
       volumes:
         # Used to install CNI.
         - name: cni-bin-dir
@@ -88,5 +95,18 @@ spec:
             path: {{ .Values.connectInject.cni.cniBinDir }} 
         - name: cni-net-dir
           hostPath:
-            path: {{ .Values.connectInject.cni.cniNetDir }} 
+            path: {{ .Values.connectInject.cni.cniNetDir }}
+        {{- if .Values.connectInject.cni.autorotateToken }}
+        - name: cni-sa-token
+          projected:
+            sources:
+                - serviceAccountToken:
+                    expirationSeconds: {{.Values.connectInject.cni.tokenExpiration}}
+                    path: token
+                - configMap:
+                    name: kube-root-ca.crt
+                    items:
+                      - key: ca.crt
+                        path: ca.crt
+        {{- end }}
 {{- end }}
