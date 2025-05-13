@@ -70,6 +70,9 @@ type TestConfig struct {
 	EnableEnterprise  bool
 	EnterpriseLicense string
 
+	SkipDataDogTests        bool
+	DatadogHelmChartVersion string
+
 	EnableOpenshift bool
 
 	EnablePodSecurityPolicies bool
