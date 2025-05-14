@@ -136,7 +136,7 @@ FROM release-default AS release-default-fips
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM registry.access.redhat.com/ubi9-minimal:9.4 as ubi
+FROM registry.access.redhat.com/ubi9-minimal:9.5 AS ubi
 
 ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
