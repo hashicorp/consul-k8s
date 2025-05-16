@@ -385,7 +385,6 @@ func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o 
 	require.NoError(t, err)
 }
 
-func
 func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1beta1.HTTPRoute {
 	t.Helper()
 

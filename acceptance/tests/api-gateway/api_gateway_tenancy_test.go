@@ -132,7 +132,6 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			retryCheck(t, 200, func(r *retry.R) {
-				fmt.Println("retry.....")
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
