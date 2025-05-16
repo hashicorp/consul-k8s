@@ -90,8 +90,13 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	if runWithEnterpriseOnlyFeatures {
 		fixturePath += "-ent"
 	}
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", fixturePath)
-	require.NoError(t, err, out)
+
+	counter := &retry.Counter{Count: 60, Wait: 10 * time.Second}
+	retry.RunWith(counter, t, func(r *retry.R) {
+		out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(r), "apply", "-k", fixturePath)
+		require.NoError(r, err, out)
+	})
+
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -127,7 +132,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		httpRoute      gwv1beta1.HTTPRoute
 	)
 
-	counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+	counter = &retry.Counter{Count: 60, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
