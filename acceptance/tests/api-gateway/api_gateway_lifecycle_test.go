@@ -162,7 +162,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	// update the route to point to the other controlled gateway
 	logger.Log(t, "updating route one to be bound to gateway two")
 	updateKubernetes(t, k8sClient, routeOne, func(r *gwv1beta1.HTTPRoute) {
-		r.SetResourceVersion("")
+		r.SetResourceVersion("nil")
 		r.Spec.ParentRefs[0].Name = gwv1beta1.ObjectName(controlledGatewayTwoName)
 	})
 
@@ -385,6 +385,7 @@ func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o 
 	require.NoError(t, err)
 }
 
+func
 func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1beta1.HTTPRoute {
 	t.Helper()
 
