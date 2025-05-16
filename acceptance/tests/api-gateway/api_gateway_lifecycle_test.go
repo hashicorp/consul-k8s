@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -377,12 +378,33 @@ func checkRouteBound(t *testing.T, client client.Client, name, namespace, parent
 
 func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o T, fn func(o T)) {
 	t.Helper()
+	maxRetries := 20
+	retryCount := 0
+	sleepTime := 1 * time.Minute
+	for {
+		if retryCount > maxRetries {
+			require.NoError(t, fmt.Errorf("max retries exceeded"))
+		}
+		retryCount++
 
-	err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(o), o)
-	require.NoError(t, err)
-	fn(o)
-	err = k8sClient.Update(context.Background(), o)
-	require.NoError(t, err)
+		err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(o), o)
+		if err != nil {
+			logger.Log(t, "k8s client get failed with error: %v", err)
+			time.Sleep(sleepTime)
+			continue
+		}
+
+		fn(o)
+
+		err = k8sClient.Update(context.Background(), o)
+		if err != nil {
+			logger.Log(t, "k8s client update failed with error: %v", err)
+			time.Sleep(sleepTime)
+			continue
+		}
+
+		break
+	}
 }
 
 func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1beta1.HTTPRoute {
