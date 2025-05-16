@@ -93,8 +93,8 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 	counter := &retry.Counter{Count: 60, Wait: 10 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
-		out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", fixturePath)
-		require.NoError(t, err, out)
+		out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(r), "apply", "-k", fixturePath)
+		require.NoError(r, err, out)
 	})
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
