@@ -2588,7 +2588,7 @@ connectInject:
     # @type: boolean
     autorotateToken: false
 
-    # Set the CNI plugin ServiceAccount token validity period. Used only when autorotateToken is true.
+    # Set the CNI plugin ServiceAccount token validity period. Applicable only when autorotateToken is true.
     # In some environments this may not work(eg. azure 1.30+ with oidc enabled)  as providers may have native expiration limits.
     # Optional and setup to 1 hour by default. Value is in seconds.
     # @type: Integer
