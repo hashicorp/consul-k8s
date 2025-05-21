@@ -39,6 +39,7 @@ jobs:
             version: "v1.62.0"
             working-directory: control-plane
             skip-cache: true  # We have seen sticky timeout bugs crop up with caching enabled, so disabling for now
+            args: --verbose --print-issued-lines --print-linter-name --out-format=colored-line-number
 
         - name: golangci-lint-acceptance
           uses: golangci/golangci-lint-action@38e1018663fa5173f3968ea0777460d3de38f256 # v5.3.0
