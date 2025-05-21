@@ -11,15 +11,15 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: cni
-    cni-version: vNEW
     {{- if .Values.global.extraLabels }}
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
 spec:
-  {{- if .Values.connectInject.cni.updateStrategy }}
   updateStrategy:
-    {{ tpl .Values.connectInject.cni.updateStrategy . | nindent 4 | trim }}
-  {{- end }}
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0  # Allow all pods to be unavailable
+      maxSurge: 1 # allow extra one pod to enable node by node rollout
   selector:
     matchLabels:
       app: {{ template "consul.name" . }}
@@ -58,7 +58,7 @@ spec:
       {{- end }}
       # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
-      terminationGracePeriodSeconds: 10
+      terminationGracePeriodSeconds: 100
       containers:
         # This container installs the consul CNI binaries and CNI network config file on each node
         - name: install-cni

@@ -102,6 +102,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	uid := fmt.Sprintf("%d", time.Now().UnixNano())
 	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
 		Name:         config.DefaultPluginName,
@@ -109,7 +110,7 @@ func (c *Command) Run(args []string) int {
 		CNITokenPath: config.DefaultCNITokenDir + "/" + config.DefaultCNITokenFilename,
 		CNIHostTokenPath: func() string {
 			if c.flagK8sAutorotateToken {
-				return c.flagCNINetDir + "/" + config.DefaultCNIHostTokenFilename
+				return c.flagCNINetDir + "/" + config.DefaultCNIHostTokenFilename + "-" + uid
 			}
 			return ""
 		}(),
@@ -137,18 +138,10 @@ func (c *Command) Run(args []string) int {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Generate the kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
-	c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
-	err := createKubeConfig(cfg)
-	if err != nil {
-		c.logger.Error("could not create kube config", "error", err)
-		return 1
-	}
-
 	// Copy the consul-cni binary from the installer container to the host.
 	c.logger.Info("Copying consul-cni binary", "destination", cfg.CNIBinDir)
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
-	err = copyFile(srcFile, cfg.CNIBinDir)
+	err := copyFile(srcFile, cfg.CNIBinDir)
 	if err != nil {
 		c.logger.Error("could not copy consul-cni binary", "error", err)
 		return 1
@@ -222,7 +215,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// cleanup removes the consul-cni configuration and kubeconfig file from cniNetDir and cniBinDir.
+// cleanup removes the consul-cni configuration, kubeconfig and cni-host-token-<uid> file from cniNetDir and cniBinDir.
 func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 	var err error
 	c.logger.Info("Shutdown received, cleaning up")
@@ -232,11 +225,15 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 			c.logger.Error("Unable to cleanup CNI Config: %w", err)
 		}
 	}
+	c.logger.Info("Removing file", "file", cfg.CNIHostTokenPath)
 
-	kubeconfig := filepath.Join(cfg.CNINetDir, cfg.Kubeconfig)
-	if cfg.AutorotateToken {
-		removeFile(cfg.CNIHostTokenPath)
+	err = removeFile(cfg.CNIHostTokenPath)
+	if err != nil {
+		c.logger.Error("Unable to remove %s file: %w", cfg.CNIHostTokenPath, err)
 	}
+	kubeconfig := filepath.Join(cfg.CNINetDir, cfg.Kubeconfig)
+	c.logger.Info("Removing file", "file", kubeconfig)
+
 	err = removeFile(kubeconfig)
 	if err != nil {
 		c.logger.Error("Unable to remove %s file: %w", kubeconfig, err)
@@ -257,12 +254,19 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 	if err != nil {
 		return fmt.Errorf("could not watch %s directory: %w", dir, err)
 	}
-	//}
-
-	// Cannot do "_ = defer watcher.Close()".
 	defer func() {
 		_ = watcher.Close()
+		c.cleanup(cfg, cfgFile)
 	}()
+
+	// Generate the initial kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
+	c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
+	kubeConfigFile := filepath.Join(cfg.CNINetDir, cfg.Kubeconfig)
+	err = createKubeConfig(cfg)
+	if err != nil {
+		c.logger.Error("could not create kube config", "error", err)
+		return fmt.Errorf("could not create kube config: %w", err)
+	}
 
 	for {
 		select {
@@ -274,12 +278,25 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 			// config file is available, do nothing. This can happen if the consul-cni daemonset was
 			// created before other CNI plugins were installed.
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0 {
-				// Only repair things if this is a non-multus setup. Multus config is handled differently
-				// than chained plugins
-				if event.Name == cfg.CNIHostTokenPath {
-					c.logger.Info("Skipping event for host token path", "event_path", event.Name)
+				// Separate tokenFileWatcher updates the token file in the host path
+				// This directory watcher doesn't need to handle anything related to token
+				if strings.Contains(event.Name, config.DefaultCNIHostTokenFilename) {
+					c.logger.Info("Skipping event for host token path. Nothing to do.", "event_path", event.Name)
 					break
 				}
+
+				// older daemonset can delete this kubeconfig on SIGTERM as cleanup
+				// new pod should listen to remove and regenerate it.
+				if event.Name == kubeConfigFile && event.Op&fsnotify.Remove != 0 {
+					c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
+					err := createKubeConfig(cfg)
+					if err != nil {
+						c.logger.Error("could not create kube config", "error", err)
+						break
+					}
+				}
+				// Only repair things if this is a non-multus setup. Multus config is handled differently
+				// than chained plugins
 				if !cfg.Multus {
 					c.logger.Info("Modified event", "event", event)
 					// Always get the config file that is on the host as we do not know if it was deleted
@@ -322,10 +339,8 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 				c.logger.Error("Event watcher event is not ok", "error", err)
 			}
 		case <-ctx.Done():
-			c.cleanup(cfg, cfgFile)
 			return nil
 		case <-c.sigCh:
-			c.cleanup(cfg, cfgFile)
 			return nil
 		}
 	}
@@ -338,7 +353,10 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 	if err != nil {
 		return fmt.Errorf("could not create token watcher: %w", err)
 	}
-	defer watcher.Close()
+
+	defer func() {
+		_ = watcher.Close()
+	}()
 
 	// Watch the directory containing the token instead of the symlink
 	c.logger.Info("Creating token watcher for", "file", sourceTokenPath)
@@ -376,7 +394,7 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove) != 0 {
 				// For remove events, retry with backoff
-				if event.Op&fsnotify.Remove != 0 {
+				if event.Name == sourceTokenPath && event.Op&fsnotify.Remove != 0 {
 					// Re-add watcher since it's removed on Remove events
 					if err := watcher.Add(sourceTokenPath); err != nil {
 						c.logger.Error("Failed to re-add watcher after remove", "error", err)
@@ -409,7 +427,6 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 		case <-ctx.Done():
 			return nil
-
 		case <-c.sigCh:
 			return nil
 		}

@@ -2656,23 +2656,6 @@ connectInject:
       runAsGroup: 0
       runAsUser: 0
 
-    # updateStrategy for the CNI installer DaemonSet.
-    # Refer to the Kubernetes [Daemonset upgrade strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy)
-    # documentation.
-    # This should be a multi-line string mapping directly to the updateStrategy
-    #
-    # Example:
-    #
-    # ```yaml
-    # updateStrategy: |
-    #   rollingUpdate:
-    #     maxUnavailable: 5
-    #   type: RollingUpdate
-    # ```
-    #
-    # @type: string
-    updateStrategy: null
-
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.
     #
