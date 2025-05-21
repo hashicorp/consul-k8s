@@ -105,7 +105,7 @@ ifeq ("$(GOTESTSUM_PATH)","")
 else
 	cd control-plane && \
 	gotestsum \
-		--format=short-verbose \
+		--format=pkgname \
 		--debug \
 		--rerun-fails=3 \
 		--packages="./..."
@@ -119,7 +119,7 @@ ifeq ("$(GOTESTSUM_PATH)","")
 else
 	cd control-plane && \
 	gotestsum \
-		--format=short-verbose \
+		--format=pkgname \
 		--debug \
 		--rerun-fails=3 \
 		--packages="./..." \

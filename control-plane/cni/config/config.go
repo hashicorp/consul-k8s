@@ -42,6 +42,7 @@ type CNIConfig struct {
 	Multus bool `json:"multus"      mapstructure:"multus"`
 }
 
+// NewDefaultCNIConfig is testing utility
 func NewDefaultCNIConfig() *CNIConfig {
 	return &CNIConfig{
 		Name:             DefaultPluginName,
@@ -50,7 +51,7 @@ func NewDefaultCNIConfig() *CNIConfig {
 		CNINetDir:        DefaultCNINetDir,
 		Kubeconfig:       DefaultKubeconfig,
 		CNITokenPath:     DefaultCNITokenDir + "/" + DefaultCNITokenFilename,
-		CNIHostTokenPath: DefaultCNIBinDir + "/" + DefaultCNIHostTokenFilename,
+		CNIHostTokenPath: DefaultCNINetDir + "/" + DefaultCNIHostTokenFilename,
 		AutorotateToken:  DefaultAutorotateToken,
 		LogLevel:         DefaultLogLevel,
 		Multus:           DefaultMultus,

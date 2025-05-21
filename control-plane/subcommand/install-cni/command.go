@@ -265,7 +265,6 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 	err = createKubeConfig(cfg)
 	if err != nil {
 		c.logger.Error("could not create kube config", "error", err)
-		return fmt.Errorf("could not create kube config: %w", err)
 	}
 
 	for {
@@ -287,13 +286,16 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 
 				// older daemonset can delete this kubeconfig on SIGTERM as cleanup
 				// new pod should listen to remove and regenerate it.
-				if event.Name == kubeConfigFile && event.Op&fsnotify.Remove != 0 {
-					c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
-					err := createKubeConfig(cfg)
-					if err != nil {
-						c.logger.Error("could not create kube config", "error", err)
-						break
+				if event.Name == kubeConfigFile {
+					if event.Op&fsnotify.Remove != 0 {
+						c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
+						err := createKubeConfig(cfg)
+						if err != nil {
+							c.logger.Error("could not create kube config", "error", err)
+							break
+						}
 					}
+					break
 				}
 				// Only repair things if this is a non-multus setup. Multus config is handled differently
 				// than chained plugins
@@ -366,7 +368,7 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 	// Copy token if initial access is possible
 	if _, err := os.Stat(sourceTokenPath); err == nil {
-		c.logger.Info("Performing initial token copy")
+		c.logger.Info("Initial token copy to host", "sourcePath", sourceTokenPath, "destinationPath", hostTokenPath)
 		if err := copyToken(sourceTokenPath, hostTokenPath); err != nil {
 			c.logger.Error("Failed initial token copy", "error", err)
 		}
@@ -377,7 +379,7 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 		case event, ok := <-watcher.Events:
 			if !ok {
 				c.logger.Error("Token watcher event is not ok", "event", event)
-				continue
+				break
 			}
 
 			// Only handle events for the specific token file
@@ -387,37 +389,25 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 			if event.Name != sourceTokenPath {
 				c.logger.Info("Skipping event as it's not for the source token path", "event_path", event.Name, "source_token_path", sourceTokenPath)
-				continue
+				break
 			}
 			// Handle Write event on symlink update to point to a new file
 			// but the symlink's creation timestamp changes on doing such update as well.
 
-			if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove) != 0 {
-				// For remove events, retry with backoff
-				if event.Name == sourceTokenPath && event.Op&fsnotify.Remove != 0 {
-					// Re-add watcher since it's removed on Remove events
-					if err := watcher.Add(sourceTokenPath); err != nil {
-						c.logger.Error("Failed to re-add watcher after remove", "error", err)
+			if event.Op&(fsnotify.Remove|fsnotify.Chmod) != 0 {
+				// Re-add watcher after remove/chmod
+				if err := watcher.Add(sourceTokenPath); err != nil {
+					c.logger.Error("Failed to re-add watcher after remove/chmod", "error", err)
+				}
+				if _, err := os.Stat(sourceTokenPath); err == nil {
+					if err := copyToken(sourceTokenPath, hostTokenPath); err != nil {
+						c.logger.Error("Failed to copy token after symlink update", "error", err)
+					} else {
+						c.logger.Info("Successfully copied new token after symlink update")
 					}
 				}
-
-				// Wait and retry copying until file is available again
-				go func() {
-					retries := 5
-					for i := 0; i < retries; i++ {
-						if _, err := os.Stat(sourceTokenPath); err == nil {
-							if err := copyToken(sourceTokenPath, hostTokenPath); err != nil {
-								c.logger.Error("Failed to copy token after remove retry", "error", err, "attempt", i+1)
-								continue
-							}
-							c.logger.Info("Successfully copied new token", "attempt", i+1)
-							return
-						}
-						time.Sleep(time.Duration(i+1) * 100 * time.Millisecond)
-					}
-				}()
-				continue
 			}
+
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				c.logger.Error("Token watcher error channel closed")

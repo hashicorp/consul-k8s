@@ -7,16 +7,16 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagDefaults(t *testing.T) {
@@ -34,7 +34,6 @@ func TestRun_FlagDefaults(t *testing.T) {
 
 func TestRun_DirectoryWatcher(t *testing.T) {
 	// Create a default configuration that matches golden file.
-
 	consulConfig := config.NewDefaultCNIConfig()
 	configFile := "10-kindnet.conflist"
 	baseConfigFile := "testdata/10-kindnet.conflist"
@@ -107,6 +106,68 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 }
 
+func TestRun_TokenFileWatcher(t *testing.T) {
+	// Create a Command and context.
+	var err error
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	tempDir := t.TempDir()
+	sourceTokenPath := path.Join(tempDir, "cni-source-token")
+	destTokenPath := path.Join(tempDir, "cni-dest-token")
+	tempFilePath := path.Join(tempDir, "temp-token-file")
+	newTempFilePath := path.Join(tempDir, "temp-token-file-new")
+
+	// Setup the Command.
+	ui := cli.NewMockUi()
+	cmd := &Command{
+		UI: ui,
+	}
+	cmd.init()
+	cmd.logger, err = common.Logger("info", false)
+	require.NoError(t, err)
+
+	tokenPrev := "TokenValue-prev"
+	tokenNext := "TokenValue-next"
+
+	// Write the token to tempFilePath
+	err = os.WriteFile(tempFilePath, []byte(tokenPrev), 0644)
+	require.NoError(t, err)
+
+	// Create a symlink at sourceTokenPath pointing to tempFilePath
+	err = os.Symlink(tempFilePath, sourceTokenPath)
+	require.NoError(t, err)
+
+	// Create the file watcher.
+	go func() {
+		err := cmd.tokenFileWatcher(ctx, sourceTokenPath, destTokenPath)
+		require.NoError(t, err)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	t.Log("Watcher initialization: Token is Initially copied to destination")
+	actual, err := os.ReadFile(destTokenPath)
+	require.Equal(t, tokenPrev, string(actual), "Token should be available at destination")
+
+	t.Log("Watcher event 1: Token is rotated as temp-token created, old source is removed and temp is renamed to new")
+	// Create new temp file with new token
+	err = os.WriteFile(newTempFilePath, []byte(tokenNext), 0644)
+	require.NoError(t, err)
+
+	// Then atomically replace the symlink
+	// Note: Keep the old symlink until the new one is ready
+	newSymlinkPath := sourceTokenPath + ".tmp"
+	err = os.Symlink(newTempFilePath, newSymlinkPath)
+	require.NoError(t, err)
+
+	// Atomic swap of symlinks
+	err = os.Rename(newSymlinkPath, sourceTokenPath)
+	require.NoError(t, err)
+
+	retry.Run(t, func(r *retry.R) {
+		actual, err := os.ReadFile(destTokenPath)
+		require.NoError(r, err)
+		require.Equal(r, tokenNext, string(actual))
+	})
+}
 func replaceFile(srcFile, destFile string) error {
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
 		return fmt.Errorf("source %s file does not exist: %v", srcFile, err)
