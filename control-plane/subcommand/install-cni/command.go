@@ -349,7 +349,7 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 }
 
 // In case of autorotate-token, we are using projected tokens which doesn't support hostpath mount,
-// we need to watch the token file for changes and copy it to the host
+// we need to watch the token file for changes and copy it to the host.
 func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTokenPath string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
