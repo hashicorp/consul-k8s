@@ -396,8 +396,15 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 			if event.Op&(fsnotify.Remove|fsnotify.Chmod) != 0 {
 				// Re-add watcher after remove/chmod
-				if err := watcher.Add(sourceTokenPath); err != nil {
-					c.logger.Error("Failed to re-add watcher after remove/chmod", "error", err)
+				backoff := time.Second
+				for i := 0; i < 5; i++ {
+					if err := watcher.Add(sourceTokenPath); err != nil {
+						c.logger.Error("Failed to re-add watcher after remove/chmod", "error", err, "attempt", i+1)
+						time.Sleep(backoff)
+						backoff *= 2
+						continue
+					}
+					break
 				}
 				if _, err := os.Stat(sourceTokenPath); err == nil {
 					if err := copyToken(sourceTokenPath, hostTokenPath); err != nil {
