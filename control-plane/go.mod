@@ -1,7 +1,7 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
 replace github.com/hashicorp/consul-k8s/version => ../version
-
+replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
