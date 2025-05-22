@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: MPL-2.0
 
 terraform {
-  required_providers {
-    azurerm = {
-      version = "~> 4.27.0"
+    required_providers {
+      azurerm = {
+        version = "~> 4.27.0"
+      }
+      random = {
+        source  = "hashicorp/random"
+        version = "~> 3.5.0"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.5.0"
   }
 }
 
