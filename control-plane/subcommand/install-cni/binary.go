@@ -47,6 +47,9 @@ func copyFile(srcFile, destDir string) error {
 }
 
 func removeFile(path string) error {
+	if path == "" {
+		return nil
+	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// Nothing to delete.
 		return nil
