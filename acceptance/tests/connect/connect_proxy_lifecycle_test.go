@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,12 +128,13 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
-			var pods *k8s.PodList
+			var pods *corev1.PodList
+			var ns string
 			var err error
 			retry.Run(t, func(r *retry.R) {
 				// Get static-client pod name
-				ns := ctx.KubectlOptions(r).Namespace
-				pods, err := ctx.KubernetesClient(r).CoreV1().Pods(ns).List(
+				ns = ctx.KubectlOptions(r).Namespace
+				pods, err = ctx.KubernetesClient(r).CoreV1().Pods(ns).List(
 					context.Background(),
 					metav1.ListOptions{
 						LabelSelector: "app=static-client",
