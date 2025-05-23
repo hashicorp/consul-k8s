@@ -79,7 +79,7 @@ type CNIArgs struct {
 	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
 
-// PluginConf is is the configuration used by the plugin.
+// PluginConf is the configuration used by the plugin.
 type PluginConf struct {
 	// NetConf is the CNI Specification configuration for standard fields like Name, Type,
 	// CNIVersion and PrevResult.
@@ -184,7 +184,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		}
 	} else {
 		if c.client == nil {
-			if err := c.createK8sClient(cfg); err != nil {
+			if err := c.createK8sClient(cfg, logger); err != nil {
 				return err
 			}
 		}
@@ -233,7 +233,6 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if cniArgsIPTablesCfg == "" {
-
 		// We do not throw an error here because kubernetes will often throw a
 		// benign error where the pod has been updated in between the get and update
 		// of the annotation. Eventually kubernetes will update the annotation
@@ -270,12 +269,13 @@ func main() {
 
 // createK8sClient configures the command's Kubernetes API client if it doesn't
 // already exist.
-func (c *Command) createK8sClient(cfg *PluginConf) error {
+// TODO: remove logger for auth provider details
+func (c *Command) createK8sClient(cfg *PluginConf, logger hclog.Logger) error {
 	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
+	logger.Info("tokenFile used  - ", restConfig.BearerTokenFile)
 	if err != nil {
 		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
 	}
-
 	c.client, err = kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return fmt.Errorf("error initializing Kubernetes client: %s", err)

@@ -12,11 +12,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
+	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 	"github.com/hashicorp/serf/testutil/retry"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
-
-	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
 func TestRun_FlagDefaults(t *testing.T) {
@@ -34,7 +33,6 @@ func TestRun_FlagDefaults(t *testing.T) {
 
 func TestRun_DirectoryWatcher(t *testing.T) {
 	// Create a default configuration that matches golden file.
-
 	consulConfig := config.NewDefaultCNIConfig()
 	configFile := "10-kindnet.conflist"
 	baseConfigFile := "testdata/10-kindnet.conflist"
