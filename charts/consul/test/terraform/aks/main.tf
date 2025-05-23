@@ -2,13 +2,13 @@
 # SPDX-License-Identifier: MPL-2.0
 
 terraform {
-    required_providers {
-      azurerm = {
-        version = "~> 4.27.0"
-      }
-      random = {
-        source  = "hashicorp/random"
-        version = "~> 3.5.0"
+  required_providers {
+    azurerm = {
+      version = "~> 4.27.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5.0"
     }
   }
 }
@@ -72,10 +72,10 @@ resource "azurerm_kubernetes_cluster" "default" {
   // communication is tested, the connections goes through the appropriate gateway
   // rather than directly from pod to pod.
   network_profile {
-    network_plugin     = "kubenet"
-    service_cidr       = "10.0.0.0/16"
-    dns_service_ip     = "10.0.0.10"
-    pod_cidr           = "10.244.0.0/16"
+    network_plugin = "kubenet"
+    service_cidr   = "10.0.0.0/16"
+    dns_service_ip = "10.0.0.10"
+    pod_cidr       = "10.244.0.0/16"
   }
 
   default_node_pool {
