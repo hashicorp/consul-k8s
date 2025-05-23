@@ -195,8 +195,8 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	var logs string
 	retry.Run(t, func(r *retry.R) {
 		var err error
-		logs, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), coreDNSCommand...)
-		require.NoError(t, err)
+		logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
+		require.NoError(r, err)
 	})
 
 	require.Contains(t, logs, "configmap/coredns replaced")
