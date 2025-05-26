@@ -1,3 +1,9 @@
+## 1.6.5 (May 26, 2025)
+
+SECURITY:
+
+* Updated base image for ubi builds to ubi9-minimal:9.5-x to fix (CVE-2024-3596)[https://nvd.nist.gov/vuln/detail/CVE-2024-3596], (CVE-2024-56171)[https://nvd.nist.gov/vuln/detail/CVE-2024-56171] and (CVE-2025-24928)[https://nvd.nist.gov/vuln/detail/CVE-2025-24928] [[GH-4570](https://github.com/hashicorp/consul-k8s/issues/4570)]
+
 ## 1.6.4 (April 24, 2025)
 
 SECURITY:
