@@ -21,7 +21,8 @@ resource "random_id" "suffix" {
 
 data "google_container_engine_versions" "main" {
   location       = var.zone
-  version_prefix = "1.31."
+  version_prefix = var.kubernetes_version_prefix
+
 }
 
 # We assume that the subnets are already created to save time.
