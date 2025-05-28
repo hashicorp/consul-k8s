@@ -6,8 +6,6 @@ package apigateway
 import (
 	"context"
 	"fmt"
-	"testing"
-
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
@@ -21,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	"testing"
 )
 
 func TestAPIGateway_Lifecycle(t *testing.T) {
@@ -376,12 +375,13 @@ func checkRouteBound(t *testing.T, client client.Client, name, namespace, parent
 
 func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o T, fn func(o T)) {
 	t.Helper()
-
-	err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(o), o)
-	require.NoError(t, err)
-	fn(o)
-	err = k8sClient.Update(context.Background(), o)
-	require.NoError(t, err)
+	retryCheck(t, 200, func(r *retry.R) {
+		err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(o), o)
+		require.NoError(t, err)
+		fn(o)
+		err = k8sClient.Update(context.Background(), o)
+		require.NoError(t, err)
+	})
 }
 
 func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1beta1.HTTPRoute {

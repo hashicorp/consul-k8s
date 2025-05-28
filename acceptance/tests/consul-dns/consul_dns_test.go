@@ -6,13 +6,14 @@ package consuldns
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	corev1 "k8s.io/api/core/v1"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/consul/api"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -191,11 +192,16 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	coreDNSCommand := []string{
 		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
 	}
-	logs, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), coreDNSCommand...)
-	require.NoError(t, err)
+	var logs string
+	retry.Run(t, func(r *retry.R) {
+		var err error
+		logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
+		require.NoError(r, err)
+	})
+
 	require.Contains(t, logs, "configmap/coredns replaced")
 	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
-	_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
+	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
 	// Wait for restart to finish.
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "1m", "--watch", "deployment/coredns", "-n", "kube-system")
