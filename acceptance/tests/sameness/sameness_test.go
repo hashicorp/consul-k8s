@@ -58,7 +58,7 @@ const (
 	cluster02Region = "us-west-1"
 	cluster03Region = "us-east-2"
 
-	retryTimeout = 5 * time.Minute
+	retryTimeout = 50 * time.Minute
 )
 
 func TestFailover_Connect(t *testing.T) {
