@@ -18,7 +18,14 @@ env:
 
 jobs:
   conditional-skip:
-    uses: ./.github/workflows/reusable-conditional-skip.yml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip tests and build if only skippable files changed
+        id: maybe-skip-ci
+        if: ${{ steps.changed-files.outputs.only_changed == 'true' }}
+        run: |
+          echo "Skipping tests and build because only skippable files changed"
+          echo "skip-ci=true" >> $GITHUB_OUTPUT
 
   get-go-version:
     # Cascades down to test jobs
