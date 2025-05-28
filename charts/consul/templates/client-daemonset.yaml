@@ -467,7 +467,14 @@ spec:
             - containerPort: 8600
               name: dns-udp
               protocol: "UDP"
+          {{- with .Values.client.livenessProbe }}
+          livenessProbe:
+          {{- toYaml . | nindent 14 }}
+          {{- end }}
           readinessProbe:
+          {{- if .Values.client.readinessProbe }}
+          {{- toYaml .Values.client.readinessProbe | nindent 14 }}
+          {{- else }}
             # NOTE(mitchellh): when our HTTP status endpoints support the
             # proper status codes, we should switch to that. This is temporary.
             exec:
@@ -483,6 +490,7 @@ spec:
                   curl http://127.0.0.1:8500/v1/status/leader \
                   {{- end }}
                   2>/dev/null | grep -E '".+"'
+          {{- end }}
           {{- if .Values.client.resources }}
           resources:
             {{- if eq (typeOf .Values.client.resources) "string" }}
