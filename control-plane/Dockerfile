@@ -79,7 +79,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.19 AS release-default
+FROM alpine:3.21 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
 ARG CNI_BIN_NAME=consul-cni
