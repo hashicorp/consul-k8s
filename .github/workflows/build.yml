@@ -25,7 +25,7 @@ jobs:
         if: ${{ steps.changed-files.outputs.only_changed == 'true' }}
         run: |
           echo "Skipping tests and build because only skippable files changed"
-          echo "skip-ci=true" >> $GITHUB_OUTPUT
+          echo "skip-ci=false" >> $GITHUB_OUTPUT
 
   get-go-version:
     # Cascades down to test jobs
