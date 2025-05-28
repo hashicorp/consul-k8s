@@ -4,6 +4,11 @@ SECURITY:
 
 * Updated base image for ubi builds to ubi9-minimal:9.5-x to fix (CVE-2024-3596)[https://nvd.nist.gov/vuln/detail/CVE-2024-3596], (CVE-2024-56171)[https://nvd.nist.gov/vuln/detail/CVE-2024-56171] and (CVE-2025-24928)[https://nvd.nist.gov/vuln/detail/CVE-2025-24928] [[GH-4570](https://github.com/hashicorp/consul-k8s/issues/4570)]
 
+IMPROVEMENTS:
+
+* cni: Add autorotate Token feature for consul CNI for time bound SA tokens enforced in K8s environments.
+* cni: CNI update strategy to be fixed to pod by pod rolling update and removed older CNI updateStrategy configuration
+
 ## 1.7.0 (May 7, 2025)
 
 > NOTE: Consul K8s 1.7.x is compatible with Consul 1.21.x and Consul Dataplane 1.7.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
