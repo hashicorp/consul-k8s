@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,17 +128,21 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
-
-			// Get static-client pod name
-			ns := ctx.KubectlOptions(t).Namespace
-			pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(
-				context.Background(),
-				metav1.ListOptions{
-					LabelSelector: "app=static-client",
-				},
-			)
-			require.NoError(t, err)
-			require.Len(t, pods.Items, 1)
+			var pods *corev1.PodList
+			var ns string
+			var err error
+			retry.Run(t, func(r *retry.R) {
+				// Get static-client pod name
+				ns = ctx.KubectlOptions(r).Namespace
+				pods, err = ctx.KubernetesClient(r).CoreV1().Pods(ns).List(
+					context.Background(),
+					metav1.ListOptions{
+						LabelSelector: "app=static-client",
+					},
+				)
+				require.NoError(r, err)
+				require.Len(r, pods.Items, 1)
+			})
 			clientPodName := pods.Items[0].Name
 
 			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
