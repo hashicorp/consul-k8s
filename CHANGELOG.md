@@ -5,6 +5,7 @@ SECURITY:
 * crd: Add `contains` and `ignoreCase` to the Intentions CRD to support configuring L7 Header intentions resilient to variable casing and multiple header values. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
 * crd: Add `http.incoming.requestNormalization` to the Mesh CRD to support configuring service traffic request normalization. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
 
+
 IMPROVEMENTS:
 
 * catalog-sync: Added field to helm chart to purge all services registered with catalog-sync from consul on disabling of catalog-sync. [[GH-4378](https://github.com/hashicorp/consul-k8s/issues/4378)]
