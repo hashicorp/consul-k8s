@@ -14,20 +14,20 @@ import (
 func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespaceMirroring bool) {
 	// Cleanup of old consul secret
 	cmd := exec.Command("kubectl", "delete", "secret", "-n", "consul", "consul-ent-license")
-	cmd.CombinedOutput()
+	_, _ = cmd.CombinedOutput()
 
 	// Cleanup of old consul helm installtion and namespace
 	cmd = exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
-	cmd.CombinedOutput()
+	_, _ = cmd.CombinedOutput()
 
 	// Bypass finalizers for the consul namespace deletion.
 	ns := "consul"
 	cmd = exec.Command("bash", "-c", `kubectl get ns "`+ns+`" -o json | jq 'del(.spec.finalizers)' | kubectl replace --raw "/api/v1/namespaces/`+ns+`/finalize" -f -`)
-	cmd.Run()
+	_ = cmd.Run()
 
 	// Cleanup of old consul namespace
 	cmd = exec.Command("kubectl", "delete", "namespace", "consul")
-	cmd.CombinedOutput()
+	_, _ = cmd.CombinedOutput()
 
 	// Add the hashicorp helm repo
 	cmd = exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
