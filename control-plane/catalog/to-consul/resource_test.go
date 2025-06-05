@@ -2092,6 +2092,24 @@ func TestServiceResource_addIngress(t *testing.T) {
 			expectedAddress:   "1.1.1.1",
 			expectedPort:      8080,
 		},
+		"ingress without an HTTP rule": {
+			enableIngress: true,
+			ingress: &networkingv1.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ingress",
+				},
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{
+						{
+							Host: "test.host.consul",
+						},
+					},
+				},
+			},
+			expectIngressSync: false,
+			expectedAddress:   "1.1.1.1",
+			expectedPort:      8080,
+		},
 	}
 
 	for name, test := range cases {
