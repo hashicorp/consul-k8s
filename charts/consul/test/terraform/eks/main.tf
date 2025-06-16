@@ -79,8 +79,12 @@ module "eks" {
       desired_capacity = 3
       max_capacity     = 3
       min_capacity     = 3
-
       instance_type = "m5.xlarge"
+      metadata_options = {
+        http_endpoint               = "enabled"
+        http_put_response_hop_limit = 2
+        http_tokens                 = "required"
+      }
     }
   }
 
