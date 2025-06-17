@@ -315,8 +315,16 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   StaticClientNamespace,
 			}
-			k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-namespaces")
-
+			retry.Run(t, func(r *retry.R) {
+				k8s.DeployKustomize(
+					t,
+					staticClientOpts,
+					cfg.NoCleanupOnFailure,
+					cfg.NoCleanup,
+					cfg.DebugDirectory,
+					"../fixtures/cases/static-client-namespaces",
+				)
+			})
 			logger.Log(t, "waiting for static-client to be registered with Consul")
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 			expectedConsulNS := StaticClientNamespace
