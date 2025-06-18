@@ -31,7 +31,7 @@ data "google_container_engine_versions" "main" {
 
 }
 
-data "google_compute_network" "custom_network" {
+resource "google_compute_network" "custom_network" {
   name                    = "custom-network-${random_string.cluster_prefix.result}"
   auto_create_subnetworks = false
 }
@@ -40,7 +40,7 @@ resource "google_compute_subnetwork" "subnet" {
   count          = var.cluster_count
   name           = "subnet-${random_string.cluster_prefix.result}-${count.index}" // Ensure valid name
   ip_cidr_range  = cidrsubnet("10.0.0.0/8", 8, count.index)
-  network        = data.google_compute_network.custom_network.name
+  network        = google_compute_network.custom_network.name
 }
 
 resource "google_container_cluster" "cluster" {
