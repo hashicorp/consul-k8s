@@ -47,7 +47,7 @@ resource "google_container_cluster" "cluster" {
     machine_type = "e2-standard-8"
   }
   subnetwork          = data.google_compute_subnetwork.subnet.name
-  cluster_ipv4_cidr   = "10.0.0.0/6"
+  cluster_ipv4_cidr   = "8.0.0.0/8"
   resource_labels     = var.labels
   deletion_protection = false
 }
