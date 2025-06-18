@@ -57,7 +57,7 @@ resource "google_container_cluster" "cluster" {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
-  subnetwork          = google_compute_subnetwork.subnet[count.index].name
+  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link // Use self_link for accuracy
   cluster_ipv4_cidr   = cidrsubnet("10.0.0.0/8", 8, count.index)
   resource_labels     = var.labels
   deletion_protection = false
