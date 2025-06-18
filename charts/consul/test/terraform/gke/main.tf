@@ -32,7 +32,8 @@ data "google_container_engine_versions" "main" {
 }
 
 data "google_compute_network" "custom_network" {
-  name = "custom-network-${random_string.cluster_prefix.result}"
+  name                    = "custom-network-${random_string.cluster_prefix.result}"
+  auto_create_subnetworks = false
 }
 
 resource "google_compute_subnetwork" "subnet" {
