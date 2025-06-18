@@ -66,7 +66,7 @@ resource "google_container_cluster" "cluster" {
 resource "google_compute_firewall" "firewall-rules" {
   project     = var.project
   name        = "${random_string.cluster_prefix.result}-firewall-${random_id.suffix[count.index].dec}"
-  network     = "default"
+  network     = google_compute_network.custom_network.name
   description = "Firewall rule for cluster ${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}."
 
   count = var.cluster_count > 1 ? var.cluster_count : 0
@@ -79,7 +79,6 @@ resource "google_compute_firewall" "firewall-rules" {
   source_tags   = ["${random_string.cluster_prefix.result}-${random_id.suffix[count.index == 0 ? 1 : 0].dec}"]
   target_tags   = ["${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
 }
-
 resource "null_resource" "kubectl" {
   count = var.init_cli ? var.cluster_count : 0
 
