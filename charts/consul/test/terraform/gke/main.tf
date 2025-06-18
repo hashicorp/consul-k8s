@@ -31,9 +31,8 @@ data "google_container_engine_versions" "main" {
 
 }
 
-resource "google_compute_network" "custom_network" {
-  name                    = "custom-network"
-  auto_create_subnetworks = false
+data "google_compute_network" "custom_network" {
+  name = "custom-network"
 }
 
 resource "google_compute_subnetwork" "subnet" {
