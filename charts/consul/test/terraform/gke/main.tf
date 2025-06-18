@@ -31,6 +31,11 @@ data "google_container_engine_versions" "main" {
 
 }
 
+resource "google_compute_network" "custom_network" {
+  name                    = "custom-network"
+  auto_create_subnetworks = false
+}
+
 resource "google_compute_subnetwork" "subnet" {
   count          = var.cluster_count
   name           = "${random_string.cluster_prefix.result}-subnet-${count.index}"
@@ -39,7 +44,7 @@ resource "google_compute_subnetwork" "subnet" {
 }
 
 resource "google_container_cluster" "cluster" {
-  provider = "google"
+  provider = google
   count    = var.cluster_count
 
   name               = "consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"
