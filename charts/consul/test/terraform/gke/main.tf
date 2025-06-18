@@ -32,7 +32,7 @@ data "google_container_engine_versions" "main" {
 }
 
 resource "google_compute_network" "custom_network" {
-  name                    = "custom-network-${random_string.cluster_prefix.result}"
+  name                    = "network-${random_string.cluster_prefix.result}"
   auto_create_subnetworks = false
 }
 
@@ -53,11 +53,12 @@ resource "google_container_cluster" "cluster" {
   location           = var.zone
   min_master_version = data.google_container_engine_versions.main.latest_master_version
   node_version       = data.google_container_engine_versions.main.latest_master_version
+  network           = google_compute_network.custom_network.name
   node_config {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
-  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link // Ensure correct subnetwork
+  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
   cluster_ipv4_cidr   = cidrsubnet("10.0.0.0/8", 8, count.index)
   resource_labels     = var.labels
   deletion_protection = false
