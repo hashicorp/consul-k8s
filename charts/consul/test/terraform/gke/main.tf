@@ -37,7 +37,7 @@ data "google_compute_network" "custom_network" {
 
 resource "google_compute_subnetwork" "subnet" {
   count          = var.cluster_count
-  name           = "${random_string.cluster_prefix.result}-subnet-${count.index}"
+  name           = "subnet-${random_string.cluster_prefix.result}-${count.index}" // Ensure valid name
   ip_cidr_range  = cidrsubnet("10.0.0.0/8", 8, count.index)
   network        = data.google_compute_network.custom_network.name
 }
