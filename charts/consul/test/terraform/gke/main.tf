@@ -59,7 +59,12 @@ resource "google_container_cluster" "cluster" {
     machine_type = "e2-standard-8"
   }
   subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
-  cluster_ipv4_cidr   = cidrsubnet("10.0.0.0/8", 8, count.index)
+  # Modified CIDR ranges to avoid conflicts
+  cluster_ipv4_cidr   = "10.${count.index + 1}.0.0/16"
+  ip_allocation_policy {
+    cluster_ipv4_cidr_block  = "10.${count.index + 1}.0.0/16"
+    services_ipv4_cidr_block = "10.${count.index + 101}.0.0/16"
+  }
   resource_labels     = var.labels
   deletion_protection = false
 }
