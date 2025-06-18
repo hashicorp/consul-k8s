@@ -31,8 +31,9 @@ data "google_container_engine_versions" "main" {
 
 }
 
-data "google_compute_network" "custom_network" {
-  name = "custom-network" # Replace with the name of your existing network
+resource "google_compute_network" "custom_network" {
+  name                    = "custom-network"
+  auto_create_subnetworks = false
 }
 
 resource "google_compute_subnetwork" "subnet" {
