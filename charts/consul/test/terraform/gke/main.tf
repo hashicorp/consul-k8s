@@ -66,7 +66,7 @@ resource "google_container_cluster" "cluster" {
 
 resource "google_compute_firewall" "firewall-rules" {
   project     = var.project
-  name        = format("fw-%s-%d", substr(random_string.cluster_prefix.result, 0, 8), count.index)
+  name        = format("firewall-%s-%d", substr(random_string.cluster_prefix.result, 0, 8), count.index)
   network     = google_compute_network.custom_network.name
   description = "Firewall rule for cluster ${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}."
 
