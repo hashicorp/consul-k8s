@@ -193,7 +193,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
 	}
 	var logs string
-	
+
 	timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		var err error
