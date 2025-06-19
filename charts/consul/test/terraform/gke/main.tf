@@ -77,9 +77,10 @@ resource "google_compute_firewall" "firewall-rules" {
   }
 
   source_ranges = [google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr]
-  source_tags   = ["${random_string.cluster_prefix.result}-${random_id.suffix[count.index == 0 ? 1 : 0].dec}"]
-  target_tags   = ["${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
+  source_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index == 0 ? 1 : 0}"]
+  target_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index}"]
 }
+
 resource "null_resource" "kubectl" {
   count = var.init_cli ? var.cluster_count : 0
 
