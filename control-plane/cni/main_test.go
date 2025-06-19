@@ -129,6 +129,32 @@ func Test_cmdAdd(t *testing.T) {
 			expectedRules: true, // Rules will be applied
 		},
 		{
+			name: "Pod with correct annotations, using projected tokens should create redirect traffic rules",
+			cmd: &Command{
+				client:           fake.NewSimpleClientset(),
+				iptablesProvider: &fakeIptablesProvider{},
+			},
+			podName:   "pod-no-proxy-outbound-port",
+			stdInData: goodStdinDataWithProjectedToken,
+			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
+				pod.Annotations[keyInjectStatus] = "true"
+				pod.Annotations[keyTransparentProxyStatus] = "enabled"
+				cfg := iptables.Config{
+					ProxyUserID:      "123",
+					ProxyInboundPort: 20000,
+				}
+				iptablesConfigJson, err := json.Marshal(&cfg)
+				require.NoError(t, err)
+				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
+				require.NoError(t, err)
+
+				return pod
+			},
+			expectedErr:   nil,
+			expectedRules: true, // Rules will be applied
+		},
+		{
 			name: "Parsing iptables from CNI_ARGs as in Nomad",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
@@ -337,6 +363,56 @@ const goodStdinData = `{
     "cni_net_dir": "/etc/cni/net.d",
     "kubeconfig": "ZZZ-consul-cni-kubeconfig",
     "log_level": "info",
+	"cni_host_token_path":"",
+	"cni_token_path": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+	"autorotate_token": false,
+    "multus": false,
+    "name": "consul-cni",
+    "type": "consul-cni"
+}`
+
+const goodStdinDataWithProjectedToken = `{
+    "cniVersion": "0.3.1",
+	"name": "kindnet",
+	"type": "kindnet",
+    "capabilities": {
+        "testCapability": false
+    },
+    "ipam": {
+        "type": "host-local"
+    },
+    "dns": {
+        "nameservers": ["nameserver"],
+        "domain": "domain",
+        "search": ["search"],
+        "options": ["option"]
+    },
+    "prevResult": {
+        "cniversion": "0.3.1",
+        "interfaces": [
+            {
+                "name": "eth0",
+                "sandbox": "/tmp"
+            }
+        ],
+        "ips": [
+            {
+                "version": "4",
+                "address": "10.0.0.2/24",
+                "gateway": "10.0.0.1",
+                "interface": 0
+            }
+        ],
+        "routes": []
+
+    },
+    "cni_bin_dir": "/opt/cni/bin",
+    "cni_net_dir": "/etc/cni/net.d",
+    "kubeconfig": "ZZZ-consul-cni-kubeconfig",
+    "log_level": "info",
+	"cni_token_path": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+	"cni_host_token_path": "/etc/cni/net.d/cni-host-token",
+	"autorotate_token": true,
     "multus": false,
     "name": "consul-cni",
     "type": "consul-cni"
@@ -373,6 +449,9 @@ const missingIPsStdinData = `{
     "cni_net_dir": "/etc/cni/net.d",
     "kubeconfig": "ZZZ-consul-cni-kubeconfig",
     "log_level": "info",
+	"cni_host_token_path":"",
+	"cni_token_path": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+	"autorotate_token": false,
     "multus": false,
     "name": "consul-cni",
     "type": "consul-cni"
@@ -404,6 +483,9 @@ const nomadStdinData = `{
     "cni_bin_dir": "/opt/cni/bin",
     "cni_net_dir": "/etc/cni/net.d",
     "log_level": "info",
+	"cni_host_token_path":"",
+	"cni_token_path": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+	"autorotate_token": false,
     "name": "nomad",
     "type": "consul-cni"
 }

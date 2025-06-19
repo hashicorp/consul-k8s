@@ -30,7 +30,7 @@
       "type": "portmap"
     },
     {
-      "autorotate_token": false,
+      "autorotate_token": true,
       "cni_bin_dir": "/opt/cni/bin",
       "cni_host_token_path": "/etc/cni/net.d/cni-host-token",
       "cni_net_dir": "/etc/cni/net.d",

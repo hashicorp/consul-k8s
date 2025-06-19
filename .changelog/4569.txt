@@ -1,0 +1,4 @@
+``release-note:improvement
+cni: Add autorotate Token feature for consul CNI for time bound SA tokens enforced in K8s environments.
+cni: CNI update strategy to be fixed to pod by pod rolling update and removed older CNI updateStrategy configuration
+```

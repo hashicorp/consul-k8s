@@ -66,7 +66,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.21-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.21.1-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -2583,7 +2583,18 @@ connectInject:
     # @type: boolean
     enabled: false
 
-    # Log level for the installer and plugin. Overrides global.logLevel
+    # If true, then use projected service account tokens for the CNI plugin and
+    # Uses auto-rotated projected token everytime when interacting with Kubernetes API.
+    # @type: boolean
+    autorotateToken: false
+
+    # Set the CNI plugin ServiceAccount token validity period. Applicable only when autorotateToken is true.
+    # In some environments this may not work(eg. azure 1.30+ with oidc enabled)  as providers may have native expiration limits.
+    # Optional and setup to 1 hour by default. Value is in seconds.
+    # @type: Integer
+    tokenExpiration: 3600
+
+    # Log level for the installer and plugin. Overrides global.logLevel. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
     logLevel: null
 
@@ -2644,23 +2655,6 @@ connectInject:
       runAsNonRoot: false
       runAsGroup: 0
       runAsUser: 0
-
-    # updateStrategy for the CNI installer DaemonSet.
-    # Refer to the Kubernetes [Daemonset upgrade strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#daemonset-update-strategy)
-    # documentation.
-    # This should be a multi-line string mapping directly to the updateStrategy
-    #
-    # Example:
-    #
-    # ```yaml
-    # updateStrategy: |
-    #   rollingUpdate:
-    #     maxUnavailable: 5
-    #   type: RollingUpdate
-    # ```
-    #
-    # @type: string
-    updateStrategy: null
 
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.

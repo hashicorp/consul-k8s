@@ -47,7 +47,8 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
-	@docker build -t '$(DEV_IMAGE)' \
+	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
+	   --no-cache \
        --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
@@ -104,7 +105,7 @@ ifeq ("$(GOTESTSUM_PATH)","")
 else
 	cd control-plane && \
 	gotestsum \
-		--format=short-verbose \
+		--format=pkgname \
 		--debug \
 		--rerun-fails=3 \
 		--packages="./..."
@@ -118,7 +119,7 @@ ifeq ("$(GOTESTSUM_PATH)","")
 else
 	cd control-plane && \
 	gotestsum \
-		--format=short-verbose \
+		--format=pkgname \
 		--debug \
 		--rerun-fails=3 \
 		--packages="./..." \
@@ -135,6 +136,9 @@ control-plane-clean: ## Delete bin and pkg dirs.
 	@rm -rf \
 		$(CURDIR)/control-plane/bin \
 		$(CURDIR)/control-plane/pkg
+	@rm -rf \
+		$(CURDIR)/control-plane/cni/bin \
+		$(CURDIR)/control-plane/cni/pkg
 
 .PHONY: control-plane-lint
 control-plane-lint: cni-plugin-lint ## Run linter in the control-plane directory.

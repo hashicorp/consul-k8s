@@ -1,17 +1,36 @@
 package openshift
 
 import (
+	"os/exec"
+	"strconv"
+	"testing"
+
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os/exec"
-	"strconv"
-	"testing"
 )
 
 func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespaceMirroring bool) {
-	cmd := exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
+	// Cleanup of old consul secret
+	cmd := exec.Command("kubectl", "delete", "secret", "-n", "consul", "consul-ent-license")
+	_, _ = cmd.CombinedOutput()
+
+	// Cleanup of old consul helm installtion and namespace
+	cmd = exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
+	_, _ = cmd.CombinedOutput()
+
+	// Bypass finalizers for the consul namespace deletion.
+	ns := "consul"
+	cmd = exec.Command("bash", "-c", `kubectl get ns "`+ns+`" -o json | jq 'del(.spec.finalizers)' | kubectl replace --raw "/api/v1/namespaces/`+ns+`/finalize" -f -`)
+	_ = cmd.Run()
+
+	// Cleanup of old consul namespace
+	cmd = exec.Command("kubectl", "delete", "namespace", "consul")
+	_, _ = cmd.CombinedOutput()
+
+	// Add the hashicorp helm repo
+	cmd = exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
 	output, err := cmd.CombinedOutput()
 	require.NoErrorf(t, err, "failed to add hashicorp helm repo: %s", string(output))
 
@@ -59,6 +78,7 @@ func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespace
 		"--set", "global.imageConsulDataplane="+cfg.ConsulDataplaneImage,
 		"--set", "global.enterpriseLicense.secretName=consul-ent-license",
 		"--set", "global.enterpriseLicense.secretKey=key",
+		"--set", "connectInject.apiGateway.manageExternalCRDs=true",
 	)
 
 	output, err = cmd.CombinedOutput()
