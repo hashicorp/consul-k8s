@@ -37,10 +37,10 @@ resource "google_compute_network" "custom_network" {
 }
 
 resource "google_compute_subnetwork" "subnet" {
-  count          = var.cluster_count
-  name           = "subnet-${random_string.cluster_prefix.result}-${count.index}" // Ensure valid name
-  ip_cidr_range  = cidrsubnet("10.0.0.0/8", 8, count.index)
-  network        = google_compute_network.custom_network.name
+  count         = var.cluster_count
+  name          = "subnet-${random_string.cluster_prefix.result}-${count.index}" // Ensure valid name
+  ip_cidr_range = cidrsubnet("10.0.0.0/8", 8, count.index)
+  network       = google_compute_network.custom_network.name
 }
 
 resource "google_container_cluster" "cluster" {
@@ -53,7 +53,7 @@ resource "google_container_cluster" "cluster" {
   location           = var.zone
   min_master_version = data.google_container_engine_versions.main.latest_master_version
   node_version       = data.google_container_engine_versions.main.latest_master_version
-  network           = google_compute_network.custom_network.name
+  network            = google_compute_network.custom_network.name
   node_config {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
