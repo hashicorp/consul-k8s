@@ -315,6 +315,7 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 				ConfigPath:  ctx.KubectlOptions(t).ConfigPath,
 				Namespace:   StaticClientNamespace,
 			}
+			// Addition of retry block in case of failure of apply to cluster.
 			retry.Run(t, func(r *retry.R) {
 				k8s.DeployKustomize(
 					t,
