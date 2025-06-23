@@ -58,7 +58,6 @@ func TestJWTProvider_MatchesConsul(t *testing.T) {
 							RequestTimeoutMs:    567,
 							CacheDuration:       metav1.Duration{Duration: 890},
 							FetchAsynchronously: true,
-							UseSNI:              true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 1,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
@@ -129,7 +128,6 @@ func TestJWTProvider_MatchesConsul(t *testing.T) {
 						RequestTimeoutMs:    567,
 						CacheDuration:       890,
 						FetchAsynchronously: true,
-						UseSNI:              true,
 						RetryPolicy: &capi.JWKSRetryPolicy{
 							NumRetries: 1,
 							RetryPolicyBackOff: &capi.RetryPolicyBackOff{
@@ -243,7 +241,6 @@ func TestJWTProvider_ToConsul(t *testing.T) {
 							RequestTimeoutMs:    567,
 							CacheDuration:       metav1.Duration{Duration: 890},
 							FetchAsynchronously: true,
-							UseSNI:              true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 1,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
@@ -313,7 +310,6 @@ func TestJWTProvider_ToConsul(t *testing.T) {
 						RequestTimeoutMs:    567,
 						CacheDuration:       890,
 						FetchAsynchronously: true,
-						UseSNI:              true,
 						RetryPolicy: &capi.JWKSRetryPolicy{
 							NumRetries: 1,
 							RetryPolicyBackOff: &capi.RetryPolicyBackOff{
@@ -418,7 +414,6 @@ func TestJWTProvider_Validate(t *testing.T) {
 						Remote: &RemoteJWKS{
 							URI:                 "https://jwks.example.com",
 							FetchAsynchronously: true,
-							UseSNI:              true,
 						},
 					},
 					Locations: []*JWTLocation{
@@ -448,7 +443,6 @@ func TestJWTProvider_Validate(t *testing.T) {
 							RequestTimeoutMs:    5000,
 							CacheDuration:       metav1.Duration{Duration: 10 * time.Second},
 							FetchAsynchronously: true,
-							UseSNI:              true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 3,
 								RetryPolicyBackOff: &RetryPolicyBackOff{
@@ -513,7 +507,6 @@ func TestJWTProvider_Validate(t *testing.T) {
 							RequestTimeoutMs:    5000,
 							CacheDuration:       metav1.Duration{Duration: 10 * time.Second},
 							FetchAsynchronously: true,
-							UseSNI:              true,
 							RetryPolicy: &JWKSRetryPolicy{
 								NumRetries: 3,
 								RetryPolicyBackOff: &RetryPolicyBackOff{

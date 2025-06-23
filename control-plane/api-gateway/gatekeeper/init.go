@@ -213,9 +213,6 @@ func (g *Gatekeeper) initContainer(config common.HelmConfig, name, namespace str
 		},
 		AllowPrivilegeEscalation: ptr.To(false),
 		ReadOnlyRootFilesystem:   ptr.To(true),
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
 	}
 
 	return container, nil

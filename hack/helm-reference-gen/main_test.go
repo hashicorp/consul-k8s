@@ -476,16 +476,16 @@ key:
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			// Swap $ for `.
-			input := strings.ReplaceAll(c.Input, "$", "`")
+			input := strings.Replace(c.Input, "$", "`", -1)
 
 			out, err := GenerateDocs(input)
 			require.NoError(t, err)
 
 			// Swap $ for `.
-			exp := strings.ReplaceAll(c.Exp, "$", "`")
+			exp := strings.Replace(c.Exp, "$", "`", -1)
 
 			// Swap \n for real \n.
-			exp = strings.ReplaceAll(exp, "\\n", "\n")
+			exp = strings.Replace(exp, "\\n", "\n", -1)
 
 			exp = tocPrefix + exp
 

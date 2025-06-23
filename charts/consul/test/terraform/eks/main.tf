@@ -68,7 +68,7 @@ module "eks" {
   kubeconfig_api_version = "client.authentication.k8s.io/v1beta1"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
-  cluster_version = var.kubernetes_version
+  cluster_version = "1.26"
   subnets         = module.vpc[count.index].private_subnets
   enable_irsa     = true
 

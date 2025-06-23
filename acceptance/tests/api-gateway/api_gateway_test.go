@@ -37,8 +37,7 @@ const (
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestAPIGateway_Basic(t *testing.T) {
 	cases := []struct {
-		secure                   bool
-		restrictedPSAEnforcement bool
+		secure bool
 	}{
 		{
 			secure: false,
@@ -46,26 +45,12 @@ func TestAPIGateway_Basic(t *testing.T) {
 		{
 			secure: true,
 		},
-		// There is an argument that all tests should be run in a restricted PSA namespace
-		// However we are on a time crunch and don't want to make sweeping changes to the test suite
-		{
-			secure:                   true,
-			restrictedPSAEnforcement: true,
-		},
-		{
-			secure:                   false,
-			restrictedPSAEnforcement: true,
-		},
 	}
 	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t restrictedPSAEnforcement: %t", c.secure, c.restrictedPSAEnforcement)
+		name := fmt.Sprintf("secure: %t", c.secure)
 		t.Run(name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
-			if cfg.EnableTransparentProxy && c.restrictedPSAEnforcement && !cfg.EnableCNI {
-				t.Skipf("skipping because -enable-transparent-proxy is set and -enable-cni is not and tproxy cannot run in restrictedPSA without CNI enabled")
-			}
-
 			helmValues := map[string]string{
 				"connectInject.enabled":        "true",
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
@@ -77,30 +62,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)
-
-			if c.restrictedPSAEnforcement {
-				//enable PSA enforcment for some tests
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "--overwrite", "ns", ctx.KubectlOptions(t).Namespace,
-					"pod-security.kubernetes.io/enforce=restricted",
-				)
-
-				if cfg.EnableCNI {
-					helmValues["connectInject.cni.namespace"] = "cni-namespace"
-					//create namespace for CNI. CNI pods require NET_ADMIN so the need to run in a non PSA restricted namespace.
-					k8s.RunKubectl(t, ctx.KubectlOptions(t), "create", "namespace", "cni-namespace")
-				}
-			}
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				if c.restrictedPSAEnforcement {
-					//reset namespace
-					k8s.RunKubectl(t, ctx.KubectlOptions(t), "label", "--overwrite", "ns", ctx.KubectlOptions(t).Namespace,
-						"pod-security.kubernetes.io/enforce=privileged",
-					)
-					if cfg.EnableCNI {
-						k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "namespace", "cni-namespace")
-					}
-				}
-			})
 
 			// Override the default proxy config settings for this test
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
@@ -247,7 +208,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.Len(t, tcpRoute.Status.Parents, 1)
 			require.EqualValues(t, gatewayClassControllerName, tcpRoute.Status.Parents[0].ControllerName)
 			require.EqualValues(t, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
-
 			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
@@ -279,10 +239,9 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			// finally we check that we can actually route to the service via the gateway
 			k8sOptions := ctx.KubectlOptions(t)
-			//we have to account for port mapping inside the cluster.
-			targetHTTPAddress := fmt.Sprintf("http://%s:8080", gatewayAddress)
-			targetHTTPSAddress := fmt.Sprintf("https://%s:8443", gatewayAddress)
-			targetTCPAddress := fmt.Sprintf("http://%s:8081", gatewayAddress)
+			targetHTTPAddress := fmt.Sprintf("http://%s", gatewayAddress)
+			targetHTTPSAddress := fmt.Sprintf("https://%s", gatewayAddress)
+			targetTCPAddress := fmt.Sprintf("http://%s:81", gatewayAddress)
 
 			if c.secure {
 				// check that intentions keep our connection from happening
@@ -584,13 +543,13 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	// finally we check that we can actually route to the service(s) via the gateway
 	k8sOptions := ctx.KubectlOptions(t)
-	targetHTTPAddress := fmt.Sprintf("http://%s:8080/v1", gatewayAddress)
-	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8083/admin", gatewayAddress)
-	targetHTTPAddressPet := fmt.Sprintf("http://%s:8083/pet", gatewayAddress)
-	targetHTTPAddressAdmin2 := fmt.Sprintf("http://%s:8083/admin-2", gatewayAddress)
-	targetHTTPAddressPet2 := fmt.Sprintf("http://%s:8083/pet-2", gatewayAddress)
-	targetHTTPAddressAdminNoAuthOnRoute := fmt.Sprintf("http://%s:8083/admin-no-auth", gatewayAddress)
-	targetHTTPAddressPetNotAuthOnRoute := fmt.Sprintf("http://%s:8083/pet-no-auth", gatewayAddress)
+	targetHTTPAddress := fmt.Sprintf("http://%s/v1", gatewayAddress)
+	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8081/admin", gatewayAddress)
+	targetHTTPAddressPet := fmt.Sprintf("http://%s:8081/pet", gatewayAddress)
+	targetHTTPAddressAdmin2 := fmt.Sprintf("http://%s:8081/admin-2", gatewayAddress)
+	targetHTTPAddressPet2 := fmt.Sprintf("http://%s:8081/pet-2", gatewayAddress)
+	targetHTTPAddressAdminNoAuthOnRoute := fmt.Sprintf("http://%s:8081/admin-no-auth", gatewayAddress)
+	targetHTTPAddressPetNotAuthOnRoute := fmt.Sprintf("http://%s:8081/pet-no-auth", gatewayAddress)
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{

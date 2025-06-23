@@ -96,11 +96,11 @@ func (n DocNode) FormattedDefault() string {
 
 // FormattedDocumentation returns the formatted documentation for this node.
 func (n DocNode) FormattedDocumentation() string {
-	//doc := n.Comment
+	doc := n.Comment
 
 	// Replace all leading YAML comment characters, e.g.
 	// `# yaml comment` => `yaml comment`.
-	doc := commentPrefix.ReplaceAllString(n.Comment, "")
+	doc = commentPrefix.ReplaceAllString(n.Comment, "")
 
 	// Indent each line of the documentation so it lines up correctly.
 	var indentedLines []string
@@ -129,6 +129,8 @@ func (n DocNode) FormattedDocumentation() string {
 				indent = n.Column
 			}
 			indentedLine = strings.Repeat(" ", indent) + line
+		} else {
+			// No need to add whitespace indent to a newline.
 		}
 		indentedLines = append(indentedLines, indentedLine)
 	}

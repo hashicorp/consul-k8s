@@ -1,3 +1,53 @@
+## 1.6.6 (June 27, 2025)
+
+SECURITY:
+
+* cve: upgraded helmv3 packages to address following CVEs:
+- [CVE-2025-32386](https://nvd.nist.gov/vuln/detail/CVE-2025-32386)
+- [CVE-2025-32387](https://nvd.nist.gov/vuln/detail/cve-2025-32387) [[GH-4635](https://github.com/hashicorp/consul-k8s/issues/4635)]
+* go: Upgraded to 1.23.10
+cve: upgraded containerd packages to address following CVEs:
+- [CVE-2025-35947](https://nvd.nist.gov/vuln/detail/cve-2024-35947)
+- [CVE-2024-36118](https://nvd.nist.gov/vuln/detail/CVE-2024-36118)
+- [CVE-2024-23651](https://nvd.nist.gov/vuln/detail/cve-2024-23651) [[GH-4629](https://github.com/hashicorp/consul-k8s/issues/4629)]
+
+## 1.6.5 (May 26, 2025)
+
+SECURITY:
+
+* Updated base image for ubi builds to ubi9-minimal:9.5-x to fix (CVE-2024-3596)[https://nvd.nist.gov/vuln/detail/CVE-2024-3596], (CVE-2024-56171)[https://nvd.nist.gov/vuln/detail/CVE-2024-56171] and (CVE-2025-24928)[https://nvd.nist.gov/vuln/detail/CVE-2025-24928] [[GH-4570](https://github.com/hashicorp/consul-k8s/issues/4570)]
+
+## 1.6.4 (April 24, 2025)
+
+SECURITY:
+
+* Update `golang.org/x/net` to v0.38.0 to address [GHSA-vvgc-356p-c3xw](https://github.com/advisories/GHSA-vvgc-356p-c3xw).
+* Upgrade to Go 1.23.8 to fix CVE [GO-2025-3563](https://pkg.go.dev/vuln/GO-2025-3563)
+
+## 1.6.3 (March 21, 2025)
+
+IMPROVEMENTS:
+
+* helm: Add support for `server.snapshotAgent.extraVolumes` and `server.snapshotAgent.extraEnvironmentVars` so privileged credentials can be configured for the snapshot agent. [[GH-4471](https://github.com/hashicorp/consul-k8s/issues/4471)]
+
+## 1.6.2 (January 7, 2025)
+
+IMPROVEMENTS:
+
+* cli: Introduce `gateway list` for collecting multiple components of all gateways' configuration by running a single command. [[GH-4433](https://github.com/hashicorp/consul-k8s/issues/4433)]
+* cli: Introduce `gateway read` for collecting multiple components of a gateway's configuration by running a single command. [[GH-4432](https://github.com/hashicorp/consul-k8s/issues/4432)]
+* Updated consul/api, envoyextensions & troubleshoot submodules [[PR-4451](https://github.com/hashicorp/consul-k8s/pull/4451)]
+
+BUG FIXES:
+
+* cli: fix issue where the `consul-k8s proxy list` command does not include API gateways. [[GH-4426](https://github.com/hashicorp/consul-k8s/issues/4426)]
+* connect-inject: fix issue where the ACL policy for the connect-injector included the `acl = "write"` rule twice when namespaces were not enabled. [[GH-4434](https://github.com/hashicorp/consul-k8s/issues/4434)]
+
+SECURITY:
+
+* updated golang.org/x/net dependency to 0.34.0 to fix vulnerability [[GO-2024-3333](https://pkg.go.dev/vuln/GO-2024-3333)] in CLI, CNI, acceptance and control-plane submodule.[[PR-4452](https://github.com/hashicorp/consul-k8s/pull/4452)]
+
+
 ## 1.6.1 (November 4, 2023)
 
 SECURITY:
@@ -20,7 +70,6 @@ Note: the referenced image pull Secret(s) must be present in the same namespace 
 
 > NOTE: Consul K8s 1.6.x is compatible with Consul 1.20.x and Consul Dataplane 1.6.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
 
-
 SECURITY:
 
 * Upgrade Go to use 1.22.7. This addresses CVE
@@ -39,26 +88,24 @@ BUG FIXES:
 * helm: Fix ArgoCD hooks related annotations on server-acl-init Job, they must be added at Job definition and not template level. [[GH-3989](https://github.com/hashicorp/consul-k8s/issues/3989)]
 * sync-catalog: Enable the user to purge the registered services by passing parent node and necessary filters. [[GH-4255](https://github.com/hashicorp/consul-k8s/issues/4255)]
 
-## 1.5.4 (November 4, 2023)
+## 1.6.0-rc1 (September 20, 2024)
 
 SECURITY:
 
 * Upgrade Go to use 1.22.7. This addresses CVE 
 [CVE-2024-34155](https://nvd.nist.gov/vuln/detail/CVE-2024-34155) [[GH-4313](https://github.com/hashicorp/consul-k8s/issues/4313)]
-* crd: Add `contains` and `ignoreCase` to the Intentions CRD to support configuring L7 Header intentions resilient to variable casing and multiple header values. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
-* crd: Add `http.incoming.requestNormalization` to the Mesh CRD to support configuring service traffic request normalization. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
 
 IMPROVEMENTS:
 
+* dns-proxy: add the ability to deploy a DNS proxy within the kubernetes cluster that forwards DNS requests to the consul server and can be configured with an ACL token and make partition aware DNS requests. [[GH-4300](https://github.com/hashicorp/consul-k8s/issues/4300)]
+* sync-catalog: expose prometheus scrape metrics on sync-catalog pods [[GH-4212](https://github.com/hashicorp/consul-k8s/issues/4212)]
 * connect-inject: remove unnecessary resource permissions from connect-inject ClusterRole [[GH-4307](https://github.com/hashicorp/consul-k8s/issues/4307)]
 * helm: Exclude gke namespaces from being connect-injected when the connect-inject: default: true value is set. [[GH-4333](https://github.com/hashicorp/consul-k8s/issues/4333)]
 
 BUG FIXES:
 
-* api-gateway: `global.imagePullSecrets` are now configured on the `ServiceAccount` for `Gateways`.
-
-Note: the referenced image pull Secret(s) must be present in the same namespace the `Gateway` is deployed to. [[GH-4316](https://github.com/hashicorp/consul-k8s/issues/4316)]
-* helm: fix issue where the API Gateway GatewayClassConfig tolerations can not be parsed by the Helm chart. [[GH-4315](https://github.com/hashicorp/consul-k8s/issues/4315)]
+* control-plane: add missing `$HOST_IP` environment variable to consul-dataplane sidecar containers [[GH-4277](https://github.com/hashicorp/consul-k8s/issues/4277)]
+* helm: Fix ArgoCD hooks related annotations on server-acl-init Job, they must be added at Job definition and not template level. [[GH-3989](https://github.com/hashicorp/consul-k8s/issues/3989)]
 * sync-catalog: Enable the user to purge the registered services by passing parent node and necessary filters. [[GH-4255](https://github.com/hashicorp/consul-k8s/issues/4255)]
 
 ## 1.5.3 (August 30, 2024)
@@ -91,28 +138,6 @@ This ensures that diff detection tools like ArgoCD consider the source and recon
 ## 1.5.2 (August 29, 2024)
 
 Release redacted, use `1.5.3`
-
-## 1.4.7 (November 4, 2023)
-
-SECURITY:
-
-* Upgrade Go to use 1.22.7. This addresses CVE 
-[CVE-2024-34155](https://nvd.nist.gov/vuln/detail/CVE-2024-34155) [[GH-4313](https://github.com/hashicorp/consul-k8s/issues/4313)]
-* crd: Add `contains` and `ignoreCase` to the Intentions CRD to support configuring L7 Header intentions resilient to variable casing and multiple header values. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
-* crd: Add `http.incoming.requestNormalization` to the Mesh CRD to support configuring service traffic request normalization. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
-
-IMPROVEMENTS:
-
-* connect-inject: remove unnecessary resource permissions from connect-inject ClusterRole [[GH-4307](https://github.com/hashicorp/consul-k8s/issues/4307)]
-* helm: Exclude gke namespaces from being connect-injected when the connect-inject: default: true value is set. [[GH-4333](https://github.com/hashicorp/consul-k8s/issues/4333)]
-
-BUG FIXES:
-
-* api-gateway: `global.imagePullSecrets` are now configured on the `ServiceAccount` for `Gateways`.
-
-Note: the referenced image pull Secret(s) must be present in the same namespace the `Gateway` is deployed to. [[GH-4316](https://github.com/hashicorp/consul-k8s/issues/4316)]
-* helm: fix issue where the API Gateway GatewayClassConfig tolerations can not be parsed by the Helm chart. [[GH-4315](https://github.com/hashicorp/consul-k8s/issues/4315)]
-* sync-catalog: Enable the user to purge the registered services by passing parent node and necessary filters. [[GH-4255](https://github.com/hashicorp/consul-k8s/issues/4255)]
 
 ## 1.4.6 (August 30, 2024)
 
@@ -173,23 +198,6 @@ This ensures that diff detection tools like ArgoCD consider the source and recon
 ## 1.3.8 (August 29, 2024)
 
 Release redacted, use `1.3.9`
-
-## 1.1.17 (November 4, 2023)
-
-SECURITY:
-
-* Upgrade Go to use 1.22.7. This addresses CVE 
-[CVE-2024-34155](https://nvd.nist.gov/vuln/detail/CVE-2024-34155) [[GH-4313](https://github.com/hashicorp/consul-k8s/issues/4313)]
-* crd: Add `contains` and `ignoreCase` to the Intentions CRD to support configuring L7 Header intentions resilient to variable casing and multiple header values. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
-* crd: Add `http.incoming.requestNormalization` to the Mesh CRD to support configuring service traffic request normalization. [[GH-4385](https://github.com/hashicorp/consul-k8s/issues/4385)]
-
-IMPROVEMENTS:
-
-* helm: Exclude gke namespaces from being connect-injected when the connect-inject: default: true value is set. [[GH-4333](https://github.com/hashicorp/consul-k8s/issues/4333)]
-
-BUG FIXES:
-
-* sync-catalog: Enable the user to purge the registered services by passing parent node and necessary filters. [[GH-4255](https://github.com/hashicorp/consul-k8s/issues/4255)]
 
 ## 1.1.16 (August 30, 2024)
 

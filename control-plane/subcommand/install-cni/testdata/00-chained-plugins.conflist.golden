@@ -20,11 +20,8 @@
       "type": "multus"
     },
     {
-      "autorotate_token": true,
       "cni_bin_dir": "/var/lib/cni/bin",
-      "cni_host_token_path": "/etc/cni/net.d/cni-host-token",
       "cni_net_dir": "/etc/kubernetes/cni/net.d",
-      "cni_token_path": "/var/run/secrets/kubernetes.io/serviceaccount/token",
       "kubeconfig": "ZZZ-consul-cni-kubeconfig",
       "log_level": "info",
       "multus": false,
