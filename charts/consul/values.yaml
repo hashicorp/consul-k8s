@@ -1458,10 +1458,10 @@ server:
     #
     # Each object supports the following keys:
     #
-    # - `type` - Type of the volume, must be one of "configMap" or "secret". Case sensitive.
+    # - `type` - Type of the volume. Must be one of `configMap` or `secret`. Case sensitive.
     #
-    # - `name` - Name of the configMap or secret to be mounted. This also controls
-    #   the path that it is mounted to. The volume will be mounted to `/consul/userconfig/<name>`.
+    # - `name` - Name of the configMap or secret to mount. This specification also controls
+    #   the path it mounts to. The volume will be mounted to `/consul/userconfig/<name>`.
     #
     # The snapshot agent will not attempt to load any volumes passed in this stanza
     # @type: array<map>
