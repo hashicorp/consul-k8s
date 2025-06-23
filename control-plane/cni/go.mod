@@ -6,7 +6,7 @@ require (
 	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.2.0
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul/sdk v0.16.2
+	github.com/hashicorp/consul/sdk v0.16.1
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/stretchr/testify v1.8.4
 	k8s.io/api v0.29.8
@@ -46,7 +46,6 @@ require (
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
