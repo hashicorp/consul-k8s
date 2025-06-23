@@ -98,14 +98,14 @@ func TestInstall(t *testing.T) {
 				})
 				require.NoError(r, err)
 
-				clientPodName := clientPod.Items[0].Name
+				clientPodName = clientPod.Items[0].Name
 				upstreamsOut, err = cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "upstreams", "-pod", clientPodName)
 				logger.Log(r, string(upstreamsOut))
 				require.NoError(r, err)
 			})
 
 			if cfg.EnableTransparentProxy {
-				retrier = &retry.Timer{Timeout: 200 * time.Minute, Wait: 1 * time.Minute}
+				retrier = &retry.Timer{Timeout: 20 * time.Minute, Wait: 1 * time.Minute}
 				retry.RunWith(retrier, t, func(r *retry.R) {
 					// If tproxy is enabled we are looking for the upstream ip which is the ClusterIP of the Kubernetes Service
 					serverService, err := connHelper.Ctx.KubernetesClient(r).CoreV1().Services(
@@ -125,7 +125,7 @@ func TestInstall(t *testing.T) {
 				})
 
 			} else {
-				retrier = &retry.Timer{Timeout: 200 * time.Minute, Wait: 60 * time.Minute}
+				retrier = &retry.Timer{Timeout: 20 * time.Minute, Wait: 1 * time.Minute}
 				retry.RunWith(retrier, t, func(r *retry.R) {
 					// With tproxy disabled and explicit upstreams we need the envoy-id of the server
 					require.Regexp(r, "static-server", string(upstreamsOut))
