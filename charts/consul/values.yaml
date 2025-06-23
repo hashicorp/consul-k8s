@@ -1444,9 +1444,9 @@ server:
     # @type: map
     extraEnvironmentVars: { }
 
-    # A list of extra volumes to mount onto the snapshot agent. This
-    # is useful for bringing in extra data that only the snapshot agent needs access
-    # to. Like storage credentials. The value of this should be a list of objects.
+    # A list of extra volumes to mount onto the snapshot agent. Use this block
+    # to include extra data that only the snapshot agent needs access
+    # to, such as storage credentials. This value should be a list of objects.
     #
     # Example:
     #
