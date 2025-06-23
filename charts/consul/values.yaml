@@ -1438,9 +1438,9 @@ server:
     # @type: string
     caCert: null
 
-    # A list of extra environment variables to set on the snapshot agent specifically
-    # This could be used to configure credentials that the rest of the
-    # stateful set would not need access to, like GOOGLE_APPLICATION_CREDENTIALS
+    # A list of extra environment variables to set on the snapshot agent specifically.
+    # Use this parameter to configure credentials that the rest of the
+    # stateful set would not need access to, like `GOOGLE_APPLICATION_CREDENTIALS`.
     # @type: map
     extraEnvironmentVars: { }
 
