@@ -302,6 +302,24 @@ global:
     # @type: string
     logLevel: ""
 
+    # tolerations configures the taints and tolerations for the gossip-encryption-autogenerate-job.
+    # This should be a multi-line string matching the
+    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    tolerations: ""
+
+    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for the gossip-encryption-autogenerate-job job pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
+
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
   # Refer to [`-recursor`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_recursor) for more details.
@@ -394,6 +412,24 @@ global:
       # The key within the Kubernetes or Vault secret that holds the CA key.
       # @type: string
       secretKey: null
+
+    # tolerations configures the taints and tolerations for the server-tls-init
+    # and server-tls-init-cleanup jobs. This should be a multi-line string matching the
+    # [Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) array in a Pod spec.
+    tolerations: ""
+
+    # This value defines [`nodeSelector`](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector)
+    # labels for the server-tls-init and server-tls-init-cleanup jobs pod assignment, formatted as a multi-line string.
+    #
+    # Example:
+    #
+    # ```yaml
+    # nodeSelector: |
+    #   beta.kubernetes.io/arch: amd64
+    # ```
+    #
+    # @type: string
+    nodeSelector: null
 
     # This value defines additional annotations for
     # tls init jobs. This should be formatted as a multi-line string.
