@@ -60,6 +60,51 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# global.tls.tolerations and global.tls.nodeSelector
+
+@test "serverTLSInitCleanup/Job: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-cleanup-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "serverTLSInitCleanup/Job: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-cleanup-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.tolerations=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+@test "serverTLSInitCleanup/Job: nodeSelector not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-cleanup-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "serverTLSInitCleanup/Job: nodeSelector can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/tls-init-cleanup-job.yaml  \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.nodeSelector=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+#--------------------------------------------------------------------
 # Vault
 
 @test "tlsInitCleanup/Job: disabled with global.secretsBackend.vault.enabled=true and global.tls.enabled=true" {
