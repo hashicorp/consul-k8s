@@ -1,0 +1,5 @@
+```release-note:security
+CVE: tj-actions/changed-files to fix GHSA-mrrh-fwg8-r2c3
+CVE: github.com/containerd/containerd to v1.7.27 to fix GHSA-265r-hfxg-fhmg
+CVE: helm.sh/helm/v3 to v3.17.3 to fix GHSA-5xqw-8hwv-wg92
+```
