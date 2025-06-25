@@ -2571,7 +2571,7 @@ connectInject:
 
       # This value contains settings related to the gateway_resources_job that runs on helm install
       resourceJob:
-        # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
+        # The resource requests (CPU, memory, etc.) for the gateway-resources-job pods.
         # This should be a YAML map corresponding to a Kubernetes
         # [`ResourceRequirements``](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#resourcerequirements-v1-core)
         # object.
@@ -2597,6 +2597,11 @@ connectInject:
           limits:
             memory: "50Mi"
             cpu: "50m"
+
+        # tolerations configures the taints and tolerations for the gateway-resources-job pod.
+        # This should be a multi-line string matching the Toleration array in a PodSpec.
+        # @type: string
+        tolerations: null
 
     # Configuration for the ServiceAccount created for the api-gateway component
     serviceAccount:

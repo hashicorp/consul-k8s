@@ -1,4 +1,5 @@
 ```release-note:enhancement
 helm: Add support for `global.tls.tolerations` and `global.tls.nodeSelector` so the tls-init-job and tls-init-cleanup-job pods can target specific nodes.
 helm: Add support for `global.gossipEncryption.tolerations` and `global.gossipEncryption.nodeSelector` so the gossip-encryption-autogenerate-job pods can target specific nodes.
+helm: Add support for `connectInject.apiGateway.managedGatewayClass.resourceJob.tolerations` to configure gateway-resources-job pods.
 ```
