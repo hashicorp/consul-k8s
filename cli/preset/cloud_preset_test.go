@@ -124,7 +124,7 @@ var validBootstrapConfig *CloudBootstrapConfig = &CloudBootstrapConfig{
 
 func TestGetValueMap(t *testing.T) {
 	// Create fake k8s.
-	k8s := fake.NewSimpleClientset()
+	k8s := fake.NewClientset()
 	namespace := "consul"
 
 	// Start the mock HCP server.
@@ -263,11 +263,11 @@ func TestGetValueMap(t *testing.T) {
 
 				// Check that HCP scada address, auth url, and api hostname are not saved
 				hcpAuthURLSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAuthURL, metav1.GetOptions{})
-				require.Nil(t, hcpAuthURLSecret)
+				require.Nil(t, hcpAuthURLSecret.Data)
 				hcpApiHostnameSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAPIHostname, metav1.GetOptions{})
-				require.Nil(t, hcpApiHostnameSecret)
+				require.Nil(t, hcpApiHostnameSecret.Data)
 				hcpScadaAddress, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPScadaAddress, metav1.GetOptions{})
-				require.Nil(t, hcpScadaAddress)
+				require.Nil(t, hcpScadaAddress.Data)
 			},
 		},
 	}
@@ -324,7 +324,7 @@ func TestSaveSecretsFromBootstrapConfig(t *testing.T) {
 	t.Parallel()
 
 	// Create fake k8s.
-	k8s := fake.NewSimpleClientset()
+	k8s := fake.NewClientset()
 
 	testCases := []struct {
 		description          string
