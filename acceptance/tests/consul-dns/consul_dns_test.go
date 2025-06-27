@@ -193,7 +193,9 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
 	}
 	var logs string
-	retry.Run(t, func(r *retry.R) {
+
+	timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
 		require.NoError(r, err)
