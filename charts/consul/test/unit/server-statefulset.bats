@@ -1083,6 +1083,58 @@ load _helpers
   [ "${actual}" = "consul-server" ]
 }
 
+@test "server/StatefulSet: datadog unified tagging env label gets updated when global.metrics.datadog.enabled=true and global.metrics.datadog.tags.env is set" {
+  cd `chart_dir`
+  local labels=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.image=hashicorp/consul-enterprise:1.17.0-ent' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.tags.env=development' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels' | tee /dev/stderr)
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/version"' | tee /dev/stderr )
+  [ "${actual}" = "1.17.0-ent" ]
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/env"' | tee /dev/stderr )
+  [ "${actual}" = "development" ]
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/service"' | tee /dev/stderr )
+  [ "${actual}" = "consul-server" ]
+}
+
+@test "server/StatefulSet: datadog unified tagging service label gets updated when global.metrics.datadog.enabled=true and global.metrics.datadog.tags.service is set" {
+  cd `chart_dir`
+  local labels=$(helm template \
+      -s templates/server-statefulset.yaml \
+      --set 'global.image=hashicorp/consul-enterprise:1.17.0-ent' \
+      --set 'global.metrics.enabled=true'  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.metrics.enableAgentMetrics=true'  \
+      --set 'global.metrics.datadog.enabled=true' \
+      --set 'global.metrics.datadog.tags.service=consul' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.metadata.labels' | tee /dev/stderr)
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/version"' | tee /dev/stderr )
+  [ "${actual}" = "1.17.0-ent" ]
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/env"' | tee /dev/stderr )
+  [ "${actual}" = "consul" ]
+
+  local actual=$( echo "$labels" | \
+    yq -r '."tags.datadoghq.com/service"' | tee /dev/stderr )
+  [ "${actual}" = "consul" ]
+}
+
 @test "server/StatefulSet: datadog unix socket path name rendering for hostPath volume and volumeMount using default" {
   cd `chart_dir`
   local actual=$(helm template \
