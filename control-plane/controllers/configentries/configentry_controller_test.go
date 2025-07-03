@@ -32,7 +32,10 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
-const datacenterName = "datacenter"
+const (
+	partitionName  = "default"
+	datacenterName = "datacenter"
+)
 
 type testReconciler interface {
 	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
@@ -73,6 +76,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -107,6 +111,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -138,6 +143,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -169,6 +175,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -213,6 +220,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -253,6 +261,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -332,6 +341,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -381,6 +391,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -421,6 +432,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -460,6 +472,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -513,6 +526,7 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
