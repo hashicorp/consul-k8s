@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"strings"
 	"text/template"
 
@@ -183,6 +184,9 @@ func (r *TerminatingGatewayController) aclsEnabled() (bool, error) {
 }
 
 func (r *TerminatingGatewayController) adminPartition() string {
+	if r.ConfigEntryController == nil {
+		return common.DefaultConsulPartition
+	}
 	return defaultIfEmpty(r.ConfigEntryController.ConsulPartition)
 }
 
@@ -280,13 +284,9 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 			log.Error(err, "error reading policy")
 			return nil, nil, err
 		}
-		if existingPolicy != nil {
-			log.Info("Found for existing policies", "policy", existingPolicy.Name, "ID", existingPolicy.ID)
-		} else {
-			log.Info("Did not find for existing policies", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
-		}
 
 		if existingPolicy == nil {
+			log.Info("No existing ACL Policies Found", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
 			policyTemplate := getPolicyTemplateFor(service.Name)
 			policyNamespace := defaultIfEmpty(service.Namespace)
 			policyAdminPartition := r.adminPartition()
@@ -314,6 +314,8 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 			} else {
 				log.Info("Created new ACL Policy", "Service", service.Name, "Namespace", policyNamespace, "Partition", policyAdminPartition)
 			}
+		} else {
+			log.Info("Found for existing policies", "policy", existingPolicy.Name, "ID", existingPolicy.ID)
 		}
 
 		termGWPoliciesToKeep = append(termGWPoliciesToKeep, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace))})

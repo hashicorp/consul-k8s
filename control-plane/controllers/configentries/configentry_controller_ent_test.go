@@ -76,6 +76,7 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -164,6 +165,7 @@ func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -292,6 +294,7 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -384,6 +387,7 @@ func TestConfigEntryController_updatesEntConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -529,6 +533,7 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -612,6 +617,7 @@ func TestConfigEntryController_deletesEntConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
+						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -1403,4 +1409,227 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 			})
 		}
 	}
+}
+
+func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T) {
+	t.Parallel()
+	const partition = "part-1" // arbitrary non-default partition
+
+	// Re-use the two representative ConfigEntry kinds used elsewhere
+	svcDefaults := &v1alpha1.ServiceDefaults{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "foo",
+			Namespace:  "default",
+			Finalizers: []string{FinalizerName},
+		},
+		Spec: v1alpha1.ServiceDefaultsSpec{Protocol: "http"},
+	}
+
+	run := func(t *testing.T, obj common.ConfigEntryResource) {
+		t.Helper()
+		req := require.New(t)
+
+		scheme := runtime.NewScheme()
+		scheme.AddKnownTypes(v1alpha1.GroupVersion, obj)
+
+		fclient := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithRuntimeObjects(obj).
+			WithStatusSubresource(obj).
+			Build()
+
+		testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+		consulClient := testClient.APIClient
+		consulClient.Partitions().Create(
+			context.Background(),
+			&capi.Partition{Name: partition},
+			nil,
+		)
+
+		ceCtrl := &ConfigEntryController{
+			ConsulClientConfig:          testClient.Cfg,
+			ConsulServerConnMgr:         testClient.Watcher,
+			DatacenterName:              datacenterName,
+			EnableConsulAdminPartitions: true,
+			ConsulPartition:             partition,
+		}
+
+		r := &ServiceDefaultsController{
+			Client:                fclient,
+			Log:                   logrtest.NewTestLogger(t),
+			Scheme:                scheme,
+			ConfigEntryController: ceCtrl,
+		}
+
+		_, err := r.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetObjectMeta().Namespace,
+				Name:      obj.KubernetesName(),
+			},
+		})
+		req.NoError(err)
+
+		// Verify object landed in the correct partition.
+		got, _, err := consulClient.ConfigEntries().Get(
+			obj.ToConsul(datacenterName).GetKind(),
+			obj.ConsulName(),
+			&capi.QueryOptions{Partition: partition},
+		)
+		req.NoError(err)
+		req.Equal(obj.ConsulName(), got.GetName())
+
+		// Status should be Synced.
+		err = fclient.Get(context.Background(),
+			types.NamespacedName{Namespace: obj.GetObjectMeta().Namespace, Name: obj.KubernetesName()},
+			obj,
+		)
+		req.NoError(err)
+		req.Equal(corev1.ConditionTrue, obj.SyncedConditionStatus())
+	}
+
+	t.Run("ServiceDefaults", func(t *testing.T) { run(t, svcDefaults) })
+	// t.Run("ProxyDefaults", func(t *testing.T) { run(t, proxyDefaults) })
+}
+
+func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T) {
+	t.Parallel()
+	const partition = "part-1"
+	ctx := context.Background()
+
+	obj := &v1alpha1.ServiceDefaults{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       "foo",
+			Namespace:  "default",
+			Finalizers: []string{FinalizerName},
+		},
+		Spec: v1alpha1.ServiceDefaultsSpec{Protocol: "http"},
+	}
+
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(v1alpha1.GroupVersion, obj)
+	fclient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(obj).
+		WithStatusSubresource(obj).Build()
+
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	consulClient := testClient.APIClient
+	consulClient.Partitions().Create(
+		context.Background(),
+		&capi.Partition{Name: partition},
+		nil,
+	)
+	r := &ServiceDefaultsController{
+		Client: fclient,
+		Log:    logrtest.NewTestLogger(t),
+		Scheme: scheme,
+		ConfigEntryController: &ConfigEntryController{
+			ConsulClientConfig:          testClient.Cfg,
+			ConsulServerConnMgr:         testClient.Watcher,
+			DatacenterName:              datacenterName,
+			EnableConsulAdminPartitions: true,
+			ConsulPartition:             partition,
+		},
+	}
+
+	// First reconcile → create
+	_, err := r.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: "default", Name: obj.KubernetesName()},
+	})
+	require.NoError(t, err)
+
+	// ---------------------------------------------------------------------
+	// 🔄  FETCH A FRESH COPY (so we have the current resourceVersion)
+	// ---------------------------------------------------------------------
+	var fresh v1alpha1.ServiceDefaults
+	require.NoError(t, fclient.Get(ctx,
+		types.NamespacedName{
+			Namespace: "default",
+			Name:      obj.KubernetesName(),
+		}, &fresh))
+
+	// Mutate & update using the fresh object
+	fresh.Spec.Protocol = "tcp"
+	require.NoError(t, fclient.Update(ctx, &fresh))
+
+	// Second reconcile → should perform the update path
+	_, err = r.Reconcile(ctx, ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: "default",
+			Name:      obj.KubernetesName(),
+		},
+	})
+	require.NoError(t, err)
+
+	// Assert the change reached Consul in the *part-1* partition
+	ce, _, err := consulClient.ConfigEntries().Get(
+		capi.ServiceDefaults,
+		obj.ConsulName(),
+		&capi.QueryOptions{Partition: partition},
+	)
+	require.NoError(t, err)
+	require.Equal(t, "tcp", ce.(*capi.ServiceConfigEntry).Protocol)
+}
+
+func TestConfigEntryController_deletesConfigEntry_consulPartitions(t *testing.T) {
+	t.Parallel()
+	const partition = "part-1"
+
+	obj := &v1alpha1.ProxyDefaults{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              common.Global,
+			Namespace:         "default",
+			Finalizers:        []string{FinalizerName},
+			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+		},
+		Spec: v1alpha1.ProxyDefaultsSpec{
+			MeshGateway: v1alpha1.MeshGateway{Mode: "remote"},
+		},
+	}
+
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(v1alpha1.GroupVersion, obj)
+	fclient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithRuntimeObjects(obj).
+		WithStatusSubresource(obj).Build()
+
+	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+	consulClient := testClient.APIClient
+	consulClient.Partitions().Create(
+		context.Background(),
+		&capi.Partition{Name: partition},
+		nil,
+	)
+	// Seed Consul with the entry so the delete path has something to remove.
+	_, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
+		Kind: capi.ProxyDefaults,
+		Name: common.Global,
+		MeshGateway: capi.MeshGatewayConfig{
+			Mode: capi.MeshGatewayModeRemote,
+		},
+	}, &capi.WriteOptions{Partition: partition})
+	require.NoError(t, err)
+
+	r := &ProxyDefaultsController{
+		Client: fclient,
+		Log:    logrtest.NewTestLogger(t),
+		Scheme: scheme,
+		ConfigEntryController: &ConfigEntryController{
+			ConsulClientConfig:          testClient.Cfg,
+			ConsulServerConnMgr:         testClient.Watcher,
+			DatacenterName:              datacenterName,
+			EnableConsulAdminPartitions: true,
+			ConsulPartition:             partition,
+		},
+	}
+
+	_, err = r.Reconcile(context.Background(), ctrl.Request{
+		NamespacedName: types.NamespacedName{Namespace: "default", Name: obj.KubernetesName()},
+	})
+	require.NoError(t, err)
+
+	_, _, err = consulClient.ConfigEntries().Get(capi.ProxyDefaults, common.Global,
+		&capi.QueryOptions{Partition: partition})
+	require.Error(t, err) // 404 expected – entry should be gone
 }
