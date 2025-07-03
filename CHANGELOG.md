@@ -1,3 +1,16 @@
+## 1.5.9 (June 27, 2025)
+
+SECURITY:
+
+* cve: upgraded helmv3 packages to address following CVEs:
+- [CVE-2025-32386](https://nvd.nist.gov/vuln/detail/CVE-2025-32386)
+- [CVE-2025-32387](https://nvd.nist.gov/vuln/detail/cve-2025-32387) [[GH-4635](https://github.com/hashicorp/consul-k8s/issues/4635)]
+* go: Upgraded to 1.23.10
+cve: upgraded containerd packages to address following CVEs:
+- [CVE-2025-35947](https://nvd.nist.gov/vuln/detail/cve-2024-35947)
+- [CVE-2024-36118](https://nvd.nist.gov/vuln/detail/CVE-2024-36118)
+- [CVE-2024-23651](https://nvd.nist.gov/vuln/detail/cve-2024-23651) [[GH-4629](https://github.com/hashicorp/consul-k8s/issues/4629)]
+
 ## 1.5.8 (May 26, 2025)
 
 SECURITY:
