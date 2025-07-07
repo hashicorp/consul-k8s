@@ -1415,7 +1415,6 @@ func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T)
 	t.Parallel()
 	const partition = "part-1" // arbitrary non-default partition
 
-	// Re-use the two representative ConfigEntry kinds used elsewhere
 	svcDefaults := &v1alpha1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "foo",
@@ -1488,7 +1487,6 @@ func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T)
 	}
 
 	t.Run("ServiceDefaults", func(t *testing.T) { run(t, svcDefaults) })
-	// t.Run("ProxyDefaults", func(t *testing.T) { run(t, proxyDefaults) })
 }
 
 func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T) {
@@ -1539,7 +1537,7 @@ func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T)
 	require.NoError(t, err)
 
 	// ---------------------------------------------------------------------
-	// 🔄  FETCH A FRESH COPY (so we have the current resourceVersion)
+	// FETCH A FRESH COPY (so we have the current resourceVersion)
 	// ---------------------------------------------------------------------
 	var fresh v1alpha1.ServiceDefaults
 	require.NoError(t, fclient.Get(ctx,
@@ -1575,61 +1573,87 @@ func TestConfigEntryController_deletesConfigEntry_consulPartitions(t *testing.T)
 	t.Parallel()
 	const partition = "part-1"
 
-	obj := &v1alpha1.ProxyDefaults{
+	// K8s object that is already marked for deletion.
+	obj := &v1alpha1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:              common.Global,
+			Name:              "foo",
 			Namespace:         "default",
 			Finalizers:        []string{FinalizerName},
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
 		},
-		Spec: v1alpha1.ProxyDefaultsSpec{
-			MeshGateway: v1alpha1.MeshGateway{Mode: "remote"},
+		Spec: v1alpha1.ServiceDefaultsSpec{
+			Protocol: "http",
 		},
 	}
 
+	// ---------------------------------------------------------------------
+	// Fake k8s client & scheme
+	// ---------------------------------------------------------------------
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypes(v1alpha1.GroupVersion, obj)
 	fclient := fake.NewClientBuilder().
 		WithScheme(scheme).
 		WithRuntimeObjects(obj).
-		WithStatusSubresource(obj).Build()
+		WithStatusSubresource(obj).
+		Build()
 
-	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
-	consulClient := testClient.APIClient
+	// ---------------------------------------------------------------------
+	// Consul test server (create partition + seed entry)
+	// ---------------------------------------------------------------------
+	tc := test.TestServerWithMockConnMgrWatcher(t, nil)
+
+	// create the partition so CRUD calls succeed
+	consulClient := tc.APIClient
 	consulClient.Partitions().Create(
 		context.Background(),
 		&capi.Partition{Name: partition},
 		nil,
 	)
-	// Seed Consul with the entry so the delete path has something to remove.
-	_, _, err := consulClient.ConfigEntries().Set(&capi.ProxyConfigEntry{
-		Kind: capi.ProxyDefaults,
-		Name: common.Global,
-		MeshGateway: capi.MeshGatewayConfig{
-			Mode: capi.MeshGatewayModeRemote,
+
+	// seed the entry inside that partition
+	_, _, err := consulClient.ConfigEntries().Set(&capi.ServiceConfigEntry{
+		Kind:      capi.ServiceDefaults,
+		Name:      obj.KubernetesName(),
+		Partition: partition,
+		Protocol:  "http",
+		Meta: map[string]string{
+			common.DatacenterKey: datacenterName,
 		},
 	}, &capi.WriteOptions{Partition: partition})
 	require.NoError(t, err)
 
-	r := &ProxyDefaultsController{
+	// ---------------------------------------------------------------------
+	// Controller under test
+	// ---------------------------------------------------------------------
+	r := &ServiceDefaultsController{
 		Client: fclient,
 		Log:    logrtest.NewTestLogger(t),
 		Scheme: scheme,
 		ConfigEntryController: &ConfigEntryController{
-			ConsulClientConfig:          testClient.Cfg,
-			ConsulServerConnMgr:         testClient.Watcher,
+			ConsulClientConfig:          tc.Cfg,
+			ConsulServerConnMgr:         tc.Watcher,
 			DatacenterName:              datacenterName,
 			EnableConsulAdminPartitions: true,
 			ConsulPartition:             partition,
 		},
 	}
 
+	// ---------------------------------------------------------------------
+	// Reconcile – should delete the entry from Consul
+	// ---------------------------------------------------------------------
 	_, err = r.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{Namespace: "default", Name: obj.KubernetesName()},
+		NamespacedName: types.NamespacedName{
+			Namespace: obj.Namespace,
+			Name:      obj.KubernetesName(),
+		},
 	})
 	require.NoError(t, err)
 
-	_, _, err = consulClient.ConfigEntries().Get(capi.ProxyDefaults, common.Global,
-		&capi.QueryOptions{Partition: partition})
-	require.Error(t, err) // 404 expected – entry should be gone
+	// Verify the config-entry is gone from the partition.
+	_, _, err = consulClient.ConfigEntries().Get(
+		capi.ServiceDefaults,
+		obj.KubernetesName(),
+		&capi.QueryOptions{Partition: partition},
+	)
+	require.Error(t, err) // 404 expected – entry should no longer exist
 }
