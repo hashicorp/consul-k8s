@@ -90,12 +90,13 @@ type ConfigEntryController struct {
 	// `k8s-default` namespace.
 	NSMirroringPrefix string
 
-	// EnableConsulAdminPartitions indicates that a user is running Consul Enterprise
-	// with Admin Partitions Enabled
+	// EnableConsulAdminPartitions indicates that the cluster is running an
+	// Enterprise binary with Admin Partitions turned on.
 	EnableConsulAdminPartitions bool
 
-	// ConsulPartition specifies the name of the Consul admin partition the controller
-	// operates in. Adds this value as metadata on managed resources.
+	// ConsulPartition is the name of the admin partition this controller writes
+	// to. It’s used by reconcile-time helpers to set Query/Write options and to
+	// stamp metadata on the config-entry.
 	ConsulPartition string
 
 	// CrossNSACLPolicy is the name of the ACL policy to attach to
@@ -499,26 +500,23 @@ func sourceDatacenterMismatchErr(sourceDatacenter string) error {
 // queryOpts builds a *capi.QueryOptions that always includes Namespace +
 // (optionally) Partition.
 func (r *ConfigEntryController) queryOpts(ns string) *capi.QueryOptions {
-	return &capi.QueryOptions{
+	opts := &capi.QueryOptions{
 		Namespace: ns,
-		Partition: func() string {
-			if r.EnableConsulAdminPartitions {
-				return r.ConsulPartition
-			}
-			return common.DefaultConsulPartition
-		}(),
 	}
+	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
+		// Only add ?partition=… for Enterprise clusters
+		opts.Partition = r.ConsulPartition
+	}
+	return opts
 }
 
 // writeOpts mirrors queryOpts for writes.
 func (r *ConfigEntryController) writeOpts(ns string) *capi.WriteOptions {
-	return &capi.WriteOptions{
+	opts := &capi.WriteOptions{
 		Namespace: ns,
-		Partition: func() string {
-			if r.EnableConsulAdminPartitions {
-				return r.ConsulPartition
-			}
-			return common.DefaultConsulPartition
-		}(),
 	}
+	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
+		opts.Partition = r.ConsulPartition
+	}
+	return opts
 }
