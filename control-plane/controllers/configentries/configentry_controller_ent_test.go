@@ -30,6 +30,12 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
+const (
+	kubeNS              = "default"
+	partitionName       = "default"
+	nonDefaultPartition = "non-default"
+)
+
 // NOTE: We're not testing each controller type here because that's mostly done in
 // the OSS tests and it would result in too many permutations. Instead
 // we're only testing with the ServiceDefaults and ProxyDefaults configentries which
@@ -39,7 +45,6 @@ import (
 
 func TestConfigEntryController_createsEntConfigEntry(t *testing.T) {
 	t.Parallel()
-	kubeNS := "default"
 
 	cases := []struct {
 		kubeKind            string
@@ -1413,12 +1418,11 @@ func TestConfigEntryController_deletesConfigEntry_consulNamespaces(tt *testing.T
 
 func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T) {
 	t.Parallel()
-	const partition = "part-1" // arbitrary non-default partition
 
 	svcDefaults := &v1alpha1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "foo",
-			Namespace:  "default",
+			Namespace:  kubeNS,
 			Finalizers: []string{FinalizerName},
 		},
 		Spec: v1alpha1.ServiceDefaultsSpec{Protocol: "http"},
@@ -1441,7 +1445,7 @@ func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T)
 		consulClient := testClient.APIClient
 		consulClient.Partitions().Create(
 			context.Background(),
-			&capi.Partition{Name: partition},
+			&capi.Partition{Name: nonDefaultPartition},
 			nil,
 		)
 
@@ -1450,7 +1454,7 @@ func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T)
 			ConsulServerConnMgr:         testClient.Watcher,
 			DatacenterName:              datacenterName,
 			EnableConsulAdminPartitions: true,
-			ConsulPartition:             partition,
+			ConsulPartition:             nonDefaultPartition,
 		}
 
 		r := &ServiceDefaultsController{
@@ -1472,7 +1476,7 @@ func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T)
 		got, _, err := consulClient.ConfigEntries().Get(
 			obj.ToConsul(datacenterName).GetKind(),
 			obj.ConsulName(),
-			&capi.QueryOptions{Partition: partition},
+			&capi.QueryOptions{Partition: nonDefaultPartition},
 		)
 		req.NoError(err)
 		req.Equal(obj.ConsulName(), got.GetName())
@@ -1491,13 +1495,13 @@ func TestConfigEntryController_createsConfigEntry_consulPartitions(t *testing.T)
 
 func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T) {
 	t.Parallel()
-	const partition = "part-1"
+
 	ctx := context.Background()
 
 	obj := &v1alpha1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "foo",
-			Namespace:  "default",
+			Namespace:  kubeNS,
 			Finalizers: []string{FinalizerName},
 		},
 		Spec: v1alpha1.ServiceDefaultsSpec{Protocol: "http"},
@@ -1514,7 +1518,7 @@ func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T)
 	consulClient := testClient.APIClient
 	consulClient.Partitions().Create(
 		context.Background(),
-		&capi.Partition{Name: partition},
+		&capi.Partition{Name: nonDefaultPartition},
 		nil,
 	)
 	r := &ServiceDefaultsController{
@@ -1526,13 +1530,13 @@ func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T)
 			ConsulServerConnMgr:         testClient.Watcher,
 			DatacenterName:              datacenterName,
 			EnableConsulAdminPartitions: true,
-			ConsulPartition:             partition,
+			ConsulPartition:             nonDefaultPartition,
 		},
 	}
 
 	// First reconcile → create
 	_, err := r.Reconcile(context.Background(), ctrl.Request{
-		NamespacedName: types.NamespacedName{Namespace: "default", Name: obj.KubernetesName()},
+		NamespacedName: types.NamespacedName{Namespace: kubeNS, Name: obj.KubernetesName()},
 	})
 	require.NoError(t, err)
 
@@ -1542,7 +1546,7 @@ func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T)
 	var fresh v1alpha1.ServiceDefaults
 	require.NoError(t, fclient.Get(ctx,
 		types.NamespacedName{
-			Namespace: "default",
+			Namespace: kubeNS,
 			Name:      obj.KubernetesName(),
 		}, &fresh))
 
@@ -1553,7 +1557,7 @@ func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T)
 	// Second reconcile → should perform the update path
 	_, err = r.Reconcile(ctx, ctrl.Request{
 		NamespacedName: types.NamespacedName{
-			Namespace: "default",
+			Namespace: kubeNS,
 			Name:      obj.KubernetesName(),
 		},
 	})
@@ -1563,7 +1567,7 @@ func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T)
 	ce, _, err := consulClient.ConfigEntries().Get(
 		capi.ServiceDefaults,
 		obj.ConsulName(),
-		&capi.QueryOptions{Partition: partition},
+		&capi.QueryOptions{Partition: nonDefaultPartition},
 	)
 	require.NoError(t, err)
 	require.Equal(t, "tcp", ce.(*capi.ServiceConfigEntry).Protocol)
@@ -1571,13 +1575,12 @@ func TestConfigEntryController_updatesConfigEntry_consulPartitions(t *testing.T)
 
 func TestConfigEntryController_deletesConfigEntry_consulPartitions(t *testing.T) {
 	t.Parallel()
-	const partition = "part-1"
 
 	// K8s object that is already marked for deletion.
 	obj := &v1alpha1.ServiceDefaults{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "foo",
-			Namespace:         "default",
+			Namespace:         kubeNS,
 			Finalizers:        []string{FinalizerName},
 			DeletionTimestamp: &metav1.Time{Time: time.Now()},
 		},
@@ -1606,7 +1609,7 @@ func TestConfigEntryController_deletesConfigEntry_consulPartitions(t *testing.T)
 	consulClient := tc.APIClient
 	consulClient.Partitions().Create(
 		context.Background(),
-		&capi.Partition{Name: partition},
+		&capi.Partition{Name: nonDefaultPartition},
 		nil,
 	)
 
@@ -1614,12 +1617,12 @@ func TestConfigEntryController_deletesConfigEntry_consulPartitions(t *testing.T)
 	_, _, err := consulClient.ConfigEntries().Set(&capi.ServiceConfigEntry{
 		Kind:      capi.ServiceDefaults,
 		Name:      obj.KubernetesName(),
-		Partition: partition,
+		Partition: nonDefaultPartition,
 		Protocol:  "http",
 		Meta: map[string]string{
 			common.DatacenterKey: datacenterName,
 		},
-	}, &capi.WriteOptions{Partition: partition})
+	}, &capi.WriteOptions{Partition: nonDefaultPartition})
 	require.NoError(t, err)
 
 	// ---------------------------------------------------------------------
@@ -1634,7 +1637,7 @@ func TestConfigEntryController_deletesConfigEntry_consulPartitions(t *testing.T)
 			ConsulServerConnMgr:         tc.Watcher,
 			DatacenterName:              datacenterName,
 			EnableConsulAdminPartitions: true,
-			ConsulPartition:             partition,
+			ConsulPartition:             nonDefaultPartition,
 		},
 	}
 
@@ -1653,7 +1656,7 @@ func TestConfigEntryController_deletesConfigEntry_consulPartitions(t *testing.T)
 	_, _, err = consulClient.ConfigEntries().Get(
 		capi.ServiceDefaults,
 		obj.KubernetesName(),
-		&capi.QueryOptions{Partition: partition},
+		&capi.QueryOptions{Partition: nonDefaultPartition},
 	)
 	require.Error(t, err) // 404 expected – entry should no longer exist
 }

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"testing"
 	"time"
 
@@ -33,10 +32,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
-const (
-	partitionName  = "default"
-	datacenterName = "datacenter"
-)
+const datacenterName = "datacenter"
 
 type testReconciler interface {
 	Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error)
@@ -77,7 +73,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -112,7 +107,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -144,7 +138,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -176,7 +169,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -221,7 +213,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -262,7 +253,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -342,7 +332,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -392,7 +381,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -433,7 +421,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -473,7 +460,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -527,7 +513,6 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
 						DatacenterName:      datacenterName,
-						ConsulPartition:     partitionName,
 					},
 				}
 			},
@@ -1626,9 +1611,9 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	})
 	req.Error(err)
 
-	expErr := fmt.Sprintf("Get \"http://127.0.0.1:%d/v1/config/%s/%s.*\": dial tcp 127.0.0.1:%d: connect: connection refused",
+	expErr := fmt.Sprintf("Get \"http://127.0.0.1:%d/v1/config/%s/%s\": dial tcp 127.0.0.1:%d: connect: connection refused",
 		testClient.Cfg.HTTPPort, capi.ServiceDefaults, svcDefaults.ConsulName(), testClient.Cfg.HTTPPort)
-	req.Regexp(regexp.MustCompile(expErr), err.Error())
+	req.Contains(err.Error(), expErr)
 	req.False(resp.Requeue)
 
 	// Check that the status is "synced=false".
@@ -1637,7 +1622,7 @@ func TestConfigEntryControllers_errorUpdatesSyncStatus(t *testing.T) {
 	status, reason, errMsg := svcDefaults.SyncedCondition()
 	req.Equal(corev1.ConditionFalse, status)
 	req.Equal("ConsulAgentError", reason)
-	req.Regexp(regexp.MustCompile(expErr), errMsg)
+	req.Contains(errMsg, expErr)
 }
 
 // Test that if the config entry hasn't changed in Consul but our resource
