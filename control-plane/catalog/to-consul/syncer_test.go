@@ -64,6 +64,41 @@ func TestConsulSyncer_register(t *testing.T) {
 	require.Equal(t, "127.0.0.1", service.Address)
 }
 
+func TestConsulSyncer_registerImmediate(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	a := agent.NewTestAgent(t, t.Name(), ``)
+	defer a.Shutdown()
+	testrpc.WaitForTestAgent(t, a.RPC, "dc1")
+	client := a.Client()
+
+	s, closer := testConsulSyncerWithConfig(client, func(s *ConsulSyncer) {
+		s.SyncPeriod = 10 * time.Second
+	})
+	defer closer()
+
+	// Sync
+	s.Sync([]*api.CatalogRegistration{
+		testRegistration("foo", "bar", "default"),
+	})
+
+	// Read the service back out
+	services, _, err := client.Catalog().Service("bar", "", nil)
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+	if len(services) == 0 {
+		t.Fatal("service not found")
+	}
+	service := services[0]
+
+	// Verify the settings
+	require.Equal("foo", service.Node)
+	require.Equal("bar", service.ServiceName)
+	require.Equal("127.0.0.1", service.Address)
+}
+
 // Test that the syncer reaps individual invalid service instances.
 func TestConsulSyncer_reapServiceInstance(t *testing.T) {
 	t.Parallel()
