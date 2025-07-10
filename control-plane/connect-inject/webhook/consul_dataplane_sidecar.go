@@ -271,6 +271,37 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		ReadOnlyRootFilesystem: ptr.To(true),
 	}
+	enableProxyLifecycle, err := w.LifecycleConfig.EnableProxyLifecycle(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if enableProxyLifecycle {
+		//poststart hook impl
+		//container.Lifecycle = &corev1.Lifecycle{
+		//	PostStart: &corev1.LifecycleHandler{
+		//		Exec: &corev1.ExecAction{
+		//			Command: []string{
+		//				"/bin/sh",
+		//				"-c",
+		//				"for i in $(seq 1 20); do curl -sf http://localhost:20601/graceful_startup && exit 0; sleep 0.5; done; exit 1",
+		//			},
+		//		},
+		//	},
+		//}
+		// readiness probe impl
+		container.ReadinessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Port: intstr.FromInt(20601),
+					Path: "/graceful_startup",
+					Host: "localhost",
+				},
+			},
+			InitialDelaySeconds: 3,
+			PeriodSeconds:       2,
+			FailureThreshold:    10,
+		}
+	}
 	return container, nil
 }
 
