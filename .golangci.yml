@@ -42,4 +42,3 @@ formatters:
       - builtin$
       - examples$
       - hack$
-
