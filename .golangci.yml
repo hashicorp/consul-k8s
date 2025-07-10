@@ -34,8 +34,6 @@ linters:
       - builtin$
       - examples$
 formatters:
-  enable:
-    - gofmt
   settings:
     gofmt:
       simplify: true
