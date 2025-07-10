@@ -34,9 +34,6 @@ linters:
       - builtin$
       - examples$
 formatters:
-  settings:
-    gofmt:
-      simplify: true
   exclusions:
     generated: lax
     paths:
