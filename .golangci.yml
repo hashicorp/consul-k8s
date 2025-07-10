@@ -1,50 +1,47 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
+version: "2"
 linters:
-  # enables all defaults + the below, `golangci-lint linters` to see the list of active linters.
+  enable:
+    - godot
+  settings:
+    govet:
+      disable:
+        - fieldalignment
+        - nilness
+        - shadow
+        - unusedwrite
+        - printf
+      enable-all: true
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - errcheck
+        path: _test\.go
+      - linters:
+          - errcheck
+        path: test_util\.go
+      - linters:
+          - staticcheck
+        text: 'SA1006:'
+      - linters:
+          - unparam
+        text: result \d+ \(bool\) is always false
+      - linters:
+          - errcheck
+        text: Error return value of `fmt.Fprintf` is not checked
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
   enable:
     - gofmt
-    - godot
-    - govet
-    # TODO: re-enable things as we have main cleaned up vs the defaults
-    #- stylecheck
-    #- goconst
-    #- prealloc
-    #- unparam
-  disable:
-    - typecheck
-
-issues:
-  # Disable the default exclude list so that all excludes are explicitly
-  # defined in this file.
-  exclude-use-default: false
-
-  exclude-rules:
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - errcheck
-    - path: test_util\.go
-      linters:
-        - errcheck
-    - linters: [ staticcheck ]
-      text: "SA1006:"
-    - linters: [ unparam ]
-      text: 'result \d+ \(bool\) is always false'
-    - linters: [ errcheck ]
-      text: 'Error return value of `fmt.Fprintf` is not checked'
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - nilness
-      - shadow
-      - unusedwrite
-      - printf
-  gofmt:
-    simplify: true
-
-run:
-  timeout: 10m
+  settings:
+    gofmt:
+      simplify: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
