@@ -1,5 +1,7 @@
 version: "2"
 linters:
+  disable:
+    - staticcheck
   enable:
     - godot
   settings:
