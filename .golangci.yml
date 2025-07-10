@@ -33,6 +33,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+      - hack$
 formatters:
   exclusions:
     generated: lax
