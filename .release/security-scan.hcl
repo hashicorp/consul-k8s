@@ -56,6 +56,7 @@ binary {
         "GHSA-5xqw-8hwv-wg92",
         "GO-2025-3601",
         "GO-2025-3602"
+        "GHSA-557j-xg8c-q2mm"
       ]
     }
   }
