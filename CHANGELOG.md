@@ -1,3 +1,39 @@
+## 1.8.0 (June 27, 2025)
+
+> NOTE: Consul K8s 1.8.x is compatible with Consul 1.21.x and Consul Dataplane 1.8.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+SECURITY:
+
+* updated golang.org/x/net dependency to 0.37.0 to fix vulnerability [[GO-2025-3503](https://pkg.go.dev/vuln/GO-2025-3503)] in CLI, CNI, acceptance and control-plane submodule.
+[[PR-4502](https://github.com/hashicorp/consul-k8s/pull/4502)] [[GH-4502](https://github.com/hashicorp/consul-k8s/issues/4502)]
+
+IMPROVEMENTS:
+
+* control-plane: Shows the health status of the services being registered/updates by endpoints controller [[GH-4616](https://github.com/hashicorp/consul-k8s/issues/4616)]
+
+BUG FIXES:
+
+* control-plane: Fixed bug in TerminatingGateway controller workflow for handling AdminPartition enabled cluster ACL policies for associated TerminatingGateway services. [[GH-4468](https://github.com/hashicorp/consul-k8s/issues/4468)]
+
+## 1.8.0 (June 27, 2025)
+
+> NOTE: Consul K8s 1.8.x is compatible with Consul 1.20.x and Consul Dataplane 1.8.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+SECURITY:
+
+* updated golang.org/x/net dependency to 0.37.0 to fix vulnerability [[GO-2025-3503](https://pkg.go.dev/vuln/GO-2025-3503)] in CLI, CNI, acceptance and control-plane submodule.
+[[PR-4502](https://github.com/hashicorp/consul-k8s/pull/4502)] [[GH-4502](https://github.com/hashicorp/consul-k8s/issues/4502)]
+
+IMPROVEMENTS:
+
+* control-plane: Shows the health status of the services being registered/updates by endpoints controller [[GH-4616](https://github.com/hashicorp/consul-k8s/issues/4616)]
+
+BUG FIXES:
+
+* control-plane: Fixed bug in TerminatingGateway controller workflow for handling AdminPartition enabled cluster ACL policies for associated TerminatingGateway services. [[GH-4468](https://github.com/hashicorp/consul-k8s/issues/4468)]
+
 ## 1.6.1 (November 4, 2023)
 
 SECURITY:
