@@ -17,7 +17,7 @@
 # go-discover builds the discover binary (which we don't currently publish
 # either).
 ARG GOLANG_VERSION
-FROM golang:${GOLANG_VERSION}-alpine3.21 AS go-discover
+FROM golang:${GOLANG_VERSION}-alpine3.22 AS go-discover
 RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@275a71457aa412bf20df9f9b77c380667164a5e6
 
 # dev copies the binary from a local build
@@ -136,7 +136,7 @@ FROM release-default AS release-default-fips
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM registry.access.redhat.com/ubi9-minimal:9.6-1747218906 AS ubi
+FROM registry.access.redhat.com/ubi9-minimal:9.6-1752069876 AS ubi
 
 ARG PRODUCT_NAME
 ARG PRODUCT_VERSION
