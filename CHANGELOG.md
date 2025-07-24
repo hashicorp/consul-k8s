@@ -1,15 +1,3 @@
-## 1.7.3 (June 27, 2025)
-
-IMPROVEMENTS:
-
-* control-plane: Shows the health status of the services being registered/updates by endpoints controller [[GH-4616](https://github.com/hashicorp/consul-k8s/issues/4616)]
-
-## 1.7.3 (June 27, 2025)
-
-IMPROVEMENTS:
-
-* control-plane: Shows the health status of the services being registered/updates by endpoints controller [[GH-4616](https://github.com/hashicorp/consul-k8s/issues/4616)]
-
 ## 1.7.3 (July 21, 2025)
 
 IMPROVEMENTS:
