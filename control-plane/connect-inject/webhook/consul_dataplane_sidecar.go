@@ -209,7 +209,13 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	if metricsPorts != nil {
 		container.Ports = append(container.Ports, metricsPorts...)
 	}
-
+	container.Ports = append(container.Ports, []corev1.ContainerPort{
+		{
+			Name:          "envoy",
+			ContainerPort: int32(20601),
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}...)
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -288,18 +294,33 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		//		},
 		//	},
 		//}
-		// readiness probe impl
-		container.ReadinessProbe = &corev1.Probe{
+		restartPolicy := corev1.ContainerRestartPolicyAlways
+		container.RestartPolicy = &restartPolicy
+
+		container.LivenessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Port: intstr.FromInt(20601),
 					Path: "/graceful_startup",
-					Host: "localhost",
 				},
 			},
-			InitialDelaySeconds: 3,
-			PeriodSeconds:       2,
+			InitialDelaySeconds: 50,
+			PeriodSeconds:       10,
 			FailureThreshold:    10,
+			TimeoutSeconds:      10,
+		}
+		// readiness probe impl
+		container.StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Port: intstr.FromInt(20601),
+					Path: "/graceful_startup",
+				},
+			},
+			InitialDelaySeconds: 50,
+			PeriodSeconds:       10,
+			FailureThreshold:    10,
+			TimeoutSeconds:      10,
 		}
 	}
 	return container, nil

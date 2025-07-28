@@ -325,7 +325,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		//Append the Envoy sidecar before the application container only if lifecycle enabled.
 
 		if lifecycleEnabled && ok == nil {
-			pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
+			pod.Spec.Containers = append(pod.Spec.Containers)
+			// Add as init container with sidecar behavior
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
+			//pod.Spec.InitContainers = append(pod.Spec.InitContainers, []corev1.Container{envoySidecar}...)
 		} else {
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 		}
