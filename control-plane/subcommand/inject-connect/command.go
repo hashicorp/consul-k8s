@@ -94,6 +94,9 @@ type Command struct {
 	flagDefaultSidecarProxyStartupFailureSeconds  int
 	flagDefaultSidecarProxyLivenessFailureSeconds int
 
+	// native sidecars
+	flagNativeSidecarsEnabled bool
+
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
 	flagEnableGatewayMetrics        bool
@@ -256,6 +259,10 @@ func (c *Command) init() {
 
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyStartupFailureSeconds, "default-sidecar-proxy-startup-failure-seconds", 0, "Default number of seconds for the k8s startup probe to fail before the proxy container is restarted. Zero disables the probe.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProxyLivenessFailureSeconds, "default-sidecar-proxy-liveness-failure-seconds", 0, "Default number of seconds for the k8s liveness probe to fail before the proxy container is restarted. Zero disables the probe.")
+
+	// Native sidecars
+	c.flagSet.BoolVar(&c.flagNativeSidecarsEnabled, "enable-native-sidecars", false,
+		"Enables Consul dataplane injection using Kubernetes native Sidecards.")
 
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
