@@ -1,3 +1,8 @@
+## 1.6.7 (July 18, 2025)
+
+SECURITY:
+* Upgraded `alpine` to 3.22
+
 ## 1.6.6 (June 27, 2025)
 
 SECURITY:
