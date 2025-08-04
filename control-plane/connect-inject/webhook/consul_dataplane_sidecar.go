@@ -209,13 +209,6 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	if metricsPorts != nil {
 		container.Ports = append(container.Ports, metricsPorts...)
 	}
-	container.Ports = append(container.Ports, []corev1.ContainerPort{
-		{
-			Name:          "envoy",
-			ContainerPort: int32(20601),
-			Protocol:      corev1.ProtocolTCP,
-		},
-	}...)
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
 		return corev1.Container{}, err
@@ -282,26 +275,18 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		return corev1.Container{}, err
 	}
 	if enableProxyLifecycle {
-		//poststart hook impl
-		//container.Lifecycle = &corev1.Lifecycle{
-		//	PostStart: &corev1.LifecycleHandler{
-		//		Exec: &corev1.ExecAction{
-		//			Command: []string{
-		//				"/bin/sh",
-		//				"-c",
-		//				"for i in $(seq 1 20); do curl -sf http://localhost:20601/graceful_startup && exit 0; sleep 0.5; done; exit 1",
-		//			},
-		//		},
-		//	},
-		//}
 		restartPolicy := corev1.ContainerRestartPolicyAlways
 		container.RestartPolicy = &restartPolicy
 
 		container.LivenessProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Port: intstr.FromInt(20601),
-					Path: "/graceful_startup",
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						// Absolute path to the binary from the Dockerfile
+						"/usr/local/bin/consul-dataplane",
+						// Built-in subcommand to check Envoy health
+						"-check-proxy-health",
+					},
 				},
 			},
 			InitialDelaySeconds: 50,
@@ -312,9 +297,13 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		// readiness probe impl
 		container.StartupProbe = &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Port: intstr.FromInt(20601),
-					Path: "/graceful_startup",
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						// Absolute path to the binary from the Dockerfile
+						"/usr/local/bin/consul-dataplane",
+						// Built-in subcommand to check Envoy health
+						"-check-proxy-health",
+					},
 				},
 			},
 			InitialDelaySeconds: 50,
