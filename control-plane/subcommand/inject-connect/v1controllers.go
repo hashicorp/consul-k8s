@@ -55,13 +55,14 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	denyK8sNamespaces := flags.ToSet(c.flagDenyK8sNamespacesList)
 
 	lifecycleConfig := lifecycle.Config{
-		DefaultEnableProxyLifecycle:         c.flagDefaultEnableSidecarProxyLifecycle,
-		DefaultEnableShutdownDrainListeners: c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
-		DefaultShutdownGracePeriodSeconds:   c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
-		DefaultStartupGracePeriodSeconds:    c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
-		DefaultGracefulPort:                 c.flagDefaultSidecarProxyLifecycleGracefulPort,
-		DefaultGracefulShutdownPath:         c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
-		DefaultGracefulStartupPath:          c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
+		DefaultEnableProxyLifecycle:           c.flagDefaultEnableSidecarProxyLifecycle,
+		DefaultEnableShutdownDrainListeners:   c.flagDefaultEnableSidecarProxyLifecycleShutdownDrainListeners,
+		DefaultShutdownGracePeriodSeconds:     c.flagDefaultSidecarProxyLifecycleShutdownGracePeriodSeconds,
+		DefaultStartupGracePeriodSeconds:      c.flagDefaultSidecarProxyLifecycleStartupGracePeriodSeconds,
+		DefaultGracefulPort:                   c.flagDefaultSidecarProxyLifecycleGracefulPort,
+		DefaultGracefulShutdownPath:           c.flagDefaultSidecarProxyLifecycleGracefulShutdownPath,
+		DefaultGracefulStartupPath:            c.flagDefaultSidecarProxyLifecycleGracefulStartupPath,
+		DefaultEnableConsulDataplaneAsSidecar: c.flagDefaultEnableConsulDataplaneAsSidecar,
 	}
 
 	metricsConfig := metrics.Config{
