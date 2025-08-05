@@ -218,7 +218,8 @@ type MeshWebhook struct {
 
 	decoder *admission.Decoder
 	// etcResolvFile is only used in tests to stub out /etc/resolv.conf file.
-	etcResolvFile string
+	etcResolvFile                               string
+	DefaultSidecarProbeCheckInitialDelaySeconds int
 }
 type multiPortInfo struct {
 	serviceIndex int
