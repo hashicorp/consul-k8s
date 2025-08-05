@@ -226,6 +226,8 @@ const (
 	// ManagedByValue is the value for keyManagedBy.
 	//TODO(zalimeni) rename this to ManagedByLegacyEndpointsValue.
 	ManagedByValue = "consul-k8s-endpoints-controller"
+
+	AnnotationEnableConsulDataplaneAsSidecar = "consul.hashicorp.com/enable-consul-dataplane-as-sidecar"
 )
 
 // Annotations used by Prometheus.
