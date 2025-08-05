@@ -227,7 +227,8 @@ const (
 	//TODO(zalimeni) rename this to ManagedByLegacyEndpointsValue.
 	ManagedByValue = "consul-k8s-endpoints-controller"
 
-	AnnotationEnableConsulDataplaneAsSidecar = "consul.hashicorp.com/enable-consul-dataplane-as-sidecar"
+	AnnotationEnableConsulDataplaneAsSidecar       = "consul.hashicorp.com/enable-consul-dataplane-as-sidecar"
+	AnnotationSidecarInitialProbeCheckDelaySeconds = "consul.hashicorp.com/sidecar-initial-probe-check-delay-seconds"
 )
 
 // Annotations used by Prometheus.

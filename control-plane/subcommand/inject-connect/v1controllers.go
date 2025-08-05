@@ -406,6 +406,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Log:                                       ctrl.Log.WithName("handler").WithName("connect"),
 		LogLevel:                                  c.flagLogLevel,
 		LogJSON:                                   c.flagLogJSON,
+		DefaultSidecarProbeCheckInitialDelaySeconds: c.flagDefaultSidecarProbeCheckInitialDelaySeconds,
 	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{
