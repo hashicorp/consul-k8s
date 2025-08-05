@@ -271,6 +271,48 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		ReadOnlyRootFilesystem: ptr.To(true),
 	}
+	enableConsulDataplaneAsSidecar, err := w.LifecycleConfig.EnableConsulDataplaneAsSidecar(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if enableConsulDataplaneAsSidecar {
+		restartPolicy := corev1.ContainerRestartPolicyAlways
+		container.RestartPolicy = &restartPolicy
+
+		container.LivenessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						// Absolute path to the binary from the Dockerfile
+						"/usr/local/bin/consul-dataplane",
+						// Built-in subcommand to check Envoy health
+						"-check-proxy-health",
+					},
+				},
+			},
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       1,
+			FailureThreshold:    10,
+			TimeoutSeconds:      5,
+		}
+		// readiness probe impl
+		container.StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						// Absolute path to the binary from the Dockerfile
+						"/usr/local/bin/consul-dataplane",
+						// Built-in subcommand to check Envoy health
+						"-check-proxy-health",
+					},
+				},
+			},
+			InitialDelaySeconds: 5,
+			PeriodSeconds:       1,
+			FailureThreshold:    10,
+			TimeoutSeconds:      5,
+		}
+	}
 	return container, nil
 }
 

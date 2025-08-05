@@ -154,6 +154,8 @@ type Command struct {
 
 	once sync.Once
 	help string
+
+	flagDefaultEnableConsulDataplaneAsSidecar bool
 }
 
 var (
@@ -272,6 +274,8 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagInitContainerMemoryLimit, "init-container-memory-limit", "150Mi", "Init container memory limit.")
 
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
+
+	c.flagSet.BoolVar(&c.flagDefaultEnableConsulDataplaneAsSidecar, "default-enable-consul-dataplane-as-sidecar", false, "Default for enabling consul-dataplane as a sidecar container in the pod. ")
 
 	c.consul = &flags.ConsulFlags{}
 

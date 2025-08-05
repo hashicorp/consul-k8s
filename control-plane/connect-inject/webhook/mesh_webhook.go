@@ -306,6 +306,12 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	if ok != nil {
 		w.Log.Error(err, "unable to get lifecycle enabled status")
 	}
+
+	consulDataplaneSidecarEnabled, consulDataplaneSidecarEnabledOk := w.LifecycleConfig.EnableConsulDataplaneAsSidecar(pod)
+	if consulDataplaneSidecarEnabledOk != nil {
+		w.Log.Error(err, "unable to get consul-dataplane as sidecar container in kubernetes enabled status")
+	}
+
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
@@ -323,9 +329,11 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
 		//Append the Envoy sidecar before the application container only if lifecycle enabled.
-
-		if lifecycleEnabled && ok == nil {
+		if lifecycleEnabled && !consulDataplaneSidecarEnabled && ok == nil {
 			pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
+		} else if consulDataplaneSidecarEnabled && consulDataplaneSidecarEnabledOk == nil {
+			// Add as init container with sidecar behavior
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
 		} else {
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 		}
@@ -405,11 +413,12 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 			// If Lifecycle is enabled, add to the list of sidecar containers to be added
 			// to pod containers at the end in order to preserve relative ordering.
-			if lifecycleEnabled {
+			if lifecycleEnabled && !consulDataplaneSidecarEnabled {
 				sidecarContainers = append(sidecarContainers, envoySidecar)
+			} else if consulDataplaneSidecarEnabled {
+				pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
 			} else {
 				pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
-
 			}
 
 		}
