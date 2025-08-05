@@ -295,7 +295,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 					},
 				},
 			},
-			InitialDelaySeconds: 5,
+			InitialDelaySeconds: w.getSidecarProbeCheckInitialDelaySeconds(pod),
 			PeriodSeconds:       1,
 			FailureThreshold:    10,
 			TimeoutSeconds:      5,
@@ -312,7 +312,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 					},
 				},
 			},
-			InitialDelaySeconds: 5,
+			InitialDelaySeconds: w.getSidecarProbeCheckInitialDelaySeconds(pod),
 			PeriodSeconds:       1,
 			FailureThreshold:    10,
 			TimeoutSeconds:      5,
@@ -649,6 +649,17 @@ func (w *MeshWebhook) getStartupFailureSeconds(pod corev1.Pod) int32 {
 func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
 	seconds := w.DefaultSidecarProxyLivenessFailureSeconds
 	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
+}
+
+func (w *MeshWebhook) getSidecarProbeCheckInitialDelaySeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProbeCheckInitialDelaySeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarInitialProbeCheckDelaySeconds]; ok {
 		seconds, _ = strconv.Atoi(v)
 	}
 	if seconds > 0 {

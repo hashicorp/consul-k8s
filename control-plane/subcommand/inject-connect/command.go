@@ -155,7 +155,8 @@ type Command struct {
 	once sync.Once
 	help string
 
-	flagDefaultEnableConsulDataplaneAsSidecar bool
+	flagDefaultEnableConsulDataplaneAsSidecar       bool
+	flagDefaultSidecarProbeCheckInitialDelaySeconds int
 }
 
 var (
@@ -276,7 +277,7 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
 
 	c.flagSet.BoolVar(&c.flagDefaultEnableConsulDataplaneAsSidecar, "default-enable-consul-dataplane-as-sidecar", false, "Default for enabling consul-dataplane as a sidecar container in the pod. ")
-
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckInitialDelaySeconds, "default-sidecar-probe-check-initial-delay-seconds", 1, "Default number of seconds for the k8s initial delay before the readiness & liveness probe starts checking the consul-dataplane sidecar container.")
 	c.consul = &flags.ConsulFlags{}
 
 	flags.Merge(c.flagSet, c.consul.Flags())
