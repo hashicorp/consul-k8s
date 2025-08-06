@@ -1,3 +1,0 @@
-```release-note:feature
-helm: add the ability to configure livenessProbe and readinesssProbe for consul-client daemonset.
-```
