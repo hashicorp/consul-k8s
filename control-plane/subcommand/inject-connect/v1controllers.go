@@ -187,7 +187,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
 		EnableNSMirroring:          c.flagEnableK8SNSMirroring,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
-		ConsulPartition:            c.consul.Partition,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
 	}
 	if err := (&controllers.ServiceDefaultsController{
@@ -276,7 +275,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.TerminatingGateway),
 		NamespacesEnabled:     c.flagEnableNamespaces,
-		PartitionsEnabled:     c.flagEnablePartitions,
 		Scheme:                mgr.GetScheme(),
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.TerminatingGateway)

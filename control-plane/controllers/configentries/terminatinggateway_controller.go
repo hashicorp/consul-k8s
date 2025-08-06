@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"strings"
 	"text/template"
 
@@ -37,7 +36,6 @@ type TerminatingGatewayController struct {
 	FinalizerPatcher
 
 	NamespacesEnabled bool
-	PartitionsEnabled bool
 
 	Log                   logr.Logger
 	Scheme                *runtime.Scheme
@@ -51,49 +49,33 @@ func init() {
 
 type templateArgs struct {
 	Namespace        string
-	Partition        string
 	ServiceName      string
 	EnableNamespaces bool
-	EnablePartitions bool
 }
 
 var (
 	servicePolicyTpl      *template.Template
 	servicePolicyRulesTpl = `
-{{- if .EnablePartitions }}
-partition "{{.Partition}}" {
-{{- end }}
 {{- if .EnableNamespaces }}
-  namespace "{{.Namespace}}" {
+namespace "{{.Namespace}}" {
 {{- end }}
-    service "{{.ServiceName}}" {
-      policy    = "write"
-      intention = "read"
-    }
-{{- if .EnableNamespaces }}
+  service "{{.ServiceName}}" {
+    policy = "write"
   }
-{{- end }}
-{{- if .EnablePartitions }}
+{{- if .EnableNamespaces }}
 }
 {{- end }}
 `
 
 	wildcardPolicyTpl      *template.Template
 	wildcardPolicyRulesTpl = `
-{{- if .EnablePartitions }}
-partition "{{.Partition}}" {
-{{- end }}
 {{- if .EnableNamespaces }}
-  namespace "{{.Namespace}}" {
+namespace "{{.Namespace}}" {
 {{- end }}
-    service_prefix "" {
-      policy    = "write"
-      intention = "read"
-    }
-{{- if .EnableNamespaces }}
+  service_prefix "" {
+    policy = "write"
   }
-{{- end }}
-{{- if .EnablePartitions }}
+{{- if .EnableNamespaces }}
 }
 {{- end }}
 `
@@ -122,7 +104,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if enabled {
-		err = r.updateACls(log, termGW)
+		err := r.updateACls(log, termGW)
 		if err != nil {
 			log.Error(err, "error updating terminating-gateway roles")
 			r.UpdateStatusFailedToSetACLs(ctx, termGW, err)
@@ -183,20 +165,13 @@ func (r *TerminatingGatewayController) aclsEnabled() (bool, error) {
 	return state.Token != "", nil
 }
 
-func (r *TerminatingGatewayController) adminPartition() string {
-	if r.ConfigEntryController == nil {
-		return common.DefaultConsulPartition
-	}
-	return defaultIfEmpty(r.ConfigEntryController.ConsulPartition)
-}
-
 func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consulv1alpha1.TerminatingGateway) error {
-	connMgrClient, err := consul.NewClientFromConnMgr(r.ConfigEntryController.ConsulClientConfig, r.ConfigEntryController.ConsulServerConnMgr)
+	client, err := consul.NewClientFromConnMgr(r.ConfigEntryController.ConsulClientConfig, r.ConfigEntryController.ConsulServerConnMgr)
 	if err != nil {
 		return err
 	}
 
-	roles, _, err := connMgrClient.ACL().RoleList(nil)
+	roles, _, err := client.ACL().RoleList(nil)
 	if err != nil {
 		return err
 	}
@@ -214,7 +189,7 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 		return errors.New("terminating gateway role not found")
 	}
 
-	terminatingGatewayRole, _, err := connMgrClient.ACL().RoleRead(terminatingGatewayRoleID, nil)
+	terminatingGatewayRole, _, err := client.ACL().RoleRead(terminatingGatewayRoleID, nil)
 	if err != nil {
 		return err
 	}
@@ -239,7 +214,7 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 	}
 
 	if termGW.ObjectMeta.DeletionTimestamp.IsZero() {
-		termGWPoliciesToKeep, termGWPoliciesToRemove, err = r.handleModificationForPolicies(log, connMgrClient, existingTermGWPolicies, termGW.Spec.Services)
+		termGWPoliciesToKeep, termGWPoliciesToRemove, err = r.handleModificationForPolicies(log, client, existingTermGWPolicies, termGW.Spec.Services)
 		if err != nil {
 			return err
 		}
@@ -250,12 +225,12 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 	termGWPoliciesToKeep = append(termGWPoliciesToKeep, terminatingGatewayPolicy)
 	terminatingGatewayRole.Policies = termGWPoliciesToKeep
 
-	_, _, err = connMgrClient.ACL().RoleUpdate(terminatingGatewayRole, nil)
+	_, _, err = client.ACL().RoleUpdate(terminatingGatewayRole, nil)
 	if err != nil {
 		return err
 	}
 
-	err = r.conditionallyDeletePolicies(log, connMgrClient, termGWPoliciesToRemove, termGW.Name)
+	err = r.conditionallyDeletePolicies(log, client, termGWPoliciesToRemove, termGW.Name)
 	if err != nil {
 		return err
 	}
@@ -278,7 +253,6 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 
 	termGWPoliciesToKeepNames := mapset.NewSet[string]()
 	for _, service := range services {
-		log.Info("Checking for existing policies", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
 		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)), &capi.QueryOptions{})
 		if err != nil {
 			log.Error(err, "error reading policy")
@@ -286,17 +260,11 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 		}
 
 		if existingPolicy == nil {
-			log.Info("No existing ACL Policies Found", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
 			policyTemplate := getPolicyTemplateFor(service.Name)
-			policyNamespace := defaultIfEmpty(service.Namespace)
-			policyAdminPartition := r.adminPartition()
-			log.Info("Templating new ACL Policy", "Service", service.Name, "Namespace", policyNamespace, "Partition", policyAdminPartition)
 			var data bytes.Buffer
 			if err := policyTemplate.Execute(&data, templateArgs{
 				EnableNamespaces: r.NamespacesEnabled,
-				EnablePartitions: r.PartitionsEnabled,
-				Namespace:        policyNamespace,
-				Partition:        policyAdminPartition,
+				Namespace:        defaultIfEmpty(service.Namespace),
 				ServiceName:      service.Name,
 			}); err != nil {
 				// just panic if we can't compile the simple template
@@ -309,13 +277,8 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 				Rules: data.String(),
 			}, nil)
 			if err != nil {
-				log.Error(err, "error creating policy")
 				return nil, nil, err
-			} else {
-				log.Info("Created new ACL Policy", "Service", service.Name, "Namespace", policyNamespace, "Partition", policyAdminPartition)
 			}
-		} else {
-			log.Info("Found for existing policies", "policy", existingPolicy.Name, "ID", existingPolicy.ID)
 		}
 
 		termGWPoliciesToKeep = append(termGWPoliciesToKeep, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace))})

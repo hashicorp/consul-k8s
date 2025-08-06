@@ -1,3 +1,0 @@
-```release-note:bug
-control-plane: Fixed bug in TerminatingGateway controller workflow for handling AdminPartition enabled cluster ACL policies for associated TerminatingGateway services.
-```
