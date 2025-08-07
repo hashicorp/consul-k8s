@@ -15,6 +15,7 @@
 container {
   dependencies = true
   alpine_secdb = true
+  osv          = true
 
   secrets {
     all = true
@@ -22,8 +23,8 @@ container {
 }
 
 binary {
-  go_modules   = true
-  osv          = true
+  go_modules = true
+  osv        = true
 
   secrets {
     all = true
@@ -33,15 +34,18 @@ binary {
     suppress {
       vulnerabilites = [
         # NET-8174 (2024-02-20): Chart YAML path traversal (not impacted)
-        "GHSA-v53g-5gjp-272r", 
-        "GO-2024-2554", # alias
-        "CVE-2024-25620", # alias
+        "GHSA-v53g-5gjp-272r",
+
+        "GO-2024-2554",        # alias
+        "CVE-2024-25620",      # alias
+
         # NET-8174 (2024-02-26): Missing YAML Content Leads To Panic (requires malicious plugin)
-        "GHSA-r53h-jv2g-vpx6", 
-        "CVE-2024-26147", # alias
+        "GHSA-r53h-jv2g-vpx6",
+
+        "CVE-2024-26147",      # alias
         "GHSA-jw44-4f3j-q396", # Tracked in NET-8174
-        "CVE-2019-25210", # alias
-        "GO-2022-0635"
+        "CVE-2019-25210",      # alias
+        "GO-2022-0635",
       ]
     }
   }
