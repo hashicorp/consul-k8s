@@ -276,6 +276,48 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		ReadOnlyRootFilesystem: ptr.To(true),
 	}
+	enableConsulDataplaneAsSidecar, err := w.LifecycleConfig.EnableConsulDataplaneAsSidecar(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if enableConsulDataplaneAsSidecar {
+		restartPolicy := corev1.ContainerRestartPolicyAlways
+		container.RestartPolicy = &restartPolicy
+
+		container.LivenessProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						// Absolute path to the binary from the Dockerfile
+						"/usr/local/bin/consul-dataplane",
+						// Built-in subcommand to check Envoy health
+						"-check-proxy-health",
+					},
+				},
+			},
+			InitialDelaySeconds: w.getSidecarProbeCheckInitialDelaySeconds(pod),
+			PeriodSeconds:       1,
+			FailureThreshold:    10,
+			TimeoutSeconds:      5,
+		}
+		// readiness probe impl
+		container.StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						// Absolute path to the binary from the Dockerfile
+						"/usr/local/bin/consul-dataplane",
+						// Built-in subcommand to check Envoy health
+						"-check-proxy-health",
+					},
+				},
+			},
+			InitialDelaySeconds: w.getSidecarProbeCheckInitialDelaySeconds(pod),
+			PeriodSeconds:       1,
+			FailureThreshold:    10,
+			TimeoutSeconds:      5,
+		}
+	}
 	return container, nil
 }
 
@@ -607,6 +649,17 @@ func (w *MeshWebhook) getStartupFailureSeconds(pod corev1.Pod) int32 {
 func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
 	seconds := w.DefaultSidecarProxyLivenessFailureSeconds
 	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
+}
+
+func (w *MeshWebhook) getSidecarProbeCheckInitialDelaySeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProbeCheckInitialDelaySeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarInitialProbeCheckDelaySeconds]; ok {
 		seconds, _ = strconv.Atoi(v)
 	}
 	if seconds > 0 {
