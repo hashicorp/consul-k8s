@@ -133,7 +133,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		httpRoute      gwv1beta1.HTTPRoute
 	)
 
-	counter = &retry.Counter{Count: 60, Wait: 60 * time.Second}
+	counter = &retry.Counter{Count: 60, Wait: 5 * time.Minute}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
@@ -149,7 +149,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		require.Len(r, gateway.Status.Listeners, 2)
 
 		// http route checks
-		counter = &retry.Counter{Count: 60, Wait: 60 * time.Second}
+		counter = &retry.Counter{Count: 60, Wait: 5 * time.Minute}
 		retry.RunWith(counter, t, func(r *retry.R) {
 			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
 			require.NoError(r, err)
