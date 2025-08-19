@@ -1,3 +1,3 @@
 ```release-note:security
-go: upgrade go version to 40c38fd658f0fd07ce74f2ee51b8abd3bfed01b3
+go: upgrade go-discover version to 40c38fd658f0fd07ce74f2ee51b8abd3bfed01b3
 ```
