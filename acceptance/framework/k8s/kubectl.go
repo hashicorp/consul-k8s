@@ -74,7 +74,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 			// these are intermittent.
 			for _, connectionErr := range kubeAPIConnectErrs {
 				if strings.Contains(err.Error(), connectionErr) {
-					r.Errorf(err.Error())
+					r.Errorf("%v", err.Error())
 					return
 				}
 			}

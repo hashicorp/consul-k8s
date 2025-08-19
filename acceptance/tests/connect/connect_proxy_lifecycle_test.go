@@ -167,7 +167,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 						retry.RunWith(retrier, t, func(r *retry.R) {
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
-								r.Errorf(err.Error())
+								r.Errorf("%v", err.Error())
 								return
 							}
 							require.Condition(r, func() bool {
