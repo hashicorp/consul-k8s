@@ -33,20 +33,15 @@ func TestOpenshift_Basic(t *testing.T) {
 	logf.SetLogger(logr.New(nil))
 	logger.Log(t, "creating resources for OpenShift test")
 
-	counter := &retry.Counter{Count: 10, Wait: 120 * time.Second}
-	var err error
-	var output []byte
-	retry.RunWith(counter, t, func(r *retry.R) {
-		cmd := exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
-		output, err = cmd.CombinedOutput()
-		require.NoErrorf(r, err, "failed to create resources: %s", string(output))
-	})
-
+	cmd := exec.Command("kubectl", "apply", "-f", "../fixtures/cases/openshift/basic")
+	output, err := cmd.CombinedOutput()
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		cmd := exec.Command("kubectl", "delete", "-f", "../fixtures/cases/openshift/basic")
 		output, err := cmd.CombinedOutput()
 		assert.NoErrorf(t, err, "failed to delete resources: %s", string(output))
 	})
+
+	require.NoErrorf(t, err, "failed to create resources: %s", string(output))
 
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
@@ -58,7 +53,7 @@ func TestOpenshift_Basic(t *testing.T) {
 	// On startup, the controller can take upwards of 1m to perform leader election,
 	// so we may need to wait a long time for the reconcile loop to run (hence the timeout).
 	var gatewayIP string
-	counter = &retry.Counter{Count: 10, Wait: 120 * time.Second}
+	counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "api-gateway", Namespace: "consul"}, &gateway)
@@ -78,7 +73,7 @@ func TestOpenshift_Basic(t *testing.T) {
 	}}
 
 	var resp *http.Response
-	counter = &retry.Counter{Count: 10, Wait: 120 * time.Second}
+	counter = &retry.Counter{Count: 120, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		resp, err = client.Get("https://" + gatewayIP)
 		require.NoErrorf(r, err, "request to API gateway failed: %s", err)

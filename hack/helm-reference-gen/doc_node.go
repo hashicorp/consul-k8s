@@ -96,7 +96,7 @@ func (n DocNode) FormattedDefault() string {
 
 // FormattedDocumentation returns the formatted documentation for this node.
 func (n DocNode) FormattedDocumentation() string {
-	//doc := n.Comment
+	// doc := n.Comment
 
 	// Replace all leading YAML comment characters, e.g.
 	// `# yaml comment` => `yaml comment`.
