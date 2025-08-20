@@ -1,3 +1,14 @@
+## 1.7.4 (August 20, 2025)
+
+BUG FIXES:
+
+* control-plane: Fixed bug in TerminatingGateway controller workflow for handling AdminPartition enabled cluster ACL policies for associated TerminatingGateway services.
+
+SECURITY:
+* cve: upgrade helm.sh/helm/v3 to v3.18.5 to fix CVE-2025-55198, CVE-2025-55199
+* go: upgrade go-discover version to 40c38fd658f0fd07ce74f2ee51b8abd3bfed01b3
+* go: upgrade go version to 1.24.5
+
 ## 1.7.3 (July 21, 2025)
 
 IMPROVEMENTS:
