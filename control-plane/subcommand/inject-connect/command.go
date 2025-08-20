@@ -157,6 +157,9 @@ type Command struct {
 
 	flagDefaultEnableConsulDataplaneAsSidecar       bool
 	flagDefaultSidecarProbeCheckInitialDelaySeconds int
+	flagDefaultSidecarProbePeriodSeconds            int
+	flagDefaultSidecarProbeFailureThreshold         int
+	flagDefaultSidecarProbeCheckTimeoutSeconds      int
 }
 
 var (
@@ -278,6 +281,10 @@ func (c *Command) init() {
 
 	c.flagSet.BoolVar(&c.flagDefaultEnableConsulDataplaneAsSidecar, "default-enable-consul-dataplane-as-sidecar", false, "Default for enabling consul-dataplane as a sidecar container in the pod. ")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckInitialDelaySeconds, "default-sidecar-probe-check-initial-delay-seconds", 1, "Default number of seconds for the k8s initial delay before the readiness & liveness probe starts checking the consul-dataplane sidecar container.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbePeriodSeconds, "default-sidecar-probe-period-seconds", 5, "Default number of seconds for the k8s period between startup probe checks.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 3, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 1, "Default number of seconds for the k8s timeout for the startup probe checks.")
+
 	c.consul = &flags.ConsulFlags{}
 
 	flags.Merge(c.flagSet, c.consul.Flags())
