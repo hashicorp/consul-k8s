@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+	"maps"
 	"strconv"
 
 	"github.com/google/go-cmp/cmp"
@@ -167,9 +168,7 @@ func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) 
 		// Preserve existing annotations from the current deployment to maintain rollout restart functionality
 		existingAnnotations := make(map[string]string)
 		if b.Spec.Template.Annotations != nil {
-			for k, v := range b.Spec.Template.Annotations {
-				existingAnnotations[k] = v
-			}
+			maps.Copy(existingAnnotations, b.Spec.Template.Annotations)
 		}
 
 		// Apply the desired template
