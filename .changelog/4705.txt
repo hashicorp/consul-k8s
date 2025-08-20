@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: fix issue where rollout restarts were getting blocked by the gateway controller
+```
