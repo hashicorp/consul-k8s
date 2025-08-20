@@ -1,3 +1,10 @@
+## 1.8.1 (August 20, 2025)
+
+SECURITY:
+* cve: upgrade helm.sh/helm/v3 to v3.18.5 to fix CVE-2025-55198, CVE-2025-55199
+* go: upgrade go-discover version to 40c38fd658f0fd07ce74f2ee51b8abd3bfed01b3
+* go: upgrade go version to 1.24.5
+
 ## 1.8.0 (June 27, 2025)
 
 > NOTE: Consul K8s 1.8.x is compatible with Consul 1.20.x and Consul Dataplane 1.8.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
