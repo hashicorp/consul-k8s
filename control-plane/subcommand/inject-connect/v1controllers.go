@@ -407,6 +407,9 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		LogLevel:                                  c.flagLogLevel,
 		LogJSON:                                   c.flagLogJSON,
 		DefaultSidecarProbeCheckInitialDelaySeconds: c.flagDefaultSidecarProbeCheckInitialDelaySeconds,
+		DefaultSidecarProbePeriodSeconds:            c.flagDefaultSidecarProbePeriodSeconds,
+		DefaultSidecarProbeFailureThreshold:         c.flagDefaultSidecarProbeFailureThreshold,
+		DefaultSidecarProbeCheckTimeoutSeconds:      c.flagDefaultSidecarProbeCheckTimeoutSeconds,
 	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{

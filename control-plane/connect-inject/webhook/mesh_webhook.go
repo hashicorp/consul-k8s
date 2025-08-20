@@ -220,6 +220,9 @@ type MeshWebhook struct {
 	// etcResolvFile is only used in tests to stub out /etc/resolv.conf file.
 	etcResolvFile                               string
 	DefaultSidecarProbeCheckInitialDelaySeconds int
+	DefaultSidecarProbePeriodSeconds            int
+	DefaultSidecarProbeFailureThreshold         int
+	DefaultSidecarProbeCheckTimeoutSeconds      int
 }
 type multiPortInfo struct {
 	serviceIndex int
