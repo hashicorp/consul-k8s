@@ -180,15 +180,11 @@ func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) 
 		}
 
 		// First add existing annotations
-		for k, v := range existingAnnotations {
-			b.Spec.Template.Annotations[k] = v
-		}
+		maps.Copy(b.Spec.Template.Annotations, existingAnnotations)
 
 		// Then overlay desired annotations (they take precedence)
 		if a.Spec.Template.Annotations != nil {
-			for k, v := range a.Spec.Template.Annotations {
-				b.Spec.Template.Annotations[k] = v
-			}
+			maps.Copy(b.Spec.Template.Annotations, a.Spec.Template.Annotations)
 		}
 
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
