@@ -20,6 +20,7 @@ import (
 
 const (
 	allCapabilities              = "ALL"
+	netBindCapability            = "NET_BIND_SERVICE"
 	consulDataplaneDNSBindHost   = "127.0.0.1"
 	consulDataplaneDNSBindPort   = 8600
 	defaultEnvoyProxyConcurrency = 1
@@ -122,11 +123,20 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		}
 	}
 
+	capabilities := &corev1.Capabilities{
+		Drop: []corev1.Capability{allCapabilities},
+	}
+	if usingPrivilegedPorts {
+		capabilities.Add = []corev1.Capability{netBindCapability}
+		container.Command = []string{"privileged-consul-dataplane"}
+		// Add the envoy executable path argument
+		container.Args = append(container.Args, "-envoy-executable-path=/usr/local/bin/privileged-envoy")
+
+	}
+
 	container.SecurityContext = &corev1.SecurityContext{
 		ReadOnlyRootFilesystem: ptr.To(true),
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{allCapabilities},
-		},
+		Capabilities:           capabilities,
 	}
 
 	return container, nil
