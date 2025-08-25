@@ -1682,3 +1682,148 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+func TestHandlerConsulDataplaneSidecar_LifecycleConfig(t *testing.T) {
+	cases := map[string]struct {
+		pod                          corev1.Pod
+		defaultProbeTimeout          int
+		defaultProbeFailureThreshold int
+		lifecycleConfig              lifecycle.Config
+		expectedRestartPolicy        *corev1.ContainerRestartPolicy
+		expectedStartupProbe         *corev1.Probe
+		expectedError                string
+	}{
+		"when lifecycle enabled": {
+			lifecycleConfig: lifecycle.Config{
+				DefaultEnableConsulDataplaneAsSidecar: true,
+			},
+			defaultProbeTimeout:          5,
+			defaultProbeFailureThreshold: 3,
+			expectedRestartPolicy:        ptr.To(corev1.ContainerRestartPolicyAlways),
+			expectedStartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					Exec: &corev1.ExecAction{
+						Command: []string{
+							"/usr/local/bin/consul-dataplane",
+							"-check-proxy-health",
+						},
+					},
+				},
+				TimeoutSeconds:   5,
+				FailureThreshold: 3,
+			},
+		},
+		"when lifecycle disabled": {
+			lifecycleConfig: lifecycle.Config{
+				DefaultEnableConsulDataplaneAsSidecar: false,
+			},
+			expectedRestartPolicy: nil,
+			expectedStartupProbe:  nil,
+		},
+		"with custom probe settings from annotations": {
+			lifecycleConfig: lifecycle.Config{
+				DefaultEnableConsulDataplaneAsSidecar: true,
+			},
+			defaultProbeTimeout:          5,
+			defaultProbeFailureThreshold: 3,
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"consul.hashicorp.com/sidecar-probe-check-timeout-seconds": "10",
+						"consul.hashicorp.com/sidecar-probe-failure-threshold":     "6",
+					},
+				},
+			},
+			expectedRestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
+			expectedStartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					Exec: &corev1.ExecAction{
+						Command: []string{
+							"/usr/local/bin/consul-dataplane",
+							"-check-proxy-health",
+						},
+					},
+				},
+				TimeoutSeconds:   10,
+				FailureThreshold: 6,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := MeshWebhook{
+				ImageConsulDataplane:                   "consul-dataplane:latest",
+				DefaultSidecarProbeCheckTimeoutSeconds: tc.defaultProbeTimeout,
+				DefaultSidecarProbeFailureThreshold:    tc.defaultProbeFailureThreshold,
+				LifecycleConfig:                        tc.lifecycleConfig,
+			}
+			w.ConsulConfig = &consul.Config{HTTPPort: 8500, GRPCPort: 8502}
+			container, err := w.consulDataplaneSidecar(testNS, tc.pod, multiPortInfo{})
+			if tc.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedRestartPolicy, container.RestartPolicy)
+			if tc.expectedStartupProbe == nil {
+				require.Nil(t, container.StartupProbe)
+			} else {
+				require.NotNil(t, container.StartupProbe)
+				require.Equal(t, tc.expectedStartupProbe.ProbeHandler, container.StartupProbe.ProbeHandler)
+				require.Equal(t, tc.expectedStartupProbe.TimeoutSeconds, container.StartupProbe.TimeoutSeconds)
+				require.Equal(t, tc.expectedStartupProbe.FailureThreshold, container.StartupProbe.FailureThreshold)
+			}
+		})
+	}
+}
+
+func TestMeshWebhook_getSidecarProbePeriodSeconds(t *testing.T) {
+	w := &MeshWebhook{DefaultSidecarProbePeriodSeconds: 5}
+	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+
+	require.Equal(t, int32(5), w.getSidecarProbePeriodSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbePeriodSeconds] = "10"
+	require.Equal(t, int32(10), w.getSidecarProbePeriodSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbePeriodSeconds] = "0"
+	require.Equal(t, int32(0), w.getSidecarProbePeriodSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbePeriodSeconds] = "invalid"
+	require.Equal(t, int32(0), w.getSidecarProbePeriodSeconds(pod))
+}
+
+func TestMeshWebhook_getSidecarProbeFailureThreshold(t *testing.T) {
+	w := &MeshWebhook{DefaultSidecarProbeFailureThreshold: 3}
+	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+
+	require.Equal(t, int32(3), w.getSidecarProbeFailureThreshold(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeFailureThreshold] = "8"
+	require.Equal(t, int32(8), w.getSidecarProbeFailureThreshold(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeFailureThreshold] = "0"
+	require.Equal(t, int32(0), w.getSidecarProbeFailureThreshold(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeFailureThreshold] = "invalid"
+	require.Equal(t, int32(0), w.getSidecarProbeFailureThreshold(pod))
+}
+
+func TestMeshWebhook_getSidecarProbeTimeoutSeconds(t *testing.T) {
+	w := &MeshWebhook{DefaultSidecarProbeCheckTimeoutSeconds: 7}
+	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+
+	require.Equal(t, int32(7), w.getSidecarProbeTimeoutSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeCheckTimeoutSeconds] = "12"
+	require.Equal(t, int32(12), w.getSidecarProbeTimeoutSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeCheckTimeoutSeconds] = "0"
+	require.Equal(t, int32(0), w.getSidecarProbeTimeoutSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeCheckTimeoutSeconds] = "invalid"
+	require.Equal(t, int32(0), w.getSidecarProbeTimeoutSeconds(pod))
+}
