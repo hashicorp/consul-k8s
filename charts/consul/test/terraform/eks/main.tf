@@ -35,7 +35,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "4.0.0"
+  version = "5.21.0"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
@@ -79,8 +79,12 @@ module "eks" {
       desired_capacity = 3
       max_capacity     = 3
       min_capacity     = 3
-
-      instance_type = "m5.xlarge"
+      instance_type    = "m5.xlarge"
+      metadata_options = {
+        http_endpoint               = "enabled"
+        http_put_response_hop_limit = 2
+        http_tokens                 = "required"
+      }
     }
   }
 
@@ -127,7 +131,7 @@ resource "aws_eks_addon" "csi-driver" {
   count                       = var.cluster_count
   cluster_name                = module.eks[count.index].cluster_id
   addon_name                  = "aws-ebs-csi-driver"
-  addon_version               = "v1.15.0-eksbuild.1"
+  addon_version               = "v1.44.0-eksbuild.1"
   service_account_role_arn    = aws_iam_role.csi-driver-role[count.index].arn
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
