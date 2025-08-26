@@ -1438,15 +1438,15 @@ server:
     # @type: string
     caCert: null
 
-    # A list of extra environment variables to set on the snapshot agent specifically
-    # This could be used to configure credentials that the rest of the
-    # stateful set would not need access to, like GOOGLE_APPLICATION_CREDENTIALS
+    # A list of extra environment variables to set on the snapshot agent specifically.
+    # Use this parameter to configure credentials that the rest of the
+    # stateful set would not need access to, like `GOOGLE_APPLICATION_CREDENTIALS`.
     # @type: map
     extraEnvironmentVars: { }
 
-    # A list of extra volumes to mount onto the snapshot agent. This
-    # is useful for bringing in extra data that only the snapshot agent needs access
-    # to. Like storage credentials. The value of this should be a list of objects.
+    # A list of extra volumes to mount onto the snapshot agent. Use this block
+    # to include extra data that only the snapshot agent needs access
+    # to, such as storage credentials. This value should be a list of objects.
     #
     # Example:
     #
@@ -1458,10 +1458,10 @@ server:
     #
     # Each object supports the following keys:
     #
-    # - `type` - Type of the volume, must be one of "configMap" or "secret". Case sensitive.
+    # - `type` - Type of the volume. Must be one of `configMap` or `secret`. Case sensitive.
     #
-    # - `name` - Name of the configMap or secret to be mounted. This also controls
-    #   the path that it is mounted to. The volume will be mounted to `/consul/userconfig/<name>`.
+    # - `name` - Name of the configMap or secret to mount. This specification also controls
+    #   the path it mounts to. The volume will be mounted to `/consul/userconfig/<name>`.
     #
     # The snapshot agent will not attempt to load any volumes passed in this stanza
     # @type: array<map>
@@ -1903,6 +1903,26 @@ client:
   #
   # @type: string
   updateStrategy: null
+
+  # Override the default livenessProbe and readinessProbe for the DaemonSet consul-client container.
+  # Refer to the Kubernetes documentation on how to [Configure Liveness, Readiness and Startup Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+  #
+  # This should be a multi-line string
+  #
+  # Example:
+  #
+  # ```yaml
+  # readinessProbe:
+  #     exec:
+  #       command:
+  #       - /bin/sh
+  #       - -ec
+  #       - "curl http://127.0.0.1:8500/v1/status/leader 2>/dev/null | grep -E '\".+\"' \n"
+  # ```
+  #
+  # @type: string
+  livenessProbe: {}
+  readinessProbe: {}
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
