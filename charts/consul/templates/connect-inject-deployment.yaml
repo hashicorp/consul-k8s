@@ -284,6 +284,17 @@ spec:
                 -enable-auto-encrypt \
                 {{- end }}
                 -enable-telemetry-collector={{ .Values.global.metrics.enableTelemetryCollector}}  \
+
+                {{- if .Values.connectInject.dataplaneAsSidecarInitContainer.defaultEnabled }}
+                -default-enable-consul-dataplane-as-sidecar=true \
+                -default-sidecar-probe-check-initial-delay-seconds={{ .Values.connectInject.dataplaneAsSidecarInitContainer.initialProbeCheckDelaySeconds }} \
+                -default-sidecar-probe-period-seconds={{ .Values.connectInject.dataplaneAsSidecarInitContainer.probeCheckPeriodSeconds }} \
+                -default-sidecar-probe-failure-threshold="{{ .Values.connectInject.dataplaneAsSidecarInitContainer.probeCheckFailureThreshold }}" \
+                -default-sidecar-probe-check-timeout-seconds="{{ .Values.connectInject.dataplaneAsSidecarInitContainer.probeCheckTimeoutSeconds }}" \
+                {{- else }}
+                -default-enable-consul-dataplane-as-sidecar=false \
+                {{- end }}
+
           startupProbe:
             httpGet:
               path: /readyz/ready
