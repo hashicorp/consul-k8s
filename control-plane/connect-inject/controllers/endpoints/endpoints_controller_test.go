@@ -7104,7 +7104,8 @@ func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Po
 			Annotations: annotations,
 		},
 		Status: corev1.PodStatus{
-			PodIP: ip,
+			PodIP:  ip,
+			HostIP: "192.168.1.1", // Add HostIP to prevent skipping due to incomplete node info
 			Conditions: []corev1.PodCondition{
 				{
 					Type:   corev1.PodReady,
