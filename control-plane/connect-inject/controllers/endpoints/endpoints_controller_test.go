@@ -7512,7 +7512,6 @@ func TestReconcile_SkipIncompleteNodeInfo(t *testing.T) {
 	}
 }
 
-// TestReconcile_CompleteNodeInfo tests that pods with complete node information are registered successfully
 func TestReconcile_CompleteNodeInfo(t *testing.T) {
 	t.Parallel()
 
