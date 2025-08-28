@@ -1438,15 +1438,15 @@ server:
     # @type: string
     caCert: null
 
-    # A list of extra environment variables to set on the snapshot agent specifically
-    # This could be used to configure credentials that the rest of the
-    # stateful set would not need access to, like GOOGLE_APPLICATION_CREDENTIALS
+    # A list of extra environment variables to set on the snapshot agent specifically.
+    # Use this parameter to configure credentials that the rest of the
+    # stateful set would not need access to, like `GOOGLE_APPLICATION_CREDENTIALS`.
     # @type: map
     extraEnvironmentVars: { }
 
-    # A list of extra volumes to mount onto the snapshot agent. This
-    # is useful for bringing in extra data that only the snapshot agent needs access
-    # to. Like storage credentials. The value of this should be a list of objects.
+    # A list of extra volumes to mount onto the snapshot agent. Use this block
+    # to include extra data that only the snapshot agent needs access
+    # to, such as storage credentials. This value should be a list of objects.
     #
     # Example:
     #
@@ -1458,10 +1458,10 @@ server:
     #
     # Each object supports the following keys:
     #
-    # - `type` - Type of the volume, must be one of "configMap" or "secret". Case sensitive.
+    # - `type` - Type of the volume. Must be one of `configMap` or `secret`. Case sensitive.
     #
-    # - `name` - Name of the configMap or secret to be mounted. This also controls
-    #   the path that it is mounted to. The volume will be mounted to `/consul/userconfig/<name>`.
+    # - `name` - Name of the configMap or secret to mount. This specification also controls
+    #   the path it mounts to. The volume will be mounted to `/consul/userconfig/<name>`.
     #
     # The snapshot agent will not attempt to load any volumes passed in this stanza
     # @type: array<map>
@@ -1903,6 +1903,26 @@ client:
   #
   # @type: string
   updateStrategy: null
+
+  # Override the default livenessProbe and readinessProbe for the DaemonSet consul-client container.
+  # Refer to the Kubernetes documentation on how to [Configure Liveness, Readiness and Startup Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+  #
+  # This should be a multi-line string
+  #
+  # Example:
+  #
+  # ```yaml
+  # readinessProbe:
+  #     exec:
+  #       command:
+  #       - /bin/sh
+  #       - -ec
+  #       - "curl http://127.0.0.1:8500/v1/status/leader 2>/dev/null | grep -E '\".+\"' \n"
+  # ```
+  #
+  # @type: string
+  livenessProbe: {}
+  readinessProbe: {}
 
 # Configuration for DNS configuration within the Kubernetes cluster.
 # This creates a service that routes to all agents (client or server)
@@ -2994,6 +3014,31 @@ connectInject:
     # Configures how long the k8s liveness probe will wait before the proxy is considered to be unhealthy and the container is restarted.
     # A value of zero disables the probe.
     defaultLivenessFailureSeconds: 0
+
+  dataplaneAsSidecarInitContainer:
+    # If true, the consul-dataplane will run as an init container with the restart policy set to "Always" and using startup probe to determine readiness.
+    # Also, Kubelet will wait for the consul-dataplane init container to be ready before starting the application container.
+    # @type: boolean
+    defaultEnabled: false
+
+    # Configures how long the k8s startup probe will wait initially before performing the first check.
+    # @type: integer
+    initialProbeCheckDelaySeconds: 1
+
+    # Configures how often the k8s startup probe will check the readiness of the consul-dataplane init container.
+    # @type: integer
+    probeCheckPeriodSeconds: 1
+
+    # Configures the failure threshold for the k8s startup probe.
+    # @type: integer
+    probeCheckFailureThreshold: 10
+
+    # Configures the timeout for each k8s startup probe check.
+    # @type: integer
+    probeCheckTimeoutSeconds: 5
+
+
+
 
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of

@@ -1,5 +1,7 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
+go 1.24.5
+
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
@@ -164,5 +166,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-go 1.23.8
