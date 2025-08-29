@@ -980,13 +980,17 @@ func (t *serviceIngressResource) Upsert(key string, raw interface{}) error {
 		var svcName string
 		var hostName string
 		var svcPort int32
-		for _, path := range rule.HTTP.Paths {
-			if path.Path == "/" {
-				svcName = path.Backend.Service.Name
-				svcPort = 80
-			} else {
-				continue
+		if rule.HTTP != nil {
+			for _, path := range rule.HTTP.Paths {
+				if path.Path == "/" {
+					svcName = path.Backend.Service.Name
+					svcPort = 80
+				} else {
+					continue
+				}
 			}
+		} else {
+			continue
 		}
 		if svcName == "" {
 			continue
