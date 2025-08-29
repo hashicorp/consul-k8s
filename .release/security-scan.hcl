@@ -23,9 +23,6 @@ container {
   triage {
     suppress {
       vulnerabilites = [
-        "CVE-2025-46394",
-        "CVE-2024-58251",
-        "CVE-2025-47268"
       ]
     }
   }
@@ -42,20 +39,6 @@ binary {
   triage {
     suppress {
       vulnerabilites = [
-        # NET-8174 (2024-02-20): Chart YAML path traversal (not impacted)
-        "GHSA-v53g-5gjp-272r", 
-        "GO-2024-2554", # alias
-        "CVE-2024-25620", # alias
-        # NET-8174 (2024-02-26): Missing YAML Content Leads To Panic (requires malicious plugin)
-        "GHSA-r53h-jv2g-vpx6", 
-        "CVE-2024-26147", # alias
-        "GHSA-jw44-4f3j-q396", # Tracked in NET-8174
-        "CVE-2019-25210",
-        "GO-2022-0635",
-        "GHSA-4hfp-h4cw-hj8p",
-        "GHSA-5xqw-8hwv-wg92",
-        "GO-2025-3601",
-        "GO-2025-3602"
       ]
     }
   }
