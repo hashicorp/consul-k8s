@@ -248,8 +248,34 @@ spec:
         image: {{ $root.Values.global.imageConsulDataplane | quote }}
         {{ template "consul.imagePullPolicy" $root }}
         {{- include "consul.restrictedSecurityContext" $ | nindent 8 }}
-        {{- if (default $defaults.resources .resources) }}
-        resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
+        # Only render 'resources' if it's not empty
+        {{- $gatewayResources := (default $defaults.resources .resources) }}
+        {{- if $gatewayResources }}
+        resources:
+          # If $gatewayResources is just a templated string, pass it as-is.
+          {{- if eq (typeOf $gatewayResources) "string" }}
+          {{ tpl $gatewayResources . | nindent 4 | trim }}
+          {{- else }}
+          {{- if $gatewayResources.requests }}
+          requests:
+              {{- if and $gatewayResources.requests.cpu (ne $gatewayResources.requests.cpu nil) }}
+            cpu: "{{ $gatewayResources.requests.cpu }}"
+              {{- end }}
+              {{- if and $gatewayResources.requests.memory (ne $gatewayResources.requests.memory nil) }}
+            memory: "{{ $gatewayResources.requests.memory }}"
+              {{- end }}
+          {{- end }}
+
+          {{- if $gatewayResources.limits }}
+          limits:
+              {{- if and $gatewayResources.limits.cpu (ne $gatewayResources.limits.cpu nil) }}
+            cpu: "{{ $gatewayResources.limits.cpu }}"
+              {{- end }}
+              {{- if and $gatewayResources.limits.memory (ne $gatewayResources.limits.memory nil) }}
+            memory: "{{ $gatewayResources.limits.memory }}"
+              {{- end }}
+          {{- end }}
+          {{- end }}
         {{- end }}
         volumeMounts:
         - name: tmp
