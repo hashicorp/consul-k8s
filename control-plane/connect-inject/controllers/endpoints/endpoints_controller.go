@@ -215,6 +215,15 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					continue
 				}
 
+				// Skip registration if node information is incomplete to prevent duplicate registrations.
+				if pod.Spec.NodeName == "" || pod.Status.PodIP == "" || pod.Status.HostIP == "" {
+					r.Log.Info("skipping pod registration due to incomplete node information",
+						"pod", pod.Name, "namespace", pod.Namespace,
+						"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
+					// Don't set up for deregistration since we're not registering it
+					continue
+				}
+
 				if isTelemetryCollector(pod) {
 					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
 						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
