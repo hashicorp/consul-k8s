@@ -17,6 +17,12 @@ import (
 func TestRegistrationsForPods_Health(t *testing.T) {
 	t.Parallel()
 
+	const (
+		testNodeName = "node1"
+		testPodIP    = "10.0.0.1"
+		testHostIP   = "192.168.1.1"
+	)
+
 	for name, tt := range map[string]struct {
 		consulNamespace string
 		gateway         gwv1beta1.Gateway
@@ -34,27 +40,79 @@ func TestRegistrationsForPods_Health(t *testing.T) {
 			gateway:         gwv1beta1.Gateway{},
 			pods: []corev1.Pod{
 				// Pods without a running status
-				{Status: corev1.PodStatus{Phase: corev1.PodFailed}},
-				{Status: corev1.PodStatus{Phase: corev1.PodPending}},
-				{Status: corev1.PodStatus{Phase: corev1.PodSucceeded}},
-				{Status: corev1.PodStatus{Phase: corev1.PodUnknown}},
+				{
+					Spec:   corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{Phase: corev1.PodFailed, PodIP: testPodIP, HostIP: testHostIP},
+				},
+				{
+					Spec:   corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{Phase: corev1.PodPending, PodIP: testPodIP, HostIP: testHostIP},
+				},
+				{
+					Spec:   corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{Phase: corev1.PodSucceeded, PodIP: testPodIP, HostIP: testHostIP},
+				},
+				{
+					Spec:   corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{Phase: corev1.PodUnknown, PodIP: testPodIP, HostIP: testHostIP},
+				},
 				// Running statuses that don't show readiness
-				{Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{
-					{Type: corev1.PodScheduled, Status: corev1.ConditionTrue},
-				}}},
-				{Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{
-					{Type: corev1.PodInitialized, Status: corev1.ConditionTrue},
-				}}},
-				{Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{
-					{Type: corev1.DisruptionTarget, Status: corev1.ConditionTrue},
-				}}},
-				{Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{
-					{Type: corev1.ContainersReady, Status: corev1.ConditionTrue},
-				}}},
+				{
+					Spec: corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{
+						Phase:  corev1.PodRunning,
+						PodIP:  testPodIP,
+						HostIP: testHostIP,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodScheduled, Status: corev1.ConditionTrue},
+						},
+					},
+				},
+				{
+					Spec: corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{
+						Phase:  corev1.PodRunning,
+						PodIP:  testPodIP,
+						HostIP: testHostIP,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodInitialized, Status: corev1.ConditionTrue},
+						},
+					},
+				},
+				{
+					Spec: corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{
+						Phase:  corev1.PodRunning,
+						PodIP:  testPodIP,
+						HostIP: testHostIP,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.DisruptionTarget, Status: corev1.ConditionTrue},
+						},
+					},
+				},
+				{
+					Spec: corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{
+						Phase:  corev1.PodRunning,
+						PodIP:  testPodIP,
+						HostIP: testHostIP,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.ContainersReady, Status: corev1.ConditionTrue},
+						},
+					},
+				},
 				// And finally, the successful check
-				{Status: corev1.PodStatus{Phase: corev1.PodRunning, Conditions: []corev1.PodCondition{
-					{Type: corev1.PodReady, Status: corev1.ConditionTrue},
-				}}},
+				{
+					Spec: corev1.PodSpec{NodeName: testNodeName},
+					Status: corev1.PodStatus{
+						Phase:  corev1.PodRunning,
+						PodIP:  testPodIP,
+						HostIP: testHostIP,
+						Conditions: []corev1.PodCondition{
+							{Type: corev1.PodReady, Status: corev1.ConditionTrue},
+						},
+					},
+				},
 			},
 			expected: []string{
 				api.HealthCritical,
@@ -88,12 +146,12 @@ func TestRegistrationsForPods_SkipIncompleteNodeInfo(t *testing.T) {
 	t.Parallel()
 
 	gateway := gwv1beta1.Gateway{}
-	
+
 	testCases := []struct {
-		name         string
-		pods         []corev1.Pod
-		expectedLen  int
-		description  string
+		name        string
+		pods        []corev1.Pod
+		expectedLen int
+		description string
 	}{
 		{
 			name: "skip pod without NodeName",
@@ -184,17 +242,17 @@ func TestRegistrationsForPods_SkipIncompleteNodeInfo(t *testing.T) {
 			pods: []corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "incomplete1"},
-					Spec: corev1.PodSpec{NodeName: ""},
-					Status: corev1.PodStatus{PodIP: "10.0.0.1", HostIP: "192.168.1.1"},
+					Spec:       corev1.PodSpec{NodeName: ""},
+					Status:     corev1.PodStatus{PodIP: "10.0.0.1", HostIP: "192.168.1.1"},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "incomplete2"},
-					Spec: corev1.PodSpec{NodeName: "node1"},
-					Status: corev1.PodStatus{PodIP: "", HostIP: "192.168.1.1"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
+					Status:     corev1.PodStatus{PodIP: "", HostIP: "192.168.1.1"},
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "complete1"},
-					Spec: corev1.PodSpec{NodeName: "node1"},
+					Spec:       corev1.PodSpec{NodeName: "node1"},
 					Status: corev1.PodStatus{
 						PodIP:  "10.0.0.1",
 						HostIP: "192.168.1.1",
@@ -206,7 +264,7 @@ func TestRegistrationsForPods_SkipIncompleteNodeInfo(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "complete2"},
-					Spec: corev1.PodSpec{NodeName: "node2"},
+					Spec:       corev1.PodSpec{NodeName: "node2"},
 					Status: corev1.PodStatus{
 						PodIP:  "10.0.0.2",
 						HostIP: "192.168.1.2",
