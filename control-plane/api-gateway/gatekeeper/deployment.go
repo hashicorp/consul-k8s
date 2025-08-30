@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+	"maps"
 	"strconv"
 
 	"github.com/google/go-cmp/cmp"
@@ -164,7 +165,28 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 
 func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
+		// Preserve existing annotations from the current deployment to maintain rollout restart functionality
+		existingAnnotations := make(map[string]string)
+		if b.Spec.Template.Annotations != nil {
+			maps.Copy(existingAnnotations, b.Spec.Template.Annotations)
+		}
+
+		// Apply the desired template
 		b.Spec.Template = a.Spec.Template
+
+		// Merge back any existing annotations with desired annotations (desired takes precedence)
+		if b.Spec.Template.Annotations == nil {
+			b.Spec.Template.Annotations = make(map[string]string)
+		}
+
+		// First add existing annotations
+		maps.Copy(b.Spec.Template.Annotations, existingAnnotations)
+
+		// Then overlay desired annotations (they take precedence)
+		if a.Spec.Template.Annotations != nil {
+			maps.Copy(b.Spec.Template.Annotations, a.Spec.Template.Annotations)
+		}
+
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
 	}
 
@@ -176,6 +198,11 @@ func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) 
 // Deployment returned by the Kubernetes API and one that we would create
 // in memory which are perfectly fine. We want to ignore those differences.
 func compareDeployments(a, b *appsv1.Deployment) bool {
+	// Compare template annotations first (important for rollout restart)
+	if !cmp.Equal(a.Spec.Template.ObjectMeta.Annotations, b.Spec.Template.ObjectMeta.Annotations) {
+		return false
+	}
+
 	if len(b.Spec.Template.Spec.InitContainers) != len(a.Spec.Template.Spec.InitContainers) {
 		return false
 	}
