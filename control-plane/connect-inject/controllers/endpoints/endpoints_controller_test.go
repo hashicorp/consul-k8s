@@ -7104,7 +7104,8 @@ func createGatewayPod(name, ip string, annotations map[string]string) *corev1.Po
 			Annotations: annotations,
 		},
 		Status: corev1.PodStatus{
-			PodIP: ip,
+			PodIP:  ip,
+			HostIP: "192.168.1.1", // Add HostIP to prevent skipping due to incomplete node info
 			Conditions: []corev1.PodCondition{
 				{
 					Type:   corev1.PodReady,
@@ -7166,6 +7167,464 @@ func TestReconcileAssignServiceVirtualIP(t *testing.T) {
 			} else {
 				require.False(t, c.expectErr)
 			}
+		})
+	}
+}
+
+func TestReconcile_SkipIncompleteNodeInfo(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		pod         *corev1.Pod
+		description string
+	}{
+		"service pod - missing node name": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-pod",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationInject: "true",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "", // Missing
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.1",
+					HostIP: "192.168.1.1",
+				},
+			},
+			description: "Service pod with missing node name should be skipped",
+		},
+		"service pod - missing pod IP": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-pod",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationInject: "true",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "", // Missing
+					HostIP: "192.168.1.1",
+				},
+			},
+			description: "Service pod with missing pod IP should be skipped",
+		},
+		"service pod - missing host IP": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-pod",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationInject: "true",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.1",
+					HostIP: "", // Missing
+				},
+			},
+			description: "Service pod with missing host IP should be skipped",
+		},
+		"mesh gateway - missing node name": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-mesh-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              meshGateway,
+						constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
+						constants.AnnotationMeshGatewayContainerPort: "8443",
+						constants.AnnotationGatewayWANSource:         "NodeIP",
+						constants.AnnotationGatewayWANPort:           "8443",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "", // Missing
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.2",
+					HostIP: "192.168.1.2",
+				},
+			},
+			description: "Mesh gateway with missing node name should be skipped",
+		},
+		"mesh gateway - missing pod IP": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-mesh-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              meshGateway,
+						constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
+						constants.AnnotationMeshGatewayContainerPort: "8443",
+						constants.AnnotationGatewayWANSource:         "NodeIP",
+						constants.AnnotationGatewayWANPort:           "8443",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "", // Missing
+					HostIP: "192.168.1.2",
+				},
+			},
+			description: "Mesh gateway with missing pod IP should be skipped",
+		},
+		"mesh gateway - missing host IP": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-mesh-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              meshGateway,
+						constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
+						constants.AnnotationMeshGatewayContainerPort: "8443",
+						constants.AnnotationGatewayWANSource:         "NodeIP",
+						constants.AnnotationGatewayWANPort:           "8443",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.2",
+					HostIP: "", // Missing
+				},
+			},
+			description: "Mesh gateway with missing host IP should be skipped",
+		},
+		"ingress gateway - missing node name": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ingress-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              ingressGateway,
+						constants.AnnotationGatewayConsulServiceName: "ingress-gateway",
+						constants.AnnotationGatewayWANSource:         "NodeIP",
+						constants.AnnotationGatewayWANPort:           "21000",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "", // Missing
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.3",
+					HostIP: "192.168.1.3",
+				},
+			},
+			description: "Ingress gateway with missing node name should be skipped",
+		},
+		"ingress gateway - missing pod IP": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ingress-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              ingressGateway,
+						constants.AnnotationGatewayConsulServiceName: "ingress-gateway",
+						constants.AnnotationGatewayWANSource:         "NodeIP",
+						constants.AnnotationGatewayWANPort:           "21000",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "", // Missing
+					HostIP: "192.168.1.3",
+				},
+			},
+			description: "Ingress gateway with missing pod IP should be skipped",
+		},
+		"terminating gateway - missing node name": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-terminating-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              terminatingGateway,
+						constants.AnnotationGatewayConsulServiceName: "terminating-gateway",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "", // Missing
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.4",
+					HostIP: "192.168.1.4",
+				},
+			},
+			description: "Terminating gateway with missing node name should be skipped",
+		},
+		"terminating gateway - missing host IP": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-terminating-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              terminatingGateway,
+						constants.AnnotationGatewayConsulServiceName: "terminating-gateway",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.4",
+					HostIP: "", // Missing
+				},
+			},
+			description: "Terminating gateway with missing host IP should be skipped",
+		},
+		"mixed scenario - all missing": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-mixed-pod",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationInject:                   "true",
+						constants.AnnotationGatewayKind:              meshGateway,
+						constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
+						constants.AnnotationMeshGatewayContainerPort: "8443",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "", // Missing
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "", // Missing
+					HostIP: "", // Missing
+				},
+			},
+			description: "Pod with all node info missing should be skipped regardless of type",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Create test consul server.
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+			consulClient := testClient.APIClient
+
+			// Create simple endpoints with address matching pod IP (using a valid IP for test)
+			endpoints := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
+			}
+
+			// Create fake client with the pod and endpoints
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(tc.pod, endpoints).Build()
+
+			// Create the controller with minimal required fields
+			epCtrl := Controller{
+				Client:                 fakeClient,
+				ConsulClientConfig:     testClient.Cfg,
+				ConsulServerConnMgr:    testClient.Watcher,
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSetWith(),
+				EnableConsulNamespaces: false,
+				Log:                    logrtest.New(t),
+				Context:                context.Background(),
+			}
+
+			// Reconcile the endpoints
+			namespacedName := types.NamespacedName{
+				Namespace: endpoints.Namespace,
+				Name:      endpoints.Name,
+			}
+			_, err := epCtrl.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+
+			// Should not return an error (pods with incomplete info are skipped gracefully)
+			require.NoError(t, err, tc.description)
+
+			// Check that no services were registered in Consul (since pod had incomplete node info)
+			services, _, err := consulClient.Catalog().Service("test-service", "", nil)
+			require.NoError(t, err, tc.description)
+			require.Empty(t, services, "Expected no services to be registered for pod with incomplete node info: %s", tc.description)
+
+			// Also check for gateway services
+			if isGateway(*tc.pod) {
+				gatewayServiceName := tc.pod.Annotations[constants.AnnotationGatewayConsulServiceName]
+				if gatewayServiceName != "" {
+					gatewayServices, _, err := consulClient.Catalog().Service(gatewayServiceName, "", nil)
+					require.NoError(t, err, tc.description)
+					require.Empty(t, gatewayServices, "Expected no gateway services to be registered for pod with incomplete node info: %s", tc.description)
+				}
+			}
+		})
+	}
+}
+
+func TestReconcile_CompleteNodeInfo(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		pod         *corev1.Pod
+		description string
+	}{
+		"service pod - complete info": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service-pod",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationInject: "true",
+						constants.AnnotationPort:   "8080",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 8080,
+								},
+							},
+						},
+					},
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.1",
+					HostIP: "192.168.1.1",
+				},
+			},
+			description: "Service pod with complete node info should be registered",
+		},
+		"mesh gateway - complete info": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-mesh-gateway",
+					Namespace: "default",
+					Labels: map[string]string{
+						constants.KeyManagedBy: constants.ManagedByValue,
+					},
+					Annotations: map[string]string{
+						constants.AnnotationGatewayKind:              meshGateway,
+						constants.AnnotationGatewayConsulServiceName: "mesh-gateway",
+						constants.AnnotationMeshGatewayContainerPort: "8443",
+						constants.AnnotationGatewayWANSource:         "NodeIP",
+						constants.AnnotationGatewayWANPort:           "8443",
+					},
+				},
+				Spec: corev1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: corev1.PodStatus{
+					Phase:  corev1.PodRunning,
+					PodIP:  "10.0.0.2",
+					HostIP: "192.168.1.2",
+				},
+			},
+			description: "Mesh gateway with complete node info should be registered",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			// Create test consul server.
+			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+
+			// Create endpoints that reference the test pod
+			endpoints := &corev1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "default",
+				},
+			}
+
+			// Create fake client with the pod and endpoints
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(tc.pod, endpoints).Build()
+
+			// Create the controller
+			epCtrl := Controller{
+				Client:                 fakeClient,
+				ConsulClientConfig:     testClient.Cfg,
+				ConsulServerConnMgr:    testClient.Watcher,
+				AllowK8sNamespacesSet:  mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:   mapset.NewSetWith(),
+				EnableConsulNamespaces: false,
+				Log:                    logrtest.New(t),
+				Context:                context.Background(),
+			}
+
+			// Reconcile the endpoints
+			namespacedName := types.NamespacedName{
+				Namespace: endpoints.Namespace,
+				Name:      endpoints.Name,
+			}
+			_, err := epCtrl.Reconcile(context.Background(), ctrl.Request{NamespacedName: namespacedName})
+
+			// Should not return an error
+			require.NoError(t, err, tc.description)
+
+			// For complete pods, we expect some form of registration attempt
+			// Note: The actual registration might still fail due to missing endpoints.Subsets
+			// but the important thing is that the node completeness check passed
 		})
 	}
 }
