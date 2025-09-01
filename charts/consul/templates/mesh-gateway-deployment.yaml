@@ -198,14 +198,24 @@ spec:
         {{ template "consul.imagePullPolicy" . }}
         {{ if not .Values.meshGateway.hostNetwork}}
         securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
+          {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
+          allowPrivilegeEscalation: true
+          runAsNonRoot: false
           capabilities:
             drop:
               - ALL
+            add:
+              - NET_BIND_SERVICE
+          {{- else }}
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
+          {{- end }}
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
         {{- end }}
         {{- if .Values.meshGateway.resources }}
         resources:
@@ -249,9 +259,16 @@ spec:
           value: component=mesh-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
+        {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
+        command:
+        - privileged-consul-dataplane
+        args:
+        - -envoy-executable-path=/usr/local/bin/privileged-envoy
+        {{- else }}
         command:
         - consul-dataplane
         args:
+        {{- end }}
         {{- if .Values.externalServers.enabled }}
         - -addresses={{ .Values.externalServers.hosts | first }}
         {{- else }}

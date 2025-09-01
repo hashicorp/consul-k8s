@@ -123,21 +123,29 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		}
 	}
 
-	capabilities := &corev1.Capabilities{
-		Drop: []corev1.Capability{allCapabilities},
+	// Set up security context with least privilege by default
+	securityContext := &corev1.SecurityContext{
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{allCapabilities},
+		},
 	}
+
 	if usingPrivilegedPorts {
-		capabilities.Add = []corev1.Capability{netBindCapability}
+		securityContext.AllowPrivilegeEscalation = ptr.To(true)
+		securityContext.RunAsNonRoot = ptr.To(false)
+		securityContext.Capabilities.Add = []corev1.Capability{netBindCapability}
 		container.Command = []string{"privileged-consul-dataplane"}
 		// Add the envoy executable path argument
 		container.Args = append(container.Args, "-envoy-executable-path=/usr/local/bin/privileged-envoy")
-
 	}
 
-	container.SecurityContext = &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: ptr.To(true),
-		Capabilities:           capabilities,
-	}
+	container.SecurityContext = securityContext
 
 	return container, nil
 }

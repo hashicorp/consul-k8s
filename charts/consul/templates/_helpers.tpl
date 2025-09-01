@@ -682,3 +682,23 @@ Usage: {{ template "consul.imagePullPolicy" . }} TODO: melisa should we name thi
 {{fail "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" }}
 {{ end }}
 {{- end -}}
+
+{{/*
+Checks if any of the ingress gateway ports are privileged (< 1024).
+This helper takes the ingress gateway configuration and checks both specific
+service ports and default service ports to determine if privileged ports are needed.
+
+Usage: {{ template "consul.ingressGatewayHasPrivilegedPorts" (dict "service" .service "defaults" $defaults) }}
+*/}}
+{{- define "consul.ingressGatewayHasPrivilegedPorts" -}}
+{{- $service := .service -}}
+{{- $defaults := .defaults -}}
+{{- $ports := (default $defaults.service.ports $service.ports) -}}
+{{- $hasPrivilegedPorts := false -}}
+{{- range $port := $ports -}}
+  {{- if lt (int $port.port) 1024 -}}
+    {{- $hasPrivilegedPorts = true -}}
+  {{- end -}}
+{{- end -}}
+{{- $hasPrivilegedPorts -}}
+{{- end -}}
