@@ -5,7 +5,7 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: "mukul/granularity-reporting-fix"
+  BRANCH: ${{ github.head_ref || github.ref_name }}
   CONTEXT: "pr"
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -24,7 +24,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: "mukul/granularity-reporting-fix"
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "uniqueness_group":"${{ github.event.pull_request.number }}", "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
 
