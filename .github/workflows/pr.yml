@@ -5,7 +5,7 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: ${{ github.head_ref || github.ref_name }}
+  BRANCH: "mukul/granularity-reporting-fix"
   CONTEXT: "pr"
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
