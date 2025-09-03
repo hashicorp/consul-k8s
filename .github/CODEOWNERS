@@ -1,1 +1,4 @@
-* @hashicorp/consul-selfmanage-maintainers
+# Temporary code owners for the soft code freeze to fix backport assistant issues
+* @vikramarjuna @sreeram77
+
+# * @hashicorp/consul-selfmanage-maintainers
