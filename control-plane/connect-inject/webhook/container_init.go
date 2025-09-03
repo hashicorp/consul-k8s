@@ -226,7 +226,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	}
 
 	// OpenShift without CNI is the only environment where privileged must be true.
-	privileged := false
+	privileged := true
 	if w.EnableOpenShift && !w.EnableCNI {
 		privileged = true
 	}
@@ -299,6 +299,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Add:  []corev1.Capability{},
 				Drop: []corev1.Capability{"ALL"},
 			},
+			Privileged:             ptr.To(true),
 			ReadOnlyRootFilesystem: ptr.To(false),
 			RunAsNonRoot:           ptr.To(false),
 			SeccompProfile: &corev1.SeccompProfile{

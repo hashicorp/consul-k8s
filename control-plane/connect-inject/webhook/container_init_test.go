@@ -343,6 +343,7 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 						Add:  []corev1.Capability{},
 						Drop: []corev1.Capability{"ALL"},
 					},
+					Privileged:   ptr.To(true),
 					ReadOnlyRootFilesystem: ptr.To(true),
 					RunAsNonRoot:           ptr.To(true),
 					SeccompProfile: &corev1.SeccompProfile{

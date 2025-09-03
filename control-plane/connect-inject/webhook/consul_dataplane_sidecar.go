@@ -265,6 +265,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		RunAsGroup:               ptr.To(group),
 		RunAsNonRoot:             ptr.To(false),
 		AllowPrivilegeEscalation: ptr.To(true),
+		Privileged:   ptr.To(true),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
