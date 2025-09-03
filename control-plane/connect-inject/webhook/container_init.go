@@ -294,7 +294,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		}
 	} else {
 		container.SecurityContext = &corev1.SecurityContext{
-			AllowPrivilegeEscalation: ptr.To(false),
+			AllowPrivilegeEscalation: ptr.To(true),
 			Capabilities: &corev1.Capabilities{
 				Add:  []corev1.Capability{},
 				Drop: []corev1.Capability{"ALL"},
