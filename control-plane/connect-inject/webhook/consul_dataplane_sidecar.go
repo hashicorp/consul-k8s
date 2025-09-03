@@ -263,8 +263,8 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 	container.SecurityContext = &corev1.SecurityContext{
 		RunAsUser:                ptr.To(uid),
 		RunAsGroup:               ptr.To(group),
-		RunAsNonRoot:             ptr.To(true),
-		AllowPrivilegeEscalation: ptr.To(false),
+		RunAsNonRoot:             ptr.To(false),
+		AllowPrivilegeEscalation: ptr.To(true),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
@@ -274,7 +274,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 			Drop: []corev1.Capability{"ALL"},
 		},
-		ReadOnlyRootFilesystem: ptr.To(true),
+		ReadOnlyRootFilesystem: ptr.To(false),
 	}
 	enableConsulDataplaneAsSidecar, err := w.LifecycleConfig.EnableConsulDataplaneAsSidecar(pod)
 	if err != nil {

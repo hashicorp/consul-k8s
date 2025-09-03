@@ -259,13 +259,13 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				},
 				RunAsUser:    ptr.To(uid),
 				RunAsGroup:   ptr.To(group),
-				RunAsNonRoot: ptr.To(true),
+				RunAsNonRoot: ptr.To(false),
 				Privileged:   ptr.To(privileged),
 				Capabilities: &corev1.Capabilities{
 					Drop: []corev1.Capability{"ALL"},
 				},
-				ReadOnlyRootFilesystem:   ptr.To(true),
-				AllowPrivilegeEscalation: ptr.To(false),
+				ReadOnlyRootFilesystem:   ptr.To(false),
+				AllowPrivilegeEscalation: ptr.To(true),
 			}
 		} else {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
@@ -299,8 +299,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Add:  []corev1.Capability{},
 				Drop: []corev1.Capability{"ALL"},
 			},
-			ReadOnlyRootFilesystem: ptr.To(true),
-			RunAsNonRoot:           ptr.To(true),
+			ReadOnlyRootFilesystem: ptr.To(false),
+			RunAsNonRoot:           ptr.To(false),
 			SeccompProfile: &corev1.SeccompProfile{
 				Type: corev1.SeccompProfileTypeRuntimeDefault,
 			},

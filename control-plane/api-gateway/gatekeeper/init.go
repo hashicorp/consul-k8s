@@ -206,13 +206,13 @@ func (g *Gatekeeper) initContainer(config common.HelmConfig, name, namespace str
 	container.SecurityContext = &corev1.SecurityContext{
 		RunAsUser:    ptr.To(uid),
 		RunAsGroup:   ptr.To(gid),
-		RunAsNonRoot: ptr.To(true),
-		Privileged:   ptr.To(false),
+		RunAsNonRoot: ptr.To(false),
+		Privileged:   ptr.To(true),
 		Capabilities: &corev1.Capabilities{
 			Drop: []corev1.Capability{"ALL"},
 		},
-		AllowPrivilegeEscalation: ptr.To(false),
-		ReadOnlyRootFilesystem:   ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(true),
+		ReadOnlyRootFilesystem:   ptr.To(false),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
