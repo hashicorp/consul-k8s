@@ -14,7 +14,7 @@ on:
       - "release/**"
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: ${{ github.event.pull_request.head.ref }}
+  BRANCH: "mukul/granularity-reporting-fix"
   CONTEXT: "pr"
 
 jobs:
