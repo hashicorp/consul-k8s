@@ -6,6 +6,8 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250904103508-a2326f5a0440
 
+replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
+
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
