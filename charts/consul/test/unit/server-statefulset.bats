@@ -1382,7 +1382,7 @@ load _helpers
   local expected=$(echo '{
     "allowPrivilegeEscalation": false,
     "capabilities": {
-      "drop": ["ALL"],
+      "drop": ["ALL"]
     },
     "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
@@ -1414,7 +1414,7 @@ load _helpers
   local expected=$(echo '{
     "allowPrivilegeEscalation": false,
     "capabilities": {
-      "drop": ["ALL"],
+      "drop": ["ALL"]
     },
     "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,

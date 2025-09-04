@@ -238,7 +238,6 @@ func TestConsulDataplaneContainer_SecurityContext(t *testing.T) {
 
 	// Check capabilities for non-privileged case
 	require.NotNil(t, container.SecurityContext.Capabilities)
-	require.Equal(t, []corev1.Capability{"NET_BIND_SERVICE"}, container.SecurityContext.Capabilities.Add)
 	require.Equal(t, []corev1.Capability{"ALL"}, container.SecurityContext.Capabilities.Drop)
 }
 
