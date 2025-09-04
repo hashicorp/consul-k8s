@@ -1,10 +1,10 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.25.1
+go 1.25.0
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
-replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250904103508-a2326f5a0440
 
 require (
 	github.com/armon/go-metrics v0.4.1
@@ -17,10 +17,10 @@ require (
 	github.com/go-logr/logr v1.3.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
-	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0
+	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul-server-connection-manager v0.1.10
-	github.com/hashicorp/consul/api v1.4.0
+	github.com/hashicorp/consul-server-connection-manager v0.1.6
+	github.com/hashicorp/consul/api v1.32.1
 	github.com/hashicorp/consul/sdk v0.16.2
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
@@ -38,7 +38,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/prometheus/client_golang v1.16.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.25.0
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 	golang.org/x/text v0.23.0
@@ -104,7 +104,6 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
-	github.com/hashicorp/go-metrics v0.5.4 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.6 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
@@ -140,7 +139,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/softlayer/softlayer-go v0.0.0-20180806151055-260589d94c7d // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.480 // indirect
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/cvm v1.0.480 // indirect
 	github.com/vmware/govmomi v0.18.0 // indirect
