@@ -4,7 +4,7 @@ go 1.25.0
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250904103508-a2326f5a0440
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250904113300-420a77481c82
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 

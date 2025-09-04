@@ -214,8 +214,8 @@ github.com/hashicorp/consul/api v1.32.1 h1:0+osr/3t/aZNAdJX558crU3PEjVrG4x6715aZ
 github.com/hashicorp/consul/api v1.32.1/go.mod h1:mXUWLnxftwTmDv4W3lzxYCPD199iNLLUyLfLGFJbtl4=
 github.com/hashicorp/consul/proto-public v0.6.4 h1:7yN6qtUeVtq4ToEwgLxSpsVpvkw0iYpAeGgjxkaP0kk=
 github.com/hashicorp/consul/proto-public v0.6.4/go.mod h1:vb3Lmun0OIwygr0Awc5PilMCWtB4qnTx59nhiJ2ra3c=
-github.com/hashicorp/consul/sdk v0.4.1-0.20250904103508-a2326f5a0440 h1:96TMQ1bGPxPok9fmOChWndg0+Kr7doDL1GVwAnkDS3g=
-github.com/hashicorp/consul/sdk v0.4.1-0.20250904103508-a2326f5a0440/go.mod h1:TSPshuYdi1OQwpLund2vkTHpp4WnLyhf7Q/YihGMtp0=
+github.com/hashicorp/consul/sdk v0.4.1-0.20250904113300-420a77481c82 h1:rK/+ayikrhlnx01pZmKUsLL7lQbZemIqP1/cS/V9KpY=
+github.com/hashicorp/consul/sdk v0.4.1-0.20250904113300-420a77481c82/go.mod h1:TSPshuYdi1OQwpLund2vkTHpp4WnLyhf7Q/YihGMtp0=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
