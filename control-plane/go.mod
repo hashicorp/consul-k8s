@@ -1,10 +1,12 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.24.5
+go 1.25.0
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
+
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250904122925-91bd843fa8fe
 
 require (
 	github.com/armon/go-metrics v0.4.1
@@ -150,7 +152,7 @@ require (
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/tools v0.31.0 // indirect
 	google.golang.org/api v0.126.0 // indirect
