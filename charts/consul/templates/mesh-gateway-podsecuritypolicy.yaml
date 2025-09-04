@@ -18,7 +18,7 @@ spec:
   # but we can provide it for defense in depth.
   requiredDropCapabilities:
     - ALL
-  {{- if lt .Values.meshGateway.containerPort 1024 }}
+  {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
   allowedCapabilities:
     - NET_BIND_SERVICE
   {{- end }}
