@@ -24,7 +24,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: "mukul/granularity-reporting-fix"
+        ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "uniqueness_group":"${{ github.event.pull_request.number }}-test", "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
 
