@@ -4,6 +4,7 @@
 package gatekeeper
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,14 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+)
+
+const (
+	PrivilegedPort443     = 443
+	NonPrivilegedPort8080 = 8080
+	PrivilegedPortMapping = 8443
+	GRPCPort              = 8502
+	MetricsPort           = 9090
 )
 
 func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
@@ -39,7 +48,7 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "https",
-							Port: 443, // Privileged port
+							Port: PrivilegedPort443, // Privileged port
 						},
 					},
 				},
@@ -65,14 +74,14 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "https",
-							Port: 443, // Privileged port
+							Port: PrivilegedPort443, // Privileged port
 						},
 					},
 				},
 			},
 			gcc: v1alpha1.GatewayClassConfig{
 				Spec: v1alpha1.GatewayClassConfigSpec{
-					MapPrivilegedContainerPorts: 8443, // Mapping enabled
+					MapPrivilegedContainerPorts: PrivilegedPortMapping, // Mapping enabled
 				},
 			},
 			expectedCommand:             nil, // No custom command
@@ -91,7 +100,7 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "http",
-							Port: 8080, // Non-privileged port
+							Port: NonPrivilegedPort8080, // Non-privileged port
 						},
 					},
 				},
@@ -117,11 +126,11 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 					Listeners: []gwv1beta1.Listener{
 						{
 							Name: "http",
-							Port: 8080, // Non-privileged port
+							Port: NonPrivilegedPort8080, // Non-privileged port
 						},
 						{
 							Name: "https",
-							Port: 443, // Privileged port
+							Port: PrivilegedPort443, // Privileged port
 						},
 					},
 				},
@@ -148,7 +157,7 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 				LogJSON:               false,
 				ConsulConfig: common.ConsulConfig{
 					Address:  "consul.default.svc.cluster.local",
-					GRPCPort: 8502,
+					GRPCPort: GRPCPort,
 				},
 			}
 
@@ -198,7 +207,7 @@ func TestConsulDataplaneContainer_SecurityContext(t *testing.T) {
 		LogJSON:               false,
 		ConsulConfig: common.ConsulConfig{
 			Address:  "consul.default.svc.cluster.local",
-			GRPCPort: 8502,
+			GRPCPort: GRPCPort,
 		},
 	}
 
@@ -211,7 +220,7 @@ func TestConsulDataplaneContainer_SecurityContext(t *testing.T) {
 			Listeners: []gwv1beta1.Listener{
 				{
 					Name: "http",
-					Port: 8080,
+					Port: NonPrivilegedPort8080,
 				},
 			},
 		},
@@ -246,7 +255,7 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 
 	metrics := common.MetricsConfig{
 		Enabled: true,
-		Port:    9090,
+		Port:    MetricsPort,
 	}
 	config := common.HelmConfig{
 		ImageDataplane:        "consul-dataplane:test",
@@ -255,7 +264,7 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 		LogJSON:               true,
 		ConsulConfig: common.ConsulConfig{
 			Address:  "consul.default.svc.cluster.local",
-			GRPCPort: 8502,
+			GRPCPort: GRPCPort,
 		},
 	}
 
@@ -268,7 +277,7 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 			Listeners: []gwv1beta1.Listener{
 				{
 					Name: "http",
-					Port: 8080,
+					Port: NonPrivilegedPort8080,
 				},
 			},
 		},
@@ -337,7 +346,7 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 		argsStr += arg + " "
 	}
 	require.Contains(t, argsStr, "-addresses")
-	require.Contains(t, argsStr, "-grpc-port=8502")
+	require.Contains(t, argsStr, fmt.Sprintf("-grpc-port=%d", GRPCPort))
 	require.Contains(t, argsStr, "-log-level=DEBUG")
 	require.Contains(t, argsStr, "-log-json=true")
 }
