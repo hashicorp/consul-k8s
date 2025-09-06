@@ -87,7 +87,7 @@ func (c *Command) init() {
 // Run runs the command.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
-
+initialize:
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
@@ -223,21 +223,24 @@ func (c *Command) Run(args []string) int {
 	}()
 
 	// Wait for either a shutdown signal or an error from watchers
-	var responseCode int
+	var reRun bool = false
 	select {
 	case sig := <-c.sigCh:
 		c.logger.Info("Received shutdown signal", "signal", sig)
-		responseCode = 0
 	case err := <-errCh:
 		c.logger.Error("Received error from watcher", "error", err)
-		responseCode = 1
+		reRun = true
+		//re-run this command to fix the issue
 		// Cancel context to stop other goroutines
 	}
 	cancel()
 	wg.Wait()
+	if reRun {
+		goto initialize
+	}
 	// wait for watchers to finish as they regenerate pluginconfs/tokens/kubeconfigs
 	c.cleanup(cfg, cfgFile)
-	return responseCode
+	return 0
 }
 
 // cleanup removes the consul-cni configuration, kubeconfig and cni-host-token-<uid> file from cniNetDir and cniBinDir.
@@ -313,12 +316,6 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 			// created before other CNI plugins were installed.
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0 {
 				// Separate tokenFileWatcher updates the token file in the host path
-				// This directory watcher doesn't need to handle anything related to token
-				if strings.Contains(event.Name, config.DefaultCNIHostTokenFilename) {
-					c.logger.Info("Skipping event for host token path. Nothing to do.", "event_path", event.Name)
-					continue
-				}
-
 				// older daemonset can delete this token on SIGTERM as cleanup
 				if cfg.AutorotateToken && event.Name == cfg.CNIHostTokenPath {
 					if event.Op&fsnotify.Remove != 0 {
@@ -329,8 +326,9 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 							return err
 						}
 					}
-					continue
+					break
 				}
+
 				// older daemonset can delete this binary on SIGTERM as cleanup
 				if event.Name == cniBinaryPath {
 					if event.Op&fsnotify.Remove != 0 {
@@ -341,8 +339,9 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 							return err
 						}
 					}
-					continue
+					break
 				}
+
 				// older daemonset can delete this kubeconfig on SIGTERM as cleanup
 				// new pod should listen to remove and regenerate it.
 				if event.Name == kubeConfigFile {
@@ -354,7 +353,7 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 							return err
 						}
 					}
-					continue
+					break
 				}
 
 				// Only repair things if this is a non-multus setup. Multus config is handled differently
@@ -391,7 +390,6 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 							}
 						} else {
 							c.logger.Info("Valid config file detected, nothing to do")
-							continue
 						}
 					}
 				}
@@ -444,7 +442,7 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 			if event.Name != sourceTokenPath {
 				c.logger.Info("Skipping event as it's not for the source token path", "event_path", event.Name, "source_token_path", sourceTokenPath)
-				continue
+				break
 			}
 			// Handle Write event on symlink update to point to a new file
 			// but the symlink's creation timestamp changes on doing such update as well.
@@ -461,14 +459,13 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 						if waitCount == i {
 							return fmt.Errorf("failed to re-add watcher after remove/chmod after %d attempts", waitCount)
 						}
-						continue
 					}
 				}
 
 				if err := copyToken(sourceTokenPath, hostTokenPath); err != nil {
 					c.logger.Error("Failed to copy token after symlink update", "error", err)
 				} else {
-					c.logger.Debug("Successfully copied new token after symlink update")
+					c.logger.Info("Successfully copied new token from source")
 				}
 			}
 
