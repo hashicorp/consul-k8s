@@ -25,10 +25,10 @@ import (
 )
 
 const (
-	defaultCNIBinSourceDir  = "/bin"
-	consulCNIName           = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
-	defaultLogJSON          = false
-	maxInitializeRetryCount = 3
+	defaultCNIBinSourceDir = "/bin"
+	consulCNIName          = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
+	defaultLogJSON         = false
+	gracePeriodTimeout     = 100 * time.Second
 )
 
 // Command flags and structure.
@@ -246,6 +246,7 @@ func (c *Command) Run(args []string) int {
 	select {
 	case sig := <-c.sigCh:
 		c.logger.Info("Received shutdown signal", "signal", sig)
+
 	case err := <-errCh:
 		c.logger.Error("Received error from watcher", "error", err)
 		responseCode = 1
@@ -272,7 +273,7 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 	c.logger.Info("Creating destBinWatcher for", "file", destBinPath)
 	for i := 1; i <= 5; i++ {
 		if _, err := os.Stat(destBinPath); err != nil && os.IsNotExist(err) {
-			// previous deployment might have cleaned it up
+			// previous pod might have cleaned it up
 			err = copyFile(sourceBinPath, destBinDir, destBinName)
 			if err != nil {
 				return err
@@ -281,13 +282,19 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 		}
 		err = destBinWatcher.Add(destBinPath)
 		if err != nil {
+			//probably the file is not present as previous pod deleted it after fileCheck as race condition
 			c.logger.Error("could not watch binary file %s: %w", sourceBinPath, err)
 			time.Sleep(time.Millisecond * time.Duration(i))
+		} else {
+			break
 		}
 		c.logger.Info("Created destBinWatcher for", "file", destBinPath)
 	}
-
-	// post this watcher is created, but it might be that older deployment still didn't remove it
+	//older pods who dont cleanup so wont fire remove event for race conditions if
+	// we added the bin watcher for older binary
+	gracePeriodAlarm := time.NewTimer(gracePeriodTimeout)
+	defer gracePeriodAlarm.Stop()
+	// post this watcher is created, but it might be that previous pod removes it later
 	// so we listen to remove events and copy once and end watching
 
 	for {
@@ -314,7 +321,16 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 				}
 				return nil
 			}
-
+		case <-gracePeriodAlarm.C:
+			c.logger.Info("Grace period timeout reached, older pod may not have cleaned up binary, proceeding with copy")
+			// Copy the binary and proceed since older pod didn't clean up within grace period
+			if err := copyFile(sourceBinPath, destBinDir, destBinName); err != nil {
+				c.logger.Error("Failed to copy binary after grace period timeout", "error", err)
+				return err
+			} else {
+				c.logger.Info("Successfully copied binary after grace period timeout")
+			}
+			return nil
 		case err, ok := <-destBinWatcher.Errors:
 			if !ok {
 				c.logger.Error("SourceBinWatcher error channel closed")
