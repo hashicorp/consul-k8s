@@ -76,7 +76,7 @@ func TestCopyFile(t *testing.T) {
 			name: "cannot read source file",
 			srcFile: func() string {
 				tempDir := t.TempDir()
-				err := copyFile("testdata/10-kindnet.conflist", tempDir)
+				err := copyFile("testdata/10-kindnet.conflist", tempDir, "")
 				require.NoError(t, err)
 				filepath := filepath.Join(tempDir, "10-kindnet.conflist")
 				os.Chmod(filepath, 0111)
@@ -108,7 +108,7 @@ func TestCopyFile(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			destDir := c.dir()
 			srcFile := c.srcFile()
-			actualErr := copyFile(srcFile, destDir)
+			actualErr := copyFile(srcFile, destDir, "")
 
 			expErr := c.expectedErr(srcFile, destDir)
 
@@ -133,7 +133,7 @@ func TestRemoveFile(t *testing.T) {
 			name: "can remove file",
 			srcFile: func() string {
 				tempDir := t.TempDir()
-				err := copyFile("testdata/10-kindnet.conflist", tempDir)
+				err := copyFile("testdata/10-kindnet.conflist", tempDir, "")
 				require.NoError(t, err)
 				filepath := filepath.Join(tempDir, "10-kindnet.conflist")
 				return filepath
