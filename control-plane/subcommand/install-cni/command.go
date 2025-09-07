@@ -266,7 +266,7 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 	c.logger.Info("Shutdown received, cleaning up")
 	// Its important to cleanup in this order as plugin conf binds cni in the workflow
 	if cfgFile != "" {
-		err = removeCNIConfig(cfgFile)
+		err = removeCNIConfig(cfgFile, cfg)
 		c.logger.Info("Removed CNI Config", "file", cfgFile)
 		if err != nil {
 			c.logger.Error("Unable to cleanup CNI Config: %w", err)

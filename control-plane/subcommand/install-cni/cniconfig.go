@@ -223,7 +223,7 @@ func consulMapFromConfig(consulCfg *config.CNIConfig) (map[string]interface{}, e
 }
 
 // removeCNIConfig removes the consul-cni config from the CNI config file. Used as part of cleanup.
-func removeCNIConfig(cfgFile string) error {
+func removeCNIConfig(cfgFile string, cfg *config.CNIConfig) error {
 	// Read the config file and convert it to a map.
 	cfgMap, err := configFileToMap(cfgFile)
 	if err != nil {
@@ -244,7 +244,8 @@ func removeCNIConfig(cfgFile string) error {
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
-		if plugin["type"] == consulCNIName {
+		// for backward compatibility remove V0 consul-cni plugin config if it is found
+		if plugin["name"] == consulCNIName {
 			cfgMap["plugins"] = append(plugins[:i], plugins[i+1:]...)
 			break
 		}
