@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	defaultCNIBinSourceDir = "/bin"
-	consulCNIName          = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
-	defaultLogJSON         = false
+	defaultCNIBinSourceDir  = "/bin"
+	consulCNIName           = "consul-cni" // Name of the plugin and binary. They must be the same as per the CNI spec.
+	defaultLogJSON          = false
+	maxInitializeRetryCount = 3
 )
 
 // Command flags and structure.
@@ -51,6 +52,10 @@ type Command struct {
 	flagLogJSON bool
 	// flagMultus is a boolean flag for multus support.
 	flagMultus bool
+	// flagInstallationID is a unique identifier for this installation instance.
+	flagInstallationID string
+	// flagCNITokenPath is the path to the CNI token file for testing purposes.
+	flagCNITokenPath string
 
 	flagSet *flag.FlagSet
 
@@ -72,6 +77,8 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagK8sAutorotateToken, "autorotate-token", config.DefaultAutorotateToken, "Enable or disable token autorotate feature.")
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", defaultLogJSON, "Enable or disable JSON output format for logging.")
 	c.flagSet.BoolVar(&c.flagMultus, "multus", config.DefaultMultus, "If the plugin is a multus plugin (default = false)")
+	c.flagSet.StringVar(&c.flagInstallationID, "installation-id", "", "Unique identifier for this installation instance (auto-generated if not provided)")
+	c.flagSet.StringVar(&c.flagCNITokenPath, "cni-token-path", "", "Path to the CNI token file for testing purposes.")
 
 	c.help = flags.Usage(help, c.flagSet)
 
@@ -87,6 +94,7 @@ func (c *Command) init() {
 // Run runs the command.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
+	var tryCount = 1
 initialize:
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
@@ -102,22 +110,35 @@ initialize:
 		}
 	}
 
-	uid := fmt.Sprintf("%d", time.Now().UnixNano())
+	// Generate or use provided installation ID
+	var installationID string
+	if c.flagInstallationID != "" {
+		installationID = c.flagInstallationID
+	} else {
+		installationID = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+
 	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
-		Name:         config.DefaultPluginName,
-		Type:         config.DefaultPluginType,
-		CNITokenPath: config.DefaultCNITokenDir + "/" + config.DefaultCNITokenFilename,
+		Name: config.DefaultPluginName,
+		Type: config.DefaultPluginType + "-" + installationID,
+		CNITokenPath: func() string {
+			dir := c.flagCNITokenPath
+			if dir == "" {
+				dir = config.DefaultCNITokenDir
+			}
+			return filepath.Join(dir, config.DefaultCNITokenFilename)
+		}(),
 		CNIHostTokenPath: func() string {
 			if c.flagK8sAutorotateToken {
-				return c.flagCNINetDir + "/" + config.DefaultCNIHostTokenFilename + "-" + uid
+				return filepath.Join(c.flagCNINetDir, config.DefaultCNIHostTokenFilename+"-"+installationID)
 			}
 			return ""
 		}(),
 		AutorotateToken: c.flagK8sAutorotateToken,
 		CNIBinDir:       c.flagCNIBinDir,
 		CNINetDir:       c.flagCNINetDir,
-		Kubeconfig:      c.flagKubeconfig,
+		Kubeconfig:      c.flagKubeconfig + "-" + installationID,
 		LogLevel:        c.flagLogLevel,
 		Multus:          c.flagMultus,
 	}
@@ -141,7 +162,9 @@ initialize:
 	// Copy the consul-cni binary from the installer container to the host.
 	c.logger.Info("Copying consul-cni binary", "destination", cfg.CNIBinDir)
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
-	err := copyFile(srcFile, cfg.CNIBinDir)
+
+	//type is what the kubelet tries to lookup as filename in cniNetDir
+	err := copyFile(srcFile, cfg.CNIBinDir, cfg.Type)
 	if err != nil {
 		c.logger.Error("could not copy consul-cni binary", "error", err)
 		return 1
@@ -196,6 +219,7 @@ initialize:
 
 	errCh := make(chan error, 2)
 	var wg sync.WaitGroup
+
 	// watch for changes in the default cni serviceaccount token directory
 	if cfg.AutorotateToken {
 		// if autorotate-token is enabled, we need to watch the token file for changes and copy it to the host
@@ -212,7 +236,7 @@ initialize:
 		}()
 	}
 
-	// Watch for changes in the cniNetDir directory and fix/install the config file if need be.
+	// Watch for changes in the cniNetDir directory and fix/install the config files if need be.
 	go func() {
 		wg.Add(1)
 		defer wg.Done()
@@ -229,13 +253,17 @@ initialize:
 		c.logger.Info("Received shutdown signal", "signal", sig)
 	case err := <-errCh:
 		c.logger.Error("Received error from watcher", "error", err)
-		reRun = true
-		//re-run this command to fix the issue
-		// Cancel context to stop other goroutines
+		if tryCount < maxInitializeRetryCount {
+			reRun = true
+			tryCount++
+		} else {
+			return 1
+		}
 	}
 	cancel()
 	wg.Wait()
 	if reRun {
+		c.cleanup(cfg, "") // do soft cleanup of artifacts and re-initialize
 		goto initialize
 	}
 	// wait for watchers to finish as they regenerate pluginconfs/tokens/kubeconfigs
@@ -255,7 +283,7 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 		}
 	}
 
-	cniBinaryPath := filepath.Join(cfg.CNIBinDir, consulCNIName)
+	cniBinaryPath := filepath.Join(cfg.CNIBinDir, cfg.Type)
 	c.logger.Info("Removing file", "file", cniBinaryPath)
 	err = removeFile(cniBinaryPath)
 	if err != nil {
@@ -283,9 +311,8 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, dir, cfgFile string) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("could not create watcher: %w", err)
+		return fmt.Errorf("could not create dirwatcher: %w", err)
 	}
-
 	c.logger.Info("Creating directory watcher for", "directory", dir)
 	err = watcher.Add(dir)
 	if err != nil {
@@ -297,10 +324,8 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 
 	// Generate the initial kubeconfig file that will be used by the plugin to communicate with the kubernetes api.
 	c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
-	kubeConfigFile := filepath.Join(cfg.CNINetDir, cfg.Kubeconfig)
-	cniBinaryPath := filepath.Join(cfg.CNIBinDir, consulCNIName)
-	cniBinarySourcePath := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
-	err = createKubeConfig(cfg)
+	kubeConfigFile := filepath.Join(dir, cfg.Kubeconfig)
+	err = createKubeConfig(dir, cfg)
 	if err != nil {
 		c.logger.Error("could not create kube config", "error", err)
 	}
@@ -317,37 +342,17 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 			if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove) != 0 {
 				// Separate tokenFileWatcher updates the token file in the host path
 				// older daemonset can delete this token on SIGTERM as cleanup
-				if cfg.AutorotateToken && event.Name == cfg.CNIHostTokenPath {
-					if event.Op&fsnotify.Remove != 0 {
-						c.logger.Info("Creating host token", "file", cfg.CNIHostTokenPath)
-						err := copyToken(cfg.CNITokenPath, cfg.CNIHostTokenPath)
-						if err != nil {
-							c.logger.Error("could not create host token", "error", err)
-							return err
-						}
-					}
+				if event.Name == cfg.CNIHostTokenPath {
+					c.logger.Info("Token file updated", "file", event.Name)
 					break
 				}
-
-				// older daemonset can delete this binary on SIGTERM as cleanup
-				if event.Name == cniBinaryPath {
-					if event.Op&fsnotify.Remove != 0 {
-						c.logger.Info("Creating CNI binary", "file", cniBinaryPath)
-						err := copyFile(cniBinarySourcePath, cniBinaryPath)
-						if err != nil {
-							c.logger.Error("could not create cni binary", "error", err)
-							return err
-						}
-					}
-					break
-				}
-
 				// older daemonset can delete this kubeconfig on SIGTERM as cleanup
 				// new pod should listen to remove and regenerate it.
+				// currently this is not unit-testable as createKubeConfig is not mockable
 				if event.Name == kubeConfigFile {
 					if event.Op&fsnotify.Remove != 0 {
 						c.logger.Info("Creating kubeconfig", "file", cfg.Kubeconfig)
-						err := createKubeConfig(cfg)
+						err := createKubeConfig(dir, cfg)
 						if err != nil {
 							c.logger.Error("could not create kube config", "error", err)
 							return err
@@ -408,18 +413,19 @@ func (c *Command) directoryWatcher(ctx context.Context, cfg *config.CNIConfig, d
 // In case of autorotate-token, we are using projected tokens which doesn't support hostpath mount,
 // we need to watch the token file for changes and copy it to the host.
 func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTokenPath string) error {
-	watcher, err := fsnotify.NewWatcher()
+	sourceTokenWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("could not create token watcher: %w", err)
+		return fmt.Errorf("could not create sourcetokenWatcher: %w", err)
 	}
-
+	if err != nil {
+		return fmt.Errorf("could not create desttokenWatcher: %w", err)
+	}
 	defer func() {
-		_ = watcher.Close()
+		_ = sourceTokenWatcher.Close()
 	}()
 
-	// Watch the directory containing the token instead of the symlink
-	c.logger.Info("Creating token watcher for", "file", sourceTokenPath)
-	if err := watcher.Add(sourceTokenPath); err != nil {
+	c.logger.Info("Creating sourceTokenWatcher for", "file", sourceTokenPath)
+	if err := sourceTokenWatcher.Add(sourceTokenPath); err != nil {
 		return fmt.Errorf("could not watch token file %s: %w", sourceTokenPath, err)
 	}
 
@@ -429,10 +435,10 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 	for {
 		select {
-		case event, ok := <-watcher.Events:
+		case event, ok := <-sourceTokenWatcher.Events:
 			if !ok {
-				c.logger.Error("Token watcher event is not ok", "event", event)
-				return fmt.Errorf("token watcher event channel closed unexpectedly")
+				c.logger.Error("Token sourceTokenWatcher event is not ok", "event", event)
+				return fmt.Errorf("token sourceTokenWatcher event channel closed unexpectedly")
 			}
 
 			// Only handle events for the specific token file
@@ -440,24 +446,20 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 				"event_type", event.Op.String(),
 				"file", event.Name)
 
-			if event.Name != sourceTokenPath {
-				c.logger.Info("Skipping event as it's not for the source token path", "event_path", event.Name, "source_token_path", sourceTokenPath)
-				break
-			}
 			// Handle Write event on symlink update to point to a new file
 			// but the symlink's creation timestamp changes on doing such update as well.
 
 			if event.Op&(fsnotify.Remove|fsnotify.Chmod) != 0 {
-				// Re-add watcher after remove/chmod
+				// Re-add sourceTokenWatcher after remove/chmod
 				backoff := time.Second
 				waitCount := 5
 				for i := 1; i <= waitCount; i++ {
-					if err := watcher.Add(sourceTokenPath); err != nil {
-						c.logger.Error("Failed to re-add watcher after remove/chmod", "error", err, "attempt", i+1)
+					if err := sourceTokenWatcher.Add(sourceTokenPath); err != nil {
+						c.logger.Error("Failed to re-add sourceTokenWatcher after remove/chmod", "error", err, "attempt", i+1)
 						time.Sleep(backoff)
 						backoff *= 2
 						if waitCount == i {
-							return fmt.Errorf("failed to re-add watcher after remove/chmod after %d attempts", waitCount)
+							return fmt.Errorf("failed to re-add sourceTokenWatcher after remove/chmod after %d attempts", waitCount)
 						}
 					}
 				}
@@ -469,12 +471,12 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 				}
 			}
 
-		case err, ok := <-watcher.Errors:
+		case err, ok := <-sourceTokenWatcher.Errors:
 			if !ok {
-				c.logger.Error("Token watcher error channel closed")
-				return fmt.Errorf("token watcher error channel closed unexpectedly")
+				c.logger.Error("SourceTokenWatcher error channel closed")
+				return fmt.Errorf("SourceTokenWatcher error channel closed unexpectedly")
 			}
-			c.logger.Error("Token watcher error", "error", err)
+			c.logger.Error("SourceTokenWatcher error", "error", err)
 
 		case <-ctx.Done():
 			return nil
@@ -484,7 +486,7 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 
 func copyToken(src, dst string) error {
 	// Read source token
-	if _, err := os.Stat(src); err == nil {
+	if _, err := os.Stat(src); err != nil {
 		return err
 	}
 	content, err := os.ReadFile(src)

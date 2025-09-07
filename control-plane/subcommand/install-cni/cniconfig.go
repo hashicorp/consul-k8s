@@ -291,7 +291,7 @@ func validConfig(cfg *config.CNIConfig, cfgFile string) error {
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
-		if plugin["type"] == consulCNIName {
+		if plugin["type"] == cfg.Type {
 			// Populate existingCfg with the consul-cni plugin info so that we can compare it with what
 			// is expected.
 			err := mapstructure.Decode(plugin, &existingCfg)
