@@ -221,8 +221,8 @@ func (c *Command) Run(args []string) int {
 		// as newly rotated projected tokens are only available in the cni-pod and not on the host
 		sourceTokenPath := cfg.CNITokenPath
 		hostTokenPath := cfg.CNIHostTokenPath
+		wg.Add(1)
 		go func() {
-			wg.Add(1)
 			defer wg.Done()
 			if err := c.tokenFileWatcher(ctx, sourceTokenPath, hostTokenPath); err != nil {
 				c.logger.Error("Token file watcher failed", "error", err)
@@ -232,8 +232,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	// Watch for changes in the cniNetDir directory and fix/install the config files if need be.
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		if err := c.directoryWatcher(ctx, cfg, cfg.CNINetDir, cfgFile); err != nil {
 			c.logger.Error("error with directory watcher", "error", err)
