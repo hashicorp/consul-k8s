@@ -278,6 +278,7 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 			if err != nil {
 				return err
 			}
+			return nil
 		}
 		err = destBinWatcher.Add(destBinPath)
 		if err != nil {
