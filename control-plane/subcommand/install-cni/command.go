@@ -160,6 +160,11 @@ func (c *Command) Run(args []string) int {
 	// Copy the consul-cni binary from the installer container to the host.
 	c.logger.Info("Copying consul-cni binary", "destination", cfg.CNIBinDir)
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
+	// Watch for changes in the binary file and copy it to the destination when updates occur.
+	if err := c.binWatcher(ctx, srcFile, cfg.CNIBinDir, cfg.Type); err != nil {
+		c.logger.Error("Binary watcher failed", "error", err)
+		return 1
+	}
 
 	// Get the config file that is on the host.
 	c.logger.Info("Getting default config file from", "destination", cfg.CNINetDir)
@@ -206,12 +211,6 @@ func (c *Command) Run(args []string) int {
 		// handles the configuration and running of the consul-cni plugin. Also, we add a `k8s.v1.cni.cncf.io/networks: consul-cni`
 		// annotation during connect inject so that multus knows to run the consul-cni plugin.
 		c.logger.Info("Multus enabled, using multus NetworkAttachementDefinition for configuration")
-	}
-
-	// Watch for changes in the binary file and copy it to the destination when updates occur.
-	if err := c.binWatcher(ctx, srcFile, cfg.CNIBinDir, cfg.Type); err != nil {
-		c.logger.Error("Binary watcher failed", "error", err)
-		return 1
 	}
 
 	errCh := make(chan error, 2)
@@ -270,7 +269,7 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 	}()
 
 	destBinPath := filepath.Join(destBinDir, destBinName)
-	c.logger.Info("Creating destBinWatcher for", "file", sourceBinPath)
+	c.logger.Info("Creating destBinWatcher for", "file", destBinPath)
 	for i := 1; i <= 5; i++ {
 		if _, err := os.Stat(destBinPath); err != nil && os.IsNotExist(err) {
 			// previous deployment might have cleaned it up
@@ -283,8 +282,9 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 		err = destBinWatcher.Add(destBinPath)
 		if err != nil {
 			c.logger.Error("could not watch binary file %s: %w", sourceBinPath, err)
-			time.Sleep(time.Second * time.Duration(i))
+			time.Sleep(time.Millisecond * time.Duration(i))
 		}
+		c.logger.Info("Created destBinWatcher for", "file", destBinPath)
 	}
 
 	// post this watcher is created, but it might be that older deployment still didn't remove it
