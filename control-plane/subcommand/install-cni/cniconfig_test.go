@@ -336,12 +336,10 @@ func TestValidConfig(t *testing.T) {
 			expectedErr:  fmt.Errorf("consul-cni config missing from config file"),
 		},
 		{
-			name:    "config passed to installer does not match config in config file",
-			cfgFile: "testdata/10-kindnet.conflist.golden",
-			consulConfig: &config.CNIConfig{
-				Type: consulCNIName,
-			},
-			expectedErr: fmt.Errorf("consul-cni config has changed"),
+			name:         "config passed to installer does not match config in config file",
+			cfgFile:      "testdata/10-kindnet.conflist.golden",
+			consulConfig: &config.CNIConfig{},
+			expectedErr:  fmt.Errorf("consul-cni config has changed"),
 		},
 		{
 			name:    "config passed to installer does not match config in config file",
@@ -349,7 +347,6 @@ func TestValidConfig(t *testing.T) {
 			consulConfig: &config.CNIConfig{
 				CNIBinDir: "foo",
 				CNINetDir: "bar",
-				Type:      consulCNIName,
 			},
 			expectedErr: fmt.Errorf("consul-cni config has changed"),
 		},

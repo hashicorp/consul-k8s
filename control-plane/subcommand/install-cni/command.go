@@ -94,8 +94,6 @@ func (c *Command) init() {
 // Run runs the command.
 func (c *Command) Run(args []string) int {
 	c.once.Do(c.init)
-	var tryCount = 1
-initialize:
 	if err := c.flagSet.Parse(args); err != nil {
 		return 1
 	}
@@ -247,28 +245,19 @@ initialize:
 	}()
 
 	// Wait for either a shutdown signal or an error from watchers
-	var reRun bool = false
+	var responseCode = 0
 	select {
 	case sig := <-c.sigCh:
 		c.logger.Info("Received shutdown signal", "signal", sig)
 	case err := <-errCh:
 		c.logger.Error("Received error from watcher", "error", err)
-		if tryCount < maxInitializeRetryCount {
-			reRun = true
-			tryCount++
-		} else {
-			return 1
-		}
+		responseCode = 1
 	}
 	cancel()
 	wg.Wait()
-	if reRun {
-		c.cleanup(cfg, "") // do soft cleanup of artifacts and re-initialize
-		goto initialize
-	}
 	// wait for watchers to finish as they regenerate pluginconfs/tokens/kubeconfigs
 	c.cleanup(cfg, cfgFile)
-	return 0
+	return responseCode
 }
 
 // cleanup removes the consul-cni configuration, kubeconfig and cni-host-token-<uid> file from cniNetDir and cniBinDir.
@@ -278,6 +267,7 @@ func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 	// Its important to cleanup in this order as plugin conf binds cni in the workflow
 	if cfgFile != "" {
 		err = removeCNIConfig(cfgFile)
+		c.logger.Info("Removed CNI Config", "file", cfgFile)
 		if err != nil {
 			c.logger.Error("Unable to cleanup CNI Config: %w", err)
 		}
