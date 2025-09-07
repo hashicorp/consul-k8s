@@ -119,7 +119,7 @@ func (c *Command) Run(args []string) int {
 	// Create the CNI Config from command flags.
 	cfg := &config.CNIConfig{
 		Name: config.DefaultPluginName,
-		Type: config.DefaultPluginType + "-" + installationID,
+		Type: config.DefaultPluginType,
 		CNITokenPath: func() string {
 			dir := c.flagCNITokenPath
 			if dir == "" {
@@ -160,13 +160,6 @@ func (c *Command) Run(args []string) int {
 	// Copy the consul-cni binary from the installer container to the host.
 	c.logger.Info("Copying consul-cni binary", "destination", cfg.CNIBinDir)
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)
-
-	//type is what the kubelet tries to lookup as filename in cniNetDir
-	err := copyFile(srcFile, cfg.CNIBinDir, cfg.Type)
-	if err != nil {
-		c.logger.Error("could not copy consul-cni binary", "error", err)
-		return 1
-	}
 
 	// Get the config file that is on the host.
 	c.logger.Info("Getting default config file from", "destination", cfg.CNINetDir)
@@ -217,6 +210,15 @@ func (c *Command) Run(args []string) int {
 
 	errCh := make(chan error, 2)
 	var wg sync.WaitGroup
+	// Watch for changes in the binary file and copy it to the destination when updates occur.
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+		if err := c.binWatcher(ctx, srcFile, cfg.CNIBinDir, cfg.Type); err != nil {
+			c.logger.Error("Binary watcher failed", "error", err)
+			errCh <- err
+		}
+	}()
 
 	// watch for changes in the default cni serviceaccount token directory
 	if cfg.AutorotateToken {
@@ -260,13 +262,79 @@ func (c *Command) Run(args []string) int {
 	return responseCode
 }
 
+// binWatcher watches for changes in the source CNI binary file and re-copies it to the destination when updates occur.
+// This is useful for scenarios where the CNI binary might be updated during runtime.
+func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, destBinName string) error {
+	destBinWatcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("could not create sourceBinWatcher: %w", err)
+	}
+	defer func() {
+		_ = destBinWatcher.Close()
+	}()
+
+	destBinPath := filepath.Join(destBinDir, destBinName)
+	c.logger.Info("Creating destBinWatcher for", "file", sourceBinPath)
+	for i := 1; i <= 5; i++ {
+		if _, err := os.Stat(destBinPath); err != nil && os.IsNotExist(err) {
+			// previous deployment might have cleaned it up
+			copyFile(sourceBinPath, destBinDir, destBinName)
+		}
+		err = destBinWatcher.Add(destBinPath)
+		if err != nil {
+			c.logger.Error("could not watch binary file %s: %w", sourceBinPath, err)
+			time.Sleep(time.Second * time.Duration(i))
+		}
+	}
+
+	// post this watcher is created, but it might be that older deployment still didn't remove it
+	// so we listen to remove events and copy once and end watching
+
+	for {
+		select {
+		case event, ok := <-destBinWatcher.Events:
+			if !ok {
+				c.logger.Error("Binary destBinWatcher event is not ok", "event", event)
+				break
+			}
+
+			// Only handle events for the specific binary file
+			c.logger.Info("Received binary file event",
+				"event_type", event.Op.String(),
+				"file", event.Name)
+
+			// Handle Remove event that might indicate binary removal
+			if event.Op&(fsnotify.Remove) != 0 {
+				// Re-copy the binary file
+				if err := copyFile(sourceBinPath, destBinDir, destBinName); err != nil {
+					c.logger.Error("Failed to copy binary after update", "error", err)
+					return err
+				} else {
+					c.logger.Info("Successfully copied updated binary from source")
+				}
+				return nil
+			}
+
+		case err, ok := <-destBinWatcher.Errors:
+			if !ok {
+				c.logger.Error("SourceBinWatcher error channel closed")
+				return nil
+			}
+			c.logger.Error("SourceBinWatcher error", "error", err)
+
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
 // cleanup removes the consul-cni configuration, kubeconfig and cni-host-token-<uid> file from cniNetDir and cniBinDir.
 func (c *Command) cleanup(cfg *config.CNIConfig, cfgFile string) {
 	var err error
 	c.logger.Info("Shutdown received, cleaning up")
 	// Its important to cleanup in this order as plugin conf binds cni in the workflow
 	if cfgFile != "" {
-		err = removeCNIConfig(cfgFile, cfg)
+		err = removeCNIConfig(cfgFile)
 		c.logger.Info("Removed CNI Config", "file", cfgFile)
 		if err != nil {
 			c.logger.Error("Unable to cleanup CNI Config: %w", err)

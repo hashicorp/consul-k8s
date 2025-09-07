@@ -223,7 +223,7 @@ func consulMapFromConfig(consulCfg *config.CNIConfig) (map[string]interface{}, e
 }
 
 // removeCNIConfig removes the consul-cni config from the CNI config file. Used as part of cleanup.
-func removeCNIConfig(cfgFile string, cfg *config.CNIConfig) error {
+func removeCNIConfig(cfgFile string) error {
 	// Read the config file and convert it to a map.
 	cfgMap, err := configFileToMap(cfgFile)
 	if err != nil {
@@ -236,21 +236,19 @@ func removeCNIConfig(cfgFile string, cfg *config.CNIConfig) error {
 		return err
 	}
 
-	finalPlugins := []interface{}{}
 	// Find the 'consul-cni' plugin and remove it.
-	for _, p := range plugins {
+	for i, p := range plugins {
 		// We do not unmarshall this into a map[string]map[string]interface{} because there is no structure to
 		// the plugins. They are unstructured json and can be in any format that the plugin provider wishes.
 		plugin, ok := p.(map[string]interface{})
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
-		// for backward compatibility remove V0 consul-cni plugin config if it is found
-		if plugin["name"] != consulCNIName {
-			finalPlugins = append(finalPlugins, p)
+		if plugin["type"] == consulCNIName {
+			cfgMap["plugins"] = append(plugins[:i], plugins[i+1:]...)
+			break
 		}
 	}
-	cfgMap["plugins"] = finalPlugins
 
 	// Marshal into a new json file.
 	cfgJSON, err := json.MarshalIndent(cfgMap, "", "  ")
@@ -293,7 +291,7 @@ func validConfig(cfg *config.CNIConfig, cfgFile string) error {
 		if !ok {
 			return fmt.Errorf("error reading plugin from plugin list")
 		}
-		if plugin["name"] == consulCNIName {
+		if plugin["type"] == consulCNIName {
 			// Populate existingCfg with the consul-cni plugin info so that we can compare it with what
 			// is expected.
 			err := mapstructure.Decode(plugin, &existingCfg)

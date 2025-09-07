@@ -321,7 +321,7 @@ func TestRun_SignalCleanup(t *testing.T) {
 			uid := fmt.Sprintf("%d", time.Now().UnixNano())
 			cfg := &config.CNIConfig{
 				Name:         config.DefaultPluginName,
-				Type:         config.DefaultPluginType + "-" + uid,
+				Type:         config.DefaultPluginType,
 				CNITokenPath: filepath.Join(sourceDir, "token"),
 				CNIHostTokenPath: func() string {
 					if tt.autorotateToken {
