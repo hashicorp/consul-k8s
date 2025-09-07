@@ -136,7 +136,7 @@ func (c *Command) Run(args []string) int {
 		AutorotateToken: c.flagK8sAutorotateToken,
 		CNIBinDir:       c.flagCNIBinDir,
 		CNINetDir:       c.flagCNINetDir,
-		Kubeconfig:      c.flagKubeconfig + "-" + installationID,
+		Kubeconfig:      config.DefaultKubeconfig + "-" + installationID,
 		LogLevel:        c.flagLogLevel,
 		Multus:          c.flagMultus,
 	}
@@ -208,18 +208,14 @@ func (c *Command) Run(args []string) int {
 		c.logger.Info("Multus enabled, using multus NetworkAttachementDefinition for configuration")
 	}
 
+	// Watch for changes in the binary file and copy it to the destination when updates occur.
+	if err := c.binWatcher(ctx, srcFile, cfg.CNIBinDir, cfg.Type); err != nil {
+		c.logger.Error("Binary watcher failed", "error", err)
+		return 1
+	}
+
 	errCh := make(chan error, 2)
 	var wg sync.WaitGroup
-	// Watch for changes in the binary file and copy it to the destination when updates occur.
-	go func() {
-		wg.Add(1)
-		defer wg.Done()
-		if err := c.binWatcher(ctx, srcFile, cfg.CNIBinDir, cfg.Type); err != nil {
-			c.logger.Error("Binary watcher failed", "error", err)
-			errCh <- err
-		}
-	}()
-
 	// watch for changes in the default cni serviceaccount token directory
 	if cfg.AutorotateToken {
 		// if autorotate-token is enabled, we need to watch the token file for changes and copy it to the host
@@ -278,7 +274,10 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 	for i := 1; i <= 5; i++ {
 		if _, err := os.Stat(destBinPath); err != nil && os.IsNotExist(err) {
 			// previous deployment might have cleaned it up
-			copyFile(sourceBinPath, destBinDir, destBinName)
+			err = copyFile(sourceBinPath, destBinDir, destBinName)
+			if err != nil {
+				return err
+			}
 		}
 		err = destBinWatcher.Add(destBinPath)
 		if err != nil {
