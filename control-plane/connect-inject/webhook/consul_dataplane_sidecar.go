@@ -325,7 +325,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		envoyConcurrency = int(val)
 	}
 
-	envoyAdminBindAddress := "127.0.0.1"
+	adminBindAddress := "127.0.0.1"
 
 	ipAddrs, err := netaddrs.IPAddrs(context.Background(), w.ConsulAddress, hclog.New(&hclog.LoggerOptions{}))
 	if err != nil {
@@ -335,14 +335,15 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 	for _, ipAddr := range ipAddrs {
 		if ipAddr.IP.To4() == nil {
-			envoyAdminBindAddress = "::"
+			adminBindAddress = "::"
 			break
 		}
 	}
 
 	args := []string{
 		"-addresses", w.ConsulAddress,
-		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-envoy-admin-bind-address=" + adminBindAddress,
+		"-consul-dns-bind-addr" + adminBindAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
