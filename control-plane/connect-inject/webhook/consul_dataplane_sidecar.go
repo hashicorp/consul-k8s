@@ -343,7 +343,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	args := []string{
 		"-addresses", w.ConsulAddress,
 		"-envoy-admin-bind-address=" + adminBindAddress,
-		"-consul-dns-bind-addr" + adminBindAddress,
+		"-consul-dns-bind-addr=" + adminBindAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
