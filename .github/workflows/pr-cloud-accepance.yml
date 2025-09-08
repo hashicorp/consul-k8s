@@ -29,4 +29,4 @@ jobs:
           repo: hashicorp/consul-k8s-workflows
           ref: main
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "uniqueness_group":"test-123"}'
