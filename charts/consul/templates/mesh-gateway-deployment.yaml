@@ -196,27 +196,23 @@ spec:
       - name: mesh-gateway
         image: {{ .Values.global.imageConsulDataplane | quote }}
         {{ template "consul.imagePullPolicy" . }}
-        {{ if not .Values.meshGateway.hostNetwork}}
         securityContext:
-          {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
-          allowPrivilegeEscalation: true
-          runAsNonRoot: false
-          capabilities:
-            drop:
-              - ALL
-            add:
-              - NET_BIND_SERVICE
-          {{- else }}
           allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          capabilities:
-            drop:
-              - ALL
-          {{- end }}
           readOnlyRootFilesystem: true
+          runAsNonRoot: true
           seccompProfile:
             type: RuntimeDefault
-        {{- end }}
+          {{- if or (not .Values.meshGateway.hostNetwork) (lt (int .Values.meshGateway.containerPort) 1024) }}
+          capabilities:
+            {{- if not .Values.meshGateway.hostNetwork }}
+            drop:
+              - ALL
+            {{- end }}
+            {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
+            add:
+              - NET_BIND_SERVICE
+            {{- end }}
+          {{- end }}
         {{- if .Values.meshGateway.resources }}
         resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
