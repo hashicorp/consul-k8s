@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-netaddrs"
 )
 
 const (
@@ -322,8 +325,24 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		envoyConcurrency = int(val)
 	}
 
+	envoyAdminBindAddress := "127.0.0.1"
+
+	ipAddrs, err := netaddrs.IPAddrs(context.Background(), w.ConsulAddress, hclog.New(&hclog.LoggerOptions{}))
+	if err != nil {
+		fmt.Println("error resolving IP Address", "err", err)
+		return nil, err
+	}
+
+	for _, ipAddr := range ipAddrs {
+		if ipAddr.IP.To4() == nil {
+			envoyAdminBindAddress = "::1"
+			break
+		}
+	}
+
 	args := []string{
 		"-addresses", w.ConsulAddress,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
