@@ -22,7 +22,7 @@ type Cluster interface {
 	// will be overridden by the helmValues keys.
 	Upgrade(t *testing.T, helmValues map[string]string)
 
-	// Destroy destroys the cluster
+	// Destroy destroys the consul cluster
 	Destroy(t *testing.T)
 }
 
