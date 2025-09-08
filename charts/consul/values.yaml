@@ -3001,6 +3001,31 @@ connectInject:
     # A value of zero disables the probe.
     defaultLivenessFailureSeconds: 0
 
+  dataplaneAsSidecarInitContainer:
+    # If true, the consul-dataplane will run as an init container with the restart policy set to "Always" and using startup probe to determine readiness.
+    # Also, Kubelet will wait for the consul-dataplane init container to be ready before starting the application container.
+    # @type: boolean
+    defaultEnabled: false
+
+    # Configures how long the k8s startup probe will wait initially before performing the first check.
+    # @type: integer
+    initialProbeCheckDelaySeconds: 1
+
+    # Configures how often the k8s startup probe will check the readiness of the consul-dataplane init container.
+    # @type: integer
+    probeCheckPeriodSeconds: 1
+
+    # Configures the failure threshold for the k8s startup probe.
+    # @type: integer
+    probeCheckFailureThreshold: 10
+
+    # Configures the timeout for each k8s startup probe check.
+    # @type: integer
+    probeCheckTimeoutSeconds: 5
+
+
+
+
   # The resource settings for the Connect injected init container. If null, the resources
   # won't be set for the initContainer. The defaults are optimized for developer instances of
   # Kubernetes, however they should be tweaked with the recommended defaults as shown below to speed up service registration times.

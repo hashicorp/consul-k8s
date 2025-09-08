@@ -271,6 +271,32 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		},
 		ReadOnlyRootFilesystem: ptr.To(true),
 	}
+	enableConsulDataplaneAsSidecar, err := w.LifecycleConfig.EnableConsulDataplaneAsSidecar(pod)
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	if enableConsulDataplaneAsSidecar {
+		restartPolicy := corev1.ContainerRestartPolicyAlways
+		container.RestartPolicy = &restartPolicy
+
+		// Configure the startup probe to check the sidecar proxy health.
+		container.StartupProbe = &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{
+					Command: []string{
+						// Absolute path to the binary from the Dockerfile
+						"/usr/local/bin/consul-dataplane",
+						// Built-in subcommand to check Envoy health
+						"-check-proxy-health",
+					},
+				},
+			},
+			InitialDelaySeconds: w.getSidecarProbeCheckInitialDelaySeconds(pod),
+			PeriodSeconds:       w.getSidecarProbePeriodSeconds(pod),
+			FailureThreshold:    w.getSidecarProbeFailureThreshold(pod),
+			TimeoutSeconds:      w.getSidecarProbeTimeoutSeconds(pod),
+		}
+	}
 	return container, nil
 }
 
@@ -610,6 +636,17 @@ func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
 	return 0
 }
 
+func (w *MeshWebhook) getSidecarProbeCheckInitialDelaySeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProbeCheckInitialDelaySeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarInitialProbeCheckDelaySeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
+}
+
 // getMetricsPorts creates container ports for exposing services such as prometheus.
 // Prometheus in particular needs a named port for use with the operator.
 // https://github.com/hashicorp/consul-k8s/pull/1440
@@ -642,4 +679,35 @@ func (w *MeshWebhook) getMetricsPorts(pod corev1.Pod) ([]corev1.ContainerPort, e
 			Protocol:      corev1.ProtocolTCP,
 		},
 	}, nil
+}
+
+func (w *MeshWebhook) getSidecarProbePeriodSeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProbePeriodSeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarProbePeriodSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
+}
+func (w *MeshWebhook) getSidecarProbeFailureThreshold(pod corev1.Pod) int32 {
+	threshold := w.DefaultSidecarProbeFailureThreshold
+	if v, ok := pod.Annotations[constants.AnnotationSidecarProbeFailureThreshold]; ok {
+		threshold, _ = strconv.Atoi(v)
+	}
+	if threshold > 0 {
+		return int32(threshold)
+	}
+	return 0
+}
+func (w *MeshWebhook) getSidecarProbeTimeoutSeconds(pod corev1.Pod) int32 {
+	seconds := w.DefaultSidecarProbeCheckTimeoutSeconds
+	if v, ok := pod.Annotations[constants.AnnotationSidecarProbeCheckTimeoutSeconds]; ok {
+		seconds, _ = strconv.Atoi(v)
+	}
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
 }
