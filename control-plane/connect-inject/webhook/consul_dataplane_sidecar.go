@@ -335,7 +335,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 	for _, ipAddr := range ipAddrs {
 		if ipAddr.IP.To4() == nil {
-			envoyAdminBindAddress = "::1"
+			envoyAdminBindAddress = "::"
 			break
 		}
 	}
