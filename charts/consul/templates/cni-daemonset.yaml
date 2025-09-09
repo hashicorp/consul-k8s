@@ -78,7 +78,7 @@ spec:
             - -cni-bin-dir={{ .Values.connectInject.cni.cniBinDir }}
             - -cni-net-dir={{ .Values.connectInject.cni.cniNetDir }}
             - -multus={{ .Values.connectInject.cni.multus }}
-            - -installationid=$(POD_UID)
+            - -installation-id=$(POD_UID)
             {{- if .Values.connectInject.cni.autorotateToken }}
             - -autorotate-token={{ .Values.connectInject.cni.autorotateToken }}
             {{- end }}
