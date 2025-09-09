@@ -28,6 +28,21 @@ jobs:
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
 
+  selective-test:
+    name: selective-test
+    needs: [ conditional-skip ]
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+      name: selective-test
+      with:
+        workflow: selective-test.yml
+        repo: hashicorp/consul-k8s-workflows
+        ref: shashank/impact-based-test-wf
+        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+        inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
     if: needs.conditional-skip.outputs.skip-ci == 'true'
