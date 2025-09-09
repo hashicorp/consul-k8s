@@ -1,0 +1,25 @@
+name: pr
+on:
+  pull_request:
+    branches:
+      - "shashank/impact-based-test-wf"
+
+# these should be the only settings that you will ever need to change
+env:
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  CONTEXT: "pr"
+  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  selective-test:
+    name: selective-test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+      name: selective-test
+      with:
+        workflow: selective-test.yml
+        repo: hashicorp/consul-k8s-workflows
+        ref: shashank/impact-based-test-wf
+        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+        inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
