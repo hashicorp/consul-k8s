@@ -274,7 +274,7 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 	for i := 1; i <= 5; i++ {
 		if _, err := os.Stat(destBinPath); err != nil && os.IsNotExist(err) {
 			// previous pod might have cleaned it up
-			err = copyFile(sourceBinPath, destBinDir, destBinName)
+			err = copyFileWithName(sourceBinPath, destBinDir, destBinName)
 			if err != nil {
 				return err
 			}
@@ -284,7 +284,7 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 		if err != nil {
 			//probably the file is not present as previous pod deleted it after fileCheck as race condition
 			c.logger.Error("could not watch binary file %s: %w", sourceBinPath, err)
-			time.Sleep(time.Millisecond * time.Duration(i))
+			time.Sleep(time.Second * time.Duration(i))
 		} else {
 			break
 		}
@@ -313,7 +313,7 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 			// Handle Remove event that might indicate binary removal
 			if event.Op&(fsnotify.Remove) != 0 {
 				// Re-copy the binary file
-				if err := copyFile(sourceBinPath, destBinDir, destBinName); err != nil {
+				if err := copyFileWithName(sourceBinPath, destBinDir, destBinName); err != nil {
 					c.logger.Error("Failed to copy binary after update", "error", err)
 					return err
 				} else {
@@ -324,7 +324,7 @@ func (c *Command) binWatcher(ctx context.Context, sourceBinPath, destBinDir, des
 		case <-gracePeriodAlarm.C:
 			c.logger.Info("Grace period timeout reached, older pod may not have cleaned up binary, proceeding with copy")
 			// Copy the binary and proceed since older pod didn't clean up within grace period
-			if err := copyFile(sourceBinPath, destBinDir, destBinName); err != nil {
+			if err := copyFileWithName(sourceBinPath, destBinDir, destBinName); err != nil {
 				c.logger.Error("Failed to copy binary after grace period timeout", "error", err)
 				return err
 			} else {
@@ -556,6 +556,42 @@ func (c *Command) tokenFileWatcher(ctx context.Context, sourceTokenPath, hostTok
 			return nil
 		}
 	}
+}
+
+func copyFileWithName(srcFile, destDir, destFileName string) error {
+	// if destFile is not passed we use the srcFile basepath
+	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
+		return err
+	}
+	if destFileName == "" {
+		destFileName = filepath.Base(srcFile)
+	}
+	// If the destDir does not exist then the incorrect command line argument was used or
+	// the CNI settings for the kubelet are not correct.
+	info, err := os.Stat(destDir)
+	if os.IsNotExist(err) {
+		return err
+	}
+
+	if !info.IsDir() {
+		return fmt.Errorf("destination directory %s is not a directory", destDir)
+	}
+
+	// Check if the user bit is enabled in folder permission.
+	if info.Mode().Perm()&(1<<(uint(7))) == 0 {
+		return fmt.Errorf("cannot write to destination directory %s", destDir)
+	}
+
+	srcBytes, err := os.ReadFile(srcFile)
+	if err != nil {
+		return fmt.Errorf("could not read %s file", srcFile)
+	}
+
+	err = os.WriteFile(filepath.Join(destDir, destFileName), srcBytes, info.Mode())
+	if err != nil {
+		return fmt.Errorf("error copying %s binary to %s", destFileName, destDir)
+	}
+	return nil
 }
 
 func copyToken(src, dst string) error {

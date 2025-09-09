@@ -63,7 +63,7 @@ func TestRun_DirectoryWatcher(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	t.Log("File event 1: Copy a base config file that does not contain the consul entry. Should detect and add consul-cni")
-	err = copyFile(baseConfigFile, tempDir, "")
+	err = copyFile(baseConfigFile, tempDir)
 	require.NoError(t, err)
 	time.Sleep(50 * time.Millisecond)
 	// The golden file contains the consul config.

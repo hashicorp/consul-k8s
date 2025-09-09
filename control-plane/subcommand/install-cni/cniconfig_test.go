@@ -40,7 +40,7 @@ func TestDefaultCNIConfigFile(t *testing.T) {
 			cfgFile: "testdata/10-kindnet.conflist",
 			dir: func(cfgFile string) string {
 				tempDir := t.TempDir()
-				err := copyFile(cfgFile, tempDir, "")
+				err := copyFile(cfgFile, tempDir)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -54,11 +54,11 @@ func TestDefaultCNIConfigFile(t *testing.T) {
 			cfgFile: "testdata/10-kindnet.conflist",
 			dir: func(cfgFile string) string {
 				tempDir := t.TempDir()
-				err := copyFile(cfgFile, tempDir, "")
+				err := copyFile(cfgFile, tempDir)
 				if err != nil {
 					t.Fatal(err)
 				}
-				err = copyFile("testdata/10-fake-cni.conf", tempDir, "")
+				err = copyFile("testdata/10-fake-cni.conf", tempDir)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -87,7 +87,7 @@ func TestConfListFromConfFile(t *testing.T) {
 	expectedCfgFile := "testdata/00-chained-plugins.conflist"
 
 	tempDir := t.TempDir()
-	err := copyFile(cfgFile, tempDir, "")
+	err := copyFile(cfgFile, tempDir)
 	require.NoError(t, err)
 
 	filename := filepath.Base(cfgFile)
@@ -167,7 +167,7 @@ func TestAppendCNIConfig(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			// Copy the config file to a temporary location so that we can append to it.
 			tempDir := t.TempDir()
-			err := copyFile(c.cfgFile, tempDir, "")
+			err := copyFile(c.cfgFile, tempDir)
 			require.NoError(t, err)
 
 			// Get the config file name in the tempdir.
@@ -206,7 +206,7 @@ func TestConfigFileToMap(t *testing.T) {
 	}
 
 	tempDir := t.TempDir()
-	err := copyFile(cfgFile, tempDir, "")
+	err := copyFile(cfgFile, tempDir)
 	require.NoError(t, err)
 
 	filename := filepath.Base(cfgFile)
@@ -296,7 +296,7 @@ func TestRemoveCNIConfig(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			// copy the config file to a temporary location so that we can append to it
 			tempDir := t.TempDir()
-			err := copyFile(c.goldenFile, tempDir, "")
+			err := copyFile(c.goldenFile, tempDir)
 			if err != nil {
 				t.Fatal(err)
 			}
