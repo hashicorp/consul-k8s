@@ -262,8 +262,8 @@ github.com/hashicorp/consul/envoyextensions v0.7.8 h1:476I35QPhthj/CcSADBOYGT87W
 github.com/hashicorp/consul/envoyextensions v0.7.8/go.mod h1:Fje3Q2QC6KDlYPEEKDuog3+tu9YfEpIcZlX0oiOxsmE=
 github.com/hashicorp/consul/sdk v0.16.2 h1:cGX/djeEe9r087ARiKVWwVWCF64J+yW0G6ftZMZYbj0=
 github.com/hashicorp/consul/sdk v0.16.2/go.mod h1:onxcZjYVsPx5XMveAC/OtoIsdr32fykB7INFltDoRE8=
-github.com/hashicorp/consul/troubleshoot v0.7.5 h1:/N5AP9GQ9JD0/sxzeTBObw5GyIZ10/o1tDdMGnh0sqg=
-github.com/hashicorp/consul/troubleshoot v0.7.5/go.mod h1:fcvATjtR7+q4fZKMnIZh/606yRf9Cj7EshyTZX8MKYs=
+github.com/hashicorp/consul/troubleshoot v0.7.1 h1:IQYxC1qsV3jO74VZDyPi283Ufi84/mXSMm53U8dsN2M=
+github.com/hashicorp/consul/troubleshoot v0.7.1/go.mod h1:U+fpb8yE3iGJTahAY1VGda4aYUDhaa0IZu+sIgGvcwk=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
