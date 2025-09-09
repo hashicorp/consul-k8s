@@ -28,29 +28,6 @@ jobs:
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "uniqueness_group":"${{ github.event.pull_request.number }}-test", "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
 
-  bypass-checks:
-    needs: [test]
-    if: always()
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          # The required checks that should be "passed" when the CI is skipped
-          - check-name: acceptance
-          - check-name: acceptance-cni
-          - check-name: acceptance-tproxy
-    steps:
-      - name: Update final status
-        uses: docker://ghcr.io/curtbushko/commit-status-action:e1d661c757934ab35c74210b4b70c44099ec747a
-        env:
-          INPUT_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-          INPUT_REPOSITORY: ${{ github.repository }}
-          INPUT_CONTEXT: ${{ matrix.check-name }}
-          INPUT_STATE: success
-          INPUT_DESCRIPTION: "Force pass check"
-          INPUT_SHA: ${{ env.SHA }}
-          INPUT_DETAILS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          INPUT_OWNER: "hashicorp"
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
     if: needs.conditional-skip.outputs.skip-ci == 'true'
