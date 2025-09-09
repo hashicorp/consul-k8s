@@ -256,8 +256,8 @@ github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79/go.mod h1:Fecb
 github.com/grpc-ecosystem/grpc-gateway v1.16.0 h1:gmcG1KaJ57LophUzW0Hy8NmPhnMZb4M0+kPpLofRdBo=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0 h1:TmHmbvxPmaegwhDubVz0lICL0J5Ka2vwTzhoePEXsGE=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0/go.mod h1:qztMSjm835F2bXf+5HKAPIS5qsmQDqZna/PgVt4rWtI=
-github.com/hashicorp/consul/api v1.31.2 h1:NicObVJHcCmyOIl7Z9iHPvvFrocgTYo9cITSGg0/7pw=
-github.com/hashicorp/consul/api v1.31.2/go.mod h1:Z8YgY0eVPukT/17ejW+l+C7zJmKwgPHtjU1q16v/Y40=
+github.com/hashicorp/consul/api v1.32.1 h1:0+osr/3t/aZNAdJX558crU3PEjVrG4x6715aZHRgceE=
+github.com/hashicorp/consul/api v1.32.1/go.mod h1:mXUWLnxftwTmDv4W3lzxYCPD199iNLLUyLfLGFJbtl4=
 github.com/hashicorp/consul/envoyextensions v0.7.8 h1:476I35QPhthj/CcSADBOYGT87WxjCs+xjz4KSixxxtc=
 github.com/hashicorp/consul/envoyextensions v0.7.8/go.mod h1:Fje3Q2QC6KDlYPEEKDuog3+tu9YfEpIcZlX0oiOxsmE=
 github.com/hashicorp/consul/sdk v0.16.2 h1:cGX/djeEe9r087ARiKVWwVWCF64J+yW0G6ftZMZYbj0=
@@ -626,8 +626,8 @@ golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a/go.mod h1:LzIPMQfyMNhhGPh
 golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d/go.mod h1:IxCIyHEi3zRg3s0A5j5BB6A9Jmi73HwBIUl50j+osU4=
 golang.org/x/crypto v0.40.0 h1:r4x+VvoG5Fm+eJcxMaY8CQM7Lb0l1lsmjGBQ6s8BfKM=
 golang.org/x/crypto v0.40.0/go.mod h1:Qr1vMER5WyS2dfPHAlsOj01wgLbsyWtFn/aY+5+ZdxY=
-golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 h1:yqrTHse8TCMW1M1ZCP+VAR/l0kKxwaAIqN/il7x4voA=
-golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8/go.mod h1:tujkw807nyEEAamNbDrEGzRav+ilXA7PCRAd6xsmwiU=
+golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 h1:nDVHiLt8aIbd/VzvPWN6kSOPE7+F/fNFDSXLVYkE/Iw=
+golang.org/x/exp v0.0.0-20250305212735-054e65f0b394/go.mod h1:sIifuuw/Yco/y6yb6+bDNfyeQ/MdPUy/hKEMYQV17cM=
 golang.org/x/mod v0.2.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
 golang.org/x/mod v0.3.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
 golang.org/x/mod v0.25.0 h1:n7a+ZbQKQA/Ysbyb0/6IbB1H/X41mKgbhfv7AfG/44w=
@@ -753,8 +753,8 @@ gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776/go.mod h1:K4uyk7z7BCEPqu6E+C
 gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-helm.sh/helm/v3 v3.18.5 h1:Cc3Z5vd6kDrZq9wO9KxKLNEickiTho6/H/dBNRVSos4=
-helm.sh/helm/v3 v3.18.5/go.mod h1:L/dXDR2r539oPlFP1PJqKAC1CUgqHJDLkxKpDGrWnyg=
+helm.sh/helm/v3 v3.18.6 h1:S/2CqcYnNfLckkHLI0VgQbxgcDaU3N4A/46E3n9wSNY=
+helm.sh/helm/v3 v3.18.6/go.mod h1:L/dXDR2r539oPlFP1PJqKAC1CUgqHJDLkxKpDGrWnyg=
 k8s.io/api v0.33.3 h1:SRd5t//hhkI1buzxb288fy2xvjubstenEKL9K51KBI8=
 k8s.io/api v0.33.3/go.mod h1:01Y/iLUjNBM3TAvypct7DIj0M0NIZc+PzAHCIo0CYGE=
 k8s.io/apiextensions-apiserver v0.33.3 h1:qmOcAHN6DjfD0v9kxL5udB27SRP6SG/MTopmge3MwEs=
