@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// TestConnectInject_PermissiveMTLS verifies that permissive mTLS works as expected when enabled in the MeshConfig
 func TestConnectInject_PermissiveMTLS(t *testing.T) {
 	cfg := suite.Config()
 	if !cfg.EnableTransparentProxy {
