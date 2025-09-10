@@ -15,7 +15,7 @@ on:
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.event.pull_request.head.ref }}
-  CONTEXT: "pr"
+  CONTEXT: "pr-ajay"
 
 jobs:
   cloud-acceptance:
@@ -29,4 +29,4 @@ jobs:
           repo: hashicorp/consul-k8s-workflows
           ref: main
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}"}'
