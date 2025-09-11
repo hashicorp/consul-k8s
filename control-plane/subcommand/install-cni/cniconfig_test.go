@@ -304,7 +304,6 @@ func TestRemoveCNIConfig(t *testing.T) {
 			// get the config file name in the tempdir
 			filename := filepath.Base(c.goldenFile)
 			tempDestFile := filepath.Join(tempDir, filename)
-
 			err = removeCNIConfig(tempDestFile)
 			if err != nil {
 				t.Fatal(err)
