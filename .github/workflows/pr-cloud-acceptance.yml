@@ -2,7 +2,7 @@
 name: pr-cloud-acceptance
 on:
   pull_request:
-    types: [opened, synchronize, labeled]
+    types: [opened, synchronize]
     # Runs on PRs to main and all release branches
     branches:
       - main
@@ -24,4 +24,4 @@ jobs:
           repo: hashicorp/consul-k8s-workflows
           ref: main
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-          inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+          inputs: '{"context":"${{ env.CONTEXT }}-${{ github.event.pull_request.head.ref }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
