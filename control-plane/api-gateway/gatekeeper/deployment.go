@@ -162,21 +162,10 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}, nil
 }
 
-func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b, existingDeployment *appsv1.Deployment, deploymentExists bool) *appsv1.Deployment {
+func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
 		b.Spec.Template = a.Spec.Template
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
-	}
-	if b.Spec.Template.Annotations == nil {
-		b.Spec.Template.Annotations = make(map[string]string)
-	}
-	if deploymentExists && existingDeployment.Spec.Template.Annotations != nil {
-		// Preserve existing annotations that are not set by the controller.
-		for k, v := range existingDeployment.Spec.Template.Annotations {
-			if _, ok := b.Spec.Template.Annotations[k]; !ok {
-				b.Spec.Template.Annotations[k] = v
-			}
-		}
 	}
 
 	return b
@@ -233,9 +222,24 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
+func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
+	if b.Spec.Template.Annotations == nil {
+		b.Spec.Template.Annotations = make(map[string]string)
+	}
+	for k, v := range annotations {
+		if _, ok := b.Spec.Template.Annotations[k]; !ok {
+			b.Spec.Template.Annotations[k] = v
+		}
+	}
+
+}
+
 func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(gcc, deployment, mutated, existingDeployment, deploymentExists)
+		mutated = mergeDeployments(gcc, deployment, mutated)
+		if deploymentExists {
+			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
+		}
 		return ctrl.SetControllerReference(&gateway, mutated, scheme)
 	}
 }
