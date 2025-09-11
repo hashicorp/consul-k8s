@@ -59,7 +59,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, gcc, gateway, g.Client.Scheme())
+	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme())
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -222,9 +222,24 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
-func newDeploymentMutator(deployment, mutated *appsv1.Deployment, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
+	if b.Spec.Template.Annotations == nil {
+		b.Spec.Template.Annotations = make(map[string]string)
+	}
+	for k, v := range annotations {
+		if _, ok := b.Spec.Template.Annotations[k]; !ok {
+			b.Spec.Template.Annotations[k] = v
+		}
+	}
+
+}
+
+func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
 		mutated = mergeDeployments(gcc, deployment, mutated)
+		if deploymentExists {
+			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
+		}
 		return ctrl.SetControllerReference(&gateway, mutated, scheme)
 	}
 }
