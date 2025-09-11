@@ -2,6 +2,12 @@
 name: pr
 on:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '.changelog/**'
+      - 'README.md'
+      - '.github/**'
+      - 'charts/consul/**'
 
 # these should be the only settings that you will ever need to change
 env:
