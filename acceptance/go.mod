@@ -1,6 +1,9 @@
 module github.com/hashicorp/consul-k8s/acceptance
 
-go 1.24.5
+go 1.25.1
+
+// replace these so we always use the latest version of the control-plane types
+replace github.com/hashicorp/consul-k8s/version => ../version
 
 require (
 	github.com/go-logr/logr v1.3.0
@@ -26,9 +29,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.16.5
 	sigs.k8s.io/gateway-api v0.7.1
 )
-
-// replace these so we always use the latest version of the control-plane types
-replace github.com/hashicorp/consul-k8s/version => ../version
 
 require (
 	github.com/armon/go-metrics v0.4.1 // indirect
