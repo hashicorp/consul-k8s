@@ -2,12 +2,6 @@
 name: pr
 on:
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '.changelog/**'
-      - 'README.md'
-      - '.github/**'
-      - 'charts/consul/**'
 
 # these should be the only settings that you will ever need to change
 env:
@@ -33,7 +27,7 @@ jobs:
         ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
-
+      
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
     if: needs.conditional-skip.outputs.skip-ci == 'true'
