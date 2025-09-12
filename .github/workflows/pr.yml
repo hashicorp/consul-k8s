@@ -2,7 +2,10 @@
 name: pr
 on:
   pull_request:
-
+    # Sequence of patterns matched against refs/heads
+    branches:
+      - main
+      - "release/**"
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -10,13 +13,56 @@ env:
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.filter.outputs.only_meta }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check file changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            only_meta:
+              - 'charts/consul/**'
+              - '.changelog/**'
+
+
+  detect-comment-changes:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+      - id: difference-check
+        name: Check file changes
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD > changes.diff
+      - id: check
+        run: |
+          if grep -vE '^\+//|^\+#|^-' changes.diff | grep -q '^\+'; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+          echo $GITHUB_OUTPUT
+          cat changes.diff
+          grep -vE '^\+//|^\+#|^-' changes.diff | grep '^\+' || true
+
+           
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
 
   test:
     name: test
-    needs: [ conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    needs: [ detect-changes, conditional-skip ]
+    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.detect-changes.outputs.skip != 'true' && needs.detect-comment-changes.outputs.skip == 'false'
     runs-on: ubuntu-latest
     steps:
     - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
@@ -24,13 +70,22 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: test_wf_din
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+        inputs: >- 
+          { 
+            "context":"${{ env.CONTEXT }}", 
+            "actor":"${{ github.actor }}", 
+            "repository":"${{ github.repository }}", 
+            "branch":"${{ env.BRANCH }}", 
+            "sha":"${{ env.SHA }}", 
+            "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}",
+            "skip":"${{ needs.detect-changes.outputs.skip }}"
+          }
 
   pass-required-checks-on-skip:
-    needs: [ conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci == 'true'
+    needs: [ conditional-skip, detect-changes ]
+    if: needs.conditional-skip.outputs.skip-ci == 'true' || needs.detect-changes.outputs.skip == 'true' || needs.detect-comment-changes.outputs.skip == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
