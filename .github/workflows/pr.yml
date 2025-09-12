@@ -27,26 +27,26 @@ jobs:
               - 'charts/consul/**'
               - '.changelog/**'
 
-    detect-comment-changes:
-      needs: detect-changes
-      runs-on: ubuntu-latest
-      outputs:
-        skip: ${{ steps.check.outputs.skip }}
-      steps:
-        - uses: actions/checkout@v4
-          with:
-            fetch-depth: 0 
-        - id: difference check
-          name: Check file changes
-          run: |
-            git fetch origin ${{ github.base_ref }}
-            git diff origin/${{ github.base_ref }}...HEAD > changes.diff
-        - id: check
-          run: |
-            if grep -vE '^\+//|^\+#|^-' changes.diff | grep -q '^\+'; then
-              echo "skip=false" >> $GITHUB_OUTPUT
-            else
-              echo "skip=true" >> $GITHUB_OUTPUT
+  detect-comment-changes:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
+      - id: difference-check
+        name: Check file changes
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD > changes.diff
+      - id: check
+        run: |
+          if grep -vE '^\+//|^\+#|^-' changes.diff | grep -q '^\+'; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
            
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
