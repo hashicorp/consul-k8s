@@ -74,7 +74,7 @@ func readChartFiles(chart embed.FS, chartDirName string) ([]*loader.BufferedFile
 		chartFiles = append(chartFiles, file)
 	}
 
-	// Load everything under templates/.
+	// Load everything in templates directory.
 	dirs, err := chart.ReadDir(path.Join(chartDirName, templatesDirName))
 	if err != nil {
 		return nil, err
