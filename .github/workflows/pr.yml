@@ -51,6 +51,7 @@ jobs:
           else
             echo "skip=true" >> $GITHUB_OUTPUT
           fi
+          echo $GITHUB_OUTPUT
           cat changes.diff
           grep -vE '^\+//|^\+#|^-' changes.diff | grep '^\+' || true
 
@@ -61,7 +62,7 @@ jobs:
   test:
     name: test
     needs: [ detect-changes, conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.detect-changes.outputs.skip == 'true' && needs.detect-comment-changes.outputs.skip == 'true'
+    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.detect-changes.outputs.skip == 'true' && needs.detect-comment-changes.outputs.skip == 'false'
     runs-on: ubuntu-latest
     steps:
     - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
