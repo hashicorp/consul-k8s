@@ -234,7 +234,12 @@ Inject extra environment vars in the format key:value, if populated
 {{- if .extraEnvironmentVars -}}
 {{- range $key, $value := .extraEnvironmentVars }}
 - name: {{ $key }}
+{{- if kindIs "map" $value }}
+  valueFrom:
+    {{- $value | toYaml | nindent 4 }}
+{{- else }}
   value: {{ $value | quote }}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
