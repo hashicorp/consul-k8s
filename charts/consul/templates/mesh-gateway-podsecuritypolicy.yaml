@@ -18,8 +18,10 @@ spec:
   # but we can provide it for defense in depth.
   requiredDropCapabilities:
     - ALL
-  defaultAddCapabilities:
+  {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
+  allowedCapabilities:
     - NET_BIND_SERVICE
+  {{- end }}
   # Allow core volume types.
   volumes:
     - 'configMap'
