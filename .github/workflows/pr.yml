@@ -50,6 +50,10 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           else
             echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+          cat changes.diff
+          grep -vE '^\+//|^\+#|^-' changes.diff | grep '^\+' || true
+
            
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
@@ -65,7 +69,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: test_wf_din
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: >- 
           { 
