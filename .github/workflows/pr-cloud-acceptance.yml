@@ -8,10 +8,17 @@ on:
       - "release/**"
   pull_request:
     types: [opened, synchronize, labeled]
+    paths-ignore:
+      - 'docs/**'
+      - '.changelog/**'
+      - 'README.md'
+      - '.github/**'
+      - 'charts/consul/**'
     # Runs on PRs to main and all release branches
     branches:
       - main
       - "release/**"
+
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.event.pull_request.head.ref }}
