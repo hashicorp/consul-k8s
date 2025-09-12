@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Fix for 'Consul agents throw warning about the tls.defaults.verify_incoming not being set even when global.tls.verify is set to true
+```
