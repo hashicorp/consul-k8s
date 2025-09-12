@@ -2,7 +2,10 @@
 name: pr
 on:
   pull_request:
-
+    # Sequence of patterns matched against refs/heads
+    branches:
+      - main
+      - "release/**"
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -23,7 +26,6 @@ jobs:
         with:
           filters: |
             only_meta:
-              - '.github/**'
               - 'charts/consul/**'
               - '.changelog/**'
 
