@@ -1014,6 +1014,9 @@ server:
     serflan:
       port: 8301
 
+  # Whether use persistent volume
+  usePersistentVolume: true
+
   # This defines the disk size for configuring the
   # servers' StatefulSet storage. For dynamically provisioned storage classes, this is the
   # desired size. For manually defined persistent volumes, this should be set to
