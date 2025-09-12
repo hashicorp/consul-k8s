@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,6 +18,7 @@ import (
 // main function
 
 func main() {
+	fmt.Println("Consul Kubernetes ")
 	c := cli.NewCLI("consul-k8s", version.GetHumanVersion())
 	c.Args = os.Args[1:]
 
