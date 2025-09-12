@@ -14,6 +14,8 @@ import (
 	"github.com/mitchellh/cli"
 )
 
+// main function
+
 func main() {
 	c := cli.NewCLI("consul-k8s", version.GetHumanVersion())
 	c.Args = os.Args[1:]

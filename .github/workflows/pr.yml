@@ -29,6 +29,7 @@ jobs:
               - 'charts/consul/**'
               - '.changelog/**'
 
+
   detect-comment-changes:
     needs: detect-changes
     runs-on: ubuntu-latest
@@ -79,7 +80,7 @@ jobs:
 
   pass-required-checks-on-skip:
     needs: [ conditional-skip, detect-changes ]
-    if: needs.conditional-skip.outputs.skip-ci == 'true' || needs.detect-changes.outputs.skip == 'true' || needs.detect-comment-changes.outputs.skip = 'true'
+    if: needs.conditional-skip.outputs.skip-ci == 'true' || needs.detect-changes.outputs.skip == 'true' || needs.detect-comment-changes.outputs.skip == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
