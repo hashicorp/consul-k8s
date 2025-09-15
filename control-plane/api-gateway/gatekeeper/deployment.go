@@ -59,7 +59,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, gcc, gateway, g.Client.Scheme())
+	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme())
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
