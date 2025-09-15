@@ -29,7 +29,7 @@ const (
 
 // createKubeConfig creates the kubeconfig file that the consul-cni plugin will use to communicate with the
 // kubernetes API.
-func createKubeConfig(cfg *config.CNIConfig) error {
+func createKubeConfig(destDir string, cfg *config.CNIConfig) error {
 	var restCfg *rest.Config
 
 	// TODO: Move clientset out of this method and put it in 'Run'
@@ -70,7 +70,7 @@ func createKubeConfig(cfg *config.CNIConfig) error {
 	}
 
 	// Write the kubeconfig file to the host.
-	destFile := filepath.Join(cfg.CNINetDir, cfg.Kubeconfig)
+	destFile := filepath.Join(destDir, cfg.Kubeconfig)
 	err = os.WriteFile(destFile, data, os.FileMode(0o644))
 	if err != nil {
 		return fmt.Errorf("error writing kube config file %s: %w", destFile, err)
