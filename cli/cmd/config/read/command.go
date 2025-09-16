@@ -25,6 +25,7 @@ const (
 	flagNameKubeContext = "context"
 )
 
+// ReadCommand represents the command to read the helm config of a Consul installation on Kubernetes.
 type ReadCommand struct {
 	*common.BaseCommand
 
