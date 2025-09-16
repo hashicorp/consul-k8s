@@ -22,4 +22,4 @@ jobs:
         repo: hashicorp/consul-k8s-workflows
         ref: 'shashank/impact-based-test-wf'
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "base_sha": "${{ github.event.pull_request.base.sha }}" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "base_sha": "${{ github.event.pull_request.base.sha }}", "uniqueness_group":"pr-4775" }'
