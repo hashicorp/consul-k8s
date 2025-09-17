@@ -6,8 +6,6 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => /Users/sriram.ramasamy/Desktop/hashicorp/consul/api
-
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -22,7 +20,7 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
-	github.com/hashicorp/consul/api v1.32.2-0.20250917064001-76f4ae4e8714
+	github.com/hashicorp/consul/api v1.32.2-0.20250917190244-1e78755d0647
 	github.com/hashicorp/consul/sdk v0.16.2
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
