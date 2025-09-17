@@ -3784,3 +3784,6 @@ telemetryCollector:
   # it could be used to configure custom consul parameters.
   # @type: map
   extraEnvironmentVars: {}
+
+dualStack:
+  defaultEnabled: false
