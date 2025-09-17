@@ -136,6 +136,13 @@ func (h *HelmCluster) Create(t *testing.T) {
 		h.Destroy(t)
 	})
 
+	// If a release with the same nameexists, delete it before starting installation.
+	_, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "status", h.releaseName)
+	if err == nil {
+		logger.Logf(t, "Helm release %s already exists, deleting it first", h.releaseName)
+		h.Destroy(t)
+	}
+
 	// Fail if there are any existing installations of the Helm chart.
 	if !h.SkipCheckForPreviousInstallations {
 		helpers.CheckForPriorInstallations(t, h.kubernetesClient, h.helmOptions, "consul-helm", "chart=consul-helm")

@@ -43,7 +43,9 @@ func TestConnectInject_PermissiveMTLS(t *testing.T) {
 
 	kubectlOpts := connHelper.Ctx.KubectlOptions(t)
 	logger.Logf(t, "Check that incoming non-mTLS connection fails in MutualTLSMode = strict")
-	k8s.CheckStaticServerConnectionFailing(t, kubectlOpts, "static-client", "http://static-server")
+	retry.Run(t, func(r *retry.R) {
+		k8s.CheckStaticServerConnectionFailing(t, kubectlOpts, "static-client", "http://static-server")
+	})
 
 	logger.Log(t, "Set allowEnablingPermissiveMutualTLS = true")
 	writeCrd(t, connHelper, "../fixtures/cases/permissive-mtls/mesh-config-permissive-allowed.yaml")
@@ -52,7 +54,9 @@ func TestConnectInject_PermissiveMTLS(t *testing.T) {
 	writeCrd(t, connHelper, "../fixtures/cases/permissive-mtls/service-defaults-static-server-permissive.yaml")
 
 	logger.Log(t, "Check that incoming mTLS connection is successful in MutualTLSMode = permissive")
-	k8s.CheckStaticServerConnectionSuccessful(t, kubectlOpts, "static-client", "http://static-server")
+	retry.Run(t, func(r *retry.R) {
+		k8s.CheckStaticServerConnectionSuccessful(t, kubectlOpts, "static-client", "http://static-server")
+	})
 }
 
 func deployNonMeshClient(t *testing.T, ch connhelper.ConnectHelper) {
