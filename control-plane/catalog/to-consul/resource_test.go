@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
@@ -657,8 +658,19 @@ func TestServiceResource_lbPort(t *testing.T) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
+
 		require.Len(r, actual, 1)
-		require.Equal(r, 80, actual[0].Service.Port)
+		require.Equal(r, 0, actual[0].Service.Port)
+
+		require.Len(r, actual[0].Service.Ports, 2)
+		require.Equal(r, 80, actual[0].Service.Ports[0].Port)
+		require.Equal(r, "http", actual[0].Service.Ports[0].Name)
+		require.True(r, actual[0].Service.Ports[0].Default)
+
+		require.Equal(r, 8500, actual[0].Service.Ports[1].Port)
+		require.Equal(r, "rpc", actual[0].Service.Ports[1].Name)
+		require.False(r, actual[0].Service.Ports[1].Default)
+
 		require.Equal(r, "80", actual[0].Service.Meta["port-http"])
 		require.Equal(r, "8500", actual[0].Service.Meta["port-rpc"])
 	})
@@ -691,7 +703,18 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
-		require.Equal(r, 8500, actual[0].Service.Port)
+
+		require.Equal(r, 0, actual[0].Service.Port)
+
+		require.Len(r, actual[0].Service.Ports, 2)
+		require.Equal(r, 8500, actual[0].Service.Ports[0].Port)
+		require.Equal(r, "rpc", actual[0].Service.Ports[0].Name)
+		require.True(r, actual[0].Service.Ports[0].Default)
+
+		require.Equal(r, 80, actual[0].Service.Ports[1].Port)
+		require.Equal(r, "http", actual[0].Service.Ports[1].Name)
+		require.False(r, actual[0].Service.Ports[1].Default)
+
 		require.Equal(r, "80", actual[0].Service.Meta["port-http"])
 		require.Equal(r, "8500", actual[0].Service.Meta["port-rpc"])
 	})
@@ -753,6 +776,7 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 }
 
 // Test that with LoadBalancerEndpointsSync set to true we track the IP of the endpoints not the LB IP/name.
+// TODO: Check on how to handle multiport
 func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
@@ -842,24 +866,40 @@ func TestServiceResource_nodePort(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+		require.Equal(r, 0, service.Port)
+
+		require.Equal(r, 30000, service.Ports[0].Port)
+		require.Equal(r, "http", service.Ports[0].Name)
+		require.True(r, service.Ports[0].Default)
+
+		require.Equal(r, 30001, service.Ports[1].Port)
+		require.Equal(r, "rpc", service.Ports[1].Name)
+		require.False(r, service.Ports[1].Default)
+	}
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
-		require.Equal(r, 30000, actual[0].Service.Port)
+		validateServicePorts(r, actual[0].Service)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		validateServicePorts(r, actual[1].Service)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		validateServicePorts(r, actual[2].Service)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -891,6 +931,19 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+		fmt.Printf("%+v\n", service.Ports)
+		require.Equal(r, 0, service.Port)
+
+		require.Equal(r, 30000, service.Ports[0].Port)
+		require.Equal(r, "http", service.Ports[0].Name)
+		require.True(r, service.Ports[0].Default)
+
+		require.Equal(r, 30001, service.Ports[1].Port)
+		require.Equal(r, "rpc", service.Ports[1].Name)
+		require.False(r, service.Ports[1].Default)
+	}
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -899,16 +952,19 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 		require.Len(r, actual, 3)
 		require.Equal(r, "prefixfoo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
-		require.Equal(r, 30000, actual[0].Service.Port)
+		validateServicePorts(r, actual[0].Service)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "prefixfoo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		validateServicePorts(r, actual[1].Service)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "prefixfoo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		validateServicePorts(r, actual[2].Service)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -982,7 +1038,18 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 		require.Len(r, actual, 1)
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
-		require.Equal(r, 30000, actual[0].Service.Port)
+		require.Equal(r, 0, actual[0].Service.Port)
+
+		require.Len(r, actual[0].Service.Ports, 2)
+
+		require.Equal(r, 30000, actual[0].Service.Ports[0].Port)
+		require.Equal(r, "http", actual[0].Service.Ports[0].Name)
+		require.True(r, actual[0].Service.Ports[0].Default)
+
+		require.Equal(r, 30001, actual[0].Service.Ports[1].Port)
+		require.Equal(r, "rpc", actual[0].Service.Ports[1].Name)
+		require.False(r, actual[0].Service.Ports[1].Default)
+
 		require.Equal(r, "k8s-sync", actual[0].Node)
 	})
 }
@@ -1009,27 +1076,44 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 
 	require.NoError(t, err)
 
+	var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+		require.Equal(r, 0, service.Port)
+
+		require.Equal(r, 30001, service.Ports[0].Port)
+		require.Equal(r, "rpc", service.Ports[0].Name)
+		require.True(r, service.Ports[0].Default)
+
+		require.Equal(r, 30000, service.Ports[1].Port)
+		require.Equal(r, "http", service.Ports[1].Name)
+		require.False(r, service.Ports[1].Default)
+	}
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
-		require.Equal(r, 30001, actual[0].Service.Port)
+		validateServicePorts(r, actual[0].Service)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30001, actual[1].Service.Port)
+		validateServicePorts(r, actual[1].Service)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30001, actual[2].Service.Port)
+		validateServicePorts(r, actual[2].Service)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1062,6 +1146,18 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+		require.Equal(r, 0, service.Port)
+
+		require.Equal(r, 30000, service.Ports[0].Port)
+		require.Equal(r, "port1", service.Ports[0].Name)
+		require.True(r, service.Ports[0].Default)
+
+		require.Equal(r, 30001, service.Ports[1].Port)
+		require.Equal(r, "port2", service.Ports[1].Name)
+		require.False(r, service.Ports[1].Default)
+	}
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -1070,19 +1166,23 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 		require.Len(r, actual, 3)
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
-		require.Equal(r, 30000, actual[0].Service.Port)
+		validateServicePorts(r, actual[0].Service)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		validateServicePorts(r, actual[1].Service)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		validateServicePorts(r, actual[2].Service)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1111,27 +1211,44 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+		require.Equal(r, 0, service.Port)
+
+		require.Equal(r, 30000, service.Ports[0].Port)
+		require.Equal(r, "http", service.Ports[0].Name)
+		require.True(r, service.Ports[0].Default)
+
+		require.Equal(r, 30001, service.Ports[1].Port)
+		require.Equal(r, "rpc", service.Ports[1].Name)
+		require.False(r, service.Ports[1].Default)
+	}
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "4.5.6.7", actual[0].Service.Address)
-		require.Equal(r, 30000, actual[0].Service.Port)
+		validateServicePorts(r, actual[0].Service)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "5.6.7.8", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		validateServicePorts(r, actual[1].Service)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "6.7.8.9", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		validateServicePorts(r, actual[2].Service)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1168,27 +1285,44 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+		require.Equal(r, 0, service.Port)
+
+		require.Equal(r, 30000, service.Ports[0].Port)
+		require.Equal(r, "http", service.Ports[0].Name)
+		require.True(r, service.Ports[0].Default)
+
+		require.Equal(r, 30001, service.Ports[1].Port)
+		require.Equal(r, "rpc", service.Ports[1].Name)
+		require.False(r, service.Ports[1].Default)
+	}
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "4.5.6.7", actual[0].Service.Address)
-		require.Equal(r, 30000, actual[0].Service.Port)
+		validateServicePorts(r, actual[0].Service)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		validateServicePorts(r, actual[1].Service)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		validateServicePorts(r, actual[2].Service)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1403,24 +1537,46 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	// Insert the endpoint slice
 	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
 
+	var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+		require.Equal(r, 0, service.Port)
+		require.Len(r, service.Ports, 3)
+
+		require.Equal(r, 4141, service.Ports[0].Port)
+		require.Equal(r, "default", service.Ports[0].Name)
+		require.True(r, service.Ports[0].Default)
+
+		require.Equal(r, 80, service.Ports[1].Port)
+		require.Equal(r, "http", service.Ports[1].Name)
+		require.False(r, service.Ports[1].Default)
+
+		require.Equal(r, 8500, service.Ports[2].Port)
+		require.Equal(r, "rpc", service.Ports[2].Name)
+		require.False(r, service.Ports[2].Default)
+	}
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
-		require.Equal(r, 4141, actual[0].Service.Port)
+		validateServicePorts(r, actual[0].Service)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 4141, actual[1].Service.Port)
+		validateServicePorts(r, actual[1].Service)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 4141, actual[2].Service.Port)
+		validateServicePorts(r, actual[2].Service)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)

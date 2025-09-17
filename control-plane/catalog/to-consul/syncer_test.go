@@ -48,6 +48,13 @@ func TestConsulSyncer_register(t *testing.T) {
 	// Read the service back out
 	var service *api.CatalogService
 	retry.Run(t, func(r *retry.R) {
+		resp, meta, err := client.Catalog().Services(&api.QueryOptions{})
+		require.NoError(t, err)
+
+		fmt.Println("=======")
+		fmt.Printf("Services: %+v\n", resp)
+		fmt.Printf("Meta: %+v\n", meta)
+
 		services, _, err := client.Catalog().Service("bar", "", nil)
 		if err != nil {
 			r.Fatalf("err: %s", err)

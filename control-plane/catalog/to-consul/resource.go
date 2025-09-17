@@ -458,58 +458,70 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	var overridePortName string
 	var overridePortNumber int
 	if len(svc.Spec.Ports) > 0 {
-		var port int
+
+		servicePorts := make(consulapi.ServicePorts, 0)
+		var defaultPort consulapi.ServicePort
+
 		isNodePort := svc.Spec.Type == corev1.ServiceTypeNodePort
 
 		// If a specific port is specified, then use that port value
 		portAnnotation, ok := svc.Annotations[annotationServicePort]
 		if ok {
 			if v, err := strconv.ParseInt(portAnnotation, 0, 0); err == nil {
-				port = int(v)
+				port := int(v)
+				defaultPort = consulapi.ServicePort{
+					Port:    port,
+					Name:    "default",
+					Default: true,
+				}
 				overridePortNumber = port
 			} else {
 				overridePortName = portAnnotation
 			}
 		}
 
-		// For when the port was a name instead of an int
-		if overridePortName != "" {
-			// Find the named port
-			for _, p := range svc.Spec.Ports {
-				if p.Name == overridePortName {
-					if isNodePort && p.NodePort > 0 {
-						port = int(p.NodePort)
-					} else {
-						port = int(p.Port)
-						// NOTE: for cluster IP services we always use the endpoint
-						// ports so this will be overridden.
-					}
-					break
+		for idx, p := range svc.Spec.Ports {
+			var port int
+			if overridePortName != "" && p.Name == overridePortName {
+				if isNodePort && p.NodePort > 0 {
+					port = int(p.NodePort)
+				} else {
+					port = int(p.Port)
+					// NOTE: for cluster IP services we always use the endpoint
+					// ports so this will be overridden.
 				}
-			}
-		}
-
-		// If the port was not set above, set it with the first port
-		// based on the service type.
-		if port == 0 {
-			if isNodePort {
-				// Find first defined NodePort
-				for _, p := range svc.Spec.Ports {
-					if p.NodePort > 0 {
-						port = int(p.NodePort)
-						break
-					}
+				defaultPort = consulapi.ServicePort{
+					Port:    port,
+					Name:    getPortName(p.Name, idx+1),
+					Default: true,
 				}
 			} else {
-				port = int(svc.Spec.Ports[0].Port)
-				// NOTE: for cluster IP services we always use the endpoint
-				// ports so this will be overridden.
+				if isNodePort && p.NodePort > 0 {
+					port = int(p.NodePort)
+				} else {
+					port = int(p.Port)
+				}
+				servicePorts = append(servicePorts, consulapi.ServicePort{
+					Port:    port,
+					Name:    getPortName(p.Name, idx+1),
+					Default: false,
+				})
 			}
 		}
 
-		baseService.Port = port
+		if defaultPort.Port > 0 {
+			servicePorts = append(consulapi.ServicePorts{defaultPort}, servicePorts...)
+		}
+
+		// If there are no default ports, make first port as default
+		if len(servicePorts) > 0 && !servicePorts.HasDefault() {
+			servicePorts[0].Default = true
+		}
+
+		baseService.Ports = servicePorts
 
 		// Add all the ports as annotations
+		// We keep this for backward compatibility
 		for _, p := range svc.Spec.Ports {
 			// Set the tag
 			baseService.Meta["port-"+p.Name] = strconv.FormatInt(int64(p.Port), 10)
@@ -1115,4 +1127,12 @@ func updateServiceMeta(baseServiceMeta map[string]string, endpoint discoveryv1.E
 		serviceMeta[ConsulK8STopologyZone] = *endpoint.Zone
 	}
 	return serviceMeta
+}
+
+func getPortName(name string, idx int) string {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Sprintf("port%d", idx)
+	}
+
+	return name
 }
