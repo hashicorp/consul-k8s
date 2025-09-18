@@ -18,6 +18,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	"github.com/hashicorp/consul/agent/netutil"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
@@ -205,9 +206,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	dualStack, err := netutil.IsDualStack(consulConfig.APIClientConfig, false)
+	if err != nil {
+		c.logger.Error("failed to get dualstack state: %s", err.Error())
+		return 1
+	}
+
 	if c.flagRedirectTrafficConfig != "" {
 		c.watcher.Stop() // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
-		err = c.applyTrafficRedirectionRules(proxyService)
+		err = c.applyTrafficRedirectionRules(proxyService, dualStack)
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)
 			return 1
@@ -387,7 +394,7 @@ type trafficRedirectProxyConfig struct {
 	StatsBindAddr string `mapstructure:"envoy_stats_bind_addr"`
 }
 
-func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService) error {
+func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack bool) error {
 	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.iptablesConfig)
 	if err != nil {
 		return err
@@ -418,9 +425,6 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService) error {
 
 		c.iptablesConfig.ExcludeInboundPorts = append(c.iptablesConfig.ExcludeInboundPorts, port)
 	}
-
-	dualStack := true
-	// Need mind bending logic here
 
 	// Configure any relevant information from the proxy service
 	err = iptables.Setup(c.iptablesConfig, dualStack)
