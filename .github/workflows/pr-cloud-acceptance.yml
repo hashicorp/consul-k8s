@@ -1,13 +1,8 @@
 # Dispatch to the consul-k8s-workflows with a nightly cron
 name: pr-cloud-acceptance
 on:
-  push:
-    # Sequence of patterns matched against refs/heads
-    branches:
-      - main
-      - "release/**"
   pull_request:
-    types: [opened, synchronize, labeled]
+    types: [opened, synchronize]
     # Runs on PRs to main and all release branches
     branches:
       - main
