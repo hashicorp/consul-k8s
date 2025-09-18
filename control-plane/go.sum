@@ -212,14 +212,8 @@ github.com/gophercloud/gophercloud v0.1.0/go.mod h1:vxM41WHh5uqHVBMZHzuwNOHh8XEo
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
 github.com/hashicorp/consul-server-connection-manager v0.1.6 h1:ktj8Fi+dRXn9hhM+FXsfEJayhzzgTqfH08Ne5M6Fmug=
 github.com/hashicorp/consul-server-connection-manager v0.1.6/go.mod h1:HngMIv57MT+pqCVeRQMa1eTB5dqnyMm8uxjyv+Hn8cs=
-github.com/hashicorp/consul/api v1.32.2-0.20250918071517-1852c1b30cb8 h1:2mVa3QJr5CJ4hVhZ+49K7kDeS8DSDU/gsWrskhfCItM=
-github.com/hashicorp/consul/api v1.32.2-0.20250918071517-1852c1b30cb8/go.mod h1:wQc2b1bwxGJ+a3vIB8cmuueJaFKDmczuM1aseD9qcmI=
-github.com/hashicorp/consul/api v1.32.2-0.20250918071517-fe73d4ffa05a h1:mRM7sOOHCmraqf088fA3lv9wm9kpGqhP+TGCsry9uDk=
-github.com/hashicorp/consul/api v1.32.2-0.20250918071517-fe73d4ffa05a/go.mod h1:wQc2b1bwxGJ+a3vIB8cmuueJaFKDmczuM1aseD9qcmI=
 github.com/hashicorp/consul/api v1.32.2-0.20250918132512-1118ee770e61 h1:ChLzrR90rSk+W9g1alyQ+wdywzrRvkhyEgfJPrsdIsw=
 github.com/hashicorp/consul/api v1.32.2-0.20250918132512-1118ee770e61/go.mod h1:wQc2b1bwxGJ+a3vIB8cmuueJaFKDmczuM1aseD9qcmI=
-github.com/hashicorp/consul/api v1.32.3 h1:uphjFvDmymhtnqWYinve9GadBPreT8EGS/u2PewIs0c=
-github.com/hashicorp/consul/api v1.32.3/go.mod h1:qCrHmC5A1g3ieZExjdU95p5cYqfah3AiTm7vxsovco0=
 github.com/hashicorp/consul/proto-public v0.6.4 h1:7yN6qtUeVtq4ToEwgLxSpsVpvkw0iYpAeGgjxkaP0kk=
 github.com/hashicorp/consul/proto-public v0.6.4/go.mod h1:vb3Lmun0OIwygr0Awc5PilMCWtB4qnTx59nhiJ2ra3c=
 github.com/hashicorp/consul/sdk v0.16.3 h1:kI/oax+yeaoremkh36G/f4Q13ivdFF4AE+Co/LlZa0Q=

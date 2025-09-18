@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.6
 	github.com/hashicorp/consul/api v1.32.2-0.20250918132512-1118ee770e61
-	github.com/hashicorp/consul/sdk v0.16.2
+	github.com/hashicorp/consul/sdk v0.16.3
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v0.0.0-20230519164032-214571b6a530
 	github.com/hashicorp/go-hclog v1.6.3
