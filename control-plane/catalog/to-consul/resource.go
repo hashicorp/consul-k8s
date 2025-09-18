@@ -501,6 +501,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 				} else {
 					port = int(p.Port)
 				}
+
 				servicePorts = append(servicePorts, consulapi.ServicePort{
 					Port:    port,
 					Name:    getPortName(p.Name, idx+1),
@@ -739,23 +740,45 @@ func (t *ServiceResource) registerServiceInstance(
 		// For ClusterIP services and if LoadBalancerEndpointsSync is true, we use the endpoint port instead
 		// of the service port because we're registering each endpoint
 		// as a separate service instance.
-		epPort := baseService.Port
-		if overridePortName != "" {
-			// If we're supposed to use a specific named port, find it.
-			for _, p := range endpointSlice.Ports {
-				if overridePortName == *p.Name {
-					epPort = int(*p.Port)
-					break
+		epPorts := make(consulapi.ServicePorts, 0)
+
+		if overridePortNumber > 0 {
+			// Make this as default port
+			epPorts = append(epPorts, consulapi.ServicePort{
+				Port:    overridePortNumber,
+				Name:    "default",
+				Default: true,
+			})
+		}
+
+		for idx, p := range endpointSlice.Ports {
+			if overridePortName != "" && p.Name != nil && overridePortName == *p.Name {
+				// This will only trigger if overridePortNumber = 0 since the annotation can only have either port or name
+				epPort := int(*p.Port)
+				defaultPort := consulapi.ServicePort{
+					Port:    epPort,
+					Name:    getPortName(*p.Name, idx+1),
+					Default: true,
 				}
-			}
-		} else if overridePortNumber == 0 {
-			// Otherwise we'll just use the first port in the list
-			// (unless the port number was overridden by an annotation).
-			for _, p := range endpointSlice.Ports {
-				epPort = int(*p.Port)
-				break
+
+				// We keep default port as first just for convinience and consistency
+				epPorts = append(consulapi.ServicePorts{defaultPort}, epPorts...)
+			} else {
+				epPorts = append(epPorts, consulapi.ServicePort{
+					Port:    int(*p.Port),
+					Name:    getPortName(*p.Name, idx+1),
+					Default: false,
+				})
 			}
 		}
+
+		if len(epPorts) > 0 && !epPorts.HasDefault() {
+			// If there is no default port, make the first one the default
+			epPorts[0].Default = true
+		}
+
+		var epPort int
+
 		for _, endpoint := range endpointSlice.Endpoints {
 			for _, endpointAddr := range endpoint.Addresses {
 
@@ -789,7 +812,14 @@ func (t *ServiceResource) registerServiceInstance(
 				r.Service = &rs
 				r.Service.ID = serviceID(r.Service.Service, addr)
 				r.Service.Address = addr
-				r.Service.Port = epPort
+
+				// We don't support multi port for ingress sync
+				if epPort > 0 {
+					r.Service.Port = epPort
+				} else {
+					r.Service.Ports = epPorts
+				}
+
 				r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
 				r.Check = &consulapi.AgentCheck{
 					CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, addr)),
