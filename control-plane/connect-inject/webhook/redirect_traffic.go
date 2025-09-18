@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/hashicorp/consul/agent/netutil"
 	"github.com/hashicorp/consul/sdk/iptables"
 	corev1 "k8s.io/api/core/v1"
 
@@ -130,6 +131,13 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
 		cfg.ConsulDNSIP = consulDataplaneDNSBindHost
 		cfg.ConsulDNSPort = consulDataplaneDNSBindPort
+		ds, err := netutil.IsDualStack(w.ConsulConfig.APIClientConfig, false)
+		if err != nil {
+			return "", fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
+		}
+		if ds {
+			cfg.ConsulDNSIP = ipv6ConsulDataplaneDNSBindHost
+		}
 	}
 
 	iptablesConfigJson, err := json.Marshal(&cfg)

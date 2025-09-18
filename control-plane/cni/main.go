@@ -150,8 +150,6 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		Level: hclog.LevelFromString(cfg.LogLevel),
 	})
 
-	logger.Debug("consul-cni plugin config", "config", cfg)
-
 	// Only chained plugins have a previous result.
 	var result *current.Result
 
@@ -226,8 +224,11 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		iptablesCfg.IptablesProvider = c.iptablesProvider
 	}
 
+	dualStack := true
+	// Need mind bending logic here
+
 	// Apply the iptables rules.
-	err = iptables.Setup(iptablesCfg)
+	err = iptables.Setup(iptablesCfg, dualStack)
 	if err != nil {
 		return fmt.Errorf("could not apply iptables setup: %v", err)
 	}

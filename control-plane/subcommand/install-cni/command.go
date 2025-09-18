@@ -137,7 +137,6 @@ func (c *Command) Run(args []string) int {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	// Copy the consul-cni binary from the installer container to the host.
 	c.logger.Info("Copying consul-cni binary", "destination", cfg.CNIBinDir)
 	srcFile := filepath.Join(c.flagCNIBinSourceDir, consulCNIName)

@@ -419,8 +419,11 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService) error {
 		c.iptablesConfig.ExcludeInboundPorts = append(c.iptablesConfig.ExcludeInboundPorts, port)
 	}
 
+	dualStack := true
+	// Need mind bending logic here
+
 	// Configure any relevant information from the proxy service
-	err = iptables.Setup(c.iptablesConfig)
+	err = iptables.Setup(c.iptablesConfig, dualStack)
 	if err != nil {
 		return err
 	}

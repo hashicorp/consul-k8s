@@ -4,7 +4,7 @@ go 1.25.0
 
 replace github.com/hashicorp/consul-k8s/version => ../../version
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250904181930-3601fa2bbbce
+replace github.com/hashicorp/consul/sdk => ../../../consul/sdk
 
 require (
 	github.com/containernetworking/cni v1.1.2
