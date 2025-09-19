@@ -212,6 +212,11 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			// This can cause the re-queued reconcile used to come back and clean up the service registration to be re-re-queued at
 			// 2-3X the intended grace period.
 			retry.RunWith(&retry.Timer{Timeout: time.Duration(30) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+
+				// Wait for the pod to be fully deleted
+				// This ensures that the ACL token associated with pod had also been cleaned up
+				k8s.WaitForPodDeletion(r, ctx.KubectlOptions(r), clientPodName)
+
 				for _, name := range []string{
 					"static-client",
 					"static-client-sidecar-proxy",
