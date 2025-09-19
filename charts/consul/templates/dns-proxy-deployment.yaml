@@ -126,7 +126,7 @@ spec:
           command:
             - consul-dataplane
           args:
-            {{- if .Values.dualStack.defaultEnabled }}
+            {{- if .Values.global.dualStack.defaultEnabled }}
             - -consul-dns-bind-addr="[::]"
             {{- else }}
             - -consul-dns-bind-addr=0.0.0.0

@@ -683,7 +683,7 @@ spec:
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.dualStack.defaultEnabled }}
+              {{- if .Values.global.dualStack.defaultEnabled }}
               value: https://[::1]:8501
               {{- else }}
               value: https://127.0.0.1:8501
@@ -696,7 +696,7 @@ spec:
               {{- end }}
             {{- else }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.dualStack.defaultEnabled }}
+              {{- if .Values.global.dualStack.defaultEnabled }}
               value: http://[::1]:8500
               {{- else }}
               value: http://127.0.0.1:8500
