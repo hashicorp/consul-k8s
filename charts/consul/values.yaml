@@ -1098,16 +1098,28 @@ server:
   #     cpu: '100m'
   # ```
   #
+  # -----------------------------------------------------------------------------------------
+  # Reference Architecture Recommendations (Production):
+  #
+  #   • Small clusters: 2–4 CPU cores, 8–16 GB RAM
+  #   • Large clusters: 8–16 CPU cores, 32–64 GB RAM
+  #
+  # The defaults below (200Mi memory, 100m CPU) remain suitable for demo or dev/test.
+  # For a production environment, size the requests/limits to align with the above guidelines.
+  # -----------------------------------------------------------------------------------------
   # @recurse: false
   # @type: map
   resources:
     requests:
+      # Recommended production default: 8Gi (Small) | 32Gi (Large)
       memory: "200Mi"
+      # Recommended production default: 2 - 4 (Small) | 8 - 16 (Large)
       cpu: "100m"
     limits:
+      # Recommended production default: 16Gi (Small) | 64Gi (Large)
       memory: "200Mi"
-      cpu: "100m"
-
+      # Recommended production default: null
+      cpu: null
   # The security context for the server pods. This should be a YAML map corresponding to a
   # Kubernetes [SecurityContext](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/) object.
   # By default, servers will run as non-root, with user ID `100` and group ID `1000`,
@@ -1978,7 +1990,7 @@ dns:
 
     # Refers to an existing Kubernetes secret that contains an ACL token
     # for your Consul cluster. This token provides permissions for the DNS
-    # proxy. This field is required when `global.acls.manageSystemACLs` 
+    # proxy. This field is required when `global.acls.manageSystemACLs`
     # is set to `false` to enable manual ACL management in a Consul cluster.
     # node_prefix "" {
     #   policy = "read"
@@ -2272,7 +2284,7 @@ syncCatalog:
   # Set this to false to skip syncing ClusterIP services.
   syncClusterIPServices: true
 
-  # If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul. 
+  # If true, LoadBalancer service endpoints instead of ingress addresses will be synced to Consul.
   # If false, LoadBalancer endpoints are not synced to Consul.
   syncLoadBalancerEndpoints: false
 
@@ -2527,17 +2539,21 @@ connectInject:
         # This value sets the path to use for scraping gateway metrics via prometheus, defaults to /metrics if not set.
         # @type: string
         path: null
-        
+
       # The resource settings for Pods handling traffic for Gateway API.
       # @recurse: false
       # @type: map
       resources:
         requests:
+          # Recommended production default: 4Gi
           memory: "100Mi"
+          # Recommended production default: 2000m
           cpu: "100m"
         limits:
+          # Recommended production default: 2Gi
           memory: "100Mi"
-          cpu: "100m"
+          # Recommended production default: null
+          cpu: null
 
       # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
       deployment:
@@ -2787,23 +2803,28 @@ connectInject:
     # @type: string
     annotations: null
 
-  # The resource settings for connect inject pods. The defaults, are optimized for getting started worklows on developer deployments. The settings should be tweaked for production deployments.
+  # The resource settings for connect inject pods. Defaults are minimal for dev/test.
+  # -----------------------------------------------------------------------------------------
+  # Production Note:
+  # It is recommended to leave CPU limits set to 'null' in production for better
+  # performance under load.
+  # -----------------------------------------------------------------------------------------
   # @type: map
   resources:
     requests:
-      # Recommended production default: 500Mi
+      # Recommended production default: 2Gi
       # @type: string
       memory: "200Mi"
-      # Recommended production default: 250m
+      # Recommended production default: 2000m
       # @type: string
       cpu: "50m"
     limits:
-      # Recommended production default: 500Mi
+      # Recommended production default: 4Gi
       # @type: string
       memory: "200Mi"
-      # Recommended production default: 250m
+      # Recommended production default: null
       # @type: string
-      cpu: "50m"
+      cpu: null
 
   # Sets the failurePolicy for the mutating webhook. By default this will cause pods not part of the consul installation to fail scheduling while the webhook
   # is offline. This prevents a pod from skipping mutation if the webhook were to be momentarily offline.
@@ -2971,17 +2992,17 @@ connectInject:
     # @type: map
     resources:
       requests:
-        # Recommended production default: 100Mi
+        # Recommended production default: 2Gi
         # @type: string
-        memory: null
-        # Recommended production default: 100m
+        memory: 200Mi
+        # Recommended production default: 2000m
         # @type: string
-        cpu: null
+        cpu: 200m
       limits:
-        # Recommended production default: 100Mi
+        # Recommended production default: 4Gi
         # @type: string
-        memory: null
-        # Recommended production default: 100m
+        memory: 500Mi
+        # Recommended production default: null
         # @type: string
         cpu: null
     # Set default lifecycle management configuration for sidecar proxy.
@@ -3190,15 +3211,23 @@ meshGateway:
   # The resource settings for mesh gateway pods.
   # NOTE: The use of a YAML string is deprecated. Instead, set directly as a
   # YAML map.
+  # -----------------------------------------------------------------------------------------
+  # Production Note:
+  # It is recommended to set CPU limits to 'null' for better runtime flexibility under load.
+  # -----------------------------------------------------------------------------------------
   # @recurse: false
   # @type: map
   resources:
     requests:
+      # Recommended production default: 2Gi
       memory: "100Mi"
+      # Recommended production default: 2000m
       cpu: "100m"
     limits:
+      # Recommended production default: 4i
       memory: "100Mi"
-      cpu: "100m"
+      # Recommended production default: null
+      cpu: null
 
   # The resource settings for the `service-init` init container.
   # @recurse: false
@@ -3357,11 +3386,15 @@ ingressGateways:
     # @type: map
     resources:
       requests:
+        # Recommended production default: 2Gi
         memory: "100Mi"
+        # Recommended production default: 2000m
         cpu: "100m"
       limits:
+        # Recommended production default: 4Gi
         memory: "100Mi"
-        cpu: "100m"
+        # Recommended production default: null
+        cpu: null
 
     # This value defines the [affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
     # for ingress gateway pods. It defaults to `null` thereby allowing multiple gateway pods on each node. But if one would prefer
@@ -3492,11 +3525,15 @@ terminatingGateways:
     # @type: map
     resources:
       requests:
+        # Recommended production default: 2Gi
         memory: "100Mi"
+        # Recommended production default: 2000m
         cpu: "100m"
       limits:
+        # Recommended production default: 4Gi
         memory: "100Mi"
-        cpu: "100m"
+        # Recommended production default: null
+        cpu: null
 
     # This value defines the [affinity](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity)
     # for terminating gateway pods. It defaults to `null` thereby allowing multiple gateway pods on each node. But if one would prefer

@@ -211,11 +211,25 @@ spec:
               - NET_BIND_SERVICE
         {{- if .Values.meshGateway.resources }}
         resources:
-            {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
-            {{ tpl .Values.meshGateway.resources . | nindent 12 | trim }}
-            {{- else }}
-            {{- toYaml .Values.meshGateway.resources | nindent 12 }}
+          {{- if .Values.meshGateway.resources.requests }}
+          requests:
+            {{- if .Values.meshGateway.resources.requests.cpu }}
+            cpu: {{ .Values.meshGateway.resources.requests.cpu | toString | trim }}
             {{- end }}
+            {{- if .Values.meshGateway.resources.requests.memory }}
+            memory: {{ .Values.meshGateway.resources.requests.memory | toString | trim }}
+            {{- end }}
+          {{- end }}
+
+          {{- if .Values.meshGateway.resources.limits }}
+          limits:
+            {{- if .Values.meshGateway.resources.limits.cpu }}
+            cpu: {{ .Values.meshGateway.resources.limits.cpu | toString | trim }}
+            {{- end }}
+            {{- if .Values.meshGateway.resources.limits.memory }}
+            memory: {{ .Values.meshGateway.resources.limits.memory | toString | trim }}
+            {{- end }}
+          {{- end }}
         {{- end }}
         volumeMounts:
         - mountPath: /consul/service

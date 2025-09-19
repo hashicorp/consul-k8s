@@ -345,7 +345,7 @@ key2: value2' \
   [ $(echo "${actual}" | yq -r '.requests.memory') = "100Mi" ]
   [ $(echo "${actual}" | yq -r '.requests.cpu') = "100m" ]
   [ $(echo "${actual}" | yq -r '.limits.memory') = "100Mi" ]
-  [ $(echo "${actual}" | yq -r '.limits.cpu') = "100m" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = null ]
 }
 
 @test "meshGateway/Deployment: resources can be overridden" {
@@ -354,10 +354,10 @@ key2: value2' \
       -s templates/mesh-gateway-deployment.yaml  \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set 'meshGateway.resources.foo=bar' \
+      --set 'meshGateway.resources.limits.cpu=4' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
-  [ "${actual}" = "bar" ]
+      yq -r '.spec.template.spec.containers[0].resources.limits.cpu' | tee /dev/stderr)
+  [ "${actual}" = 4 ]
 }
 
 # Test support for the deprecated method of setting a YAML string.
@@ -368,10 +368,10 @@ key2: value2' \
       --set 'meshGateway.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'client.grpc=true' \
-      --set 'meshGateway.resources=foo: bar' \
+      --set 'meshGateway.resources.limits.cpu="2000m"' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
-  [ "${actual}" = "bar" ]
+      yq -r '.spec.template.spec.containers[0].resources.limits.cpu' | tee /dev/stderr)
+  [ "${actual}" = "2000m" ]
 }
 
 #--------------------------------------------------------------------

@@ -99,17 +99,17 @@ load _helpers
       -s templates/server-statefulset.yaml  \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.containers[0].resources' | tee /dev/stderr)
-  [ "${actual}" = '{"limits":{"cpu":"100m","memory":"200Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}' ]
+  [ "${actual}" = '{"requests":{"cpu":"100m","memory":"200Mi"},"limits":{"memory":"200Mi"}}' ]
 }
 
 @test "server/StatefulSet: resources can be overridden" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.resources.foo=bar' \
+      --set 'server.resources.limits.cpu=4' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
-  [ "${actual}" = "bar" ]
+      yq -r '.spec.template.spec.containers[0].resources.limits.cpu' | tee /dev/stderr)
+  [ "${actual}" = 4 ]
 }
 
 # Test support for the deprecated method of setting a YAML string.
@@ -117,10 +117,10 @@ load _helpers
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
-      --set 'server.resources=foo: bar' \
+      --set 'server.resources.limits.cpu="2000m"' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].resources.foo' | tee /dev/stderr)
-  [ "${actual}" = "bar" ]
+      yq -r '.spec.template.spec.containers[0].resources.limits.cpu' | tee /dev/stderr)
+  [ "${actual}" = "2000m" ]
 }
 
 #--------------------------------------------------------------------

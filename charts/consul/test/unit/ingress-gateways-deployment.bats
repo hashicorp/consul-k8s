@@ -515,7 +515,7 @@ load _helpers
   [ $(echo "${actual}" | yq -r '.requests.memory') = "100Mi" ]
   [ $(echo "${actual}" | yq -r '.requests.cpu') = "100m" ]
   [ $(echo "${actual}" | yq -r '.limits.memory') = "100Mi" ]
-  [ $(echo "${actual}" | yq -r '.limits.cpu') = "100m" ]
+  [ $(echo "${actual}" | yq -r '.limits.cpu') = null ]
 }
 
 @test "ingressGateways/Deployment: resources can be set through defaults" {
