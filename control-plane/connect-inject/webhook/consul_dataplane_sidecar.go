@@ -17,11 +17,13 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const (
-	consulDataplaneDNSBindHost = "127.0.0.1"
-	consulDataplaneDNSBindPort = 8600
+	consulDataplaneDNSBindHost     = "127.0.0.1"
+	ipv6ConsulDataplaneDNSBindHost = "::1"
+	consulDataplaneDNSBindPort     = 8600
 )
 
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
@@ -321,9 +323,26 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
+	envoyAdminBindAddress := "127.0.0.1"
+	consulDNSBindAddress := consulDataplaneDNSBindHost
+	consulDPBindAddress := "127.0.0.1"
+	xdsBindAddress := "127.0.0.1"
 
+	ds, err := netutil.IsDualStack(w.ConsulConfig.APIClientConfig, false)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
+	}
+	if ds {
+		envoyAdminBindAddress = "::1"
+		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
+		consulDPBindAddress = "::"
+		xdsBindAddress = "::1"
+	}
 	args := []string{
 		"-addresses", w.ConsulAddress,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-consul-dns-bind-addr=" + consulDNSBindAddress,
+		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
@@ -389,6 +408,9 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	// To avoid conflicts
 	if mpi.serviceName != "" {
 		gracefulPort = gracefulPort + mpi.serviceIndex
+	}
+	if consulDPBindAddress != "" {
+		args = append(args, fmt.Sprintf("-graceful-addr=%s", consulDPBindAddress))
 	}
 	args = append(args, fmt.Sprintf("-graceful-port=%d", gracefulPort))
 

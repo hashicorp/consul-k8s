@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -226,8 +227,13 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		iptablesCfg.IptablesProvider = c.iptablesProvider
 	}
 
+	dualStack := false
+	if os.Getenv("CNI_DUAL_STACK") == "true" {
+		dualStack = true
+	}
+
 	// Apply the iptables rules.
-	err = iptables.Setup(iptablesCfg)
+	err = iptables.Setup(iptablesCfg, dualStack)
 	if err != nil {
 		return fmt.Errorf("could not apply iptables setup: %v", err)
 	}
