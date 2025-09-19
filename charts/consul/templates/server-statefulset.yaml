@@ -644,12 +644,27 @@ spec:
                 - "-ec"
                 - |
                   {{- if .Values.global.tls.enabled }}
-                  curl -k \
+                  {{- if .Values.server.readinessProbe.usePodIp.enabled }}
+                  POD_IP=$POD_IP /bin/sh -ce 'curl -k \
+                     --cacert /consul/tls/ca/tls.crt \
+                     https://"$POD_IP":8501/v1/status/leader \
+                  {{- else }}
+                  curl \
+                    --cacert /consul/tls/ca/tls.crt \
                     https://127.0.0.1:8501/v1/status/leader \
+                  {{- end }}
+                  {{- else }}
+                  {{- if .Values.server.readinessProbe.usePodIp.enabled }}
+                  POD_IP=$POD_IP /bin/sh -ce 'curl http://"$POD_IP":8500/v1/status/leader \
                   {{- else }}
                   curl http://127.0.0.1:8500/v1/status/leader \
                   {{- end }}
+                  {{- end }}
+                  {{- if .Values.server.readinessProbe.usePodIp.enabled }}
+                  2>/dev/null | grep -E '".+"''
+                  {{- else }}
                   2>/dev/null | grep -E '".+"'
+                  {{- end }}
             failureThreshold: 2
             initialDelaySeconds: 5
             periodSeconds: 3
