@@ -807,13 +807,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				RunAsNonRoot:             ptr.To(true),
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
-				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-					Drop: []corev1.Capability{"ALL"},
-				},
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
 			},
 		},
 		"tproxy enabled; openshift disabled": {
@@ -825,13 +818,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				RunAsNonRoot:             ptr.To(true),
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
-				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-					Drop: []corev1.Capability{"ALL"},
-				},
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
 			},
 		},
 		"tproxy disabled; openshift enabled": {
@@ -843,13 +829,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				RunAsNonRoot:             ptr.To(true),
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
-				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-					Drop: []corev1.Capability{"ALL"},
-				},
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
 			},
 		},
 		"tproxy enabled; openshift enabled": {
@@ -861,13 +840,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				RunAsNonRoot:             ptr.To(true),
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
-				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
-					Drop: []corev1.Capability{"ALL"},
-				},
-				SeccompProfile: &corev1.SeccompProfile{
-					Type: corev1.SeccompProfileTypeRuntimeDefault,
-				},
 			},
 		},
 	}
