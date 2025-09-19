@@ -291,8 +291,13 @@ spec:
               exec /usr/local/bin/docker-entrypoint.sh consul agent \
                 -node="${NODE}" \
                 -advertise="${ADVERTISE_IP}" \
+                {{- if .Values.global.dualStack.defaultEnabled }}
+                -bind="[::]" \
+                -client="[::]" \
+                {{- else }}
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
+                {{- end }}
                 {{- range $k, $v := .Values.client.nodeMeta }}
                 -node-meta={{ $k }}:{{ $v }} \
                 {{- end }}
@@ -485,7 +490,11 @@ spec:
                   {{- if .Values.global.tls.enabled }}
                   curl \
                     -k \
+                    {{- if .Values.global.dualStack.defaultEnabled }}
+                    https://[::1]:8501/v1/status/leader \
+                    {{- else }}
                     https://127.0.0.1:8501/v1/status/leader \
+                    {{- end }}
                   {{- else }}
                   curl http://127.0.0.1:8500/v1/status/leader \
                   {{- end }}
