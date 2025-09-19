@@ -920,6 +920,9 @@ global:
   # @type: array<string>
   experiments: []
 
+  dualStack:
+    defaultEnabled: false
+
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
 # the Kube cluster.
@@ -3784,3 +3787,4 @@ telemetryCollector:
   # it could be used to configure custom consul parameters.
   # @type: map
   extraEnvironmentVars: {}
+
