@@ -147,9 +147,8 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
 			var terminationGracePeriod int64 = 6
-			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
-			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
-			require.NoError(t, err)
+			logger.Logf(t, "scaling down the static-client deployment to 0 replicas")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
 
 			// Exec into terminating pod, not just any static-client pod
 			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
