@@ -147,9 +147,8 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
 			var terminationGracePeriod int64 = 6
-			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
-			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
-			require.NoError(t, err)
+			logger.Logf(t, "scaling down the static-client deployment to 0 replicas")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
 
 			// Exec into terminating pod, not just any static-client pod
 			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
@@ -212,6 +211,11 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			// This can cause the re-queued reconcile used to come back and clean up the service registration to be re-re-queued at
 			// 2-3X the intended grace period.
 			retry.RunWith(&retry.Timer{Timeout: time.Duration(30) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+
+				// Wait for the pod to be fully deleted
+				// This ensures that the ACL token associated with pod had also been cleaned up
+				k8s.WaitForPodDeletion(r, ctx.KubectlOptions(r), clientPodName)
+
 				for _, name := range []string{
 					"static-client",
 					"static-client-sidecar-proxy",
