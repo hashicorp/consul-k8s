@@ -8,13 +8,14 @@ require (
 	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.2.0
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul/sdk v0.16.2
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/stretchr/testify v1.8.4
 	k8s.io/api v0.29.8
 	k8s.io/apimachinery v0.29.8
 	k8s.io/client-go v0.29.8
 )
+
+require github.com/hashicorp/consul/sdk v0.4.1-0.20250919124332-fe5b36f5014c
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -44,7 +45,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
