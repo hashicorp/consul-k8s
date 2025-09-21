@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -28,9 +30,10 @@ import (
 const defaultAdminPort int = 19000
 
 const (
-	Table = "table"
-	JSON  = "json"
-	Raw   = "raw"
+	Table   = "table"
+	JSON    = "json"
+	Raw     = "raw"
+	Archive = "archive"
 
 	flagNameNamespace   = "namespace"
 	flagNameOutput      = "output"
@@ -96,7 +99,7 @@ func (c *ReadCommand) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameOutput,
 		Target:  &c.flagOutput,
-		Usage:   "Output the Envoy configuration as 'table', 'json', or 'raw'.",
+		Usage:   "Output the Envoy configuration as 'table', 'json', 'raw' or 'archive'.",
 		Default: Table,
 		Aliases: []string{"o"},
 	})
@@ -266,7 +269,7 @@ func (c *ReadCommand) validateFlags() error {
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
-	if outputs := []string{Table, JSON, Raw}; !slices.Contains(outputs, c.flagOutput) {
+	if outputs := []string{Table, JSON, Raw, Archive}; !slices.Contains(outputs, c.flagOutput) {
 		return fmt.Errorf("-output must be one of %s.", strings.Join(outputs, ", "))
 	}
 	return nil
@@ -356,6 +359,8 @@ func (c *ReadCommand) outputConfigs(configs map[string]*envoy.EnvoyConfig) error
 		return c.outputJSON(configs)
 	case Raw:
 		return c.outputRaw(configs)
+	case Archive:
+		return c.outputArchive(configs)
 	}
 
 	return nil
@@ -544,4 +549,49 @@ func (c *ReadCommand) outputSecretsTable(secrets []envoy.Secret) {
 
 	c.UI.Output(fmt.Sprintf("Secrets (%d)", len(secrets)), terminal.WithHeaderStyle())
 	c.UI.Table(formatSecrets(secrets))
+}
+
+func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error {
+	cfgs := make(map[string]interface{})
+	for name, config := range configs {
+		cfg := make(map[string]interface{})
+		if c.shouldPrintTable(c.flagClusters) {
+			cfg["clusters"] = FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort)
+		}
+		if c.shouldPrintTable(c.flagEndpoints) {
+			cfg["endpoints"] = FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort)
+		}
+		if c.shouldPrintTable(c.flagListeners) {
+			cfg["listeners"] = FilterListeners(config.Listeners, c.flagAddress, c.flagPort)
+		}
+		if c.shouldPrintTable(c.flagRoutes) {
+			cfg["routes"] = config.Routes
+		}
+		if c.shouldPrintTable(c.flagSecrets) {
+			cfg["secrets"] = config.Secrets
+		}
+		cfgs[name] = cfg
+	}
+
+	marshalled, err := json.MarshalIndent(cfgs, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	// Create file path and directory for storing proxy read data
+	// NOTE: currently it is writing data file in cwd /proxy dir only. Also, file contents will be overwritten if
+	// the command is run multiple times for the same pod name or if file already exists.
+	proxyReadFilePath := filepath.Join("proxy", "proxy-read-"+c.flagPodName+".json")
+	err = os.MkdirAll(filepath.Dir(proxyReadFilePath), 0755)
+	if err != nil {
+		fmt.Printf("error creating proxy read output directory: %v", err)
+	}
+	err = os.WriteFile(proxyReadFilePath, marshalled, 0644)
+	if err != nil {
+		// Note: Please do not delete the directory created above even if writing file fails.
+		// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
+		fmt.Printf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err)
+	}
+	c.UI.Output("proxy read '%s' output saved to '%s'", c.flagPodName, proxyReadFilePath, terminal.WithSuccessStyle())
+	return nil
 }

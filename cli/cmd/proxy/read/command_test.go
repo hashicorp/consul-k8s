@@ -6,10 +6,12 @@ package read
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/posener/complete"
@@ -157,6 +159,58 @@ func TestReadCommandOutput(t *testing.T) {
 			}
 		})
 	}
+}
+func TestReadCommandOutputArchive(t *testing.T) {
+
+	tempDir := t.TempDir()
+	originalWD, err := os.Getwd()
+	require.NoError(t, err)
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	defer os.Chdir(originalWD)
+
+	podName := "fakePod"
+	fakePod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: "default",
+		},
+	}
+
+	buf := new(bytes.Buffer)
+	c := setupCommand(buf)
+	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{fakePod}})
+	c.fetchConfig = func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error) {
+		return testEnvoyConfig, nil
+	}
+
+	args := []string{podName, "-output", "archive"}
+	out := c.Run(args)
+
+	require.Equal(t, 0, out)
+
+	expectedFilePath := filepath.Join(tempDir, "proxy", "proxy-read-"+podName+".json")
+
+	_, err = os.Stat(expectedFilePath)
+	require.NoError(t, err, "expected output file to be created, but it was not")
+
+	expectedConfig := map[string]interface{}{
+		podName: map[string]interface{}{
+			"clusters":  testEnvoyConfig.Clusters,
+			"endpoints": testEnvoyConfig.Endpoints,
+			"listeners": testEnvoyConfig.Listeners,
+			"routes":    testEnvoyConfig.Routes,
+			"secrets":   testEnvoyConfig.Secrets,
+		},
+	}
+	expectedJSON, err := json.MarshalIndent(expectedConfig, "", "\t")
+	require.NoError(t, err)
+
+	actualJSON, err := os.ReadFile(expectedFilePath)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expectedJSON), string(actualJSON))
+
+	require.Contains(t, buf.String(), fmt.Sprintf("proxy read '%s' output saved to", podName))
 }
 
 // TestFilterWarnings ensures that a warning is printed if the user applies a
