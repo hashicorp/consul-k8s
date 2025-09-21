@@ -37,7 +37,7 @@ func TestCheckConsulServers(t *testing.T) {
 		desired int
 		healthy int
 	}{
-		"No servers":                    {0, 0},
+		"No servers":                    {},
 		"3 servers expected, 1 healthy": {3, 1},
 		"3 servers expected, 3 healthy": {3, 3},
 	}
@@ -48,17 +48,102 @@ func TestCheckConsulServers(t *testing.T) {
 			c := getInitializedCommand(t, buf)
 			c.kubernetes = fake.NewSimpleClientset()
 
-			// Deploy servers
-			err := createServers("consul-servers", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
-			require.NoError(t, err)
+			// Deploy servers if needed.
+			if name != "No servers" {
+				err := createServers("consul-server", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
+				require.NoError(t, err)
+			}
 
 			// Verify that the correct server statuses are seen.
-			err = c.checkConsulServers(namespace)
+			err := c.checkConsulServers(namespace)
 			require.NoError(t, err)
 
 			actual := buf.String()
-			if tc.desired != 0 {
-				require.Contains(t, actual, fmt.Sprintf("Consul servers healthy %d/%d", tc.healthy, tc.desired))
+			if tc.desired > 0 {
+				require.Contains(t, actual, "NAME         \tREADY\tAGE          \tCONTAINERS\tIMAGES ")
+				require.Contains(t, actual, "consul-server")
+				require.Contains(t, actual, fmt.Sprintf("%d/%d", tc.healthy, tc.desired))
+			} else {
+				require.Contains(t, actual, "No Consul Server found in Kubernetes cluster.")
+			}
+			buf.Reset()
+		})
+	}
+}
+func TestCheckConsulClients(t *testing.T) {
+	namespace := "default"
+	cases := map[string]struct {
+		desired int
+		healthy int
+	}{
+		"No clients":                    {},
+		"3 clients expected, 1 healthy": {3, 1},
+		"3 clients expected, 3 healthy": {3, 3},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := getInitializedCommand(t, buf)
+			c.kubernetes = fake.NewSimpleClientset()
+
+			// Deploy clients if needed.
+			if name != "No clients" {
+				err := createClients("consul-client", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
+				require.NoError(t, err)
+			}
+
+			// Verify that the correct server statuses are seen.
+			err := c.checkConsulClients(namespace)
+			require.NoError(t, err)
+
+			actual := buf.String()
+			if tc.desired > 0 {
+				require.Contains(t, actual, "NAME         \tREADY\tAGE          \tCONTAINERS\tIMAGES ")
+				require.Contains(t, actual, "consul-client")
+				require.Contains(t, actual, fmt.Sprintf("%d/%d", tc.healthy, tc.desired))
+			} else {
+				require.Contains(t, actual, "No Consul Client found in Kubernetes cluster.")
+			}
+			buf.Reset()
+		})
+	}
+
+}
+func TestCheckConsulDeployments(t *testing.T) {
+	namespace := "default"
+	cases := map[string]struct {
+		desired int
+		healthy int
+	}{
+		"No deployments":                    {},
+		"3 deployments expected, 1 healthy": {3, 1},
+		"3 deployments expected, 3 healthy": {3, 3},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			c := getInitializedCommand(t, buf)
+			c.kubernetes = fake.NewSimpleClientset()
+
+			// Deploy clients if needed.
+			if name != "No deployments" {
+				err := createDeployments("consul-deployment", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
+				require.NoError(t, err)
+			}
+
+			// Verify that the correct server statuses are seen.
+			err := c.checkConsulDeployments(namespace)
+			require.NoError(t, err)
+
+			actual := buf.String()
+			if tc.desired > 0 {
+				require.Contains(t, actual, "NAME             \tREADY\tAGE          \tCONTAINERS\tIMAGES ")
+				require.Contains(t, actual, "consul-deployment")
+				require.Contains(t, actual, fmt.Sprintf("%d/%d", tc.healthy, tc.desired))
+			} else {
+				require.Contains(t, actual, "No Consul deployments found in Kubernetes cluster.")
 			}
 			buf.Reset()
 		})
@@ -77,14 +162,29 @@ func TestStatus(t *testing.T) {
 		helmActionsRunner  *helm.MockActionRunner
 		expectedReturnCode int
 	}{
-		"status with servers returns success": {
+		"status with checkConsulComponentsStatus returns success": {
 			input: []string{},
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
-				"\n==> Config:\n    {}\n    \nConsul servers healthy 3/3\n",
+				"\n==> Config:\n    {}\n",
+				"\n==> Consul Client status:",
+				"\nconsul-client-test1\t3/3",
+				"\n==> Consul Server status:",
+				"\nconsul-server-test1\t3/3",
+				"\n==> Consul Deployment status:",
+				"\nconsul-deployment-test1\t3/3",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) error {
-				return createServers("consul-server-test1", "consul", 3, 3, k8s)
+				if err := createServers("consul-server-test1", "consul", 3, 3, k8s); err != nil {
+					return err
+				}
+				if err := createClients("consul-client-test1", "consul", 3, 3, k8s); err != nil {
+					return err
+				}
+				if err := createDeployments("consul-deployment-test1", "consul", 3, 3, k8s); err != nil {
+					return err
+				}
+				return nil
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -107,10 +207,25 @@ func TestStatus(t *testing.T) {
 			messages: []string{
 				fmt.Sprintf("\n==> Consul Status Summary\nName\tNamespace\tStatus\tChart Version\tAppVersion\tRevision\tLast Updated            \n    \t         \tREADY \t1.0.0        \t          \t0       \t%s\t\n", notImeStr),
 				"\n==> Config:\n    {}\n    \n",
-				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded\nConsul servers healthy 3/3\n",
+				"\n==> Status Of Helm Hooks:\npre-install-hook pre-install: Succeeded\npre-upgrade-hook pre-upgrade: Succeeded",
+				"\n==> Consul Client status:",
+				"\nconsul-client-test1\t3/3",
+				"\n==> Consul Server status:",
+				"\nconsul-server-test1\t3/3",
+				"\n==> Consul Deployment status:",
+				"\nconsul-deployment-test1\t3/3",
 			},
 			preProcessingFunc: func(k8s kubernetes.Interface) error {
-				return createServers("consul-server-test1", "consul", 3, 3, k8s)
+				if err := createServers("consul-server-test1", "consul", 3, 3, k8s); err != nil {
+					return err
+				}
+				if err := createClients("consul-client-test1", "consul", 3, 3, k8s); err != nil {
+					return err
+				}
+				if err := createDeployments("consul-deployment-test1", "consul", 3, 3, k8s); err != nil {
+					return err
+				}
+				return nil
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
@@ -282,5 +397,38 @@ func createServers(name, namespace string, replicas, readyReplicas int32, k8s ku
 		},
 	}
 	_, err := k8s.AppsV1().StatefulSets(namespace).Create(context.Background(), &servers, metav1.CreateOptions{})
+	return err
+}
+func createClients(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
+	clients := appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "client"},
+		},
+		Status: appsv1.DaemonSetStatus{
+			DesiredNumberScheduled: replicas,
+			NumberReady:            readyReplicas,
+		},
+	}
+	_, err := k8s.AppsV1().DaemonSets(namespace).Create(context.Background(), &clients, metav1.CreateOptions{})
+	return err
+}
+func createDeployments(name, namespace string, replicas, readyReplicas int32, k8s kubernetes.Interface) error {
+	deployments := appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "deployment"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+		},
+		Status: appsv1.DeploymentStatus{
+			Replicas:      replicas,
+			ReadyReplicas: readyReplicas,
+		},
+	}
+	_, err := k8s.AppsV1().Deployments(namespace).Create(context.Background(), &deployments, metav1.CreateOptions{})
 	return err
 }
