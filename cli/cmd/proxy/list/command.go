@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -30,7 +33,7 @@ const (
 	flagNameAllNamespaces = "all-namespaces"
 	flagNameKubeConfig    = "kubeconfig"
 	flagNameKubeContext   = "context"
-	flagOutputFormat      = "output-format"
+	flagNameOutputFormat  = "output"
 )
 
 // ListCommand is the command struct for the proxy list command.
@@ -71,7 +74,7 @@ func (c *ListCommand) init() {
 		Aliases: []string{"A"},
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    flagOutputFormat,
+		Name:    flagNameOutputFormat,
 		Default: "table",
 		Target:  &c.flagOutputFormat,
 		Usage:   "Output format",
@@ -151,7 +154,7 @@ func (c *ListCommand) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameAllNamespaces): complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeConfig):    complete.PredictFiles("*"),
 		fmt.Sprintf("-%s", flagNameKubeContext):   complete.PredictNothing,
-		fmt.Sprintf("-%s", flagOutputFormat):      complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameOutputFormat):  complete.PredictNothing,
 	}
 }
 
@@ -169,6 +172,9 @@ func (c *ListCommand) validateFlags() error {
 	}
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
+	}
+	if outputs := []string{"table", "json", "archive"}; !slices.Contains(outputs, c.flagOutputFormat) {
+		return fmt.Errorf("-output must be one of %s.", strings.Join(outputs, ", "))
 	}
 
 	return nil
@@ -325,10 +331,32 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		tableJson := tbl.ToJson()
 		jsonSt, err := json.MarshalIndent(tableJson, "", "    ")
 		if err != nil {
-			c.UI.Output("Error converting table to json: %v", err.Error(), terminal.WithErrorStyle())
+			c.UI.Output("error converting table to json: %v", err.Error(), terminal.WithErrorStyle())
 		} else {
 			c.UI.Output(string(jsonSt))
 		}
+	} else if c.flagOutputFormat == "archive" {
+		tableJson := tbl.ToJson()
+		jsonSt, err := json.MarshalIndent(tableJson, "", "    ")
+		if err != nil {
+			c.UI.Output("error converting proxy list output to json: %v", err.Error(), terminal.WithErrorStyle())
+		}
+
+		// Create file path and directory for storing proxy list
+		// NOTE: currently it is writing stats file in cwd '/proxy' only. Also, file contents will be overwritten
+		// if the command is run multiple times or if file already exists.
+		proxyListFilePath := filepath.Join("proxy", "proxy-list.json")
+		err = os.MkdirAll(filepath.Dir(proxyListFilePath), 0755)
+		if err != nil {
+			fmt.Printf("error creating proxy list output directory: %v", err)
+		}
+		err = os.WriteFile(proxyListFilePath, jsonSt, 0644)
+		if err != nil {
+			// Note: Please do not delete the directory created above even if writing file fails.
+			// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
+			fmt.Printf("error writing proxy list output to json file: %v", err)
+		}
+		c.UI.Output("proxy list output saved to '%s'", proxyListFilePath, terminal.WithSuccessStyle())
 	} else {
 		if !c.flagAllNamespaces {
 			c.UI.Output("Namespace: %s\n", c.namespace())

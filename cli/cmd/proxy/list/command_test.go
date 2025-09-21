@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
@@ -40,6 +41,10 @@ func TestFlagParsing(t *testing.T) {
 			out:  1,
 		},
 		"Invalid argument passed, -namespace YOLO": {
+			args: []string{"-namespace", "YOLO"},
+			out:  1,
+		},
+		"Invalid argument passed, -output-format pdf ": {
 			args: []string{"-namespace", "YOLO"},
 			out:  1,
 		},
@@ -442,6 +447,127 @@ func TestListCommandOutputInJsonFormat(t *testing.T) {
 		Type      string `json:"Type"`
 	}
 	require.NoErrorf(t, json.Unmarshal(buf.Bytes(), &actual), "failed to parse json output: %s", buf.String())
+
+	require.Len(t, actual, 7)
+	assert.Equal(t, "api-gateway", actual[0].Name)
+	assert.Equal(t, "both-labels-api-gateway", actual[1].Name)
+	assert.Equal(t, "deprecated-api-gateway", actual[2].Name)
+	assert.Equal(t, "ingress-gateway", actual[3].Name)
+	assert.Equal(t, "mesh-gateway", actual[4].Name)
+	assert.Equal(t, "terminating-gateway", actual[5].Name)
+	assert.Equal(t, "pod1", actual[6].Name)
+}
+func TestListCommandOutputInArchiveFormat(t *testing.T) {
+	pods := []v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "ingress-gateway",
+				Namespace: "default",
+				Labels: map[string]string{
+					"component": "ingress-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "mesh-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "mesh-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "terminating-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component": "terminating-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"component":                            "api-gateway",
+					"gateway.consul.hashicorp.com/managed": "true",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "both-labels-api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+					"component": "api-gateway",
+					"chart":     "consul-helm",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "deprecated-api-gateway",
+				Namespace: "consul",
+				Labels: map[string]string{
+					"api-gateway.consul.hashicorp.com/managed": "true",
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "dont-fetch",
+				Namespace: "default",
+				Labels:    map[string]string{},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod1",
+				Namespace: "default",
+				Labels: map[string]string{
+					"consul.hashicorp.com/connect-inject-status": "injected",
+				},
+			},
+		},
+	}
+	client := fake.NewSimpleClientset(&v1.PodList{Items: pods})
+
+	// Create a temporary directory for this test run.
+	tempDir := t.TempDir()
+
+	// Change the current working directory to our temporary directory.
+	originalWD, err := os.Getwd()
+	require.NoError(t, err)
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
+	defer os.Chdir(originalWD) // Ensure we change back.
+
+	buf := new(bytes.Buffer)
+	c := setupCommand(buf)
+	c.kubernetes = client
+
+	out := c.Run([]string{"-A", "-o", "archive"})
+	require.Equal(t, 0, out)
+
+	expectedFilePath := filepath.Join(tempDir, "proxy", "proxy-list.json")
+	_, err = os.Stat(expectedFilePath)
+	require.NoError(t, err, "expected output file to be created, but it was not")
+
+	actualJSON, err := os.ReadFile(expectedFilePath)
+	require.NoError(t, err)
+
+	var actual []struct {
+		Name      string `json:"Name"`
+		Namespace string `json:"Namespace"`
+		Type      string `json:"Type"`
+	}
+	require.NoErrorf(t, json.Unmarshal(actualJSON, &actual), "failed to parse json output: %s", actualJSON)
 
 	require.Len(t, actual, 7)
 	assert.Equal(t, "api-gateway", actual[0].Name)
