@@ -6,6 +6,8 @@ package main
 import (
 	"context"
 
+	debug "github.com/hashicorp/consul-k8s/cli/cmd/debug"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 
@@ -31,7 +33,7 @@ import (
 	"github.com/hashicorp/consul-k8s/version"
 )
 
-func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseCommand, map[string]cli.CommandFactory) {
+func initializeCommands(ctx context.Context, log hclog.Logger, cleanupConfirmation chan int, cleanupReq chan bool) (*common.BaseCommand, map[string]cli.CommandFactory) {
 	baseCommand := &common.BaseCommand{
 		Ctx: ctx,
 		Log: log,
@@ -74,6 +76,19 @@ func initializeCommands(ctx context.Context, log hclog.Logger) (*common.BaseComm
 			return &gwread.Command{
 				BaseCommand: baseCommand,
 			}, nil
+		},
+		"debug": func() (cli.Command, error) {
+			// if cleanup is required
+			baseCommandWithCleanup := *baseCommand
+			baseCommandWithCleanup.CleanupConfirmation = cleanupConfirmation
+			baseCommandWithCleanup.CleanupReq = cleanupReq
+			return &debug.DebugCommand{
+				BaseCommand: &baseCommandWithCleanup,
+			}, nil
+			// if NO cleanup is required
+			// return &debug.DebugCommand{
+			// 	BaseCommand: baseCommand,
+			// }, nil
 		},
 		"proxy": func() (cli.Command, error) {
 			return &proxy.ProxyCommand{
