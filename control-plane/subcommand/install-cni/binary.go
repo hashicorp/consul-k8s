@@ -10,14 +10,15 @@ import (
 )
 
 // copyFile copies a file from a source directory to a destination directory.
-func copyFile(srcFile, destDir string) error {
+func copyFile(srcFile, destDir, filename string) error {
 	// If the src file does not exist then either the incorrect command line argument was used or
 	// the docker container we built is broken somehow.
 	if _, err := os.Stat(srcFile); os.IsNotExist(err) {
 		return err
 	}
-
-	filename := filepath.Base(srcFile)
+	if filename == "" {
+		filename = filepath.Base(srcFile)
+	}
 	// If the destDir does not exist then the incorrect command line argument was used or
 	// the CNI settings for the kubelet are not correct.
 	info, err := os.Stat(destDir)
