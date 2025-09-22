@@ -151,13 +151,18 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				require.NoError(r, err)
 				require.Len(r, pods.Items, 1)
 			})
-			clientPodName := pods.Items[0].Name
 
 			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
 			var terminationGracePeriod int64 = 6
 			logger.Logf(t, "scaling down the static-client deployment to 0 replicas")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
 
+			clientPodName := pods.Items[0].Name
+			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
+			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
+			require.NoError(t, err)
+
+			logger.Logf(t, "pod %q should terminate in approximately %d seconds", clientPodName, terminationGracePeriod)
 			// Exec into terminating pod, not just any static-client pod
 			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
 
@@ -168,6 +173,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			if gracePeriodSeconds > 0 {
+				logger.Logf(t, "ensuring pod does not terminate before %d second grace period", gracePeriodSeconds)
 				// Ensure outbound requests are still successful during grace period.
 				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
 			gracePeriodLoop:
@@ -178,6 +184,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					default:
 						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
 						retry.RunWith(retrier, t, func(r *retry.R) {
+							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
 								r.Errorf("%v", err.Error())
@@ -200,6 +207,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					}
 				}
 			} else {
+				logger.Logf(t, "ensuring pod terminates immediately with 0 second grace period")
 				// Ensure outbound requests fail because proxy has terminated
 				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
 					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
