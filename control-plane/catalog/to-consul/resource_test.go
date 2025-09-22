@@ -776,7 +776,6 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 }
 
 // Test that with LoadBalancerEndpointsSync set to true we track the IP of the endpoints not the LB IP/name.
-// TODO: Check on how to handle multiport
 func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 	t.Parallel()
 	client := fake.NewSimpleClientset()
