@@ -965,11 +965,15 @@ func (f *fakeIptablesProvider) AddRule(_ string, args ...string) {
 	f.rules = append(f.rules, strings.Join(args, " "))
 }
 
-func (f *fakeIptablesProvider) ApplyRules() error {
+func (f *fakeIptablesProvider) ApplyRules(command string) error {
 	f.applyCalled = true
 	return nil
 }
 
 func (f *fakeIptablesProvider) Rules() []string {
 	return f.rules
+}
+
+func (f *fakeIptablesProvider) ClearAllRules() {
+	f.rules = nil
 }

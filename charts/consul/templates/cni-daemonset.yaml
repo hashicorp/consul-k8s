@@ -71,6 +71,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.uid
+            - name: CNI_DUAL_STACK
+              value: "{{ .Values.global.dualStack.defaultEnabled }}"
           command:
             - consul-k8s-control-plane
             - install-cni
