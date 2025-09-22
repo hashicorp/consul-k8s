@@ -101,6 +101,14 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			connHelper.Setup(t)
 			connHelper.Install(t)
+
+			// Sanity check that control plane is healthy before deploying any applications
+			retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				peers, err := connHelper.ConsulClient.Status().Peers()
+				require.NoError(r, err)
+				require.Len(r, peers, 1)
+			})
+
 			connHelper.DeployClientAndServer(t)
 
 			// TODO: should this move into connhelper.DeployClientAndServer?
