@@ -126,7 +126,11 @@ spec:
           command:
             - consul-dataplane
           args:
+            {{- if .Values.global.dualStack.defaultEnabled }}
+            - -consul-dns-bind-addr="[::]"
+            {{- else }}
             - -consul-dns-bind-addr=0.0.0.0
+            {{- end}}
             - -consul-dns-bind-port={{ .Values.dns.proxy.port }}
         {{- if .Values.externalServers.enabled }}
             - -addresses={{ .Values.externalServers.hosts | first }}

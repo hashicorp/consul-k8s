@@ -119,7 +119,7 @@ func main() {
 	}
 
 	// Otherwise we'll go on to write the changes to the helm docs.
-	helmReferenceFile := filepath.Join(consulRepoPath, "website/content/docs/k8s/helm.mdx")
+	helmReferenceFile := filepath.Join(consulRepoPath, "website/content/docs/reference/k8s/helm.mdx")
 	helmReferenceBytes, err := os.ReadFile(helmReferenceFile)
 	if err != nil {
 		fmt.Println(err.Error())
