@@ -1,0 +1,3 @@
+```release-note:feature
+cli: updated `status` cmd to include client and deploymet status in terminal output
+```
