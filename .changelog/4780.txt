@@ -1,3 +1,0 @@
-```release-note:feature
-cli: add new `-capture` flag to proxy loglevel cmd. Also updated main.go, command.go and common/base.go to support graceful handle signal interrupts for any commands
-```
