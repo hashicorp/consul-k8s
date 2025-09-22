@@ -1,3 +1,0 @@
-```release-note:feature
-cli: add new output format `archive` to proxy stats cmd, this will enable user to save the command output to a file.
-```
