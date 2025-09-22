@@ -1,0 +1,3 @@
+```release-note:feature
+cli: add new flag -output to proxy stats cmd, this will enable user to write output to json file using -output flag.
+```
