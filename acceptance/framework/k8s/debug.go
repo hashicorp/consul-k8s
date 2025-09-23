@@ -183,6 +183,17 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 				writeResourceInfoToFile(t, service.Name, "service", testDebugDirectory, kubectlOptions)
 			}
 		}
+
+		// Describe any endpoints.
+		endpoints, err := client.CoreV1().Endpoints(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			logger.Log(t, "unable to get endpoints", "err", err)
+		} else {
+			for _, endpoint := range endpoints.Items {
+				// Describe endpoint and write it to a file.
+				writeResourceInfoToFile(t, endpoint.Name, "endpoints", testDebugDirectory, kubectlOptions)
+			}
+		}
 	}
 }
 
