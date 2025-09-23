@@ -151,7 +151,7 @@ func sliceContains(s []string, target string) bool {
 // WaitForPodDeletion waits until a pod with the given name is deleted from the cluster.
 func WaitForPodDeletion(t testutil.TestingTB, options *k8s.KubectlOptions, podName string) {
 	t.Helper()
-	counter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+	counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 	logger.Logf(t, "Waiting %s for pod %q to be deleted.", time.Duration(counter.Count*int(counter.Wait)), podName)
 
 	retry.RunWith(counter, t, func(r *retry.R) {

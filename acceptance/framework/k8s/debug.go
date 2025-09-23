@@ -62,8 +62,8 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
 			require.NoError(t, os.WriteFile(logFilename, []byte(logs), 0600))
 
-			if strings.Contains(pod.Name, "static-server") {
-				// If this is a static-server pod, also get logs of init containers
+			if strings.Contains(pod.Name, "static-server") || strings.Contains(pod.Name, "static-client") {
+				// If this is a static-server/client pod, also get logs of init containers
 				for _, container := range pod.Spec.InitContainers {
 					initLogs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "-c", container.Name, pod.Name)
 					if err != nil {
@@ -192,6 +192,23 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			for _, endpoint := range endpoints.Items {
 				// Describe endpoint and write it to a file.
 				writeResourceInfoToFile(t, endpoint.Name, "endpoints", testDebugDirectory, kubectlOptions)
+			}
+		}
+
+		// Get YAML spec for any endpoints.
+		endpointsList, err := client.CoreV1().Endpoints(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			logger.Log(t, "unable to get endpoints", "err", err)
+		} else {
+			for _, endpoint := range endpointsList.Items {
+				endpointYAML, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "endpoints", endpoint.Name, "-o", "yaml")
+				if err != nil {
+					endpointYAML = fmt.Sprintf("Error getting endpoints YAML: %s: %s", err, endpointYAML)
+				}
+
+				// Write endpoints YAML or err to file name <endpoint.Name>-endpoints.yaml
+				endpointYAMLFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-endpoints.yaml", endpoint.Name))
+				require.NoError(t, os.WriteFile(endpointYAMLFilename, []byte(endpointYAML), 0600))
 			}
 		}
 	}
