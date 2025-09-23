@@ -154,9 +154,6 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
 			var terminationGracePeriod int64 = 6
-			logger.Logf(t, "scaling down the static-client deployment to 0 replicas")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
-
 			clientPodName := pods.Items[0].Name
 			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
@@ -221,6 +218,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					})
 				})
 			}
+
+			// Checks are done, now ensure the pod is fully removed from k8s and Consul.
+			logger.Logf(t, "scaling down the static-client deployment to 0 replicas to clean up the terminating pod %q", clientPodName)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
 
 			logger.Log(t, "ensuring pod is deregistered after termination")
 			// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
