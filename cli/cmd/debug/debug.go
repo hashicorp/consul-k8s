@@ -435,61 +435,34 @@ func (c *DebugCommand) initKubernetes() (err error) {
 // captureStaticInfo - captures Helm config, CRDs and its resources, consul injected sidecar pods, proxy data, if asked
 func (c *DebugCommand) captureStaticInfo() error {
 	c.UI.Output("\nCapturing static info......")
-	var errs error
-	if c.CaptureTarget(targetHelmConfig) {
-		err := c.captureHelmConfig()
-		if err != nil {
-			c.UI.Output(fmt.Sprintf("error capturing Helm config: %v", err), terminal.WithErrorStyle())
-			errs = multierror.Append(errs, err)
-		} else {
-			c.UI.Output("Helm config captured", terminal.WithSuccessStyle())
-		}
-	}
-	if c.CaptureTarget(targetCRDs) {
-		err := c.captureCRDResources()
-		if err != nil {
-			if errors.Is(err, notFoundError) {
-				c.UI.Output("No Consul CRDs found in Kubernetes cluster", terminal.WithWarningStyle())
-			} else {
-				c.UI.Output(fmt.Sprintf("error capturing CRD resources: %v", err), terminal.WithErrorStyle())
-				errs = multierror.Append(errs, err)
-			}
-		} else {
-			c.UI.Output("CRDs resources captured", terminal.WithSuccessStyle())
-		}
-	}
-	if c.CaptureTarget(targetSidecarPods) {
-		err := c.captureConsulInjectedSidecarPods()
-		if err != nil {
-			if errors.Is(err, notFoundError) {
-				c.UI.Output("No Consul injected sidecar pods found in Kubernetes cluster.", terminal.WithWarningStyle())
-			} else {
-				c.UI.Output(fmt.Sprintf("error capturing Consul Injected Sidecar Pods: %v", err), terminal.WithErrorStyle())
-				errs = multierror.Append(errs, err)
-			}
-		} else {
-			c.UI.Output("Consul Injected Sidecar Pods captured", terminal.WithSuccessStyle())
-		}
-	}
-	if c.CaptureTarget(targetProxy) {
-		err := c.captureEnvoyProxyData()
-		if err != nil {
-			if errors.Is(err, notFoundError) {
-				c.UI.Output("No Envoy Proxy pods found in Kubernetes cluster in all namespaces.", terminal.WithWarningStyle())
-			} else {
-				c.UI.Output(fmt.Sprintf("error capturing Consul Envoy Proxy data: \n%v", err), terminal.WithErrorStyle())
-				errs = multierror.Append(errs, err)
-			}
-		} else {
-			c.UI.Output("Envoy Proxy data captured", terminal.WithSuccessStyle())
-		}
-	}
+	var errs *multierror.Error
+	c.runCapture("Helm config", targetHelmConfig, c.captureHelmConfig, &errs)
+	c.runCapture("CRD resources", targetCRDs, c.captureCRDResources, &errs)
+	c.runCapture("Consul Injected Sidecar Pods", targetSidecarPods, c.captureConsulInjectedSidecarPods, &errs)
+	c.runCapture("Envoy Proxy data", targetProxy, c.captureEnvoyProxyData, &errs)
 	return errs
+}
+func (c *DebugCommand) runCapture(name, target string, fn func() error, errs **multierror.Error) {
+	if !c.CaptureTarget(target) {
+		return
+	}
+	err := fn()
+	if err != nil {
+		if errors.Is(err, notFoundError) {
+			c.UI.Output(fmt.Sprintf("No %s found.", name), terminal.WithWarningStyle())
+		} else {
+			c.UI.Output(fmt.Sprintf("error capturing %s: %v", name, err), terminal.WithErrorStyle())
+			*errs = multierror.Append(*errs, err)
+		}
+	} else {
+		c.UI.Output(fmt.Sprintf("%s captured", name), terminal.WithSuccessStyle())
+	}
 }
 
 // captureHelmConfig - captures consul-k8s Helm configuration and write it to helm-config.json file within debug archive
 func (c *DebugCommand) captureHelmConfig() error {
 	// Setup logger to stream Helm library logs.
+
 	var uiLogger = func(s string, args ...interface{}) {
 		logMsg := fmt.Sprintf(s, args...)
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
@@ -502,7 +475,7 @@ func (c *DebugCommand) captureHelmConfig() error {
 	if err != nil {
 		return fmt.Errorf("couldn't find the helm releases: %w", err)
 	}
-	helmRelease, err := c.getHelmRelease(c.helmEnvSettings, uiLogger, releaseName, namespace)
+	helmRelease, err := c.checkHelmInstallation(c.helmEnvSettings, uiLogger, releaseName, namespace)
 	if err != nil {
 		return err
 	}
@@ -513,8 +486,9 @@ func (c *DebugCommand) captureHelmConfig() error {
 	return nil
 }
 
-// getHelmRelease uses the helm Go SDK to depict the status of a named release. It returns the release for a Consul installation in the specified k8s namespace.
-func (c *DebugCommand) getHelmRelease(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) (*release.Release, error) {
+// checkHelmInstallation uses the helm Go SDK to depict the status of a named release. This function then prints
+// the version of the release, it's status (unknown, deployed, uninstalled, ...), and the overwritten values.
+func (c *DebugCommand) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) (*release.Release, error) {
 	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
 	statusConfig := new(action.Configuration)
 	statusConfig, err := helm.InitActionConfig(statusConfig, namespace, settings, uiLogger)
