@@ -224,14 +224,27 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
 
 			logger.Log(t, "ensuring pod is deregistered after termination")
+
+			// Wait for the pod to be fully deleted
+			// This ensures that the ACL token associated with pod had also been cleaned up
+			retrier := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+			retry.RunWith(retrier, t, func(r *retry.R) {
+				err = ctx.KubernetesClient(r).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{})
+				if err != nil {
+					if strings.Contains(err.Error(), "not found") {
+						logger.Logf(r, "pod %q successfully deleted", clientPodName)
+						return
+					}
+					r.Errorf("error deleting pod %q: %v", clientPodName, err)
+				} else {
+					r.Errorf("pod %q still exists", clientPodName)
+				}
+			})
+
 			// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
 			// This can cause the re-queued reconcile used to come back and clean up the service registration to be re-re-queued at
 			// 2-3X the intended grace period.
 			retry.RunWith(&retry.Timer{Timeout: time.Duration(30) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-
-				// Wait for the pod to be fully deleted
-				// This ensures that the ACL token associated with pod had also been cleaned up
-				k8s.WaitForPodDeletion(r, connHelper.Ctx.KubectlOptions(r), clientPodName)
 
 				for _, name := range []string{
 					"static-client",
