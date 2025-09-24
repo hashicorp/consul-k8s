@@ -816,7 +816,8 @@ func (t *ServiceResource) registerServiceInstance(
 				// We don't support multi port for ingress sync
 				if epPort > 0 {
 					r.Service.Port = epPort
-					r.Service.Ports = nil
+					// We need to reset Ports since service registration will error out if both `Port` and `Ports` are set.
+					r.Service.Ports = make(consulapi.ServicePorts, 0)
 				} else {
 					r.Service.Ports = epPorts
 					r.Service.Port = 0
