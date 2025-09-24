@@ -15,7 +15,7 @@ require (
 	k8s.io/client-go v0.29.8
 )
 
-require github.com/hashicorp/consul/sdk v0.4.1-0.20250919124332-fe5b36f5014c
+require github.com/hashicorp/consul/sdk v0.4.1-0.20250924061425-7e8f30184eaf
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect

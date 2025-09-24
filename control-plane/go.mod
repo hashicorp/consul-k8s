@@ -6,11 +6,11 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20250919124332-fe5b36f5014c
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20250924061425-7e8f30184eaf
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250919124332-fe5b36f5014c
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20250924061425-7e8f30184eaf
 
-replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20250919124332-fe5b36f5014c
+replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20250924061425-7e8f30184eaf
 
 require (
 	github.com/armon/go-metrics v0.4.1
