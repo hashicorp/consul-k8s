@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
+	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const (
@@ -28,7 +29,7 @@ const (
 	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
 )
 
-func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
+func (g *Gatekeeper) consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -39,7 +40,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
+	args, err := g.getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -142,20 +143,41 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	return container, nil
 }
 
-func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func (g *Gatekeeper) getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
+	envoyAdminBindAddress := "0.0.0.0"
+	consulDPBindAddress := "127.0.0.1"
+	xdsBindAddress := "127.0.0.1"
+
+	ds, err := netutil.IsDualStack(g.ConsulConfig.APIClientConfig, false)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
+	}
+	if ds {
+		envoyAdminBindAddress = "::"
+		consulDPBindAddress = "::"
+		xdsBindAddress = "::1"
+	}
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-graceful-addr=" + consulDPBindAddress,
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(
+		namespace, config.EnableNamespaces,
+		config.ConsulDestinationNamespace,
+		config.EnableNamespaceMirroring,
+		config.NamespaceMirroringPrefix,
+	)
 
 	if config.AuthMethod != "" {
 		args = append(args,

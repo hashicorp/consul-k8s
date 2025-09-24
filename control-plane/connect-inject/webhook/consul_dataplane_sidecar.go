@@ -323,7 +323,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
-	envoyAdminBindAddress := "127.0.0.1"
+	envoyAdminBindAddress := "0.0.0.0"
 	consulDNSBindAddress := consulDataplaneDNSBindHost
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
@@ -333,7 +333,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		return nil, fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
 	}
 	if ds {
-		envoyAdminBindAddress = "::1"
+		envoyAdminBindAddress = "::"
 		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
 		consulDPBindAddress = "::"
 		xdsBindAddress = "::1"
@@ -348,6 +348,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-graceful-addr=" + consulDPBindAddress,
 	}
 
 	if w.SkipServerWatch {
@@ -409,9 +410,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	if mpi.serviceName != "" {
 		gracefulPort = gracefulPort + mpi.serviceIndex
 	}
-	if consulDPBindAddress != "" {
-		args = append(args, fmt.Sprintf("-graceful-addr=%s", consulDPBindAddress))
-	}
+
 	args = append(args, fmt.Sprintf("-graceful-port=%d", gracefulPort))
 
 	enableProxyLifecycle, err := w.LifecycleConfig.EnableProxyLifecycle(pod)

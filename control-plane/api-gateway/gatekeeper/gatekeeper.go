@@ -14,19 +14,22 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
 
 // Gatekeeper is used to manage the lifecycle of Gateway deployments and services.
 type Gatekeeper struct {
-	Log    logr.Logger
-	Client client.Client
+	Log          logr.Logger
+	Client       client.Client
+	ConsulConfig *consul.Config
 }
 
 // New creates a new Gatekeeper from the Config.
-func New(log logr.Logger, client client.Client) *Gatekeeper {
+func New(log logr.Logger, client client.Client, consulConfig *consul.Config) *Gatekeeper {
 	return &Gatekeeper{
-		Log:    log,
-		Client: client,
+		Log:          log,
+		Client:       client,
+		ConsulConfig: consulConfig,
 	}
 }
 
