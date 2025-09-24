@@ -231,7 +231,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 				// Wait for the pod to be fully deleted
 				// This ensures that the ACL token associated with pod had also been cleaned up
-				k8s.WaitForPodDeletion(r, ctx.KubectlOptions(r), clientPodName)
+				k8s.WaitForPodDeletion(r, connHelper.Ctx.KubectlOptions(r), clientPodName)
 
 				for _, name := range []string{
 					"static-client",
