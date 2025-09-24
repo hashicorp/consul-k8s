@@ -323,7 +323,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
-	envoyAdminBindAddress := "0.0.0.0"
+	// envoyAdminBindAddress := "0.0.0.0"
 	consulDNSBindAddress := consulDataplaneDNSBindHost
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
@@ -333,14 +333,14 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		return nil, fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
 	}
 	if ds {
-		envoyAdminBindAddress = "::"
+		// envoyAdminBindAddress = "::"
 		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
 		consulDPBindAddress = "::"
 		xdsBindAddress = "::1"
 	}
 	args := []string{
 		"-addresses", w.ConsulAddress,
-		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		// "-envoy-admin-bind-address=" + envoyAdminBindAddress,
 		"-consul-dns-bind-addr=" + consulDNSBindAddress,
 		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
