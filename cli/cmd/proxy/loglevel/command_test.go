@@ -314,7 +314,7 @@ func TestLogCaptureWithNewLogLevels(t *testing.T) {
 	c.getLogFunc = func(ctx context.Context, pod *corev1.Pod, podLogOptions *corev1.PodLogOptions) ([]byte, error) {
 		return []byte("2023-09-19T10:15:30Z INFO Sample log entry\n2023-09-19T10:15:31Z DEBUG Another log entry"), nil
 	}
-	duration := "10s"
+	duration := "30s"
 	args := []string{podName, "-capture", duration, "-u", "grpc:critical,http:warning,forward_proxy:trace,upstream:debug,rbac:error"}
 	out := c.Run(args)
 	require.Equal(t, 0, out)

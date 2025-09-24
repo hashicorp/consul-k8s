@@ -445,7 +445,7 @@ func (l *LogLevelCommand) fetchPodLogs(ctx context.Context) error {
 
 	select {
 	case <-durationChn:
-		logs, err := l.logger(ctx, pod, podLogOptions)
+		logs, err := l.getLogFunc(ctx, pod, podLogOptions)
 		if err != nil {
 			return err
 		}
@@ -463,9 +463,6 @@ func (l *LogLevelCommand) fetchPodLogs(ctx context.Context) error {
 	case <-ctx.Done():
 		return fmt.Errorf("stopping collection due to shutdown signal recieved")
 	}
-}
-func (l *LogLevelCommand) logger(ctx context.Context, pod *corev1.Pod, podLogOptions *corev1.PodLogOptions) ([]byte, error) {
-	return l.getLogFunc(ctx, pod, podLogOptions)
 }
 func (l *LogLevelCommand) getLogs(ctx context.Context, pod *corev1.Pod, podLogOptions *corev1.PodLogOptions) ([]byte, error) {
 	podLogRequest := l.kubernetes.CoreV1().Pods(l.namespace).GetLogs(pod.Name, podLogOptions)
