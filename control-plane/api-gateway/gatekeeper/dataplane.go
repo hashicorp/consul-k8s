@@ -147,7 +147,7 @@ func (g *Gatekeeper) getDataplaneArgs(metrics common.MetricsConfig, namespace st
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
-	envoyAdminBindAddress := "0.0.0.0"
+	envoyAdminBindAddress := "127.0.0.1"
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
@@ -156,7 +156,7 @@ func (g *Gatekeeper) getDataplaneArgs(metrics common.MetricsConfig, namespace st
 		return nil, fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
 	}
 	if ds {
-		// envoyAdminBindAddress = "::"
+		envoyAdminBindAddress = "::1"
 		consulDPBindAddress = "::"
 		xdsBindAddress = "::1"
 	}
