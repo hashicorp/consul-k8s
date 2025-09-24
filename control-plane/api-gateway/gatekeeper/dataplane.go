@@ -147,7 +147,7 @@ func (g *Gatekeeper) getDataplaneArgs(metrics common.MetricsConfig, namespace st
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
-	// envoyAdminBindAddress := "0.0.0.0"
+	envoyAdminBindAddress := "0.0.0.0"
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
@@ -162,7 +162,7 @@ func (g *Gatekeeper) getDataplaneArgs(metrics common.MetricsConfig, namespace st
 	}
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
-		// "-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
 		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
