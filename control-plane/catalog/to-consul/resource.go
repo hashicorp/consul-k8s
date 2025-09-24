@@ -816,8 +816,10 @@ func (t *ServiceResource) registerServiceInstance(
 				// We don't support multi port for ingress sync
 				if epPort > 0 {
 					r.Service.Port = epPort
+					r.Service.Ports = nil
 				} else {
 					r.Service.Ports = epPorts
+					r.Service.Port = 0
 				}
 
 				r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
