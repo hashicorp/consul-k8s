@@ -3,6 +3,7 @@ package debug
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -16,38 +17,27 @@ import (
 	"sync"
 	"time"
 
-	shared "github.com/hashicorp/consul-k8s/cli/cmd/shared"
 	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/envoy"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/go-multierror"
 	"github.com/posener/complete"
 	"golang.org/x/sync/errgroup"
+	"helm.sh/helm/v3/pkg/action"
+	helmCLI "helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/release"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-
-	// "context"
-	// "errors"
-	// "fmt"
-	// "strings"
-	// "sync"
-	// "github.com/posener/complete"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
-	// "k8s.io/apimachinery/pkg/api/validation"
-	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	// "k8s.io/client-go/kubernetes"
-	// "k8s.io/client-go/rest"
-	// "github.com/hashicorp/consul-k8s/cli/common"
-	// "github.com/hashicorp/consul-k8s/cli/common/envoy"
-	// "github.com/hashicorp/consul-k8s/cli/common/flag"
-	// "github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
 
 const (
@@ -84,8 +74,14 @@ type debugIndex struct {
 
 const (
 	flagNameKubeConfig  = "kubeconfig"
-	flagNameKubeContext = "context"
+	flagNameKubeContext = "kubecontext"
 	flagNameNamespace   = "namespace"
+
+	flagDuration = "duration"
+	flagSince    = "since"
+	flagOutput   = "output"
+	flagArchive  = "archive"
+	flagCapture  = "capture"
 )
 
 // timeDateformat is a modified version of time.RFC3339 which replaces colons with
@@ -106,19 +102,23 @@ type DebugCommand struct {
 
 	set *flag.Sets
 
+	// Global flags
 	flagKubeConfig  string
 	flagKubeContext string
-	flagNamespace   string
 
 	restConfig *rest.Config
 
-	// flags
-	duration time.Duration
-	since    time.Duration
-	output   string
-	archive  bool
-	capture  []string
+	// Command flags
+	duration      time.Duration
+	since         time.Duration
+	output        string
+	archive       bool
+	capture       []string
+	flagNamespace string
 
+	// Dependency Injections for testing
+	fetchEnvoyConfig func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error)
+	fetchLogsFunc    func(context.Context, string, string, *corev1.PodLogOptions) (io.ReadCloser, error)
 	// validateTiming can be used to skip validation of duration. This
 	// is primarily useful for testing
 	validateTiming bool
@@ -138,43 +138,52 @@ func (c *DebugCommand) init() {
 	defaultOutputFilename := fmt.Sprintf("consul-debug-%v", time.Now().Format(timeDateFormat))
 
 	f.DurationVar(&flag.DurationVar{
-		Name:    "duration",
+		Name:    flagDuration,
 		Target:  &c.duration,
 		Default: debugDuration,
 		Usage:   "To capture the logs of consul cluster for the a given duration",
 		Aliases: []string{"d"},
 	})
 	f.DurationVar(&flag.DurationVar{
-		Name:    "since",
+		Name:    flagSince,
 		Target:  &c.since,
 		Default: 0,
 		Usage:   "The time duration since when to capture logs from pods",
 		Aliases: []string{"s"},
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "output",
+		Name:    flagOutput,
 		Target:  &c.output,
 		Default: defaultOutputFilename,
-		Usage:   "The filename of the debug output archive",
+		Usage:   "The filename of the debug output archive.",
 		Aliases: []string{"o"},
 	})
 	f.BoolVar(&flag.BoolVar{
-		Name:    "archive",
+		Name:    flagArchive,
 		Target:  &c.archive,
 		Default: true,
-		Usage:   "Whether to archive the output debug directory to a .tar.gz",
+		Usage:   "Whether to archive the output debug directory to a .tar.gz.",
+		Aliases: []string{"a"},
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
-		Name:    "capture",
+		Name:    flagCapture,
 		Target:  &c.capture,
 		Default: []string{"all"},
-		Usage:   "A list of components to capture. Supported values are: all, pods, events, nodes, services, endpoints, configmaps, daemonsets, statefulsets, deployments, replicasets. (e.g. -capture pods -capture events)",
+		Usage:   "A list of components to capture. Supported values are: all, pods, events, nodes, services, endpoints, configmaps, daemonsets, statefulsets, deployments, replicasets. (e.g. -capture pods -capture events).",
+		Aliases: []string{"c"},
+	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameNamespace,
+		Target:  &c.flagNamespace,
+		Default: "consul",
+		Usage:   "The namespace where the target Pod can be found.",
+		Aliases: []string{"n"},
 	})
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameKubeConfig,
-		Aliases: []string{"c"},
+		Aliases: []string{"kc"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
 		Usage:   "Set the path to kubeconfig file.",
@@ -184,13 +193,6 @@ func (c *DebugCommand) init() {
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
-	})
-	f.StringVar(&flag.StringVar{
-		Name:    flagNameNamespace,
-		Target:  &c.flagNamespace,
-		Default: "consul",
-		Usage:   "The namespace where the target Pod can be found.",
-		Aliases: []string{"n"},
 	})
 
 	c.validateTiming = true
@@ -205,10 +207,6 @@ func (c *DebugCommand) Run(args []string) int {
 	c.once.Do(c.init)
 	defer common.CloseWithError(c.BaseCommand)
 
-	if c.helmActionsRunner == nil {
-		c.helmActionsRunner = &helm.ActionRunner{}
-	}
-
 	c.Log.ResetNamed("debug")
 	defer common.CloseWithError(c.BaseCommand)
 
@@ -222,9 +220,15 @@ func (c *DebugCommand) Run(args []string) int {
 		c.UI.Output("Invalid argument: %v", err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	if err := c.preValidations(); err != nil {
+	// Checks if cwd have write permissions and
+	// if output directory already exists
+	if err := c.preChecks(); err != nil {
 		c.UI.Output("Pre-validation failed: %v", err.Error(), terminal.WithErrorStyle())
 		return 1
+	}
+
+	if c.helmActionsRunner == nil {
+		c.helmActionsRunner = &helm.ActionRunner{}
 	}
 	if c.kubernetes == nil {
 		if err := c.initKubernetes(); err != nil {
@@ -263,7 +267,7 @@ func (c *DebugCommand) Run(args []string) int {
 	if c.CaptureTarget(targetLogs) {
 		g := new(errgroup.Group)
 		g.Go(func() error {
-			return c.capturePodLogsAndEvents()
+			return c.captureLogs()
 		})
 		err := g.Wait()
 		if err != nil {
@@ -284,9 +288,14 @@ func (c *DebugCommand) Run(args []string) int {
 	}
 
 	// Capture metadata about debug run at the root of the debug archive
-	index := &debugIndex{
-		Duration:  c.duration.String(),
-		Since:     c.since.String(),
+	var index debugIndex
+	if c.CaptureTarget(targetLogs) {
+		index = debugIndex{
+			Duration: c.duration.String(),
+			Since:    c.since.String(),
+		}
+	}
+	index = debugIndex{
 		Targets:   c.capture,
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
@@ -303,7 +312,6 @@ func (c *DebugCommand) Run(args []string) int {
 		}
 	}
 	c.UI.Output(fmt.Sprintf("Saved debug archive: %s", archiveName))
-
 	return 0
 }
 
@@ -311,14 +319,18 @@ func (c *DebugCommand) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return fmt.Errorf("should have no non-flag arguments")
 	}
-
+	// Namespace name validation
+	if c.flagNamespace != "" {
+		if errs := validation.ValidateNamespaceName(c.flagNamespace, false); len(errs) > 0 {
+			return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
+		}
+	}
 	// Ensure realistic duration is specified
 	if c.validateTiming {
 		if c.duration < debugMinDuration {
 			return fmt.Errorf("duration must be longer than %s", debugMinDuration)
 		}
 	}
-
 	// If none are specified in capture, we will collect information from all by default
 	// otherwise, validate that the specified targets are known/valid
 	if len(c.capture) == 0 || (len(c.capture) == 1 && c.capture[0] == "all") {
@@ -333,7 +345,7 @@ func (c *DebugCommand) validateFlags() error {
 	}
 	return nil
 }
-func (c *DebugCommand) preValidations() error {
+func (c *DebugCommand) preChecks() error {
 	// Ensure the output directory can be created (have write permissions and it does not already exist
 	if _, err := os.Stat(c.output); os.IsNotExist(err) {
 		err := os.MkdirAll(c.output, 0755)
@@ -351,15 +363,19 @@ func (c *DebugCommand) preValidations() error {
 	return nil
 }
 
-// TODO: check if AutocompleteFlags & AutocompleteArgs are required
-
 // AutocompleteFlags returns a mapping of supported flags and autocomplete
 // options for this command. The map key for the Flags map should be the
 // complete flag such as "-foo" or "--foo".
 func (c *DebugCommand) AutocompleteFlags() complete.Flags {
 	return complete.Flags{
+		fmt.Sprintf("-%s", flagNameNamespace):   complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeConfig):  complete.PredictFiles("*"),
 		fmt.Sprintf("-%s", flagNameKubeContext): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagDuration):        complete.PredictNothing,
+		fmt.Sprintf("-%s", flagSince):           complete.PredictNothing,
+		fmt.Sprintf("-%s", flagOutput):          complete.PredictNothing,
+		fmt.Sprintf("-%s", flagCapture):         complete.PredictSet(defaultTargets...),
+		fmt.Sprintf("-%s", flagArchive):         complete.PredictNothing,
 	}
 }
 
@@ -455,7 +471,7 @@ func (c *DebugCommand) captureStaticInfo() error {
 			c.UI.Output("Consul Injected Sidecar Pods captured", terminal.WithSuccessStyle())
 		}
 	}
-	if c.CaptureTarget(targetEnvoy) {
+	if c.CaptureTarget(targetProxy) {
 		err := c.captureEnvoyProxyData()
 		if err != nil {
 			if errors.Is(err, notFoundError) {
@@ -473,15 +489,44 @@ func (c *DebugCommand) captureStaticInfo() error {
 
 // captureHelmConfig - captures consul-k8s Helm configuration and write it to helm-config.json file within debug archive
 func (c *DebugCommand) captureHelmConfig() error {
-	helmRelease, _, _, err := shared.GetHelmRelease(c.helmEnvSettings, c.helmActionsRunner)
+	// Setup logger to stream Helm library logs.
+	var uiLogger = func(s string, args ...interface{}) {
+		logMsg := fmt.Sprintf(s, args...)
+		c.UI.Output(logMsg, terminal.WithLibraryStyle())
+	}
+	_, releaseName, namespace, err := c.helmActionsRunner.CheckForInstallations(&helm.CheckForInstallationsOptions{
+		Settings:    c.helmEnvSettings,
+		ReleaseName: common.DefaultReleaseName,
+		DebugLog:    uiLogger,
+	})
 	if err != nil {
-		return fmt.Errorf("couldn't retrieve Helm release: %v", err)
+		return fmt.Errorf("couldn't find the helm releases: %w", err)
+	}
+	helmRelease, err := c.getHelmRelease(c.helmEnvSettings, uiLogger, releaseName, namespace)
+	if err != nil {
+		return err
 	}
 	err = writeJSONFile(filepath.Join(c.output, "helm-config.json"), helmRelease)
 	if err != nil {
 		return fmt.Errorf("couldn't write Helm config to json file: %v", err)
 	}
 	return nil
+}
+
+// getHelmRelease uses the helm Go SDK to depict the status of a named release. It returns the release for a Consul installation in the specified k8s namespace.
+func (c *DebugCommand) getHelmRelease(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) (*release.Release, error) {
+	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
+	statusConfig := new(action.Configuration)
+	statusConfig, err := helm.InitActionConfig(statusConfig, namespace, settings, uiLogger)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't intialise helm go SDK action configuration: %s", err)
+	}
+	statuser := action.NewStatus(statusConfig)
+	rel, err := c.helmActionsRunner.GetStatus(statuser, releaseName)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get the helm release: %s", err)
+	}
+	return rel, nil
 }
 
 // captureCRDResources - captures consul-k8s CRDs and their instances and write it to CRDsResources.json file within debug archive
@@ -747,11 +792,11 @@ func (c *DebugCommand) createArchiveTemp(path string) (tempName string, err erro
 
 // Helm config, pod logs, CRDs, proxy stats, and Envoy endpoints.
 const (
-	targetHelmConfig  = "helm"    // captures helm config 														// for whole k8s cluster
-	targetCRDs        = "crds"    // captures crds and theit applied resources(k8s objects) 					// for whole k8s cluster
-	targetSidecarPods = "sidecar" // captures consul injected sidecar pods metadata								// for whole k8s cluster
-	targetLogs        = "logs"    // capture logs & events 														// for ALL pods in the k8s cluster related to consul
-	targetEnvoy       = "envoy"   // capture envoy endpoint {/stats, /endpoints, /clusters, /config_dumps},  	// for ALL proxy pod in the k8s cluster related to consul
+	targetHelmConfig  = "helm"
+	targetCRDs        = "crds"
+	targetSidecarPods = "sidecar"
+	targetLogs        = "logs"
+	targetProxy       = "proxy"
 )
 
 // defaultTargets specifies the list of targets that will be captured by default
@@ -760,16 +805,16 @@ var defaultTargets = []string{
 	targetCRDs,
 	targetLogs,
 	targetSidecarPods,
-	targetEnvoy,
+	targetProxy,
 }
 
 // Help returns a description of the command and how it is used.
 func (c *DebugCommand) Help() string {
 	c.once.Do(c.init)
-	return c.Synopsis() + "\n\nUsage: consul-k8s debug [flags]\n\n" + c.help
+	return c.Synopsis() + "\n\nUsage: Consul-k8s debug [flags]\n\n" + c.help
 }
 
 // Synopsis returns a one-line command summary.
 func (c *DebugCommand) Synopsis() string {
-	return "debug consul on Kubernetes."
+	return "Capture debugging information from a Consul deployment on Kubernetes."
 }

@@ -35,7 +35,7 @@ func (c *DebugCommand) captureEnvoyProxyData() error {
 		}
 		return fmt.Errorf("Error fetching pods: %s", err)
 	}
-	// capture proxy details and write them to debug bundle
+	// capture all proxy details and write them to debug bundle
 	var errs error
 	for _, pod := range pods {
 		podProxyType := c.getPodProxyType(pod)
@@ -43,7 +43,7 @@ func (c *DebugCommand) captureEnvoyProxyData() error {
 			errs = multierror.Append(errs, err)
 		}
 	}
-	// write envoy proxy pods list to json file
+	// write envoy proxy pods list to json file within debug bundle
 	err = c.writeEnvoyProxyPodList(pods)
 	if err != nil {
 		errs = multierror.Append(errs, err)
@@ -101,7 +101,7 @@ func (c *DebugCommand) getPodProxyType(pod v1.Pod) string {
 		proxyType = mappedType
 	} else if pod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
 		// Special case for deprecated API Gateway.
-		proxyType = "API Gateway"
+		proxyType = "API Gateway(Depricated)"
 	}
 	return proxyType
 }
@@ -235,8 +235,11 @@ func (c *DebugCommand) captureEnvoyConfig(pod v1.Pod, proxyType string, namespac
 			KubeClient: c.kubernetes,
 			RestConfig: c.restConfig,
 		}
-
-		config, err := envoy.FetchConfig(c.Ctx, &pf)
+		// Dependency injection for testing
+		if c.fetchEnvoyConfig == nil {
+			c.fetchEnvoyConfig = envoy.FetchConfig
+		}
+		config, err := c.fetchEnvoyConfig(c.Ctx, &pf)
 		if err != nil {
 			return fmt.Errorf("error fetching envoy config: %v", err)
 		}
@@ -254,7 +257,7 @@ func (c *DebugCommand) captureEnvoyConfig(pod v1.Pod, proxyType string, namespac
 	}
 	configJson, err := json.MarshalIndent(cfgs, "", "\t")
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshalling the config json: %v", err)
 	}
 
 	configPath := filepath.Join(c.output, "proxy", namespace, proxyType, pod.Name, "config.json")
@@ -270,13 +273,13 @@ func (c *DebugCommand) captureEnvoyConfig(pod v1.Pod, proxyType string, namespac
 	for name, config := range configs {
 		var config_dumps_json interface{}
 		if err := json.Unmarshal(config.RawCfg, &config_dumps_json); err != nil {
-			return err
+			return fmt.Errorf("error unmarshalling the config dumps: %v", err)
 		}
 		config_dumps[name] = config_dumps_json
 	}
 	configDumpsJson, err := json.MarshalIndent(config_dumps, "", "\t")
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshalling the config dump json: %v", err)
 	}
 
 	rawConfigDumpsPath := filepath.Join(c.output, "proxy", namespace, proxyType, pod.Name, "config_dumps.json")
