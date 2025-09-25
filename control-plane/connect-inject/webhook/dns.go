@@ -47,7 +47,13 @@ func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 
 	ds, err := netutil.IsDualStack(w.ConsulConfig.APIClientConfig, false)
 	if err != nil {
-		return fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
+		return fmt.Errorf(
+			"unable to get consul dual stack status with error: %s, consul-url: %s, consul-token: %s, %v",
+			err.Error(),
+			w.ConsulConfig.APIClientConfig.Address,
+			w.ConsulConfig.APIClientConfig.Token,
+			w.ConsulConfig,
+		)
 	}
 	if ds {
 		nameserver = ipv6ConsulDataplaneDNSBindHost
