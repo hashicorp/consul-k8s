@@ -160,7 +160,8 @@ func (c *StatsCommand) Run(args []string) int {
 	}
 
 	if c.flagOutputFormat == "archive" {
-		proxyStatsFilePath := filepath.Join("proxy", "proxy-stats-"+c.flagPod+".json")
+		fileName := fmt.Sprintf("proxy-stats-%s.json", c.flagPod)
+		proxyStatsFilePath := filepath.Join("proxy", fileName)
 		err := c.captureEnvoyStats(&pf, proxyStatsFilePath)
 		if err != nil {
 			c.UI.Output("error capturing envoy stats: %v", err, terminal.WithErrorStyle())
