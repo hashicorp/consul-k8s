@@ -29,6 +29,13 @@ import (
 // defaultAdminPort is the port where the Envoy admin API is exposed.
 const defaultAdminPort int = 19000
 
+type OutputFormat struct {
+	Table   string
+	JSON    string
+	Raw     string
+	Archive string
+}
+
 const (
 	Table   = "table"
 	JSON    = "json"
@@ -581,7 +588,8 @@ func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error
 	// Create file path and directory for storing proxy read data
 	// NOTE: currently it is writing data file in cwd /proxy dir only. Also, file contents will be overwritten if
 	// the command is run multiple times for the same pod name or if file already exists.
-	proxyReadFilePath := filepath.Join("proxy", "proxy-read-"+c.flagPodName+".json")
+	fileName := fmt.Sprintf("proxy-read-%s.json", c.flagPodName)
+	proxyReadFilePath := filepath.Join("proxy", fileName)
 	err = os.MkdirAll(filepath.Dir(proxyReadFilePath), 0755)
 	if err != nil {
 		fmt.Printf("error creating proxy read output directory: %v", err)
