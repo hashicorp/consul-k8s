@@ -235,6 +235,15 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 
 	go func() {
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+		t.Log(
+			"Executing command: ",
+			command.Command,
+			strings.Join(command.Args, " "),
+			"with error:",
+			err,
+			" and output:",
+			string(output),
+		)
 		resultCh <- &cmdResult{output: string(output), err: err}
 	}()
 
