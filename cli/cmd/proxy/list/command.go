@@ -35,6 +35,11 @@ const (
 	flagNameKubeContext   = "context"
 	flagNameOutputFormat  = "output"
 )
+const (
+	opFormatTable   = "table"
+	opFormatJSON    = "json"
+	opFormatArchive = "archive"
+)
 
 // ListCommand is the command struct for the proxy list command.
 type ListCommand struct {
@@ -75,7 +80,7 @@ func (c *ListCommand) init() {
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameOutputFormat,
-		Default: "table",
+		Default: opFormatTable,
 		Target:  &c.flagOutputFormat,
 		Usage:   "Output format",
 		Aliases: []string{"o"},
@@ -173,7 +178,7 @@ func (c *ListCommand) validateFlags() error {
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
-	if outputs := []string{"table", "json", "archive"}; !slices.Contains(outputs, c.flagOutputFormat) {
+	if outputs := []string{opFormatArchive, opFormatJSON, opFormatTable}; !slices.Contains(outputs, c.flagOutputFormat) {
 		return fmt.Errorf("-output must be one of %s.", strings.Join(outputs, ", "))
 	}
 
@@ -327,7 +332,8 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		}
 	}
 
-	if c.flagOutputFormat == "json" {
+	switch c.flagOutputFormat {
+	case opFormatJSON:
 		tableJson := tbl.ToJson()
 		jsonSt, err := json.MarshalIndent(tableJson, "", "    ")
 		if err != nil {
@@ -335,7 +341,7 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		} else {
 			c.UI.Output(string(jsonSt))
 		}
-	} else if c.flagOutputFormat == "archive" {
+	case opFormatArchive:
 		tableJson := tbl.ToJson()
 		jsonSt, err := json.MarshalIndent(tableJson, "", "    ")
 		if err != nil {
@@ -357,7 +363,7 @@ func (c *ListCommand) output(pods []v1.Pod) {
 			fmt.Printf("error writing proxy list output to json file: %v", err)
 		}
 		c.UI.Output("proxy list output saved to '%s'", proxyListFilePath, terminal.WithSuccessStyle())
-	} else {
+	default: // opFormatTable
 		if !c.flagAllNamespaces {
 			c.UI.Output("Namespace: %s\n", c.namespace())
 		}
