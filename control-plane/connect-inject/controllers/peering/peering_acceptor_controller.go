@@ -113,8 +113,6 @@ func (r *AcceptorController) Reconcile(ctx context.Context, req ctrl.Request) (c
 			if err := r.Update(ctx, acceptor); err != nil {
 				return ctrl.Result{}, err
 			}
-			// Return to ensure that rest of the reconcile is done in a subsequent call with updated resource version.
-			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
 		if containsString(acceptor.Finalizers, finalizerName) {
