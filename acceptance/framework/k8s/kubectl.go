@@ -135,6 +135,9 @@ func KubectlLabel(t *testing.T, options *k8s.KubectlOptions, objectType string, 
 // If there's an error running the command, fail the test.
 func RunKubectl(t *testing.T, options *k8s.KubectlOptions, args ...string) {
 	_, err := RunKubectlAndGetOutputE(t, options, args...)
+	if err != nil {
+		t.Errorf("Error running kubectl %v: %v", args, err)
+	}
 	require.NoError(t, err)
 }
 
