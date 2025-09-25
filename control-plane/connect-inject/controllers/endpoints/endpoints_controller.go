@@ -216,8 +216,8 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				}
 
 				// Skip registration if node information is incomplete to prevent duplicate registrations.
-				// Retry for 2 minutes because the pod IP may not be immediately available after pod creation.
-				retries := 60
+				// Retry for 30 seconds because the pod IP may not be immediately available after pod creation.
+				retries := 15
 				for range retries {
 					if pod.Spec.NodeName == "" || pod.Status.PodIP == "" || pod.Status.HostIP == "" {
 						r.Log.Info("waiting for pod to have complete node information before registering",
