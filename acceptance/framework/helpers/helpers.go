@@ -229,7 +229,9 @@ type cmdResult struct {
 }
 
 func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Command) (string, error) {
+	t.Log("RunCommand 1")
 	t.Helper()
+	t.Log("RunCommand 2")
 
 	resultCh := make(chan *cmdResult, 1)
 
