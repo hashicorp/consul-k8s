@@ -29,13 +29,6 @@ import (
 // defaultAdminPort is the port where the Envoy admin API is exposed.
 const defaultAdminPort int = 19000
 
-type OutputFormat struct {
-	Table   string
-	JSON    string
-	Raw     string
-	Archive string
-}
-
 const (
 	Table   = "table"
 	JSON    = "json"
