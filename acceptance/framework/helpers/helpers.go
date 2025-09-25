@@ -235,7 +235,7 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 
 	go func() {
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
-		t.Log(
+		t.Error(
 			"Executing command: ",
 			command.Command,
 			strings.Join(command.Args, " "),
