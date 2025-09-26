@@ -23,69 +23,56 @@ import (
 // and assert the log collection based on given namespace.
 func TestCapturePodLogs(t *testing.T) {
 	cases := map[string]struct {
-		namespace string
-		duration  time.Duration
-		since     time.Duration
+		namespace            string
+		duration             time.Duration
+		since                time.Duration
+		expectedOutputBuffer []string
+		fetchLogsFunc        func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error)
+		errorExpected        bool
 	}{
 		"test consul namespace": {
 			namespace: "consul",
 			duration:  10 * time.Second,
+			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
+				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
+			},
+			expectedOutputBuffer: []string{"Capturing pods logs.....", "Pods Logs captured"},
+			errorExpected:        false,
 		},
 		"test another namespace": {
 			namespace: "another",
 			duration:  10 * time.Second,
+			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
+				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
+			},
+			expectedOutputBuffer: []string{"Capturing pods logs.....", "Pods Logs captured"},
+			errorExpected:        false,
 		},
 		"test log collection with since": {
 			namespace: "consul",
 			since:     10 * time.Second,
+			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
+				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
+			},
+			expectedOutputBuffer: []string{"Capturing pods logs.....", "Pods Logs captured"},
+			errorExpected:        false,
+		},
+		"log capture failure": {
+			namespace: "consul",
+			duration:  10 * time.Second,
+			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				return nil, fmt.Errorf("testing log fetch error")
+			},
+			expectedOutputBuffer: []string{"one or more errors occurred during log collection;"},
+			errorExpected:        true,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			resourceConfigs := []ResourceConfig{
-				{
-					Replicas:  1,
-					Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
-					Component: "StatefulSet",
-					Name:      "consul-server",
-					Namespace: "consul",
-				},
-				{
-					Replicas:  1,
-					Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
-					Component: "StatefulSet",
-					Name:      "consul-server",
-					Namespace: "another",
-				},
-				{
-					Replicas:  2,
-					Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "client"},
-					Component: "DaemonSet",
-					Name:      "consul-client",
-					Namespace: "consul",
-				},
-				{
-					Replicas:  1,
-					Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "consul-deployment-1"},
-					Component: "Deployment",
-					Name:      "consul-deployment-1",
-					Namespace: "consul",
-				},
-				{
-					Replicas:  1,
-					Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "consul-deployment-2"},
-					Component: "Deployment",
-					Name:      "consul-deployment-2",
-					Namespace: "another",
-				},
-				{
-					Replicas:  1,
-					Labels:    map[string]string{"consul.hashicorp.com/connect-inject-status": "injected"},
-					Component: "Sidecar",
-					Name:      "sidecar",
-					Namespace: "another",
-				},
-			}
+			t.Parallel()
 
 			buf := new(bytes.Buffer)
 			c := initializeDebugCommands(buf)
@@ -96,19 +83,27 @@ func TestCapturePodLogs(t *testing.T) {
 			c.since = tc.since
 			c.flagNamespace = tc.namespace
 
-			err := CreateConsulResources(c.Ctx, c.kubernetes, resourceConfigs)
+			err := createConsulResources(c.Ctx, c.kubernetes, getResourceConfigs())
 			require.NoError(t, err, "failed to create consul resources")
 
 			// Mock the log fetching function.
-			c.fetchLogsFunc = func(ctx context.Context, namespace, podName string, podLogOptions *corev1.PodLogOptions) (io.ReadCloser, error) {
-				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, namespace)
-				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
-			}
+			c.fetchLogsFunc = tc.fetchLogsFunc
 
 			err = c.captureLogs()
 
-			// verify buffer
-			require.NoError(t, err, "expected no error capturing pod logs and events")
+			if tc.errorExpected {
+				require.Error(t, err, "expected error capturing pod logs")
+				require.Contains(t, err.Error(), tc.expectedOutputBuffer[0], "expected err but mismatch")
+				expectedErrorFile := filepath.Join(c.output, "logs", "logCaptureErrors.txt")
+				_, statErr := os.Stat(expectedErrorFile)
+				require.NoError(t, statErr, "expected error file to be created: %s", expectedErrorFile)
+				errorContent, readErr := os.ReadFile(expectedErrorFile)
+				require.NoError(t, readErr, "failed to read error file: %s", expectedErrorFile)
+				require.Contains(t, string(errorContent), "testing log fetch error", "expected error messages in error file")
+				return
+			}
+
+			require.NoError(t, err, "did not expect error capturing pod logs")
 			actual := buf.String()
 			require.Contains(t, actual, "Capturing pods logs.....")
 			require.Contains(t, actual, "Pods Logs captured")
@@ -117,7 +112,9 @@ func TestCapturePodLogs(t *testing.T) {
 			expectedContainers := []string{"init-container", "nginx-container"}
 			baseLogPath := filepath.Join(c.output, "logs")
 
-			for _, config := range resourceConfigs {
+			for _, config := range getResourceConfigs() {
+				// config.Component are: StatefulSet, DaemonSet, Deployment, Sidecar
+				// kind are: statefulsets, daemonsets, deployments, sidecars
 				kind := strings.ToLower(config.Component) + "s"
 				for i := 0; i < int(config.Replicas); i++ {
 					podName := fmt.Sprintf("%s-pod-%d", config.Name, i)
@@ -159,8 +156,57 @@ type ResourceConfig struct {
 	Namespace string
 }
 
+// getResourceConfigs returns a slice of ResourceConfig for creating fake k8 resources for testing.
+func getResourceConfigs() []ResourceConfig {
+	resourceConfigs := []ResourceConfig{
+		{
+			Replicas:  1,
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
+			Component: "StatefulSet",
+			Name:      "consul-server",
+			Namespace: "consul",
+		},
+		{
+			Replicas:  1,
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "server"},
+			Component: "StatefulSet",
+			Name:      "consul-server",
+			Namespace: "another",
+		},
+		{
+			Replicas:  2,
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "client"},
+			Component: "DaemonSet",
+			Name:      "consul-client",
+			Namespace: "consul",
+		},
+		{
+			Replicas:  1,
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "consul-deployment-1"},
+			Component: "Deployment",
+			Name:      "consul-deployment-1",
+			Namespace: "consul",
+		},
+		{
+			Replicas:  1,
+			Labels:    map[string]string{"app": "consul", "chart": "consul-helm", "component": "consul-deployment-2"},
+			Component: "Deployment",
+			Name:      "consul-deployment-2",
+			Namespace: "another",
+		},
+		{
+			Replicas:  1,
+			Labels:    map[string]string{"consul.hashicorp.com/connect-inject-status": "injected"},
+			Component: "Sidecar",
+			Name:      "sidecar",
+			Namespace: "another",
+		},
+	}
+	return resourceConfigs
+}
+
 // CreateConsulResources creates fake Kubernetes resources based on the provided configs.
-func CreateConsulResources(ctx context.Context, k8sClient kubernetes.Interface, configs []ResourceConfig) error {
+func createConsulResources(ctx context.Context, k8sClient kubernetes.Interface, configs []ResourceConfig) error {
 	for _, config := range configs {
 		switch config.Component {
 		case "StatefulSet":

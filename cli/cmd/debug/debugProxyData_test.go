@@ -124,6 +124,7 @@ func TestGetAndWriteEnvoyProxyPodList(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedFilePath := filepath.Join(c.output, "proxy", "proxyList.json")
+	_, err = os.Stat(expectedFilePath)
 	require.NoError(t, err, "expected output file '%s' to be created, but it was not", expectedFilePath)
 
 	actualFileContent, err := os.ReadFile(expectedFilePath)
@@ -161,7 +162,6 @@ func startHttpServerForEnvoyStats(port int, jsonResponse string) *http.Server {
 
 	handler := http.NewServeMux()
 	handler.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
-		// Check if the `format=json` query parameter is present.
 		if r.URL.Query().Get("format") == "json" {
 			w.Header().Set("Content-Type", "application/json")
 			io.WriteString(w, jsonResponse)

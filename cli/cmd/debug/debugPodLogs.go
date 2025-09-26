@@ -164,7 +164,7 @@ func (c *DebugCommand) captureLogs() error {
 // =======================================================
 
 // getWorkloadLogs - fetches logs 'of each containers' 'of each pods' 'of each workload items' using k8s api
-// with filter of 'sinceSeconds' and writes to log directory within debug archive.
+// and writes to log directory within debug archive.
 func (c *DebugCommand) getWorkloadLogs(ctx context.Context, workloads []workload, totalContainers int, sinceSeconds int64) error {
 
 	// create logCaptureAudit file for each container logs collection
@@ -177,7 +177,7 @@ func (c *DebugCommand) getWorkloadLogs(ctx context.Context, workloads []workload
 		return fmt.Errorf("error creating logCaptureAudit file: %v", err)
 	}
 	w := tabwriter.NewWriter(auditFile, 1, 3, 2, ' ', 0)
-	fmt.Fprintln(w, "WORKLOAD-KIND\tWORKLOAD-NAME\tPOD-NAME\tCONTAINER-NAME\tLOG COLLECTION STATUS\tDETAILS")
+	fmt.Fprintln(w, "WORKLOAD-KIND\tWORKLOAD-NAME\tPOD-NAME\tCONTAINER-NAME\tSTATUS\tDETAILS")
 	defer auditFile.Close()
 	defer w.Flush()
 
@@ -192,6 +192,7 @@ func (c *DebugCommand) getWorkloadLogs(ctx context.Context, workloads []workload
 	return c.resultCollectorAndAuditor(ctx, w, resultsChan)
 }
 
+// logCollector - spawns goroutines to fetch logs for each container in each pod of each workload
 func (c *DebugCommand) logCollector(ctx context.Context, wg *sync.WaitGroup, workloads []workload, resultsChan chan<- logCollectionResult, sinceSeconds int64) {
 	sem := make(chan struct{}, 10) // Buffered Channel Semaphore: limit to 10 concurrent goroutines
 
@@ -246,6 +247,8 @@ func (c *DebugCommand) logCollector(ctx context.Context, wg *sync.WaitGroup, wor
 		}
 	}
 }
+
+// resultCollectorAndAuditor - collects results & errors of each resource (from logCollector) and writes to audit & error file resp.
 func (c *DebugCommand) resultCollectorAndAuditor(ctx context.Context, w *tabwriter.Writer, resultsChan <-chan logCollectionResult) error {
 	var logCaptureErrors *multierror.Error
 	var tabWriterMutex sync.Mutex
@@ -288,7 +291,7 @@ ReadLoop:
 		if err := os.WriteFile(errorFilePath, errorContent, 0644); err != nil {
 			return fmt.Errorf("error writing log capture errors to file: %v\n Collected Errors:\n%v", err, errorContent)
 		}
-		return fmt.Errorf("one or more errors occurred during log collection; \n\tplease check logs/logCaptureErrors.txt in debug archive for details")
+		return fmt.Errorf("one or more errors occurred during log collection; \n\tPlease check logs/logCaptureErrors.txt in debug archive for details")
 	}
 	return nil
 }

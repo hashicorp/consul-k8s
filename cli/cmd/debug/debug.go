@@ -44,13 +44,6 @@ const (
 	// debugDuration is the total time that debug runs before being shut down
 	debugDuration = 5 * time.Minute
 
-	// debugSince is the time that debug looks back to capture logs from pods
-	debugSince = 5 * time.Minute
-
-	// debugDurationGrace is a period of time added to the specified
-	// duration to allow log capture within that time
-	debugDurationGrace = 2 * time.Second
-
 	// debugMinDuration is the minimum a user can configure the duration
 	// to ensure that all information can be collected in time
 	debugMinDuration = 10 * time.Second
@@ -90,12 +83,14 @@ const (
 // is used.
 const timeDateFormat = "2006-01-02T15-04-05Z0700"
 
+const envoyDefaultAdminPort = 19000
+
 type DebugCommand struct {
 	*common.BaseCommand
 
 	kubernetes    kubernetes.Interface
-	apiextensions *apiextensionsclient.Clientset // for retrieving k8s CRDs List
-	dynamic       dynamic.Interface              // for retrieving k8s CRD resources
+	apiextensions apiextensionsclient.Interface // for retrieving k8s CRDs
+	dynamic       dynamic.Interface             // for retrieving k8s CRD resources
 
 	helmEnvSettings   *helmCLI.EnvSettings
 	helmActionsRunner helm.HelmActionsRunner
@@ -117,8 +112,10 @@ type DebugCommand struct {
 	flagNamespace string
 
 	// Dependency Injections for testing
-	fetchEnvoyConfig func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error)
-	fetchLogsFunc    func(context.Context, string, string, *corev1.PodLogOptions) (io.ReadCloser, error)
+	fetchEnvoyConfig              func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error)
+	fetchLogsFunc                 func(context.Context, string, string, *corev1.PodLogOptions) (io.ReadCloser, error)
+	envoyDefaultAdminPortEndpoint string
+
 	// validateTiming can be used to skip validation of duration. This
 	// is primarily useful for testing
 	validateTiming bool
@@ -236,83 +233,7 @@ func (c *DebugCommand) Run(args []string) int {
 			return 1
 		}
 	}
-
-	archiveName := c.output
-	if c.archive {
-		archiveName = archiveName + debugArchiveExtension
-	}
-
-	c.UI.Output("\nStarting debugger: ")
-
-	// Output metadata about debug run
-	c.UI.Output(fmt.Sprintf(" - Output:           %s", archiveName))
-	c.UI.Output(fmt.Sprintf(" - Capture Targets:  %s", strings.Join(c.capture, ", ")))
-
-	c.duration = c.duration + debugDurationGrace
-
-	select {
-	case <-c.CleanupReq:
-	default:
-	}
-	c.CleanupReq <- true
-	defer func() { c.CleanupConfirmation <- 1 }()
-
-	// capture helm config, CRDs and its resources, consul injected sidecar pods, proxy data, if asked
-	if err := c.captureStaticInfo(); err != nil {
-		c.UI.Output("Error capturing static info: %v", err.Error(), terminal.WithErrorStyle())
-		// return 1 // error(s) already printed in captureStaticInfo, primarily useful for testing
-	}
-
-	// capture pod logs & events, if asked
-	if c.CaptureTarget(targetLogs) {
-		g := new(errgroup.Group)
-		g.Go(func() error {
-			return c.captureLogs()
-		})
-		err := g.Wait()
-		if err != nil {
-			if errors.Is(err, signalInterruptError) {
-				c.UI.Output("Debug run interrupted, cleaning up partial capture...", terminal.WithErrorStyle())
-				err := os.RemoveAll(c.output)
-				if err != nil {
-					c.UI.Output(fmt.Sprintf("error cleaning up partial capture: %v", err), terminal.WithErrorStyle())
-					return 1
-				}
-				c.UI.Output(" - Cleanup completed")
-				return 1
-			}
-			c.UI.Output(fmt.Sprintf("error capturing consul pods logs: %v", err), terminal.WithErrorStyle())
-			c.UI.Output("Partial logs might be captured, please verify saved debug archive", terminal.WithWarningStyle())
-			// return 1
-		}
-	}
-
-	// Capture metadata about debug run at the root of the debug archive
-	var index debugIndex
-	if c.CaptureTarget(targetLogs) {
-		index = debugIndex{
-			Duration: c.duration.String(),
-			Since:    c.since.String(),
-		}
-	}
-	index = debugIndex{
-		Targets:   c.capture,
-		Timestamp: time.Now().Format(time.RFC3339),
-	}
-	if err := writeJSONFile(filepath.Join(c.output, "index.json"), index); err != nil {
-		c.UI.Output(fmt.Sprintf("error writing index.json: %v", err))
-		// return 1
-	}
-	// Archive the data if configured to
-	if c.archive {
-		err := c.createArchive()
-		if err != nil {
-			c.UI.Output(fmt.Sprintf("error archiving debug output: %v", err), terminal.WithErrorStyle())
-			return 1
-		}
-	}
-	c.UI.Output(fmt.Sprintf("Saved debug archive: %s", archiveName))
-	return 0
+	return c.debugger()
 }
 
 func (c *DebugCommand) validateFlags() error {
@@ -430,6 +351,90 @@ func (c *DebugCommand) initKubernetes() (err error) {
 	return nil
 }
 
+func (c *DebugCommand) debugger() int {
+	archiveName := c.output
+	if c.archive {
+		archiveName = archiveName + debugArchiveExtension
+	}
+
+	c.UI.Output("\nStarting debugger: ")
+
+	// Output metadata about debug run
+	c.UI.Output(fmt.Sprintf(" - Output:           %s", archiveName))
+	c.UI.Output(fmt.Sprintf(" - Capture Targets:  %s", strings.Join(c.capture, ", ")))
+
+	// Set up signal handling to ensure we can clean up properly
+	select {
+	case <-c.CleanupReq:
+	default:
+	}
+	c.CleanupReq <- true
+	defer func() { c.CleanupConfirmation <- 1 }()
+
+	// capture helm config, CRDs and its resources, consul injected sidecar pods, proxy data
+	if err := c.captureStaticInfo(); err != nil {
+		c.outputError("error capturing static info", err, archiveName)
+		return 1
+	}
+
+	// capture pod logs & events
+	if c.CaptureTarget(targetLogs) {
+		g := new(errgroup.Group)
+		g.Go(func() error {
+			return c.captureLogs()
+		})
+		err := g.Wait()
+		if err != nil {
+			if errors.Is(err, signalInterruptError) {
+				c.UI.Output("Debug run interrupted (due to signal interrupt), cleaning up partial debug capture...", terminal.WithErrorStyle())
+				err := os.RemoveAll(c.output)
+				if err != nil {
+					c.UI.Output(fmt.Sprintf("error cleaning up partial capture: %v", err), terminal.WithErrorStyle())
+					return 1
+				}
+				c.UI.Output(" - Cleanup completed")
+				return 1
+			}
+			c.outputError("error capturing logs", err, archiveName)
+			return 1
+		}
+	}
+
+	// Capture metadata about debug run at the root of the debug archive
+	var index debugIndex
+	if c.CaptureTarget(targetLogs) {
+		index = debugIndex{
+			Duration: c.duration.String(),
+			Since:    c.since.String(),
+		}
+	}
+	index = debugIndex{
+		Targets:   c.capture,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+	err := writeJSONFile(filepath.Join(c.output, "index.json"), index)
+	if err != nil {
+		c.outputError("error writing index.json", err, archiveName)
+		return 1
+	}
+
+	// Archive the data if configured to
+	if c.archive {
+		err := c.createArchive()
+		if err != nil {
+			c.outputError("error creating archive", err, c.output)
+			return 1
+		}
+	}
+	c.UI.Output(fmt.Sprintf("Saved debug archive: %s", archiveName), terminal.WithSuccessStyle())
+	return 0
+}
+
+func (c *DebugCommand) outputError(errmsg string, err error, archiveName string) {
+	c.UI.Output(fmt.Sprintf("%s: %v", errmsg, err), terminal.WithErrorStyle())
+	c.UI.Output(fmt.Sprintf("Partial debug capture, saved debug directory: %s", archiveName), terminal.WithWarningStyle())
+}
+
 // ===================================================================================================================
 
 // captureStaticInfo - captures Helm config, CRDs and its resources, consul injected sidecar pods, proxy data, if asked
@@ -440,7 +445,7 @@ func (c *DebugCommand) captureStaticInfo() error {
 	c.runCapture("CRD resources", targetCRDs, c.captureCRDResources, &errs)
 	c.runCapture("Consul Injected Sidecar Pods", targetSidecarPods, c.captureConsulInjectedSidecarPods, &errs)
 	c.runCapture("Envoy Proxy data", targetProxy, c.captureEnvoyProxyData, &errs)
-	return errs
+	return errs.ErrorOrNil()
 }
 func (c *DebugCommand) runCapture(name, target string, fn func() error, errs **multierror.Error) {
 	if !c.CaptureTarget(target) {
@@ -451,8 +456,7 @@ func (c *DebugCommand) runCapture(name, target string, fn func() error, errs **m
 		if errors.Is(err, notFoundError) {
 			c.UI.Output(fmt.Sprintf("No %s found.", name), terminal.WithWarningStyle())
 		} else {
-			c.UI.Output(fmt.Sprintf("error capturing %s: %v", name, err), terminal.WithErrorStyle())
-			*errs = multierror.Append(*errs, err)
+			*errs = multierror.Append(*errs, fmt.Errorf("error capturing %s: %v", name, err))
 		}
 	} else {
 		c.UI.Output(fmt.Sprintf("%s captured", name), terminal.WithSuccessStyle())

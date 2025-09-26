@@ -21,8 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const envoyDefaultAdminPort = 19000
-
 // captureEnvoyProxyData -
 // captures consul-k8s Envoy admin endpoint data (/stats, /clusters, /listeners, /config_dump)
 // for ALL proxy pods in ALL namespaces and writes it to /proxy dir within debug bundle
@@ -33,22 +31,33 @@ func (c *DebugCommand) captureEnvoyProxyData() error {
 		if err == notFoundError {
 			return err
 		}
-		return fmt.Errorf("Error fetching pods: %s", err)
-	}
-	// capture all proxy details and write them to debug bundle
-	var errs error
-	for _, pod := range pods {
-		podProxyType := c.getPodProxyType(pod)
-		if err := c.captureEnvoyProxyPodData(pod, podProxyType, pod.Namespace); err != nil {
-			errs = multierror.Append(errs, err)
-		}
+		return fmt.Errorf("error fetching pods list: %s", err)
 	}
 	// write envoy proxy pods list to json file within debug bundle
 	err = c.writeEnvoyProxyPodList(pods)
 	if err != nil {
-		errs = multierror.Append(errs, err)
+		return err
 	}
-	return errs
+
+	// capture all proxy's details and write them to debug bundle
+	var errs *multierror.Error
+	for _, pod := range pods {
+		podProxyType := c.getPodProxyType(pod)
+		if err := c.captureEnvoyProxyPodData(pod, podProxyType, pod.Namespace); err != nil {
+			err = fmt.Errorf("%s: %v\n", pod.Name, err)
+			errs = multierror.Append(errs, err)
+		}
+	}
+	// If any errors were collected during the capture, write them to a file in the debug directory.
+	if errs.ErrorOrNil() != nil {
+		errorFilePath := filepath.Join(c.output, "proxy", "proxyCaptureErrors.txt")
+		errorContent := []byte(errs.Error())
+		if err := os.WriteFile(errorFilePath, errorContent, 0644); err != nil {
+			return fmt.Errorf("error writing proxy data capture errors to file: %v\n Collected Errors:\n%v", err, errorContent)
+		}
+		return fmt.Errorf("one or more errors occurred during proxy data collection; \n\tPlease check logs/logCaptureErrors.txt in debug archive for details")
+	}
+	return nil
 }
 
 // getEnvoyProxyPodsList - captures all pods in ALL Namespaces which run envoy proxies,
@@ -163,11 +172,20 @@ func (c *DebugCommand) captureEnvoyProxyPodData(pod v1.Pod, proxyType string, na
 		KubeClient: c.kubernetes,
 		RestConfig: c.restConfig,
 	}
-	endpoint, err := pf.Open(c.Ctx)
-	if err != nil {
-		return fmt.Errorf("error port forwarding %s", err)
+
+	var endpoint string
+	var err error
+	// Dependency injection for testing
+	if c.envoyDefaultAdminPortEndpoint != "" {
+		endpoint = c.envoyDefaultAdminPortEndpoint
 	}
-	defer pf.Close()
+	if endpoint == "" {
+		endpoint, err = pf.Open(c.Ctx)
+		if err != nil {
+			return fmt.Errorf("error port forwarding %s", err)
+		}
+		defer pf.Close()
+	}
 
 	var errs error
 	err = c.captureEnvoyStats(endpoint, pod, proxyType, namespace)
@@ -186,7 +204,7 @@ func (c *DebugCommand) captureEnvoyStats(endpoint string, pod v1.Pod, proxyType 
 
 	resp, err := http.Get(fmt.Sprintf("http://%s/stats?format=json", endpoint))
 	if err != nil {
-		return fmt.Errorf("error hitting stats endpoint of envoy %s", err)
+		return fmt.Errorf("error hitting stats endpoint of envoy: %s", err)
 	}
 	stats, err := io.ReadAll(resp.Body)
 	if err != nil {

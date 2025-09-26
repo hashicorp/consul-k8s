@@ -10,9 +10,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/envoy"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
@@ -23,12 +25,20 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/release"
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmTime "helm.sh/helm/v3/pkg/time"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
+
+	dynamicFake "k8s.io/client-go/dynamic/fake"
 )
 
 func TestFlagParsingFails(t *testing.T) {
@@ -370,4 +380,385 @@ func TestCaptureConsulInjectedSidecarPods(t *testing.T) {
 			require.Equal(t, tc.expectedReadyVal, podInfo["ready"])
 		})
 	}
+}
+
+func createFakeCRD() *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "serviceintentions.consul.hashicorp.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "consul.hashicorp.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{Name: "v1alpha1", Served: true, Storage: true},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   "serviceintentions",
+				Singular: "serviceintention",
+				Kind:     "ServiceIntention",
+			},
+		},
+	}
+}
+func createFakeCR(name, namespace string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "consul.hashicorp.com/v1alpha1",
+			"kind":       "ServiceIntention",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": namespace,
+			},
+		},
+	}
+}
+func TestListAndCaptureCRDResources(t *testing.T) {
+	crd := createFakeCRD()
+	cr1 := createFakeCR("my-cr-1", "default")
+	cr2 := createFakeCR("my-cr-2", "default")
+	cr3 := createFakeCR("my-cr-3", "consul")
+	// Define the GVR for the custom resource. This is needed for the fake client setup.
+	serviceIntentionsGVR := schema.GroupVersionResource{
+		Group:    "consul.hashicorp.com",
+		Version:  "v1alpha1",
+		Resource: "serviceintentions",
+	}
+	cases := map[string]struct {
+		crdObjects    []runtime.Object
+		crObjects     []runtime.Object
+		namespace     string
+		expectedError error
+		assertFunc    func(t *testing.T, crdMap map[string][]unstructured.Unstructured)
+	}{
+		"success with multiple CRs in default namespace": {
+			crdObjects: []runtime.Object{crd},
+			crObjects:  []runtime.Object{cr1, cr2, cr3},
+			namespace:  "default",
+			assertFunc: func(t *testing.T, crdMap map[string][]unstructured.Unstructured) {
+				require.Len(t, crdMap, 1, "Expected one CRD type in the map")
+				key := fmt.Sprintf("%s/v1alpha1", crd.Name)
+				resources, ok := crdMap[key]
+				require.True(t, ok, "Expected key for CRD version not found")
+				require.Len(t, resources, 2, "Expected two CR instances")
+				require.Equal(t, "my-cr-1", resources[0].GetName())
+				require.Equal(t, "my-cr-2", resources[1].GetName())
+			},
+		},
+		"success with single CRs in consul namespace": {
+			crdObjects: []runtime.Object{crd},
+			crObjects:  []runtime.Object{cr1, cr2, cr3},
+			namespace:  "consul",
+			assertFunc: func(t *testing.T, crdMap map[string][]unstructured.Unstructured) {
+				require.Len(t, crdMap, 1, "Expected one CRD type in the map")
+				key := fmt.Sprintf("%s/v1alpha1", crd.Name)
+				resources, ok := crdMap[key]
+				require.True(t, ok, "Expected key for CRD version not found")
+				require.Len(t, resources, 1, "Expected one CR instances")
+				require.Equal(t, "my-cr-3", resources[0].GetName())
+			},
+		},
+		"no CRDs found": {
+			crdObjects:    []runtime.Object{},
+			crObjects:     []runtime.Object{},
+			namespace:     "default",
+			expectedError: notFoundError,
+		},
+		"crd exists but no resources": {
+			crdObjects: []runtime.Object{crd},
+			crObjects:  []runtime.Object{}, // No CR instances
+			namespace:  "default",
+			assertFunc: func(t *testing.T, crdMap map[string][]unstructured.Unstructured) {
+				require.Len(t, crdMap, 1, "Expected one CRD type in the map")
+				key := fmt.Sprintf("%s/v1alpha1", crd.Name)
+				resources, ok := crdMap[key]
+				require.True(t, ok, "Expected key for CRD version not found")
+				require.Len(t, resources, 0, "Expected zero CR instances")
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			c := initializeDebugCommands(new(bytes.Buffer))
+			c.flagNamespace = tc.namespace
+
+			c.apiextensions = apiextensionsfake.NewSimpleClientset(tc.crdObjects...)
+			listMapping := map[schema.GroupVersionResource]string{
+				serviceIntentionsGVR: "ServiceIntentionList",
+			}
+			dynamicClient := dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listMapping, tc.crObjects...)
+			c.dynamic = dynamicClient
+
+			// testListCRDResources
+			crdResourcesMap, err := c.listCRDResources()
+			if tc.expectedError != nil {
+				require.Error(t, err)
+				require.True(t, errors.Is(err, tc.expectedError))
+			} else {
+				require.NoError(t, err)
+				tc.assertFunc(t, crdResourcesMap)
+			}
+
+			// testCaptureCRDResources
+			c.output = t.TempDir()
+			err = c.captureCRDResources()
+			if name == "no CRDs found" {
+				require.Error(t, err)
+				require.True(t, errors.Is(err, notFoundError))
+				return
+			}
+			require.NoError(t, err)
+
+			jsonFilePath := filepath.Join(c.output, "CRDsResources.json")
+			_, statErr := os.Stat(jsonFilePath)
+			require.NoError(t, statErr, "expected JSON file to be created")
+
+			content, readErr := os.ReadFile(jsonFilePath)
+			require.NoError(t, readErr)
+
+			// Unmarshal the JSON into a Go map.
+			var fileData map[string][]unstructured.Unstructured
+			unmarshalErr := json.Unmarshal(content, &fileData)
+			require.NoError(t, unmarshalErr, "failed to unmarshal output JSON")
+
+			// Use the same assertion function to validate the file contents
+			tc.assertFunc(t, fileData)
+		})
+	}
+}
+
+func TestDebugRun(t *testing.T) {
+	// test environment setup
+	helmRelease := &release.Release{
+		Name: "consul", Namespace: "consul",
+		Info:   &release.Info{Status: "deployed"},
+		Chart:  &chart.Chart{Metadata: &chart.Metadata{Version: "1.0.0"}},
+		Config: make(map[string]interface{}),
+	}
+	server := startHttpServerForEnvoyStats(envoyDefaultAdminPort, `{"stats": {}}`)
+	defer server.Close()
+	k8sObjects, crObjects, crdObjects, serviceIntentionsGVR := createTestResource()
+
+	// testcases
+	cases := map[string]struct {
+		args                 []string
+		helmRunner           *helm.MockActionRunner
+		fetchLogFunc         func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error)
+		fetchEnvoyConfig     func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error)
+		expectedOutputPath   string
+		expectedReturnCode   int
+		expectedOutputBuffer []string
+		expectArchive        bool
+	}{
+		"success case with all targets with duration": {
+			args: []string{"-archive=true", "-duration=10s", "-output=tc1"},
+			helmRunner: &helm.MockActionRunner{
+				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
+					return helmRelease, nil
+				},
+			},
+			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewBufferString("log line")), nil
+			},
+			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
+				return testEnvoyConfig, nil
+			},
+			expectedOutputPath: "tc1",
+			expectedReturnCode: 0,
+			expectArchive:      true,
+			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
+				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
+				"Capturing pods info.....", "Capturing pods logs.....", "Pods Logs captured", "Saved debug archive"},
+		},
+		"success case with all targets with since": {
+			args: []string{"-archive=true", "-since=10s", "-output=tc2"}, // Default is all capture targets
+			helmRunner: &helm.MockActionRunner{
+				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
+					return helmRelease, nil
+				},
+			},
+			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewBufferString("log line")), nil
+			},
+			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
+				return testEnvoyConfig, nil
+			},
+			expectedOutputPath: "tc2",
+			expectedReturnCode: 0,
+			expectArchive:      true,
+			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
+				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
+				"Capturing pods info.....", "Capturing pods logs.....", "Pods Logs captured", "Saved debug archive"},
+		},
+		"static info failure (helm)": {
+			args: []string{"-archive=false", "-duration=10s", "-output=tc3"},
+			helmRunner: &helm.MockActionRunner{
+				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
+					return nil, errors.New("testing helm error")
+				},
+			},
+			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewBufferString("log line")), nil
+			},
+			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
+				return testEnvoyConfig, nil
+			},
+			expectedOutputPath: "tc3",
+			expectedReturnCode: 1,
+			expectArchive:      true,
+			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......",
+				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
+				"error capturing static info", "error capturing Helm config"},
+		},
+		"static info failure (envoy proxy - config data)": {
+			args: []string{"-archive=false", "-duration=10s", "-output=tc4"},
+			helmRunner: &helm.MockActionRunner{
+				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
+					return helmRelease, nil
+				},
+			},
+			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewBufferString("log line")), nil
+			},
+			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
+				return nil, errors.New("testing envoy config fetch error")
+			},
+			expectedOutputPath: "tc4",
+			expectedReturnCode: 1,
+			expectArchive:      true,
+			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
+				"CRD resources captured", "Consul Injected Sidecar Pods captured",
+				"error capturing static info", "error capturing Envoy Proxy data"},
+		},
+		"log capture fail": {
+			args: []string{"-archive=false", "-duration=10s", "-output=tc5"},
+			helmRunner: &helm.MockActionRunner{
+				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
+					return helmRelease, nil
+				},
+			},
+			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				return nil, errors.New("testing log fetch error")
+			},
+			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
+				return testEnvoyConfig, nil
+			},
+			expectedOutputPath: "tc5",
+			expectedReturnCode: 1,
+			expectArchive:      true,
+			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
+				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
+				"Capturing pods info.....", "Capturing pods logs.....", "error capturing logs"},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+
+			// Setup a temp working directory for the test
+			tempDir := t.TempDir()
+			originalWD, err := os.Getwd()
+			require.NoError(t, err)
+			err = os.Chdir(tempDir)
+			require.NoError(t, err)
+			defer os.Chdir(originalWD)
+
+			tc.expectedOutputPath = filepath.Join(tempDir, tc.expectedOutputPath)
+
+			buf := new(bytes.Buffer)
+			c := initializeDebugCommands(buf)
+			c.Ctx = context.Background()
+
+			c.helmActionsRunner = tc.helmRunner
+			c.helmEnvSettings = helmCLI.New()
+			c.kubernetes = fake.NewSimpleClientset(k8sObjects...)
+			c.apiextensions = apiextensionsfake.NewSimpleClientset(crdObjects...)
+			listMapping := map[schema.GroupVersionResource]string{serviceIntentionsGVR: "ServiceIntentionList"}
+			c.dynamic = dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listMapping, crObjects...)
+
+			c.envoyDefaultAdminPortEndpoint = "localhost:" + strconv.Itoa(envoyDefaultAdminPort)
+			c.fetchEnvoyConfig = tc.fetchEnvoyConfig
+			c.fetchLogsFunc = tc.fetchLogFunc
+
+			returnCode := c.Run(tc.args)
+
+			require.Equal(t, tc.expectedReturnCode, returnCode, "unexpected return code")
+			for _, expectedStr := range tc.expectedOutputBuffer {
+				require.Contains(t, buf.String(), expectedStr, "unexpected buffer output")
+			}
+
+			expectedArchivePath := tc.expectedOutputPath
+			if tc.expectedReturnCode == 0 {
+				expectedArchivePath = tc.expectedOutputPath + debugArchiveExtension
+			}
+			_, err = os.Stat(expectedArchivePath)
+
+			// expectArchive indicates whether we expect debug archive to be created
+			// be it archived or not
+			if tc.expectArchive == true {
+				require.NoError(t, err, "expected archive file to be created")
+			} else {
+				require.True(t, os.IsNotExist(err), "expected archive file not to be created")
+			}
+		})
+	}
+}
+
+// Helper to convert a slice of concrete pods to a slice of runtime.Object
+func convertPodsToRuntimeObjects(pods []corev1.Pod) []runtime.Object {
+	objects := make([]runtime.Object, len(pods))
+	for i := range pods {
+		objects[i] = &pods[i]
+	}
+	return objects
+}
+
+func createTestResource() (k8sObjects, crObjects, crdObjects []runtime.Object, serviceIntentionsGVR schema.GroupVersionResource) {
+	crd := createFakeCRD()
+	cr := createFakeCR("my-cr-1", "consul")
+	serviceIntentionsGVR = schema.GroupVersionResource{
+		Group: "consul.hashicorp.com", Version: "v1alpha1", Resource: "serviceintentions",
+	}
+
+	sidecarPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "sidecar-pod", Namespace: "default",
+			Labels: map[string]string{"consul.hashicorp.com/connect-inject-status": "injected"},
+		},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{{Name: "init-container", Image: "busybox:1.28"}},
+			Containers: []corev1.Container{
+				{Name: "control-dataplane", Image: "nginx:1.21.6"},
+				{Name: "app-container", Image: "nginx:1.21.6"},
+			},
+		},
+	}
+
+	consulServerLabels := map[string]string{"app": "consul", "component": "server"}
+	consulStatefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-server", Namespace: "consul",
+		},
+		Spec: appsv1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: consulServerLabels,
+			},
+		},
+	}
+	consulServerPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-server-0", Namespace: "consul",
+			Labels: consulServerLabels,
+		},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{{Name: "init-container", Image: "busybox:1.28"}},
+			Containers:     []corev1.Container{{Name: "consul", Image: "nginx:1.21.6"}},
+		},
+	}
+
+	k8sObjects = []runtime.Object{sidecarPod, consulStatefulSet, consulServerPod}
+	k8sObjects = append(k8sObjects, convertPodsToRuntimeObjects(pods)...)
+	crdObjects = []runtime.Object{crd}
+	crObjects = []runtime.Object{cr}
+	return k8sObjects, crObjects, crdObjects, serviceIntentionsGVR
 }
