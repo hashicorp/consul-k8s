@@ -55,16 +55,24 @@ func TestCheckConsulServers(t *testing.T) {
 			}
 
 			// Verify that the correct server statuses are seen.
-			err := c.checkConsulServers(namespace)
+			tbl, err := c.getConsulServersTable(namespace)
 			require.NoError(t, err)
 
-			actual := buf.String()
 			if tc.desired > 0 {
-				require.Contains(t, actual, "NAME         \tREADY\tAGE          \tCONTAINERS\tIMAGES ")
-				require.Contains(t, actual, "consul-server")
-				require.Contains(t, actual, fmt.Sprintf("%d/%d", tc.healthy, tc.desired))
+				require.NotNil(t, tbl)
+				expectedHeaders := []string{"NAME", "READY", "AGE", "CONTAINERS", "IMAGES"}
+				assert.Equal(t, expectedHeaders, tbl.Headers)
+
+				require.Len(t, tbl.Rows, 1)
+				serverRow := tbl.Rows[0]
+
+				require.Equal(t, "consul-server", serverRow[0].Value)
+				require.Equal(t, fmt.Sprintf("%d/%d", tc.healthy, tc.desired), serverRow[1].Value)
+				if tc.desired != tc.healthy {
+					require.Equal(t, terminal.Red, serverRow[1].Color)
+				}
 			} else {
-				require.Contains(t, actual, "No Consul Server found in Kubernetes cluster.")
+				require.Nil(t, tbl)
 			}
 			buf.Reset()
 		})
@@ -93,17 +101,25 @@ func TestCheckConsulClients(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// Verify that the correct server statuses are seen.
-			err := c.checkConsulClients(namespace)
+			// Verify that the correct clients statuses are seen.
+			tbl, err := c.getConsulClientsTable(namespace)
 			require.NoError(t, err)
 
-			actual := buf.String()
 			if tc.desired > 0 {
-				require.Contains(t, actual, "NAME         \tREADY\tAGE          \tCONTAINERS\tIMAGES ")
-				require.Contains(t, actual, "consul-client")
-				require.Contains(t, actual, fmt.Sprintf("%d/%d", tc.healthy, tc.desired))
+				require.NotNil(t, tbl)
+				expectedHeaders := []string{"NAME", "READY", "AGE", "CONTAINERS", "IMAGES"}
+				assert.Equal(t, expectedHeaders, tbl.Headers)
+
+				require.Len(t, tbl.Rows, 1)
+				serverRow := tbl.Rows[0]
+
+				require.Equal(t, "consul-client", serverRow[0].Value)
+				require.Equal(t, fmt.Sprintf("%d/%d", tc.healthy, tc.desired), serverRow[1].Value)
+				if tc.desired != tc.healthy {
+					require.Equal(t, terminal.Red, serverRow[1].Color)
+				}
 			} else {
-				require.Contains(t, actual, "No Consul Client found in Kubernetes cluster.")
+				require.Nil(t, tbl)
 			}
 			buf.Reset()
 		})
@@ -133,17 +149,25 @@ func TestCheckConsulDeployments(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// Verify that the correct server statuses are seen.
-			err := c.checkConsulDeployments(namespace)
+			// Verify that the correct deployments statuses are seen.
+			tbl, err := c.getConsulDeploymentsTable(namespace)
 			require.NoError(t, err)
 
-			actual := buf.String()
 			if tc.desired > 0 {
-				require.Contains(t, actual, "NAME             \tREADY\tAGE          \tCONTAINERS\tIMAGES ")
-				require.Contains(t, actual, "consul-deployment")
-				require.Contains(t, actual, fmt.Sprintf("%d/%d", tc.healthy, tc.desired))
+				require.NotNil(t, tbl)
+				expectedHeaders := []string{"NAME", "READY", "AGE", "CONTAINERS", "IMAGES"}
+				assert.Equal(t, expectedHeaders, tbl.Headers)
+
+				require.Len(t, tbl.Rows, 1)
+				serverRow := tbl.Rows[0]
+
+				require.Equal(t, "consul-deployment", serverRow[0].Value)
+				require.Equal(t, fmt.Sprintf("%d/%d", tc.healthy, tc.desired), serverRow[1].Value)
+				if tc.desired != tc.healthy {
+					require.Equal(t, terminal.Red, serverRow[1].Color)
+				}
 			} else {
-				require.Contains(t, actual, "No Consul deployments found in Kubernetes cluster.")
+				require.Nil(t, tbl)
 			}
 			buf.Reset()
 		})

@@ -126,7 +126,7 @@ func (c *Command) Run(args []string) int {
 
 	err = c.checkConsulComponentsStatus(namespace)
 	if err != nil {
-		return 1 // Only for testing
+		return 1
 	}
 	return 0
 }
@@ -218,32 +218,43 @@ func validEvent(events []release.HookEvent) bool {
 	return false
 }
 
-// checkConsulComponentsStatus lists status of different consul components
+// checkConsulComponentsStatus fetch and prints the status of different consul components
+// like Consul Clients, Consul Servers, and Consul Deployments, in the given namespace of the cluster.
 func (c *Command) checkConsulComponentsStatus(namespace string) error {
 	var err error
-	c.UI.Output("Consul Client status: ", terminal.WithHeaderStyle())
-	if err = c.checkConsulClients(namespace); err != nil {
-		c.UI.Output("Unable to list Consul Clients: %s", err, terminal.WithErrorStyle())
-	}
-	c.UI.Output("Consul Server status: ", terminal.WithHeaderStyle())
-	if err = c.checkConsulServers(namespace); err != nil {
-		c.UI.Output("Unable to list Consul Servers: %s", err, terminal.WithErrorStyle())
-	}
-	c.UI.Output("Consul Deployment status: ", terminal.WithHeaderStyle())
-	if err = c.checkConsulDeployments(namespace); err != nil {
-		c.UI.Output("Unable to list Consul deployments: %s", err, terminal.WithWarningStyle())
-	}
+	var tbl *terminal.Table
+	tbl, err = c.getConsulClientsTable(namespace)
+	c.printComponentStatus(tbl, err, "Consul Clients")
+	tbl, err = c.getConsulServersTable(namespace)
+	c.printComponentStatus(tbl, err, "Consul Servers")
+	tbl, err = c.getConsulDeploymentsTable(namespace)
+	c.printComponentStatus(tbl, err, "Consul Deployments")
 	return err
 }
 
-// checkConsulClients list the Consul Clients and their ready status (number of pods ready/desired)
-func (c *Command) checkConsulClients(namespace string) error {
-	clients, err := c.kubernetes.AppsV1().DaemonSets(namespace).List(c.Ctx, metav1.ListOptions{})
+// printComponentStatus prints the status of a given component (Consul Clients, Consul Servers, or Consul Deployments).
+func (c *Command) printComponentStatus(tbl *terminal.Table, err error, component string) {
+	c.UI.Output(fmt.Sprintf("%s status: ", component), terminal.WithHeaderStyle())
 	if err != nil {
-		return err
+		c.UI.Output("unable to list %s: %s", component, err, terminal.WithErrorStyle())
 	}
+	if tbl != nil {
+		c.UI.Table(tbl)
+	} else {
+		c.UI.Output(fmt.Sprintf("No %s found in Kubernetes cluster.", component))
+	}
+}
+
+// getConsulClientsTable returns the table instance with the Consul Clients
+// and their ready status (number of pods ready/desired)
+func (c *Command) getConsulClientsTable(namespace string) (*terminal.Table, error) {
+	clients, err := c.kubernetes.AppsV1().DaemonSets(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=client"})
+	if err != nil {
+		return nil, err
+	}
+	var tbl *terminal.Table
 	if len(clients.Items) != 0 {
-		tbl := terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
+		tbl = terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
 		for _, c := range clients.Items {
 			age := time.Since(c.CreationTimestamp.Time).Round(time.Minute)
 			readyStatus := fmt.Sprintf("%d/%d", c.Status.NumberReady, c.Status.DesiredNumberScheduled)
@@ -256,26 +267,26 @@ func (c *Command) checkConsulClients(namespace string) error {
 			imagesString := strings.Join(images, ", ")
 			containersString := strings.Join(containers, ", ")
 			if c.Status.NumberReady != c.Status.DesiredNumberScheduled {
-				tbl.AddRow([]string{c.Name, readyStatus, age.String(), containersString, imagesString}, []string{"Red"})
+				colourCode := []string{terminal.Red, terminal.Red, "", "", ""}
+				tbl.AddRow([]string{c.Name, readyStatus, age.String(), containersString, imagesString}, colourCode)
 			} else {
 				tbl.AddRow([]string{c.Name, readyStatus, age.String(), containersString, imagesString}, []string{})
 			}
 		}
-		c.UI.Table(tbl)
-	} else {
-		c.UI.Output("No Consul Client found in Kubernetes cluster.")
 	}
-	return nil
+	return tbl, nil
 }
 
-// checkConsulServers list the Consul Servers and their ready status (number of pods ready/desired),
-func (c *Command) checkConsulServers(namespace string) error {
-	servers, err := c.kubernetes.AppsV1().StatefulSets(namespace).List(c.Ctx, metav1.ListOptions{})
+// getConsulServersTable returns the table instance with the Consul Servers
+// and their ready status (number of pods ready/desired),
+func (c *Command) getConsulServersTable(namespace string) (*terminal.Table, error) {
+	servers, err := c.kubernetes.AppsV1().StatefulSets(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=server"})
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var tbl *terminal.Table
 	if len(servers.Items) != 0 {
-		tbl := terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
+		tbl = terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
 		for _, s := range servers.Items {
 			age := time.Since(s.CreationTimestamp.Time).Round(time.Minute)
 			readyStatus := fmt.Sprintf("%d/%d", s.Status.ReadyReplicas, *s.Spec.Replicas)
@@ -288,26 +299,26 @@ func (c *Command) checkConsulServers(namespace string) error {
 			imagesString := strings.Join(images, ", ")
 			containersString := strings.Join(containers, ", ")
 			if s.Status.ReadyReplicas != *s.Spec.Replicas {
-				tbl.AddRow([]string{s.Name, readyStatus, age.String(), containersString, imagesString}, []string{"Red"})
+				colourCode := []string{terminal.Red, terminal.Red, "", "", ""}
+				tbl.AddRow([]string{s.Name, readyStatus, age.String(), containersString, imagesString}, colourCode)
 			} else {
 				tbl.AddRow([]string{s.Name, readyStatus, age.String(), containersString, imagesString}, []string{})
 			}
 		}
-		c.UI.Table(tbl)
-	} else {
-		c.UI.Output("No Consul Server found in Kubernetes cluster.")
 	}
-	return nil
+	return tbl, nil
 }
 
-// checkConsulDeployments list the Consul Deployed Deployments and their ready status (number of pods ready/desired),
-func (c *Command) checkConsulDeployments(namespace string) error {
+// getConsulDeploymentsTable returns the table instance with the Consul Deployed Deployments
+// and their ready status (number of pods ready/desired),
+func (c *Command) getConsulDeploymentsTable(namespace string) (*terminal.Table, error) {
 	deployments, err := c.kubernetes.AppsV1().Deployments(namespace).List(c.Ctx, metav1.ListOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var tbl *terminal.Table
 	if len(deployments.Items) != 0 {
-		tbl := terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
+		tbl = terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
 		for _, d := range deployments.Items {
 			age := time.Since(d.CreationTimestamp.Time).Round(time.Minute)
 			readyStatus := fmt.Sprintf("%d/%d", d.Status.ReadyReplicas, *d.Spec.Replicas)
@@ -320,16 +331,14 @@ func (c *Command) checkConsulDeployments(namespace string) error {
 			imagesString := strings.Join(images, ", ")
 			containersString := strings.Join(containers, ", ")
 			if d.Status.ReadyReplicas != *d.Spec.Replicas {
-				tbl.AddRow([]string{d.Name, readyStatus, age.String(), containersString, imagesString}, []string{"Red"})
+				colourCode := []string{terminal.Red, terminal.Red, "", "", ""}
+				tbl.AddRow([]string{d.Name, readyStatus, age.String(), containersString, imagesString}, colourCode)
 			} else {
 				tbl.AddRow([]string{d.Name, readyStatus, age.String(), containersString, imagesString}, []string{})
 			}
 		}
-		c.UI.Table(tbl)
-	} else {
-		c.UI.Output("No Consul deployments found in Kubernetes cluster.")
 	}
-	return nil
+	return tbl, nil
 }
 
 // setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
