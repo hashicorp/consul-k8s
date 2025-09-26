@@ -79,10 +79,10 @@ const (
 	// MeshV2VolumePath is the name of the volume that contains the proxy ID.
 	MeshV2VolumePath = "/consul/mesh-inject"
 
-	UseTLSEnvVar        = "CONSUL_USE_TLS"
-	CACertFileEnvVar    = "CONSUL_CACERT_FILE"
-	CACertPEMEnvVar     = "CONSUL_CACERT_PEM"
-	TLSServerNameEnvVar = "CONSUL_TLS_SERVER_NAME"
+	UseTLSEnvVar          = "CONSUL_USE_TLS"
+	CACertFileEnvVar      = "CONSUL_CACERT_FILE"
+	CACertPEMEnvVar       = "CONSUL_CACERT_PEM"
+	TLSServerNameEnvVar   = "CONSUL_TLS_SERVER_NAME"
 	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
 )
 

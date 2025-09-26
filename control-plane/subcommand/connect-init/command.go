@@ -18,7 +18,6 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
-	"github.com/hashicorp/consul/agent/netutil"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/iptables"
 	"github.com/hashicorp/go-hclog"
@@ -207,10 +206,9 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
-		dualStack, err := netutil.IsDualStack(consulConfig.APIClientConfig, false)
-		if err != nil {
-			c.logger.Error("failed to get dualstack state: %s", err.Error())
-			return 1
+		dualStack := false
+		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+			dualStack = true
 		}
 		c.watcher.Stop() // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
 		err = c.applyTrafficRedirectionRules(proxyService, dualStack)
