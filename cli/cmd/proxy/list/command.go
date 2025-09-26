@@ -40,6 +40,10 @@ const (
 	opFormatJSON    = "json"
 	opFormatArchive = "archive"
 )
+const (
+	filePerm = 0644
+	dirPerm  = 0755
+)
 
 // ListCommand is the command struct for the proxy list command.
 type ListCommand struct {
@@ -352,11 +356,11 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		// NOTE: currently it is writing stats file in cwd '/proxy' only. Also, file contents will be overwritten
 		// if the command is run multiple times or if file already exists.
 		proxyListFilePath := filepath.Join("proxy", "proxy-list.json")
-		err = os.MkdirAll(filepath.Dir(proxyListFilePath), 0755)
+		err = os.MkdirAll(filepath.Dir(proxyListFilePath), dirPerm)
 		if err != nil {
 			fmt.Printf("error creating proxy list output directory: %v", err)
 		}
-		err = os.WriteFile(proxyListFilePath, jsonSt, 0644)
+		err = os.WriteFile(proxyListFilePath, jsonSt, filePerm)
 		if err != nil {
 			// Note: Please do not delete the directory created above even if writing file fails.
 			// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
