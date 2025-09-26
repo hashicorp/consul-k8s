@@ -5,9 +5,10 @@ package webhook
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
-	"github.com/hashicorp/consul/agent/netutil"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -45,17 +46,7 @@ func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 
 	nameserver := consulDataplaneDNSBindHost
 
-	ds, err := netutil.IsDualStack(w.ConsulConfig.APIClientConfig, false)
-	if err != nil {
-		return fmt.Errorf(
-			"unable to get consul dual stack status with error: %s, consul-url: %s, consul-token: %s, %v",
-			err.Error(),
-			w.ConsulConfig.APIClientConfig.Address,
-			w.ConsulConfig.APIClientConfig.Token,
-			w.ConsulConfig,
-		)
-	}
-	if ds {
+	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
 		nameserver = ipv6ConsulDataplaneDNSBindHost
 	}
 

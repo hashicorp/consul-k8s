@@ -83,6 +83,7 @@ const (
 	CACertFileEnvVar    = "CONSUL_CACERT_FILE"
 	CACertPEMEnvVar     = "CONSUL_CACERT_PEM"
 	TLSServerNameEnvVar = "CONSUL_TLS_SERVER_NAME"
+	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

@@ -6,6 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const (
@@ -328,11 +328,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
-	ds, err := netutil.IsDualStack(w.ConsulConfig.APIClientConfig, false)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
-	}
-	if ds {
+	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
 		envoyAdminBindAddress = "::1"
 		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
 		consulDPBindAddress = "::"
