@@ -44,7 +44,7 @@ func TestFlagParsing(t *testing.T) {
 			args: []string{"-namespace", "notaname"},
 			out:  1,
 		},
-		"Valid podName passed, Invalid arg value(so it can fail at validation)": {
+		"Valid podName passed, -output invalid value, should fail": {
 			args: []string{"podName", "-output", "image"},
 			out:  1,
 		},
@@ -252,7 +252,8 @@ func TestCaptureEnvoyStats(t *testing.T) {
 				c.flagPod = pod.Name
 				mpf := &MockPortForwarder{}
 
-				expectedFilePath := filepath.Join(tempDir, "proxy", "proxy-stats-"+pod.Name+".json")
+				fileName := fmt.Sprintf("proxy-stats-%s.json", pod.Name)
+				expectedFilePath := filepath.Join(tempDir, "proxy", fileName)
 				err := c.captureEnvoyStats(mpf, expectedFilePath)
 
 				require.NoError(t, err)

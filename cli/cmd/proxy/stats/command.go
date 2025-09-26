@@ -26,6 +26,10 @@ import (
 )
 
 const envoyAdminPort = 19000
+const (
+	filePerm = 0644
+	dirPerm  = 0755
+)
 
 const (
 	flagNameNamespace    = "namespace"
@@ -71,7 +75,7 @@ func (c *StatsCommand) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameOutputFormat,
 		Target:  &c.flagOutputFormat,
-		Usage:   "To store the stats of a given proxy pod in a json file.",
+		Usage:   "To write the stats of a given proxy pod in a json file.",
 		Default: "",
 		Aliases: []string{"o"},
 	})
@@ -224,7 +228,7 @@ func (c *StatsCommand) captureEnvoyStats(pf common.PortForwarder, proxyStatsFile
 	// Create file path and directory for storing stats
 	// NOTE: currently it is writing log file in cwd /proxy dir only. Also, file contents will be overwritten if
 	// the command is run multiple times for the same pod name or if file already exists.
-	if err := os.MkdirAll(filepath.Dir(proxyStatsFilePath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(proxyStatsFilePath), dirPerm); err != nil {
 		return fmt.Errorf("error creating proxy stats output directory: %w", err)
 	}
 
@@ -238,7 +242,7 @@ func (c *StatsCommand) captureEnvoyStats(pf common.PortForwarder, proxyStatsFile
 		return fmt.Errorf("error converting proxy stats output to json: %w", err)
 	}
 
-	if err := os.WriteFile(proxyStatsFilePath, marshaled, 0644); err != nil {
+	if err := os.WriteFile(proxyStatsFilePath, marshaled, filePerm); err != nil {
 		// Note: Please do not delete the directory created above even if writing file fails.
 		// This (proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
 		return fmt.Errorf("error writing proxy stats output to json file '%s': %w", proxyStatsFilePath, err)
