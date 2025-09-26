@@ -136,12 +136,12 @@ func (h *HelmCluster) Create(t *testing.T) {
 		h.Destroy(t)
 	})
 
-	// If a release with the same nameexists, delete it before starting installation.
-	_, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "status", h.releaseName)
-	if err == nil {
-		logger.Logf(t, "Helm release %s already exists, deleting it first", h.releaseName)
-		h.Destroy(t)
-	}
+	// // If a release with the same nameexists, delete it before starting installation.
+	// _, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "status", h.releaseName)
+	// if err == nil {
+	// 	logger.Logf(t, "Helm release %s already exists, deleting it first", h.releaseName)
+	// 	h.Destroy(t)
+	// }
 
 	// Fail if there are any existing installations of the Helm chart.
 	if !h.SkipCheckForPreviousInstallations {
@@ -164,7 +164,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
+		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
 
