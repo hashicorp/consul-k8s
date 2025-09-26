@@ -4,6 +4,7 @@
 package stats
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -232,17 +233,12 @@ func (c *StatsCommand) captureEnvoyStats(pf common.PortForwarder, proxyStatsFile
 		return fmt.Errorf("error creating proxy stats output directory: %w", err)
 	}
 
-	var statsJson interface{}
-	err = json.Unmarshal(stats, &statsJson)
-	if err != nil {
-		return fmt.Errorf("error unmarshalling JSON proxy stats output: %w", err)
-	}
-	marshaled, err := json.MarshalIndent(statsJson, "", "\t")
-	if err != nil {
-		return fmt.Errorf("error converting proxy stats output to json: %w", err)
+	var statsJson bytes.Buffer
+	if err := json.Indent(&statsJson, stats, "", "\t"); err != nil {
+		return fmt.Errorf("error indenting JSON proxy stats output: %w", err)
 	}
 
-	if err := os.WriteFile(proxyStatsFilePath, marshaled, filePerm); err != nil {
+	if err := os.WriteFile(proxyStatsFilePath, statsJson.Bytes(), filePerm); err != nil {
 		// Note: Please do not delete the directory created above even if writing file fails.
 		// This (proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
 		return fmt.Errorf("error writing proxy stats output to json file '%s': %w", proxyStatsFilePath, err)
