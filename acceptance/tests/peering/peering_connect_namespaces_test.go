@@ -195,7 +195,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			// Ensure mesh config entries are created in Consul.
-			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+			timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
 				ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
 				require.NoError(r, err)

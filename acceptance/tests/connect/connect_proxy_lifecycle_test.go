@@ -101,6 +101,14 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			connHelper.Setup(t)
 			connHelper.Install(t)
+
+			// Sanity check that control plane is healthy before deploying any applications
+			retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				peers, err := connHelper.ConsulClient.Status().Peers()
+				require.NoError(r, err)
+				require.Len(r, peers, 1)
+			})
+
 			connHelper.DeployClientAndServer(t)
 
 			// TODO: should this move into connhelper.DeployClientAndServer?
@@ -143,14 +151,15 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				require.NoError(r, err)
 				require.Len(r, pods.Items, 1)
 			})
-			clientPodName := pods.Items[0].Name
 
 			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
 			var terminationGracePeriod int64 = 6
+			clientPodName := pods.Items[0].Name
 			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
 			require.NoError(t, err)
 
+			logger.Logf(t, "pod %q should terminate in approximately %d seconds", clientPodName, terminationGracePeriod)
 			// Exec into terminating pod, not just any static-client pod
 			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
 
@@ -161,6 +170,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			if gracePeriodSeconds > 0 {
+				logger.Logf(t, "ensuring pod does not terminate before %d second grace period", gracePeriodSeconds)
 				// Ensure outbound requests are still successful during grace period.
 				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
 			gracePeriodLoop:
@@ -171,6 +181,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					default:
 						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
 						retry.RunWith(retrier, t, func(r *retry.R) {
+							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
 								r.Errorf("%v", err.Error())
@@ -193,6 +204,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					}
 				}
 			} else {
+				logger.Logf(t, "ensuring pod terminates immediately with 0 second grace period")
 				// Ensure outbound requests fail because proxy has terminated
 				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
 					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
@@ -207,11 +219,33 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				})
 			}
 
+			// Checks are done, now ensure the pod is fully removed from k8s and Consul.
+			logger.Logf(t, "scaling down the static-client deployment to 0 replicas to clean up the terminating pod %q", clientPodName)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
+
 			logger.Log(t, "ensuring pod is deregistered after termination")
+
+			// Wait for the pod to be fully deleted
+			// This ensures that the ACL token associated with pod had also been cleaned up
+			retrier := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+			retry.RunWith(retrier, t, func(r *retry.R) {
+				err = ctx.KubernetesClient(r).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{})
+				if err != nil {
+					if strings.Contains(err.Error(), "not found") {
+						logger.Logf(r, "pod %q successfully deleted", clientPodName)
+						return
+					}
+					r.Errorf("error deleting pod %q: %v", clientPodName, err)
+				} else {
+					r.Errorf("pod %q still exists", clientPodName)
+				}
+			})
+
 			// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
 			// This can cause the re-queued reconcile used to come back and clean up the service registration to be re-re-queued at
 			// 2-3X the intended grace period.
 			retry.RunWith(&retry.Timer{Timeout: time.Duration(30) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+
 				for _, name := range []string{
 					"static-client",
 					"static-client-sidecar-proxy",
