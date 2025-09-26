@@ -189,7 +189,8 @@ func TestReadCommandOutputArchive(t *testing.T) {
 
 	require.Equal(t, 0, out)
 
-	expectedFilePath := filepath.Join(tempDir, "proxy", "proxy-read-"+podName+".json")
+	fileName := fmt.Sprintf("proxy-read-%s.json", podName)
+	expectedFilePath := filepath.Join(tempDir, "proxy", fileName)
 
 	_, err = os.Stat(expectedFilePath)
 	require.NoError(t, err, "expected output file to be created, but it was not")

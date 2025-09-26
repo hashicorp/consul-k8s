@@ -30,6 +30,11 @@ import (
 const defaultAdminPort int = 19000
 
 const (
+	filePerm = 0644
+	dirPerm  = 0755
+)
+
+const (
 	Table   = "table"
 	JSON    = "json"
 	Raw     = "raw"
@@ -442,29 +447,9 @@ func (c *ReadCommand) outputTables(configs map[string]*envoy.EnvoyConfig) error 
 }
 
 func (c *ReadCommand) outputJSON(configs map[string]*envoy.EnvoyConfig) error {
-	cfgs := make(map[string]interface{})
-	for name, config := range configs {
-		cfg := make(map[string]interface{})
-		if c.shouldPrintTable(c.flagClusters) {
-			cfg["clusters"] = FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort)
-		}
-		if c.shouldPrintTable(c.flagEndpoints) {
-			cfg["endpoints"] = FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort)
-		}
-		if c.shouldPrintTable(c.flagListeners) {
-			cfg["listeners"] = FilterListeners(config.Listeners, c.flagAddress, c.flagPort)
-		}
-		if c.shouldPrintTable(c.flagRoutes) {
-			cfg["routes"] = config.Routes
-		}
-		if c.shouldPrintTable(c.flagSecrets) {
-			cfg["secrets"] = config.Secrets
-		}
+	config := c.filterConfigs(configs)
 
-		cfgs[name] = cfg
-	}
-
-	escaped, err := json.MarshalIndent(cfgs, "", "\t")
+	escaped, err := json.MarshalIndent(config, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -552,6 +537,33 @@ func (c *ReadCommand) outputSecretsTable(secrets []envoy.Secret) {
 }
 
 func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error {
+	config := c.filterConfigs(configs)
+	marshalled, err := json.MarshalIndent(config, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	// Create file path and directory for storing proxy read data
+	// NOTE: currently it is writing data file in cwd /proxy dir only. Also, file contents will be overwritten if
+	// the command is run multiple times for the same pod name or if file already exists.
+	fileName := fmt.Sprintf("proxy-read-%s.json", c.flagPodName)
+	proxyReadFilePath := filepath.Join("proxy", fileName)
+	err = os.MkdirAll(filepath.Dir(proxyReadFilePath), dirPerm)
+	if err != nil {
+		fmt.Printf("error creating proxy read output directory: %v", err)
+	}
+	err = os.WriteFile(proxyReadFilePath, marshalled, filePerm)
+	if err != nil {
+		// Note: Please do not delete the directory created above even if writing file fails.
+		// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
+		fmt.Printf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err)
+	}
+	c.UI.Output("proxy read '%s' output saved to '%s'", c.flagPodName, proxyReadFilePath, terminal.WithSuccessStyle())
+	return nil
+}
+
+// filterConfigs- applies the field filters to the configs and returns a map[string]interface{}
+func (c *ReadCommand) filterConfigs(configs map[string]*envoy.EnvoyConfig) map[string]interface{} {
 	cfgs := make(map[string]interface{})
 	for name, config := range configs {
 		cfg := make(map[string]interface{})
@@ -572,27 +584,5 @@ func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error
 		}
 		cfgs[name] = cfg
 	}
-
-	marshalled, err := json.MarshalIndent(cfgs, "", "\t")
-	if err != nil {
-		return err
-	}
-
-	// Create file path and directory for storing proxy read data
-	// NOTE: currently it is writing data file in cwd /proxy dir only. Also, file contents will be overwritten if
-	// the command is run multiple times for the same pod name or if file already exists.
-	fileName := fmt.Sprintf("proxy-read-%s.json", c.flagPodName)
-	proxyReadFilePath := filepath.Join("proxy", fileName)
-	err = os.MkdirAll(filepath.Dir(proxyReadFilePath), 0755)
-	if err != nil {
-		fmt.Printf("error creating proxy read output directory: %v", err)
-	}
-	err = os.WriteFile(proxyReadFilePath, marshalled, 0644)
-	if err != nil {
-		// Note: Please do not delete the directory created above even if writing file fails.
-		// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
-		fmt.Printf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err)
-	}
-	c.UI.Output("proxy read '%s' output saved to '%s'", c.flagPodName, proxyReadFilePath, terminal.WithSuccessStyle())
-	return nil
+	return cfgs
 }
