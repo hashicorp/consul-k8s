@@ -315,15 +315,21 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// Kubernetes namespace.
 			// If a single destination namespace is set, we expect all services
 			// to be registered in that destination Consul namespace.
+
 			// Server cluster.
-			services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", serverQueryOpts)
-			require.NoError(t, err)
-			require.Len(t, services, 1)
+			timer = &retry.Timer{Timeout: 2 * time.Minute, Wait: 3 * time.Second}
+			retry.RunWith(timer, t, func(r *retry.R) {
+				services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", serverQueryOpts)
+				require.NoError(r, err)
+				require.Len(r, services, 1)
+			})
 
 			// Client cluster.
-			services, _, err = staticClientPeerClient.Catalog().Service(staticClientName, "", clientQueryOpts)
-			require.NoError(t, err)
-			require.Len(t, services, 1)
+			retry.RunWith(timer, t, func(r *retry.R) {
+				services, _, err := staticClientPeerClient.Catalog().Service(staticClientName, "", clientQueryOpts)
+				require.NoError(r, err)
+				require.Len(r, services, 1)
+			})
 
 			logger.Log(t, "creating exported services")
 			if c.destinationNamespace == defaultNamespace {

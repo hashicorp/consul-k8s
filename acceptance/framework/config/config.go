@@ -110,6 +110,7 @@ type TestConfig struct {
 	UseOpenshift    bool
 
 	helmChartPath string
+	DualStack     bool
 }
 
 // HelmValuesFromConfig returns a map of Helm values
@@ -158,6 +159,10 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 			// namespace it must be run in a different privileged namespace.
 			setIfNotEmpty(helmValues, "connectInject.cni.namespace", "kube-system")
 		}
+	}
+
+	if t.DualStack {
+		setIfNotEmpty(helmValues, "global.dualStack.enabled", "true")
 	}
 
 	// UseGKEAutopilot is a temporary hack that we need in place as GKE Autopilot is already installing
