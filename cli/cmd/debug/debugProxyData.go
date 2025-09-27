@@ -3,6 +3,7 @@
 package debug
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -218,17 +219,11 @@ func (c *DebugCommand) captureEnvoyStats(endpoint string, pod v1.Pod, proxyType 
 		return fmt.Errorf("error creating directory for enviy stats file: %w", err)
 	}
 
-	var statsJson interface{}
-	err = json.Unmarshal(stats, &statsJson)
-	if err != nil {
-		return fmt.Errorf("error unmarshalling JSON: %s", err)
+	var statsJson bytes.Buffer
+	if err := json.Indent(&statsJson, stats, "", "\t"); err != nil {
+		return fmt.Errorf("error indenting JSON proxy stats output: %w", err)
 	}
-	marshaled, err := json.MarshalIndent(statsJson, "", "\t")
-	if err != nil {
-		return fmt.Errorf("error marshalling JSON: %s", err)
-	}
-
-	if err := os.WriteFile(proxyPodEnvoyStatsPath, marshaled, 0644); err != nil {
+	if err := os.WriteFile(proxyPodEnvoyStatsPath, statsJson.Bytes(), 0644); err != nil {
 		return fmt.Errorf("error writing envoy stats to json file for pod '%s': %v", pod.Name, err)
 	}
 	return nil
