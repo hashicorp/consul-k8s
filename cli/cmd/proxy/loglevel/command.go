@@ -39,6 +39,11 @@ const (
 	flagNameKubeContext = "context"
 	flagNameCapture     = "capture"
 )
+const (
+	minimumCaptureDuration = 10 * time.Second
+	filePermission         = 0644
+	dirPermission          = 0755
+)
 
 var ErrIncorrectArgFormat = errors.New("Exactly one positional argument is required: <pod-name>")
 
@@ -65,7 +70,7 @@ type LogLevelCommand struct {
 	namespace   string
 	level       string
 	reset       bool
-	capture     string
+	capture     time.Duration
 	kubeConfig  string
 	kubeContext string
 
@@ -93,10 +98,10 @@ func (l *LogLevelCommand) init() {
 		Usage:   "Update the level for the logger. Can be either `-update-level warning` to change all loggers to warning, or a comma delineated list of loggers with level can be passed like `-update-level grpc:warning,http:info` to only modify specific loggers.",
 		Aliases: []string{"u"},
 	})
-	f.StringVar(&flag.StringVar{
+	f.DurationVar(&flag.DurationVar{
 		Name:    flagNameCapture,
 		Target:  &l.capture,
-		Default: "",
+		Default: 0,
 		Usage:   "Captures pod log for the given duration according to existing/new update-level. It can be used with -update-level <any> flag to capture logs at that level or with -reset flag to capture logs at default info level",
 	})
 
@@ -158,16 +163,17 @@ func (l *LogLevelCommand) Run(args []string) int {
 		return l.logOutputAndDie(err)
 	}
 
-	if l.capture == "" {
-		newLogger, err := l.fetchOrSetLogLevels(adminPorts)
+	if l.capture == 0 {
+		loggers, err := l.fetchOrSetLogLevels(adminPorts, l.level)
 		if err != nil {
 			return l.logOutputAndDie(err)
 		}
-		l.outputLevels(newLogger)
+		l.outputLevels(loggers)
 		return 0
 	}
 
-	if err := l.captureLogsAndResetLogLevels(adminPorts); err != nil {
+	err = l.captureLogsAndResetLogLevels(adminPorts, l.level)
+	if err != nil {
 		return 1
 	}
 	return 0
@@ -212,10 +218,8 @@ func (l *LogLevelCommand) validateFlags() error {
 			return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 		}
 	}
-	if l.capture != "" {
-		if _, err := time.ParseDuration(l.capture); err != nil {
-			return fmt.Errorf("invalid duration passed for -capture: %v", err)
-		}
+	if l.capture != 0 && l.capture < minimumCaptureDuration {
+		return fmt.Errorf("capture duration must be at least %s", minimumCaptureDuration)
 	}
 
 	return nil
@@ -277,7 +281,10 @@ func (l *LogLevelCommand) fetchAdminPorts() (map[string]int, error) {
 	return adminPorts, nil
 }
 
-func (l *LogLevelCommand) fetchOrSetLogLevels(adminPorts map[string]int) (map[string]LoggerConfig, error) {
+// fetchOrSetLogLevels - fetches or sets the log levels for all admin ports depending on the logLevel parameter
+//   - if logLevel is empty, it fetches the existing log levels
+//   - if logLevel is non-empty, it sets the new log levels
+func (l *LogLevelCommand) fetchOrSetLogLevels(adminPorts map[string]int, logLevel string) (map[string]LoggerConfig, error) {
 	loggers := make(map[string]LoggerConfig, 0)
 
 	for name, port := range adminPorts {
@@ -288,7 +295,7 @@ func (l *LogLevelCommand) fetchOrSetLogLevels(adminPorts map[string]int) (map[st
 			KubeClient: l.kubernetes,
 			RestConfig: l.restConfig,
 		}
-		params, err := parseParams(l.level)
+		params, err := parseParams(logLevel)
 		if err != nil {
 			return nil, err
 		}
@@ -301,9 +308,10 @@ func (l *LogLevelCommand) fetchOrSetLogLevels(adminPorts map[string]int) (map[st
 	return loggers, nil
 }
 
-func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int) error {
-	// If no new level is provided, just capture logs.
-	if l.level == "" {
+// captureLogsAndResetLogLevels - captures the logs from the given pod at given logLevels for the given duration and writes it to a file
+func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int, logLevels string) error {
+	// if no new log level is provided, just capture logs at existing log levels.
+	if logLevels == "" {
 		return l.captureLogs()
 	}
 
@@ -313,11 +321,6 @@ func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int
 	// 3. Capture logs at NEW log levels for the given duration
 	// 4. Reset back to existing log levels
 
-	existingLogger, err := l.fetchExistingLogLevels(adminPorts)
-	if err != nil {
-		return err
-	}
-
 	// cleanup is required to ensure that if new log level set,
 	// should be reset back to existing log level after log capture
 	// even if user interrupts the command during log capture.
@@ -326,47 +329,45 @@ func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int
 	default:
 	}
 	l.CleanupReq <- true
+
+	// fetch log levels
+	l.UI.Output(fmt.Sprintf("Fetching existing log levels..."))
+	existingLoggers, err := l.fetchOrSetLogLevels(adminPorts, "")
+	if err != nil {
+		return fmt.Errorf("error fetching existing log levels: %w", err)
+	}
+
+	// defer reset of log levels
 	defer func() {
-		l.CleanupConfirmation <- 1
-	}()
-	defer func() {
-		if err := l.resetLogLevels(existingLogger, adminPorts); err != nil {
-			l.UI.Output(fmt.Sprintf("error resetting log levels: %v", err), terminal.WithErrorStyle())
+		l.UI.Output("Resetting log levels back to existing levels...")
+		if err := l.resetLogLevels(existingLoggers, adminPorts); err != nil {
+			l.UI.Output(err.Error(), terminal.WithErrorStyle())
 		} else {
 			l.UI.Output("Reset completed successfully!")
 		}
+		l.CleanupConfirmation <- 1
 	}()
 
+	// set new log levels for log capture
 	l.UI.Output(fmt.Sprintf("Setting new log levels..."))
-	currentLogger, err := l.fetchOrSetLogLevels(adminPorts)
+	newLogger, err := l.fetchOrSetLogLevels(adminPorts, logLevels)
 	if err != nil {
 		return fmt.Errorf("error setting new log levels: %w", err)
 	}
-	l.outputLevels(currentLogger)
+	l.outputLevels(newLogger)
 
+	// capture logs at new log levels
 	err = l.captureLogs()
 	if err != nil {
-		l.UI.Output(err.Error(), terminal.WithErrorStyle())
+		l.UI.Output(fmt.Sprintf("error capturing logs: %v", err), terminal.WithErrorStyle())
+		return err
 	}
-	return err
+	return nil
 }
 
-func (l *LogLevelCommand) fetchExistingLogLevels(adminPorts map[string]int) (map[string]LoggerConfig, error) {
-	l.UI.Output(fmt.Sprintf("Fetching existing log levels..."))
-	existingLogger := make(map[string]LoggerConfig, 0)
-	newLogLevels := l.level
-	l.level = ""
-	existingLogger, err := l.fetchOrSetLogLevels(adminPorts)
-	l.level = newLogLevels
-	if err != nil {
-		return nil, fmt.Errorf("error fetching existing log levels: %w", err)
-	}
-	return existingLogger, nil
-}
-
+// resetLogLevels - converts the 'existing logger map' to logLevel parameter string
+// and reset the log levels back for EACH admin ports
 func (l *LogLevelCommand) resetLogLevels(existingLogger map[string]LoggerConfig, adminPorts map[string]int) error {
-	l.UI.Output("Resetting log levels back to previous configuration...")
-	var errs error
 	// Use a fresh context for resetting log levels as
 	// l.Ctx might be cancelled during log capture DUE TO user interrupt
 	originalCtx := l.Ctx
@@ -374,25 +375,28 @@ func (l *LogLevelCommand) resetLogLevels(existingLogger map[string]LoggerConfig,
 	defer func() {
 		l.Ctx = originalCtx
 	}()
-	for loggerName, levels := range existingLogger {
-		var levelParams []string
-		for k, v := range levels {
+
+	var errs error
+	for adminPortName, loggers := range existingLogger {
+		var logLevelParams []string
+		for loggerName, logLevel := range loggers {
 			// EnvoyLoggers is a map of valid logger for consul and
-			// fetchOrSetLogLevels return ALL the envoy logger (not the one specific of consul)
+			// fetchLogLevels return ALL the envoy logger (not the one specific of consul)
 			// so below check is needed to filter out unspecified loggers.
 			// It can be removed once the above is fixed.
-			if _, ok := envoy.EnvoyLoggers[k]; ok {
-				levelParams = append(levelParams, fmt.Sprintf("%s:%s", k, v))
+			if _, ok := envoy.EnvoyLoggers[loggerName]; ok {
+				logLevelParams = append(logLevelParams, fmt.Sprintf("%s:%s", loggerName, logLevel))
 			}
 		}
-		if len(levelParams) > 0 {
-			l.level = strings.Join(levelParams, ",")
+		var logLevelParamsString string
+		if len(logLevelParams) > 0 {
+			logLevelParamsString = strings.Join(logLevelParams, ",")
 		} else {
-			l.level = "info"
+			logLevelParamsString = "info"
 		}
-		_, err := l.fetchOrSetLogLevels(map[string]int{loggerName: adminPorts[loggerName]})
+		_, err := l.fetchOrSetLogLevels(map[string]int{adminPortName: adminPorts[adminPortName]}, logLevelParamsString)
 		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("error resetting log level for %s: %w", loggerName, err))
+			errs = multierror.Append(errs, fmt.Errorf("error resetting log level for %s: %w", adminPortName, err))
 		}
 	}
 	return errs
@@ -402,25 +406,19 @@ func (l *LogLevelCommand) captureLogs() error {
 	l.UI.Output("Starting log capture...")
 	g := new(errgroup.Group)
 	g.Go(func() error {
-		return l.fetchPodLogs(l.Ctx)
+		return l.fetchPodLogs()
 	})
 	err := g.Wait()
 	if err != nil {
-		return fmt.Errorf("error capturing logs: %w", err)
+		return err
 	}
 	return nil
 }
 
 // fetchPodLogs - captures the logs from the given pod for the given duration and writes it to a file
-func (l *LogLevelCommand) fetchPodLogs(ctx context.Context) error {
-	duration, err := time.ParseDuration(l.capture)
-	if err != nil {
-		return fmt.Errorf("error parsing capture's duration")
-	}
-	durationChn := time.After(duration)
-
-	sinceSeconds := int64(duration.Seconds())
-	pod, err := l.kubernetes.CoreV1().Pods(l.namespace).Get(ctx, l.podName, metav1.GetOptions{})
+func (l *LogLevelCommand) fetchPodLogs() error {
+	sinceSeconds := int64(l.capture.Seconds())
+	pod, err := l.kubernetes.CoreV1().Pods(l.namespace).Get(l.Ctx, l.podName, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("error getting pod object from k8s: %w", err)
 	}
@@ -439,28 +437,30 @@ func (l *LogLevelCommand) fetchPodLogs(ctx context.Context) error {
 
 	// metadata of log capture
 	l.UI.Output("Pod Name:             %s", pod.Name)
+	l.UI.Output("Container Name:       %s", podLogOptions.Container)
 	l.UI.Output("Namespace:            %s", pod.Namespace)
 	l.UI.Output("Log Capture Duration: %s", l.capture)
 	l.UI.Output("Log File Path:        %s", proxyLogFilePath)
 
+	durationChn := time.After(l.capture)
 	select {
 	case <-durationChn:
-		logs, err := l.getLogFunc(ctx, pod, podLogOptions)
+		logs, err := l.getLogFunc(l.Ctx, pod, podLogOptions)
 		if err != nil {
 			return err
 		}
 		// Create file path and directory for storing logs
 		// NOTE: currently it is writing log file in cwd /proxy only. Also, log file contents will be overwritten if
 		// the command is run multiple times for the same pod name or if file already exists.
-		if err := os.MkdirAll(filepath.Dir(proxyLogFilePath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(proxyLogFilePath), dirPermission); err != nil {
 			return fmt.Errorf("error creating directory for log file: %w", err)
 		}
-		if err := os.WriteFile(proxyLogFilePath, logs, 0644); err != nil {
+		if err := os.WriteFile(proxyLogFilePath, logs, filePermission); err != nil {
 			return fmt.Errorf("error writing log to file: %v", err)
 		}
 		l.UI.Output("Logs saved to '%s'", proxyLogFilePath, terminal.WithSuccessStyle())
 		return nil
-	case <-ctx.Done():
+	case <-l.Ctx.Done():
 		return fmt.Errorf("stopping collection due to shutdown signal recieved")
 	}
 }

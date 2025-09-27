@@ -267,7 +267,7 @@ func TestLogCaptureWithExistingLogLevels(t *testing.T) {
 
 	// buffer checks
 	cwdLogFilePath := "proxy/" + "proxy-log-" + podName + ".log"
-	expectedCaptureOutput := fmt.Sprintf("Starting log capture...\nPod Name:             %s\nNamespace:            %s\nLog Capture Duration: %s\nLog File Path:        %s\n ✓ Logs saved to '%s'\n", fakePod.Name, fakePod.Namespace, duration, cwdLogFilePath, cwdLogFilePath)
+	expectedCaptureOutput := fmt.Sprintf("Starting log capture...\nPod Name:             %s\nContainer Name:       consul-dataplane\nNamespace:            %s\nLog Capture Duration: %s\nLog File Path:        %s\n ✓ Logs saved to '%s'\n", fakePod.Name, fakePod.Namespace, duration, cwdLogFilePath, cwdLogFilePath)
 	actual := buf.String()
 	require.Equal(t, expectedCaptureOutput, actual)
 
@@ -328,7 +328,7 @@ func TestLogCaptureWithNewLogLevels(t *testing.T) {
 	for logger, level := range testLogConfig {
 		require.Regexp(t, regexp.MustCompile(logger+`.*`+level), actual)
 	}
-	expectedCaptureOutput := fmt.Sprintf("Starting log capture...\nPod Name:             %s\nNamespace:            %s\nLog Capture Duration: %s\nLog File Path:        %s\n ✓ Logs saved to '%s'\nResetting log levels back to previous configuration...\nReset completed successfully!\n", fakePod.Name, fakePod.Namespace, duration, cwdLogFilePath, cwdLogFilePath)
+	expectedCaptureOutput := fmt.Sprintf("Starting log capture...\nPod Name:             %s\nContainer Name:       consul-dataplane\nNamespace:            %s\nLog Capture Duration: %s\nLog File Path:        %s\n ✓ Logs saved to '%s'\nResetting log levels back to existing levels...\nReset completed successfully!\n", fakePod.Name, fakePod.Namespace, duration, cwdLogFilePath, cwdLogFilePath)
 	require.Contains(t, actual, expectedCaptureOutput)
 
 	// file checks
