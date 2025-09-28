@@ -3,7 +3,6 @@ package debug
 import (
 	"archive/tar"
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -18,17 +17,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/envoy"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/go-multierror"
 	"github.com/posener/complete"
-	"golang.org/x/sync/errgroup"
 	"helm.sh/helm/v3/pkg/action"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/release"
-	corev1 "k8s.io/api/core/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -47,13 +43,30 @@ const (
 	// debugMinDuration is the minimum a user can configure the duration
 	// to ensure that all information can be collected in time
 	debugMinDuration = 10 * time.Second
+	debugLeastSince  = 10 * time.Second
+
+	debugGraceDuration = 2 * time.Second
 
 	// debugArchiveExtension is the extension for archive files
 	debugArchiveExtension = ".tar.gz"
 )
 
-var notFoundError = errors.New("not found")
-var signalInterruptError = errors.New("signal interrupt received")
+// Predefined errors
+var (
+	notFoundError        = errors.New("not found")
+	signalInterruptError = errors.New("signal interrupt received")
+	// oneOrMoreErrorOccured is used to indicate that one or more errors occurred
+	// during a capture task and they are written successfully to debug bundle,
+	// otherwise whole error would be printed on terminal
+	oneOrMoreErrorOccured = errors.New(fmt.Sprint("one or more errors occurred during capture for this target",
+		"\n\tplease check the respective error file within the debug bundle for details"))
+)
+
+// Predefined file and directory permissions
+const (
+	filePerm = 0644
+	dirPerm  = 0755
+)
 
 // debugIndex is used to manage the summary of all data recorded
 // during the debug, to be written to json at the end of the run
@@ -64,6 +77,39 @@ type debugIndex struct {
 	Targets   []string `json:"targets"`
 	Timestamp string   `json:"timestamp"`
 }
+
+// capture Targets: Helm config, CRDs, sidecars, pod logs and Envoy endpoints data.
+const (
+	targetHelmConfig  = "helm"
+	targetCRDs        = "crds"
+	targetSidecarPods = "sidecar"
+	targetLogs        = "logs"
+	targetProxy       = "proxy"
+)
+
+// defaultTargets specifies the list of targets that will be captured by default
+var defaultTargets = []string{
+	targetHelmConfig,
+	targetCRDs,
+	targetLogs,
+	targetSidecarPods,
+	targetProxy,
+}
+
+// capture Targets Not Found Error Messages
+const (
+	noHelmReleaseFound = "No helm release found"
+	noCRDsFound        = "No consul CRDs found in the cluster"
+	noSidecarPodsFound = "No consul injected sidecar pods found in all namespace"
+	noProxiesFound     = "No envoy proxy pods found in the cluster"
+	noPodsFound        = "No pods found to capture log"
+)
+
+// timeDateformat is a modified version of time.RFC3339 which replaces colons with
+// hyphens. This is to make it more convenient to untar these files, because
+// tar assumes colons indicate the file is on a remote host, unless --force-local
+// is used.
+const timeDateFormat = "2006-01-02T15-04-05Z0700"
 
 const (
 	flagNameKubeConfig  = "kubeconfig"
@@ -77,31 +123,20 @@ const (
 	flagCapture  = "capture"
 )
 
-// timeDateformat is a modified version of time.RFC3339 which replaces colons with
-// hyphens. This is to make it more convenient to untar these files, because
-// tar assumes colons indicate the file is on a remote host, unless --force-local
-// is used.
-const timeDateFormat = "2006-01-02T15-04-05Z0700"
-
-const envoyDefaultAdminPort = 19000
+type captureTask struct {
+	name        string
+	target      string
+	captureFxn  func() error
+	notFoundMsg string
+}
 
 type DebugCommand struct {
 	*common.BaseCommand
-
-	kubernetes    kubernetes.Interface
-	apiextensions apiextensionsclient.Interface // for retrieving k8s CRDs
-	dynamic       dynamic.Interface             // for retrieving k8s CRD resources
-
-	helmEnvSettings   *helmCLI.EnvSettings
-	helmActionsRunner helm.HelmActionsRunner
-
 	set *flag.Sets
 
 	// Global flags
 	flagKubeConfig  string
 	flagKubeContext string
-
-	restConfig *rest.Config
 
 	// Command flags
 	duration      time.Duration
@@ -111,20 +146,19 @@ type DebugCommand struct {
 	capture       []string
 	flagNamespace string
 
+	// Internal state
+	kubernetes      kubernetes.Interface
+	restConfig      *rest.Config
+	apiextensions   apiextensionsclient.Interface // for retrieving k8s CRDs
+	dynamic         dynamic.Interface             // for retrieving k8s CRD resources
+	helmEnvSettings *helmCLI.EnvSettings
+
 	// Dependency Injections for testing
-	fetchEnvoyConfig              func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error)
-	fetchLogsFunc                 func(context.Context, string, string, *corev1.PodLogOptions) (io.ReadCloser, error)
-	envoyDefaultAdminPortEndpoint string
-
-	// validateTiming can be used to skip validation of duration. This
-	// is primarily useful for testing
-	validateTiming bool
-	// timeNow is a shim for testing, it is used to generate the time used in
-	// file paths.
-	timeNow func() time.Time
-
-	once sync.Once
-	help string
+	helmActionsRunner helm.HelmActionsRunner
+	proxyCapturer     *EnvoyProxyCapture
+	logCapturer       *LogCapture
+	once              sync.Once
+	help              string
 }
 
 // init sets up flags and help text for the command.
@@ -192,10 +226,6 @@ func (c *DebugCommand) init() {
 		Usage:   "Set the Kubernetes context to use.",
 	})
 
-	c.validateTiming = true
-	c.timeNow = func() time.Time {
-		return time.Now().UTC()
-	}
 	c.help = c.set.Help()
 }
 
@@ -220,13 +250,15 @@ func (c *DebugCommand) Run(args []string) int {
 	// Checks if cwd have write permissions and
 	// if output directory already exists
 	if err := c.preChecks(); err != nil {
-		c.UI.Output("Pre-validation failed: %v", err.Error(), terminal.WithErrorStyle())
+		c.UI.Output("Pre-checks failed: %v", err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
+	// Testing dependencies
 	if c.helmActionsRunner == nil {
 		c.helmActionsRunner = &helm.ActionRunner{}
 	}
+
 	if c.kubernetes == nil {
 		if err := c.initKubernetes(); err != nil {
 			c.UI.Output("Error initializing Kubernetes client: %v", err.Error(), terminal.WithErrorStyle())
@@ -247,11 +279,13 @@ func (c *DebugCommand) validateFlags() error {
 		}
 	}
 	// Ensure realistic duration is specified
-	if c.validateTiming {
-		if c.duration < debugMinDuration {
-			return fmt.Errorf("duration must be longer than %s", debugMinDuration)
-		}
+	if c.duration < debugMinDuration {
+		return fmt.Errorf("duration must be longer than %s", debugMinDuration)
 	}
+	if c.since != 0 && c.since < debugLeastSince {
+		return fmt.Errorf("since must be longer than %s", debugLeastSince)
+	}
+
 	// If none are specified in capture, we will collect information from all by default
 	// otherwise, validate that the specified targets are known/valid
 	if len(c.capture) == 0 || (len(c.capture) == 1 && c.capture[0] == "all") {
@@ -266,6 +300,7 @@ func (c *DebugCommand) validateFlags() error {
 	}
 	return nil
 }
+
 func (c *DebugCommand) preChecks() error {
 	// Ensure the output directory can be created (have write permissions and it does not already exist
 	if _, err := os.Stat(c.output); os.IsNotExist(err) {
@@ -333,7 +368,7 @@ func (c *DebugCommand) initKubernetes() (err error) {
 
 	// for retrieving k8s CRDs resources
 	//if targetCapture(targetCRDs) is false, skip creating these clients
-	if c.CaptureTarget(targetCRDs) {
+	if c.captureTarget(targetCRDs) {
 		c.dynamic, err = dynamic.NewForConfig(c.restConfig)
 		if err != nil {
 			return fmt.Errorf("error creating dynamic client: %w", err)
@@ -351,17 +386,14 @@ func (c *DebugCommand) initKubernetes() (err error) {
 	return nil
 }
 
+// ===================================================================================================================
+
+// debugger is the main function that orchestrate the debug process
 func (c *DebugCommand) debugger() int {
 	archiveName := c.output
 	if c.archive {
 		archiveName = archiveName + debugArchiveExtension
 	}
-
-	c.UI.Output("\nStarting debugger: ")
-
-	// Output metadata about debug run
-	c.UI.Output(fmt.Sprintf(" - Output:           %s", archiveName))
-	c.UI.Output(fmt.Sprintf(" - Capture Targets:  %s", strings.Join(c.capture, ", ")))
 
 	// Set up signal handling to ensure we can clean up properly
 	select {
@@ -369,104 +401,137 @@ func (c *DebugCommand) debugger() int {
 	default:
 	}
 	c.CleanupReq <- true
-	defer func() { c.CleanupConfirmation <- 1 }()
+	// cleanupConfirmation will be in cleanupAndReturn
 
-	// capture helm config, CRDs and its resources, consul injected sidecar pods, proxy data
-	if err := c.captureStaticInfo(); err != nil {
-		c.outputError("error capturing static info", err, archiveName)
-		return 1
+	c.UI.Output("\nStarting debugger: ")
+	// Output metadata about debug run
+	c.UI.Output(fmt.Sprintf(" - Output:           %s", archiveName))
+	c.UI.Output(fmt.Sprintf(" - Capture Targets:  %s", strings.Join(c.capture, ", ")))
+
+	if c.proxyCapturer == nil {
+		c.proxyCapturer = &EnvoyProxyCapture{
+			kubernetes: c.kubernetes,
+			restConfig: c.restConfig,
+			output:     c.output,
+			ctx:        c.Ctx,
+		}
+	}
+	if c.logCapturer == nil {
+		c.logCapturer = &LogCapture{
+			BaseCommand: c.BaseCommand,
+			kubernetes:  c.kubernetes,
+			namespace:   c.flagNamespace,
+			ctx:         c.Ctx,
+			output:      c.output,
+			since:       c.since,
+			duration:    c.duration,
+		}
+	}
+	tasks := []captureTask{
+		{name: "Helm config", target: targetHelmConfig, captureFxn: c.captureHelmConfig, notFoundMsg: noHelmReleaseFound},
+		{name: "CRD resources", target: targetCRDs, captureFxn: c.captureCRDResources, notFoundMsg: noCRDsFound},
+		{name: "Consul Sidecar Pods", target: targetSidecarPods, captureFxn: c.captureSidecarPods, notFoundMsg: noSidecarPodsFound},
+		{name: "Envoy Proxy data", target: targetProxy, captureFxn: c.proxyCapturer.captureEnvoyProxyData, notFoundMsg: noProxiesFound},
+		{name: "Pods Logs", target: targetLogs, captureFxn: c.logCapturer.captureLogs, notFoundMsg: noPodsFound},
+		{name: "Index", target: "index", captureFxn: c.captureIndex, notFoundMsg: ""},
 	}
 
-	// capture pod logs & events
-	if c.CaptureTarget(targetLogs) {
-		g := new(errgroup.Group)
-		g.Go(func() error {
-			return c.captureLogs()
-		})
-		err := g.Wait()
-		if err != nil {
-			if errors.Is(err, signalInterruptError) {
-				c.UI.Output("Debug run interrupted (due to signal interrupt), cleaning up partial debug capture...", terminal.WithErrorStyle())
-				err := os.RemoveAll(c.output)
-				if err != nil {
-					c.UI.Output(fmt.Sprintf("error cleaning up partial capture: %v", err), terminal.WithErrorStyle())
-					return 1
-				}
-				c.UI.Output(" - Cleanup completed")
-				return 1
-			}
-			c.outputError("error capturing logs", err, archiveName)
+	errorsOccuredDuringCapture := false
+	for _, task := range tasks {
+		if c.Ctx.Err() != nil {
 			return 1
 		}
+		c.runCapture(task, &errorsOccuredDuringCapture)
 	}
-
-	// Capture metadata about debug run at the root of the debug archive
-	var index debugIndex
-	if c.CaptureTarget(targetLogs) {
-		index = debugIndex{
-			Duration: c.duration.String(),
-			Since:    c.since.String(),
-		}
-	}
-	index = debugIndex{
-		Targets:   c.capture,
-		Timestamp: time.Now().Format(time.RFC3339),
-	}
-	err := writeJSONFile(filepath.Join(c.output, "index.json"), index)
-	if err != nil {
-		c.outputError("error writing index.json", err, archiveName)
-		return 1
-	}
-
-	// Archive the data if configured to
-	if c.archive {
-		err := c.createArchive()
-		if err != nil {
-			c.outputError("error creating archive", err, c.output)
-			return 1
-		}
-	}
-	c.UI.Output(fmt.Sprintf("Saved debug archive: %s", archiveName), terminal.WithSuccessStyle())
-	return 0
+	return c.archiveDebugBundleAndReturn(archiveName, errorsOccuredDuringCapture)
 }
 
-func (c *DebugCommand) outputError(errmsg string, err error, archiveName string) {
-	c.UI.Output(fmt.Sprintf("%s: %v", errmsg, err), terminal.WithErrorStyle())
-	c.UI.Output(fmt.Sprintf("Partial debug capture, saved debug directory: %s", archiveName), terminal.WithWarningStyle())
+// archiveDebugBundleAndReturn - creates archive if requested and
+// returns appropriate exit code based on capture status
+func (c *DebugCommand) archiveDebugBundleAndReturn(archiveName string, errorsOccuredDuringCapture bool) int {
+	if !c.archive {
+		c.UI.Output(fmt.Sprintf("Saved debug directory: %s", archiveName))
+		if errorsOccuredDuringCapture {
+			return 1
+		}
+		return 0
+	} else {
+		var archiveErr error
+		archiveErr = c.createArchive()
+		if archiveErr != nil {
+			c.UI.Output(fmt.Sprintf("error creating archive: %v", archiveErr), terminal.WithErrorStyle())
+			c.UI.Output(fmt.Sprintf("Saved debug directory: %s", c.output))
+		} else {
+			c.UI.Output(fmt.Sprintf("Saved debug archive: %s", archiveName))
+		}
+		if errorsOccuredDuringCapture {
+			return 1
+		}
+		return 0
+	}
+}
+
+// cleanupAndReturn - cleans up partial debug capture and returns 1
+func (c *DebugCommand) cleanupAndReturn() int {
+	defer func() { c.CleanupConfirmation <- 1 }()
+	c.UI.Output("\nDebug run interrupted (received signal interrupt)", terminal.WithErrorStyle())
+
+	// if signal interrupt is before archive creation,
+	// even if archive flag is true, only dir will be present to cleanup.
+	bundles := []string{c.output, c.output + debugArchiveExtension}
+
+	for _, bundle := range bundles {
+		if _, err := os.Stat(bundle); err == nil {
+			// found the bundle to cleanup
+			c.UI.Output(" - Cleaning up partial capture...")
+			err := os.RemoveAll(bundle)
+			if err != nil {
+				c.UI.Output(fmt.Sprintf("error cleaning up partial capture: %v", err), terminal.WithErrorStyle())
+				c.UI.Output(fmt.Sprintf("Partial debug capture, saved debug dir: %s", bundle), terminal.WithWarningStyle())
+				c.UI.Output(fmt.Sprint("Please delete it and re-run the debug command for completed capture"), terminal.WithWarningStyle())
+				return 1
+			}
+			c.UI.Output(" - Cleanup completed")
+			return 1
+		}
+	}
+	return 1
+}
+
+// runCapture - runs a capture function if the target is specified in the capture list.
+// Hanldles errors and output messages.
+func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) {
+	target := task.target
+	captureName := task.name
+	captureFunction := task.captureFxn
+	notFoundMsg := task.notFoundMsg
+
+	// Skip if target not specified in capture list
+	if !c.captureTarget(target) {
+		return
+	}
+	err := captureFunction()
+	if err != nil {
+		switch {
+		case errors.Is(err, signalInterruptError):
+			c.cleanupAndReturn()
+		case errors.Is(err, notFoundError):
+			c.UI.Output(notFoundMsg, terminal.WithWarningStyle())
+		default:
+			*errorsOccured = true
+			c.UI.Output(fmt.Sprintf("error capturing %s: %v", captureName, err), terminal.WithErrorStyle())
+		}
+	} else {
+		c.UI.Output(fmt.Sprintf("%s captured", captureName), terminal.WithSuccessStyle())
+	}
 }
 
 // ===================================================================================================================
 
-// captureStaticInfo - captures Helm config, CRDs and its resources, consul injected sidecar pods, proxy data, if asked
-func (c *DebugCommand) captureStaticInfo() error {
-	c.UI.Output("\nCapturing static info......")
-	var errs *multierror.Error
-	c.runCapture("Helm config", targetHelmConfig, c.captureHelmConfig, &errs)
-	c.runCapture("CRD resources", targetCRDs, c.captureCRDResources, &errs)
-	c.runCapture("Consul Injected Sidecar Pods", targetSidecarPods, c.captureConsulInjectedSidecarPods, &errs)
-	c.runCapture("Envoy Proxy data", targetProxy, c.captureEnvoyProxyData, &errs)
-	return errs.ErrorOrNil()
-}
-func (c *DebugCommand) runCapture(name, target string, fn func() error, errs **multierror.Error) {
-	if !c.CaptureTarget(target) {
-		return
-	}
-	err := fn()
-	if err != nil {
-		if errors.Is(err, notFoundError) {
-			c.UI.Output(fmt.Sprintf("No %s found.", name), terminal.WithWarningStyle())
-		} else {
-			*errs = multierror.Append(*errs, fmt.Errorf("error capturing %s: %v", name, err))
-		}
-	} else {
-		c.UI.Output(fmt.Sprintf("%s captured", name), terminal.WithSuccessStyle())
-	}
-}
-
-// captureHelmConfig - captures consul-k8s Helm configuration and write it to helm-config.json file within debug archive
+// captureHelmConfig - captures consul-k8s Helm configuration and
+// write it to helm-config.json file within debug archive
 func (c *DebugCommand) captureHelmConfig() error {
 	// Setup logger to stream Helm library logs.
-
 	var uiLogger = func(s string, args ...interface{}) {
 		logMsg := fmt.Sprintf(s, args...)
 		c.UI.Output(logMsg, terminal.WithLibraryStyle())
@@ -483,15 +548,16 @@ func (c *DebugCommand) captureHelmConfig() error {
 	if err != nil {
 		return err
 	}
-	err = writeJSONFile(filepath.Join(c.output, "helm-config.json"), helmRelease)
+	helmFilePath := filepath.Join(c.output, "helm-config.json")
+	err = writeJSONFile(helmFilePath, helmRelease)
 	if err != nil {
 		return fmt.Errorf("couldn't write Helm config to json file: %v", err)
 	}
 	return nil
 }
 
-// checkHelmInstallation uses the helm Go SDK to depict the status of a named release. This function then prints
-// the version of the release, it's status (unknown, deployed, uninstalled, ...), and the overwritten values.
+// checkHelmInstallation uses the helm Go SDK to depict the status of a named release.
+// This function then prints the version of the release, it's status (unknown, deployed, uninstalled, ...), and the overwritten values.
 func (c *DebugCommand) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) (*release.Release, error) {
 	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
 	statusConfig := new(action.Configuration)
@@ -507,26 +573,43 @@ func (c *DebugCommand) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLo
 	return rel, nil
 }
 
-// captureCRDResources - captures consul-k8s CRDs and their instances and write it to CRDsResources.json file within debug archive
+// captureCRDResources - captures consul-k8s CRDs and their instances
+// and write it to CRDsResources.json file within debug archive
 func (c *DebugCommand) captureCRDResources() error {
-	var errs error
 	crdResources, err := c.listCRDResources()
 	if err != nil {
-		if errors.Is(err, notFoundError) {
+		if errors.Is(err, notFoundError) || strings.Contains(err.Error(), "couldn't retrive CRDs") {
 			return err
 		}
-		errs = multierror.Append(errs, err)
 	}
+
+	var writeErrors error
 	if len(crdResources) != 0 {
-		err := writeJSONFile(filepath.Join(c.output, "CRDsResources.json"), crdResources)
+		crdsFilePath := filepath.Join(c.output, "CRDsResources.json")
+		err = writeJSONFile(crdsFilePath, crdResources)
 		if err != nil {
-			errs = multierror.Append(errs, fmt.Errorf("couldn't write CRDs Resources to json file: %v", err))
+			writeErrors = multierror.Append(writeErrors, fmt.Errorf("couldn't write CRD resources to json file: %v", err))
 		}
 	}
-	return errs
+
+	if err != nil {
+		errorFilePath := filepath.Join(c.output, "CRDsResourcesErrors.txt")
+		err = fileWriter(errorFilePath, []byte(err.Error()))
+		if err != nil {
+			writeErrors = multierror.Append(writeErrors, fmt.Errorf("couldn't write CRD resources errors to text file: %v", err))
+		}
+	}
+	if writeErrors != nil {
+		return multierror.Append(err, writeErrors)
+	}
+	if err != nil {
+		return oneOrMoreErrorOccured
+	}
+	return nil
 }
 
-// listCRDResources - captures all Consul-related CRDs and lists their applied resources for ALL VERSION of CRDs respectively in a map.
+// listCRDResources - captures all Consul-related CRDs
+// and lists their applied resources for ALL VERSION of CRDs respectively in a map.
 func (c *DebugCommand) listCRDResources() (map[string][]unstructured.Unstructured, error) {
 	namespace := c.flagNamespace
 
@@ -569,7 +652,7 @@ func (c *DebugCommand) listCRDResources() (map[string][]unstructured.Unstructure
 					crdResourcesMap[key] = []unstructured.Unstructured{}
 					continue
 				}
-				errs = multierror.Append(errs, fmt.Errorf("couldn't retrieve resources for CRD %s and version %s: %w", crd.Name, version.Name, err))
+				errs = multierror.Append(errs, fmt.Errorf("CRD: %s [%s] - \tcouldn't retrieve applied resources: \t%w", crd.Name, version.Name, err))
 				continue
 			}
 			crdResourcesMap[key] = unstructuredList.Items
@@ -578,10 +661,11 @@ func (c *DebugCommand) listCRDResources() (map[string][]unstructured.Unstructure
 	return crdResourcesMap, errs
 }
 
-// captureConsulInjectedSidecarPods - captures & list all pods across all namespaces and their status (number of pods ready/desired)
-// that have been injected with Consul sidecars using the label consul.hashicorp.com/connect-inject-status=injected.
-// and write it to sidecarPods.json within debug archive
-func (c *DebugCommand) captureConsulInjectedSidecarPods() error {
+// captureSidecarPods - captures all pods across all namespaces
+// and their status (number of pods ready/desired) that have been injected by Consul
+//
+//	using the label consul.hashicorp.com/connect-inject-status=injected.
+func (c *DebugCommand) captureSidecarPods() error {
 	pods, err := c.kubernetes.CoreV1().Pods("").List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
 	})
@@ -629,11 +713,32 @@ func (c *DebugCommand) captureConsulInjectedSidecarPods() error {
 	}
 }
 
+// captureIndex - captures debug run metadata and writes to file at the root of the debug archive
+func (c *DebugCommand) captureIndex() error {
+	var index debugIndex
+	if c.captureTarget(targetLogs) {
+		index = debugIndex{
+			Duration: c.duration.String(),
+			Since:    c.since.String(),
+		}
+	}
+	index = debugIndex{
+		Targets:   c.capture,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+	err := writeJSONFile(filepath.Join(c.output, "index.json"), index)
+	if err != nil {
+		return fmt.Errorf("error writing index.json: %s", err)
+	}
+	return nil
+}
+
 // ===================================================================================================================
 
-// captureTarget returns true if the target capture type is enabled. (Otherwords, is the target given in capture flag in command line)
-func (c *DebugCommand) CaptureTarget(target string) bool {
-	if c.capture == nil || slices.Contains(c.capture, "all") || slices.Contains(c.capture, target) {
+// captureTarget returns true if the target capture type is enabled.
+// (Otherwords, is the target given in capture flag in command line)
+func (c *DebugCommand) captureTarget(target string) bool {
+	if c.capture == nil || slices.Contains(c.capture, "all") || slices.Contains(c.capture, target) || target == "index" {
 		return true
 	}
 	return false
@@ -644,10 +749,28 @@ func writeJSONFile(filename string, content interface{}) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filename, marshaled, 0644)
+	err = os.MkdirAll(filepath.Dir(filename), dirPerm)
+	if err != nil {
+		return fmt.Errorf("failed to create directory, %w", err)
+	}
+	err = os.WriteFile(filename, marshaled, filePerm)
+	if err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	return nil
 }
 
-// ===================================================================================================================
+func fileWriter(filename string, content []byte) error {
+	err := os.MkdirAll(filepath.Dir(filename), dirPerm)
+	if err != nil {
+		return fmt.Errorf("failed to create directory, %w", err)
+	}
+	err = os.WriteFile(filename, content, filePerm)
+	if err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+	return nil
+}
 
 // createArchive walks the files in the temporary directory
 // and creates a tar file that is gzipped with the contents
@@ -764,26 +887,6 @@ func (c *DebugCommand) createArchiveTemp(path string) (tempName string, err erro
 	}
 
 	return tempName, nil
-}
-
-// ===================================================================================================================
-
-// Helm config, pod logs, CRDs, proxy stats, and Envoy endpoints.
-const (
-	targetHelmConfig  = "helm"
-	targetCRDs        = "crds"
-	targetSidecarPods = "sidecar"
-	targetLogs        = "logs"
-	targetProxy       = "proxy"
-)
-
-// defaultTargets specifies the list of targets that will be captured by default
-var defaultTargets = []string{
-	targetHelmConfig,
-	targetCRDs,
-	targetLogs,
-	targetSidecarPods,
-	targetProxy,
 }
 
 // Help returns a description of the command and how it is used.

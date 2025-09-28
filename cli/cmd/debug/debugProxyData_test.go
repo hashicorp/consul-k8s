@@ -20,6 +20,14 @@ import (
 )
 
 func TestCaptureEnvoyStats(t *testing.T) {
+	pod := pods[0]
+	proxyPod := proxyPodData{
+		pod:       pod,
+		proxyType: "dummyProxyType",
+		namespace: pod.Namespace,
+		name:      pod.Name,
+	}
+
 	mockJSONResponse := `{"server":{"stats_recent_lookups":0}}`
 	// indentation should match the output of json.MarshalIndent in command.go
 	expectedFileContent := `{
@@ -31,13 +39,16 @@ func TestCaptureEnvoyStats(t *testing.T) {
 	defer server.Close()
 
 	c := initializeDebugCommands(new(bytes.Buffer))
-	c.output = t.TempDir()
 	endpoint := "localhost:" + strconv.Itoa(envoyDefaultAdminPort)
-	pod := pods[0]
-	err := c.captureEnvoyStats(endpoint, pod, "dummyProxyType", pod.Namespace)
+
+	p := &EnvoyProxyCapture{
+		output: t.TempDir(),
+		ctx:    c.Ctx,
+	}
+	err := p.captureEnvoyStats(endpoint, proxyPod)
 
 	require.NoError(t, err, "captureEnvoyStats should not return an error")
-	expectedFilePath := filepath.Join(c.output, "proxy", pod.Namespace, "dummyProxyType", pod.Name, "stats.json")
+	expectedFilePath := filepath.Join(p.output, "proxy", pod.Namespace, "dummyProxyType", pod.Name, "stats.json")
 	require.NoError(t, err, "expected output file '%s' to be created, but it was not", expectedFilePath)
 
 	actualFileContent, err := os.ReadFile(expectedFilePath)
@@ -46,8 +57,15 @@ func TestCaptureEnvoyStats(t *testing.T) {
 }
 func TestCaptureEnvoyConfig(t *testing.T) {
 	pod := pods[0]
+	proxyPod := proxyPodData{
+		pod:       pod,
+		proxyType: "dummyProxyType",
+		namespace: pod.Namespace,
+		name:      pod.Name,
+	}
+
 	expectedConfig := map[string]interface{}{
-		pod.Name: map[string]interface{}{
+		proxyPod.name: map[string]interface{}{
 			"clusters":  testEnvoyConfig.Clusters,
 			"endpoints": testEnvoyConfig.Endpoints,
 			"listeners": testEnvoyConfig.Listeners,
@@ -68,19 +86,24 @@ func TestCaptureEnvoyConfig(t *testing.T) {
 	}
 }`)
 	c := initializeDebugCommands(new(bytes.Buffer))
-	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{pod}})
-	c.output = t.TempDir()
-	c.fetchEnvoyConfig = func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
+
+	p := &EnvoyProxyCapture{
+		kubernetes: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{pod}}),
+		output:     t.TempDir(),
+		ctx:        c.Ctx,
+	}
+	// Override fetchEnvoyConfig to return our test data instead of making an actual HTTP call.
+	p.fetchEnvoyConfig = func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
 		return testEnvoyConfig, nil
 	}
 
-	err = c.captureEnvoyConfig(pod, "dummyProxyType", pod.Namespace)
+	err = p.captureEnvoyConfig(proxyPod)
 	require.NoError(t, err, "captureEnvoyConfig should not return an error")
 
-	expectedConfigFilePath := filepath.Join(c.output, "proxy", pod.Namespace, "dummyProxyType", pod.Name, "config.json")
+	expectedConfigFilePath := filepath.Join(p.output, "proxy", pod.Namespace, "dummyProxyType", pod.Name, "config.json")
 	require.NoError(t, err, "expected output file '%s' to be created, but it was not", expectedConfigFilePath)
 
-	expectedConfigDumpFilePath := filepath.Join(c.output, "proxy", pod.Namespace, "dummyProxyType", pod.Name, "config_dumps.json")
+	expectedConfigDumpFilePath := filepath.Join(p.output, "proxy", pod.Namespace, "dummyProxyType", pod.Name, "config_dumps.json")
 	require.NoError(t, err, "expected output file '%s' to be created, but it was not", expectedConfigDumpFilePath)
 
 	actualConfigJSON, err := os.ReadFile(expectedConfigFilePath)
@@ -94,36 +117,42 @@ func TestCaptureEnvoyConfig(t *testing.T) {
 
 func TestGetEnvoyProxyPodsList(t *testing.T) {
 	c := initializeDebugCommands(new(bytes.Buffer))
-	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: pods})
 
-	proxyPods, err := c.getEnvoyProxyPodsList()
+	p := &EnvoyProxyCapture{
+		kubernetes: fake.NewSimpleClientset(&v1.PodList{Items: pods}),
+		ctx:        c.Ctx,
+	}
+	err := p.getEnvoyProxyPodsList()
 	require.NoError(t, err)
 	// "Not-a-proxy-pod" is not a proxy pod and should be filtered out.
-	require.Equal(t, len(proxyPods), len(pods)-1)
-	for _, pod := range proxyPods {
-		require.NotEqual(t, "Not-a-proxy-pod", pod.Name, "Not-a-proxy-pod should not be in the returned list")
+	require.Equal(t, len(p.proxyPods), len(pods)-1)
+	for _, pod := range p.proxyPods {
+		require.NotEqual(t, "Not-a-proxy-pod", pod.name, "Not-a-proxy-pod should not be in the returned list")
 	}
 }
 
 func TestGetAndWriteEnvoyProxyPodList(t *testing.T) {
 	c := initializeDebugCommands(new(bytes.Buffer))
-	c.kubernetes = fake.NewSimpleClientset(&v1.PodList{Items: pods})
-	c.output = t.TempDir()
+	p := &EnvoyProxyCapture{
+		kubernetes: fake.NewSimpleClientset(&v1.PodList{Items: pods}),
+		output:     t.TempDir(),
+		ctx:        c.Ctx,
+	}
 
 	// getproxypods
-	proxyPods, err := c.getEnvoyProxyPodsList()
+	err := p.getEnvoyProxyPodsList()
 	require.NoError(t, err)
 	// "Not-a-proxy-pod" is not a proxy pod and should be filtered out.
-	require.Equal(t, len(proxyPods), len(pods)-1)
-	for _, pod := range proxyPods {
-		require.NotEqual(t, "Not-a-proxy-pod", pod.Name, "Not-a-proxy-pod should not be in the returned list")
+	require.Equal(t, len(p.proxyPods), len(pods)-1)
+	for _, pod := range p.proxyPods {
+		require.NotEqual(t, "Not-a-proxy-pod", pod.name, "Not-a-proxy-pod should not be in the returned list")
 	}
 
 	// writeproxypods
-	err = c.writeEnvoyProxyPodList(proxyPods)
+	err = p.writeEnvoyProxyPodList()
 	require.NoError(t, err)
 
-	expectedFilePath := filepath.Join(c.output, "proxy", "proxyList.json")
+	expectedFilePath := filepath.Join(p.output, "proxy", "proxyList.json")
 	_, err = os.Stat(expectedFilePath)
 	require.NoError(t, err, "expected output file '%s' to be created, but it was not", expectedFilePath)
 

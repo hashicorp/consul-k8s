@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -17,7 +16,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
 
+	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-multierror"
 )
@@ -34,145 +36,175 @@ type consulK8sComponents struct {
 }
 
 type workload struct {
-	Name     string          `json:"name"`     // consul-server
-	Kind     string          `json:"kind"`     // statefulsets
-	PodsList *corev1.PodList `json:"podsList"` // [consul-server-0, consul-server-1, ...]
+	name     string          // consul-server
+	kind     string          // statefulsets
+	podsList *corev1.PodList // [consul-server-0, consul-server-1, ...]
 }
 
-func (c *DebugCommand) getConsulK8sComponents(ctx context.Context) (consulK8sComponents, error) {
-	namespace := c.flagNamespace
+type containerData struct {
+	pod           corev1.Pod
+	podName       string
+	container     corev1.Container
+	containerName string
+	workloadName  string
+	workloadKind  string
+	namespace     string
+}
+
+type LogCapture struct {
+	*common.BaseCommand
+	// Debug command objects
+	kubernetes kubernetes.Interface
+	namespace  string
+	ctx        context.Context
+	output     string
+	since      time.Duration
+	duration   time.Duration
+
+	// Internal states
+	components          consulK8sComponents
+	workloads           []workload
+	k8sSinceSecondParam int64
+
+	// Workload Metadata
+	totalContainers int
+	totalPods       int
+
+	// Dependency injection for testing
+	fetchLogsFunc func(string, string, *corev1.PodLogOptions) (io.ReadCloser, error)
+}
+
+func (l *LogCapture) getConsulK8sComponents() error {
+	var comp consulK8sComponents
 	var errs error
-	clients, err := c.kubernetes.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{})
+	var err error
+	comp.clientList, err = l.kubernetes.AppsV1().DaemonSets(l.namespace).List(l.ctx,
+		metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=client"})
 	if err != nil {
 		err = multierror.Append(errs, fmt.Errorf("Unable to list consul-k8s clients, %s", err))
 	}
-	servers, err := c.kubernetes.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+	comp.serverList, err = l.kubernetes.AppsV1().StatefulSets(l.namespace).List(l.ctx,
+		metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=server"})
 	if err != nil {
 		err = multierror.Append(errs, fmt.Errorf("Unable to list consul-k8s servers, %s", err))
 	}
-	deployments, err := c.kubernetes.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	comp.deploymentList, err = l.kubernetes.AppsV1().Deployments(l.namespace).List(l.ctx, metav1.ListOptions{})
 	if err != nil {
 		err = multierror.Append(errs, fmt.Errorf("Unable to list consul-k8s deployments, %s", err))
 	}
-	components := consulK8sComponents{
-		clientList:     clients,
-		serverList:     servers,
-		deploymentList: deployments,
-	}
-	return components, errs
+	l.components = comp
+	return errs
 }
-func (c *DebugCommand) getPodsForWorkload(ctx context.Context, namespace string, selector *metav1.LabelSelector) (*corev1.PodList, error) {
-	var specSelectorString []string
-	for key, value := range selector.MatchLabels {
-		specSelectorString = append(specSelectorString, fmt.Sprintf("%s=%s", key, value))
-	}
-	labelSelector := strings.Join(specSelectorString, ",")
-
-	return c.kubernetes.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+func (l *LogCapture) getPodsForWorkload(selector *metav1.LabelSelector) (*corev1.PodList, error) {
+	labelSelector := labels.SelectorFromSet(selector.MatchLabels).String()
+	return l.kubernetes.CoreV1().Pods(l.namespace).List(l.ctx, metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 }
-func (c *DebugCommand) getComponentsWorkload(ctx context.Context, components consulK8sComponents) ([]workload, error) {
+func (l *LogCapture) getComponentsWorkload() error {
 	var errs error
 	workloads := []workload{}
+
 	// statefulsets
-	for _, server := range components.serverList.Items {
-		podsList, err := c.getPodsForWorkload(ctx, server.Namespace, server.Spec.Selector)
+	for _, server := range l.components.serverList.Items {
+		podsList, err := l.getPodsForWorkload(server.Spec.Selector)
 		if err != nil {
 			err = multierror.Append(errs, fmt.Errorf("Unable to list pods for Consul Server- '%s': %v\n", server.Name, err))
 		}
 		workloads = append(workloads, workload{server.Name, "statefulsets", podsList})
 	}
 	// daemonset
-	for _, client := range components.clientList.Items {
-		podsList, err := c.getPodsForWorkload(ctx, client.Namespace, client.Spec.Selector)
+	for _, client := range l.components.clientList.Items {
+		podsList, err := l.getPodsForWorkload(client.Spec.Selector)
 		if err != nil {
 			err = multierror.Append(errs, fmt.Errorf("Unable to list pods for Consul Clients- '%s': %v\n", client.Name, err))
 		}
 		workloads = append(workloads, workload{client.Name, "daemonsets", podsList})
 	}
 	// deployments
-	for _, deployment := range components.deploymentList.Items {
-		podsList, err := c.getPodsForWorkload(ctx, deployment.Namespace, deployment.Spec.Selector)
+	for _, deployment := range l.components.deploymentList.Items {
+		podsList, err := l.getPodsForWorkload(deployment.Spec.Selector)
 		if err != nil {
 			err = multierror.Append(errs, fmt.Errorf("Unable to list pods for Consul deployments- '%s': %v\n", deployment.Name, err))
 		}
 		workloads = append(workloads, workload{deployment.Name, "deployments", podsList})
 	}
 	// sidecars
-	proxyPodList, err := c.kubernetes.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+	proxyPodList, err := l.kubernetes.CoreV1().Pods("").List(l.ctx, metav1.ListOptions{
 		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
 	})
 	if err != nil {
 		err = multierror.Append(errs, fmt.Errorf("Unable to list pods for consul-injected-proxy: %v\n", err))
 	}
 	workloads = append(workloads, workload{"sidecar", "sidecars", proxyPodList})
-	return workloads, errs
+
+	l.workloads = workloads
+	return errs
 }
 
 // captureLogs
 // - retrieves consul-k8s components (server, client, injector, sidecar) pods
 // - and fetches log for each of the pods and write it to /pod dir within debug archive
-func (c *DebugCommand) captureLogs() error {
-	c.UI.Output("\nCapturing pods info.....")
-	components, err := c.getConsulK8sComponents(c.Ctx)
+// - also, writes log capture status to logCaptureAudit file and errors to logCaptureErrors file.
+func (l *LogCapture) captureLogs() error {
+	l.UI.Output("\nCapturing pods logs.....")
+	err := l.getConsulK8sComponents()
 	if err != nil {
-		c.UI.Output("%s", err, terminal.WithWarningStyle())
+		l.UI.Output("%s", err, terminal.WithWarningStyle())
 	}
-	workloads, err := c.getComponentsWorkload(c.Ctx, components)
+	err = l.getComponentsWorkload()
 	if err != nil {
-		c.UI.Output("%s", err, terminal.WithWarningStyle())
+		l.UI.Output("%s", err, terminal.WithWarningStyle())
 	}
-	if len(workloads) == 0 {
-		c.UI.Output("No Consul Component Found! \n")
+	if len(l.workloads) == 0 {
+		l.UI.Output("No Consul Component Found! \n")
 		return nil
 	}
-	totalPods, totalContainers := 0, 0
-	for _, workload := range workloads {
-		for _, pod := range workload.PodsList.Items {
-			totalPods++
-			totalContainers += len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
+
+	l.totalPods, l.totalContainers = 0, 0
+	for _, workload := range l.workloads {
+		for _, pod := range workload.podsList.Items {
+			l.totalPods++
+			l.totalContainers += len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
 		}
 	}
-	// Output metadata about workload
-	c.UI.Output(fmt.Sprintf(" - Total Pods:        %d", totalPods))
-	c.UI.Output(fmt.Sprintf(" - Total Containers:  %d", totalContainers))
 
-	c.UI.Output("\nCapturing pods logs.....")
-	if c.since != 0 {
-		c.UI.Output(fmt.Sprintf(" - Since:            %s", c.since))
-		sinceSeconds := int64(c.since.Seconds())
-		err = c.getWorkloadLogs(c.Ctx, workloads, totalContainers, sinceSeconds)
+	// Output metadata about workload
+	l.outputLogCaptureMetadata()
+
+	if l.since != 0 {
+		l.since += debugGraceDuration
+		l.k8sSinceSecondParam = int64(l.since.Seconds())
+		err = l.getWorkloadLogs()
 	} else {
-		c.UI.Output(fmt.Sprintf(" - Duration:         %s", c.duration))
-		durationChn := time.After(c.duration)
-		sinceSeconds := int64(c.duration.Seconds())
+		l.duration += debugGraceDuration
+		l.k8sSinceSecondParam = int64(l.duration.Seconds())
+		durationChn := time.After(l.duration)
 		select {
 		case <-durationChn:
-			err = c.getWorkloadLogs(c.Ctx, workloads, totalContainers, sinceSeconds)
-		case <-c.Ctx.Done():
+			err = l.getWorkloadLogs()
+		case <-l.ctx.Done():
 			return signalInterruptError
 		}
 	}
 	if err != nil {
 		return err
 	}
-	c.UI.Output("Pods Logs captured", terminal.WithSuccessStyle())
 	return nil
 }
 
 // =======================================================
 
-// getWorkloadLogs - fetches logs 'of each containers' 'of each pods' 'of each workload items' using k8s api
-// and writes to log directory within debug archive.
-func (c *DebugCommand) getWorkloadLogs(ctx context.Context, workloads []workload, totalContainers int, sinceSeconds int64) error {
+// getWorkloadLogs - fetches logs 'of each containers' 'of each pods' 'of each workload items'.
+// write log status to logCaptureAudit file and errors to logCaptureErrors file.
+func (l *LogCapture) getWorkloadLogs() error {
 
 	// create logCaptureAudit file for each container logs collection
-	auditFilePath := filepath.Join(c.output, "logs", "logCaptureAudit.txt")
-	if err := os.MkdirAll(filepath.Dir(auditFilePath), 0755); err != nil {
+	auditFilePath := filepath.Join(l.output, "logs", "logCaptureAudit.txt")
+	if err := os.MkdirAll(filepath.Dir(auditFilePath), dirPerm); err != nil {
 		return fmt.Errorf("error creating logCaptureAudit directory: %v", err)
 	}
-	auditFile, err := os.OpenFile(auditFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	auditFile, err := os.OpenFile(auditFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, filePerm)
 	if err != nil {
 		return fmt.Errorf("error creating logCaptureAudit file: %v", err)
 	}
@@ -181,86 +213,66 @@ func (c *DebugCommand) getWorkloadLogs(ctx context.Context, workloads []workload
 	defer auditFile.Close()
 	defer w.Flush()
 
-	resultsChan := make(chan logCollectionResult, totalContainers)
+	// log collection
+	resultsChan := make(chan logCollectionResult, l.totalContainers)
 	var wg sync.WaitGroup
 
-	c.logCollector(ctx, &wg, workloads, resultsChan, sinceSeconds)
+	l.logCollector(&wg, resultsChan)
 	go func() {
 		wg.Wait()
 		close(resultsChan)
 	}()
-	return c.resultCollectorAndAuditor(ctx, w, resultsChan)
+	return l.resultCollectorAndAuditor(w, resultsChan)
 }
 
-// logCollector - spawns goroutines to fetch logs for each container in each pod of each workload
-func (c *DebugCommand) logCollector(ctx context.Context, wg *sync.WaitGroup, workloads []workload, resultsChan chan<- logCollectionResult, sinceSeconds int64) {
-	sem := make(chan struct{}, 10) // Buffered Channel Semaphore: limit to 10 concurrent goroutines
-
-	for _, workload := range workloads {
-		if len(workload.PodsList.Items) == 0 {
+// logCollector -  fetch logs for each container in each pod for all workload items
+func (l *LogCapture) logCollector(wg *sync.WaitGroup, resultsChan chan<- logCollectionResult) {
+	for _, workload := range l.workloads {
+		if len(workload.podsList.Items) == 0 {
 			resultsChan <- logCollectionResult{
-				StatusLine: fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.Kind, workload.Name, "", "", "No Pods Found", "No Pods Found"),
+				StatusLine: fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.kind, workload.name, "", "", "No Pods Found", "No Pods Found"),
 			}
 			continue
 		}
-		for _, pod := range workload.PodsList.Items {
+		for _, pod := range workload.podsList.Items {
+			containerData := containerData{
+				pod:          pod,
+				podName:      pod.Name,
+				workloadName: workload.name,
+				workloadKind: workload.kind,
+				namespace:    pod.Namespace,
+			}
 			for _, container := range pod.Spec.Containers {
-				wg.Add(1)
-				sem <- struct{}{} // aquire semaphore {blocks if full}
-
-				workload, pod, container := workload, pod, container // local copy for goroutine
-
-				go func() {
-					defer wg.Done()
-					defer func() { <-sem }() // release semaphore when done
-					logErr := c.getContainerLogs(ctx, sinceSeconds, pod.Namespace, pod.Name, container.Name, workload.Kind, workload.Name)
-					var statusLine string
-					if logErr != nil {
-						statusLine = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.Kind, workload.Name, pod.Name, container.Name, "Failed", logErr.Error())
-						logErr = fmt.Errorf("%s -> %s -> %s -> %s\n\t=> %v", workload.Kind, workload.Name, pod.Name, container.Name, logErr)
-					} else {
-						statusLine = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.Kind, workload.Name, pod.Name, container.Name, "Successful", "")
-					}
-					resultsChan <- logCollectionResult{StatusLine: statusLine, Err: logErr}
-				}()
+				containerData.container = container
+				containerData.containerName = container.Name
+				l.getContainerLogAndUpdateResult(wg, resultsChan, containerData)
 			}
 			for _, container := range pod.Spec.InitContainers {
-				wg.Add(1)
-				sem <- struct{}{} // aquire semaphore {blocks if full}
-
-				workload, pod, container := workload, pod, container // local copy for goroutine
-
-				go func() {
-					defer wg.Done()
-					defer func() { <-sem }() // release semaphore when done
-					logErr := c.getContainerLogs(ctx, sinceSeconds, pod.Namespace, pod.Name, container.Name, workload.Kind, workload.Name)
-					var statusLine string
-					if logErr != nil {
-						statusLine = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.Kind, workload.Name, pod.Name, container.Name, "Failed", logErr.Error())
-						logErr = fmt.Errorf("%s -> %s -> %s -> %s\n\t=> %v", workload.Kind, workload.Name, pod.Name, container.Name, logErr)
-					} else {
-						statusLine = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.Kind, workload.Name, pod.Name, container.Name, "Successful", "")
-					}
-					resultsChan <- logCollectionResult{StatusLine: statusLine, Err: logErr}
-				}()
+				containerData.container = container
+				containerData.containerName = container.Name
+				l.getContainerLogAndUpdateResult(wg, resultsChan, containerData)
 			}
 		}
 	}
 }
 
 // resultCollectorAndAuditor - collects results & errors of each resource (from logCollector) and writes to audit & error file resp.
-func (c *DebugCommand) resultCollectorAndAuditor(ctx context.Context, w *tabwriter.Writer, resultsChan <-chan logCollectionResult) error {
+func (l *LogCapture) resultCollectorAndAuditor(w *tabwriter.Writer, resultsChan <-chan logCollectionResult) error {
 	var logCaptureErrors *multierror.Error
 	var tabWriterMutex sync.Mutex
-	var auditWriteErrOnce sync.Once // Use sync.Once to report the write error only once.
+	var auditWriteErrOnce sync.Once
 
 ReadLoop:
 	for {
 		select {
+		case <-l.ctx.Done():
+			return signalInterruptError
 		case result, ok := <-resultsChan:
 			if !ok {
-				// Channel closed, all results processed
 				break ReadLoop
+			}
+			if l.ctx.Err() != nil {
+				return signalInterruptError
 			}
 			if result.Err != nil {
 				logCaptureErrors = multierror.Append(logCaptureErrors, result.Err)
@@ -273,40 +285,60 @@ ReadLoop:
 			if writeErr != nil {
 				// prevent flooding of write errors on terminal
 				auditWriteErrOnce.Do(func() {
-					c.UI.Output(
-						fmt.Sprintf("error writing to audit file, it may be incomplete. First error: %v", writeErr),
+					l.UI.Output(
+						fmt.Sprintf("error writing results to audit file, it may be incomplete, error: %v", writeErr),
 						terminal.WithWarningStyle(),
 					)
 				})
 			}
-		case <-ctx.Done():
-			logCaptureErrors = multierror.Append(logCaptureErrors, ctx.Err())
-			break ReadLoop
 		}
 	}
 
 	if logCaptureErrors.ErrorOrNil() != nil {
-		errorFilePath := filepath.Join(c.output, "logs", "logCaptureErrors.txt")
+		errorFilePath := filepath.Join(l.output, "logs", "logCaptureErrors.txt")
 		errorContent := []byte(logCaptureErrors.Error())
-		if err := os.WriteFile(errorFilePath, errorContent, 0644); err != nil {
+		if err := os.WriteFile(errorFilePath, errorContent, filePerm); err != nil {
 			return fmt.Errorf("error writing log capture errors to file: %v\n Collected Errors:\n%v", err, errorContent)
 		}
-		return fmt.Errorf("one or more errors occurred during log collection; \n\tPlease check logs/logCaptureErrors.txt in debug archive for details")
+		return oneOrMoreErrorOccured
 	}
 	return nil
 }
 
+// getContainerLogAndUpdateResult - spawns goroutine to fetch logs for a container in a pod and write its status to results channel
+func (l *LogCapture) getContainerLogAndUpdateResult(wg *sync.WaitGroup, resultsChan chan<- logCollectionResult, cd containerData) {
+	sem := make(chan struct{}, 10) // Buffered Channel Semaphore: limit to 10 concurrent goroutines
+	wg.Add(1)
+	sem <- struct{}{} // aquire semaphore {blocks if full}
+
+	go func() {
+		defer wg.Done()
+		defer func() { <-sem }() // release semaphore when done
+		logErr := l.getContainerLogs(cd)
+
+		// write log status to results channel
+		var statusLine string
+		if logErr != nil {
+			statusLine = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", cd.workloadKind, cd.workloadName, cd.podName, cd.containerName, "Failed", logErr.Error())
+			logErr = fmt.Errorf("%s -> %s -> %s -> %s\n\t=> %v", cd.workloadKind, cd.workloadName, cd.podName, cd.containerName, logErr)
+		} else {
+			statusLine = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", cd.workloadKind, cd.workloadName, cd.podName, cd.containerName, "Successful", "")
+		}
+		resultsChan <- logCollectionResult{StatusLine: statusLine, Err: logErr}
+	}()
+}
+
 // getContainerLogs - fetches logs for a container and write it to log file.
-func (c *DebugCommand) getContainerLogs(ctx context.Context, sinceSeconds int64, namespace, podName, containerName, workloadKind, workloadName string) error {
+func (l *LogCapture) getContainerLogs(cd containerData) error {
 	podLogOptions := &corev1.PodLogOptions{
-		Container:    containerName,
-		SinceSeconds: &sinceSeconds,
+		Container:    cd.containerName,
+		SinceSeconds: &l.k8sSinceSecondParam,
 		Follow:       false,
 		Timestamps:   true,
 	}
 
-	logFilePath := filepath.Join(c.output, "logs", workloadKind, workloadName, podName, fmt.Sprintf("%s.log", containerName))
-	if err := os.MkdirAll(filepath.Dir(logFilePath), 0755); err != nil {
+	logFilePath := filepath.Join(l.output, "logs", cd.workloadKind, cd.workloadName, cd.podName, fmt.Sprintf("%s.log", cd.containerName))
+	if err := os.MkdirAll(filepath.Dir(logFilePath), dirPerm); err != nil {
 		return fmt.Errorf("error creating log directory: %w", err)
 	}
 	logFile, err := os.Create(logFilePath)
@@ -316,10 +348,11 @@ func (c *DebugCommand) getContainerLogs(ctx context.Context, sinceSeconds int64,
 	defer logFile.Close()
 
 	// Dependency Injection for easier testing
-	if c.fetchLogsFunc == nil {
-		c.fetchLogsFunc = c.fetchLogs
+	if l.fetchLogsFunc == nil {
+		l.fetchLogsFunc = l.fetchLogs
+
 	}
-	podLogStream, err := c.fetchLogsFunc(ctx, namespace, podName, podLogOptions)
+	podLogStream, err := l.fetchLogsFunc(cd.namespace, cd.podName, podLogOptions)
 	if err != nil {
 		return err
 	}
@@ -333,11 +366,22 @@ func (c *DebugCommand) getContainerLogs(ctx context.Context, sinceSeconds int64,
 }
 
 // fetchLogs - fetches the log stream for a given pod and container using the Kubernetes API.
-func (c *DebugCommand) fetchLogs(ctx context.Context, namespace, podName string, podLogOptions *corev1.PodLogOptions) (io.ReadCloser, error) {
-	podLogRequest := c.kubernetes.CoreV1().Pods(namespace).GetLogs(podName, podLogOptions)
-	podLogStream, err := podLogRequest.Stream(ctx)
+func (l *LogCapture) fetchLogs(namespace, podName string, podLogOptions *corev1.PodLogOptions) (io.ReadCloser, error) {
+	podLogRequest := l.kubernetes.CoreV1().Pods(namespace).GetLogs(podName, podLogOptions)
+	podLogStream, err := podLogRequest.Stream(l.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting log stream: %v", err)
 	}
 	return podLogStream, nil
+}
+
+// =======================================================
+func (l *LogCapture) outputLogCaptureMetadata() {
+	l.UI.Output(fmt.Sprintf(" - Total Pods:        %d", l.totalPods))
+	l.UI.Output(fmt.Sprintf(" - Total Containers:  %d", l.totalContainers))
+	if l.since != 0 {
+		l.UI.Output(fmt.Sprintf(" - Since:             %s", l.since))
+	} else {
+		l.UI.Output(fmt.Sprintf(" - Duration:          %s", l.duration))
+	}
 }

@@ -27,13 +27,13 @@ func TestCapturePodLogs(t *testing.T) {
 		duration             time.Duration
 		since                time.Duration
 		expectedOutputBuffer []string
-		fetchLogsFunc        func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error)
+		fetchLogsFunc        func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error)
 		errorExpected        bool
 	}{
 		"test consul namespace": {
 			namespace: "consul",
 			duration:  10 * time.Second,
-			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogsFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
 				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
 			},
@@ -43,7 +43,7 @@ func TestCapturePodLogs(t *testing.T) {
 		"test another namespace": {
 			namespace: "another",
 			duration:  10 * time.Second,
-			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogsFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
 				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
 			},
@@ -53,7 +53,7 @@ func TestCapturePodLogs(t *testing.T) {
 		"test log collection with since": {
 			namespace: "consul",
 			since:     10 * time.Second,
-			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogsFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
 				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
 			},
@@ -63,10 +63,10 @@ func TestCapturePodLogs(t *testing.T) {
 		"log capture failure": {
 			namespace: "consul",
 			duration:  10 * time.Second,
-			fetchLogsFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogsFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				return nil, fmt.Errorf("testing log fetch error")
 			},
-			expectedOutputBuffer: []string{"one or more errors occurred during log collection;"},
+			expectedOutputBuffer: []string{oneOrMoreErrorOccured.Error()},
 			errorExpected:        true,
 		},
 	}
@@ -76,25 +76,27 @@ func TestCapturePodLogs(t *testing.T) {
 
 			buf := new(bytes.Buffer)
 			c := initializeDebugCommands(buf)
-			c.Ctx = context.Background()
-			c.kubernetes = fake.NewSimpleClientset()
-			c.output = t.TempDir()
-			c.duration = tc.duration
-			c.since = tc.since
-			c.flagNamespace = tc.namespace
-
-			err := createConsulResources(c.Ctx, c.kubernetes, getResourceConfigs())
+			l := &LogCapture{
+				BaseCommand: c.BaseCommand,
+				kubernetes:  fake.NewSimpleClientset(),
+				output:      t.TempDir(),
+				duration:    tc.duration,
+				since:       tc.since,
+				namespace:   tc.namespace,
+				ctx:         c.Ctx,
+			}
+			err := createConsulResources(l.ctx, l.kubernetes)
 			require.NoError(t, err, "failed to create consul resources")
 
 			// Mock the log fetching function.
-			c.fetchLogsFunc = tc.fetchLogsFunc
+			l.fetchLogsFunc = tc.fetchLogsFunc
 
-			err = c.captureLogs()
+			err = l.captureLogs()
 
 			if tc.errorExpected {
 				require.Error(t, err, "expected error capturing pod logs")
 				require.Contains(t, err.Error(), tc.expectedOutputBuffer[0], "expected err but mismatch")
-				expectedErrorFile := filepath.Join(c.output, "logs", "logCaptureErrors.txt")
+				expectedErrorFile := filepath.Join(l.output, "logs", "logCaptureErrors.txt")
 				_, statErr := os.Stat(expectedErrorFile)
 				require.NoError(t, statErr, "expected error file to be created: %s", expectedErrorFile)
 				errorContent, readErr := os.ReadFile(expectedErrorFile)
@@ -110,7 +112,7 @@ func TestCapturePodLogs(t *testing.T) {
 
 			// verify log files
 			expectedContainers := []string{"init-container", "nginx-container"}
-			baseLogPath := filepath.Join(c.output, "logs")
+			baseLogPath := filepath.Join(l.output, "logs")
 
 			for _, config := range getResourceConfigs() {
 				// config.Component are: StatefulSet, DaemonSet, Deployment, Sidecar
@@ -134,7 +136,7 @@ func TestCapturePodLogs(t *testing.T) {
 				}
 			}
 			t.Run("check audit log file", func(t *testing.T) {
-				expectedAuditLogPath := filepath.Join(c.output, "logs", "logCaptureAudit.txt")
+				expectedAuditLogPath := filepath.Join(l.output, "logs", "logCaptureAudit.txt")
 				_, err := os.Stat(expectedAuditLogPath)
 				require.NoError(t, err, "expected audit log file to exist: %s", expectedAuditLogPath)
 				auditLogContent, err := os.ReadFile(expectedAuditLogPath)
@@ -206,7 +208,8 @@ func getResourceConfigs() []ResourceConfig {
 }
 
 // CreateConsulResources creates fake Kubernetes resources based on the provided configs.
-func createConsulResources(ctx context.Context, k8sClient kubernetes.Interface, configs []ResourceConfig) error {
+func createConsulResources(ctx context.Context, k8sClient kubernetes.Interface) error {
+	configs := getResourceConfigs()
 	for _, config := range configs {
 		switch config.Component {
 		case "StatefulSet":

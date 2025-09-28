@@ -257,28 +257,6 @@ func TestCaptureHelmConfig(t *testing.T) {
 	}
 
 }
-
-func initializeDebugCommands(buf io.Writer) *DebugCommand {
-	// Log at a test level to standard out.
-	log := hclog.New(&hclog.LoggerOptions{
-		Name:   "test",
-		Level:  hclog.Debug,
-		Output: os.Stdout,
-	})
-	cleanupReq := make(chan bool, 1)
-	cleanupConfirmation := make(chan int, 1)
-	// Setup and initialize the command struct
-	command := &DebugCommand{
-		BaseCommand: &common.BaseCommand{
-			Log:                 log,
-			UI:                  terminal.NewUI(context.Background(), buf),
-			CleanupReq:          cleanupReq,
-			CleanupConfirmation: cleanupConfirmation,
-		},
-	}
-	command.init()
-	return command
-}
 func TestCaptureConsulInjectedSidecarPods(t *testing.T) {
 	// Helper to create a fake pod for testing.
 	createFakePod := func(name, namespace string, ready, totalContainers, restarts int) *corev1.Pod {
@@ -345,7 +323,7 @@ func TestCaptureConsulInjectedSidecarPods(t *testing.T) {
 			c.Ctx = context.Background()
 			c.kubernetes = fake.NewSimpleClientset(tc.initialPods...)
 
-			err := c.captureConsulInjectedSidecarPods()
+			err := c.captureSidecarPods()
 
 			if tc.expectedError != nil {
 				require.Error(t, err)
@@ -371,45 +349,11 @@ func TestCaptureConsulInjectedSidecarPods(t *testing.T) {
 			unmarshalErr := json.Unmarshal(content, &podsData)
 			require.NoError(t, unmarshalErr, "failed to unmarshal output JSON")
 
-			fmt.Println(string(content))
-			fmt.Println(podsData)
-
 			// Assert that the specific data exists in the map.
 			podInfo, ok := podsData[tc.expectedPodName]
 			require.True(t, ok, "expected pod not found in JSON output")
 			require.Equal(t, tc.expectedReadyVal, podInfo["ready"])
 		})
-	}
-}
-
-func createFakeCRD() *apiextensionsv1.CustomResourceDefinition {
-	return &apiextensionsv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "serviceintentions.consul.hashicorp.com",
-		},
-		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
-			Group: "consul.hashicorp.com",
-			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
-				{Name: "v1alpha1", Served: true, Storage: true},
-			},
-			Names: apiextensionsv1.CustomResourceDefinitionNames{
-				Plural:   "serviceintentions",
-				Singular: "serviceintention",
-				Kind:     "ServiceIntention",
-			},
-		},
-	}
-}
-func createFakeCR(name, namespace string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "consul.hashicorp.com/v1alpha1",
-			"kind":       "ServiceIntention",
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-			},
-		},
 	}
 }
 func TestListAndCaptureCRDResources(t *testing.T) {
@@ -526,7 +470,6 @@ func TestListAndCaptureCRDResources(t *testing.T) {
 		})
 	}
 }
-
 func TestDebugRun(t *testing.T) {
 	// test environment setup
 	helmRelease := &release.Release{
@@ -543,12 +486,12 @@ func TestDebugRun(t *testing.T) {
 	cases := map[string]struct {
 		args                 []string
 		helmRunner           *helm.MockActionRunner
-		fetchLogFunc         func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error)
+		fetchLogFunc         func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error)
 		fetchEnvoyConfig     func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error)
 		expectedOutputPath   string
 		expectedReturnCode   int
 		expectedOutputBuffer []string
-		expectArchive        bool
+		expectDebugArchive   bool // whether we expect debug bundle to be an archive or a directory
 	}{
 		"success case with all targets with duration": {
 			args: []string{"-archive=true", "-duration=10s", "-output=tc1"},
@@ -557,7 +500,7 @@ func TestDebugRun(t *testing.T) {
 					return helmRelease, nil
 				},
 			},
-			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				return io.NopCloser(bytes.NewBufferString("log line")), nil
 			},
 			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
@@ -565,19 +508,19 @@ func TestDebugRun(t *testing.T) {
 			},
 			expectedOutputPath: "tc1",
 			expectedReturnCode: 0,
-			expectArchive:      true,
-			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
-				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
-				"Capturing pods info.....", "Capturing pods logs.....", "Pods Logs captured", "Saved debug archive"},
+			expectDebugArchive: true,
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured",
+				"CRD resources captured", "Consul Sidecar Pods captured", "Envoy Proxy data captured",
+				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug archive"},
 		},
 		"success case with all targets with since": {
-			args: []string{"-archive=true", "-since=10s", "-output=tc2"}, // Default is all capture targets
+			args: []string{"-archive=false", "-since=10s", "-output=tc2"}, // Default is all capture targets
 			helmRunner: &helm.MockActionRunner{
 				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
 					return helmRelease, nil
 				},
 			},
-			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				return io.NopCloser(bytes.NewBufferString("log line")), nil
 			},
 			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
@@ -585,19 +528,19 @@ func TestDebugRun(t *testing.T) {
 			},
 			expectedOutputPath: "tc2",
 			expectedReturnCode: 0,
-			expectArchive:      true,
-			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
-				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
-				"Capturing pods info.....", "Capturing pods logs.....", "Pods Logs captured", "Saved debug archive"},
+			expectDebugArchive: false,
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured",
+				"CRD resources captured", "Consul Sidecar Pods captured", "Envoy Proxy data captured",
+				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug directory"},
 		},
-		"static info failure (helm)": {
+		"helm capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc3"},
 			helmRunner: &helm.MockActionRunner{
 				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
 					return nil, errors.New("testing helm error")
 				},
 			},
-			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				return io.NopCloser(bytes.NewBufferString("log line")), nil
 			},
 			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
@@ -605,19 +548,19 @@ func TestDebugRun(t *testing.T) {
 			},
 			expectedOutputPath: "tc3",
 			expectedReturnCode: 1,
-			expectArchive:      true,
-			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......",
-				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
-				"error capturing static info", "error capturing Helm config"},
+			expectDebugArchive: false,
+			expectedOutputBuffer: []string{"Starting debugger:", "error capturing Helm config", "testing helm error",
+				"CRD resources captured", "Consul Sidecar Pods captured", "Envoy Proxy data captured",
+				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug directory"},
 		},
-		"static info failure (envoy proxy - config data)": {
+		"envoy proxy data capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc4"},
 			helmRunner: &helm.MockActionRunner{
 				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
 					return helmRelease, nil
 				},
 			},
-			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				return io.NopCloser(bytes.NewBufferString("log line")), nil
 			},
 			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
@@ -625,19 +568,19 @@ func TestDebugRun(t *testing.T) {
 			},
 			expectedOutputPath: "tc4",
 			expectedReturnCode: 1,
-			expectArchive:      true,
-			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
-				"CRD resources captured", "Consul Injected Sidecar Pods captured",
-				"error capturing static info", "error capturing Envoy Proxy data"},
+			expectDebugArchive: false,
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured", "CRD resources captured",
+				"Consul Sidecar Pods captured", "error capturing Envoy Proxy data", oneOrMoreErrorOccured.Error(),
+				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug directory"},
 		},
 		"log capture fail": {
-			args: []string{"-archive=false", "-duration=10s", "-output=tc5"},
+			args: []string{"-archive=true", "-duration=10s", "-output=tc5"},
 			helmRunner: &helm.MockActionRunner{
 				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
 					return helmRelease, nil
 				},
 			},
-			fetchLogFunc: func(ctx context.Context, ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				return nil, errors.New("testing log fetch error")
 			},
 			fetchEnvoyConfig: func(ctx context.Context, pf common.PortForwarder) (*envoy.EnvoyConfig, error) {
@@ -645,10 +588,10 @@ func TestDebugRun(t *testing.T) {
 			},
 			expectedOutputPath: "tc5",
 			expectedReturnCode: 1,
-			expectArchive:      true,
-			expectedOutputBuffer: []string{"Starting debugger:", "Capturing static info......", "Helm config captured",
-				"CRD resources captured", "Consul Injected Sidecar Pods captured", "Envoy Proxy data captured",
-				"Capturing pods info.....", "Capturing pods logs.....", "error capturing logs"},
+			expectDebugArchive: true,
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured", "CRD resources captured",
+				"Consul Sidecar Pods captured", "Envoy Proxy data captured", "Capturing pods logs.....", "error capturing Pods Logs",
+				oneOrMoreErrorOccured.Error(), "Index captured", "Saved debug archive"},
 		},
 	}
 
@@ -667,7 +610,6 @@ func TestDebugRun(t *testing.T) {
 
 			buf := new(bytes.Buffer)
 			c := initializeDebugCommands(buf)
-			c.Ctx = context.Background()
 
 			c.helmActionsRunner = tc.helmRunner
 			c.helmEnvSettings = helmCLI.New()
@@ -676,9 +618,20 @@ func TestDebugRun(t *testing.T) {
 			listMapping := map[schema.GroupVersionResource]string{serviceIntentionsGVR: "ServiceIntentionList"}
 			c.dynamic = dynamicFake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), listMapping, crObjects...)
 
-			c.envoyDefaultAdminPortEndpoint = "localhost:" + strconv.Itoa(envoyDefaultAdminPort)
-			c.fetchEnvoyConfig = tc.fetchEnvoyConfig
-			c.fetchLogsFunc = tc.fetchLogFunc
+			c.proxyCapturer = &EnvoyProxyCapture{
+				kubernetes: c.kubernetes,
+				output:     c.output,
+				ctx:        c.Ctx,
+			}
+			c.logCapturer = &LogCapture{
+				BaseCommand: c.BaseCommand,
+				kubernetes:  c.kubernetes,
+				output:      c.output,
+				ctx:         c.Ctx,
+			}
+			c.proxyCapturer.envoyDefaultAdminPortEndpoint = "localhost:" + strconv.Itoa(envoyDefaultAdminPort)
+			c.proxyCapturer.fetchEnvoyConfig = tc.fetchEnvoyConfig
+			c.logCapturer.fetchLogsFunc = tc.fetchLogFunc
 
 			returnCode := c.Run(tc.args)
 
@@ -688,19 +641,44 @@ func TestDebugRun(t *testing.T) {
 			}
 
 			expectedArchivePath := tc.expectedOutputPath
-			if tc.expectedReturnCode == 0 {
-				expectedArchivePath = tc.expectedOutputPath + debugArchiveExtension
+			if tc.expectDebugArchive {
+				expectedArchivePath += debugArchiveExtension
 			}
 			_, err = os.Stat(expectedArchivePath)
+			require.NoError(t, err, "expected archive file to be created")
 
-			// expectArchive indicates whether we expect debug archive to be created
-			// be it archived or not
-			if tc.expectArchive == true {
-				require.NoError(t, err, "expected archive file to be created")
-			} else {
-				require.True(t, os.IsNotExist(err), "expected archive file not to be created")
-			}
 		})
+	}
+}
+
+func createFakeCRD() *apiextensionsv1.CustomResourceDefinition {
+	return &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "serviceintentions.consul.hashicorp.com",
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "consul.hashicorp.com",
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{Name: "v1alpha1", Served: true, Storage: true},
+			},
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural:   "serviceintentions",
+				Singular: "serviceintention",
+				Kind:     "ServiceIntention",
+			},
+		},
+	}
+}
+func createFakeCR(name, namespace string) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "consul.hashicorp.com/v1alpha1",
+			"kind":       "ServiceIntention",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": namespace,
+			},
+		},
 	}
 }
 
@@ -761,4 +739,27 @@ func createTestResource() (k8sObjects, crObjects, crdObjects []runtime.Object, s
 	crdObjects = []runtime.Object{crd}
 	crObjects = []runtime.Object{cr}
 	return k8sObjects, crObjects, crdObjects, serviceIntentionsGVR
+}
+
+func initializeDebugCommands(buf io.Writer) *DebugCommand {
+	// Log at a test level to standard out.
+	log := hclog.New(&hclog.LoggerOptions{
+		Name:   "test",
+		Level:  hclog.Debug,
+		Output: os.Stdout,
+	})
+	cleanupReq := make(chan bool, 1)
+	cleanupConfirmation := make(chan int, 1)
+	// Setup and initialize the command struct
+	command := &DebugCommand{
+		BaseCommand: &common.BaseCommand{
+			Log:                 log,
+			UI:                  terminal.NewUI(context.Background(), buf),
+			CleanupReq:          cleanupReq,
+			CleanupConfirmation: cleanupConfirmation,
+			Ctx:                 context.Background(),
+		},
+	}
+	command.init()
+	return command
 }
