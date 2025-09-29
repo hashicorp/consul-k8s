@@ -33,20 +33,20 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 	}{
 		"default": {
 			webhookSetupFunc:     nil,
-			additionalExpCmdArgs: " -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with custom gRPC port": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulConfig.GRPCPort = 8602
 			},
-			additionalExpCmdArgs: " -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.AuthMethod = "test-auth-method"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -55,7 +55,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-namespace=default -service-namespace=k8snamespace -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-namespace=default -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -64,7 +64,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulDestinationNamespace = "test-ns"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-namespace=test-ns -service-namespace=test-ns -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-namespace=test-ns -service-namespace=test-ns -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with ACLs and partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -72,7 +72,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.ConsulPartition = "test-part"
 			},
 			additionalExpCmdArgs: " -credential-type=login -login-auth-method=test-auth-method -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token " +
-				"-login-partition=test-part -service-partition=test-part -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+				"-login-partition=test-part -service-partition=test-part -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with TLS and CA cert provided": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -87,21 +87,21 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.TLSEnabled = true
 				w.ConsulTLSServerName = "server.dc1.consul"
 			},
-			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-server-name=server.dc1.consul -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with single destination namespace": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.ConsulDestinationNamespace = "consul-namespace"
 			},
-			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-namespace=consul-namespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.EnableNamespaces = true
 				w.EnableK8SNSMirroring = true
 			},
-			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-namespace=k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with namespace mirroring prefix": {
 			webhookSetupFunc: func(w *MeshWebhook) {
@@ -109,38 +109,38 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 				w.EnableK8SNSMirroring = true
 				w.K8SNSMirroringPrefix = "foo-"
 			},
-			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-namespace=foo-k8snamespace -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with partitions": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.ConsulPartition = "partition-1"
 			},
-			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -service-partition=partition-1 -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with different log level": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 			},
-			additionalExpCmdArgs: " -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"with different log level and log json": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.LogLevel = "debug"
 				w.LogJSON = true
 			},
-			additionalExpCmdArgs: " -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"skip server watch enabled": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.SkipServerWatch = true
 			},
-			additionalExpCmdArgs: " -server-watch-disabled=true -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
+			additionalExpCmdArgs: " -server-watch-disabled=true -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/metrics",
 		},
 		"custom prometheus scrape path": {
 			webhookSetupFunc: func(w *MeshWebhook) {
 				w.MetricsConfig.DefaultPrometheusScrapePath = "/scrape-path" // Simulate what would be passed as a flag
 			},
-			additionalExpCmdArgs: " -tls-disabled -graceful-addr=127.0.0.1 -graceful-port=20600 -telemetry-prom-scrape-path=/scrape-path",
+			additionalExpCmdArgs: " -tls-disabled -graceful-port=20600 -telemetry-prom-scrape-path=/scrape-path",
 		},
 	}
 

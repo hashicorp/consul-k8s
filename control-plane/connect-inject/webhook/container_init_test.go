@@ -92,6 +92,10 @@ func TestHandlerContainerInit(t *testing.T) {
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
 				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
+				},
 			},
 		},
 
@@ -459,6 +463,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 					Value: "$(NODE_NAME)-virtual",
 				},
 				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
+				},
+				{
 					Name:  "CONSUL_NAMESPACE",
 					Value: "default",
 				},
@@ -500,6 +508,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -549,6 +561,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 					Value: "$(NODE_NAME)-virtual",
 				},
 				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
+				},
+				{
 					Name:  "CONSUL_NAMESPACE",
 					Value: "non-default",
 				},
@@ -590,6 +606,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -640,6 +660,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -711,6 +735,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -958,8 +986,8 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 			require.Equal(t, "CONSUL_HTTP_PORT", container.Env[5].Name)
 			require.Equal(t, fmt.Sprintf("%d", w.ConsulConfig.HTTPPort), container.Env[5].Value)
 			if w.TLSEnabled {
-				require.Equal(t, "CONSUL_USE_TLS", container.Env[8].Name)
-				require.Equal(t, "true", container.Env[8].Value)
+				require.Equal(t, "CONSUL_USE_TLS", container.Env[9].Name)
+				require.Equal(t, "true", container.Env[9].Value)
 				if caProvided {
 					require.Equal(t, "CONSUL_CACERT_PEM", container.Env[9].Name)
 					require.Equal(t, "consul-ca-cert", container.Env[9].Value)
