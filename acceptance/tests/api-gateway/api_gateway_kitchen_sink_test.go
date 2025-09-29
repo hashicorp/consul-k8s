@@ -65,6 +65,12 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	// Override the default proxy config settings for this test
 	consulClient, _ := consulCluster.SetupConsulClient(t, true, serverReleaseName)
 	logger.Log(t, "have consul client")
+
+	retry.Run(t, func(r *retry.R) {
+		peers, err := consulClient.Status().Peers()
+		require.NoError(r, err)
+		require.Len(r, peers, 1)
+	})
 	_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
 		Kind: api.ProxyDefaults,
 		Name: api.ProxyConfigGlobal,
@@ -98,6 +104,8 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		require.NoError(r, err, out)
 	})
 
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
+
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -123,7 +131,6 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	// Create static server and static client
 	logger.Log(t, "creating static-client pod")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
 
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
@@ -133,7 +140,8 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		httpRoute      gwv1beta1.HTTPRoute
 	)
 
-	counter = &retry.Counter{Count: 60, Wait: 5 * time.Minute}
+	logger.Log(t, "waiting for gateway and httproute to be ready")
+	counter = &retry.Counter{Count: 20, Wait: 5 * time.Minute}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
@@ -149,7 +157,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		require.Len(r, gateway.Status.Listeners, 2)
 
 		// http route checks
-		counter = &retry.Counter{Count: 60, Wait: 5 * time.Minute}
+		counter = &retry.Counter{Count: 20, Wait: 5 * time.Minute}
 		retry.RunWith(counter, t, func(r *retry.R) {
 			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
 			require.NoError(r, err)

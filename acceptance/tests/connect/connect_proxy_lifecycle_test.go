@@ -101,6 +101,13 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			connHelper.Setup(t)
 			connHelper.Install(t)
+
+			retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				peers, err := connHelper.ConsulClient.Status().Peers()
+				require.NoError(r, err)
+				require.Len(r, peers, 1)
+			})
+
 			connHelper.DeployClientAndServer(t)
 
 			// TODO: should this move into connhelper.DeployClientAndServer?
@@ -171,6 +178,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					default:
 						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
 						retry.RunWith(retrier, t, func(r *retry.R) {
+							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
 								r.Errorf("%v", err.Error())
@@ -206,6 +214,26 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					})
 				})
 			}
+
+			// Checks are done, now ensure the pod is fully removed from k8s and Consul.
+			logger.Logf(t, "scaling down the static-client deployment to 0 replicas to clean up the terminating pod %q", clientPodName)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
+
+			// Wait for the pod to be fully deleted
+			// This ensures that the ACL token associated with pod had also been cleaned up
+			retrier := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+			retry.RunWith(retrier, t, func(r *retry.R) {
+				err = ctx.KubernetesClient(r).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{})
+				if err != nil {
+					if strings.Contains(err.Error(), "not found") {
+						logger.Logf(r, "pod %q successfully deleted", clientPodName)
+						return
+					}
+					r.Errorf("error deleting pod %q: %v", clientPodName, err)
+				} else {
+					r.Errorf("pod %q still exists", clientPodName)
+				}
+			})
 
 			logger.Log(t, "ensuring pod is deregistered after termination")
 			// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
