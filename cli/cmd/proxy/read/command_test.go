@@ -6,7 +6,6 @@ package read
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -190,28 +189,27 @@ func TestReadCommandOutputArchive(t *testing.T) {
 	require.Equal(t, 0, out)
 
 	fileName := fmt.Sprintf("proxy-read-%s.json", podName)
-	expectedFilePath := filepath.Join(tempDir, "proxy", fileName)
+	expectedFilePath := filepath.Join("proxy", fileName)
 
 	_, err = os.Stat(expectedFilePath)
 	require.NoError(t, err, "expected output file to be created, but it was not")
 
-	expectedConfig := map[string]interface{}{
-		podName: map[string]interface{}{
-			"clusters":  testEnvoyConfig.Clusters,
-			"endpoints": testEnvoyConfig.Endpoints,
-			"listeners": testEnvoyConfig.Listeners,
-			"routes":    testEnvoyConfig.Routes,
-			"secrets":   testEnvoyConfig.Secrets,
-		},
-	}
-	expectedJSON, err := json.MarshalIndent(expectedConfig, "", "\t")
+	expectedJSON := []byte(`{
+        "fakePod": {
+            "secrets": [
+                {
+                	"name": "default",
+                	"type": "Dynamic Active",
+                    "last_updated": "2022-05-24T17:41:59.078Z"
+                }
+            ]
+        }
+    }`)
 	require.NoError(t, err)
-
 	actualJSON, err := os.ReadFile(expectedFilePath)
 	require.NoError(t, err)
 	require.JSONEq(t, string(expectedJSON), string(actualJSON))
-
-	require.Contains(t, buf.String(), fmt.Sprintf("proxy read '%s' output saved to", podName))
+	require.Contains(t, buf.String(), fmt.Sprintf("proxy read '%s' output saved to '%s'", podName, expectedFilePath))
 }
 
 // TestFilterWarnings ensures that a warning is printed if the user applies a
@@ -367,7 +365,6 @@ func TestTaskCreateCommand_AutocompleteArgs(t *testing.T) {
 }
 
 // testEnvoyConfig is what we expect the config at `test_config_dump.json` to be.
-
 var testEnvoyConfig = &envoy.EnvoyConfig{
 	Clusters: []envoy.Cluster{
 		{Name: "local_agent", FullyQualifiedDomainName: "local_agent", Endpoints: []string{"192.168.79.187:8502"}, Type: "STATIC", LastUpdated: "2022-05-13T04:22:39.553Z"},
@@ -434,4 +431,5 @@ var testEnvoyConfig = &envoy.EnvoyConfig{
 			LastUpdated: "2022-03-15T05:14:22.868Z",
 		},
 	},
+	RawCfg: []byte(`{"secrets":[{"name":"default","type":"Dynamic Active","last_updated":"2022-05-24T17:41:59.078Z"}]}`),
 }

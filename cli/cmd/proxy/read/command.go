@@ -447,9 +447,29 @@ func (c *ReadCommand) outputTables(configs map[string]*envoy.EnvoyConfig) error 
 }
 
 func (c *ReadCommand) outputJSON(configs map[string]*envoy.EnvoyConfig) error {
-	config := c.filterConfigs(configs)
+	cfgs := make(map[string]interface{})
+	for name, config := range configs {
+		cfg := make(map[string]interface{})
+		if c.shouldPrintTable(c.flagClusters) {
+			cfg["clusters"] = FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort)
+		}
+		if c.shouldPrintTable(c.flagEndpoints) {
+			cfg["endpoints"] = FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort)
+		}
+		if c.shouldPrintTable(c.flagListeners) {
+			cfg["listeners"] = FilterListeners(config.Listeners, c.flagAddress, c.flagPort)
+		}
+		if c.shouldPrintTable(c.flagRoutes) {
+			cfg["routes"] = config.Routes
+		}
+		if c.shouldPrintTable(c.flagSecrets) {
+			cfg["secrets"] = config.Secrets
+		}
 
-	escaped, err := json.MarshalIndent(config, "", "\t")
+		cfgs[name] = cfg
+	}
+
+	escaped, err := json.MarshalIndent(cfgs, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -469,7 +489,6 @@ func (c *ReadCommand) outputRaw(configs map[string]*envoy.EnvoyConfig) error {
 		if err := json.Unmarshal(config.RawCfg, &cfg); err != nil {
 			return err
 		}
-
 		cfgs[name] = cfg
 	}
 
@@ -537,8 +556,17 @@ func (c *ReadCommand) outputSecretsTable(secrets []envoy.Secret) {
 }
 
 func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error {
-	config := c.filterConfigs(configs)
-	marshalled, err := json.MarshalIndent(config, "", "\t")
+	cfgs := make(map[string]interface{}, 0)
+	for name, config := range configs {
+		var cfg interface{}
+		if err := json.Unmarshal(config.RawCfg, &cfg); err != nil {
+			return err
+		}
+
+		cfgs[name] = cfg
+	}
+
+	out, err := json.MarshalIndent(cfgs, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -549,40 +577,16 @@ func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error
 	fileName := fmt.Sprintf("proxy-read-%s.json", c.flagPodName)
 	proxyReadFilePath := filepath.Join("proxy", fileName)
 	err = os.MkdirAll(filepath.Dir(proxyReadFilePath), dirPerm)
+	c.UI.Output(proxyReadFilePath)
 	if err != nil {
-		fmt.Printf("error creating proxy read output directory: %v", err)
+		c.UI.Output(fmt.Sprintf("error creating proxy read output directory: %v", err), terminal.WithErrorStyle())
 	}
-	err = os.WriteFile(proxyReadFilePath, marshalled, filePerm)
+	err = os.WriteFile(proxyReadFilePath, out, filePerm)
 	if err != nil {
 		// Note: Please do not delete the directory created above even if writing file fails.
 		// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
-		fmt.Printf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err)
+		c.UI.Output(fmt.Sprintf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err), terminal.WithErrorStyle())
 	}
 	c.UI.Output("proxy read '%s' output saved to '%s'", c.flagPodName, proxyReadFilePath, terminal.WithSuccessStyle())
 	return nil
-}
-
-// filterConfigs- applies the field filters to the configs and returns a map[string]interface{}
-func (c *ReadCommand) filterConfigs(configs map[string]*envoy.EnvoyConfig) map[string]interface{} {
-	cfgs := make(map[string]interface{})
-	for name, config := range configs {
-		cfg := make(map[string]interface{})
-		if c.shouldPrintTable(c.flagClusters) {
-			cfg["clusters"] = FilterClusters(config.Clusters, c.flagFQDN, c.flagAddress, c.flagPort)
-		}
-		if c.shouldPrintTable(c.flagEndpoints) {
-			cfg["endpoints"] = FilterEndpoints(config.Endpoints, c.flagAddress, c.flagPort)
-		}
-		if c.shouldPrintTable(c.flagListeners) {
-			cfg["listeners"] = FilterListeners(config.Listeners, c.flagAddress, c.flagPort)
-		}
-		if c.shouldPrintTable(c.flagRoutes) {
-			cfg["routes"] = config.Routes
-		}
-		if c.shouldPrintTable(c.flagSecrets) {
-			cfg["secrets"] = config.Secrets
-		}
-		cfgs[name] = cfg
-	}
-	return cfgs
 }
