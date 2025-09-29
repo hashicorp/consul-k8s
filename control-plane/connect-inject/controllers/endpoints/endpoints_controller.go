@@ -216,14 +216,14 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				}
 
 				// Skip registration if node information is incomplete to prevent duplicate registrations.
-				// Retry for 30 seconds because the pod IP may not be immediately available after pod creation.
-				retries := 15
+				// Retry for 5 seconds because the pod IP may not be immediately available after pod creation.
+				retries := 5
 				for range retries {
 					if pod.Spec.NodeName == "" || pod.Status.PodIP == "" || pod.Status.HostIP == "" {
 						r.Log.Info("waiting for pod to have complete node information before registering",
 							"pod", pod.Name, "namespace", pod.Namespace,
 							"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
-						time.Sleep(2 * time.Second)
+						time.Sleep(1 * time.Second)
 						if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
 							// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
 							if k8serrors.IsNotFound(err) {
@@ -243,7 +243,6 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					}
 				}
 				// If after retries the node information is still incomplete, skip registration.
-				// Set up the deregisterEndpointAddress map to deregister it.
 				// This could happen if the pod is stuck in Pending state for a long time.
 				if pod.Spec.NodeName == "" || pod.Status.PodIP == "" || pod.Status.HostIP == "" {
 					r.Log.Info("skipping pod registration due to incomplete node information",
