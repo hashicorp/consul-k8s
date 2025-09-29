@@ -190,7 +190,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 			require.NoError(t, err)
 			expCmd := "-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 				" -proxy-service-id-path=/consul/connect-inject/proxyid " +
-				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + "-graceful-addr=127.0.0.1" + c.additionalExpCmdArgs
+				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + " -graceful-addr=127.0.0.1" + c.additionalExpCmdArgs
 			require.Equal(t, expCmd, strings.Join(container.Args, " "))
 
 			if w.AuthMethod != "" {
@@ -737,7 +737,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 					"-log-level=info -log-json=false -envoy-concurrency=0 -graceful-addr=127.0.0.1 -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
 				"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-					"-log-level=info -log-json=false -envoy-concurrency=0 -graceful-addr=127.0.0.1 -tls-disabled -envoy-admin-bind-port=19001 -graceful-addr=127.0.0.1 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
+					"-log-level=info -log-json=false -envoy-concurrency=0 -graceful-addr=127.0.0.1 -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 			}
 			if aclsEnabled {
 				expArgs = []string{
