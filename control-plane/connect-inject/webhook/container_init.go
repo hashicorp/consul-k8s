@@ -155,10 +155,6 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Value: "$(NODE_NAME)-virtual",
 			},
 			{
-				Name:  "CONSUL_DUAL_STACK",
-				Value: "false",
-			},
-			{
 				Name:  constants.ConsulDualStackEnvVar,
 				Value: dualStack,
 			},
