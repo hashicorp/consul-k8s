@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -16,7 +17,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
-	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const (
@@ -151,15 +151,16 @@ func (g *Gatekeeper) getDataplaneArgs(metrics common.MetricsConfig, namespace st
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
-	ds, err := netutil.IsDualStack(g.ConsulConfig.APIClientConfig, false)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get consul dual stack status with error: %s", err.Error())
+	dualStack := false
+	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+		dualStack = true
 	}
-	if ds {
+	if dualStack {
 		envoyAdminBindAddress = "::1"
 		consulDPBindAddress = "::"
 		xdsBindAddress = "::1"
 	}
+
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
 		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
