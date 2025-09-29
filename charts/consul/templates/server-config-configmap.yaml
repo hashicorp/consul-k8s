@@ -139,7 +139,7 @@ data:
         "defaults": {
           {{- if .Values.global.tls.verify }}
           "verify_outgoing": true,
-          "verify_incoming": true
+          "verify_incoming": true,
           {{- end }}
           {{- if .Values.global.secretsBackend.vault.enabled }}
           "ca_file": "/vault/secrets/serverca.crt",
