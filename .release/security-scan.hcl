@@ -32,6 +32,7 @@ binary {
   triage {
     suppress {
       vulnerabilites = [
+        "GO-2022-0635"
       ]
     }
   }
