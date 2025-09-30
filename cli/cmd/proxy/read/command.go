@@ -577,16 +577,15 @@ func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error
 	fileName := fmt.Sprintf("proxy-read-%s.json", c.flagPodName)
 	proxyReadFilePath := filepath.Join("proxy", fileName)
 	err = os.MkdirAll(filepath.Dir(proxyReadFilePath), dirPerm)
-	c.UI.Output(proxyReadFilePath)
 	if err != nil {
-		c.UI.Output(fmt.Sprintf("error creating proxy read output directory: %v", err), terminal.WithErrorStyle())
+		return fmt.Errorf("error creating proxy read output directory: %v", err)
 	}
 	err = os.WriteFile(proxyReadFilePath, out, filePerm)
 	if err != nil {
 		// Note: Please do not delete the directory created above even if writing file fails.
 		// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
-		c.UI.Output(fmt.Sprintf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err), terminal.WithErrorStyle())
+		return fmt.Errorf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err)
 	}
-	c.UI.Output("proxy read '%s' output saved to '%s'", c.flagPodName, proxyReadFilePath, terminal.WithSuccessStyle())
+	c.UI.Output(fmt.Sprintf("proxy read '%s' output saved to '%s'", c.flagPodName, proxyReadFilePath), terminal.WithSuccessStyle())
 	return nil
 }
