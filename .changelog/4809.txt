@@ -1,0 +1,4 @@
+```release-note:improvement
+control-plane: added retries in endpoints controller to avoid racing scenarios
+tests: updated tests in api-gateway, connect and peering packages to improve dump collection and cleanup
+```
