@@ -1,3 +1,13 @@
+## 1.6.9 (September 30, 2025)
+
+FEATURES:
+
+* Added boolean annotation "consul.hashicorp.com/enable-consul-dataplane-as-sidecar" for registering consul-dataplane as init container so that consul-dataplane container is initialised and started before application container. Default value is "false" i.e the feature is disabled by default. Also made the probe properties configurable through annotations. [[GH-4678](https://github.com/hashicorp/consul-k8s/issues/4678)]
+
+BUG FIXES:
+
+* control-plane: fix duplicate health check registrations for API Gateways and Mesh Gateways when node assignment is delayed [[GH-4715](https://github.com/hashicorp/consul-k8s/issues/4715)]
+
 ## 1.6.7 (July 18, 2025)
 
 SECURITY:
