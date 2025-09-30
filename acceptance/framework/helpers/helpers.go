@@ -234,7 +234,8 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 	t.Log("RunCommand 2")
 
 	resultCh := make(chan *cmdResult, 1)
-
+	o, err := exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
+	t.Logf("Current pods in the cluster: with error: %s \noutput:\n %s", err.Error(), string(o))
 	go func() {
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 		t.Log(
@@ -263,6 +264,8 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 		if res.err != nil {
 			logger.Logf(t, "Output: %v.", res.output)
 		}
+		o, err := exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
+		t.Logf("Current pods in the cluster: with error: %s \noutput:\n %s", err.Error(), string(o))
 		return res.output, res.err
 		// Sometimes this func runs for too long handle timeout if needed.
 	case <-time.After(320 * time.Second):
