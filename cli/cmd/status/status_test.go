@@ -37,7 +37,7 @@ func TestCheckConsulServers(t *testing.T) {
 		desired int
 		healthy int
 	}{
-		"No servers":                    {},
+		"No servers":                    {0, 0},
 		"3 servers expected, 1 healthy": {3, 1},
 		"3 servers expected, 3 healthy": {3, 3},
 	}
@@ -49,7 +49,7 @@ func TestCheckConsulServers(t *testing.T) {
 			c.kubernetes = fake.NewSimpleClientset()
 
 			// Deploy servers if needed.
-			if name != "No servers" {
+			if tc.desired != 0 {
 				err := createServers("consul-server", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
 				require.NoError(t, err)
 			}
@@ -60,7 +60,7 @@ func TestCheckConsulServers(t *testing.T) {
 
 			if tc.desired > 0 {
 				require.NotNil(t, tbl)
-				expectedHeaders := []string{"NAME", "READY", "AGE", "CONTAINERS", "IMAGES"}
+				expectedHeaders := tableHeaderForConsulComponents
 				assert.Equal(t, expectedHeaders, tbl.Headers)
 
 				require.Len(t, tbl.Rows, 1)
@@ -84,7 +84,7 @@ func TestCheckConsulClients(t *testing.T) {
 		desired int
 		healthy int
 	}{
-		"No clients":                    {},
+		"No clients":                    {0, 0},
 		"3 clients expected, 1 healthy": {3, 1},
 		"3 clients expected, 3 healthy": {3, 3},
 	}
@@ -96,7 +96,7 @@ func TestCheckConsulClients(t *testing.T) {
 			c.kubernetes = fake.NewSimpleClientset()
 
 			// Deploy clients if needed.
-			if name != "No clients" {
+			if tc.desired != 0 {
 				err := createClients("consul-client", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
 				require.NoError(t, err)
 			}
@@ -107,7 +107,7 @@ func TestCheckConsulClients(t *testing.T) {
 
 			if tc.desired > 0 {
 				require.NotNil(t, tbl)
-				expectedHeaders := []string{"NAME", "READY", "AGE", "CONTAINERS", "IMAGES"}
+				expectedHeaders := tableHeaderForConsulComponents
 				assert.Equal(t, expectedHeaders, tbl.Headers)
 
 				require.Len(t, tbl.Rows, 1)
@@ -132,7 +132,7 @@ func TestCheckConsulDeployments(t *testing.T) {
 		desired int
 		healthy int
 	}{
-		"No deployments":                    {},
+		"No deployments":                    {0, 0},
 		"3 deployments expected, 1 healthy": {3, 1},
 		"3 deployments expected, 3 healthy": {3, 3},
 	}
@@ -144,7 +144,7 @@ func TestCheckConsulDeployments(t *testing.T) {
 			c.kubernetes = fake.NewSimpleClientset()
 
 			// Deploy clients if needed.
-			if name != "No deployments" {
+			if tc.desired != 0 {
 				err := createDeployments("consul-deployment", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
 				require.NoError(t, err)
 			}
@@ -155,7 +155,7 @@ func TestCheckConsulDeployments(t *testing.T) {
 
 			if tc.desired > 0 {
 				require.NotNil(t, tbl)
-				expectedHeaders := []string{"NAME", "READY", "AGE", "CONTAINERS", "IMAGES"}
+				expectedHeaders := tableHeaderForConsulComponents
 				assert.Equal(t, expectedHeaders, tbl.Headers)
 
 				require.Len(t, tbl.Rows, 1)

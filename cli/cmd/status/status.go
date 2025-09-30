@@ -25,6 +25,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+var tableHeaderForConsulComponents = []string{"NAME", "READY", "AGE", "CONTAINERS", "IMAGES"}
+
 const (
 	flagNameKubeConfig  = "kubeconfig"
 	flagNameKubeContext = "context"
@@ -254,7 +256,7 @@ func (c *Command) getConsulClientsTable(namespace string) (*terminal.Table, erro
 	}
 	var tbl *terminal.Table
 	if len(clients.Items) != 0 {
-		tbl = terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
+		tbl = terminal.NewTable(tableHeaderForConsulComponents...)
 		for _, c := range clients.Items {
 			age := time.Since(c.CreationTimestamp.Time).Round(time.Minute)
 			readyStatus := fmt.Sprintf("%d/%d", c.Status.NumberReady, c.Status.DesiredNumberScheduled)
@@ -286,7 +288,7 @@ func (c *Command) getConsulServersTable(namespace string) (*terminal.Table, erro
 	}
 	var tbl *terminal.Table
 	if len(servers.Items) != 0 {
-		tbl = terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
+		tbl = terminal.NewTable(tableHeaderForConsulComponents...)
 		for _, s := range servers.Items {
 			age := time.Since(s.CreationTimestamp.Time).Round(time.Minute)
 			readyStatus := fmt.Sprintf("%d/%d", s.Status.ReadyReplicas, *s.Spec.Replicas)
@@ -312,13 +314,13 @@ func (c *Command) getConsulServersTable(namespace string) (*terminal.Table, erro
 // getConsulDeploymentsTable returns the table instance with the Consul Deployed Deployments
 // and their ready status (number of pods ready/desired),
 func (c *Command) getConsulDeploymentsTable(namespace string) (*terminal.Table, error) {
-	deployments, err := c.kubernetes.AppsV1().Deployments(namespace).List(c.Ctx, metav1.ListOptions{})
+	deployments, err := c.kubernetes.AppsV1().Deployments(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm"})
 	if err != nil {
 		return nil, err
 	}
 	var tbl *terminal.Table
 	if len(deployments.Items) != 0 {
-		tbl = terminal.NewTable("NAME", "READY", "AGE", "CONTAINERS", "IMAGES")
+		tbl = terminal.NewTable(tableHeaderForConsulComponents...)
 		for _, d := range deployments.Items {
 			age := time.Since(d.CreationTimestamp.Time).Round(time.Minute)
 			readyStatus := fmt.Sprintf("%d/%d", d.Status.ReadyReplicas, *d.Spec.Replicas)
