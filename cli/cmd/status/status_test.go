@@ -143,7 +143,7 @@ func TestCheckConsulDeployments(t *testing.T) {
 			c := getInitializedCommand(t, buf)
 			c.kubernetes = fake.NewSimpleClientset()
 
-			// Deploy clients if needed.
+			// Deploy deployments if needed.
 			if tc.desired != 0 {
 				err := createDeployments("consul-deployment", namespace, int32(tc.desired), int32(tc.healthy), c.kubernetes)
 				require.NoError(t, err)
