@@ -30,7 +30,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	basecmd, commands := initializeCommands(ctx, log)
+	// Below two channels are to handle graceful cleanup when terminal catches a signal interrupt/terminate
+	// CleanupReq channel - Signals whether a command needs cleanup (true/false), needed to block main until cleanup is done
+	// CleanupConfirmation channel - Signals when cleanup is complete (sends 1) to unblock main
+	cleanupConfirmation := make(chan int, 1)
+	cleanupReq := make(chan bool, 1)
+	cleanupReq <- false // by default no cleanup required
+
+	basecmd, commands := initializeCommands(ctx, log, cleanupConfirmation, cleanupReq)
 	c.Commands = commands
 	defer func() {
 		_ = basecmd.Close()
@@ -42,6 +49,9 @@ func main() {
 		<-ch
 		// Any cleanups, such as cancelling contexts
 		cancel()
+		if cleanup := <-cleanupReq; cleanup {
+			<-cleanupConfirmation
+		}
 		_ = basecmd.Close()
 		os.Exit(1)
 	}()
