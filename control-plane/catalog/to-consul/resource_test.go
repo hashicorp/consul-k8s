@@ -2076,9 +2076,14 @@ func TestServiceResource_addIngress(t *testing.T) {
 						},
 					},
 				},
+				Status: networkingv1.IngressStatus{
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{Hostname: "test-ingress.host.consul"}},
+					},
+				},
 			},
 			expectIngressSync: true,
-			expectedAddress:   "test.host.consul",
+			expectedAddress:   "test-ingress.host.consul",
 			expectedPort:      80,
 		},
 		"enable ingress on port 443": {
@@ -2117,9 +2122,14 @@ func TestServiceResource_addIngress(t *testing.T) {
 						},
 					},
 				},
+				Status: networkingv1.IngressStatus{
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{Hostname: "test-ingress.host.consul"}},
+					},
+				},
 			},
 			expectIngressSync: true,
-			expectedAddress:   "test.host.consul",
+			expectedAddress:   "test-ingress.host.consul",
 			expectedPort:      443,
 		},
 		"enable ingress on port 80 with loadbalancer IP": {
@@ -2279,6 +2289,11 @@ func TestServiceResource_addIngress(t *testing.T) {
 								},
 							},
 						},
+					},
+				},
+				Status: networkingv1.IngressStatus{
+					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
+						Ingress: []networkingv1.IngressLoadBalancerIngress{{Hostname: "test-ingress.host.consul"}},
 					},
 				},
 			},
