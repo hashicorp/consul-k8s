@@ -235,7 +235,11 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 
 	resultCh := make(chan *cmdResult, 1)
 	go func() {
-		o, err := exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
+		o, err := exec.Command("kubectl", "get", "ns").CombinedOutput()
+		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "get", "pods", "-n", "consul").CombinedOutput()
+		t.Logf("Current pods in consul the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
 		t.Logf("Current pods in the cluster: with error: %s \noutput:\n %s", err, string(o))
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 		t.Log(
