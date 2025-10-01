@@ -237,16 +237,14 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 	go func() {
 		o, err := exec.Command("kubectl", "get", "ns", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "pods", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "deploy", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "deploy", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current deploy in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "rs", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "rs", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current rs in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "statefulset", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "statefulset", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current statefulset in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
-		t.Logf("Current pods in the cluster: with error: %s \noutput:\n %s", err, string(o))
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 		t.Log(
 			"Executing command: ",
@@ -273,13 +271,13 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 	case res := <-resultCh:
 		o, err := exec.Command("kubectl", "get", "ns", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "pods", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "deploy", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "deploy", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current deploy in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "rs", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "rs", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current rs in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "statefulset", "-n", "default", "--context", options.ContextName).CombinedOutput()
+		o, err = exec.Command("kubectl", "get", "statefulset", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
 		t.Logf("Current statefulset in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		if res.err != nil {
 			logger.Logf(t, "Output: %v.", res.output)
