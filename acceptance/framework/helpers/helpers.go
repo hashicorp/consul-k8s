@@ -237,8 +237,8 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 	go func() {
 		o, err := exec.Command("kubectl", "get", "ns").CombinedOutput()
 		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "pods", "-n", "consul").CombinedOutput()
-		t.Logf("Current pods in consul the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "get", "pods", "-n", "default").CombinedOutput()
+		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		o, err = exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
 		t.Logf("Current pods in the cluster: with error: %s \noutput:\n %s", err, string(o))
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
@@ -265,11 +265,14 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 
 	select {
 	case res := <-resultCh:
+		o, err := exec.Command("kubectl", "get", "pods", "-n", "default").CombinedOutput()
+		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
+		t.Logf("Current pods in the cluster: with error: %s \noutput:\n %s", err, string(o))
 		if res.err != nil {
 			logger.Logf(t, "Output: %v.", res.output)
 		}
-		o, err := exec.Command("kubectl", "get", "pods", "-A").CombinedOutput()
-		t.Logf("Current pods in the cluster: with error: %s \noutput:\n %s", err, string(o))
+
 		return res.output, res.err
 		// Sometimes this func runs for too long handle timeout if needed.
 	case <-time.After(320 * time.Second):
