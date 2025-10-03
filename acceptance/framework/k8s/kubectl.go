@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	kubectlTimeout = "--timeout=5m"
+	kubectlTimeout = "--timeout=120s"
 )
 
 // kubeAPIConnectErrs are errors that sometimes occur when talking to the
@@ -36,7 +36,6 @@ var kubeAPIConnectErrs = []string{
 // RunKubectlAndGetOutputE runs an arbitrary kubectl command provided via args
 // and returns its output and error.
 func RunKubectlAndGetOutputE(t testutil.TestingTB, options *k8s.KubectlOptions, args ...string) (string, error) {
-	t.Log("RunKubectlAndGetOutputE Running kubectl ", strings.Join(args, " "))
 	return RunKubectlAndGetOutputWithLoggerE(t, options, terratestLogger.New(logger.TestLogger{}), args...)
 }
 
@@ -44,8 +43,6 @@ func RunKubectlAndGetOutputE(t testutil.TestingTB, options *k8s.KubectlOptions, 
 // it also allows you to provide a custom logger. This is useful if the command output
 // contains sensitive information, for example, when you can pass logger.Discard.
 func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.KubectlOptions, logger *terratestLogger.Logger, args ...string) (string, error) {
-	t.Log("RunKubectlAndGetOutputWithLoggerE Running kubectl ", strings.Join(args, " "))
-
 	var cmdArgs []string
 	if options.ContextName != "" {
 		cmdArgs = append(cmdArgs, "--context", options.ContextName)
@@ -71,7 +68,6 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 	var output string
 	var err error
 	retry.RunWith(counter, t, func(r *retry.R) {
-		t.Log("RunWith Running command: ", command.Command, strings.Join(command.Args, " "))
 		output, err = helpers.RunCommand(t, options, command)
 		if err != nil {
 			// Want to retry on errors connecting to actual Kube API because
@@ -139,9 +135,6 @@ func KubectlLabel(t *testing.T, options *k8s.KubectlOptions, objectType string, 
 // If there's an error running the command, fail the test.
 func RunKubectl(t *testing.T, options *k8s.KubectlOptions, args ...string) {
 	_, err := RunKubectlAndGetOutputE(t, options, args...)
-	if err != nil {
-		t.Errorf("Error running kubectl %v: %v", args, err)
-	}
 	require.NoError(t, err)
 }
 
