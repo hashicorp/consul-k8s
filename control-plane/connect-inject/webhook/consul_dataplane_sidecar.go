@@ -268,6 +268,9 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{"ALL"},
+		},
 		ReadOnlyRootFilesystem: ptr.To(true),
 	}
 	enableConsulDataplaneAsSidecar, err := w.LifecycleConfig.EnableConsulDataplaneAsSidecar(pod)
