@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	kubectlTimeout = "--timeout=120s"
+	kubectlTimeout = "--timeout=5m"
 )
 
 // kubeAPIConnectErrs are errors that sometimes occur when talking to the
