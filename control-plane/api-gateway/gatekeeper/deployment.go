@@ -109,7 +109,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 
 	volumes, mounts := volumesAndMounts(gateway)
 
-	container, err := g.consulDataplaneContainer(metrics, config, gcc, gateway, mounts)
+	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, mounts)
 	if err != nil {
 		return nil, err
 	}

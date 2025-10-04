@@ -29,7 +29,7 @@ const (
 	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
 )
 
-func (g *Gatekeeper) consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -40,7 +40,7 @@ func (g *Gatekeeper) consulDataplaneContainer(metrics common.MetricsConfig, conf
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := g.getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
+	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -151,7 +151,7 @@ func (g *Gatekeeper) consulDataplaneContainer(metrics common.MetricsConfig, conf
 	return container, nil
 }
 
-func (g *Gatekeeper) getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 

@@ -7,13 +7,10 @@ import (
 	"fmt"
 	"testing"
 
-	logrtest "github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -163,12 +160,8 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 					GRPCPort: GRPCPort,
 				},
 			}
-			log := logrtest.New(t)
-			s := runtime.NewScheme()
-			objs := []resources{}
-			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
-			gatekeeper := New(log, client, nil)
-			container, err := gatekeeper.consulDataplaneContainer(metrics, config, tc.gcc, tc.gateway, []corev1.VolumeMount{})
+
+			container, err := consulDataplaneContainer(metrics, config, tc.gcc, tc.gateway, []corev1.VolumeMount{})
 			require.NoError(t, err)
 
 			// Check command
@@ -238,12 +231,8 @@ func TestConsulDataplaneContainer_SecurityContext(t *testing.T) {
 			MapPrivilegedContainerPorts: 0,
 		},
 	}
-	log := logrtest.New(t)
-	s := runtime.NewScheme()
-	objs := []resources{}
-	client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
-	gatekeeper := New(log, client, nil)
-	container, err := gatekeeper.consulDataplaneContainer(metrics, config, gcc, gateway, []corev1.VolumeMount{})
+
+	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, []corev1.VolumeMount{})
 	require.NoError(t, err)
 
 	// Verify all security context fields are set correctly
@@ -307,13 +296,7 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 		},
 	}
 
-	log := logrtest.New(t)
-	s := runtime.NewScheme()
-	objs := []resources{}
-	client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
-	gatekeeper := New(log, client, nil)
-
-	container, err := gatekeeper.consulDataplaneContainer(metrics, config, gcc, gateway, volumeMounts)
+	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, volumeMounts)
 	require.NoError(t, err)
 
 	// Basic container properties
