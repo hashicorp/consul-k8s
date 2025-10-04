@@ -6,6 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -20,8 +21,9 @@ import (
 )
 
 const (
-	consulDataplaneDNSBindHost = "127.0.0.1"
-	consulDataplaneDNSBindPort = 8600
+	consulDataplaneDNSBindHost     = "127.0.0.1"
+	ipv6ConsulDataplaneDNSBindHost = "::1"
+	consulDataplaneDNSBindPort     = 8600
 )
 
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
@@ -318,14 +320,28 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
+	envoyAdminBindAddress := "127.0.0.1"
+	consulDNSBindAddress := consulDataplaneDNSBindHost
+	consulDPBindAddress := "127.0.0.1"
+	xdsBindAddress := "127.0.0.1"
 
+	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+		envoyAdminBindAddress = "::1"
+		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
+		consulDPBindAddress = "::"
+		xdsBindAddress = "::1"
+	}
 	args := []string{
 		"-addresses", w.ConsulAddress,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-consul-dns-bind-addr=" + consulDNSBindAddress,
+		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-graceful-addr=" + consulDPBindAddress,
 	}
 
 	if w.SkipServerWatch {
@@ -387,6 +403,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	if mpi.serviceName != "" {
 		gracefulPort = gracefulPort + mpi.serviceIndex
 	}
+
 	args = append(args, fmt.Sprintf("-graceful-port=%d", gracefulPort))
 
 	enableProxyLifecycle, err := w.LifecycleConfig.EnableProxyLifecycle(pod)

@@ -100,7 +100,7 @@ func MockConnMgrForIPAndPort(t *testing.T, ip string, port int, enableGRPCConn b
 	if enableGRPCConn {
 		conn, err := grpc.DialContext(
 			context.Background(),
-			fmt.Sprintf("%s:%d", parsedIP, port),
+			net.JoinHostPort(parsedIP.String(), strconv.Itoa(port)),
 			grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err)
 		mockState.GRPCConn = conn

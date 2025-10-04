@@ -315,6 +315,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// Kubernetes namespace.
 			// If a single destination namespace is set, we expect all services
 			// to be registered in that destination Consul namespace.
+
 			// Server cluster.
 			services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", serverQueryOpts)
 			require.NoError(t, err)

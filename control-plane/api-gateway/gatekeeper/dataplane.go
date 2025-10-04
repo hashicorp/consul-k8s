@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -154,16 +155,38 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
+	envoyAdminBindAddress := "127.0.0.1"
+	consulDPBindAddress := "127.0.0.1"
+	xdsBindAddress := "127.0.0.1"
+
+	dualStack := false
+	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+		dualStack = true
+	}
+	if dualStack {
+		envoyAdminBindAddress = "::1"
+		consulDPBindAddress = "::"
+		xdsBindAddress = "::1"
+	}
+
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-graceful-addr=" + consulDPBindAddress,
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(
+		namespace, config.EnableNamespaces,
+		config.ConsulDestinationNamespace,
+		config.EnableNamespaceMirroring,
+		config.NamespaceMirroringPrefix,
+	)
 
 	if config.AuthMethod != "" {
 		args = append(args,

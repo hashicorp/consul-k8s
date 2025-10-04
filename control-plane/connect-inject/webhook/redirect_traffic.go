@@ -6,6 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/hashicorp/consul/sdk/iptables"
@@ -130,6 +131,10 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		// the name of the env variable whose value is the ClusterIP of the Consul DNS Service.
 		cfg.ConsulDNSIP = consulDataplaneDNSBindHost
 		cfg.ConsulDNSPort = consulDataplaneDNSBindPort
+
+		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+			cfg.ConsulDNSIP = ipv6ConsulDataplaneDNSBindHost
+		}
 	}
 
 	iptablesConfigJson, err := json.Marshal(&cfg)

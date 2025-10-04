@@ -1358,7 +1358,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 						value := actual[i].Value.([]any)
 						valueMap := value[0].(map[string]any)
 						envs := valueMap["env"].([]any)
-						redirectEnv := envs[8].(map[string]any)
+						redirectEnv := envs[9].(map[string]any)
 						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
 						iptablesJson := redirectEnv["value"].(string)
 

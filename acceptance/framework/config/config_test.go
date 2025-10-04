@@ -120,6 +120,16 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},
+		{
+			"sets dualstack helm value",
+			TestConfig{
+				DualStack: true,
+			},
+			map[string]string{
+				"global.dualStack.enabled":                      "true",
+				"connectInject.transparentProxy.defaultEnabled": "false",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
