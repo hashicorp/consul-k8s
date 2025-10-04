@@ -110,19 +110,44 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		container.Resources = *gcc.Spec.DeploymentSpec.Resources
 	}
 
-	// If running in vanilla K8s, run as root to allow binding to privileged ports;
-	// otherwise, allow the user to be assigned by OpenShift.
-	container.SecurityContext = &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: ptr.To(true),
-		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
+	// For backwards-compatibility, we allow privilege escalation if port mapping
+	// is disabled and the Gateway utilizes a privileged port (< 1024).
+	usingPrivilegedPorts := false
+	if gcc.Spec.MapPrivilegedContainerPorts == 0 {
+		for _, listener := range gateway.Spec.Listeners {
+			if listener.Port < 1024 {
+				usingPrivilegedPorts = true
+				break
+			}
+		}
+	}
+
+	// Set up security context with least privilege by default
+	securityContext := &corev1.SecurityContext{
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
 	}
 	if !config.EnableOpenShift {
 		container.SecurityContext.RunAsUser = ptr.To(int64(0))
 	}
+
+	if usingPrivilegedPorts {
+		securityContext.AllowPrivilegeEscalation = ptr.To(true)
+		securityContext.RunAsNonRoot = ptr.To(false)
+		securityContext.Capabilities.Add = []corev1.Capability{netBindCapability}
+		container.Command = []string{"privileged-consul-dataplane"}
+		// Add the envoy executable path argument
+		container.Args = append(container.Args, "-envoy-executable-path=/usr/local/bin/privileged-envoy")
+	}
+
+	container.SecurityContext = securityContext
 
 	return container, nil
 }
