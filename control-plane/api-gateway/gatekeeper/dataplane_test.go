@@ -165,7 +165,7 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 			}
 			log := logrtest.New(t)
 			s := runtime.NewScheme()
-			objs := resources{}
+			objs := []resources{}
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			gatekeeper := New(log, client, nil)
 			container, err := gatekeeper.consulDataplaneContainer(metrics, config, tc.gcc, tc.gateway, []corev1.VolumeMount{})
@@ -240,7 +240,7 @@ func TestConsulDataplaneContainer_SecurityContext(t *testing.T) {
 	}
 	log := logrtest.New(t)
 	s := runtime.NewScheme()
-	objs := resources{}
+	objs := []resources{}
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 	gatekeeper := New(log, client, nil)
 	container, err := gatekeeper.consulDataplaneContainer(metrics, config, gcc, gateway, []corev1.VolumeMount{})
@@ -309,7 +309,7 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 
 	log := logrtest.New(t)
 	s := runtime.NewScheme()
-	objs := resources{}
+	objs := []resources{}
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 	gatekeeper := New(log, client, nil)
 
