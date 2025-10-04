@@ -124,21 +124,29 @@ func (g *Gatekeeper) consulDataplaneContainer(metrics common.MetricsConfig, conf
 		}
 	}
 
-	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(usingPrivilegedPorts),
+	// Set up security context with least privilege by default
+	securityContext := &corev1.SecurityContext{
 		ReadOnlyRootFilesystem:   ptr.To(true),
 		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
-		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
-		// NET_BIND_SERVICE is a requirement for consul-dataplane, even though we don't
-		// bind to privileged ports.
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
 	}
+
+	if usingPrivilegedPorts {
+		securityContext.AllowPrivilegeEscalation = ptr.To(true)
+		securityContext.RunAsNonRoot = ptr.To(false)
+		securityContext.Capabilities.Add = []corev1.Capability{netBindCapability}
+		container.Command = []string{"privileged-consul-dataplane"}
+		// Add the envoy executable path argument
+		container.Args = append(container.Args, "-envoy-executable-path=/usr/local/bin/privileged-envoy")
+	}
+
+	container.SecurityContext = securityContext
 
 	return container, nil
 }
