@@ -6,6 +6,7 @@ package wanfederation
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -208,7 +209,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, targetAddress)

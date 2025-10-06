@@ -6,6 +6,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -133,7 +134,7 @@ func TestAppMetrics(t *testing.T) {
 	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
 	// to start.
 	retry.RunWith(&retry.Counter{Count: 20, Wait: 2 * time.Second}, t, func(r *retry.R) {
-		metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s/metrics", net.JoinHostPort(podIP, "20200")))
 		require.NoError(r, err)
 		// This assertion represents the metrics from the envoy sidecar.
 		require.Contains(r, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server"`)
@@ -147,7 +148,7 @@ func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, 
 	require.NoError(t, err)
 	for _, pod := range pods.Items {
 		podIP := pod.Status.PodIP
-		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s/metrics", net.JoinHostPort(podIP, "20200")))
 		require.NoError(t, err)
 		require.Contains(t, metricsOutput, metricsAssertion)
 	}
