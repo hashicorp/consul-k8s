@@ -1,16 +1,16 @@
-name: conditional-skip
+name: conditional-skip-tests
 
 on:
   workflow_call:
     outputs:
       skip-ci:
-        description: "Whether we should skip build and test jobs"
+        description: "Whether we should skip test jobs"
         value: ${{ jobs.check-skip.outputs.skip-ci }}
 
 jobs:
   check-skip:
     runs-on: ubuntu-latest
-    name: Check whether to skip build and tests
+    name: Check whether to skip tests
     outputs:
       skip-ci: ${{ steps.maybe-skip-ci.outputs.skip-ci }}
     steps:
@@ -52,6 +52,7 @@ jobs:
             assets/**
             .changelog/**
             .github/CODEOWNERS
+            .release/security-scan.hcl
       - name: Print changed files
         env:
           SKIPPABLE_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
@@ -66,5 +67,5 @@ jobs:
         id: maybe-skip-ci
         if: ${{ steps.changed-files.outputs.only_changed == 'true' }}
         run: |
-          echo "Skipping tests and build because only skippable files changed"
+          echo "Skipping tests because only skippable files changed"
           echo "skip-ci=true" >> $GITHUB_OUTPUT
