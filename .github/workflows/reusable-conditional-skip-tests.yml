@@ -44,7 +44,7 @@ jobs:
           # See https://github.com/tj-actions/changed-files/blob/main/README.md#inputs-%EF%B8%8F
           # for usage, options, and more details on match syntax.
           files: |
-            .github/workflows/reusable-conditional-skip.yml
+            .github/workflows/reusable-conditional-skip-tests.yml
             LICENSE
             .copywrite.hcl
             .gitignore
