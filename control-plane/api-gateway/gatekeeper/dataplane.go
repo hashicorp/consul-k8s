@@ -159,11 +159,7 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
-	dualStack := false
 	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
-		dualStack = true
-	}
-	if dualStack {
 		envoyAdminBindAddress = "::1"
 		consulDPBindAddress = "::"
 		xdsBindAddress = "::1"
