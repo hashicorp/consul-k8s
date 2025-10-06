@@ -15,7 +15,7 @@ env:
 
 jobs:
   conditional-skip:
-    uses: ./.github/workflows/reusable-conditional-skip.yml
+    uses: ./.github/workflows/reusable-conditional-skip-tests.yml
 
   test:
     name: test
