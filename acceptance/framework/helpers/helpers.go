@@ -234,6 +234,12 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 	resultCh := make(chan *cmdResult, 1)
 
 	go func() {
+		o, err := exec.Command("kubectl", "get", "ns", "--context", options.ContextName).CombinedOutput()
+		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
+		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "describe", "pods", "-A", "--context", options.ContextName).CombinedOutput()
+		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 		resultCh <- &cmdResult{output: string(output), err: err}
 	}()
@@ -249,10 +255,14 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 
 	select {
 	case res := <-resultCh:
-		if res.err != nil {
-			logger.Logf(t, "Output: %v.", res.output)
-		}
 
+		logger.Logf(t, "Output: %v.", res.output)
+		o, err := exec.Command("kubectl", "get", "ns", "--context", options.ContextName).CombinedOutput()
+		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", options.ContextName).CombinedOutput()
+		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
+		o, err = exec.Command("kubectl", "describe", "pods", "-A", "--context", options.ContextName).CombinedOutput()
+		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		return res.output, res.err
 		// Sometimes this func runs for too long handle timeout if needed.
 	case <-time.After(320 * time.Second):
