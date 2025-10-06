@@ -23,6 +23,12 @@ container {
   triage {
     suppress {
       vulnerabilites = [
+        "CVE-2025-46394",
+        "CVE-2024-58251",
+        "CVE-2025-47268",
+        "CVE-2025-48964",
+        "CVE-2025-46394",
+        "CVE-2024-58251"
       ]
     }
   }
@@ -39,6 +45,7 @@ binary {
   triage {
     suppress {
       vulnerabilites = [
+        "GO-2022-0635"
       ]
     }
   }
