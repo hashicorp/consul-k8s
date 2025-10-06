@@ -208,7 +208,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Minute, Count: 30}, t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 		require.NoError(r, err)
 	})
