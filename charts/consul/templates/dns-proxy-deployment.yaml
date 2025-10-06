@@ -152,7 +152,7 @@ spec:
             - -envoy-executable-path=/usr/local/bin/privileged-envoy
             {{- end }}
             {{- if .Values.global.dualStack.defaultEnabled }}
-            - -consul-dns-bind-addr="::"
+            - -consul-dns-bind-addr=::
             {{- else }}
             - -consul-dns-bind-addr=0.0.0.0
             {{- end}}
