@@ -816,7 +816,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 					Drop: []corev1.Capability{"ALL"},
 				},
 				SeccompProfile: &corev1.SeccompProfile{
@@ -834,7 +833,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 					Drop: []corev1.Capability{"ALL"},
 				},
 				SeccompProfile: &corev1.SeccompProfile{
@@ -852,7 +850,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 					Drop: []corev1.Capability{"ALL"},
 				},
 				SeccompProfile: &corev1.SeccompProfile{
@@ -870,7 +867,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 					Drop: []corev1.Capability{"ALL"},
 				},
 				SeccompProfile: &corev1.SeccompProfile{

@@ -23,6 +23,7 @@
 {{- range .Values.ingressGateways.gateways }}
 
 {{- $service := .service }}
+{{- $needsPrivilegedPorts := eq "true" (include "consul.ingressGatewayHasPrivilegedPorts" (dict "service" $service "defaults" $defaults)) }}
 
 {{- if empty .name }}
 # Check that the gateway name is provided
@@ -247,7 +248,11 @@ spec:
       - name: ingress-gateway
         image: {{ $root.Values.global.imageConsulDataplane | quote }}
         {{ template "consul.imagePullPolicy" $root }}
+        {{- if $needsPrivilegedPorts }}
+        {{- include "consul.restrictedSecurityContextWithNetBindService" $ | nindent 8 }}
+        {{- else }}
         {{- include "consul.restrictedSecurityContext" $ | nindent 8 }}
+        {{- end }}
         {{- if (default $defaults.resources .resources) }}
         resources: {{ toYaml (default $defaults.resources .resources) | nindent 10 }}
         {{- end }}
@@ -291,9 +296,14 @@ spec:
           value: component=ingress-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
+        {{- if $needsPrivilegedPorts }}
         command:
-        - consul-dataplane
+        - privileged-consul-dataplane
         args:
+        - -envoy-executable-path=/usr/local/bin/privileged-envoy
+        {{- else }}
+        args:
+        {{- end }}
         - -envoy-ready-bind-port=21000
         {{- if $root.Values.externalServers.enabled }}
         - -addresses={{ $root.Values.externalServers.hosts | first }}
