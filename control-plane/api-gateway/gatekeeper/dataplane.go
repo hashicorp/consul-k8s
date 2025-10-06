@@ -136,7 +136,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		},
 	}
 	if !config.EnableOpenShift {
-		container.SecurityContext.RunAsUser = ptr.To(int64(0))
+		securityContext.RunAsUser = ptr.To(int64(0))
 	}
 
 	if usingPrivilegedPorts {
