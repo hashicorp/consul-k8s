@@ -636,8 +636,6 @@ spec:
               containerPort: 8600
               protocol: "UDP"
           readinessProbe:
-            # NOTE(mitchellh): when our HTTP status endpoints support the
-            # proper status codes, we should switch to that. This is temporary.
             exec:
               command:
                 - "/bin/sh"
@@ -645,9 +643,18 @@ spec:
                 - |
                   {{- if .Values.global.tls.enabled }}
                   curl -k \
+                    {{- if .Values.global.dualStack.defaultEnabled }}
+                    https://[::1]:8501/v1/status/leader \
+                    {{- else }}
                     https://127.0.0.1:8501/v1/status/leader \
+                    {{- end }}
                   {{- else }}
-                  curl http://127.0.0.1:8500/v1/status/leader \
+                  curl \
+                    {{- if .Values.global.dualStack.defaultEnabled }}
+                    http://[::1]:8500/v1/status/leader \
+                    {{- else }}
+                    http://127.0.0.1:8500/v1/status/leader \
+                    {{- end }}
                   {{- end }}
                   2>/dev/null | grep -E '".+"'
             failureThreshold: 2
