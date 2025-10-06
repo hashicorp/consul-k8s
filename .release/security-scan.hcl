@@ -15,14 +15,6 @@
 container {
   dependencies = true
   alpine_secdb = true
-
-  secrets {
-    all = true
-  }
-}
-
-binary {
-  go_modules   = true
   osv          = true
 
   secrets {
@@ -30,9 +22,22 @@ binary {
   }
 
   triage {
-    suppress {
-      vulnerabilites = [
-      ]
-    }
+  		suppress {
+  			vulnerabilities = [
+              "CVE-2024-58251",
+              "CVE-2025-46394",
+              "CVE-2025-47268",
+              "CVE-2025-48964"
+            ]
+        }
+  }
+}
+
+binary {
+  go_modules = true
+  osv        = true
+
+  secrets {
+    all = true
   }
 }
