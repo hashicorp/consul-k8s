@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -230,7 +229,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	dualStack := false
-	if os.Getenv(ConsulDualStackEnvVar) == "true" {
+	if cniArgs.IP != nil && cniArgs.IP.To4() == nil {
 		dualStack = true
 	}
 
