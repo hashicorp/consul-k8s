@@ -73,7 +73,6 @@ func TestBasicInstallation(t *testing.T) {
 
 			logger.Logf(t, "reading value for key %s", randomKey)
 			kv, _, err := client.KV().Get(randomKey, nil)
-			t.Log("got error", err)
 			require.NoError(t, err)
 			require.Equal(t, kv.Value, randomValue)
 			t.Log("done 1")
@@ -86,24 +85,17 @@ func TestBasicInstallation(t *testing.T) {
 				secretKey := "key"
 
 				keyring, err := client.Operator().KeyringList(nil)
-				t.Log("got error", err)
 				require.NoError(t, err)
 
 				testContext := suite.Environment().DefaultContext(t)
 				secret, err := testContext.KubernetesClient(t).CoreV1().Secrets(testContext.KubectlOptions(t).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
-				t.Log("got error", err)
 				require.NoError(t, err)
 				gossipEncryptionKey := strings.TrimSpace(string(secret.Data[secretKey]))
 
 				require.Len(t, keyring, 2)
 				require.Contains(t, keyring[0].Keys, gossipEncryptionKey)
 				require.Contains(t, keyring[1].Keys, gossipEncryptionKey)
-				t.Log("done 2")
 			}
-			t.Log("done 3")
-
 		})
-		t.Log("done 4")
 	}
-	t.Log("done all")
 }
