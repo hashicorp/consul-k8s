@@ -116,16 +116,16 @@ func NewHelmCluster(
 		Version:        cfg.HelmChartVersion,
 	}
 	return &HelmCluster{
-		ctx:                          ctx,
-		helmOptions:                  opts,
-		releaseName:                  releaseName,
-		runtimeClient:                ctx.ControllerRuntimeClient(t),
-		kubernetesClient:             ctx.KubernetesClient(t),
-		apiExtensionKubernetesClient: ctx.APIExtensionClient(t),
-		noCleanupOnFailure:           cfg.NoCleanupOnFailure,
-		noCleanup:                    cfg.NoCleanup,
-		debugDirectory:               cfg.DebugDirectory,
-		logger:                       logger,
+		ctx:                ctx,
+		helmOptions:        opts,
+		releaseName:        releaseName,
+		runtimeClient:      ctx.ControllerRuntimeClient(t),
+		kubernetesClient:   ctx.KubernetesClient(t),
+		apiExtensionClient: ctx.APIExtensionClient(t),
+		noCleanupOnFailure: cfg.NoCleanupOnFailure,
+		noCleanup:          cfg.NoCleanup,
+		debugDirectory:     cfg.DebugDirectory,
+		logger:             logger,
 	}
 }
 
