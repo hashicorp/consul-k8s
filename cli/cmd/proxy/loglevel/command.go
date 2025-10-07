@@ -38,11 +38,13 @@ const (
 	flagNameKubeConfig  = "kubeconfig"
 	flagNameKubeContext = "context"
 	flagNameCapture     = "capture"
-)
-const (
+
+	// minimum duration for log capture should be atleast 10seconds
 	minimumCaptureDuration = 10 * time.Second
-	filePermission         = 0644
-	dirPermission          = 0755
+
+	// permission to be used when creating files and directories
+	filePermission = 0644
+	dirPermission  = 0755
 )
 
 var ErrIncorrectArgFormat = errors.New("Exactly one positional argument is required: <pod-name>")
