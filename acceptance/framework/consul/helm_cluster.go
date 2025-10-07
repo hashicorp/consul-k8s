@@ -243,6 +243,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		err = helm.DeleteE(t, h.helmOptions, h.releaseName, false)
 		if err != nil {
 			t.Logf("helm delete failed with error %s, retrying...", err.Error())
+		} else {
+			t.Logf("helm delete no error")
+			break
 		}
 		t.Logf("======================================= postdelete cluster state ======================================= ")
 
