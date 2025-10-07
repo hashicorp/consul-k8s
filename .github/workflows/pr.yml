@@ -18,7 +18,8 @@ jobs:
     uses: ./.github/workflows/reusable-conditional-skip.yml
     with:
       additional-skip-files: |
-        .github/workflows/**
+        .github/workflows
+        acceptance/ci-inputs
 
   test:
     name: test
