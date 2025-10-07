@@ -37,6 +37,12 @@ import (
 )
 
 const (
+	// timeDateformat is a modified version of time.RFC3339 which replaces colons with
+	// hyphens. This is to make it more convenient to untar these files, because
+	// tar assumes colons indicate the file is on a remote host, unless --force-local
+	// is used.
+	timeDateFormat = "2006-01-02T15-04-05Z0700"
+
 	// debugDuration is the total time that debug runs before being shut down
 	debugDuration = 5 * time.Minute
 
@@ -49,55 +55,31 @@ const (
 
 	// debugArchiveExtension is the extension for archive files
 	debugArchiveExtension = ".tar.gz"
-)
 
-// Predefined errors
-var (
-	notFoundError        = errors.New("not found")
-	signalInterruptError = errors.New("signal interrupt received")
-	// oneOrMoreErrorOccured is used to indicate that one or more errors occurred
-	// during a capture task and they are written successfully to debug bundle,
-	// otherwise whole error would be printed on terminal
-	oneOrMoreErrorOccured = errors.New(fmt.Sprint("one or more errors occurred during capture for this target",
-		"\n\tplease check the respective error file within the debug bundle for details"))
-)
-
-// Predefined file and directory permissions
-const (
+	// permissions to be used when creating files and directories
 	filePerm = 0644
 	dirPerm  = 0755
-)
 
-// debugIndex is used to manage the summary of all data recorded
-// during the debug, to be written to json at the end of the run
-// and stored at the root. Each attribute corresponds to a file or files.
-type debugIndex struct {
-	Duration  string   `json:"duration"`
-	Since     string   `json:"since"`
-	Targets   []string `json:"targets"`
-	Timestamp string   `json:"timestamp"`
-}
+	// global flag names
+	flagNameKubeConfig  = "kubeconfig"
+	flagNameKubeContext = "kubecontext"
 
-// capture Targets: Helm config, CRDs, sidecars, pod logs and Envoy endpoints data.
-const (
+	// command flag names
+	flagNameNamespace = "namespace"
+	flagDuration      = "duration"
+	flagSince         = "since"
+	flagOutput        = "output"
+	flagArchive       = "archive"
+	flagCapture       = "capture"
+
+	// capture Targets: Helm config, CRDs, sidecars, pod logs and Envoy endpoints data.
 	targetHelmConfig  = "helm"
 	targetCRDs        = "crds"
 	targetSidecarPods = "sidecar"
 	targetLogs        = "logs"
 	targetProxy       = "proxy"
-)
 
-// defaultTargets specifies the list of targets that will be captured by default
-var defaultTargets = []string{
-	targetHelmConfig,
-	targetCRDs,
-	targetLogs,
-	targetSidecarPods,
-	targetProxy,
-}
-
-// capture Targets Not Found Error Messages
-const (
+	// capture Targets Not Found Error Messages
 	noHelmReleaseFound = "No helm release found"
 	noCRDsFound        = "No consul CRDs found in the cluster"
 	noSidecarPodsFound = "No consul injected sidecar pods found in all namespace"
@@ -105,24 +87,38 @@ const (
 	noPodsFound        = "No pods found to capture log"
 )
 
-// timeDateformat is a modified version of time.RFC3339 which replaces colons with
-// hyphens. This is to make it more convenient to untar these files, because
-// tar assumes colons indicate the file is on a remote host, unless --force-local
-// is used.
-const timeDateFormat = "2006-01-02T15-04-05Z0700"
+var (
+	// Predefined errors - helpful for comparing error types
+	notFoundError        = errors.New("not found")
+	signalInterruptError = errors.New("signal interrupt received")
+	// oneOrMoreErrorOccured is used to indicate that one or more errors occurred
+	// during a capture task and they (errors) are written successfully to debug bundle,
+	// otherwise whole error would be printed on terminal
+	oneOrMoreErrorOccured = errors.New(fmt.Sprint("one or more errors occurred during capture for this target",
+		"\n\tplease check the respective error file within the debug bundle for details"))
 
-const (
-	flagNameKubeConfig  = "kubeconfig"
-	flagNameKubeContext = "kubecontext"
-	flagNameNamespace   = "namespace"
-
-	flagDuration = "duration"
-	flagSince    = "since"
-	flagOutput   = "output"
-	flagArchive  = "archive"
-	flagCapture  = "capture"
+	// defaultTargets specifies the list of targets that will be captured by default
+	defaultTargets = []string{
+		targetHelmConfig,
+		targetCRDs,
+		targetLogs,
+		targetSidecarPods,
+		targetProxy,
+	}
 )
 
+// debugIndex is used to manage the summary of all data recorded
+// during the debug, to be written to json at the end of the run
+// and stored at the root.
+type debugIndex struct {
+	Duration  string   `json:"duration"`
+	Since     string   `json:"since"`
+	Targets   []string `json:"targets"`
+	Timestamp string   `json:"timestamp"`
+}
+
+// captureTask defines a single capture task to be performed by the debugger
+// including its name, target identifier, the function to call to perform the capture
 type captureTask struct {
 	name        string
 	target      string
@@ -396,7 +392,7 @@ func (c *DebugCommand) debugger() int {
 	}
 
 	// Set up signal handling to ensure we can clean up properly
-	// Once we read from this buffered channel, channel will be empty and main will wait cleanup.
+	// Once we read from this buffered channel, channel will be empty and main will wait for cleanup.
 	// We will again send true to this channel once cleanup is completed.
 	select {
 	case <-c.CleanupReqAndCompleted:
@@ -436,18 +432,30 @@ func (c *DebugCommand) debugger() int {
 		{name: "Index", target: "index", captureFxn: c.captureIndex, notFoundMsg: ""},
 	}
 
+	// errorsOccuredDuringCapture -
+	// tracks if any errors occured during any capture task
+	// - used to determine exit code at end of run
 	errorsOccuredDuringCapture := false
+
 	for _, task := range tasks {
-		if c.Ctx.Err() != nil {
-			return 1
+		// if current task target not specified in capture list,
+		// skip this capture task
+		if !c.captureTarget(task.target) {
+			continue
 		}
-		c.runCapture(task, &errorsOccuredDuringCapture)
+
+		// if returnCode is 1, it means signal interrupt received and cleanup is completed, return.
+		// otherwise current capture task completed normally, continue with next capture task
+		returnCode := c.runCapture(task, &errorsOccuredDuringCapture)
+		if returnCode == 1 {
+			return returnCode
+		}
 	}
 	return c.archiveDebugBundleAndReturn(archiveName, errorsOccuredDuringCapture)
 }
 
 // archiveDebugBundleAndReturn - creates archive if requested and
-// returns appropriate exit code based on capture status
+// returns appropriate exit code based on errorsOccuredDuringCapture flag
 func (c *DebugCommand) archiveDebugBundleAndReturn(archiveName string, errorsOccuredDuringCapture bool) int {
 	if !c.archive {
 		c.UI.Output(fmt.Sprintf("Saved debug directory: %s", archiveName))
@@ -498,23 +506,18 @@ func (c *DebugCommand) cleanupAndReturn() int {
 	return 1
 }
 
-// runCapture - runs a capture function if the target is specified in the capture list.
+// runCapture - it is executed for each capture task and runs a capture function,
 // Hanldles errors and output messages.
-func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) {
-	target := task.target
+// If signal interrupt is received during capture, it calls cleanupAndReturn and returns 1
+func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 	captureName := task.name
 	captureFunction := task.captureFxn
 	notFoundMsg := task.notFoundMsg
-
-	// Skip if target not specified in capture list
-	if !c.captureTarget(target) {
-		return
-	}
 	err := captureFunction()
 	if err != nil {
 		switch {
 		case errors.Is(err, signalInterruptError):
-			c.cleanupAndReturn()
+			return c.cleanupAndReturn()
 		case errors.Is(err, notFoundError):
 			c.UI.Output(notFoundMsg, terminal.WithWarningStyle())
 		default:
@@ -524,6 +527,7 @@ func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) {
 	} else {
 		c.UI.Output(fmt.Sprintf("%s captured", captureName), terminal.WithSuccessStyle())
 	}
+	return 0
 }
 
 // ===================================================================================================================
