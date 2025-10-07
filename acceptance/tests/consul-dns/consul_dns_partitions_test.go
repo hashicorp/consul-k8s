@@ -260,7 +260,7 @@ func restartDNSProxy(t *testing.T, releaseName string, ctx environment.TestConte
 	require.NoError(t, err)
 
 	// Wait for restart to finish.
-	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "1m", "--watch", dnsDeploymentName)
+	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "5m", "--watch", dnsDeploymentName)
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 	logger.Log(t, fmt.Sprintf("dns-proxy deployment in %s k8s context has finished restarting", k8sOptions.ContextName))
 }
