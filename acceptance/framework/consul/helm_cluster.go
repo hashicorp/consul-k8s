@@ -223,6 +223,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
+	o, err := exec.Command("kubectl", "delete", "pods", "--all", "-n", h.helmOptions.KubectlOptions.Namespace, "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
+	t.Logf("Deleting all pods in %s: with error: %s \noutput:\n %s", h.helmOptions.KubectlOptions.Namespace, err, string(o))
+
 	for i := 0; i < 30; i++ {
 		t.Logf("======================================= predelete cluster state ======================================= ")
 		o, err := exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
@@ -508,7 +511,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	})
 
 	t.Logf("================================= before force delete cluster state ================================= ")
-	o, err := exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
+	o, err = exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
 	t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
 	o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
 	t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))

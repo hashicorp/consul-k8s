@@ -62,17 +62,25 @@ spec:
             - "/bin/sh"
             - "-ec"
             - |
+              # Detect if KUBERNETES_SERVICE_HOST is IPv6 and wrap it with []
+              if echo "$KUBERNETES_SERVICE_HOST" | grep -q ':'; then
+                API_HOST="[$KUBERNETES_SERVICE_HOST]"
+              else
+                API_HOST="$KUBERNETES_SERVICE_HOST"
+              fi
+
               {{- if (not (and .Values.global.tls.caCert.secretName .Values.global.tls.caKey.secretName)) }}
               curl -s -X DELETE --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/{{ template "consul.fullname" . }}-ca-cert \
-                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )"
+                https://${API_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/{{ template "consul.fullname" . }}-ca-cert \
+                -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
               curl -s -X DELETE --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/{{ template "consul.fullname" . }}-ca-key \
-                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )"
+                https://${API_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/{{ template "consul.fullname" . }}-ca-key \
+                -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
               {{- end }}
               curl -s -X DELETE --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-                https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/{{ template "consul.fullname" . }}-server-cert \
-                -H "Authorization: Bearer $( cat /var/run/secrets/kubernetes.io/serviceaccount/token )"
+                https://${API_HOST}:${KUBERNETES_SERVICE_PORT}/api/v1/namespaces/${NAMESPACE}/secrets/{{ template "consul.fullname" . }}-server-cert \
+                -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+
           resources:
             requests:
               memory: "50Mi"
