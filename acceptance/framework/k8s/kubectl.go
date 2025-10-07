@@ -64,13 +64,13 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 
 	counter := &retry.Counter{
 		Count: 10,
-		Wait:  1 * time.Second,
+		Wait:  5 * time.Second,
 	}
 	var output string
 	var err error
 	retry.RunWith(counter, t, func(r *retry.R) {
-		t.Log("===========================STACK TRACE OF CALL =========================================")
-		t.Log(string(debug.Stack()))
+		// t.Log("===========================STACK TRACE OF CALL =========================================")
+		// t.Log(string(debug.Stack()))
 		t.Log("====================================================================")
 		t.Log("executing command:", command.Command, strings.Join(command.Args, " "))
 		output, err = helpers.RunCommand(t, options, command)

@@ -105,7 +105,8 @@ func NewHelmCluster(
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "30m"},
+		"install": {"--timeout", "30m", "--wait"},
+		"delete":  {"--timeout", "30m", "--wait"},
 	}
 
 	opts := &helm.Options{
@@ -131,10 +132,7 @@ func NewHelmCluster(
 
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
-	h.helmOptions.ExtraArgs = map[string][]string{
-		"--wait":    nil,
-		"--timeout": {"10m"},
-	}
+
 	// check and remove any CRDs with finalizers
 	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
 
@@ -192,13 +190,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
-	// Ignore the error returned by the helm delete here so that we can
-	// always idempotently clean up resources in the cluster.
-	h.helmOptions.ExtraArgs = map[string][]string{
-		"--wait":    nil,
-		"--timeout": {"10m"},
-	}
-
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
 	// deleted at this point, in which case these operations will fail on non-existent
@@ -254,12 +245,12 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
 		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		t.Logf("================================= -------------------------------- ================================= ")
-		time.Sleep(20 * time.Minute)
+		time.Sleep(30 * time.Second)
 	}
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 150}, t, func(r *retry.R) {
 
 		crds, err := h.apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().List(context.Background(), metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("release=%s", h.releaseName),
@@ -587,7 +578,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 		if h.ACLToken != "" {
 			config.Token = h.ACLToken
 		} else {
-			retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+			retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 150}, t, func(r *retry.R) {
 				// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
 				// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
 				// and will try to read the replication token from the federation secret.
