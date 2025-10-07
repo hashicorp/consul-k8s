@@ -208,7 +208,10 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	helm.DeleteE(t, h.helmOptions, h.releaseName, true)
+	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 30}, t, func(r *retry.R) {
+		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		require.NoError(r, err)
+	})
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
@@ -457,8 +460,8 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	})
-	helm.DeleteE(t, h.helmOptions, h.releaseName, true)
 
+	helm.DeleteE(t, h.helmOptions, h.releaseName, true)
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
