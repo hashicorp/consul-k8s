@@ -156,8 +156,11 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 20 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
+		if err != nil {
+			t.Logf("helm install failed with error %s, retrying...", err.Error())
+		}
 		require.NoError(r, err)
 	})
 
@@ -210,6 +213,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		if err != nil {
+			t.Logf("helm delete failed with error %s, retrying...", err.Error())
+		}
 		require.NoError(r, err)
 	})
 
