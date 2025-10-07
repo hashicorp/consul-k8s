@@ -58,7 +58,6 @@ jobs:
             assets/**
             .changelog/**
             .github/CODEOWNERS
-            acceptance/ci-inputs/**
             ${{ inputs.additional-skip-files }}
       - name: Print changed files
         env:
