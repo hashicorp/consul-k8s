@@ -2,6 +2,12 @@ name: conditional-skip
 
 on:
   workflow_call:
+    inputs:
+      additional-skip-files:
+        description: "Additional files to consider for skipping (one per line)"
+        required: false
+        type: string
+        default: ""
     outputs:
       skip-ci:
         description: "Whether we should skip build and test jobs"
@@ -52,6 +58,7 @@ jobs:
             assets/**
             .changelog/**
             .github/CODEOWNERS
+            ${{ inputs.additional-skip-files }}
       - name: Print changed files
         env:
           SKIPPABLE_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}

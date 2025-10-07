@@ -16,6 +16,9 @@ env:
 jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
+    with:
+      additional-skip-files: |
+        .github/workflows/pr.yml
 
   test:
     name: test
