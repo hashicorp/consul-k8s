@@ -145,7 +145,7 @@ func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 		remotePort,
 		v.logger)
 
-	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 60}, t, func(r *retry.R) {
 		require.NoError(r, tunnel.ForwardPortE(r))
 	})
 
