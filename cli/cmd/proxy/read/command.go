@@ -26,20 +26,21 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
 
-// defaultAdminPort is the port where the Envoy admin API is exposed.
-const defaultAdminPort int = 19000
-
 const (
+	// defaultAdminPort is the port where the Envoy admin API is exposed.
+	defaultAdminPort int = 19000
+
+	// permissions for creating dir & file [before writing envoy config to a file].
 	filePerm = 0644
 	dirPerm  = 0755
-)
 
-const (
+	// Output formats
 	Table   = "table"
 	JSON    = "json"
 	Raw     = "raw"
 	Archive = "archive"
 
+	// Flag names
 	flagNameNamespace   = "namespace"
 	flagNameOutput      = "output"
 	flagNameClusters    = "clusters"
