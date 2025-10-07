@@ -223,6 +223,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
+	o, err := exec.Command("kubectl", "delete", "pods", "--all", "-n", h.helmOptions.KubectlOptions.Namespace, "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
+	t.Logf("Deleting all pods in %s: with error: %s \noutput:\n %s", h.helmOptions.KubectlOptions.Namespace, err, string(o))
+
 	for i := 0; i < 30; i++ {
 		t.Logf("======================================= predelete cluster state ======================================= ")
 		o, err := exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
