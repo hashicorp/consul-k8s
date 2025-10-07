@@ -5,7 +5,6 @@ package k8s
 
 import (
 	"fmt"
-	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
