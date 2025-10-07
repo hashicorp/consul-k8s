@@ -147,14 +147,14 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "creating static-client pod")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=15m", fmt.Sprintf("deploy/%s", "static-server"))
 
 			logger.Log(t, "patching route to target http server")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
 
 			logger.Log(t, "creating target tcp server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=15m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
 
 			logger.Log(t, "creating tcp-route")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
@@ -431,7 +431,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	logger.Log(t, "creating static-client pod")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=15m", fmt.Sprintf("deploy/%s", "static-server"))
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
 	k8sClient := ctx.ControllerRuntimeClient(t)

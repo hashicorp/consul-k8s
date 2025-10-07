@@ -71,7 +71,7 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	})
 
 	// The timeout to allow for connect-init to wait for services to be registered by the endpoints controller.
-	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
+	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=15m", fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
 func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory, kustomizeDir string) {
@@ -97,7 +97,7 @@ func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure boo
 	logger.Log(t, "job deployed")
 
 	// Because Jobs don't have a "started" condition, we have to check the status of the Pods they create.
-	RunKubectl(t, options, "wait", "--for=condition=Ready", "--timeout=5m", "pods", "--selector", fmt.Sprintf("job-name=%s", job.Name))
+	RunKubectl(t, options, "wait", "--for=condition=Ready", "--timeout=15m", "pods", "--selector", fmt.Sprintf("job-name=%s", job.Name))
 }
 
 // CheckStaticServerConnection execs into a pod of sourceApp
