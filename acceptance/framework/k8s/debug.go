@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/k8s"
@@ -62,32 +61,18 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
 			require.NoError(t, os.WriteFile(logFilename, []byte(logs), 0600))
 
-			if strings.Contains(pod.Name, "static-server") || strings.Contains(pod.Name, "static-client") {
-				// If this is a static-server/client pod, also get logs of init containers
-				for _, container := range pod.Spec.InitContainers {
-					initLogs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "-c", container.Name, pod.Name)
-					if err != nil {
-						initLogs = fmt.Sprintf("Error getting logs: %s: %s", err, initLogs)
-					}
-
-					// Write init container logs or err to file name <pod.Name>-<container.Name>-init.log
-					initLogFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-%s-init.log", pod.Name, container.Name))
-					require.NoError(t, os.WriteFile(initLogFilename, []byte(initLogs), 0600))
-
-					// If this init container restarted, get logs from previous instance
-					if pod.Status.ContainerStatuses != nil {
-						for _, status := range pod.Status.InitContainerStatuses {
-							if status.Name == container.Name && status.RestartCount > 0 {
-								prevInitLogs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "-c", container.Name, "--previous", pod.Name)
-								if err != nil {
-									prevInitLogs = fmt.Sprintf("Error getting logs: %s: %s", err, prevInitLogs)
-								}
-
-								// Write previous init container logs or err to file name <pod.Name>-<container.Name>-init-previous.log
-								prevInitLogFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-%s-init-previous.log", pod.Name, container.Name))
-								require.NoError(t, os.WriteFile(prevInitLogFilename, []byte(prevInitLogs), 0600))
-							}
+			if pod.Status.ContainerStatuses != nil {
+				for _, status := range pod.Status.InitContainerStatuses {
+					// If this init container restarted, get logs from previous instance.
+					if status.RestartCount > 0 {
+						prevInitLogs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "-c", status.Name, "--previous", pod.Name)
+						if err != nil {
+							prevInitLogs = fmt.Sprintf("Error getting logs: %s: %s", err, prevInitLogs)
 						}
+
+						// Write previous init container logs or err to file name <pod.Name>-<container.Name>-init-previous.log
+						prevInitLogFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-%s-init-previous.log", pod.Name, status.Name))
+						require.NoError(t, os.WriteFile(prevInitLogFilename, []byte(prevInitLogs), 0600))
 					}
 				}
 			}
