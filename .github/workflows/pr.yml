@@ -61,3 +61,6 @@ jobs:
         INPUT_SHA: ${{ env.SHA }}
         INPUT_DETAILS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         INPUT_OWNER: "hashicorp"
+
+#adding this to trigger the tests 
+
