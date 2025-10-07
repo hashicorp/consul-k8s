@@ -748,16 +748,14 @@ func initializeDebugCommands(buf io.Writer) *DebugCommand {
 		Level:  hclog.Debug,
 		Output: os.Stdout,
 	})
-	cleanupReq := make(chan bool, 1)
-	cleanupConfirmation := make(chan int, 1)
+	cleanupReqAndCompleted := make(chan bool, 1)
 	// Setup and initialize the command struct
 	command := &DebugCommand{
 		BaseCommand: &common.BaseCommand{
-			Log:                 log,
-			UI:                  terminal.NewUI(context.Background(), buf),
-			CleanupReq:          cleanupReq,
-			CleanupConfirmation: cleanupConfirmation,
-			Ctx:                 context.Background(),
+			Log:                    log,
+			UI:                     terminal.NewUI(context.Background(), buf),
+			CleanupReqAndCompleted: cleanupReqAndCompleted,
+			Ctx:                    context.Background(),
 		},
 	}
 	command.init()

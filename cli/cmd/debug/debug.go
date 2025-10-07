@@ -396,12 +396,12 @@ func (c *DebugCommand) debugger() int {
 	}
 
 	// Set up signal handling to ensure we can clean up properly
+	// Once we read from this buffered channel, channel will be empty and main will wait cleanup.
+	// We will again send true to this channel once cleanup is completed.
 	select {
-	case <-c.CleanupReq:
+	case <-c.CleanupReqAndCompleted:
 	default:
 	}
-	c.CleanupReq <- true
-	// cleanupConfirmation will be in cleanupAndReturn
 
 	c.UI.Output("\nStarting debugger: ")
 	// Output metadata about debug run
@@ -473,7 +473,7 @@ func (c *DebugCommand) archiveDebugBundleAndReturn(archiveName string, errorsOcc
 
 // cleanupAndReturn - cleans up partial debug capture and returns 1
 func (c *DebugCommand) cleanupAndReturn() int {
-	defer func() { c.CleanupConfirmation <- 1 }()
+	defer func() { c.CleanupReqAndCompleted <- true }()
 	c.UI.Output("\nDebug run interrupted (received signal interrupt)", terminal.WithErrorStyle())
 
 	// if signal interrupt is before archive creation,

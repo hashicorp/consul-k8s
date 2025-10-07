@@ -30,14 +30,16 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Below two channels are to handle graceful cleanup when terminal catches a signal interrupt/terminate
-	// CleanupReq channel - Signals whether a command needs cleanup (true/false), needed to block main until cleanup is done
-	// CleanupConfirmation channel - Signals when cleanup is complete (sends 1) to unblock main
-	cleanupConfirmation := make(chan int, 1)
-	cleanupReq := make(chan bool, 1)
-	cleanupReq <- false // by default no cleanup required
+	// Below channel is required to handle cleanup on signal interrupt
+	// - By default, main assumes that no command requires cleanup, so it sends false to the channel
+	// - If a command requires cleanup, it should read from this channel BEFORE context cancellation ,
+	// so channel will be empty and "signal handler goroutine" in main will wait unitll command sends true to the channel at line- 54
+	// and send true to the channel only AFTER cleanup is completed,
+	// so that the signal handler goroutine in main can proceed to exit.
+	cleanupReqAndCompleted := make(chan bool, 1)
+	cleanupReqAndCompleted <- false // by default no cleanup required
 
-	basecmd, commands := initializeCommands(ctx, log, cleanupConfirmation, cleanupReq)
+	basecmd, commands := initializeCommands(ctx, log, cleanupReqAndCompleted)
 	c.Commands = commands
 	defer func() {
 		_ = basecmd.Close()
@@ -49,9 +51,7 @@ func main() {
 		<-ch
 		// Any cleanups, such as cancelling contexts
 		cancel()
-		if cleanup := <-cleanupReq; cleanup {
-			<-cleanupConfirmation
-		}
+		<-cleanupReqAndCompleted // by default this will be false, so this will proceed to exit, but if a command requires cleanup, it will wait here(emply channel)
 		_ = basecmd.Close()
 		os.Exit(1)
 	}()
