@@ -325,10 +325,9 @@ func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int
 	// should be reset back to existing log level after log capture
 	// even if user interrupts the command during log capture.
 	select {
-	case <-l.CleanupReq:
+	case <-l.CleanupReqAndCompleted:
 	default:
 	}
-	l.CleanupReq <- true
 
 	// fetch log levels
 	l.UI.Output(fmt.Sprintf("Fetching existing log levels..."))
@@ -345,7 +344,7 @@ func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int
 		} else {
 			l.UI.Output("Reset completed successfully!")
 		}
-		l.CleanupConfirmation <- 1
+		l.CleanupReqAndCompleted <- false
 	}()
 
 	// set new log levels for log capture

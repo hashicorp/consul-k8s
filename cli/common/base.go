@@ -23,16 +23,8 @@ type BaseCommand struct {
 	// UI is used to write to the CLI.
 	UI terminal.UI
 
-	// CleanupReq is the channel to notify main.go that current tied command needs cleanup and blocks main until cleanup is done.
-	// Once it notifies, main.go will wait for confirmation on CleanupConfirmation channel.
-	// By default, this channel is injected with false to indicate no cleanup is needed for any command
-	// and it is upto the command to make this true when it needs cleanup
-	// Example: debug command needs cleanup to after signal interrupt
-	// Example: proxy log command only with -capture flag requires cleanup
-	CleanupReq chan bool
-
-	// CleanupConfirmation is the channel to notify main.go that cleanup is done.
-	CleanupConfirmation chan int
+	// CleanupConfirmation is the channel to notify main.go if cleanup is required and is completed
+	CleanupReqAndCompleted chan bool
 }
 
 // Close cleans up any resources that the command created. This should be

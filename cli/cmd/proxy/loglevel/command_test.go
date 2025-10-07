@@ -361,10 +361,9 @@ func setupCommand(buf io.Writer) *LogLevelCommand {
 
 	command := &LogLevelCommand{
 		BaseCommand: &common.BaseCommand{
-			Log:                 log,
-			UI:                  terminal.NewUI(context.Background(), buf),
-			CleanupReq:          make(chan bool, 1),
-			CleanupConfirmation: make(chan int, 1),
+			Log:                    log,
+			UI:                     terminal.NewUI(context.Background(), buf),
+			CleanupReqAndCompleted: make(chan bool, 1),
 		},
 	}
 	command.init()

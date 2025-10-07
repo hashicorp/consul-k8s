@@ -31,7 +31,7 @@ import (
 	"github.com/hashicorp/consul-k8s/version"
 )
 
-func initializeCommands(ctx context.Context, log hclog.Logger, cleanupConfirmation chan int, cleanupReq chan bool) (*common.BaseCommand, map[string]cli.CommandFactory) {
+func initializeCommands(ctx context.Context, log hclog.Logger, cleanupReqAndCompleted chan bool) (*common.BaseCommand, map[string]cli.CommandFactory) {
 	baseCommand := &common.BaseCommand{
 		Ctx: ctx,
 		Log: log,
@@ -87,8 +87,7 @@ func initializeCommands(ctx context.Context, log hclog.Logger, cleanupConfirmati
 		},
 		"proxy log": func() (cli.Command, error) {
 			baseCommandWithCleanup := *baseCommand
-			baseCommandWithCleanup.CleanupConfirmation = cleanupConfirmation
-			baseCommandWithCleanup.CleanupReq = cleanupReq
+			baseCommandWithCleanup.CleanupReqAndCompleted = cleanupReqAndCompleted
 			return &loglevel.LogLevelCommand{
 				BaseCommand: &baseCommandWithCleanup,
 			}, nil
