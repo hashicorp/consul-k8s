@@ -1,5 +1,9 @@
 ## 1.8.3 (September 30, 2025)
 
+SECURITY:
+
+* go: upgrade go version to 1.25.1 [[GH-4762](https://github.com/hashicorp/consul-k8s/issues/4762)]
+
 FEATURES:
 
 * Added boolean annotation "consul.hashicorp.com/enable-consul-dataplane-as-sidecar" for registering consul-dataplane as init container so that consul-dataplane container is initialised and started before application container. Default value is "false" i.e the feature is disabled by default. Also made the probe properties configurable through annotations. [[GH-4678](https://github.com/hashicorp/consul-k8s/issues/4678)]
