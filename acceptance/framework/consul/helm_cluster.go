@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/stretchr/testify/require"
@@ -58,6 +60,7 @@ type HelmCluster struct {
 	releaseName        string
 	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
+	apiExtensionClient apiextensionsclientset.Interface
 	noCleanupOnFailure bool
 	noCleanup          bool
 	debugDirectory     string
@@ -113,15 +116,16 @@ func NewHelmCluster(
 		Version:        cfg.HelmChartVersion,
 	}
 	return &HelmCluster{
-		ctx:                ctx,
-		helmOptions:        opts,
-		releaseName:        releaseName,
-		runtimeClient:      ctx.ControllerRuntimeClient(t),
-		kubernetesClient:   ctx.KubernetesClient(t),
-		noCleanupOnFailure: cfg.NoCleanupOnFailure,
-		noCleanup:          cfg.NoCleanup,
-		debugDirectory:     cfg.DebugDirectory,
-		logger:             logger,
+		ctx:                          ctx,
+		helmOptions:                  opts,
+		releaseName:                  releaseName,
+		runtimeClient:                ctx.ControllerRuntimeClient(t),
+		kubernetesClient:             ctx.KubernetesClient(t),
+		apiExtensionKubernetesClient: ctx.APIExtensionClient(t),
+		noCleanupOnFailure:           cfg.NoCleanupOnFailure,
+		noCleanup:                    cfg.NoCleanup,
+		debugDirectory:               cfg.DebugDirectory,
+		logger:                       logger,
 	}
 }
 
@@ -228,7 +232,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Minute, Count: 30}, t, func(r *retry.R) {
+	for i := 0; i < 30; i++ {
 		t.Logf("======================================= predelete cluster state ======================================= ")
 		o, err := exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
 		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
@@ -236,7 +240,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		t.Logf("================================= -------------------------------- ================================= ")
 
-		err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		err = helm.DeleteE(t, h.helmOptions, h.releaseName, false)
 		if err != nil {
 			t.Logf("helm delete failed with error %s, retrying...", err.Error())
 		}
@@ -247,13 +251,23 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
 		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		t.Logf("================================= -------------------------------- ================================= ")
-
-		require.NoError(r, err)
-	})
+		time.Sleep(20 * time.Minute)
+	}
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+
+		crds, err := h.apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().List(context.Background(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("release=%s", h.releaseName),
+		})
+		require.NoError(r, err)
+		for _, crd := range crds.Items {
+			err := h.apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Delete(context.Background(), crd.Name, metav1.DeleteOptions{})
+			if !errors.IsNotFound(err) {
+				require.NoError(r, err)
+			}
+		}
 
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
