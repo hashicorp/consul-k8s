@@ -89,12 +89,9 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			true,
 		},
 	}
-	logger.Log(t, "==================================> 1111111111111111111")
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			logger.Log(t, "==================================> 222222222222222222")
-
 			staticServerPeerClusterContext := env.DefaultContext(t)
 			staticClientPeerClusterContext := env.Context(t, 1)
 
@@ -125,11 +122,7 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			var staticServerPeerCluster *consul.HelmCluster
 			wg.Add(1)
-			logger.Log(t, "==================================> 333333333333333333")
-
 			go func() {
-				logger.Log(t, "==================================> 444444444444444444")
-
 				defer wg.Done()
 				staticServerPeerHelmValues := map[string]string{
 					"global.datacenter": staticServerPeer,
@@ -154,13 +147,10 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				staticServerPeerCluster = consul.NewHelmCluster(t, staticServerPeerHelmValues, staticServerPeerClusterContext, cfg, releaseName)
 				staticServerPeerCluster.Create(t)
 			}()
-			logger.Log(t, "==================================> 55555555555555555555")
 
 			var staticClientPeerCluster *consul.HelmCluster
 			wg.Add(1)
 			go func() {
-				logger.Log(t, "==================================> 66666666666666666666")
-
 				defer wg.Done()
 				staticClientPeerHelmValues := map[string]string{
 					"global.datacenter": staticClientPeer,
@@ -186,36 +176,28 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// Wait for the clusters to start up
 			logger.Log(t, "waiting for clusters to start up . . .")
 			wg.Wait()
-			logger.Log(t, "==================================> 77777777777777777777")
 
 			// Create Mesh resource to use mesh gateways.
 			logger.Log(t, "creating mesh config")
 			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
 
 			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
-			logger.Log(t, "==================================> 88888888888888888888")
 
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				logger.Log(t, "==================================> 99999999999999999999")
-
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
-			logger.Log(t, "==================================> 10101010101010101010")
 
 			k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				logger.Log(t, "==================================> 11-11-11-11-11-11-11-11-11")
 
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
-			logger.Log(t, "==================================> 12-12-12-12-12-12-12-12-12")
 			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
 			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			// Ensure mesh config entries are created in Consul.
 			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
-				logger.Log(t, "==================================> 13-13-13-13-13-13-13-13-13")
 				ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
 				require.NoError(r, err)
 				configEntryServer, ok := ceServer.(*api.MeshConfigEntry)
@@ -229,43 +211,26 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				require.True(r, ok)
 				require.Equal(r, configEntryClient.GetName(), "mesh")
 				require.NoError(r, err)
-				logger.Log(t, "==================================> 14-14-14-14-14-14-14-14-14")
-
 			})
-			logger.Log(t, "==================================> 15-15-15-15-15-15-15-15-15")
 
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
-			logger.Log(t, "==================================> 16-16-16-16-16-16-16-16-16")
-
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				logger.Log(t, "==================================> 17-17-17-17-17-17-17-17-17")
-
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
-			logger.Log(t, "==================================> 18-18-18-18-18-18-18-18-18")
-
 			// Ensure the secret is created.
 			retry.RunWith(timer, t, func(r *retry.R) {
-				logger.Log(t, "==================================> 19-19-19-19-19-19-19-19-19")
-
 				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
 				require.NotEmpty(r, acceptorSecretName)
 			})
-			logger.Log(t, "==================================> 20-20-20-20-20-20-20-20-20")
-
 			// Copy secret from client peer to server peer.
 			k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
-			logger.Log(t, "==================================> 21-21-21-21-21-21-21-21-21")
-
 			// Create the peering dialer on the server peer.
 			k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
-			logger.Log(t, "==================================> 22-22-22-22-22-22-22-22-22")
 
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				logger.Log(t, "==================================> 23-23-23-23-23-23-23-23-23")
-
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 				k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 			})
@@ -283,7 +248,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s in server peer", staticServerNamespace)
 			k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			logger.Log(t, "==================================> 24	24-24-24-24-24-24-24")
 
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
@@ -419,8 +383,5 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, "http://localhost:1234")
 			}
 		})
-		logger.Log(t, "==================================> Done DOne Done")
-
 	}
-	logger.Log(t, "==================================> ALL DONE DONE DONE")
 }
