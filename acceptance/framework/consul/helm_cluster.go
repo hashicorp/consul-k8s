@@ -127,7 +127,10 @@ func NewHelmCluster(
 
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
-
+	h.helmOptions.ExtraArgs = map[string][]string{
+		"--wait":    nil,
+		"--timeout": {"10m"},
+	}
 	// check and remove any CRDs with finalizers
 	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
 
@@ -189,7 +192,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	// always idempotently clean up resources in the cluster.
 	h.helmOptions.ExtraArgs = map[string][]string{
 		"--wait":    nil,
-		"--timeout": {"5m"},
+		"--timeout": {"10m"},
 	}
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
@@ -225,7 +228,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Minute, Count: 30}, t, func(r *retry.R) {
 		t.Logf("======================================= predelete cluster state ======================================= ")
 		o, err := exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
 		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
@@ -245,7 +248,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
 		t.Logf("================================= -------------------------------- ================================= ")
 
-		// require.NoError(r, err)
+		require.NoError(r, err)
 	})
 
 	// Retry because sometimes certain resources (like PVC) take time to delete

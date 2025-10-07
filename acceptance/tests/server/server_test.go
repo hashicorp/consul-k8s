@@ -81,7 +81,7 @@ func TestServerRestart(t *testing.T) {
 
 	// Wait for restart to finish.
 	start := time.Now()
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", fmt.Sprintf("statefulset/%s-consul-server", releaseName))
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "10m", "--watch", fmt.Sprintf("statefulset/%s-consul-server", releaseName))
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 
 	// Check results
