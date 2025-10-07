@@ -6,7 +6,6 @@ package consul
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -161,12 +160,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
-	t.Logf("================================= preinstall cluster state ================================= ")
-	o, err := exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-	o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-	t.Logf("================================= -------------------------------- ================================= ")
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 20 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
@@ -175,12 +168,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 		}
 		require.NoError(r, err)
 	})
-	t.Logf("================================= post install cluster state ================================= ")
-	o, err = exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-	o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-	t.Logf("================================= -------------------------------- ================================= ")
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -223,33 +210,10 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	o, err := exec.Command("kubectl", "delete", "pods", "--all", "-n", h.helmOptions.KubectlOptions.Namespace, "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Deleting all pods in %s: with error: %s \noutput:\n %s", h.helmOptions.KubectlOptions.Namespace, err, string(o))
-
-	for i := 0; i < 30; i++ {
-		t.Logf("======================================= predelete cluster state ======================================= ")
-		o, err := exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		t.Logf("================================= -------------------------------- ================================= ")
-
-		err = helm.DeleteE(t, h.helmOptions, h.releaseName, false)
-		if err != nil {
-			t.Logf("helm delete failed with error %s, retrying...", err.Error())
-		} else {
-			t.Logf("helm delete no error")
-			break
-		}
-		t.Logf("======================================= postdelete cluster state ======================================= ")
-
-		o, err = exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-		t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-		o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-		t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-		t.Logf("================================= -------------------------------- ================================= ")
-		time.Sleep(30 * time.Second)
-	}
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		require.NoError(r, err)
+	})
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
@@ -510,20 +474,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	})
 
-	t.Logf("================================= before force delete cluster state ================================= ")
-	o, err = exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-	o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-	t.Logf("================================= -------------------------------- ================================= ")
-
 	helm.DeleteE(t, h.helmOptions, h.releaseName, true)
-	t.Logf("================================= after force delete cluster state ================================= ")
-	o, err = exec.Command("kubectl", "get", "ns", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current namespaces in the cluster: with error: %s \noutput:\n %s", err, string(o))
-	o, err = exec.Command("kubectl", "get", "pods", "-A", "-o", "wide", "--context", h.helmOptions.KubectlOptions.ContextName).CombinedOutput()
-	t.Logf("Current pods in default the cluster: with error: %s \noutput:\n %s", err, string(o))
-	t.Logf("================================= -------------------------------- ================================= ")
 
 }
 
