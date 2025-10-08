@@ -19,7 +19,6 @@ jobs:
     with:
       additional-skip-files: |
         .github/workflows/**
-        charts/consul/**
 
   test:
     name: test
