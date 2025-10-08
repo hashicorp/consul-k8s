@@ -182,14 +182,12 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
 
 			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
-
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
 
 			k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			})
 			staticServerPeerClient, _ := staticServerPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
@@ -216,7 +214,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				logger.Log(t, "==================================> 17-17-17-17-17-17-17-17-17")
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 			// Ensure the secret is created.
@@ -225,11 +222,12 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				require.NoError(r, err)
 				require.NotEmpty(r, acceptorSecretName)
 			})
+
 			// Copy secret from client peer to server peer.
 			k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
+
 			// Create the peering dialer on the server peer.
 			k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
-
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 				k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
@@ -248,7 +246,6 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 
 			logger.Logf(t, "creating namespaces %s in server peer", staticServerNamespace)
 			k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 			})

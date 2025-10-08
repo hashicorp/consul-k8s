@@ -253,19 +253,26 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-            {{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}
+            # These are now set by the postStart hook
             - name: CO_OTEL_HTTP_ENDPOINT
-              value: "http://$(HOST_IP):4318"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://$(HOST_IP):4318"
-            {{- else if eq (.Values.global.metrics.datadog.otlp.protocol | lower) "grpc" }}
-            - name: CO_OTEL_HTTP_ENDPOINT
-              value: "http://$(HOST_IP):4317"
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://$(HOST_IP):4317"
             {{- end }}
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.telemetryCollector | nindent 12 }}
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - >
+                  if echo "$HOST_IP" | grep -q ':'; then
+                    # It's an IPv6 address, add brackets
+                    OTEL_ENDPOINT="http://[$HOST_IP]:{{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}4318{{ else }}4317{{ end }}"
+                  else
+                    # It's an IPv4 address
+                    OTEL_ENDPOINT="http://$HOST_IP:{{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}4318{{ else }}4317{{ end }}"
+                  fi;
         command:
         - "/bin/sh"
         - "-ec"
