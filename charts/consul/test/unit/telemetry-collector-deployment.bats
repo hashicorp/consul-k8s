@@ -1361,42 +1361,38 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 #--------------------------------------------------------------------
 # global.metrics.datadog.otlp
 
-@test "telemetryCollector/Deployment: DataDog OTLP Collector HTTP protocol verification" {
+@test "telemetryCollector/Deployment: DataDog OTLP Collector dual-stack verification" {
   cd `chart_dir`
-  local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.cloud.enabled=false' \
-      --set 'global.metrics.enabled=true' \
-      --set 'global.metrics.enableAgentMetrics=true' \
-      --set 'global.metrics.datadog.enabled=true' \
-      --set 'global.metrics.datadog.otlp.enabled=true' \
-      --set 'global.metrics.datadog.otlp.protocol'="http" \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+  # Render the template with the necessary values for a valid render
+  local template=$(helm template \
+    -s templates/telemetry-collector-deployment.yaml  \
+    --set 'telemetryCollector.enabled=true' \
+    --set 'telemetryCollector.image=fake:image' \
+    --set 'connectInject.enabled=true' \
+    --set 'global.metrics.enabled=true' \
+    --set 'global.metrics.datadog.enabled=true' \
+    --set 'global.metrics.datadog.otlp.enabled=true' \
+    --set 'global.metrics.datadog.otlp.protocol'="http" \
+    .)
 
-  local actual=$(echo "$object" |
-      yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
-  [ "${actual}" = 'http://$(HOST_IP):4318' ]
-}
+  # 1. Verify the postStart hook command contains the correct conditional logic
+  local post_start_command=$(echo "$template" |
+    yq -r '.spec.template.spec.containers[0].lifecycle.postStart.exec.command[2]')
 
-@test "telemetryCollector/Deployment: DataDog OTLP Collector HTTP protocol verification, case-insensitive" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/telemetry-collector-deployment.yaml  \
-      --set 'telemetryCollector.enabled=true' \
-      --set 'telemetryCollector.cloud.enabled=false' \
-      --set 'global.metrics.enabled=true' \
-      --set 'global.metrics.enableAgentMetrics=true' \
-      --set 'global.metrics.datadog.enabled=true' \
-      --set 'global.metrics.datadog.otlp.enabled=true' \
-      --set 'global.metrics.datadog.otlp.protocol'="HTTP" \
-      . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env' | tee /dev/stderr)
+  run echo "$post_start_command"
+  [ "$status" -eq 0 ]
+  assert_output --partial 'if echo "$HOST_IP" | grep -q'
+  assert_output --partial 'OTEL_ENDPOINT="http://[$HOST_IP]:4318"' # IPv6 case
+  assert_output --partial 'OTEL_ENDPOINT="http://$HOST_IP:4318"'   # IPv4 case
+  assert_output --partial 'echo "export CO_OTEL_HTTP_ENDPOINT=$OTEL_ENDPOINT"'
 
-  local actual=$(echo "$object" |
-      yq -r '.[] | select(.name=="CO_OTEL_HTTP_ENDPOINT").value' | tee /dev/stderr)
-  [ "${actual}" = 'http://$(HOST_IP):4318' ]
+  # 2. Verify the main container's command now sources the environment file
+  local main_command=$(echo "$template" |
+    yq -r '.spec.template.spec.containers[0].command[2]')
+
+  run echo "$main_command"
+  [ "$status" -eq 0 ]
+  assert_output --partial '. /etc/otel-env/endpoint.env'
 }
 
 @test "telemetryCollector/Deployment: DataDog OTLP Collector gRPC protocol verification" {
