@@ -162,9 +162,9 @@ func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, 
 	for _, pod := range pods.Items {
 		podIP := pod.Status.PodIP
 		retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 150}, t, func(r *retry.R) {
-			metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s/metrics", net.JoinHostPort(podIP, "20200")))
-			require.NoError(t, err)
-			require.Contains(t, metricsOutput, metricsAssertion)
+			metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s/metrics", net.JoinHostPort(podIP, "20200")))
+			require.NoError(r, err)
+			require.Contains(r, metricsOutput, metricsAssertion)
 		})
 	}
 }

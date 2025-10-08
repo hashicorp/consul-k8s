@@ -226,7 +226,7 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName, "ANY",
+		"run", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName, "ANY",
 	}
 
 	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
@@ -242,6 +242,7 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
 	})
+
 	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 10}, t, func(r *retry.R) {
 		// When the `dig` request is successful, a section of it's response looks like the following:
 		//
