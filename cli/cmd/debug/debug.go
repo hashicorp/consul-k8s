@@ -3,6 +3,7 @@ package debug
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"strconv"
@@ -443,10 +444,16 @@ func (c *DebugCommand) debugger() int {
 		if !c.captureTarget(task.target) {
 			continue
 		}
+		// if context is cancelled, return
+		if c.Ctx.Err() == context.Canceled {
+			return 1
+		}
+
+		// run the capture task
+		returnCode := c.runCapture(task, &errorsOccuredDuringCapture)
 
 		// if returnCode is 1, it means signal interrupt received and cleanup is completed, return.
 		// otherwise current capture task completed normally, continue with next capture task
-		returnCode := c.runCapture(task, &errorsOccuredDuringCapture)
 		if returnCode == 1 {
 			return returnCode
 		}
@@ -479,8 +486,8 @@ func (c *DebugCommand) archiveDebugBundleAndReturn(archiveName string, errorsOcc
 	}
 }
 
-// cleanupAndReturn - cleans up partial debug capture and returns 1
-func (c *DebugCommand) cleanupAndReturn() int {
+// cleanup - cleans up partial debug capture
+func (c *DebugCommand) cleanup() {
 	defer func() { c.CleanupReqAndCompleted <- true }()
 	c.UI.Output("\nDebug run interrupted (received signal interrupt)", terminal.WithErrorStyle())
 
@@ -497,18 +504,15 @@ func (c *DebugCommand) cleanupAndReturn() int {
 				c.UI.Output(fmt.Sprintf("error cleaning up partial capture: %v", err), terminal.WithErrorStyle())
 				c.UI.Output(fmt.Sprintf("Partial debug capture, saved debug dir: %s", bundle), terminal.WithWarningStyle())
 				c.UI.Output(fmt.Sprint("Please delete it and re-run the debug command for completed capture"), terminal.WithWarningStyle())
-				return 1
 			}
 			c.UI.Output(" - Cleanup completed")
-			return 1
 		}
 	}
-	return 1
 }
 
 // runCapture - it is executed for each capture task and runs a capture function,
 // Hanldles errors and output messages.
-// If signal interrupt is received during capture, it calls cleanupAndReturn and returns 1
+// If signal interrupt is received during capture, it calls cleanup and returns 1
 func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 	captureName := task.name
 	captureFunction := task.captureFxn
@@ -516,8 +520,9 @@ func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 	err := captureFunction()
 	if err != nil {
 		switch {
-		case errors.Is(err, signalInterruptError):
-			return c.cleanupAndReturn()
+		case errors.Is(err, signalInterruptError) || c.Ctx.Err() == context.Canceled:
+			c.cleanup()
+			return 1
 		case errors.Is(err, notFoundError):
 			c.UI.Output(notFoundMsg, terminal.WithWarningStyle())
 		default:
@@ -553,6 +558,11 @@ func (c *DebugCommand) captureHelmConfig() error {
 		return err
 	}
 	helmFilePath := filepath.Join(c.output, "helm-config.json")
+
+	// return if context is cancelled
+	if c.Ctx.Err() == context.Canceled {
+		return signalInterruptError
+	}
 	err = writeJSONFile(helmFilePath, helmRelease)
 	if err != nil {
 		return fmt.Errorf("couldn't write Helm config to json file: %v", err)
@@ -585,6 +595,10 @@ func (c *DebugCommand) captureCRDResources() error {
 		if errors.Is(err, notFoundError) || strings.Contains(err.Error(), "couldn't retrive CRDs") {
 			return err
 		}
+	}
+	// return if context is cancelled
+	if c.Ctx.Err() == context.Canceled {
+		return signalInterruptError
 	}
 
 	var writeErrors error
@@ -667,8 +681,7 @@ func (c *DebugCommand) listCRDResources() (map[string][]unstructured.Unstructure
 
 // captureSidecarPods - captures all pods across all namespaces
 // and their status (number of pods ready/desired) that have been injected by Consul
-//
-//	using the label consul.hashicorp.com/connect-inject-status=injected.
+// using the label consul.hashicorp.com/connect-inject-status=injected.
 func (c *DebugCommand) captureSidecarPods() error {
 	pods, err := c.kubernetes.CoreV1().Pods("").List(c.Ctx, metav1.ListOptions{
 		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
@@ -679,42 +692,46 @@ func (c *DebugCommand) captureSidecarPods() error {
 
 	if len(pods.Items) == 0 {
 		return notFoundError
-	} else {
-		podsData := make(map[string]map[string]string)
-		for _, pod := range pods.Items {
-			age := time.Since(pod.CreationTimestamp.Time).Round(time.Minute)
-			var readyCount int
-			for _, status := range pod.Status.ContainerStatuses {
-				if status.Ready {
-					readyCount++
-				}
-			}
-			readyStatus := fmt.Sprintf("%d/%d", readyCount, len(pod.Spec.Containers))
-
-			// restartCount - shows how many times the container(s) within each pod have restarted.
-			var totalRestartCount int32
-			for _, status := range pod.Status.ContainerStatuses {
-				totalRestartCount += status.RestartCount
-			}
-
-			ip := pod.Status.PodIP
-
-			data := map[string]string{
-				"ready":     readyStatus,
-				"status":    string(pod.Status.Phase),
-				"restart":   strconv.Itoa(int(totalRestartCount)),
-				"age":       age.String(),
-				"namespace": pod.Namespace,
-				"ip":        ip,
-			}
-			podsData[pod.Name] = data
-		}
-		err = writeJSONFile(filepath.Join(c.output, "sidecarPods.json"), podsData)
-		if err != nil {
-			return fmt.Errorf("couldn't write Consul injected sidecar pods to json file: %v", err)
-		}
-		return nil
 	}
+	podsData := make(map[string]map[string]string)
+	for _, pod := range pods.Items {
+		age := time.Since(pod.CreationTimestamp.Time).Round(time.Minute)
+		var readyCount int
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Ready {
+				readyCount++
+			}
+		}
+		readyStatus := fmt.Sprintf("%d/%d", readyCount, len(pod.Spec.Containers))
+
+		// restartCount - shows how many times the container(s) within each pod have restarted.
+		var totalRestartCount int32
+		for _, status := range pod.Status.ContainerStatuses {
+			totalRestartCount += status.RestartCount
+		}
+
+		ip := pod.Status.PodIP
+
+		data := map[string]string{
+			"ready":     readyStatus,
+			"status":    string(pod.Status.Phase),
+			"restart":   strconv.Itoa(int(totalRestartCount)),
+			"age":       age.String(),
+			"namespace": pod.Namespace,
+			"ip":        ip,
+		}
+		podsData[pod.Name] = data
+	}
+
+	// return if context is cancelled
+	if c.Ctx.Err() == context.Canceled {
+		return signalInterruptError
+	}
+	err = writeJSONFile(filepath.Join(c.output, "sidecarPods.json"), podsData)
+	if err != nil {
+		return fmt.Errorf("couldn't write Consul injected sidecar pods to json file: %v", err)
+	}
+	return nil
 }
 
 // captureIndex - captures debug run metadata and writes to file at the root of the debug archive
@@ -729,6 +746,11 @@ func (c *DebugCommand) captureIndex() error {
 	index = debugIndex{
 		Targets:   c.capture,
 		Timestamp: time.Now().Format(time.RFC3339),
+	}
+
+	// return if context is cancelled
+	if c.Ctx.Err() == context.Canceled {
+		return signalInterruptError
 	}
 	err := writeJSONFile(filepath.Join(c.output, "index.json"), index)
 	if err != nil {
