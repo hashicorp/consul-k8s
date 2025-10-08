@@ -131,8 +131,8 @@ func TestConsulDNS(t *testing.T) {
 			// also start the DNS proxy if it is enabled and it will pick up the ACL token
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
-			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
 
+			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
 			verifyDNS(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
@@ -167,14 +167,13 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 }
 
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
-
 	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, "coredns-custom.yaml")
 	updateCoreDNS(t, ctx, "coredns-custom.yaml")
 
 	t.Cleanup(func() {
 		updateCoreDNS(t, ctx, "coredns-original.yaml")
+		time.Sleep(5 * time.Second)
 	})
-
 }
 
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
@@ -190,7 +189,6 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 }
 
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
-
 	coreDNSCommand := []string{
 		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
 	}
@@ -201,18 +199,15 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
 		require.NoError(r, err)
-
 	})
 
 	require.Contains(t, logs, "configmap/coredns replaced")
 	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
 	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
-
 	// Wait for restart to finish.
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", "deployment/coredns", "-n", "kube-system")
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
-
 }
 
 func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
@@ -242,8 +237,6 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 	})
 
 	retry.RunWith(&retry.Counter{Wait: 30 * time.Second, Count: 10}, t, func(r *retry.R) {
-		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
-
 		logger.Log(t, "run the dns utilize pod and query DNS for the service.")
 		logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)

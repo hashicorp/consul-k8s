@@ -473,9 +473,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	})
-
-	helm.DeleteE(t, h.helmOptions, h.releaseName, true)
-
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {

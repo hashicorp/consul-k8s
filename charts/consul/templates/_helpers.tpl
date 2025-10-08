@@ -87,7 +87,7 @@ and consul-k8s-control-plane images.
 {{- define "consul.serverTLSCertTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1,::1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.certificate -{{ "}}" }}
             {{ "{{" }}- if .Data.ca_chain -{{ "}}" }}
             {{ "{{" }}- $lastintermediatecertindex := len .Data.ca_chain | subtract 1 -{{ "}}" }}
@@ -103,7 +103,7 @@ and consul-k8s-control-plane images.
 {{- define "consul.serverTLSKeyTemplate" -}}
  |
             {{ "{{" }}- with secret "{{ .Values.server.serverCert.secretName }}" "{{ printf "common_name=server.%s.%s" .Values.global.datacenter .Values.global.domain }}"
-            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1,::1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
+            "alt_names={{ include "consul.serverTLSAltNames" . }}" "ip_sans=127.0.0.1{{ include "consul.serverAdditionalIPSANs" . }}" -{{ "}}" }}
             {{ "{{" }}- .Data.private_key -{{ "}}" }}
             {{ "{{" }}- end -{{ "}}" }}
 {{- end -}}

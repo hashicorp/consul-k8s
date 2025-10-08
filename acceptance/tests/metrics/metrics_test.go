@@ -80,7 +80,13 @@ func TestComponentMetrics(t *testing.T) {
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
 	// Client Metrics
-	metricsOutput, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "sh", "-c", "curl --silent --show-error http://$HOST_IP:8500/v1/agent/metrics?format=prometheus")
+	metricsOutput, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+		"exec", "deploy/"+StaticClientName,
+		"-c", "static-client",
+		"--",
+		"sh", "-c",
+		`if echo "$HOST_IP" | grep -q ':'; then url="http://[$HOST_IP]:8500"; else url="http://$HOST_IP:8500"; fi; curl --silent --show-error "$url/v1/agent/metrics?format=prometheus"`,
+	)
 	require.NoError(t, err)
 	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 

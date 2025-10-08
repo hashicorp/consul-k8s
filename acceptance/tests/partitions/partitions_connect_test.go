@@ -278,17 +278,14 @@ func TestPartitions_Connect(t *testing.T) {
 			kustomizeDir := "../fixtures/bases/mesh-gateway"
 
 			k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), kustomizeDir)
-
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 
 			k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), kustomizeDir)
-
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), kustomizeDir)
 			})
-
 			// This section of the tests runs the in-partition networking tests.
 			t.Run("in-partition", func(t *testing.T) {
 				logger.Log(t, "test in-partition networking")
@@ -608,7 +605,6 @@ func TestPartitions_Connect(t *testing.T) {
 					k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 				}
 			})
-
 		})
 	}
 }
