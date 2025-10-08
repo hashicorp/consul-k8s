@@ -126,7 +126,7 @@ spec:
           {{- else }}
           - name: CONSUL_LOGIN_NAMESPACE
             value: {{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
-          {{- end }} 
+          {{- end }}
           {{- end }}
           {{- end }}
         command:
@@ -253,30 +253,17 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-            # These are now set by the postStart hook
-            - name: CO_OTEL_HTTP_ENDPOINT
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-            {{- end }}
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.telemetryCollector | nindent 12 }}
-        lifecycle:
-          postStart:
-            exec:
-              command:
-                - "/bin/sh"
-                - "-c"
-                - >
-                  if echo "$HOST_IP" | grep -q ':'; then
-                    # It's an IPv6 address, add brackets
-                    OTEL_ENDPOINT="http://[$HOST_IP]:{{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}4318{{ else }}4317{{ end }}"
-                  else
-                    # It's an IPv4 address
-                    OTEL_ENDPOINT="http://$HOST_IP:{{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}4318{{ else }}4317{{ end }}"
-                  fi;
         command:
         - "/bin/sh"
         - "-ec"
         - |
+          # Source the environment file created by the postStart hook
+          if [ -f /etc/otel-env/endpoint.env ]; then
+            . /etc/otel-env/endpoint.env
+          fi
+
           {{- if .Values.global.trustedCAs }}
           {{- range $i, $cert := .Values.global.trustedCAs }}
           cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
@@ -288,8 +275,26 @@ spec:
           exec consul-telemetry-collector agent \
           {{- if .Values.telemetryCollector.customExporterConfig }}
             -config-file-path /consul/config/config.json \
-          {{ end }}
+          {{- end }}
+        lifecycle:
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - >
+                  if [ -n "$HOST_IP" ]; then
+                    if echo "$HOST_IP" | grep -q ':'; then
+                      OTEL_ENDPOINT="http://[$HOST_IP]:{{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}4318{{ else }}4317{{ end }}"
+                    else
+                      OTEL_ENDPOINT="http://$HOST_IP:{{- if eq (.Values.global.metrics.datadog.otlp.protocol | lower ) "http" }}4318{{ else }}4317{{ end }}"
+                    fi;
+                    echo "export CO_OTEL_HTTP_ENDPOINT=$OTEL_ENDPOINT" > /etc/otel-env/endpoint.env;
+                    echo "export OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_ENDPOINT" >> /etc/otel-env/endpoint.env;
+                  fi
         volumeMounts:
+          - name: otel-env
+            mountPath: /etc/otel-env
           {{- if .Values.telemetryCollector.customExporterConfig }}
           - name: config
             mountPath: /consul/config
@@ -358,7 +363,7 @@ spec:
           - -login-namespace=default
           {{- else }}
           - -login-namespace={{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
-          {{- end }} 
+          {{- end }}
           {{- end }}
           {{- end }}
           # service and login partition
@@ -432,6 +437,8 @@ spec:
       priorityClassName: {{ .Values.telemetryCollector.priorityClassName }}
       {{- end }}
       volumes:
+        - name: otel-env
+          emptyDir: {}
         - emptyDir:
             medium: Memory
           name: consul-connect-inject-data
@@ -440,8 +447,8 @@ spec:
           emptyDir:
             medium: "Memory"
         {{- end }}
-      {{- if .Values.global.tls.enabled }}
-      {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
+        {{- if .Values.global.tls.enabled }}
+        {{- if not (or (and .Values.externalServers.enabled .Values.externalServers.useSystemRoots) .Values.global.secretsBackend.vault.enabled) }}
         - name: consul-ca-cert
           secret:
           {{- if .Values.global.tls.caCert.secretName }}
@@ -454,7 +461,9 @@ spec:
                 path: tls.crt
       {{- end }}
       {{- end }}
+      {{- if .Values.telemetryCollector.customExporterConfig }}
         - name: config
           configMap:
             name: {{ template "consul.fullname" . }}-telemetry-collector
+      {{- end }}
 {{- end }}
