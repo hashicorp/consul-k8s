@@ -181,9 +181,15 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
+	// If we're using the DNS proxy, we need to use port 8053 (non-privileged) in K8s 1.30+
+	dnsTarget := dnsIP
+	if enableDNSProxy {
+		dnsTarget = fmt.Sprintf("%s:8053", dnsIP)
+	}
+
 	input, err := os.ReadFile("coredns-template.yaml")
 	require.NoError(t, err)
-	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsIP, -1)
+	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
 	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
 	require.NoError(t, err)
 }
