@@ -68,6 +68,11 @@ func TestConsulDNS(t *testing.T) {
 				"global.logLevel":              "debug",
 			}
 
+			// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
+			if c.enableDNSProxy {
+				helmValues["dns.proxy.port"] = "8053"
+			}
+
 			// If ACLs are enabled and we are not managing system ACLs, we need to
 			// set the initial management token in the server.extraConfig.
 			const initialManagementToken = "b1gs33cr3t"
