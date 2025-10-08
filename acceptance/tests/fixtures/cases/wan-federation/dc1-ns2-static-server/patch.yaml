@@ -16,7 +16,7 @@ spec:
           image: docker.mirror.hashicorp.services/kschoche/http-echo:latest
           args:
             - -text="ns2"
-            - -listen=:8080
+            - -listen=[::]:8080
           ports:
             - containerPort: 8080
               name: http

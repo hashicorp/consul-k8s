@@ -27,7 +27,7 @@ spec:
           image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="hello world"
-            - -listen=:8080
+            - -listen=[::]:8080
           ports:
             - containerPort: 8080
               name: web
@@ -53,7 +53,7 @@ spec:
           image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="hello world from 9090 admin"
-            - -listen=:9090
+            - -listen=[::]:9090
           ports:
             - containerPort: 9090
               # This name is meant to be used alongside the _numeric_ K8s service target port

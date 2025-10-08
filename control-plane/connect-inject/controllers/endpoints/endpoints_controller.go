@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -540,7 +541,11 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		if err != nil {
 			return nil, nil, err
 		}
-		prometheusScrapeListener := fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
+		prometheusScrapeAddr := "0.0.0.0"
+		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+			prometheusScrapeAddr = "::"
+		}
+		prometheusScrapeListener := net.JoinHostPort(prometheusScrapeAddr, prometheusScrapePort)
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
@@ -550,6 +555,9 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 
 	if consulServicePort > 0 {
 		proxyConfig.LocalServiceAddress = "127.0.0.1"
+		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+			proxyConfig.LocalServiceAddress = "::"
+		}
 		proxyConfig.LocalServicePort = consulServicePort
 	}
 
@@ -825,7 +833,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
+		service.Proxy.Config["envoy_prometheus_bind_addr"] = net.JoinHostPort(pod.Status.PodIP, "20200")
 	}
 
 	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {

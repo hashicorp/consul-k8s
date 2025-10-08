@@ -156,7 +156,11 @@ spec:
                 -release-name="{{ .Release.Name }}" \
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
+                {{- if .Values.global.dualStack.defaultEnabled }}
+                -listen=[::]:8080 \
+                {{- else }}
                 -listen=:8080 \
+                {{- end}}
                 {{- range $k, $v := .Values.connectInject.consulNode.meta }}
                 -node-meta={{ $k }}={{ $v }} \
                 {{- end }}
