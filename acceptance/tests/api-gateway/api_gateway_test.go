@@ -155,7 +155,12 @@ func TestAPIGateway_Basic(t *testing.T) {
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			logger.Log(t, "patching route to target http server")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+			// Use retries to handle intermittent failures when patching the httproute
+			retry.Run(t, func(r *retry.R) {
+				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+				require.NoError(r, err, out)
+				logger.Log(t, "successfully patched httproute")
+			})
 
 			logger.Log(t, "creating target tcp server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
