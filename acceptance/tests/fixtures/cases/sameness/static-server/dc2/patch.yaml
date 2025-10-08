@@ -16,7 +16,7 @@ spec:
           image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
           args:
             - -text="cluster-02-a"
-            - -listen=:8080
+            - -listen=[::]:8080
           ports:
             - containerPort: 8080
               name: http
