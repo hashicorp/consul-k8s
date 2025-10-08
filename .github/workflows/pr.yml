@@ -20,6 +20,7 @@ jobs:
       additional-skip-files: |
         .github/workflows/**
         acceptance/ci-inputs/**
+        charts/consul/**
 
   test:
     name: test
