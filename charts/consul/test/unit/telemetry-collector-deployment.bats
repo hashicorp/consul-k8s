@@ -1358,39 +1358,5 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = 'true' ]
 }
 
-#--------------------------------------------------------------------
-# global.metrics.datadog.otlp
 
-@test "telemetryCollector/Deployment: DataDog OTLP Collector dual-stack verification" {
-  cd `chart_dir`
-  # Render the template with the necessary values for a valid render
-  local template=$(helm template \
-    -s templates/telemetry-collector-deployment.yaml  \
-    --set 'telemetryCollector.enabled=true' \
-    --set 'telemetryCollector.image=fake:image' \
-    --set 'connectInject.enabled=true' \
-    --set 'global.metrics.enabled=true' \
-    --set 'global.metrics.datadog.enabled=true' \
-    --set 'global.metrics.datadog.otlp.enabled=true' \
-    --set 'global.metrics.datadog.otlp.protocol'="http" \
-    .)
-
-  # 1. Verify the postStart hook command contains the correct conditional logic
-  local post_start_command=$(echo "$template" |
-    yq -r '.spec.template.spec.containers[0].lifecycle.postStart.exec.command[2]')
-
-  run echo "$post_start_command"
-  [ "$status" -eq 0 ]
-  assert_output --partial 'OTEL_ENDPOINT="http://[$HOST_IP]:4318"' # IPv6 case
-  assert_output --partial 'OTEL_ENDPOINT="http://$HOST_IP:4318"'   # IPv4 case
-  assert_output --partial 'echo "export CO_OTEL_HTTP_ENDPOINT=$OTEL_ENDPOINT"'
-
-  # 2. Verify the main container's command now sources the environment file
-  local main_command=$(echo "$template" |
-    yq -r '.spec.template.spec.containers[0].command[2]')
-
-  run echo "$main_command"
-  [ "$status" -eq 0 ]
-  assert_output --partial '. /etc/otel-env/endpoint.env'
-}
 

@@ -255,7 +255,7 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 		//
 		// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
 
-		logger.Log(r, "verify the DNS results. with logs %s", logs)
+		logger.Logf(r, "verify the DNS results. with logs %s", logs)
 		// strip logs of tabs, newlines and spaces to make it easier to assert on the content when there is a DNS match
 		strippedLogs := strings.Replace(logs, "\t", "", -1)
 		strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
