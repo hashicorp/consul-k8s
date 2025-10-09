@@ -659,6 +659,8 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {

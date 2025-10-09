@@ -61,8 +61,9 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
 
-				"global.acls.manageSystemACLs":    strconv.FormatBool(c.secure),
-				"global.tls.enabled":              strconv.FormatBool(c.secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 

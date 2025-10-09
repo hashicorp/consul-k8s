@@ -68,10 +68,11 @@ func TestAPIGateway_Basic(t *testing.T) {
 			}
 
 			helmValues := map[string]string{
-				"connectInject.enabled":           "true",
-				"global.acls.manageSystemACLs":    strconv.FormatBool(c.secure),
-				"global.tls.enabled":              strconv.FormatBool(c.secure),
-				"global.logLevel":                 "trace",
+				"connectInject.enabled":        "true",
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+				"global.logLevel":              "trace",
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
@@ -371,7 +372,8 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		"global.acls.manageSystemACLs":                "true",
 		"global.tls.enabled":                          "true",
 		"global.logLevel":                             "trace",
-		"global.dualStack.defaultEnabled":             cfg.GetDualStack(),
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()

@@ -54,6 +54,8 @@ func TestBasicInstallation(t *testing.T) {
 				"global.gossipEncryption.autoGenerate": strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt":         strconv.FormatBool(c.autoEncrypt),
 				"client.enabled":                       "true",
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 			consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 

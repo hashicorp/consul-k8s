@@ -42,8 +42,9 @@ func TestIngressGateway(t *testing.T) {
 				"ingressGateways.gateways[0].name":     igName,
 				"ingressGateways.gateways[0].replicas": "1",
 
-				"global.acls.manageSystemACLs":    strconv.FormatBool(c.secure),
-				"global.tls.enabled":              strconv.FormatBool(c.secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 

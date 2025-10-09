@@ -54,7 +54,8 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				"terminatingGateways.gateways[0].name":            "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas":        "1",
 				"terminatingGateways.gateways[0].consulNamespace": testNamespace,
-				"global.dualStack.defaultEnabled":                 cfg.GetDualStack(),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -259,7 +260,8 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					"terminatingGateways.gateways[0].name":            "terminating-gateway",
 					"terminatingGateways.gateways[0].replicas":        "1",
 					"terminatingGateways.gateways[0].consulNamespace": tc.termGWConfig.namespace,
-					"global.dualStack.defaultEnabled":                 cfg.GetDualStack(),
+
+					"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 				}
 
 				releaseName := helpers.RandomName()

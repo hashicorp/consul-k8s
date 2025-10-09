@@ -434,11 +434,12 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 // Secure and AutoEncrypt fields taking precedence.
 func (c *ConnectHelper) helmValues() map[string]string {
 	helmValues := map[string]string{
-		"connectInject.enabled":           "true",
-		"global.tls.enabled":              strconv.FormatBool(c.Secure),
-		"global.acls.manageSystemACLs":    strconv.FormatBool(c.Secure),
-		"dns.enabled":                     "true",
-		"dns.enableRedirection":           "true",
+		"connectInject.enabled":        "true",
+		"global.tls.enabled":           strconv.FormatBool(c.Secure),
+		"global.acls.manageSystemACLs": strconv.FormatBool(c.Secure),
+		"dns.enabled":                  "true",
+		"dns.enableRedirection":        "true",
+
 		"global.dualStack.defaultEnabled": c.Cfg.GetDualStack(),
 	}
 

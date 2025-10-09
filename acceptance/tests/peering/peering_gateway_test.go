@@ -62,7 +62,8 @@ func TestPeering_Gateway(t *testing.T) {
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
 
-		"dns.enabled":                     "true",
+		"dns.enabled": "true",
+
 		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 

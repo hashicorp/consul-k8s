@@ -76,8 +76,9 @@ func TestPeering_Connect(t *testing.T) {
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
 
-				"dns.enabled":                     "true",
-				"dns.enableRedirection":           strconv.FormatBool(cfg.EnableTransparentProxy),
+				"dns.enabled":           "true",
+				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
