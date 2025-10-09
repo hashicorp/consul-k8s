@@ -933,7 +933,16 @@ server:
   # @default: global.enabled
   # @type: boolean
   enabled: "-"
-
+  # If True, then Readines probe url will be generated with POD IP for each replica
+  # This is disabled by default
+  # @default: readinessProbe.usePodIp.enabled
+  # @type: boolean
+  # This is used when you want to use more than one consul server
+  # in kubernetes cluster.
+  # This can accure when you are using CNI like a cilium.
+  readinessProbe:
+    usePodIp:
+      enabled: false
   # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
   # @type: string
   logLevel: ""
