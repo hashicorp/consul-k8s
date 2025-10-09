@@ -61,7 +61,8 @@ func TestSnapshotAgent_K8sSecret(t *testing.T) {
 				"server.snapshotAgent.configSecret.secretName": saSecretName,
 				"server.snapshotAgent.configSecret.secretKey":  saSecretKey,
 				"connectInject.enabled":                        "false",
-				"global.dualStack.defaultEnabled":              cfg.GetDualStack(),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			// Get new cluster

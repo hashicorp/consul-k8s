@@ -87,7 +87,8 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 				"global.logLevel":                             "trace",
 				"connectInject.enabled":                       "true",
 				"connectInject.consulNamespaces.mirroringK8S": strconv.FormatBool(c.namespaceMirroring),
-				"global.dualStack.defaultEnabled":             cfg.GetDualStack(),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()

@@ -52,8 +52,9 @@ func TestWANFederation_Gateway(t *testing.T) {
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
 
-		"meshGateway.enabled":             "true",
-		"meshGateway.replicas":            "1",
+		"meshGateway.enabled":  "true",
+		"meshGateway.replicas": "1",
+
 		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
@@ -108,7 +109,8 @@ func TestWANFederation_Gateway(t *testing.T) {
 		"global.acls.replicationToken.secretKey":  "replicationToken",
 		"global.federation.k8sAuthMethodHost":     k8sAuthMethodHost,
 		"global.federation.primaryDatacenter":     "dc1",
-		"global.dualStack.defaultEnabled":         cfg.GetDualStack(),
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	// Install the secondary consul cluster in the secondary kubernetes context

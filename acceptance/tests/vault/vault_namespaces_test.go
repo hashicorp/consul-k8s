@@ -219,9 +219,10 @@ func TestVault_VaultNamespace(t *testing.T) {
 		// because we only care that get-auto-encrypt-client-ca init container was able
 		// to talk to the Consul server using the CA from Vault. For this reason,
 		// we don't need any services to be synced in either direction.
-		"syncCatalog.enabled":             "true",
-		"syncCatalog.toConsul":            "false",
-		"syncCatalog.toK8S":               "false",
+		"syncCatalog.enabled":  "true",
+		"syncCatalog.toConsul": "false",
+		"syncCatalog.toK8S":    "false",
+
 		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 

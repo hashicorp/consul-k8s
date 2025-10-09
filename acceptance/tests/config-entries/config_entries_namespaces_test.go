@@ -92,7 +92,8 @@ func TestControllerNamespaces(t *testing.T) {
 				"terminatingGateways.enabled":              "true",
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
-				"global.dualStack.defaultEnabled":          cfg.GetDualStack(),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()

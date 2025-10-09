@@ -39,8 +39,9 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"global.tls.enabled":           strconv.FormatBool(secure),
 
 				// Don't install injector, controller and cni on this cluster so that it's not installed twice.
-				"connectInject.enabled":           "false",
-				"connectInject.cni.enabled":       "false",
+				"connectInject.enabled":     "false",
+				"connectInject.cni.enabled": "false",
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 			serverReleaseName := helpers.RandomName()
@@ -56,9 +57,10 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 
 				"connectInject.enabled": "true",
 
-				"externalServers.enabled":         "true",
-				"externalServers.hosts[0]":        fmt.Sprintf("%s-consul-server", serverReleaseName),
-				"externalServers.httpsPort":       "8500",
+				"externalServers.enabled":   "true",
+				"externalServers.hosts[0]":  fmt.Sprintf("%s-consul-server", serverReleaseName),
+				"externalServers.httpsPort": "8500",
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 

@@ -79,8 +79,9 @@ func TestConnectInjectNamespaces(t *testing.T) {
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
 
-				"global.acls.manageSystemACLs":    strconv.FormatBool(c.secure),
-				"global.tls.enabled":              strconv.FormatBool(c.secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
@@ -295,8 +296,9 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
 
-				"global.acls.manageSystemACLs":    strconv.FormatBool(c.secure),
-				"global.tls.enabled":              strconv.FormatBool(c.secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+				"global.tls.enabled":           strconv.FormatBool(c.secure),
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 

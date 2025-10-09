@@ -203,7 +203,8 @@ func TestObservabilityCloud(t *testing.T) {
 				"server.extraEnvironmentVars.HCP_API_TLS":   "insecure",
 				"server.extraEnvironmentVars.HCP_AUTH_TLS":  "insecure",
 				"server.extraEnvironmentVars.HCP_SCADA_TLS": "insecure",
-				"global.dualStack.defaultEnabled":           cfg.GetDualStack(),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 			if cfg.ConsulImage != "" {
 				helmValues["global.image"] = cfg.ConsulImage

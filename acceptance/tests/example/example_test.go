@@ -25,6 +25,8 @@ func TestExample(t *testing.T) {
 	// Create Helm values for the Helm install.
 	helmValues := map[string]string{
 		"exampleFeature.enabled": "true",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	// Generate a random name for this test.

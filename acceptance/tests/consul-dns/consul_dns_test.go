@@ -63,11 +63,12 @@ func TestConsulDNS(t *testing.T) {
 			ctx := env.DefaultContext(t)
 			releaseName := helpers.RandomName()
 			helmValues := map[string]string{
-				"connectInject.enabled":           strconv.FormatBool(c.connectInjectEnabled),
-				"dns.enabled":                     "true",
-				"global.tls.enabled":              strconv.FormatBool(c.tlsEnabled),
-				"global.acls.manageSystemACLs":    strconv.FormatBool(c.manageSystemACLs),
-				"global.logLevel":                 "debug",
+				"connectInject.enabled":        strconv.FormatBool(c.connectInjectEnabled),
+				"dns.enabled":                  "true",
+				"global.tls.enabled":           strconv.FormatBool(c.tlsEnabled),
+				"global.acls.manageSystemACLs": strconv.FormatBool(c.manageSystemACLs),
+				"global.logLevel":              "debug",
+
 				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
