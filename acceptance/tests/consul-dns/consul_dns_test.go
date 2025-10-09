@@ -245,8 +245,11 @@ func verifyDNS(
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", dnsUtilsPod, "--image", "anubhavmishra/tiny-tools", "--restart", "Never", "--labels", "release=" + releaseName,
-		"--", "dig", "+short", svcName, "ANY",
+		"run", "-i", dnsUtilsPod,
+		"--restart", "Never",
+		"--image", "anubhavmishra/tiny-tools",
+		"--labels", "release=" + releaseName,
+		"--", "dig", svcName, "ANY",
 	}
 	// helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
 	// 	// Note: this delete command won't wait for pods to be fully terminated.
@@ -257,7 +260,7 @@ func verifyDNS(
 	// })
 	var logs string
 	retry.RunWith(&retry.Counter{Wait: 30 * time.Second, Count: 10}, t, func(r *retry.R) {
-		logger.Log(r, "run the dns utility pod and query DNS for the service.")
+		fmt.Println("run the dns utility pod and query DNS for the service.")
 		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
 	})
