@@ -1,16 +1,15 @@
 # Dispatch to the consul-k8s-workflows with a nightly cron
 name: pr-cloud-acceptance
 on:
-  pull_request:
-    types: [opened, synchronize]
-    # Runs on PRs to main and all release branches
+  push:
+    # Runs on push to main and all release branches
     branches:
       - main
       - "release/**"
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: ${{ github.event.pull_request.head.ref }}
-  CONTEXT: "pr"
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  CONTEXT: "merge"
 
 jobs:
   cloud-acceptance:

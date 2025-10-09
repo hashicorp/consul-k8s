@@ -100,6 +100,8 @@ func TestPartitions_Sync(t *testing.T) {
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			serverHelmValues := map[string]string{
@@ -159,6 +161,8 @@ func TestPartitions_Sync(t *testing.T) {
 				"externalServers.enabled":       "true",
 				"externalServers.hosts[0]":      partitionSvcAddress,
 				"externalServers.tlsServerName": "server.dc1.consul",
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			if c.ACLsEnabled {

@@ -316,6 +316,17 @@ spec:
         {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
         - -server-watch-disabled=true
         {{- end }}
+        {{- if and .Values.global .Values.global.dualStack .Values.global.dualStack.defaultEnabled }}
+        - "-envoy-admin-bind-address=::1"
+        - "-xds-bind-addr=::1"
+        - "-graceful-addr=::1"
+        - "-consul-dns-bind-addr=::1"
+        {{- else }}
+        - -envoy-admin-bind-address=127.0.0.1
+        - -xds-bind-addr=127.0.0.1
+        - -graceful-addr=127.0.0.1
+        - -consul-dns-bind-addr=127.0.0.1
+        {{- end }}
         livenessProbe:
           tcpSocket:
             port: {{ .Values.meshGateway.containerPort }}

@@ -6,6 +6,7 @@ package apigateway
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/hashicorp/consul/api"
@@ -34,6 +35,8 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		// Don't install injector, controller and cni on this cluster so that it's not installed twice.
 		"connectInject.enabled":     "false",
 		"connectInject.cni.enabled": "false",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 	serverReleaseName := helpers.RandomName()
 	consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
@@ -52,6 +55,8 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		"global.tls.caCert.secretKey":           "tls.crt",
 		"global.acls.bootstrapToken.secretName": fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName),
 		"global.acls.bootstrapToken.secretKey":  "token",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()
@@ -120,7 +125,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	k8sOptions := ctx.KubectlOptions(t)
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	// check that intentions keep our connection from happening
 	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)

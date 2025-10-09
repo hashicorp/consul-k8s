@@ -101,7 +101,7 @@ type Command struct {
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-	c.flags.StringVar(&c.flagListen, "listen", ":8080", "Address to bind listener to.")
+	c.flags.StringVar(&c.flagListen, "listen", "[::]:8080", "Address to bind listener to.")
 	c.flags.BoolVar(&c.flagToConsul, "to-consul", true,
 		"If true, K8S services will be synced to Consul.")
 	c.flags.BoolVar(&c.flagToK8S, "to-k8s", true,

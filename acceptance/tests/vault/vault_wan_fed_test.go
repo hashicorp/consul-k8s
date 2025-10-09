@@ -6,6 +6,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -386,6 +387,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.address":             primaryVaultCluster.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {
@@ -463,6 +466,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPathSecondary,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePathSecondary,
 		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{"connect": [{"ca_config": [{"tls_server_name": "%s-vault"}]}]}"`, vaultReleaseName),
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {
@@ -527,9 +532,9 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 func vaultAddress(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext, vaultReleaseName string) string {
 	vaultHost := k8s.ServiceHost(t, cfg, ctx, fmt.Sprintf("%s-vault", vaultReleaseName))
 	if cfg.UseKind {
-		return fmt.Sprintf("https://%s:31000", vaultHost)
+		return fmt.Sprintf("https://%s", net.JoinHostPort(vaultHost, "31000"))
 	}
-	return fmt.Sprintf("https://%s:8200", vaultHost)
+	return fmt.Sprintf("https://%s", net.JoinHostPort(vaultHost, "8200"))
 }
 
 // meshGatewayAddress returns a full address of the mesh gateway depending on configuration.

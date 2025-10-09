@@ -40,6 +40,8 @@ func TestTerminatingGateway(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			logger.Log(t, "creating consul cluster")

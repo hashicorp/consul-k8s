@@ -204,7 +204,6 @@ spec:
             - "-ec"
             - |
               exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
-                  -gateway-kind="terminating-gateway" \
                   -proxy-id-file=/consul/service/proxy-id \
                   -service-name={{ .name }} \
                   -log-level={{ default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel }} \
@@ -324,6 +323,17 @@ spec:
           {{- end }}
           {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.skipServerWatch }}
           - -server-watch-disabled=true
+          {{- end }}
+          {{- if and $root.Values.global $root.Values.global.dualStack $root.Values.global.dualStack.defaultEnabled }}
+          - "-envoy-admin-bind-address=::1"
+          - "-xds-bind-addr=::1"
+          - "-graceful-addr=::1"
+          - "-consul-dns-bind-addr=::1"
+          {{- else }}
+          - -envoy-admin-bind-address=127.0.0.1
+          - -xds-bind-addr=127.0.0.1
+          - -graceful-addr=127.0.0.1
+          - -consul-dns-bind-addr=127.0.0.1
           {{- end }}
           livenessProbe:
             tcpSocket:

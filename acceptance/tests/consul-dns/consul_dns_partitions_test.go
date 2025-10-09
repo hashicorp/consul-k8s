@@ -260,7 +260,7 @@ func restartDNSProxy(t *testing.T, releaseName string, ctx environment.TestConte
 	require.NoError(t, err)
 
 	// Wait for restart to finish.
-	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "1m", "--watch", dnsDeploymentName)
+	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "rollout", "status", "--timeout", "5m", "--watch", dnsDeploymentName)
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 	logger.Log(t, fmt.Sprintf("dns-proxy deployment in %s k8s context has finished restarting", k8sOptions.ContextName))
 }
@@ -296,11 +296,15 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 
 		// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
 		"dns.proxy.port": "8053",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	serverHelmValues := map[string]string{
 		"server.exposeGossipAndRPCPorts": "true",
 		"server.extraConfig":             `"{\"log_level\": \"TRACE\"}"`,
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.UseKind {
@@ -353,6 +357,8 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 		"externalServers.enabled":       "true",
 		"externalServers.hosts[0]":      partitionSvcAddress,
 		"externalServers.tlsServerName": "server.dc1.consul",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if c.secure {

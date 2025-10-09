@@ -42,10 +42,13 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
+
 	helmValues := map[string]string{
-		"global.logLevel":       "trace",
-		"connectInject.enabled": "true",
+		"global.logLevel":                 "trace",
+		"connectInject.enabled":           "true",
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
+
 	releaseName := helpers.RandomName()
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 	consulCluster.Create(t)

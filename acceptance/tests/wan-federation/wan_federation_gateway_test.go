@@ -6,6 +6,7 @@ package wanfederation
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -53,6 +54,8 @@ func TestWANFederation_Gateway(t *testing.T) {
 
 		"meshGateway.enabled":  "true",
 		"meshGateway.replicas": "1",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()
@@ -106,6 +109,8 @@ func TestWANFederation_Gateway(t *testing.T) {
 		"global.acls.replicationToken.secretKey":  "replicationToken",
 		"global.federation.k8sAuthMethodHost":     k8sAuthMethodHost,
 		"global.federation.primaryDatacenter":     "dc1",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	// Install the secondary consul cluster in the secondary kubernetes context
@@ -208,7 +213,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, targetAddress)

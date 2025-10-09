@@ -5,6 +5,7 @@ package terminatinggateway
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 
@@ -62,6 +63,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			logger.Log(t, "creating consul cluster")
@@ -102,7 +105,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			require.NotEmpty(t, staticServerIP)
 
 			staticServerHostnameURL := fmt.Sprintf("https://%s", staticServerServiceName)
-			staticServerIPURL := fmt.Sprintf("http://%s", staticServerIP)
+			staticServerIPURL := fmt.Sprintf("http://%s", net.JoinHostPort(staticServerIP, ""))
 
 			// Create the service default declaring the external service (aka Destination)
 			logger.Log(t, "creating tcp-based service defaults")
@@ -129,8 +132,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
 
 			// Try running some different scenarios
-			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
-			staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			staticServerHostnameURL = fmt.Sprintf("'http://%s'", staticServerServiceName)
+			staticServerIPURL = fmt.Sprintf("'http://%s'", staticServerIP)
 
 			// Update the service default declaring the external service (aka Destination)
 			logger.Log(t, "updating service defaults to try other scenarios")

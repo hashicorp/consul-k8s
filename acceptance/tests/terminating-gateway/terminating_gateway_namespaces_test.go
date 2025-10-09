@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 )
 
 const testNamespace = "ns1"
@@ -52,6 +54,8 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				"terminatingGateways.gateways[0].name":            "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas":        "1",
 				"terminatingGateways.gateways[0].consulNamespace": testNamespace,
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -115,8 +119,10 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 			}
 
 			// Test that we can make a call to the terminating gateway.
-			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
+			retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				logger.Log(r, "trying calls to terminating gateway")
+				k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
+			})
 		})
 	}
 }
@@ -254,6 +260,8 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					"terminatingGateways.gateways[0].name":            "terminating-gateway",
 					"terminatingGateways.gateways[0].replicas":        "1",
 					"terminatingGateways.gateways[0].consulNamespace": tc.termGWConfig.namespace,
+
+					"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 				}
 
 				releaseName := helpers.RandomName()

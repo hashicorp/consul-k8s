@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-enterprise/sdk/testutil/retry"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
@@ -58,6 +60,8 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 				"ingressGateways.gateways[0].name":            igName,
 				"ingressGateways.gateways[0].replicas":        "1",
 				"ingressGateways.gateways[0].consulNamespace": testNamespace,
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -138,8 +142,10 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 
 			// Test that we can make a call to the ingress gateway
 			// via the static-client pod. It should route to the static-server pod.
-			logger.Log(t, "trying calls to ingress gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, StaticClientName, "-H", "Host: static-server.ingress.consul", ingressGatewayService)
+			retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				logger.Log(r, "trying calls to ingress gateway")
+				k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, StaticClientName, "-H", "Host: static-server.ingress.consul", ingressGatewayService)
+			})
 		})
 	}
 }
@@ -179,6 +185,8 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 				"ingressGateways.enabled":              "true",
 				"ingressGateways.gateways[0].name":     igName,
 				"ingressGateways.gateways[0].replicas": "1",
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()

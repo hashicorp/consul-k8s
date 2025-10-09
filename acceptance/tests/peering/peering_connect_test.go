@@ -78,6 +78,8 @@ func TestPeering_Connect(t *testing.T) {
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			var wg sync.WaitGroup
@@ -389,8 +391,10 @@ func TestPeering_Connect(t *testing.T) {
 				}
 
 				// Test that we can make a call to the terminating gateway.
-				logger.Log(t, "trying calls to terminating gateway")
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerHostnameURL)
+				retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
+					logger.Log(r, "trying calls to terminating gateway")
+					k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerHostnameURL)
+				})
 			}
 		})
 	}

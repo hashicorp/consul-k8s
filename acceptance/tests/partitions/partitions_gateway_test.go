@@ -6,6 +6,7 @@ package partitions
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 	"time"
@@ -59,6 +60,8 @@ func TestPartitions_Gateway(t *testing.T) {
 
 		"dns.enabled":           "true",
 		"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	defaultPartitionHelmValues := make(map[string]string)
@@ -109,6 +112,8 @@ func TestPartitions_Gateway(t *testing.T) {
 		"externalServers.enabled":       "true",
 		"externalServers.hosts[0]":      partitionSvcAddress,
 		"externalServers.tlsServerName": "server.dc1.consul",
+
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	// Setup partition token and auth method host since ACLs enabled.
@@ -259,7 +264,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	// This section of the tests runs the in-partition networking tests.
 	t.Run("in-partition", func(t *testing.T) {
