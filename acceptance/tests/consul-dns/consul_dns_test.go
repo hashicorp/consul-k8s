@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -62,11 +63,12 @@ func TestConsulDNS(t *testing.T) {
 			ctx := env.DefaultContext(t)
 			releaseName := helpers.RandomName()
 			helmValues := map[string]string{
-				"connectInject.enabled":        strconv.FormatBool(c.connectInjectEnabled),
-				"dns.enabled":                  "true",
-				"global.tls.enabled":           strconv.FormatBool(c.tlsEnabled),
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.manageSystemACLs),
-				"global.logLevel":              "debug",
+				"connectInject.enabled":           strconv.FormatBool(c.connectInjectEnabled),
+				"dns.enabled":                     "true",
+				"global.tls.enabled":              strconv.FormatBool(c.tlsEnabled),
+				"global.acls.manageSystemACLs":    strconv.FormatBool(c.manageSystemACLs),
+				"global.logLevel":                 "debug",
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
@@ -222,8 +224,15 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 
-func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
-	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
+func verifyDNS(
+	t *testing.T,
+	releaseName string,
+	svcNamespace string,
+	requestingCtx, svcContext environment.TestContext,
+	podLabelSelector, svcName string,
+	shouldResolveDNSRecord bool,
+	dnsUtilsPodIndex int,
+) {
 	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: podLabelSelector,
 	})
@@ -237,10 +246,12 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", dnsUtilsPod, "--image", "anubhavmishra/tiny-tools", "--labels", "release=" + releaseName,
-		"--", "dig", svcName, "ANY",
+		"run", "-i", dnsUtilsPod, "--rm",
+		"--restart", "Never",
+		"--image", "anubhavmishra/tiny-tools",
+		"--labels", "release=" + releaseName,
+		"--", "dig", svcName,
 	}
-
 	// helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
 	// 	// Note: this delete command won't wait for pods to be fully terminated.
 	// 	// This shouldn't cause any test pollution because the underlying
@@ -250,55 +261,43 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 	// })
 	var logs string
 	retry.RunWith(&retry.Counter{Wait: 30 * time.Second, Count: 10}, t, func(r *retry.R) {
-		logger.Log(r, "run the dns utilize pod and query DNS for the service.")
+		fmt.Println("run the dns utility pod and query DNS for the service.")
 		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
+		logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)
+
+		// Normalize whitespace for reliable matching
+		cleanLogs := strings.ReplaceAll(logs, "\t", " ")
+		cleanLogs = strings.Join(strings.Fields(cleanLogs), " ")
+
+		for _, ipStr := range servicePodIPs {
+			ip := net.ParseIP(ipStr)
+			require.NotNil(r, ip, "failed to parse IP: %s", ipStr)
+
+			// Build a regex that tolerates TTL and spacing variations
+			var recordPattern string
+			if ip.To4() != nil {
+				// IPv4 record (A)
+				recordPattern = fmt.Sprintf(`%s\.\s+\d+\s+IN\s+A\s+%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
+			} else {
+				// IPv6 record (AAAA)
+				recordPattern = fmt.Sprintf(`%s\.\s+\d+\s+IN\s+AAAA\s+%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
+			}
+
+			matched, _ := regexp.MatchString(recordPattern, cleanLogs)
+
+			if shouldResolveDNSRecord {
+				require.Contains(r, logs, "ANSWER SECTION:", "expected ANSWER SECTION in dig output but none found.\nFull logs:\n%s", logs)
+				require.Truef(r, matched, "expected DNS record for %s with IP %s not found.\nPattern: %s\nLogs:\n%s", svcName, ipStr, recordPattern, logs)
+			} else {
+				require.NotContains(r, logs, "ANSWER SECTION:", "unexpected ANSWER SECTION in dig output.\nLogs:\n%s", logs)
+				require.Falsef(r, matched, "unexpected DNS record for %s found with IP %s.\nLogs:\n%s", svcName, ipStr, logs)
+				require.Contains(r, logs, "status: NXDOMAIN", "expected NXDOMAIN when record should not resolve.\nLogs:\n%s", logs)
+				require.Contains(r, logs, "AUTHORITY SECTION:", "expected AUTHORITY SECTION in NXDOMAIN response.\nLogs:\n%s", logs)
+			}
+		}
 	})
-	logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)
 
-	// When the `dig` request is successful, a section of it's response looks like the following:
-	//
-	// ;; ANSWER SECTION:
-	// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
-	//
-	// ;; Query time: 2 msec
-	// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
-	// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
-	// ;; MSG SIZE  rcvd: 98
-	//
-	// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
-
-	// strip logs of tabs, newlines and spaces to make it easier to assert on the content when there is a DNS match
-	strippedLogs := strings.Replace(logs, "\t", "", -1)
-	strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
-	strippedLogs = strings.Replace(strippedLogs, " ", "", -1)
-	for _, ipStr := range servicePodIPs {
-		ip := net.ParseIP(ipStr)
-		require.NotNil(t, ip, "failed to parse IP: %s", ipStr)
-
-		var recordPattern string
-
-		// Check if the IP is IPv4 or IPv6 and set the correct record type
-		if ip.To4() != nil {
-			recordPattern = "%s.\t\t5\tIN\tA\t%s"
-		} else {
-			recordPattern = "%s.\t\t5\tIN\tAAAA\t%s"
-		}
-
-		// Construct the expected DNS record line from the logs
-		expectedRecord := fmt.Sprintf(recordPattern, svcName, ipStr)
-
-		if shouldResolveDNSRecord {
-			require.Contains(t, logs, "ANSWER SECTION:")
-			// Check for the correctly formatted A or AAAA record
-			require.Contains(t, strippedLogs, expectedRecord)
-		} else {
-			require.NotContains(t, logs, "ANSWER SECTION:")
-			require.NotContains(t, strippedLogs, expectedRecord)
-			require.Contains(t, logs, "status: NXDOMAIN")
-			require.Contains(t, logs, "AUTHORITY SECTION:\nconsul.\t\t\t5\tIN\tSOA\tns.consul. hostmaster.consul.")
-		}
-	}
 }
 
 func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {

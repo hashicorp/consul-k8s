@@ -322,6 +322,7 @@ func TestVault_Partitions(t *testing.T) {
 
 		"global.enterpriseLicense.secretName": licenseSecret.Path,
 		"global.enterpriseLicense.secretKey":  licenseSecret.Key,
+		"global.dualStack.defaultEnabled":     cfg.GetDualStack(),
 	}
 
 	serverHelmValues := map[string]string{

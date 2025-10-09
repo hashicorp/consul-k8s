@@ -184,6 +184,7 @@ func TestFailover_Connect(t *testing.T) {
 
 				"dns.enabled": "true",
 				"connectInject.sidecarProxy.lifecycle.defaultEnabled": "false",
+				"global.dualStack.defaultEnabled":                     cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -836,7 +837,7 @@ func dnsQuery(t testutil.TestingTB, releaseName string, dnsQuery []string, dnsSe
 
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default ANY",
+			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
 				releaseName)}
 		args = append(args, dnsQuery...)
 		var err error

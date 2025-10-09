@@ -29,11 +29,12 @@ func TestServerRestart(t *testing.T) {
 	replicas := 3
 	releaseName := helpers.RandomName()
 	helmValues := map[string]string{
-		"global.enabled":        "false",
-		"connectInject.enabled": "false",
-		"server.enabled":        "true",
-		"server.replicas":       fmt.Sprintf("%d", replicas),
-		"server.affinity":       "null", // Allow >1 pods per node so we can test in minikube with one node.
+		"global.enabled":                  "false",
+		"connectInject.enabled":           "false",
+		"server.enabled":                  "true",
+		"server.replicas":                 fmt.Sprintf("%d", replicas),
+		"server.affinity":                 "null", // Allow >1 pods per node so we can test in minikube with one node.
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 	consulCluster.Create(t)

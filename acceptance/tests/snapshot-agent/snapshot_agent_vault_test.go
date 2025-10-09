@@ -188,6 +188,7 @@ func TestSnapshotAgent_Vault(t *testing.T) {
 		"server.snapshotAgent.enabled":                 "true",
 		"server.snapshotAgent.configSecret.secretName": snapshotAgentConfigSecret.Path,
 		"server.snapshotAgent.configSecret.secretKey":  snapshotAgentConfigSecret.Key,
+		"global.dualStack.defaultEnabled":              cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {

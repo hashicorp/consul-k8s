@@ -35,8 +35,9 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		"global.tls.enabled":           "true",
 
 		// Don't install injector, controller and cni on this cluster so that it's not installed twice.
-		"connectInject.enabled":     "false",
-		"connectInject.cni.enabled": "false",
+		"connectInject.enabled":           "false",
+		"connectInject.cni.enabled":       "false",
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 	serverReleaseName := helpers.RandomName()
 	consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)

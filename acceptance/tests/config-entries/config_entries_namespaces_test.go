@@ -80,11 +80,9 @@ func TestControllerNamespaces(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.enableConsulNamespaces":  "true",
-				"global.adminPartitions.enabled": "true",
-				"connectInject.enabled":          "true",
-
-				// When mirroringK8S is set, this setting is ignored.
+				"global.enableConsulNamespaces":                             "true",
+				"global.adminPartitions.enabled":                            "true",
+				"connectInject.enabled":                                     "true",
 				"connectInject.consulNamespaces.consulDestinationNamespace": c.destinationNamespace,
 				"connectInject.consulNamespaces.mirroringK8S":               strconv.FormatBool(c.mirrorK8S),
 
@@ -94,6 +92,7 @@ func TestControllerNamespaces(t *testing.T) {
 				"terminatingGateways.enabled":              "true",
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
+				"global.dualStack.defaultEnabled":          cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
