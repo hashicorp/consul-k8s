@@ -1,0 +1,3 @@
+```release-note:feature
+cli: add consul-k8s debug command to consul-k8s cli
+```
