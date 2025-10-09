@@ -226,9 +226,10 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName, "ANY",
+		"run", dnsUtilsPod, "--image", "anubhavmishra/tiny-tools", "--labels", "release=" + releaseName,
+		"--", "dig", svcName, "ANY",
 	}
-	// Enable it after tests are stable.
+
 	// helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
 	// 	// Note: this delete command won't wait for pods to be fully terminated.
 	// 	// This shouldn't cause any test pollution because the underlying
