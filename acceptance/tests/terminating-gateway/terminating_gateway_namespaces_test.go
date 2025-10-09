@@ -10,11 +10,11 @@ import (
 	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-enterprise/sdk/testutil/retry"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 )
 
 const testNamespace = "ns1"

@@ -104,8 +104,8 @@ func NewHelmCluster(
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "60m", "--wait"},
-		"delete":  {"--timeout", "60m", "--wait"},
+		"install": {"--timeout", "15m", "--wait"},
+		"delete":  {"--timeout", "15m", "--wait"},
 	}
 
 	opts := &helm.Options{
@@ -161,7 +161,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 20 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 1 * time.Minute, Count: 5}, t, func(r *retry.R) {
 		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
 		if err != nil {
 			t.Logf("helm install failed with error %s, retrying...", err.Error())
