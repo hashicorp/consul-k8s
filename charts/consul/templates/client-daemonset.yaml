@@ -291,7 +291,7 @@ spec:
               exec /usr/local/bin/docker-entrypoint.sh consul agent \
                 -node="${NODE}" \
                 -advertise="${ADVERTISE_IP}" \
-
+                {{- if and .Values.global .Values.global.dualStack .Values.global.dualStack.defaultEnabled }}
                 -bind=:: \
                 -client=:: \
                 {{- else }}
