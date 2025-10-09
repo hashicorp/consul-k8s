@@ -1,0 +1,3 @@
+```release-note:improvement
+control-plane: updated endpoints controller to use podIP from endpoint object
+```

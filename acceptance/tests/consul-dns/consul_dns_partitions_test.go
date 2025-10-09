@@ -293,6 +293,9 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 		"dns.enabled":           "true",
 		"dns.proxy.enabled":     "true",
 		"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+
+		// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
+		"dns.proxy.port": "8053",
 	}
 
 	serverHelmValues := map[string]string{
