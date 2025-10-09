@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"testing"
@@ -161,11 +162,13 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		}
 	}
 
+	fmt.Println("===========================> \n", string(debug.Stack()))
+
 	if t.DualStack {
-		fmt.Println("===========> Dual stack mode set to true")
+		fmt.Println("===========================> Dual stack mode set to true")
 		setIfNotEmpty(helmValues, "global.dualStack.defaultEnabled", "true")
 	} else {
-		fmt.Println("===========> Dual stack mode set to false false false")
+		fmt.Println("===========================> Dual stack mode set to false false false")
 	}
 
 	// UseGKEAutopilot is a temporary hack that we need in place as GKE Autopilot is already installing
