@@ -20,13 +20,14 @@ import (
 )
 
 const (
-	allCapabilities              = "ALL"
-	netBindCapability            = "NET_BIND_SERVICE"
-	consulDataplaneDNSBindHost   = "127.0.0.1"
-	consulDataplaneDNSBindPort   = 8600
-	defaultEnvoyProxyConcurrency = 1
-	volumeNameForConnectInject   = "consul-connect-inject-data"
-	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
+	allCapabilities                = "ALL"
+	netBindCapability              = "NET_BIND_SERVICE"
+	consulDataplaneDNSBindHost     = "127.0.0.1"
+	ipv6ConsulDataplaneDNSBindHost = "::1"
+	consulDataplaneDNSBindPort     = 8600
+	defaultEnvoyProxyConcurrency   = 1
+	volumeNameForConnectInject     = "consul-connect-inject-data"
+	volumeNameForTLSCerts          = "consul-gateway-tls-certificates"
 )
 
 func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
@@ -158,16 +159,20 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	envoyAdminBindAddress := "127.0.0.1"
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
+	consulDNSBindAddress := consulDataplaneDNSBindHost
 
 	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
 		envoyAdminBindAddress = "::1"
+		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
 		consulDPBindAddress = "::"
 		xdsBindAddress = "::1"
+
 	}
 
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
 		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-consul-dns-bind-addr=" + consulDNSBindAddress,
 		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,

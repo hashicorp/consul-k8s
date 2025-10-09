@@ -74,8 +74,8 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 		t.Log("executing command:", command.Command, strings.Join(command.Args, " "))
 		output, err = helpers.RunCommand(t, options, command)
 		t.Log("====================================================================")
-		t.Log("with error", err, "output:", output)
-		t.Log("====================================================================")
+		// t.Log("with error", err, "output:", output)
+		// t.Log("====================================================================")
 
 		if err != nil {
 			// Want to retry on errors connecting to actual Kube API because
