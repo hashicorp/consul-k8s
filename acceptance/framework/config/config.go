@@ -237,6 +237,7 @@ func (t *TestConfig) entImage() (string, error) {
 	if strings.Contains(v.Global.Image, "@sha256") {
 		return v.Global.Image, nil
 	}
+	
 
 	// Otherwise, assume that we have an image tag with a version in it.
 	// Use the same Docker repository and tagging scheme, but replace 'consul' with 'consul-enterprise'.
