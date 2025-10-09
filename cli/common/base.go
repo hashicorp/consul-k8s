@@ -22,6 +22,9 @@ type BaseCommand struct {
 
 	// UI is used to write to the CLI.
 	UI terminal.UI
+
+	// CleanupConfirmation is the channel to notify main.go if cleanup is required and is completed
+	CleanupReqAndCompleted chan bool
 }
 
 // Close cleans up any resources that the command created. This should be
