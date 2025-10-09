@@ -222,16 +222,10 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
-	ds := "false"
-	if cfg.DualStack {
-		ds = "true"
-	}
-
 	consulHelmValues := map[string]string{
-		"global.dualStack.defaultEnabled": ds,
-		"server.extraVolumes[0].type":     "secret",
-		"server.extraVolumes[0].name":     vaultCASecret,
-		"server.extraVolumes[0].load":     "false",
+		"server.extraVolumes[0].type": "secret",
+		"server.extraVolumes[0].name": vaultCASecret,
+		"server.extraVolumes[0].load": "false",
 
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
@@ -277,7 +271,8 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 		"syncCatalog.toK8S":    "false",
 
 		// Enable clients to make sure vault integration still works.
-		"client.enabled": "true",
+		"client.enabled":                  "true",
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {

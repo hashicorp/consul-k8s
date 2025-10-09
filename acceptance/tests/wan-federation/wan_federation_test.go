@@ -79,8 +79,9 @@ func TestWANFederation(t *testing.T) {
 				"connectInject.enabled":  "true",
 				"connectInject.replicas": "1",
 
-				"meshGateway.enabled":  "true",
-				"meshGateway.replicas": "1",
+				"meshGateway.enabled":             "true",
+				"meshGateway.replicas":            "1",
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			if cfg.UseKind {
@@ -122,8 +123,9 @@ func TestWANFederation(t *testing.T) {
 				"connectInject.enabled":  "true",
 				"connectInject.replicas": "1",
 
-				"meshGateway.enabled":  "true",
-				"meshGateway.replicas": "1",
+				"meshGateway.enabled":             "true",
+				"meshGateway.replicas":            "1",
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			if c.secure {
@@ -255,6 +257,7 @@ func TestWANFederationFailover(t *testing.T) {
 
 				"global.enableConsulNamespaces":               "true",
 				"connectInject.consulNamespaces.mirroringK8S": "true",
+				"global.dualStack.defaultEnabled":             cfg.GetDualStack(),
 			}
 
 			if cfg.UseKind {
@@ -301,6 +304,7 @@ func TestWANFederationFailover(t *testing.T) {
 
 				"global.enableConsulNamespaces":               "true",
 				"connectInject.consulNamespaces.mirroringK8S": "true",
+				"global.dualStack.defaultEnabled":             cfg.GetDualStack(),
 			}
 
 			if c.secure {

@@ -387,6 +387,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.address":             primaryVaultCluster.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
+		"global.dualStack.defaultEnabled":                           cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {
@@ -464,6 +465,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPathSecondary,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePathSecondary,
 		"global.secretsBackend.vault.connectCA.additionalConfig":    fmt.Sprintf(`"{"connect": [{"ca_config": [{"tls_server_name": "%s-vault"}]}]}"`, vaultReleaseName),
+		"global.dualStack.defaultEnabled":                           cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {

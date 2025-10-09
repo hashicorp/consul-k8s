@@ -184,6 +184,7 @@ func TestFailover_Connect(t *testing.T) {
 
 				"dns.enabled": "true",
 				"connectInject.sidecarProxy.lifecycle.defaultEnabled": "false",
+				"global.dualStack.defaultEnabled":                     cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()

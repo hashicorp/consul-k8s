@@ -63,6 +63,8 @@ func TestController(t *testing.T) {
 				"terminatingGateways.enabled":              "true",
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
+				// When mirroringK8S is set, this setting is ignored.
+				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()

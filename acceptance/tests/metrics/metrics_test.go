@@ -60,6 +60,7 @@ func TestComponentMetrics(t *testing.T) {
 		"ingressGateways.defaults.resources.requests.cpu":     "50m",
 		"terminatingGateways.defaults.resources.requests.cpu": "50m",
 		"meshGateway.resources.requests.cpu":                  "50m",
+		"global.dualStack.defaultEnabled":                     cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()
@@ -119,6 +120,7 @@ func TestAppMetrics(t *testing.T) {
 		"global.metrics.enabled":                     "true",
 		"connectInject.enabled":                      "true",
 		"connectInject.metrics.defaultEnableMerging": "true",
+		"global.dualStack.defaultEnabled":            cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()

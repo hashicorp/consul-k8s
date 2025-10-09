@@ -72,6 +72,11 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
 	vaultLicenseSecretKey := "license"
 
+	if cfg.DualStack {
+		values["server.service.ipFamilyPolicy"] = "SingleStack"
+		values["server.service.ipFamilies"] = "[\"IPv6\"]"
+	}
+
 	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
 	if cfg.VaultServerVersion != "" {
@@ -411,7 +416,7 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 
 	v.logger.Logf(t, "initializing and unsealing Vault")
 	namespace := v.helmOptions.KubectlOptions.Namespace
-	retrier := &retry.Timer{Timeout: 10 * time.Minute, Wait: 10 * time.Second}
+	retrier := &retry.Timer{Timeout: 20 * time.Minute, Wait: 10 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		// Wait for vault server pod to be running so that we can create Vault client without errors.
 		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})

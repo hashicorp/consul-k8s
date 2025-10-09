@@ -27,10 +27,11 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 	helmValues := map[string]string{
-		"global.logLevel":              "trace",
-		"connectInject.enabled":        "true",
-		"global.acls.manageSystemACLs": "true",
-		"global.tls.enabled":           "true",
+		"global.logLevel":                 "trace",
+		"connectInject.enabled":           "true",
+		"global.acls.manageSystemACLs":    "true",
+		"global.tls.enabled":              "true",
+		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()

@@ -114,6 +114,13 @@ type TestConfig struct {
 	DualStack     bool
 }
 
+func (t *TestConfig) GetDualStack() string {
+	if t.DualStack {
+		return "true"
+	}
+	return "false"
+}
+
 // HelmValuesFromConfig returns a map of Helm values
 // that includes any non-empty values from the TestConfig.
 func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
