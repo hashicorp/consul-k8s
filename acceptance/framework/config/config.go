@@ -162,6 +162,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	}
 
 	if t.DualStack {
+		fmt.Println("===========> Dual stack mode set to true")
 		setIfNotEmpty(helmValues, "global.dualStack.defaultEnabled", "true")
 	}
 

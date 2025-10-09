@@ -643,14 +643,14 @@ spec:
                 - |
                   {{- if .Values.global.tls.enabled }}
                   curl -k \
-                    {{- if .Values.global.dualStack.defaultEnabled }}
+                    {{- if and .Values.global .Values.global.dualStack .Values.global.dualStack.defaultEnabled }}
                     https://[::1]:8501/v1/status/leader \
                     {{- else }}
                     https://127.0.0.1:8501/v1/status/leader \
                     {{- end }}
                   {{- else }}
                   curl \
-                    {{- if .Values.global.dualStack.defaultEnabled }}
+                    {{- if and .Values.global .Values.global.dualStack .Values.global.dualStack.defaultEnabled }}
                     http://[::1]:8500/v1/status/leader \
                     {{- else }}
                     http://127.0.0.1:8500/v1/status/leader \
@@ -690,7 +690,7 @@ spec:
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.defaultEnabled }}
+              {{- if and .Values.global .Values.global.dualStack .Values.global.dualStack.defaultEnabled }}
               value: https://[::1]:8501
               {{- else }}
               value: https://127.0.0.1:8501
@@ -703,7 +703,7 @@ spec:
               {{- end }}
             {{- else }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.defaultEnabled }}
+              {{- if and .Values.global .Values.global.dualStack .Values.global.dualStack.defaultEnabled }}
               value: http://[::1]:8500
               {{- else }}
               value: http://127.0.0.1:8500
