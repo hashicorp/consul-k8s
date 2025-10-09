@@ -216,10 +216,10 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				}
 
 				// Skip registration if node information is incomplete to prevent duplicate registrations.
-				if pod.Spec.NodeName == "" || pod.Status.PodIP == "" || pod.Status.HostIP == "" {
+				if pod.Spec.NodeName == "" || address.IP == "" || pod.Status.HostIP == "" {
 					r.Log.Info("skipping pod registration due to incomplete node information",
 						"pod", pod.Name, "namespace", pod.Namespace,
-						"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
+						"nodeName", pod.Spec.NodeName, "podIP", address.IP, "hostIP", pod.Status.HostIP)
 					// Don't set up for deregistration since we're not registering it
 					continue
 				}
@@ -233,12 +233,12 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 				if hasBeenInjected(pod) {
 					if isConsulDataplaneSupported(pod) {
-						if err = r.registerServicesAndHealthCheck(apiClient, pod, serviceEndpoints, healthStatus); err != nil {
+						if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
 							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 							errs = multierror.Append(errs, err)
 						}
 						// Build the deregisterEndpointAddress map up for deregistering service instances later.
-						deregisterEndpointAddress[pod.Status.PodIP] = false
+						deregisterEndpointAddress[address.IP] = false
 					} else {
 						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
@@ -261,12 +261,12 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				}
 
 				if isGateway(pod) {
-					if err = r.registerGateway(apiClient, pod, serviceEndpoints, healthStatus); err != nil {
+					if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
 						r.Log.Error(err, "failed to register gateway or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 						errs = multierror.Append(errs, err)
 					}
 					// Build the deregisterEndpointAddress map up for deregistering service instances later.
-					deregisterEndpointAddress[pod.Status.PodIP] = false
+					deregisterEndpointAddress[address.IP] = false
 				}
 			}
 		}
@@ -296,7 +296,7 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) error {
+func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	var managedByEndpointsController bool
 	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
@@ -304,7 +304,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	// For pods managed by this controller, create and register the service instance.
 	if managedByEndpointsController {
 		// Get information from the pod to create service instance registrations.
-		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, serviceEndpoints, healthStatus)
+		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, podIP, serviceEndpoints, healthStatus)
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
@@ -354,7 +354,7 @@ func parseLocality(node corev1.Node) *api.Locality {
 
 // registerGateway creates Consul registrations for the Connect Gateways and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) error {
+func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	var managedByEndpointsController bool
 	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
@@ -362,7 +362,7 @@ func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, serv
 	// For pods managed by this controller, create and register the service instance.
 	if managedByEndpointsController {
 		// Get information from the pod to create service instance registrations.
-		serviceRegistration, err := r.createGatewayRegistrations(pod, serviceEndpoints, healthStatus)
+		serviceRegistration, err := r.createGatewayRegistrations(pod, podIP, serviceEndpoints, healthStatus)
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
@@ -429,7 +429,7 @@ func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
 	// If a port is specified, then we determine the value of that port
 	// and register that port for the host service.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
@@ -486,7 +486,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		ID:        svcID,
 		Service:   svcName,
 		Port:      consulServicePort,
-		Address:   pod.Status.PodIP,
+		Address:   podIP,
 		Meta:      meta,
 		Namespace: consulNS,
 		Tags:      tags,
@@ -568,7 +568,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 		ID:        proxySvcID,
 		Service:   proxySvcName,
 		Port:      proxyPort,
-		Address:   pod.Status.PodIP,
+		Address:   podIP,
 		Meta:      meta,
 		Namespace: consulNS,
 		Proxy:     proxyConfig,
@@ -716,7 +716,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, serviceEndpoints
 }
 
 // createGatewayRegistrations creates the gateway service registrations with the information from the Pod.
-func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, error) {
+func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, error) {
 	meta := map[string]string{
 		constants.MetaKeyPodName: pod.Name,
 		metaKeyKubeServiceName:   serviceEndpoints.Name,
@@ -734,7 +734,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 
 	service := &api.AgentService{
 		ID:      pod.Name,
-		Address: pod.Status.PodIP,
+		Address: podIP,
 		Meta:    meta,
 		Proxy: &api.AgentServiceConnectProxyConfig{
 			Config: baseConfig,
@@ -774,7 +774,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		}
 		service.TaggedAddresses = map[string]api.ServiceAddress{
 			"lan": {
-				Address: pod.Status.PodIP,
+				Address: podIP,
 				Port:    port,
 			},
 			"wan": {
@@ -803,7 +803,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 		service.Port = 21000
 		service.TaggedAddresses = map[string]api.ServiceAddress{
 			"lan": {
-				Address: pod.Status.PodIP,
+				Address: podIP,
 				Port:    21000,
 			},
 			"wan": {
@@ -825,7 +825,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, serviceEndpoints
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", pod.Status.PodIP)
+		service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", podIP)
 	}
 
 	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {
