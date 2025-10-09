@@ -104,6 +104,12 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			// Override the default proxy config settings for this test
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
+
+			retry.Run(t, func(r *retry.R) {
+				peers, err := consulClient.Status().Peers()
+				require.NoError(r, err)
+				require.Len(r, peers, 1)
+			})
 			_, _, err := consulClient.ConfigEntries().Set(&api.ProxyConfigEntry{
 				Kind: api.ProxyDefaults,
 				Name: api.ProxyConfigGlobal,
@@ -141,15 +147,20 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "creating target http server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
+
 			// We use the static-client pod so that we can make calls to the api gateway
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			logger.Log(t, "creating static-client pod")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
-
 			logger.Log(t, "patching route to target http server")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+			// Use retries to handle intermittent failures when patching the httproute
+			retry.Run(t, func(r *retry.R) {
+				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+				require.NoError(r, err, out)
+				logger.Log(t, "successfully patched httproute")
+			})
 
 			logger.Log(t, "creating target tcp server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
