@@ -245,7 +245,7 @@ func verifyDNS(
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", "-i", dnsUtilsPod,
+		"run", "-i", dnsUtilsPod, "--rm",
 		"--restart", "Never",
 		"--image", "anubhavmishra/tiny-tools",
 		"--labels", "release=" + releaseName,
@@ -263,39 +263,40 @@ func verifyDNS(
 		fmt.Println("run the dns utility pod and query DNS for the service.")
 		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
+		logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)
+
+		// Normalize whitespace for reliable matching
+		cleanLogs := strings.ReplaceAll(logs, "\t", " ")
+		cleanLogs = strings.Join(strings.Fields(cleanLogs), " ")
+
+		for _, ipStr := range servicePodIPs {
+			ip := net.ParseIP(ipStr)
+			require.NotNil(r, ip, "failed to parse IP: %s", ipStr)
+
+			// Build a regex that tolerates TTL and spacing variations
+			var recordPattern string
+			if ip.To4() != nil {
+				// IPv4 record (A)
+				recordPattern = fmt.Sprintf(`%s\.\s+\d+\s+IN\s+A\s+%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
+			} else {
+				// IPv6 record (AAAA)
+				recordPattern = fmt.Sprintf(`%s\.\s+\d+\s+IN\s+AAAA\s+%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
+			}
+
+			matched, _ := regexp.MatchString(recordPattern, cleanLogs)
+
+			if shouldResolveDNSRecord {
+				require.Contains(r, logs, "ANSWER SECTION:", "expected ANSWER SECTION in dig output but none found.\nFull logs:\n%s", logs)
+				require.Truef(r, matched, "expected DNS record for %s with IP %s not found.\nPattern: %s\nLogs:\n%s", svcName, ipStr, recordPattern, logs)
+			} else {
+				require.NotContains(r, logs, "ANSWER SECTION:", "unexpected ANSWER SECTION in dig output.\nLogs:\n%s", logs)
+				require.Falsef(r, matched, "unexpected DNS record for %s found with IP %s.\nLogs:\n%s", svcName, ipStr, logs)
+				require.Contains(r, logs, "status: NXDOMAIN", "expected NXDOMAIN when record should not resolve.\nLogs:\n%s", logs)
+				require.Contains(r, logs, "AUTHORITY SECTION:", "expected AUTHORITY SECTION in NXDOMAIN response.\nLogs:\n%s", logs)
+			}
+		}
 	})
-	logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)
 
-	// Normalize whitespace for reliable matching
-	cleanLogs := strings.ReplaceAll(logs, "\t", " ")
-	cleanLogs = strings.Join(strings.Fields(cleanLogs), " ")
-
-	for _, ipStr := range servicePodIPs {
-		ip := net.ParseIP(ipStr)
-		require.NotNil(t, ip, "failed to parse IP: %s", ipStr)
-
-		// Build a regex that tolerates TTL and spacing variations
-		var recordPattern string
-		if ip.To4() != nil {
-			// IPv4 record (A)
-			recordPattern = fmt.Sprintf(`%s\.\s+\d+\s+IN\s+A\s+%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
-		} else {
-			// IPv6 record (AAAA)
-			recordPattern = fmt.Sprintf(`%s\.\s+\d+\s+IN\s+AAAA\s+%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
-		}
-
-		matched, _ := regexp.MatchString(recordPattern, cleanLogs)
-
-		if shouldResolveDNSRecord {
-			require.Contains(t, logs, "ANSWER SECTION:", "expected ANSWER SECTION in dig output but none found.\nFull logs:\n%s", logs)
-			require.Truef(t, matched, "expected DNS record for %s with IP %s not found.\nPattern: %s\nLogs:\n%s", svcName, ipStr, recordPattern, logs)
-		} else {
-			require.NotContains(t, logs, "ANSWER SECTION:", "unexpected ANSWER SECTION in dig output.\nLogs:\n%s", logs)
-			require.Falsef(t, matched, "unexpected DNS record for %s found with IP %s.\nLogs:\n%s", svcName, ipStr, logs)
-			require.Contains(t, logs, "status: NXDOMAIN", "expected NXDOMAIN when record should not resolve.\nLogs:\n%s", logs)
-			require.Contains(t, logs, "AUTHORITY SECTION:", "expected AUTHORITY SECTION in NXDOMAIN response.\nLogs:\n%s", logs)
-		}
-	}
 }
 
 func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {

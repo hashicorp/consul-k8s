@@ -222,10 +222,16 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 
 	vaultCASecret := vault.CASecretName(vaultReleaseName)
 
+	ds := "false"
+	if cfg.DualStack {
+		ds = "true"
+	}
+
 	consulHelmValues := map[string]string{
-		"server.extraVolumes[0].type": "secret",
-		"server.extraVolumes[0].name": vaultCASecret,
-		"server.extraVolumes[0].load": "false",
+		"global.dualStack.defaultEnabled": ds,
+		"server.extraVolumes[0].type":     "secret",
+		"server.extraVolumes[0].name":     vaultCASecret,
+		"server.extraVolumes[0].load":     "false",
 
 		"connectInject.enabled":  "true",
 		"connectInject.replicas": "1",
