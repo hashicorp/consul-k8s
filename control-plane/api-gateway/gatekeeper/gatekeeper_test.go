@@ -1506,8 +1506,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		}
 		assert.True(t, hasInitContainer)
 
-		// Ensure there is a consul-dataplane container dropping ALL capabilities, adding
-		// back the NET_BIND_SERVICE capability, and establishing a read-only root filesystem
+		// Ensure there is a consul-dataplane container dropping ALL capabilities and establishing a read-only root filesystem
 		hasDataplaneContainer := false
 		for _, container := range actual.Spec.Template.Spec.Containers {
 			if container.Image == dataplaneImage {
@@ -1516,7 +1515,6 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 				require.NotNil(t, container.SecurityContext.Capabilities)
 				require.NotNil(t, container.SecurityContext.ReadOnlyRootFilesystem)
 				assert.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)
-				assert.Equal(t, []corev1.Capability{netBindCapability}, container.SecurityContext.Capabilities.Add)
 				assert.Equal(t, []corev1.Capability{allCapabilities}, container.SecurityContext.Capabilities.Drop)
 			}
 		}

@@ -23,8 +23,33 @@ securityContext:
   capabilities:
     drop:
     - ALL
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+{{- if not .Values.global.openshift.enabled -}}
+{{/*
+We must set runAsUser or else the root user will be used in some cases and
+containers will fail to start due to runAsNonRoot above (e.g.
+tls-init-cleanup). On OpenShift, runAsUser is automatically. We pick user 100
+because it is a non-root user id that exists in the consul, consul-dataplane,
+and consul-k8s-control-plane images.
+*/}}
+  runAsUser: 100
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+
+{{- define "consul.restrictedSecurityContextWithNetBindService" -}}
+{{- if not .Values.global.enablePodSecurityPolicies -}}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
     add:
     - NET_BIND_SERVICE
+    drop:
+    - ALL
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
@@ -656,4 +681,24 @@ Usage: {{ template "consul.imagePullPolicy" . }} TODO: melisa should we name thi
 {{ else }}
 {{fail "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" }}
 {{ end }}
+{{- end -}}
+
+{{/*
+Checks if any of the ingress gateway ports are privileged (< 1024).
+This helper takes the ingress gateway configuration and checks both specific
+service ports and default service ports to determine if privileged ports are needed.
+
+Usage: {{ template "consul.ingressGatewayHasPrivilegedPorts" (dict "service" .service "defaults" $defaults) }}
+*/}}
+{{- define "consul.ingressGatewayHasPrivilegedPorts" -}}
+{{- $service := .service -}}
+{{- $defaults := .defaults -}}
+{{- $ports := (default $defaults.service.ports $service.ports) -}}
+{{- $hasPrivilegedPorts := false -}}
+{{- range $port := $ports -}}
+  {{- if lt (int $port.port) 1024 -}}
+    {{- $hasPrivilegedPorts = true -}}
+  {{- end -}}
+{{- end -}}
+{{- $hasPrivilegedPorts -}}
 {{- end -}}
