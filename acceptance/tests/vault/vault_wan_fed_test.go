@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -410,7 +411,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 		kubernetesEndpoint, err := secondaryCtx.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), KubernetesAuthMethodPath, metav1.GetOptions{})
 		require.NoError(t, err)
-		k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+		k8sAuthMethodHost = net.JoinHostPort(kubernetesEndpoint.Subsets[0].Addresses[0].IP, strconv.Itoa(kubernetesEndpoint.Subsets[0].Ports[0].Port))
 	} else {
 		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryCtx.KubectlOptions(t))
 	}
@@ -537,8 +538,8 @@ func vaultAddress(t *testing.T, cfg *config.TestConfig, ctx environment.TestCont
 func meshGatewayAddress(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext, consulReleaseName string) string {
 	primaryMeshGWHost := k8s.ServiceHost(t, cfg, ctx, fmt.Sprintf("%s-consul-mesh-gateway", consulReleaseName))
 	if cfg.UseKind {
-		return fmt.Sprintf("%s:%d", primaryMeshGWHost, 30000)
+		return net.JoinHostPort(primaryMeshGWHost, "30000")
 	} else {
-		return fmt.Sprintf("%s:%d", primaryMeshGWHost, 443)
+		return net.JoinHostPort(primaryMeshGWHost, "443")
 	}
 }

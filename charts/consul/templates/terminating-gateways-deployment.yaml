@@ -204,6 +204,7 @@ spec:
             - "-ec"
             - |
               exec consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${NAMESPACE} \
+                  -gateway-kind="terminating-gateway" \
                   -proxy-id-file=/consul/service/proxy-id \
                   -service-name={{ .name }} \
                   -log-level={{ default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel }} \
@@ -272,6 +273,10 @@ spec:
             value: component=terminating-gateway
           - name: DP_SERVICE_NODE_NAME
             value: $(NODE_NAME)-virtual
+          - name: DP_ENVOY_READY_BIND_ADDRESS
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
           command:
           - consul-dataplane
           args:

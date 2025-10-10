@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 		kubernetesEndpoint, err := secondaryContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
 		require.NoError(t, err)
-		k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+		k8sAuthMethodHost = net.JoinHostPort(kubernetesEndpoint.Subsets[0].Addresses[0].IP, strconv.Itoa(kubernetesEndpoint.Subsets[0].Ports[0].Port))
 	} else {
 		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
 	}

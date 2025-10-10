@@ -319,14 +319,14 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// Server cluster.
 			retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 				services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", serverQueryOpts)
-				require.NoError(t, err)
-				require.Len(t, services, 1)
+				require.NoError(r, err)
+				require.Len(r, services, 1)
 			})
 			// Client cluster.
 			retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 				services, _, err := staticClientPeerClient.Catalog().Service(staticClientName, "", clientQueryOpts)
-				require.NoError(t, err)
-				require.Len(t, services, 1)
+				require.NoError(r, err)
+				require.Len(r, services, 1)
 			})
 
 			logger.Log(t, "creating exported services")

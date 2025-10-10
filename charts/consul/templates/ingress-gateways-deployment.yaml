@@ -296,10 +296,6 @@ spec:
           value: component=ingress-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
-        - name: DP_ENVOY_READY_BIND_ADDRESS
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         {{- if $needsPrivilegedPorts }}
         command:
         - privileged-consul-dataplane

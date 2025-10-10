@@ -191,7 +191,7 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	// If we're using the DNS proxy, we need to use port 8053 (non-privileged) in K8s 1.30+
 	dnsTarget := dnsIP
 	if enableDNSProxy {
-		dnsTarget = fmt.Sprintf("%s:8053", dnsIP)
+		dnsTarget = net.JoinHostPort(dnsIP, "8053")
 	}
 
 	input, err := os.ReadFile("coredns-template.yaml")
