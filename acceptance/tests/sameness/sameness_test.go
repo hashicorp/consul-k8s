@@ -683,9 +683,9 @@ func (c *cluster) preparedQueryFailoverCheck(t *testing.T, releaseName string, e
 func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, failover *cluster) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	q := "SRV"
-	if cfg.DualStack {
-		q = "AAAA"
-	}
+	// if cfg.DualStack {
+	// 	q = "AAAA"
+	// }
 	dnsLookup := []string{fmt.Sprintf("static-server.service.ns2.ns.%s.sg.%s.ap.consul", samenessGroupName, c.fullTextPartition()), "+tcp", q}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use the primary cluster when performing a DNS lookup, this mostly affects cases
