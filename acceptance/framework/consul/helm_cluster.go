@@ -101,8 +101,8 @@ func NewHelmCluster(
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m", "--debug"},
-		"delete":  {"--timeout", "15m", "--debug"},
+		"install": {"--timeout", "30m", "--debug"},
+		"delete":  {"--timeout", "30m", "--debug"},
 	}
 
 	opts := &helm.Options{
@@ -157,6 +157,29 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 
+	fmt.Println("========================================================================")
+	fmt.Println("values are ", h.helmOptions.SetValues)
+	fmt.Println("========================================================================")
+	fmt.Println("========================Preinstall cluster state==========================")
+	o, err := k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "get", "nodes", "-o", "wide")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "describe", "node", "-A")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "get", "pods", "-A", "-o", "wide")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "logs", "-n", "kube-system", "-l", "k8s-app=kube-proxy")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "logs", "-n", "kube-system", "-l", "app=kindnet")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+	fmt.Println("========================================================================")
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 5}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
@@ -165,7 +188,29 @@ func (h *HelmCluster) Create(t *testing.T) {
 		}
 		require.NoError(r, err)
 	})
+	fmt.Println("========================================================================")
+	fmt.Println("values are ", h.helmOptions.SetValues)
+	fmt.Println("========================================================================")
+	fmt.Println("========================Preinstall cluster state==========================")
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "get", "nodes", "-o", "wide")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "describe", "node", "-A")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
 
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "get", "pods", "-A", "-o", "wide")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "logs", "-n", "kube-system", "-l", "k8s-app=kube-proxy")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "logs", "-n", "kube-system", "-l", "app=kindnet")
+	fmt.Println(err, o)
+	fmt.Println("========================================================================")
+	fmt.Println("========================================================================")
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
