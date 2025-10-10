@@ -141,7 +141,7 @@ func TestConsulDNS_PrivilegedPort(t *testing.T) {
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
 
-			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName)
+			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName, c.enableDNSProxy)
 			verifyDNSWithPrivilegedPort(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 
@@ -273,7 +273,7 @@ func TestConsulDNSProxy_PrivilegedPort(t *testing.T) {
 			}
 
 			// Update CoreDNS to use Consul DNS
-			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName)
+			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName, true)  // DNS proxy is enabled in TestConsulDNSProxy_PrivilegedPort
 
 			// Verify that the Consul service can be resolved through DNS
 			verifyDNSWithPrivilegedPort(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server", "consul.service.consul", true, 0)
@@ -285,9 +285,9 @@ func TestConsulDNSProxy_PrivilegedPort(t *testing.T) {
 	}
 }
 
-func updateCoreDNSWithConsulDomainPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string) {
+func updateCoreDNSWithConsulDomainPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
 	// For privileged port, don't need to specify port number, using default DNS port 53
-	updateCoreDNSFileForPrivilegedPort(t, ctx, releaseName, "coredns-custom.yaml")
+	updateCoreDNSFileForPrivilegedPort(t, ctx, releaseName, "coredns-custom.yaml", enableDNSProxy)
 	updateCoreDNS(t, ctx, "coredns-custom.yaml")
 
 	t.Cleanup(func() {
@@ -296,8 +296,8 @@ func updateCoreDNSWithConsulDomainPrivilegedPort(t *testing.T, ctx environment.T
 	})
 }
 
-func updateCoreDNSFileForPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string, dnsFileName string) {
-	dnsIP, err := getDNSServiceOrProxyIP(t, ctx, releaseName, true)
+func updateCoreDNSFileForPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string, dnsFileName string, enableDNSProxy bool) {
+	dnsIP, err := getDNSServiceOrProxyIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
 	// When using a privileged port (53), we don't need to specify the port in the CoreDNS config

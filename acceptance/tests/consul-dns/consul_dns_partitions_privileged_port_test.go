@@ -62,8 +62,9 @@ func TestConsulDNSProxy_WithPartitionsAndPrivilegedPort(t *testing.T) {
 				defaultPartition)
 
 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
-			updateCoreDNSWithConsulDomainForPrivilegedPort(t, defaultClusterContext, releaseName)
-			updateCoreDNSWithConsulDomainForPrivilegedPort(t, secondaryClusterContext, releaseName)
+			// For partitions test, DNS proxy is enabled by default
+			updateCoreDNSWithConsulDomainForPrivilegedPort(t, defaultClusterContext, releaseName, true)
+			updateCoreDNSWithConsulDomainForPrivilegedPort(t, secondaryClusterContext, releaseName, true)
 
 			podLabelSelector := "app=static-server"
 			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
@@ -211,11 +212,10 @@ func getVerificationsForPrivilegedPort(defaultClusterContext environment.TestCon
 				// Disable DNS proxy, should fall back to DNS service
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "false"})
 
-				// Now we need to update CoreDNS to use the DNS service (not proxy)
+				// Update CoreDNS to use the DNS service (not proxy)
 				dnsIP, err := getDNSServiceOrProxyIP(t, defaultClusterContext, releaseName, false)
 				require.NoError(t, err)
 
-				// When using a privileged port (53), we don't need to specify the port in the CoreDNS config
 				input, err := os.ReadFile("coredns-template.yaml")
 				require.NoError(t, err)
 
@@ -244,11 +244,10 @@ func getVerificationsForPrivilegedPort(defaultClusterContext environment.TestCon
 				// Re-enable DNS proxy with privileged port
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "true", "dns.proxy.port": "53"})
 
-				// Now we need to update CoreDNS to use the DNS proxy
+				// Update CoreDNS to use the DNS proxy
 				dnsIP, err := getDNSServiceOrProxyIP(t, defaultClusterContext, releaseName, true)
 				require.NoError(t, err)
 
-				// When using a privileged port (53), we don't need to specify the port in the CoreDNS config
 				input, err := os.ReadFile("coredns-template.yaml")
 				require.NoError(t, err)
 
@@ -466,12 +465,11 @@ func setupClustersAndStaticServiceWithPrivilegedPort(t *testing.T, cfg *config.T
 	return releaseName, consulClient, defaultPartitionQueryOpts, secondaryPartitionQueryOpts, defaultConsulCluster
 }
 
-func updateCoreDNSWithConsulDomainForPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string) {
+func updateCoreDNSWithConsulDomainForPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
 	// Get the DNS service/proxy IP and update CoreDNS to forward to it
-	dnsIP, err := getDNSServiceOrProxyIP(t, ctx, releaseName, true)
+	dnsIP, err := getDNSServiceOrProxyIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
-	// When using a privileged port (53), we don't need to specify the port in the CoreDNS config
 	input, err := os.ReadFile("coredns-template.yaml")
 	require.NoError(t, err)
 
@@ -503,7 +501,7 @@ func getDNSServiceOrProxyIP(t *testing.T, ctx environment.TestContext, releaseNa
 	return dnsService.Spec.ClusterIP, nil
 }
 
-// getDNSServiceName returns the correct service name for either DNS proxy or DNS service
+// getDNSServiceName returns the correct service name for either DNS proxy or service
 func getDNSServiceName(releaseName string, enableDNSProxy bool) string {
 	if enableDNSProxy {
 		return fmt.Sprintf("%s-consul-dns-proxy", releaseName)
