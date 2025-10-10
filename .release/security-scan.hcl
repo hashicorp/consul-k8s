@@ -48,6 +48,12 @@ repository {
 
   triage {
     suppress {
+      paths = [
+        # Ignore test and local tool modules, which are not included in published
+        # artifacts.
+        "acceptance/*",
+        "hack/*",
+      ]
       vulnerabilities = [
         "GO-2022-0635"
       ]
