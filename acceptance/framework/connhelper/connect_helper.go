@@ -29,7 +29,7 @@ const (
 	StaticServerName = "static-server"
 	JobName          = "job-client"
 
-	retryTimeout = 240 * time.Second
+	retryTimeout = 120 * time.Second
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.

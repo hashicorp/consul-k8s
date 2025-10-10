@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	kubectlTimeout = "--timeout=5m"
+	kubectlTimeout = "--timeout=120s"
 )
 
 // kubeAPIConnectErrs are errors that sometimes occur when talking to the
@@ -63,7 +63,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 
 	counter := &retry.Counter{
 		Count: 10,
-		Wait:  5 * time.Second,
+		Wait:  1 * time.Second,
 	}
 	var output string
 	var err error

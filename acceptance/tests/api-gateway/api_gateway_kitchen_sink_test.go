@@ -134,7 +134,6 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	// Create static server and static client
 	logger.Log(t, "creating static-client pod")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=30m", fmt.Sprintf("deploy/%s", "static-server"))
 
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
@@ -147,7 +146,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
 	// Waiting for gateway to be ready.
-	gatewayCounter := &retry.Counter{Count: 30, Wait: 30 * time.Second}
+	gatewayCounter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
 	logger.Log(t, "waiting for gateway to be ready")
 	retry.RunWith(gatewayCounter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway

@@ -416,7 +416,7 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 
 	v.logger.Logf(t, "initializing and unsealing Vault")
 	namespace := v.helmOptions.KubectlOptions.Namespace
-	retrier := &retry.Timer{Timeout: 20 * time.Minute, Wait: 10 * time.Second}
+	retrier := &retry.Timer{Timeout: 4 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		// Wait for vault server pod to be running so that we can create Vault client without errors.
 		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})

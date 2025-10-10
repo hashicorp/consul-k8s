@@ -555,9 +555,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 
 	if consulServicePort > 0 {
 		proxyConfig.LocalServiceAddress = "127.0.0.1"
-		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
-			proxyConfig.LocalServiceAddress = "::"
-		}
 		proxyConfig.LocalServicePort = consulServicePort
 	}
 

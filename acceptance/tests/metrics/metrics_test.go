@@ -75,8 +75,6 @@ func TestComponentMetrics(t *testing.T) {
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 	// Server Metrics
-	// add retry
-	logger.Log(t, "server metrics")
 
 	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 150}, t, func(r *retry.R) {
 		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:8500/v1/agent/metrics?format=prometheus", fmt.Sprintf("%s-consul-server.%s.svc", releaseName, ns)))
@@ -95,9 +93,6 @@ func TestComponentMetrics(t *testing.T) {
 		require.NoError(r, err)
 		require.Contains(r, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 	})
-
-	// logger.Log(t, "ingress gateway metrics")
-	// assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
 
 	logger.Log(t, "terminating gateway metrics")
 	assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)

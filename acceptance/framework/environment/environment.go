@@ -12,7 +12,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -40,7 +39,6 @@ type TestContext interface {
 	KubectlOptions(t testutil.TestingTB) *k8s.KubectlOptions
 	KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions
 	KubernetesClient(t testutil.TestingTB) kubernetes.Interface
-	APIExtensionClient(t testutil.TestingTB) apiextensionsclientset.Interface
 	ControllerRuntimeClient(t testutil.TestingTB) client.Client
 }
 
@@ -82,13 +80,12 @@ func (k *KubernetesEnvironment) DefaultContext(t testutil.TestingTB) TestContext
 }
 
 type kubernetesContext struct {
-	pathToKubeConfig    string
-	kubeContextName     string
-	namespace           string
-	client              kubernetes.Interface
-	apiExtensionsClient apiextensionsclientset.Interface
-	runtimeClient       client.Client
-	options             *k8s.KubectlOptions
+	pathToKubeConfig string
+	kubeContextName  string
+	namespace        string
+	client           kubernetes.Interface
+	runtimeClient    client.Client
+	options          *k8s.KubectlOptions
 }
 
 // KubernetesContextFromOptions returns the Kubernetes context from options.
@@ -162,20 +159,6 @@ func KubernetesClientFromOptions(t testutil.TestingTB, options *k8s.KubectlOptio
 	return client
 }
 
-// APIExtensionFromOptions takes KubectlOptions and returns APIExtension API client.
-func APIExtensionFromOptions(t testutil.TestingTB, options *k8s.KubectlOptions) apiextensionsclientset.Interface {
-	configPath, err := options.GetConfigPath(t)
-	require.NoError(t, err)
-
-	config, err := k8s.LoadApiClientConfigE(configPath, options.ContextName)
-	require.NoError(t, err)
-
-	client, err := apiextensionsclientset.NewForConfig(config)
-	require.NoError(t, err)
-
-	return client
-}
-
 func (k kubernetesContext) KubernetesClient(t testutil.TestingTB) kubernetes.Interface {
 	if k.client != nil {
 		return k.client
@@ -184,16 +167,6 @@ func (k kubernetesContext) KubernetesClient(t testutil.TestingTB) kubernetes.Int
 	k.client = KubernetesClientFromOptions(t, k.KubectlOptions(t))
 
 	return k.client
-}
-
-func (k kubernetesContext) APIExtensionClient(t testutil.TestingTB) apiextensionsclientset.Interface {
-	if k.client != nil {
-		return k.apiExtensionsClient
-	}
-
-	k.apiExtensionsClient = APIExtensionFromOptions(t, k.KubectlOptions(t))
-
-	return k.apiExtensionsClient
 }
 
 func (k kubernetesContext) ControllerRuntimeClient(t testutil.TestingTB) client.Client {

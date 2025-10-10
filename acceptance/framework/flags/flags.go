@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -170,7 +169,6 @@ func (t *TestFlags) init() {
 		"If true, datadog acceptance tests will not run.")
 
 	flag.BoolVar(&t.flagDualStack, "dual-stack", false, "Dual stack test with both IPv4 and IPv6")
-	fmt.Println("===========================> \n", string(debug.Stack()))
 
 	fmt.Println("==========================> t.flagDualStack dual stack", t.flagDualStack)
 	if t.flagEnterpriseLicense == "" {
@@ -262,9 +260,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		UseOpenshift:       t.flagUseOpenshift,
 		DualStack:          t.flagDualStack,
 	}
-	fmt.Println("===========================> \n", string(debug.Stack()))
-
-	fmt.Println("==========================> test config dual stack", c.DualStack)
 
 	return c
 }

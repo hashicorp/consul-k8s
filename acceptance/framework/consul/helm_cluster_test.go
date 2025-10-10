@@ -6,12 +6,9 @@ package consul
 import (
 	"testing"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
-	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -94,10 +91,6 @@ func (c *ctx) KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions {
 }
 func (c *ctx) KubernetesClient(_ testutil.TestingTB) kubernetes.Interface {
 	return fake.NewSimpleClientset()
-}
-
-func (c *ctx) APIExtensionClient(_ testutil.TestingTB) apiextensionsclientset.Interface {
-	return apiextensionsfake.NewSimpleClientset()
 }
 
 func (c *ctx) ControllerRuntimeClient(_ testutil.TestingTB) client.Client {

@@ -156,8 +156,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "creating static-client pod")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=30m", fmt.Sprintf("deploy/%s", "static-server"))
-
 			logger.Log(t, "patching route to target http server")
 			// Use retries to handle intermittent failures when patching the httproute
 			retry.Run(t, func(r *retry.R) {
@@ -168,7 +166,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			logger.Log(t, "creating target tcp server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=30m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
 
 			logger.Log(t, "creating tcp-route")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")
@@ -186,7 +183,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// leader election so we may need to wait a long time for
 			// the reconcile loop to run (hence the timeout here).
 			var gatewayAddress string
-			counter := &retry.Counter{Count: 40, Wait: 5 * time.Second}
+			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
@@ -446,7 +443,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	logger.Log(t, "creating static-client pod")
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=30m", fmt.Sprintf("deploy/%s", "static-server"))
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
 	k8sClient := ctx.ControllerRuntimeClient(t)
