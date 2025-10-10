@@ -297,7 +297,7 @@ func updateCoreDNSWithConsulDomainPrivilegedPort(t *testing.T, ctx environment.T
 }
 
 func updateCoreDNSFileForPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string, dnsFileName string) {
-	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, true)
+	dnsIP, err := getDNSServiceOrProxyIP(t, ctx, releaseName, true)
 	require.NoError(t, err)
 
 	// When using a privileged port (53), we don't need to specify the port in the CoreDNS config

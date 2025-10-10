@@ -4,8 +4,11 @@
 package consuldns
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +16,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -204,8 +208,26 @@ func getVerificationsForPrivilegedPort(defaultClusterContext environment.TestCon
 			svcName:          serviceRequestInSecondaryPartition,
 			shouldResolveDNS: true,
 			preProcessingFunc: func(t *testing.T) {
+				// Disable DNS proxy, should fall back to DNS service
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "false"})
-				updateCoreDNSWithConsulDomainForPrivilegedPort(t, defaultClusterContext, releaseName)
+
+				// Now we need to update CoreDNS to use the DNS service (not proxy)
+				dnsIP, err := getDNSServiceOrProxyIP(t, defaultClusterContext, releaseName, false)
+				require.NoError(t, err)
+
+				// When using a privileged port (53), we don't need to specify the port in the CoreDNS config
+				input, err := os.ReadFile("coredns-template.yaml")
+				require.NoError(t, err)
+
+				// Replace the template placeholder with the DNS service IP
+				newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsIP, -1)
+				err = os.WriteFile("coredns-custom.yaml", []byte(newContents), 0644)
+				require.NoError(t, err)
+
+				// Update CoreDNS with the new configuration
+				updateCoreDNS(t, defaultClusterContext, "coredns-custom.yaml")
+
+				// Apply the export configuration
 				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
@@ -219,8 +241,26 @@ func getVerificationsForPrivilegedPort(defaultClusterContext environment.TestCon
 			svcName:          serviceRequestInSecondaryPartition,
 			shouldResolveDNS: true,
 			preProcessingFunc: func(t *testing.T) {
+				// Re-enable DNS proxy with privileged port
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "true", "dns.proxy.port": "53"})
-				updateCoreDNSWithConsulDomainForPrivilegedPort(t, defaultClusterContext, releaseName)
+
+				// Now we need to update CoreDNS to use the DNS proxy
+				dnsIP, err := getDNSServiceOrProxyIP(t, defaultClusterContext, releaseName, true)
+				require.NoError(t, err)
+
+				// When using a privileged port (53), we don't need to specify the port in the CoreDNS config
+				input, err := os.ReadFile("coredns-template.yaml")
+				require.NoError(t, err)
+
+				// Replace the template placeholder with the DNS proxy IP
+				newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsIP, -1)
+				err = os.WriteFile("coredns-custom.yaml", []byte(newContents), 0644)
+				require.NoError(t, err)
+
+				// Update CoreDNS with the new configuration
+				updateCoreDNS(t, defaultClusterContext, "coredns-custom.yaml")
+
+				// Apply the export configuration
 				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
@@ -427,10 +467,46 @@ func setupClustersAndStaticServiceWithPrivilegedPort(t *testing.T, cfg *config.T
 }
 
 func updateCoreDNSWithConsulDomainForPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string) {
-	updateCoreDNSFileForPrivilegedPort(t, ctx, releaseName, "coredns-custom.yaml")
+	// Get the DNS service/proxy IP and update CoreDNS to forward to it
+	dnsIP, err := getDNSServiceOrProxyIP(t, ctx, releaseName, true)
+	require.NoError(t, err)
+
+	// When using a privileged port (53), we don't need to specify the port in the CoreDNS config
+	input, err := os.ReadFile("coredns-template.yaml")
+	require.NoError(t, err)
+
+	// Replace the template placeholder with the DNS IP (no port needed for standard DNS port 53)
+	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsIP, -1)
+	err = os.WriteFile("coredns-custom.yaml", []byte(newContents), 0644)
+	require.NoError(t, err)
+
 	updateCoreDNS(t, ctx, "coredns-custom.yaml")
 
 	t.Cleanup(func() {
 		updateCoreDNS(t, ctx, "coredns-original.yaml")
 	})
+}
+
+// getDNSServiceOrProxyIP returns the DNS service or proxy service ClusterIP depending on whether DNS proxy is enabled or not.
+func getDNSServiceOrProxyIP(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {
+	t.Helper()
+
+	logger.Logf(t, "getting the in cluster %s", getDNSServiceName(releaseName, enableDNSProxy))
+
+	dnsService, err := ctx.KubernetesClient(t).CoreV1().Services(ctx.KubectlOptions(t).Namespace).Get(
+		context.Background(),
+		getDNSServiceName(releaseName, enableDNSProxy),
+		metav1.GetOptions{},
+	)
+
+	require.NoError(t, err)
+	return dnsService.Spec.ClusterIP, nil
+}
+
+// getDNSServiceName returns the correct service name for either DNS proxy or DNS service
+func getDNSServiceName(releaseName string, enableDNSProxy bool) string {
+	if enableDNSProxy {
+		return fmt.Sprintf("%s-consul-dns-proxy", releaseName)
+	}
+	return fmt.Sprintf("%s-consul-dns", releaseName)
 }
