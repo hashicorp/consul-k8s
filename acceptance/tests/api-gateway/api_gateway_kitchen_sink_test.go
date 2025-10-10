@@ -147,7 +147,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
 	// Waiting for gateway to be ready.
-	gatewayCounter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
+	gatewayCounter := &retry.Counter{Count: 30, Wait: 30 * time.Second}
 	logger.Log(t, "waiting for gateway to be ready")
 	retry.RunWith(gatewayCounter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway

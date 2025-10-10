@@ -255,6 +255,10 @@ spec:
           value: component=mesh-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
+        - name: DP_ENVOY_READY_BIND_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
         command:
         - privileged-consul-dataplane
