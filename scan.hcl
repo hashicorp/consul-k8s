@@ -31,7 +31,9 @@ repository {
         "acceptance/*",
         "hack/*",
       ]
-      vulnerabilites = [
+      vulnerabilities = [
+        # GO-2022-0635: CVE suppression (consistent with release scan config)
+        "GO-2022-0635",
         # NET-8174 (2024-02-20): Chart YAML path traversal (not impacted)
         "GHSA-v53g-5gjp-272r", 
         "GO-2024-2554", # alias
