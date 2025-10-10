@@ -17,6 +17,7 @@ const (
 	staticClientName         = "static-client"
 	staticServerName         = "static-server"
 	staticServerLocalAddress = "http://localhost:1234"
+	staticServerLocalAddressIpv6 = "http://[::1]:1234"
 )
 
 func AddIntention(t *testing.T, consulClient *api.Client, sourcePeer, sourceNS, sourceService, destinationNS, destinationsService string) {

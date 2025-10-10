@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -140,7 +141,7 @@ func TestConsulDNS(t *testing.T) {
 			cluster.Upgrade(t, helmValues)
 
 			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
-			verifyDNS(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
+			verifyDNS(t, cfg, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
 	}
@@ -225,6 +226,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 
 func verifyDNS(
 	t *testing.T,
+	cfg *config.TestConfig,
 	releaseName string,
 	svcNamespace string,
 	requestingCtx, svcContext environment.TestContext,
@@ -244,13 +246,18 @@ func verifyDNS(
 
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
+	queryType := "A"
+	if cfg.DualStack {
+		queryType = "AAAA"
+	}
 	dnsTestPodArgs := []string{
 		"run", "-i", dnsUtilsPod, "--rm",
 		"--restart", "Never",
 		"--image", "anubhavmishra/tiny-tools",
 		"--labels", "release=" + releaseName,
-		"--", "dig", svcName,
+		"--", "dig", svcName, queryType,
 	}
+
 	// helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
 	// 	// Note: this delete command won't wait for pods to be fully terminated.
 	// 	// This shouldn't cause any test pollution because the underlying

@@ -116,10 +116,14 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 				AddIntention(t, consulClient, "", testNamespace, staticClientName, testNamespace, staticServerName)
 			}
 
+			staticServerAddr := staticServerLocalAddress
+			if cfg.DualStack {
+				staticServerAddr = staticServerLocalAddressIpv6
+			}
 			// Test that we can make a call to the terminating gateway.
 			retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
 				logger.Log(r, "trying calls to terminating gateway")
-				k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
+				k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, staticServerAddr)
 			})
 		})
 	}
