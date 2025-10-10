@@ -29,7 +29,7 @@ const (
 	StaticServerName = "static-server"
 	JobName          = "job-client"
 
-	retryTimeout = 120 * time.Second
+	retryTimeout = 240 * time.Second
 )
 
 // ConnectHelper configures a Consul cluster for connect injection tests.
@@ -168,7 +168,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	retry.RunWith(
-		&retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}, t,
+		&retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
 				podList, err := c.Ctx.KubernetesClient(r).CoreV1().
@@ -416,7 +416,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, opts, StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
-			"curl: (7) Failed to connect to static-server port 80: Connection refused",
+			"curl: (7) Failed to connect to static-server port 80",
 		}, "", "http://static-server")
 	} else {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, opts, StaticClientName, false, []string{

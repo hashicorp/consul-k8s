@@ -228,10 +228,10 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		iptablesCfg.IptablesProvider = c.iptablesProvider
 	}
 
-	dualStack := false
-	if cniArgs.IP != nil && cniArgs.IP.To4() == nil {
-		dualStack = true
-	}
+	dualStack := true
+	// if cniArgs.IP != nil && cniArgs.IP.To4() != nil {
+	// 	dualStack = false
+	// }
 
 	// Apply the iptables rules.
 	err = iptables.Setup(iptablesCfg, dualStack)

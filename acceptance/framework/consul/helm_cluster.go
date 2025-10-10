@@ -201,7 +201,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	fmt.Println(err, o)
 	fmt.Println("========================================================================")
 
-	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "get", "pods", "-A", "wide")
+	o, err = k8s.RunKubectlAndGetOutputE(t, h.ctx.KubectlOptions(t), "get", "pods", "-A", "-o", "wide")
 	fmt.Println(err, o)
 	fmt.Println("========================================================================")
 
