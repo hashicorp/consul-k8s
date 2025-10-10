@@ -63,8 +63,6 @@ func TestController(t *testing.T) {
 				"terminatingGateways.enabled":              "true",
 				"terminatingGateways.gateways[0].name":     "terminating-gateway",
 				"terminatingGateways.gateways[0].replicas": "1",
-				// When mirroringK8S is set, this setting is ignored.
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -659,8 +657,6 @@ func configureAndGetVaultHelmValues(t *testing.T, ctx environment.TestContext,
 
 		"global.secretsBackend.vault.ca.secretName": vaultCASecret,
 		"global.secretsBackend.vault.ca.secretKey":  "tls.crt",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {

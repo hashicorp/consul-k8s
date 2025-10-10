@@ -43,8 +43,6 @@ func TestSyncCatalog(t *testing.T) {
 				"syncCatalog.enabled":          "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -108,8 +106,6 @@ func TestSyncCatalogWithIngress(t *testing.T) {
 				"syncCatalog.ingress.enabled":  "true",
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()

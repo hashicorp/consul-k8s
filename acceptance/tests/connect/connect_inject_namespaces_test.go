@@ -81,8 +81,6 @@ func TestConnectInjectNamespaces(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -298,8 +296,6 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()

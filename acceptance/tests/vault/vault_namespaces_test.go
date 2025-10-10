@@ -222,8 +222,6 @@ func TestVault_VaultNamespace(t *testing.T) {
 		"syncCatalog.enabled":  "true",
 		"syncCatalog.toConsul": "false",
 		"syncCatalog.toK8S":    "false",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {

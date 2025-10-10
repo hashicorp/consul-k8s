@@ -72,8 +72,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 				"global.logLevel":              "trace",
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -372,8 +370,6 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		"global.acls.manageSystemACLs":                "true",
 		"global.tls.enabled":                          "true",
 		"global.logLevel":                             "trace",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()

@@ -286,7 +286,6 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 		HelmValues: map[string]string{
 			"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": strconv.FormatInt(int64(defaultGracePeriod), 10),
 			"connectInject.sidecarProxy.lifecycle.defaultEnabled":                    strconv.FormatBool(true),
-			"global.dualStack.defaultEnabled":                                        cfg.GetDualStack(),
 		},
 	}
 

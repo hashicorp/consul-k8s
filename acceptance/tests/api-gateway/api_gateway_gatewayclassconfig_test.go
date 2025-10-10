@@ -44,9 +44,8 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	cfg := suite.Config()
 
 	helmValues := map[string]string{
-		"global.logLevel":                 "trace",
-		"connectInject.enabled":           "true",
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
+		"global.logLevel":       "trace",
+		"connectInject.enabled": "true",
 	}
 
 	releaseName := helpers.RandomName()

@@ -184,8 +184,6 @@ func TestFailover_Connect(t *testing.T) {
 
 				"dns.enabled": "true",
 				"connectInject.sidecarProxy.lifecycle.defaultEnabled": "false",
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -248,8 +246,6 @@ func TestFailover_Connect(t *testing.T) {
 					"externalServers.hosts[0]":      partitionSvcAddress,
 					"externalServers.tlsServerName": fmt.Sprintf("server.%s.consul", cluster01Datacenter),
 					"global.server.enabled":         "false",
-
-					"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 				}
 
 				if c.ACLsEnabled {

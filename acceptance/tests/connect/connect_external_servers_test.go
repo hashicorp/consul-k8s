@@ -41,8 +41,6 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				// Don't install injector, controller and cni on this cluster so that it's not installed twice.
 				"connectInject.enabled":     "false",
 				"connectInject.cni.enabled": "false",
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 			serverReleaseName := helpers.RandomName()
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
@@ -60,8 +58,6 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"externalServers.enabled":   "true",
 				"externalServers.hosts[0]":  fmt.Sprintf("%s-consul-server", serverReleaseName),
 				"externalServers.httpsPort": "8500",
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			if secure {

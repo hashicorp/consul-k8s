@@ -53,8 +53,6 @@ func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 				"client.join[1]":     "${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
 				"client.join[2]":     "${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
 				"client.extraConfig": `"{\"segment\": \"alpha1\"}"`,
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			connHelper := connhelper.ConnectHelper{
@@ -116,8 +114,6 @@ func TestSegments_MeshWithAgentfulClientsMultiCluster(t *testing.T) {
 				"client.join[1]":     "${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
 				"client.join[2]":     "${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
 				"client.extraConfig": `"{\"segment\": \"alpha1\"}"`,
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			serverConnHelper := connhelper.ConnectHelper{
@@ -146,8 +142,6 @@ func TestSegments_MeshWithAgentfulClientsMultiCluster(t *testing.T) {
 				"client.join[1]":     "${CONSUL_FULLNAME}-server-1.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
 				"client.join[2]":     "${CONSUL_FULLNAME}-server-2.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
 				"client.extraConfig": `"{\"segment\": \"alpha1\"}"`,
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			clientClusterConnHelper := connhelper.ConnectHelper{

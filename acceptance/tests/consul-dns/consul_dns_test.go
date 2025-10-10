@@ -68,8 +68,6 @@ func TestConsulDNS(t *testing.T) {
 				"global.tls.enabled":           strconv.FormatBool(c.tlsEnabled),
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.manageSystemACLs),
 				"global.logLevel":              "debug",
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+

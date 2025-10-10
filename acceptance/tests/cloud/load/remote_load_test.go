@@ -193,8 +193,6 @@ func TestLoadTestCTGW(t *testing.T) {
 		// set TLS to insecure
 
 		"telemetryCollector.extraEnvironmentVars.HCP_API_ADDRESS": apiHostSecretKeyValue,
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.ConsulImage != "" {

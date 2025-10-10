@@ -54,8 +54,6 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[0]":    "source:consul",
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[1]":    "consul_service:consul-server",
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[2]":    acceptanceTestingTags,
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()
@@ -125,8 +123,6 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[0]":    "source:consul",
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[1]":    "consul_service:consul-server",
 		"global.metrics.datadog.dogstatsd.dogstatsdTags[2]":    acceptanceTestingTags,
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()
@@ -189,8 +185,6 @@ func TestDatadogConsulChecks(t *testing.T) {
 		"global.metrics.enableHostMetrics":    "true",
 		"global.metrics.datadog.enabled":      "true",
 		"global.metrics.datadog.namespace":    "datadog",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()
@@ -259,8 +253,6 @@ func TestDatadogOpenmetrics(t *testing.T) {
 		"global.metrics.datadog.enabled":                       "true",
 		"global.metrics.datadog.namespace":                     "datadog",
 		"global.metrics.datadog.openMetricsPrometheus.enabled": "true",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()

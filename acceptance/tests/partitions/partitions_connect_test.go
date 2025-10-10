@@ -111,8 +111,6 @@ func TestPartitions_Connect(t *testing.T) {
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			// Setup the default partition
@@ -167,8 +165,6 @@ func TestPartitions_Connect(t *testing.T) {
 				"externalServers.enabled":       "true",
 				"externalServers.hosts[0]":      partitionSvcAddress,
 				"externalServers.tlsServerName": "server.dc1.consul",
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			if c.ACLsEnabled {

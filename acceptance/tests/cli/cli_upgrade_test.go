@@ -34,8 +34,6 @@ func TestUpgrade(t *testing.T) {
 	connHelper.HelmValues = map[string]string{
 		"ingressGateways.enabled":           "true",
 		"ingressGateways.defaults.replicas": "1",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	connHelper.Upgrade(t)

@@ -322,8 +322,6 @@ func TestVault_Partitions(t *testing.T) {
 
 		"global.enterpriseLicense.secretName": licenseSecret.Path,
 		"global.enterpriseLicense.secretKey":  licenseSecret.Key,
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	serverHelmValues := map[string]string{
@@ -343,9 +341,6 @@ func TestVault_Partitions(t *testing.T) {
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,
 		"server.extraVolumes[0].load": "false",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
-
 	}
 
 	// On Kind, there are no load balancers but since all clusters
@@ -401,8 +396,6 @@ func TestVault_Partitions(t *testing.T) {
 		"client.enabled":           "true",
 		"client.exposeGossipPorts": "true",
 		"client.join[0]":           partitionSvcAddress,
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.UseKind {

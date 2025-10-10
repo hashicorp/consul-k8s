@@ -31,8 +31,6 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 		"connectInject.enabled":        "true",
 		"global.acls.manageSystemACLs": "true",
 		"global.tls.enabled":           "true",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()

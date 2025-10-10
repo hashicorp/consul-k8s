@@ -78,8 +78,6 @@ func TestPeering_Connect(t *testing.T) {
 
 				"dns.enabled":           "true",
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			var wg sync.WaitGroup

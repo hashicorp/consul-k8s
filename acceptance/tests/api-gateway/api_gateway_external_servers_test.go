@@ -35,8 +35,6 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		// Don't install injector, controller and cni on this cluster so that it's not installed twice.
 		"connectInject.enabled":     "false",
 		"connectInject.cni.enabled": "false",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 	serverReleaseName := helpers.RandomName()
 	consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
@@ -55,8 +53,6 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		"global.tls.caCert.secretKey":           "tls.crt",
 		"global.acls.bootstrapToken.secretName": fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName),
 		"global.acls.bootstrapToken.secretKey":  "token",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	releaseName := helpers.RandomName()

@@ -60,8 +60,6 @@ func TestPartitions_Gateway(t *testing.T) {
 
 		"dns.enabled":           "true",
 		"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	defaultPartitionHelmValues := make(map[string]string)
@@ -112,8 +110,6 @@ func TestPartitions_Gateway(t *testing.T) {
 		"externalServers.enabled":       "true",
 		"externalServers.hosts[0]":      partitionSvcAddress,
 		"externalServers.tlsServerName": "server.dc1.consul",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	// Setup partition token and auth method host since ACLs enabled.

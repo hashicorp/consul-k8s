@@ -296,15 +296,11 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 
 		// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
 		"dns.proxy.port": "8053",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	serverHelmValues := map[string]string{
 		"server.exposeGossipAndRPCPorts": "true",
 		"server.extraConfig":             `"{\"log_level\": \"TRACE\"}"`,
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.UseKind {
@@ -357,8 +353,6 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 		"externalServers.enabled":       "true",
 		"externalServers.hosts[0]":      partitionSvcAddress,
 		"externalServers.tlsServerName": "server.dc1.consul",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if c.secure {

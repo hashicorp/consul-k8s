@@ -439,8 +439,6 @@ func (c *ConnectHelper) helmValues() map[string]string {
 		"global.acls.manageSystemACLs": strconv.FormatBool(c.Secure),
 		"dns.enabled":                  "true",
 		"dns.enableRedirection":        "true",
-
-		"global.dualStack.defaultEnabled": c.Cfg.GetDualStack(),
 	}
 
 	helpers.MergeMaps(helmValues, c.HelmValues)

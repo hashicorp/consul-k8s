@@ -102,10 +102,9 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"connectInject.enabled":           "true",
-				"global.tls.enabled":              strconv.FormatBool(secure),
-				"global.acls.manageSystemACLs":    strconv.FormatBool(secure),
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
+				"connectInject.enabled":        "true",
+				"global.tls.enabled":           strconv.FormatBool(secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 			}
 
 			releaseName := helpers.RandomName()
@@ -207,9 +206,8 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 				// Enable DNS so we can test that DNS redirection _isn't_ set in the pod.
 				"dns.enabled": "true",
 
-				"global.tls.enabled":              strconv.FormatBool(secure),
-				"global.acls.manageSystemACLs":    strconv.FormatBool(secure),
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
+				"global.tls.enabled":           strconv.FormatBool(secure),
+				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 			}
 
 			releaseName := helpers.RandomName()

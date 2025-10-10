@@ -35,7 +35,6 @@ func TestServerRestart(t *testing.T) {
 		"server.replicas":       fmt.Sprintf("%d", replicas),
 		"server.affinity":       "null", // Allow >1 pods per node so we can test in minikube with one node.
 
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 	consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 	consulCluster.Create(t)

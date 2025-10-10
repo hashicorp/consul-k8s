@@ -272,8 +272,6 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 
 		// Enable clients to make sure vault integration still works.
 		"client.enabled": "true",
-
-		"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 	}
 
 	if cfg.EnableEnterprise {

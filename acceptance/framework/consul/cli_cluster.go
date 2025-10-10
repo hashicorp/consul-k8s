@@ -136,7 +136,7 @@ func (c *CLICluster) Create(t *testing.T) {
 	}
 
 	// Match the timeout for the helm tests.
-	args = append(args, "-timeout", "30m")
+	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
 	out, err := c.cli.Run(t, c.kubectlOptions, args...)
@@ -169,7 +169,7 @@ func (c *CLICluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	}
 
 	// Match the timeout for the helm tests.
-	args = append(args, "-timeout", "30m")
+	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
 	out, err := c.cli.Run(t, c.kubectlOptions, args...)

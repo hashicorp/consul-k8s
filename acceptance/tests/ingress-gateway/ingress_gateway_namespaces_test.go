@@ -60,8 +60,6 @@ func TestIngressGatewaySingleNamespace(t *testing.T) {
 				"ingressGateways.gateways[0].name":            igName,
 				"ingressGateways.gateways[0].replicas":        "1",
 				"ingressGateways.gateways[0].consulNamespace": testNamespace,
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
@@ -185,8 +183,6 @@ func TestIngressGatewayNamespaceMirroring(t *testing.T) {
 				"ingressGateways.enabled":              "true",
 				"ingressGateways.gateways[0].name":     igName,
 				"ingressGateways.gateways[0].replicas": "1",
-
-				"global.dualStack.defaultEnabled": cfg.GetDualStack(),
 			}
 
 			releaseName := helpers.RandomName()
