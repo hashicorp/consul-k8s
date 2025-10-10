@@ -53,8 +53,6 @@ const (
 	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
-
-	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
 )
 
 type Command struct {
@@ -228,10 +226,10 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		iptablesCfg.IptablesProvider = c.iptablesProvider
 	}
 
-	dualStack := true
-	// if cniArgs.IP != nil && cniArgs.IP.To4() != nil {
-	// 	dualStack = false
-	// }
+	dualStack := false
+	if i := net.ParseIP(iptablesCfg.ConsulDNSIP); i != nil && i.To4() == nil {
+		dualStack = true
+	}
 
 	// Apply the iptables rules.
 	err = iptables.Setup(iptablesCfg, dualStack)
