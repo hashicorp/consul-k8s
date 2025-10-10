@@ -31,7 +31,25 @@ binary {
 
   triage {
     suppress {
-      vulnerabilites = [
+      vulnerabilities = [
+        "GO-2022-0635"
+      ]
+    }
+  }
+}
+
+repository {
+  go_modules = true
+  osv        = true
+
+  secrets {
+    all = true
+  }
+
+  triage {
+    suppress {
+      vulnerabilities = [
+        "GO-2022-0635"
       ]
     }
   }
