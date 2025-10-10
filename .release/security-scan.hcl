@@ -42,10 +42,6 @@ repository {
   go_modules = true
   osv        = true
 
-  secrets {
-    all = true
-  }
-
   triage {
     suppress {
       vulnerabilities = [
