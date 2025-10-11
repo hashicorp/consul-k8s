@@ -13,8 +13,10 @@
 # See `security-scanner` docs or run with `--help` for scan target syntax.
 
 container {
-  dependencies = true
-  alpine_secdb = true
+  dependencies    = true
+  alpine_security = true
+  osv             = true
+  go_modules      = true
 
   secrets {
     all = true
@@ -29,8 +31,8 @@ container {
 }
 
 binary {
-  go_modules   = true
-  osv          = true
+  go_modules = true
+  osv        = true
 
   secrets {
     all = true
@@ -38,8 +40,7 @@ binary {
 
   triage {
     suppress {
-      vulnerabilites = [
-      ]
+      vulnerabilites = []
     }
   }
 }
