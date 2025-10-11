@@ -6,6 +6,7 @@ package apigateway
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/hashicorp/consul/api"
@@ -120,7 +121,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	k8sOptions := ctx.KubectlOptions(t)
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	// check that intentions keep our connection from happening
 	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)

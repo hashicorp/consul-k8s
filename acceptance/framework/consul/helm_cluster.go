@@ -101,7 +101,8 @@ func NewHelmCluster(
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m"},
+		"install": {"--timeout", "30m", "--debug"},
+		"delete":  {"--timeout", "30m", "--debug"},
 	}
 
 	opts := &helm.Options{
@@ -155,12 +156,18 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
+
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 5}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+		if err != nil {
+			t.Logf("helm install failed with error %s, retrying...", err.Error())
+		}
 		require.NoError(r, err)
 	})
-
+	fmt.Println("========================================================================")
+	fmt.Println("values are ", h.helmOptions.SetValues)
+	fmt.Println("========================================================================")
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
@@ -168,12 +175,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
-
-	// Ignore the error returned by the helm delete here so that we can
-	// always idempotently clean up resources in the cluster.
-	h.helmOptions.ExtraArgs = map[string][]string{
-		"--wait": nil,
-	}
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
@@ -215,7 +216,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 150}, t, func(r *retry.R) {
 
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall

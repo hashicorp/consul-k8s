@@ -50,7 +50,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 	if options.ConfigPath != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
 	}
-	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") {
+	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") && !sliceContains(args, "-A") {
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
 	cmdArgs = append(cmdArgs, args...)
@@ -68,7 +68,15 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 	var output string
 	var err error
 	retry.RunWith(counter, t, func(r *retry.R) {
+		// t.Log("===========================STACK TRACE OF CALL =========================================")
+		// t.Log(string(debug.Stack()))
+		t.Log("====================================================================")
+		t.Log("executing command:", command.Command, strings.Join(command.Args, " "))
 		output, err = helpers.RunCommand(t, options, command)
+		t.Log("====================================================================")
+		// t.Log("with error", err, "output:", output)
+		// t.Log("====================================================================")
+
 		if err != nil {
 			// Want to retry on errors connecting to actual Kube API because
 			// these are intermittent.

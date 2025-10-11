@@ -72,6 +72,11 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
 	vaultLicenseSecretKey := "license"
 
+	if cfg.DualStack {
+		values["server.service.ipFamilyPolicy"] = "SingleStack"
+		values["server.service.ipFamilies"] = "[\"IPv6\"]"
+	}
+
 	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
 	if cfg.VaultServerVersion != "" {
@@ -145,7 +150,7 @@ func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 		remotePort,
 		v.logger)
 
-	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 10 * time.Second, Count: 60}, t, func(r *retry.R) {
 		require.NoError(r, tunnel.ForwardPortE(r))
 	})
 

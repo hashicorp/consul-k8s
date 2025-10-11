@@ -6,6 +6,7 @@ package peering
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -276,7 +277,7 @@ func TestPeering_Gateway(t *testing.T) {
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	logger.Log(t, "creating local service resolver")
 	k8s.KubectlApplyK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")

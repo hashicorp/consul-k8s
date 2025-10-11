@@ -6,6 +6,7 @@ package terminatinggateway
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -98,12 +99,17 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 
 			staticServerIP, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "po", "-l", "app=static-server", `-o=jsonpath={.items[0].status.podIP}`)
+			staticServerIP = strings.TrimSpace(staticServerIP)
 			require.NoError(t, err)
 			require.NotEmpty(t, staticServerIP)
 
 			staticServerHostnameURL := fmt.Sprintf("https://%s", staticServerServiceName)
-			staticServerIPURL := fmt.Sprintf("http://%s", staticServerIP)
-
+			staticServerIPURL := ""
+			if strings.Contains(staticServerIP, ":") {
+				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
+			} else {
+				staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			}
 			// Create the service default declaring the external service (aka Destination)
 			logger.Log(t, "creating tcp-based service defaults")
 			CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
@@ -129,8 +135,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
 
 			// Try running some different scenarios
-			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
-			staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			staticServerHostnameURL = fmt.Sprintf("'http://%s'", staticServerServiceName)
+			staticServerIPURL = fmt.Sprintf("'http://%s'", staticServerIP)
 
 			// Update the service default declaring the external service (aka Destination)
 			logger.Log(t, "updating service defaults to try other scenarios")

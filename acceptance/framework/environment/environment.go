@@ -83,11 +83,9 @@ type kubernetesContext struct {
 	pathToKubeConfig string
 	kubeContextName  string
 	namespace        string
-
-	client        kubernetes.Interface
-	runtimeClient client.Client
-
-	options *k8s.KubectlOptions
+	client           kubernetes.Interface
+	runtimeClient    client.Client
+	options          *k8s.KubectlOptions
 }
 
 // KubernetesContextFromOptions returns the Kubernetes context from options.

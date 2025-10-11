@@ -1,3 +1,4 @@
+
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
@@ -13,6 +14,10 @@ data:
       auto_https disable_redirects
     }
     static-server.default {
+      log
+      respond  "hello world"
+    }
+    :443 {
       log
       respond  "hello world"
     }

@@ -288,12 +288,14 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			// Check connection from static-client to multiport.
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
+			retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
 
-			// Check connection from static-client to multiport-admin.
-			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "hello world from 9090 admin", "http://localhost:2234")
+				// Check connection from static-client to multiport.
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(r), connhelper.StaticClientName, "http://localhost:1234")
 
+				// Check connection from static-client to multiport-admin.
+				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, ctx.KubectlOptions(r), connhelper.StaticClientName, "hello world from 9090 admin", "http://localhost:2234")
+			})
 			// Now that we've checked inbound connections to a multi port pod, check outbound connection from multi port
 			// pod to static-server.
 
@@ -320,25 +322,29 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 				}, nil)
 				require.NoError(t, err)
 			}
+			retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				// Check the connection from the multi port pod to static-server.
+				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(r), multiport, "http://localhost:3234")
+			})
 
-			// Check the connection from the multi port pod to static-server.
-			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), multiport, "http://localhost:3234")
+			retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
 
-			// Test that kubernetes readiness status is synced to Consul. This will make the multi port pods unhealthy
-			// and check inbound connections to the multi port pods' services.
-			// Create the files so that the readiness probes of the multi port pod fails.
-			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "-c", "multiport", "--", "touch", "/tmp/unhealthy-multiport")
-			logger.Log(t, "testing k8s -> consul health checks sync by making the multiport-admin unhealthy")
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "exec", "deploy/"+multiport, "-c", "multiport-admin", "--", "touch", "/tmp/unhealthy-multiport-admin")
+				// Test that kubernetes readiness status is synced to Consul. This will make the multi port pods unhealthy
+				// and check inbound connections to the multi port pods' services.
+				// Create the files so that the readiness probes of the multi port pod fails.
+				logger.Log(t, "testing k8s -> consul health checks sync by making the multiport unhealthy")
+				k8s.RunKubectl(t, ctx.KubectlOptions(r), "exec", "deploy/"+multiport, "-c", "multiport", "--", "touch", "/tmp/unhealthy-multiport")
+				logger.Log(t, "testing k8s -> consul health checks sync by making the multiport-admin unhealthy")
+				k8s.RunKubectl(t, ctx.KubectlOptions(r), "exec", "deploy/"+multiport, "-c", "multiport-admin", "--", "touch", "/tmp/unhealthy-multiport-admin")
 
-			// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
-			// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
-			// We are expecting a "connection reset by peer" error because in a case of health checks,
-			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
-			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
-			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
-			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
+				// The readiness probe should take a moment to be reflected in Consul, CheckStaticServerConnection will retry
+				// until Consul marks the service instance unavailable for mesh traffic, causing the connection to fail.
+				// We are expecting a "connection reset by peer" error because in a case of health checks,
+				// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
+				// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(r), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(r), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:2234")
+			})
 		})
 	}
 }

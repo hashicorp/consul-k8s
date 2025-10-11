@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -54,8 +53,6 @@ const (
 	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
-
-	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
 )
 
 type Command struct {
@@ -230,7 +227,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	dualStack := false
-	if os.Getenv(ConsulDualStackEnvVar) == "true" {
+	if i := net.ParseIP(iptablesCfg.ConsulDNSIP); i != nil && i.To4() == nil {
 		dualStack = true
 	}
 

@@ -92,6 +92,7 @@ func (c *ctx) KubectlOptionsForNamespace(ns string) *k8s.KubectlOptions {
 func (c *ctx) KubernetesClient(_ testutil.TestingTB) kubernetes.Interface {
 	return fake.NewSimpleClientset()
 }
+
 func (c *ctx) ControllerRuntimeClient(_ testutil.TestingTB) client.Client {
 	return runtimefake.NewClientBuilder().Build()
 }
