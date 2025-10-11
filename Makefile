@@ -6,7 +6,6 @@ CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/c
 KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
 KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
 KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
-
 GO_MODULES := $(shell find . -name go.mod -exec dirname {} \; | sort)
 
 GOTESTSUM_PATH?=$(shell command -v gotestsum)
@@ -191,30 +190,49 @@ acceptance-lint: ## Run linter in the control-plane directory.
 # For CNI acceptance tests, the calico CNI plugin needs to be installed on Kind. Our consul-cni plugin will not work
 # without another plugin installed first
 kind-cni-calico: ## install cni plugin on kind
-	kubectl create namespace calico-system ||true
+	kubectl create namespace calico-system || true
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
-	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
+	@echo "=>>>>>>>>>>>>>>DUAL_STACK $(DUAL_STACK)"
+	@if [ "$(DUAL_STACK)" = "true" ]; then \
+		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources-ipv6.yaml; \
+	else \
+		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml; \
+	fi
 	@sleep 20
 
 .PHONY: kind-delete
 kind-delete:
-	kind delete cluster --name dc1
-	kind delete cluster --name dc2
-	kind delete cluster --name dc3
-	kind delete cluster --name dc4
+	kind delete cluster --name dc1 || true
+	kind delete cluster --name dc2 || true
+	kind delete cluster --name dc3 || true
+	kind delete cluster --name dc4 || true
 
 .PHONY: kind-cni
 kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
+	@echo "=>>>>>>>>>>>>>>DUAL_STACK $(DUAL_STACK)"
+	@if [ "$(DUAL_STACK)" = "true" ]; then \
+		echo "Creating IPv6 clusters..."; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+	else \
+		echo "Creating IPv4 clusters..."; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+	fi
 
 .PHONY: kind
 kind: kind-delete ## Helper target for doing local acceptance testing (works in all cases)
