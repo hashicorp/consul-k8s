@@ -194,10 +194,11 @@ kind-cni-calico: ## install cni plugin on kind
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
-	@echo "=>>>>>>>>>>>>>>DUAL_STACK $(DUAL_STACK)"
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
+		echo "Adding IPv6 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources-ipv6.yaml; \
 	else \
+		echo "Adding IPv4 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml; \
 	fi
 	@sleep 20
@@ -211,17 +212,16 @@ kind-delete:
 
 .PHONY: kind-cni
 kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
-	@echo "=>>>>>>>>>>>>>>DUAL_STACK $(DUAL_STACK)"
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
 		echo "Creating IPv6 clusters..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+		make kind-cni-calico \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc2 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+		make kind-cni-calico \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+		make kind-cni-calico \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico DUAL_STACK=$(DUAL_STACK); \
+		make kind-cni-calico \
 	else \
 		echo "Creating IPv4 clusters..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
