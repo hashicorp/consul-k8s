@@ -99,6 +99,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 
 			staticServerIP, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "po", "-l", "app=static-server", `-o=jsonpath={.items[0].status.podIP}`)
+			staticServerIP = strings.TrimSpace(staticServerIP)
 			require.NoError(t, err)
 			require.NotEmpty(t, staticServerIP)
 
