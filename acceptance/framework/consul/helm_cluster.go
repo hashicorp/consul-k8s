@@ -101,8 +101,8 @@ func NewHelmCluster(
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "30m", "--debug"},
-		"delete":  {"--timeout", "30m", "--debug"},
+		"install": {"--timeout", "15m", "--debug"},
+		"delete":  {"--timeout", "15m", "--debug"},
 	}
 
 	opts := &helm.Options{

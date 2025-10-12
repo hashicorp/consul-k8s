@@ -683,9 +683,6 @@ func (c *cluster) preparedQueryFailoverCheck(t *testing.T, cfg *config.TestConfi
 func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, failover *cluster) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	q := "SRV"
-	// if cfg.DualStack {
-	// 	q = "AAAA"
-	// }
 	dnsLookup := []string{fmt.Sprintf("static-server.service.ns2.ns.%s.sg.%s.ap.consul", samenessGroupName, c.fullTextPartition()), "+tcp", q}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use the primary cluster when performing a DNS lookup, this mostly affects cases
@@ -836,15 +833,11 @@ func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluste
 // dnsQuery performs a dns query with the provided query string.
 func dnsQuery(t testutil.TestingTB, cfg *config.TestConfig, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
-	queryType := "A"
-	if cfg.DualStack {
-		queryType = "AAAA"
-	}
 	var logs string
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
 			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
-				releaseName), queryType}
+				releaseName), "ANY"}
 		args = append(args, dnsQuery...)
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)

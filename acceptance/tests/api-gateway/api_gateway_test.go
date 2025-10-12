@@ -121,7 +121,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "creating api-gateway resources")
-
 			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
 			require.NoError(t, err, out)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -166,6 +165,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			logger.Log(t, "creating target tcp server")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
 
 			logger.Log(t, "creating tcp-route")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/api-gateways/tcproute/route.yaml")

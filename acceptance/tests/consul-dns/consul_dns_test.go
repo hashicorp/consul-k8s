@@ -246,16 +246,12 @@ func verifyDNS(
 
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
-	queryType := "A"
-	if cfg.DualStack {
-		queryType = "AAAA"
-	}
 	dnsTestPodArgs := []string{
 		"run", "-i", dnsUtilsPod, "--rm",
 		"--restart", "Never",
 		"--image", "anubhavmishra/tiny-tools",
 		"--labels", "release=" + releaseName,
-		"--", "dig", svcName, queryType,
+		"--", "dig", svcName, "ANY",
 	}
 
 	// helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
