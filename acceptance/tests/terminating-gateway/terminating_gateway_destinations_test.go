@@ -135,8 +135,13 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
 
 			// Try running some different scenarios
-			staticServerHostnameURL = fmt.Sprintf("'http://%s'", staticServerServiceName)
-			staticServerIPURL = fmt.Sprintf("'http://%s'", staticServerIP)
+			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
+			staticServerIPURL = ""
+			if strings.Contains(staticServerIP, ":") {
+				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
+			} else {
+				staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			}
 
 			// Update the service default declaring the external service (aka Destination)
 			logger.Log(t, "updating service defaults to try other scenarios")
