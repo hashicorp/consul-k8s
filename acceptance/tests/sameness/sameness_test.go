@@ -6,6 +6,7 @@ package sameness
 import (
 	ctx "context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -773,10 +774,11 @@ func (c clusters) setServerIP(t *testing.T) {
 			require.Len(t, podList.Items, 1)
 			require.Len(t, podList.Items[0].Spec.Containers, 2)
 			if labelSelector == "app=static-server" {
-				ip := &podList.Items[0].Status.PodIP
+				ip := net.ParseIP(podList.Items[0].Status.PodIP)
 				require.NotNil(t, ip)
-				logger.Logf(t, "%s-static-server-ip: %s", v.name, *ip)
-				c[k].staticServerIP = ip
+				logger.Logf(t, "%s-static-server-ip: %s", v.name, ip.String())
+				ipStr := ip.String()
+				c[k].staticServerIP = &ipStr
 			}
 		}
 	}
