@@ -160,8 +160,12 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 	require.NoError(t, err)
 	logger.Logf(t, "Created ACL policy '%s' with ID '%s'", policy.Name, policy.ID)
 
+	// Add a short description to the token
+	tokenDescription := fmt.Sprintf("DNS Proxy Token for %s", strings.Split(configAddress, ":")[0])
+	logger.Logf(t, "Creating token with description: %s", tokenDescription)
+
 	dnsProxyToken, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{
-		Description: fmt.Sprintf("DNS Proxy Token for %s", strings.Split(configAddress, ":")[0]),
+		Description: tokenDescription,
 		Policies: []*api.ACLTokenPolicyLink{
 			{
 				Name: policy.Name,
@@ -173,6 +177,14 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 	require.NoError(t, err)
 	logger.Logf(t, "Created DNS Proxy token with AccessorID '%s' and SecretID '%s'",
 		dnsProxyToken.AccessorID, dnsProxyToken.SecretID)
+
+	// Verify token was created successfully by listing it
+	token, _, err := consulClient.ACL().TokenRead(dnsProxyToken.AccessorID, &api.QueryOptions{
+		Token: initialManagementToken,
+	})
+	require.NoError(t, err)
+	logger.Logf(t, "Verified token exists with description: %s", token.Description)
+
 	return err, dnsProxyToken
 }
 

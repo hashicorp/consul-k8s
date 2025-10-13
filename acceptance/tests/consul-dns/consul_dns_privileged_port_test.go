@@ -107,6 +107,9 @@ func TestConsulDNS_PrivilegedPort(t *testing.T) {
 					service_prefix "" {
 					  policy = "read"
 					}
+					agent_prefix "" {
+					  policy = "read"
+					}
 				`
 				err, dnsProxyToken := createACLTokenWithGivenPolicy(t, consulClient, dnsProxyPolicy, initialManagementToken, configAddress)
 				require.NoError(t, err)
@@ -251,6 +254,9 @@ func TestConsulDNSProxy_PrivilegedPort(t *testing.T) {
 					service_prefix "" {
 					  policy = "read"
 					}
+					agent_prefix "" {
+					  policy = "read"
+					}
 				`
 				err, dnsProxyToken := createACLTokenWithGivenPolicy(t, consulClient, dnsProxyPolicy, initialManagementToken, configAddress)
 				require.NoError(t, err)
@@ -277,6 +283,16 @@ func TestConsulDNSProxy_PrivilegedPort(t *testing.T) {
 
 				// Upgrade the cluster to apply the changes created above.
 				cluster.Upgrade(t, helmValues)
+
+				// Wait for DNS proxy to become ready
+				logger.Log(t, "waiting for DNS proxy pod to become ready")
+				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
+					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
+
+				// Wait for DNS proxy to become ready
+				logger.Log(t, "waiting for DNS proxy pod to become ready")
+				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
+					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
 			}
 
 			// Update CoreDNS to use Consul DNS
