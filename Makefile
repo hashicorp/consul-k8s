@@ -217,13 +217,13 @@ kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
 		echo "Creating IPv6 clusters..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico \
+		make kind-cni-calico; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc2 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico \
+		make kind-cni-calico; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico \
+		make kind-cni-calico; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico \
+		make kind-cni-calico; \
 	else \
 		echo "Creating IPv4 clusters..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
