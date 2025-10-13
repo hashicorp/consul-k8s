@@ -16,11 +16,11 @@ data:
       log
       respond  "hello world"
     }
-    :443 {
+    [::]:443 {
       log
       respond  "hello world"
     }
-    :80 {
+    [::]:80 {
       log
       respond  "hello world"
     }
