@@ -116,8 +116,8 @@ global:
     # in the server certificate. This is useful when you need to access the
     # Consul server(s) externally, for example, if you're using the UI.
     # @type: array<string>
-    serverAdditionalIPSANs:
-      - ::1
+    serverAdditionalIPSANs: []
+
     # If true, `verify_outgoing`, `verify_server_hostname`,
     # and `verify_incoming_rpc` will be set to `true` for Consul servers and clients.
     # Set this to false to incrementally roll out TLS on an existing Consul cluster.
