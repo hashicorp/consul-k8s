@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 	"time"
@@ -221,48 +222,50 @@ func TestAPIGateway_Basic(t *testing.T) {
 
 			// gateway class checks
 			var gatewayClass gwv1beta1.GatewayClass
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway-class"}, &gatewayClass)
-			require.NoError(t, err)
+			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway-class"}, &gatewayClass)
+				require.NoError(r, err)
 
-			// check our finalizers
-			require.Len(t, gatewayClass.Finalizers, 1)
-			require.EqualValues(t, gatewayClassFinalizer, gatewayClass.Finalizers[0])
+				// check our finalizers
+				require.Len(r, gatewayClass.Finalizers, 1)
+				require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
-			// http route checks
-			var httproute gwv1beta1.HTTPRoute
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
-			require.NoError(t, err)
+				// http route checks
+				var httproute gwv1beta1.HTTPRoute
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
+				require.NoError(r, err)
 
-			// check our finalizers
-			require.Len(t, httproute.Finalizers, 1)
-			require.EqualValues(t, gatewayFinalizer, httproute.Finalizers[0])
+				// check our finalizers
+				require.Len(r, httproute.Finalizers, 1)
+				require.EqualValues(r, gatewayFinalizer, httproute.Finalizers[0])
 
-			// check parent status
-			require.Len(t, httproute.Status.Parents, 1)
-			require.EqualValues(t, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
-			require.EqualValues(t, "gateway", httproute.Status.Parents[0].ParentRef.Name)
-			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-			checkStatusCondition(t, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
-
+				// check parent status
+				require.Len(r, httproute.Status.Parents, 1)
+				require.EqualValues(r, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
+				require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+			})
 			// tcp route checks
 			var tcpRoute gwv1alpha2.TCPRoute
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
-			require.NoError(t, err)
+			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
+				require.NoError(r, err)
 
-			// check our finalizers
-			require.Len(t, tcpRoute.Finalizers, 1)
-			require.EqualValues(t, gatewayFinalizer, tcpRoute.Finalizers[0])
+				// check our finalizers
+				require.Len(r, tcpRoute.Finalizers, 1)
+				require.EqualValues(r, gatewayFinalizer, tcpRoute.Finalizers[0])
 
-			// check parent status
-			require.Len(t, tcpRoute.Status.Parents, 1)
-			require.EqualValues(t, gatewayClassControllerName, tcpRoute.Status.Parents[0].ControllerName)
-			require.EqualValues(t, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
+				// check parent status
+				require.Len(r, tcpRoute.Status.Parents, 1)
+				require.EqualValues(r, gatewayClassControllerName, tcpRoute.Status.Parents[0].ControllerName)
+				require.EqualValues(r, "gateway", tcpRoute.Status.Parents[0].ParentRef.Name)
 
-			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-			checkStatusCondition(t, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
-
+				checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+				checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+				checkStatusCondition(r, tcpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+			})
 			// check that the Consul entries were created
 			var gateway *api.APIGatewayConfigEntry
 			var httpRoute *api.HTTPRouteConfigEntry
@@ -279,21 +282,20 @@ func TestAPIGateway_Basic(t *testing.T) {
 				entry, _, err = consulClient.ConfigEntries().Get(api.TCPRoute, "tcp-route", nil)
 				require.NoError(r, err)
 				route = entry.(*api.TCPRouteConfigEntry)
+				// now check the gateway status conditions
+				checkConsulStatusCondition(r, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
+
+				// and the route status conditions
+				checkConsulStatusCondition(r, httpRoute.Status.Conditions, trueConsulCondition("Bound", "Bound"))
+				checkConsulStatusCondition(r, route.Status.Conditions, trueConsulCondition("Bound", "Bound"))
 			})
-
-			// now check the gateway status conditions
-			checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
-
-			// and the route status conditions
-			checkConsulStatusCondition(t, httpRoute.Status.Conditions, trueConsulCondition("Bound", "Bound"))
-			checkConsulStatusCondition(t, route.Status.Conditions, trueConsulCondition("Bound", "Bound"))
 
 			// finally we check that we can actually route to the service via the gateway
 			k8sOptions := ctx.KubectlOptions(t)
 			//we have to account for port mapping inside the cluster.
-			targetHTTPAddress := fmt.Sprintf("http://%s:8080", gatewayAddress)
-			targetHTTPSAddress := fmt.Sprintf("https://%s:8443", gatewayAddress)
-			targetTCPAddress := fmt.Sprintf("http://%s:8081", gatewayAddress)
+			targetHTTPAddress := fmt.Sprintf("http://%s", net.JoinHostPort(gatewayAddress, "8080"))
+			targetHTTPSAddress := fmt.Sprintf("https://%s", net.JoinHostPort(gatewayAddress, "8443"))
+			targetTCPAddress := fmt.Sprintf("http://%s", net.JoinHostPort(gatewayAddress, "8081"))
 
 			if c.secure {
 				// check that intentions keep our connection from happening
@@ -595,13 +597,13 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	// finally we check that we can actually route to the service(s) via the gateway
 	k8sOptions := ctx.KubectlOptions(t)
-	targetHTTPAddress := fmt.Sprintf("http://%s:8080/v1", gatewayAddress)
-	targetHTTPAddressAdmin := fmt.Sprintf("http://%s:8083/admin", gatewayAddress)
-	targetHTTPAddressPet := fmt.Sprintf("http://%s:8083/pet", gatewayAddress)
-	targetHTTPAddressAdmin2 := fmt.Sprintf("http://%s:8083/admin-2", gatewayAddress)
-	targetHTTPAddressPet2 := fmt.Sprintf("http://%s:8083/pet-2", gatewayAddress)
-	targetHTTPAddressAdminNoAuthOnRoute := fmt.Sprintf("http://%s:8083/admin-no-auth", gatewayAddress)
-	targetHTTPAddressPetNotAuthOnRoute := fmt.Sprintf("http://%s:8083/pet-no-auth", gatewayAddress)
+	targetHTTPAddress := fmt.Sprintf("http://%s/v1", net.JoinHostPort(gatewayAddress, "8080"))
+	targetHTTPAddressAdmin := fmt.Sprintf("http://%s/admin", net.JoinHostPort(gatewayAddress, "8083"))
+	targetHTTPAddressPet := fmt.Sprintf("http://%s/pet", net.JoinHostPort(gatewayAddress, "8083"))
+	targetHTTPAddressAdmin2 := fmt.Sprintf("http://%s/admin-2", net.JoinHostPort(gatewayAddress, "8083"))
+	targetHTTPAddressPet2 := fmt.Sprintf("http://%s/pet-2", net.JoinHostPort(gatewayAddress, "8083"))
+	targetHTTPAddressAdminNoAuthOnRoute := fmt.Sprintf("http://%s/admin-no-auth", net.JoinHostPort(gatewayAddress, "8083"))
+	targetHTTPAddressPetNotAuthOnRoute := fmt.Sprintf("http://%s/pet-no-auth", net.JoinHostPort(gatewayAddress, "8083"))
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
