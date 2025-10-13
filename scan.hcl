@@ -32,8 +32,9 @@ repository {
         "hack/*",
       ]
       vulnerabilities = [
-        # GO-2022-0635: CVE suppression (consistent with release scan config)
+        # GO-2022-0635, GO-2022-0646: AWS S3 Crypto SDK CVE suppressions (consistent with release scan config)
         "GO-2022-0635",
+        "GO-2022-0646",
         # NET-8174 (2024-02-20): Chart YAML path traversal (not impacted)
         "GHSA-v53g-5gjp-272r", 
         "GO-2024-2554", # alias
