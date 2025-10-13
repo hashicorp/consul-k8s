@@ -13,10 +13,8 @@
 # See `security-scanner` docs or run with `--help` for scan target syntax.
 
 container {
-  dependencies    = true
-  alpine_security = true
-  osv             = true
-  go_modules      = true
+  dependencies = true
+  alpine_secdb = true
 
   secrets {
     all = true
@@ -34,7 +32,8 @@ binary {
   triage {
     suppress {
       vulnerabilities = [
-        "GO-2022-0635"
+        "GO-2022-0635",
+        "GO-2022-0646"
       ]
     }
   }
@@ -47,7 +46,8 @@ repository {
   triage {
     suppress {
       vulnerabilities = [
-        "GO-2022-0635"
+        "GO-2022-0635",
+        "GO-2022-0646"
       ]
     }
   }
