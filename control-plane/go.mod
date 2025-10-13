@@ -12,6 +12,8 @@ replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17
 
 replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.22.0-rc1
 
+replace sigs.k8s.io/gateway-api/apis/v1alpha2 => ./gatewaytest/gateway-api
+
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
