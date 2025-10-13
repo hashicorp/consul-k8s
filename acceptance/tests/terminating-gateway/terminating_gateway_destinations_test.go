@@ -6,6 +6,7 @@ package terminatinggateway
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -102,8 +103,12 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			require.NotEmpty(t, staticServerIP)
 
 			staticServerHostnameURL := fmt.Sprintf("https://%s", staticServerServiceName)
-			staticServerIPURL := fmt.Sprintf("http://%s", staticServerIP)
-
+			staticServerIPURL := ""
+			if strings.Contains(staticServerIP, ":") {
+				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
+			} else {
+				staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			}
 			// Create the service default declaring the external service (aka Destination)
 			logger.Log(t, "creating tcp-based service defaults")
 			CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
@@ -130,8 +135,12 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Try running some different scenarios
 			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
-			staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
 
+			if strings.Contains(staticServerIP, ":") {
+				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
+			} else {
+				staticServerIPURL = fmt.Sprintf("http://%s", staticServerIP)
+			}
 			// Update the service default declaring the external service (aka Destination)
 			logger.Log(t, "updating service defaults to try other scenarios")
 

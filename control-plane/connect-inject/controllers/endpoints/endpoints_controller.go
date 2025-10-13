@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -540,7 +541,11 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		if err != nil {
 			return nil, nil, err
 		}
-		prometheusScrapeListener := fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
+		prometheusScrapeAddr := "0.0.0.0"
+		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+			prometheusScrapeAddr = "::"
+		}
+		prometheusScrapeListener := net.JoinHostPort(prometheusScrapeAddr, prometheusScrapePort)
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
@@ -825,7 +830,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", podIP)
+		service.Proxy.Config["envoy_prometheus_bind_addr"] = net.JoinHostPort(pod.Status.PodIP, "20200")
 	}
 
 	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {

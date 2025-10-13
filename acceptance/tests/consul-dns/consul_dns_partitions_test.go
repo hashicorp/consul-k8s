@@ -105,7 +105,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 					if v.preProcessingFunc != nil {
 						v.preProcessingFunc(t)
 					}
-					verifyDNS(t, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
+					verifyDNS(t, cfg, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
 						podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
 					dnsUtilsPodIndex++
 				})
