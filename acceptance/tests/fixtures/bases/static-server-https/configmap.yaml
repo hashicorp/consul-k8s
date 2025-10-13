@@ -16,11 +16,13 @@ data:
       log
       respond  "hello world"
     }
-    [::]:443 {
+    :443 {
+      bind 0.0.0.0 [::]
       log
       respond  "hello world"
     }
-    [::]:80 {
+    :80 {
+      bind 0.0.0.0 [::]
       log
       respond  "hello world"
     }
