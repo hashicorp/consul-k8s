@@ -195,7 +195,6 @@ kind-cni-calico: ## install cni plugin on kind
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
-	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
 		echo "Adding IPv6 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources-ipv6.yaml; \
