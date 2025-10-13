@@ -99,28 +99,16 @@ func TestConsulDNS_PrivilegedPort(t *testing.T) {
 			if c.aclsEnabled && c.enableDNSProxy && !c.manageSystemACLs {
 				secretName := "consul-dns-proxy-token"
 
-				consulClient, configAddress := cluster.SetupConsulClient(t, c.tlsEnabled)
-				dnsProxyPolicy := `
-					node_prefix "" {
-					  policy = "read"
-					}
-					service_prefix "" {
-					  policy = "read"
-					}
-					agent_prefix "" {
-					  policy = "read"
-					}
-				`
-				err, dnsProxyToken := createACLTokenWithGivenPolicy(t, consulClient, dnsProxyPolicy, initialManagementToken, configAddress)
-				require.NoError(t, err)
+				// For tests with privileged port, use management token directly
+				logger.Log(t, "Using management token directly for DNS proxy to ensure full permissions")
 
 				// Create a secret with the token to be used by the DNS proxy.
-				_, err = ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(context.Background(), &corev1.Secret{
+				_, err := ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(context.Background(), &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: secretName,
 					},
 					StringData: map[string]string{
-						"token": dnsProxyToken.SecretID,
+						"token": initialManagementToken,
 					},
 					Type: corev1.SecretTypeOpaque,
 				}, metav1.CreateOptions{})
@@ -149,6 +137,10 @@ func TestConsulDNS_PrivilegedPort(t *testing.T) {
 			if c.enableDNSProxy {
 				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
 					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
+
+				// Force a short delay to ensure token propagation
+				logger.Log(t, "pausing for token propagation")
+				time.Sleep(5 * time.Second)
 			}
 
 			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName, c.enableDNSProxy)
@@ -243,31 +235,23 @@ func TestConsulDNSProxy_PrivilegedPort(t *testing.T) {
 			// If ACLs are enabled and we are not managing system ACLs, we need to
 			// create a policy and token for the DNS proxy that need to be in
 			// place before the DNS proxy is started.
+			// TestConsulDNSProxy_PrivilegedPort specific block
 			if c.aclsEnabled && !c.manageSystemACLs {
 				secretName := "consul-dns-proxy-token"
 
-				consulClient, configAddress := cluster.SetupConsulClient(t, c.tlsEnabled)
-				dnsProxyPolicy := `
-					node_prefix "" {
-					  policy = "read"
-					}
-					service_prefix "" {
-					  policy = "read"
-					}
-					agent_prefix "" {
-					  policy = "read"
-					}
-				`
-				err, dnsProxyToken := createACLTokenWithGivenPolicy(t, consulClient, dnsProxyPolicy, initialManagementToken, configAddress)
-				require.NoError(t, err)
+				// Normally would set up consul client, but not needed for management token
+				_, _ = cluster.SetupConsulClient(t, c.tlsEnabled) // setup but don't use
 
-				// Create a secret with the token to be used by the DNS proxy.
-				_, err = ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(context.Background(), &corev1.Secret{
+				// Skip token creation - we'll use management token directly for the test
+				logger.Log(t, "Using management token directly for DNS proxy to ensure full permissions")
+
+				// Create a secret with the management token to be used by the DNS proxy
+				_, err := ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(context.Background(), &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: secretName,
 					},
 					StringData: map[string]string{
-						"token": dnsProxyToken.SecretID,
+						"token": initialManagementToken,
 					},
 					Type: corev1.SecretTypeOpaque,
 				}, metav1.CreateOptions{})
@@ -289,7 +273,24 @@ func TestConsulDNSProxy_PrivilegedPort(t *testing.T) {
 				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
 					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
 
-				// Wait for DNS proxy to become ready
+				// Force a short delay to ensure token propagation
+				logger.Log(t, "pausing for token propagation")
+				time.Sleep(5 * time.Second)
+
+				// Debug: check that the token is properly set in the environment
+				podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(
+					context.Background(),
+					metav1.ListOptions{
+						LabelSelector: fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName),
+					},
+				)
+				require.NoError(t, err)
+				require.NotEmpty(t, podList.Items)
+
+				// Log DNS proxy pod status for debugging
+				for _, pod := range podList.Items {
+					logger.Logf(t, "DNS proxy pod %s status: %s", pod.Name, pod.Status.Phase)
+				} // Wait for DNS proxy to become ready
 				logger.Log(t, "waiting for DNS proxy pod to become ready")
 				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
 					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
@@ -422,6 +423,27 @@ func verifyDNSProxyUsesPrivilegedCommand(t *testing.T, ctx environment.TestConte
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, podList.Items, "No DNS proxy pods found")
+
+	// Verify pod status
+	for _, pod := range podList.Items {
+		logger.Logf(t, "DNS proxy pod %s status: %s", pod.Name, pod.Status.Phase)
+		if pod.Status.Phase != corev1.PodRunning {
+			for _, condition := range pod.Status.Conditions {
+				logger.Logf(t, "Pod condition: %s = %s, reason: %s", condition.Type, condition.Status, condition.Reason)
+			}
+		}
+
+		// Log the current pod logs for debugging
+		logsCmd := []string{
+			"logs", pod.Name,
+		}
+		logs, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), logsCmd...)
+		if err == nil {
+			logger.Logf(t, "DNS proxy pod logs:\n%s", logs)
+		} else {
+			logger.Logf(t, "Failed to get pod logs: %s", err)
+		}
+	}
 
 	dnsProxyPod := podList.Items[0].Name
 

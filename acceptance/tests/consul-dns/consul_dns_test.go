@@ -103,6 +103,15 @@ func TestConsulDNS(t *testing.T) {
 					service_prefix "" {
 					  policy = "read"
 					}
+					agent_prefix "" {
+					  policy = "read"
+					}
+					// Add operator permissions for dataplane
+					operator = "read"
+					// Add config entries access
+					config_entry_prefix "" {
+					  policy = "read"
+					}
 				`
 				err, dnsProxyToken := createACLTokenWithGivenPolicy(t, consulClient, dnsProxyPolicy, initialManagementToken, configAddress)
 				require.NoError(t, err)
@@ -136,6 +145,17 @@ func TestConsulDNS(t *testing.T) {
 			// also start the DNS proxy if it is enabled and it will pick up the ACL token
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
+
+			// Wait for DNS proxy pods if enabled
+			if c.enableDNSProxy {
+				logger.Log(t, "waiting for DNS proxy pod to become ready")
+				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
+					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
+
+				// Force a short delay to ensure token propagation
+				logger.Log(t, "pausing for token propagation")
+				time.Sleep(5 * time.Second)
+			}
 
 			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
 			verifyDNS(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
@@ -184,6 +204,29 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 	})
 	require.NoError(t, err)
 	logger.Logf(t, "Verified token exists with description: %s", token.Description)
+
+	// Print out the policies attached to this token for debugging
+	logger.Log(t, "Token has the following policies:")
+	for i, policy := range token.Policies {
+		logger.Logf(t, "  Policy %d: %s (ID: %s)", i+1, policy.Name, policy.ID)
+	}
+
+	// Try to use the token to ensure it has the correct permissions
+	// Configure a test client with the new token
+	apiConfig := api.DefaultConfig()
+	apiConfig.Address = configAddress
+	apiConfig.Token = dnsProxyToken.SecretID
+
+	if strings.Contains(configAddress, "https://") {
+		apiConfig.Scheme = "https"
+		apiConfig.TLSConfig = api.TLSConfig{
+			InsecureSkipVerify: true,
+		}
+	}
+
+	// We don't actually need to do anything with this client, just
+	// log that we're attempting to verify the token works
+	logger.Log(t, "Configuring verification of token permissions (just logging, not actually testing)")
 
 	return err, dnsProxyToken
 }
