@@ -6,6 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -460,7 +461,12 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+			addr := "127.0.0.1"
+			if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+				addr = "::1"
+			}
+			addr = net.JoinHostPort(addr, serviceMetricsPort)
+			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, serviceMetricsPath))
 		}
 
 		// Pull the TLS config from the relevant annotations.

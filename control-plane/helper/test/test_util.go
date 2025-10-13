@@ -70,7 +70,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	require.NoError(t, err)
 
 	requireACLBootstrapped(t, cfg, client)
-	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true)
+	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1 ", cfg.Ports.GRPC, true)
 
 	requireTenancyBuiltins(t, cfg, client)
 
@@ -131,7 +131,7 @@ func GenerateServerCerts(t *testing.T) (string, string, string) {
 
 	// Generate Server Cert
 	name := "server.dc1.consul"
-	hosts := []string{name, "localhost", "127.0.0.1"}
+	hosts := []string{name, "localhost", "127.0.0.1", "::1"}
 	certPem, keyPem, err := cert.GenerateCert(name, 1*time.Hour, caCertTemplate, signer, hosts)
 	require.NoError(t, err)
 

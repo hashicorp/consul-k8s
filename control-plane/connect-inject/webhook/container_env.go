@@ -5,6 +5,7 @@ package webhook
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -33,10 +34,13 @@ func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) []corev1.EnvVar {
 			name := strings.TrimSpace(parts[0])
 			name = strings.ToUpper(strings.Replace(name, "-", "_", -1))
 			portStr := strconv.Itoa(int(port))
-
+			addr := "127.0.0.1"
+			if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+				addr = "::1"
+			}
 			result = append(result, corev1.EnvVar{
 				Name:  fmt.Sprintf("%s_CONNECT_SERVICE_HOST", name),
-				Value: "127.0.0.1",
+				Value: addr,
 			}, corev1.EnvVar{
 				Name:  fmt.Sprintf("%s_CONNECT_SERVICE_PORT", name),
 				Value: portStr,
