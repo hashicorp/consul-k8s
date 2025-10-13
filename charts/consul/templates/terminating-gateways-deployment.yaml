@@ -273,6 +273,10 @@ spec:
             value: component=terminating-gateway
           - name: DP_SERVICE_NODE_NAME
             value: $(NODE_NAME)-virtual
+          - name: DP_ENVOY_READY_BIND_ADDRESS
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
           command:
           - consul-dataplane
           args:
@@ -324,6 +328,17 @@ spec:
           {{- end }}
           {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.skipServerWatch }}
           - -server-watch-disabled=true
+          {{- end }}
+          {{- if $root.Values.global.dualStack.defaultEnabled }}
+          - "-envoy-admin-bind-address=::1"
+          - "-xds-bind-addr=::1"
+          - "-graceful-addr=::1"
+          - "-consul-dns-bind-addr=::1"
+          {{- else }}
+          - -envoy-admin-bind-address=127.0.0.1
+          - -xds-bind-addr=127.0.0.1
+          - -graceful-addr=127.0.0.1
+          - -consul-dns-bind-addr=127.0.0.1
           {{- end }}
           livenessProbe:
             tcpSocket:

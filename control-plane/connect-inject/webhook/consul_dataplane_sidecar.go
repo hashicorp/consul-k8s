@@ -328,7 +328,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
 		envoyAdminBindAddress = "::1"
 		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
-		consulDPBindAddress = "::"
+		consulDPBindAddress = "::1"
 		xdsBindAddress = "::1"
 	}
 	args := []string{
