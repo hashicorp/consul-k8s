@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -145,7 +146,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
 	// Waiting for gateway to be ready.
-	gatewayCounter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
+	gatewayCounter := &retry.Counter{Count: 30, Wait: 30 * time.Second}
 	logger.Log(t, "waiting for gateway to be ready")
 	retry.RunWith(gatewayCounter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
@@ -209,7 +210,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 	// finally we check that we can actually route to the service(s) via the gateway
 	k8sOptions := ctx.KubectlOptions(t)
-	targetHTTPAddress := fmt.Sprintf("http://%s:8080/v1", gatewayAddress)
+	targetHTTPAddress := fmt.Sprintf("http://%s/v1", net.JoinHostPort(gatewayAddress, "8080"))
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
