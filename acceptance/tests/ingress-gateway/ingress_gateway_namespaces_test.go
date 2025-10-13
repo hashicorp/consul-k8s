@@ -10,12 +10,12 @@ import (
 	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
-	"github.com/hashicorp/consul-enterprise/sdk/testutil/retry"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 )
 
