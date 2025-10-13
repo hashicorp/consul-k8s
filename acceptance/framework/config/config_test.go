@@ -126,7 +126,7 @@ func TestConfig_HelmValuesFromConfig(t *testing.T) {
 				DualStack: true,
 			},
 			map[string]string{
-				"global.dualStack.enabled":                      "true",
+				"global.dualStack.defaultEnabled":               "true",
 				"connectInject.transparentProxy.defaultEnabled": "false",
 			},
 		},

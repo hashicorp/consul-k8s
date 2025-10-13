@@ -292,8 +292,8 @@ spec:
                 -node="${NODE}" \
                 -advertise="${ADVERTISE_IP}" \
                 {{- if .Values.global.dualStack.defaultEnabled }}
-                -bind="[::]" \
-                -client="[::]" \
+                -bind="::" \
+                -client="::" \
                 {{- else }}
                 -bind=0.0.0.0 \
                 -client=0.0.0.0 \
