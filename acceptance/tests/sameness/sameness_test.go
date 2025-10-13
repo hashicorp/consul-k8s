@@ -666,7 +666,8 @@ func (c *cluster) preparedQueryFailoverCheck(t *testing.T, cfg *config.TestConfi
 	assert.Equal(t, epq.partition, resp.Nodes[0].Service.Partition)
 	assert.Equal(t, epq.peerName, resp.Nodes[0].Service.PeerName)
 	assert.Equal(t, epq.namespace, resp.Nodes[0].Service.Namespace)
-	assert.Equal(t, *failover.staticServerIP, resp.Nodes[0].Service.Address)
+	addr := strings.ReplaceAll(resp.Nodes[0].Service.Address, ":0:", "::")
+	assert.Equal(t, *failover.staticServerIP, addr)
 
 	// Verify that dns lookup is successful, there is no guarantee that the ip address is unique, so for PQ this is
 	// just verifying that we can query using DNS and that the ip address is correct. It does not however prove
