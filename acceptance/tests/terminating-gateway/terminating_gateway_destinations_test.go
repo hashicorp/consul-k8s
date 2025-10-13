@@ -135,7 +135,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// Try running some different scenarios
 			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
-			staticServerIPURL = ""
+
 			if strings.Contains(staticServerIP, ":") {
 				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
 			} else {
