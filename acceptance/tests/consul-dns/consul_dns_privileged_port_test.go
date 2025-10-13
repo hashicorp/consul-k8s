@@ -136,10 +136,17 @@ func TestConsulDNS_PrivilegedPort(t *testing.T) {
 			if c.enableDNSProxy {
 				helmValues["dns.proxy.enabled"] = strconv.FormatBool(c.enableDNSProxy)
 			}
+
 			// Upgrade the cluster to apply the changes created above.  This will
 			// also start the DNS proxy if it is enabled and it will pick up the ACL token
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
+
+			// Wait specifically for DNS proxy pods if enabled
+			if c.enableDNSProxy {
+				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
+					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
+			}
 
 			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName, c.enableDNSProxy)
 			verifyDNSWithPrivilegedPort(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
@@ -273,7 +280,7 @@ func TestConsulDNSProxy_PrivilegedPort(t *testing.T) {
 			}
 
 			// Update CoreDNS to use Consul DNS
-			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName, true)  // DNS proxy is enabled in TestConsulDNSProxy_PrivilegedPort
+			updateCoreDNSWithConsulDomainPrivilegedPort(t, ctx, releaseName, true) // DNS proxy is enabled in TestConsulDNSProxy_PrivilegedPort
 
 			// Verify that the Consul service can be resolved through DNS
 			verifyDNSWithPrivilegedPort(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server", "consul.service.consul", true, 0)

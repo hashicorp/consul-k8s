@@ -145,19 +145,21 @@ func TestConsulDNS(t *testing.T) {
 }
 
 func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, policyRules string, initialManagementToken string, configAddress string) (error, *api.ACLToken) {
-	_, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{}, &api.WriteOptions{
-		Token: initialManagementToken,
-	})
-	require.NoError(t, err)
+	// Log detailed information for debugging
+	logger.Logf(t, "Creating ACL policy and token for DNS proxy using management token '%s'", initialManagementToken)
+	logger.Logf(t, "Policy rules:\n%s", policyRules)
 
 	// Create the policy and token _before_ we enable dns proxy and upgrade the cluster.
-	require.NoError(t, err)
 	policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
 		Name:        "dns-proxy-token",
 		Description: "DNS Proxy Policy",
 		Rules:       policyRules,
-	}, nil)
+	}, &api.WriteOptions{
+		Token: initialManagementToken,
+	})
 	require.NoError(t, err)
+	logger.Logf(t, "Created ACL policy '%s' with ID '%s'", policy.Name, policy.ID)
+
 	dnsProxyToken, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{
 		Description: fmt.Sprintf("DNS Proxy Token for %s", strings.Split(configAddress, ":")[0]),
 		Policies: []*api.ACLTokenPolicyLink{
@@ -165,9 +167,12 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 				Name: policy.Name,
 			},
 		},
-	}, nil)
+	}, &api.WriteOptions{
+		Token: initialManagementToken,
+	})
 	require.NoError(t, err)
-	logger.Log(t, "created DNS Proxy token", "token", dnsProxyToken)
+	logger.Logf(t, "Created DNS Proxy token with AccessorID '%s' and SecretID '%s'",
+		dnsProxyToken.AccessorID, dnsProxyToken.SecretID)
 	return err, dnsProxyToken
 }
 
