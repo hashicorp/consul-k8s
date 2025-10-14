@@ -5,6 +5,7 @@ package segments
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -39,12 +40,15 @@ func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			releaseName := helpers.RandomName()
-
+			addr := "0.0.0.0"
+			if cfg.DualStack {
+				addr = "::"
+			}
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
 
 				"server.replicas":    "3",
-				"server.extraConfig": `"{\"segments\": [{\"name\":\"alpha1\"\,\"bind\":\"0.0.0.0\"\,\"port\":8303}]}"`,
+				"server.extraConfig": fmt.Sprintf(`"{\"segments\": [{\"name\":\"alpha1\"\,\"bind\":\"%s\"\,\"port\":8303}]}"`, addr),
 
 				"client.enabled": "true",
 				// need to configure clients to connect to port 8303 that the alpha segment was configured on rather than
@@ -100,14 +104,17 @@ func TestSegments_MeshWithAgentfulClientsMultiCluster(t *testing.T) {
 				t.Skipf("skipping this test because -enable-enterprise is not set")
 			}
 			releaseName := helpers.RandomName()
-
+			addr := "0.0.0.0"
+			if cfg.DualStack {
+				addr = "::"
+			}
 			// deploy server cluster
 			serverClusterContext := suite.Environment().DefaultContext(t)
 			serverClusterHelmValues := map[string]string{
 				"connectInject.enabled": "true",
 
 				"server.replicas":    "3",
-				"server.extraConfig": `"{\"segments\": [{\"name\":\"alpha1\"\,\"bind\":\"0.0.0.0\"\,\"port\":8303}]}"`,
+				"server.extraConfig": fmt.Sprintf(`"{\"segments\": [{\"name\":\"alpha1\"\,\"bind\":\"%s\"\,\"port\":8303}]}"`,addr),
 
 				"client.enabled":     "true",
 				"client.join[0]":     "${CONSUL_FULLNAME}-server-0.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:8303",
