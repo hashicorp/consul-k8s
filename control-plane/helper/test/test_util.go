@@ -70,7 +70,7 @@ func TestServerWithMockConnMgrWatcher(t *testing.T, callback testutil.ServerConf
 	require.NoError(t, err)
 
 	requireACLBootstrapped(t, cfg, client)
-	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1 ", cfg.Ports.GRPC, true)
+	watcher := MockConnMgrForIPAndPort(t, "127.0.0.1", cfg.Ports.GRPC, true)
 
 	requireTenancyBuiltins(t, cfg, client)
 
