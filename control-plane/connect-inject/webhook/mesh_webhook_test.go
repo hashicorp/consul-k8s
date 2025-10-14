@@ -1163,6 +1163,7 @@ func TestHandlerHandle(t *testing.T) {
 			if (tt.Err == "") != resp.Allowed {
 				t.Fatalf("allowed: %v, expected err: %v", resp.Allowed, tt.Err)
 			}
+			
 			if tt.Err != "" {
 				require.Contains(t, resp.Result.Message, tt.Err)
 				return
