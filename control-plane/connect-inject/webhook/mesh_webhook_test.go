@@ -1150,6 +1150,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.ConsulDualStackEnvVar),
+				},
 				// Note: no DNS policy/config additions.
 			},
 		},
@@ -1328,6 +1332,10 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.ConsulDualStackEnvVar),
 				},
 			},
 		},
