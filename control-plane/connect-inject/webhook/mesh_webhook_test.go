@@ -1406,10 +1406,6 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 	}
