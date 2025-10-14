@@ -346,7 +346,7 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 
 		// Exec into job and send shutdown request to running proxy.
 		// curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
-		sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://127.0.0.1:20600/graceful_shutdown"}
+		sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://localhost:20600/graceful_shutdown"}
 		_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), sendProxyShutdownArgs...)
 		require.NoError(t, err)
 
