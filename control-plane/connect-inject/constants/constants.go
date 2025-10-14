@@ -120,7 +120,7 @@ func GetNormalizedConsulPeer(peer string) string {
 	return peer
 }
 
-// IsDualStack checks ConsulDualStackEnvVar is set to true for dual stack case
+// IsDualStack checks ConsulDualStackEnvVar is set to true for dual stack.
 func IsDualStack() bool {
 	return os.Getenv(ConsulDualStackEnvVar) == "true"
 }

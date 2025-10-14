@@ -584,7 +584,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	return nil
 }
 
-// addDualStackAnnotation add the dual stack annotation
+// addDualStackAnnotation adds the dual stack annotation.
 func (w *MeshWebhook) addDualStackAnnotation(pod *corev1.Pod) error {
 	if constants.IsDualStack() {
 		pod.Annotations[constants.AnnotationDualStack] = "true"
