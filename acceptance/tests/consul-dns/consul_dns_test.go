@@ -6,6 +6,7 @@ package consuldns
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -79,6 +80,27 @@ func TestConsulDNS(t *testing.T) {
 			if c.aclsEnabled && !c.manageSystemACLs {
 				helmValues["server.extraConfig"] = fmt.Sprintf(`"{\"acl\": {\"enabled\": true\, \"default_policy\": \"deny\"\, \"tokens\": {\"initial_management\": \"%s\"}}}"`,
 					initialManagementToken)
+
+				// Set ACL token for connect-injector
+				helmValues["connectInject.aclInjectToken.secretName"] = "consul-connect-inject-acl-token"
+
+				// Create the secret that will hold this token
+				secretName := "consul-connect-inject-acl-token"
+				_, err := ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(
+					context.Background(),
+					&corev1.Secret{
+						ObjectMeta: metav1.ObjectMeta{Name: secretName},
+						StringData: map[string]string{"token": initialManagementToken},
+						Type:       corev1.SecretTypeOpaque,
+					},
+					metav1.CreateOptions{},
+				)
+				require.NoError(t, err)
+
+				t.Cleanup(func() {
+					_ = ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Delete(
+						context.Background(), secretName, metav1.DeleteOptions{})
+				})
 			}
 
 			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
@@ -249,7 +271,7 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	// If we're using the DNS proxy, we need to use port 8053 (non-privileged) in K8s 1.30+
 	dnsTarget := dnsIP
 	if enableDNSProxy {
-		dnsTarget = fmt.Sprintf("%s:8053", dnsIP)
+		dnsTarget = net.JoinHostPort(dnsIP, "8053")
 	}
 
 	input, err := os.ReadFile("coredns-template.yaml")
@@ -296,7 +318,7 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
+		"run", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
 	}
 
 	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
