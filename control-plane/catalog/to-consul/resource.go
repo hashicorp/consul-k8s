@@ -6,7 +6,6 @@ package catalog
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -423,7 +422,7 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// service-type specific changes. These are not pointers, they should be
 	// shallow copied for each instance.
 	addr := "127.0.0.1"
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		addr = "::1"
 	}
 	baseNode := consulapi.CatalogRegistration{

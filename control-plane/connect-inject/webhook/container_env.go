@@ -5,7 +5,6 @@ package webhook
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -35,7 +34,7 @@ func (w *MeshWebhook) containerEnvVars(pod corev1.Pod) []corev1.EnvVar {
 			name = strings.ToUpper(strings.Replace(name, "-", "_", -1))
 			portStr := strconv.Itoa(int(port))
 			addr := "127.0.0.1"
-			if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+			if constants.IsDualStack() {
 				addr = "::1"
 			}
 			result = append(result, corev1.EnvVar{

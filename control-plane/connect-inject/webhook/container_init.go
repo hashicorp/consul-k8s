@@ -6,7 +6,6 @@ package webhook
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -105,7 +104,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
 	dualStack := "false"
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		dualStack = "true"
 	}
 

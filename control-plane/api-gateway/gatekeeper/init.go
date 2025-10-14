@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -73,7 +72,7 @@ func (g *Gatekeeper) initContainer(config common.HelmConfig, name, namespace str
 
 	initContainerName := injectInitContainerName
 	dualStack := "false"
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		dualStack = "true"
 	}
 	container := corev1.Container{

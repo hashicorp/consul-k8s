@@ -3,6 +3,10 @@
 
 package constants
 
+import (
+	"os"
+)
+
 const (
 	// LegacyConsulCAFile is the location of the Consul CA file inside the injected pod.
 	// This is used with the V1 API.
@@ -114,4 +118,9 @@ func GetNormalizedConsulPeer(peer string) string {
 	}
 
 	return peer
+}
+
+// IsDualStack checks ConsulDualStackEnvVar is set to true for dual stack case
+func IsDualStack() bool {
+	return os.Getenv(ConsulDualStackEnvVar) == "true"
 }

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 
@@ -326,7 +325,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		envoyAdminBindAddress = "::1"
 		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
 		consulDPBindAddress = "::1"
@@ -462,7 +461,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
 			addr := "127.0.0.1"
-			if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+			if constants.IsDualStack() {
 				addr = "::1"
 			}
 			addr = net.JoinHostPort(addr, serviceMetricsPort)
