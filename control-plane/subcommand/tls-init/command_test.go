@@ -122,7 +122,7 @@ func TestRun_CreatesServerCertificatesWithExistingCAAsFiles(t *testing.T) {
 			require.NoError(t, err)
 			require.False(t, certificate.IsCA)
 			require.Equal(t, []string{"server.dc1.consul", "localhost"}, certificate.DNSNames)
-			require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4(), net.ParseIP("::").To16()}, certificate.IPAddresses)
+			require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4(), net.ParseIP("::1").To16()}, certificate.IPAddresses)
 
 			keyBlock, _ := pem.Decode(serverKey)
 			privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
@@ -246,7 +246,7 @@ func TestRun_CreatesServerCertificatesWithExistingCertsAsSecrets(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, certificate.IsCA)
 	require.Equal(t, []string{"server.dc1.consul", "localhost"}, certificate.DNSNames)
-	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4(), net.ParseIP("::").To16()}, certificate.IPAddresses)
+	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4(), net.ParseIP("::1").To16()}, certificate.IPAddresses)
 
 	keyBlock, _ := pem.Decode(serverKey)
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
@@ -276,7 +276,7 @@ func TestRun_CreatesServerCertificatesWithoutExistingCerts(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, certificate.IsCA)
 	require.Equal(t, []string{"server.dc1.consul", "localhost"}, certificate.DNSNames)
-	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4(), net.ParseIP("::").To16()}, certificate.IPAddresses)
+	require.Equal(t, []net.IP{net.ParseIP("127.0.0.1").To4(), net.ParseIP("::1").To16()}, certificate.IPAddresses)
 
 	keyBlock, _ := pem.Decode(newServerKey)
 	privateKey, err := x509.ParseECPrivateKey(keyBlock.Bytes)
