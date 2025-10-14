@@ -24,6 +24,8 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
+// dummy comment
+
 // TestConsulDNSProxy_PrivilegedPort tests that the Consul DNS proxy works correctly with privileged ports.
 // It configures CoreDNS to use Consul domain queries forwarded to the Consul DNS Proxy
 // using a privileged port (53, the standard DNS port). The test validates that the DNS queries
