@@ -1150,10 +1150,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 				// Note: no DNS policy/config additions.
 			},
 		},
