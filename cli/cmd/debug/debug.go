@@ -86,16 +86,26 @@ const (
 	noSidecarPodsFound = "No consul injected sidecar pods found in all namespace"
 	noProxiesFound     = "No envoy proxy pods found in the cluster"
 	noPodsFound        = "No pods found to capture log"
+
+	// constant filenames for various debug info files
+	// Please Note, some filenames cannot be constants like log/proxy captures files
+	// as they will be fetched dynamically based on pods/containers found
+	helmConfigFileName         = "helm-config.json"
+	crdResourcesFileName       = "CRDsResources.json"
+	crdResourcesErrorsFileName = "CRDsResourcesErrors.txt"
+	sidecarPodsFileName        = "sidecar-pods.json"
+	debugIndexFileName         = "index.json"
 )
 
 var (
-	// Predefined errors - helpful for comparing error types
-	notFoundError        = errors.New("not found")
-	signalInterruptError = errors.New("signal interrupt received")
-	// oneOrMoreErrorOccured is used to indicate that one or more errors occurred
-	// during a capture task and they (errors) are written successfully to debug bundle,
-	// otherwise whole error would be printed on terminal
-	oneOrMoreErrorOccured = errors.New(fmt.Sprint("one or more errors occurred during capture for this target",
+	// Predefined errors - helpful for comparing returned errors
+	errNotFound        = errors.New("not found")
+	errSignalInterrupt = errors.New("signal interrupt received")
+
+	// ErrMultipleErrorsOccuredAndWritten is returned to stricly indicate that one or more errors occurred
+	// during a single capture task and they (multiple errors) are written successfully to debug bundle,
+	// In case if errors are not written, whole error would be printed on terminal
+	errMultipleErrorsOccuredAndWritten = errors.New(fmt.Sprint("one or more errors occurred during capture for this target",
 		"\n\tplease check the respective error file within the debug bundle for details"))
 
 	// defaultTargets specifies the list of targets that will be captured by default
@@ -152,10 +162,12 @@ type DebugCommand struct {
 
 	// Dependency Injections for testing
 	helmActionsRunner helm.HelmActionsRunner
-	proxyCapturer     *EnvoyProxyCapture
-	logCapturer       *LogCapture
-	once              sync.Once
-	help              string
+
+	proxyCapturer *EnvoyProxyCapture
+	logCapturer   *LogCapture
+
+	once sync.Once
+	help string
 }
 
 // init sets up flags and help text for the command.
@@ -197,7 +209,7 @@ func (c *DebugCommand) init() {
 		Name:    flagCapture,
 		Target:  &c.capture,
 		Default: []string{"all"},
-		Usage:   "A list of components to capture. Supported values are: all, helm, crds, sidecar, pods, proxy. (e.g. -capture pods -capture events).",
+		Usage:   "A list of components to capture. Supported values are: all, helm, crds, sidecar, pods, proxy. (e.g. -capture pods -capture proxy).",
 		Aliases: []string{"c"},
 	})
 	f.StringVar(&flag.StringVar{
@@ -226,7 +238,7 @@ func (c *DebugCommand) init() {
 	c.help = c.set.Help()
 }
 
-// Run executes the list command.
+// Run executes the command.
 func (c *DebugCommand) Run(args []string) int {
 	c.once.Do(c.init)
 	defer common.CloseWithError(c.BaseCommand)
@@ -291,7 +303,7 @@ func (c *DebugCommand) validateFlags() error {
 	} else {
 		for _, t := range c.capture {
 			if !slices.Contains(defaultTargets, t) {
-				return fmt.Errorf("invalid capture target agrument: '%s', Valid capture targets are: %s", t, strings.Join(defaultTargets, ", "))
+				return fmt.Errorf("invalid capture target argument: '%s', Valid capture targets are: %s", t, strings.Join(defaultTargets, ", "))
 			}
 		}
 	}
@@ -364,7 +376,7 @@ func (c *DebugCommand) initKubernetes() (err error) {
 	}
 
 	// for retrieving k8s CRDs resources
-	//if targetCapture(targetCRDs) is false, skip creating these clients
+	// if targetCapture(targetCRDs) is false, skip creating these clients
 	if c.captureTarget(targetCRDs) {
 		c.dynamic, err = dynamic.NewForConfig(c.restConfig)
 		if err != nil {
@@ -382,8 +394,6 @@ func (c *DebugCommand) initKubernetes() (err error) {
 	c.helmEnvSettings = settings
 	return nil
 }
-
-// ===================================================================================================================
 
 // debugger is the main function that orchestrate the debug process
 func (c *DebugCommand) debugger() int {
@@ -424,6 +434,10 @@ func (c *DebugCommand) debugger() int {
 			duration:    c.duration,
 		}
 	}
+
+	// Define the list of capture tasks to be performed
+	// each task has a resource name to be captured, target identifier,
+	// method to call and resourceNotFound message.
 	tasks := []captureTask{
 		{name: "Helm config", target: targetHelmConfig, captureFxn: c.captureHelmConfig, notFoundMsg: noHelmReleaseFound},
 		{name: "CRD resources", target: targetCRDs, captureFxn: c.captureCRDResources, notFoundMsg: noCRDsFound},
@@ -439,7 +453,7 @@ func (c *DebugCommand) debugger() int {
 	errorsOccuredDuringCapture := false
 
 	for _, task := range tasks {
-		// if current task target not specified in capture list,
+		// if current task target not specified in captureTarget list,
 		// skip this capture task
 		if !c.captureTarget(task.target) {
 			continue
@@ -458,6 +472,8 @@ func (c *DebugCommand) debugger() int {
 			return returnCode
 		}
 	}
+
+	// All capture tasks completed, create archive if requested and return appropriate exit code
 	return c.archiveDebugBundleAndReturn(archiveName, errorsOccuredDuringCapture)
 }
 
@@ -487,8 +503,11 @@ func (c *DebugCommand) archiveDebugBundleAndReturn(archiveName string, errorsOcc
 }
 
 // cleanup - cleans up partial debug capture
+// and sends cleanup completed signal to main to stop waiting and exit gracefully
 func (c *DebugCommand) cleanup() {
+	// send cleanup completed signal to main to stop waiting and exit gracefully
 	defer func() { c.CleanupReqAndCompleted <- true }()
+
 	c.UI.Output("\nDebug run interrupted (received signal interrupt)", terminal.WithErrorStyle())
 
 	// if signal interrupt is before archive creation,
@@ -506,24 +525,28 @@ func (c *DebugCommand) cleanup() {
 				c.UI.Output(fmt.Sprint("Please delete it and re-run the debug command for completed capture"), terminal.WithWarningStyle())
 			}
 			c.UI.Output(" - Cleanup completed")
+			return
 		}
 	}
 }
 
-// runCapture - it is executed for each capture task and runs a capture function,
-// Hanldles errors and output messages.
-// If signal interrupt is received during capture, it calls cleanup and returns 1
+// runCapture - this method is executed for each capture task
+// and it executed the given the capture function for each task.
+// Handles errors and output messages and returns exit codes accordingly.
+// If signal interrupt is received during capture, it calls cleanup
+// and returns 1 (to exit debugger with correct exit code)
 func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 	captureName := task.name
 	captureFunction := task.captureFxn
 	notFoundMsg := task.notFoundMsg
 	err := captureFunction()
+	if c.Ctx.Err() == context.Canceled || errors.Is(err, errSignalInterrupt) {
+		c.cleanup()
+		return 1
+	}
 	if err != nil {
 		switch {
-		case errors.Is(err, signalInterruptError) || c.Ctx.Err() == context.Canceled:
-			c.cleanup()
-			return 1
-		case errors.Is(err, notFoundError):
+		case errors.Is(err, errNotFound):
 			c.UI.Output(notFoundMsg, terminal.WithWarningStyle())
 		default:
 			*errorsOccured = true
@@ -534,8 +557,6 @@ func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 	}
 	return 0
 }
-
-// ===================================================================================================================
 
 // captureHelmConfig - captures consul-k8s Helm configuration and
 // write it to helm-config.json file within debug archive
@@ -553,16 +574,15 @@ func (c *DebugCommand) captureHelmConfig() error {
 	if err != nil {
 		return fmt.Errorf("couldn't find the helm releases: %w", err)
 	}
-	helmRelease, err := c.checkHelmInstallation(c.helmEnvSettings, uiLogger, releaseName, namespace)
+	helmRelease, err := c.getHelmRelease(c.helmEnvSettings, uiLogger, releaseName, namespace)
 	if err != nil {
 		return err
 	}
-	helmFilePath := filepath.Join(c.output, "helm-config.json")
-
-	// return if context is cancelled
+	// return if context is cancelled before writing files
 	if c.Ctx.Err() == context.Canceled {
-		return signalInterruptError
+		return errSignalInterrupt
 	}
+	helmFilePath := filepath.Join(c.output, helmConfigFileName)
 	err = writeJSONFile(helmFilePath, helmRelease)
 	if err != nil {
 		return fmt.Errorf("couldn't write Helm config to json file: %v", err)
@@ -570,9 +590,9 @@ func (c *DebugCommand) captureHelmConfig() error {
 	return nil
 }
 
-// checkHelmInstallation uses the helm Go SDK to depict the status of a named release.
-// This function then prints the version of the release, it's status (unknown, deployed, uninstalled, ...), and the overwritten values.
-func (c *DebugCommand) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) (*release.Release, error) {
+// getHelmRelease uses the helm Go SDK to depict the status of a named release.
+// This function returns the helm release object.
+func (c *DebugCommand) getHelmRelease(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) (*release.Release, error) {
 	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
 	statusConfig := new(action.Configuration)
 	statusConfig, err := helm.InitActionConfig(statusConfig, namespace, settings, uiLogger)
@@ -590,38 +610,60 @@ func (c *DebugCommand) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLo
 // captureCRDResources - captures consul-k8s CRDs and their instances
 // and write it to CRDsResources.json file within debug archive
 func (c *DebugCommand) captureCRDResources() error {
-	crdResources, err := c.listCRDResources()
-	if err != nil {
-		if errors.Is(err, notFoundError) || strings.Contains(err.Error(), "couldn't retrive CRDs") {
-			return err
+	crdResources, listCRDError := c.listCRDResources()
+
+	// if listCRDError is not nil and
+	// is errNotFound, or if error message contains "couldn't retrive CRDs",
+	// return the error (simple errors)
+	// otherwise,
+
+	// it means that, multiple errors occurred during listing CRD resources,
+	// so write those errors to an error file (to, avoid terminal clutter)
+	// and return "errMultipleErrorsOccuredAndWritten" error to indicate this.
+
+	if listCRDError != nil {
+		if errors.Is(listCRDError, errNotFound) || strings.Contains(listCRDError.Error(), "couldn't retrive CRDs") {
+			return listCRDError
 		}
 	}
-	// return if context is cancelled
+
+	// check if context is cancelled before writing to file
 	if c.Ctx.Err() == context.Canceled {
-		return signalInterruptError
+		return errSignalInterrupt
 	}
 
-	var writeErrors error
+	// lets assume,
+	// 5 CRDs and its resources are captured in the `crdResources` map, we will write them, and
+	// 5 CRDs returned error during their resource capture, we will write those errors too.
+
+	var finalError error
+	// write the CRD resources to json file (if any)
 	if len(crdResources) != 0 {
-		crdsFilePath := filepath.Join(c.output, "CRDsResources.json")
-		err = writeJSONFile(crdsFilePath, crdResources)
+		crdsFilePath := filepath.Join(c.output, crdResourcesFileName)
+		err := writeJSONFile(crdsFilePath, crdResources)
 		if err != nil {
-			writeErrors = multierror.Append(writeErrors, fmt.Errorf("couldn't write CRD resources to json file: %v", err))
+			finalError = multierror.Append(finalError, fmt.Errorf("couldn't write CRD resources to json file: %v", err))
 		}
 	}
 
-	if err != nil {
-		errorFilePath := filepath.Join(c.output, "CRDsResourcesErrors.txt")
-		err = fileWriter(errorFilePath, []byte(err.Error()))
+	// write the errors (if any) to a text file
+	if listCRDError != nil {
+		errorFilePath := filepath.Join(c.output, crdResourcesErrorsFileName)
+		err := fileWriter(errorFilePath, []byte(listCRDError.Error()))
 		if err != nil {
-			writeErrors = multierror.Append(writeErrors, fmt.Errorf("couldn't write CRD resources errors to text file: %v", err))
+			finalError = multierror.Append(finalError, fmt.Errorf("couldn't write CRD resources errors to txt file: %v", err))
+			finalError = multierror.Append(finalError, listCRDError)
 		}
 	}
-	if writeErrors != nil {
-		return multierror.Append(err, writeErrors)
+	if finalError != nil {
+		return finalError
 	}
-	if err != nil {
-		return oneOrMoreErrorOccured
+
+	// return errMultipleErrorsOccuredAndWritten
+	// to indicate that one or more errors occurred during listing CRD resources,
+	// and they are successfully written to a file within the debug bundle.
+	if listCRDError != nil {
+		return errMultipleErrorsOccuredAndWritten
 	}
 	return nil
 }
@@ -636,18 +678,18 @@ func (c *DebugCommand) listCRDResources() (map[string][]unstructured.Unstructure
 	if err != nil {
 		return nil, fmt.Errorf("couldn't retrive CRDs: %w", err)
 	}
-	crdResourcesMap := make(map[string][]unstructured.Unstructured)
 	if len(crdList.Items) == 0 {
-		return nil, notFoundError
+		return nil, errNotFound
 	}
 
+	crdResourcesMap := make(map[string][]unstructured.Unstructured)
 	var errs error
 	// Loop through each CRD and list its applied resources for ALL versions and collect errors for any CRD (if any)
 	for _, crd := range crdList.Items {
 
 		// Iterate through each version of the CRD
 		for _, version := range crd.Spec.Versions {
-			// Check if the version is served and is not deprecated
+			// Skip if the version is not served or if it is deprecated
 			if !version.Served || version.Deprecated {
 				continue
 			}
@@ -691,7 +733,7 @@ func (c *DebugCommand) captureSidecarPods() error {
 	}
 
 	if len(pods.Items) == 0 {
-		return notFoundError
+		return errNotFound
 	}
 	podsData := make(map[string]map[string]string)
 	for _, pod := range pods.Items {
@@ -723,11 +765,11 @@ func (c *DebugCommand) captureSidecarPods() error {
 		podsData[pod.Name] = data
 	}
 
-	// return if context is cancelled
+	// return if context is cancelled before writing file
 	if c.Ctx.Err() == context.Canceled {
-		return signalInterruptError
+		return errSignalInterrupt
 	}
-	err = writeJSONFile(filepath.Join(c.output, "sidecarPods.json"), podsData)
+	err = writeJSONFile(filepath.Join(c.output, sidecarPodsFileName), podsData)
 	if err != nil {
 		return fmt.Errorf("couldn't write Consul injected sidecar pods to json file: %v", err)
 	}
@@ -748,21 +790,19 @@ func (c *DebugCommand) captureIndex() error {
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
 
-	// return if context is cancelled
+	// return if context is cancelled before writing fil
 	if c.Ctx.Err() == context.Canceled {
-		return signalInterruptError
+		return errSignalInterrupt
 	}
-	err := writeJSONFile(filepath.Join(c.output, "index.json"), index)
+	err := writeJSONFile(filepath.Join(c.output, debugIndexFileName), index)
 	if err != nil {
 		return fmt.Errorf("error writing index.json: %s", err)
 	}
 	return nil
 }
 
-// ===================================================================================================================
-
 // captureTarget returns true if the target capture type is enabled.
-// (Otherwords, is the target given in capture flag in command line)
+// (Otherwords, is the target given in capture flag in command line?)
 func (c *DebugCommand) captureTarget(target string) bool {
 	if c.capture == nil || slices.Contains(c.capture, "all") || slices.Contains(c.capture, target) || target == "index" {
 		return true

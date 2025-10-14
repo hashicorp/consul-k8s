@@ -1,11 +1,10 @@
-// https://www.envoyproxy.io/docs/envoy/latest/operations/admin
-
 package debug
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,13 +23,28 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const envoyDefaultAdminPort = 19000
+const (
+	envoyDefaultAdminPort      = 19000
+	proxyCaptureErrorsFileName = "proxyCaptureErrors.txt"
+)
 
 type proxyPodData struct {
-	name      string
-	pod       v1.Pod
-	namespace string
-	proxyType string
+	// Unexported fields for internal use
+	pod       v1.Pod `json:"-"` // Ignore the large pod object in JSON output
+	proxyType string `json:"-"`
+
+	// Exported fields for JSON output
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Ready     string `json:"ready"`
+	Status    string `json:"status"`
+	Restart   string `json:"restart"`
+	Age       string `json:"age"`
+	IP        string `json:"ip"`
+}
+type proxyPods struct {
+	ProxyPodType string         `json:"proxyPodType"`
+	ProxyPodData []proxyPodData `json:"proxyPods"`
 }
 
 type EnvoyProxyCapture struct {
@@ -41,7 +55,7 @@ type EnvoyProxyCapture struct {
 	ctx        context.Context
 
 	// Internal state
-	proxyPods []proxyPodData
+	proxyPodsList []proxyPods
 
 	// Dependency injection for testing
 	fetchEnvoyConfig              func(context.Context, common.PortForwarder) (*envoy.EnvoyConfig, error)
@@ -55,7 +69,7 @@ func (e *EnvoyProxyCapture) captureEnvoyProxyData() error {
 	// get all proxy pods
 	err := e.getEnvoyProxyPodsList()
 	if err != nil {
-		if err == notFoundError {
+		if errors.Is(err, errNotFound) {
 			return err
 		}
 		return fmt.Errorf("error fetching pods list: %s", err)
@@ -68,21 +82,29 @@ func (e *EnvoyProxyCapture) captureEnvoyProxyData() error {
 
 	// capture all proxy's details and write them to debug bundle
 	var errs *multierror.Error
-	for _, proxyPod := range e.proxyPods {
-		if err := e.captureEnvoyProxyPodData(proxyPod); err != nil {
-			err = fmt.Errorf("%s: %v\n", proxyPod.name, err)
-			errs = multierror.Append(errs, err)
+	for _, proxyGroup := range e.proxyPodsList {
+		// Iterate through each individual pod within the group
+		for _, podData := range proxyGroup.ProxyPodData {
+			if err := e.captureEnvoyProxyPodData(podData); err != nil {
+				err = fmt.Errorf("%s/%s: %v", podData.Namespace, podData.Name, err)
+				errs = multierror.Append(errs, err)
+			}
 		}
 	}
-	// If any errors were collected during the capture, write them to a file in the debug directory.
+
+	// return if context is cancelled before writing errors to file
+	if e.ctx.Err() == context.Canceled {
+		return errSignalInterrupt
+	}
+	// If any errors were collected during the capture, write them to a file in the debug bundle.
 	if errs.ErrorOrNil() != nil {
-		errorFilePath := filepath.Join(e.output, "proxy", "proxyCaptureErrors.txt")
+		errorFilePath := filepath.Join(e.output, "proxy", proxyCaptureErrorsFileName)
 		errorContent := []byte(errs.Error())
 		err := fileWriter(errorFilePath, errorContent)
 		if err != nil {
 			return fmt.Errorf("error writing proxy data capture errors to file: %v\n Collected Errors:\n%v", err, errorContent)
 		}
-		return oneOrMoreErrorOccured
+		return errMultipleErrorsOccuredAndWritten
 	}
 	return nil
 }
@@ -110,22 +132,32 @@ func (e *EnvoyProxyCapture) getEnvoyProxyPodsList() error {
 		for _, pod := range pods.Items {
 			name := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 			uniquePods[name] = proxyPodData{
-				namespace: pod.Namespace,
+				Namespace: pod.Namespace,
 				pod:       pod,
 				proxyType: e.getPodProxyType(pod),
-				name:      pod.Name,
+				Name:      pod.Name,
 			}
 		}
 	}
 	if len(uniquePods) == 0 {
-		return notFoundError
+		return errNotFound
 	}
-	// Convert the map values back into a slice
-	var allPods []proxyPodData
+
+	// Group pods by their proxyType
+	groupedPods := make(map[string][]proxyPodData)
 	for _, pod := range uniquePods {
-		allPods = append(allPods, pod)
+		groupedPods[pod.proxyType] = append(groupedPods[pod.proxyType], pod)
 	}
-	e.proxyPods = allPods
+
+	// Convert the grouped map into the final slice structure
+	var allProxyPods []proxyPods
+	for proxyType, pods := range groupedPods {
+		allProxyPods = append(allProxyPods, proxyPods{
+			ProxyPodType: proxyType,
+			ProxyPodData: pods,
+		})
+	}
+	e.proxyPodsList = allProxyPods
 	return nil
 }
 
@@ -143,48 +175,53 @@ func (e *EnvoyProxyCapture) getPodProxyType(proxyPod v1.Pod) string {
 		proxyType = mappedType
 	} else if proxyPod.Labels["api-gateway.consul.hashicorp.com/managed"] == "true" {
 		// Special case for deprecated API Gateway.
-		proxyType = "API Gateway(Depricated)"
+		proxyType = "API Gateway(Deprecated)"
 	}
 	return proxyType
 }
 
 func (e *EnvoyProxyCapture) writeEnvoyProxyPodList() error {
-	type podDataType map[string]map[string]string
-	type proxyPodsDataType map[string][]podDataType
+	// Iterate through the list of proxy groups (e.g., "Sidecar", "Ingress Gateway")
+	// and populate the data for each pod.
+	for i := range e.proxyPodsList {
+		// Iterate through each pod within the group
+		for j := range e.proxyPodsList[i].ProxyPodData {
+			// Get a pointer to the pod data to modify it in place
+			pd := &e.proxyPodsList[i].ProxyPodData[j]
 
-	proxyPodsData := make(proxyPodsDataType)
-	for _, pp := range e.proxyPods {
-		podData := make(podDataType)
-		age := time.Since(pp.pod.CreationTimestamp.Time).Round(time.Minute)
-		var readyCount int
-		for _, status := range pp.pod.Status.ContainerStatuses {
-			if status.Ready {
-				readyCount++
+			// Calculate Ready Status
+			var readyCount int
+			for _, status := range pd.pod.Status.ContainerStatuses {
+				if status.Ready {
+					readyCount++
+				}
 			}
-		}
-		readyStatus := fmt.Sprintf("%d/%d", readyCount, len(pp.pod.Spec.Containers))
+			pd.Ready = fmt.Sprintf("%d/%d", readyCount, len(pd.pod.Spec.Containers))
 
-		// restartCount - shows how many times the container(s) within each pod have restarted.
-		var totalRestartCount int32
-		for _, status := range pp.pod.Status.ContainerStatuses {
-			totalRestartCount += status.RestartCount
-		}
+			// Calculate Total Restarts
+			var totalRestartCount int32
+			for _, status := range pd.pod.Status.ContainerStatuses {
+				totalRestartCount += status.RestartCount
+			}
+			pd.Restart = strconv.Itoa(int(totalRestartCount))
 
-		ip := pp.pod.Status.PodIP
-
-		data := map[string]string{
-			"ready":     readyStatus,
-			"status":    string(pp.pod.Status.Phase),
-			"restart":   strconv.Itoa(int(totalRestartCount)),
-			"age":       age.String(),
-			"namespace": pp.namespace,
-			"ip":        ip,
+			// Set other fields from the pod object
+			pd.Status = string(pd.pod.Status.Phase)
+			pd.Age = time.Since(pd.pod.CreationTimestamp.Time).Round(time.Second).String()
+			pd.IP = pd.pod.Status.PodIP
+			pd.Name = pd.pod.Name
+			pd.Namespace = pd.pod.Namespace
 		}
-		podData[pp.name] = data
-		proxyPodsData[pp.proxyType] = append(proxyPodsData[pp.proxyType], podData)
 	}
+
+	// return if context is cancelled before writing files
+	if e.ctx.Err() == context.Canceled {
+		return errSignalInterrupt
+	}
+
 	proxyPodsListPath := filepath.Join(e.output, "proxy", "proxyList.json")
-	err := writeJSONFile(proxyPodsListPath, proxyPodsData)
+	// Marshal the entire, updated list of structs
+	err := writeJSONFile(proxyPodsListPath, e.proxyPodsList)
 	if err != nil {
 		return fmt.Errorf("error writing proxy list to json file: %v", err)
 	}
@@ -195,8 +232,8 @@ func (e *EnvoyProxyCapture) writeEnvoyProxyPodList() error {
 func (e *EnvoyProxyCapture) captureEnvoyProxyPodData(proxyPod proxyPodData) error {
 
 	pf := common.PortForward{
-		Namespace:  proxyPod.namespace,
-		PodName:    proxyPod.name,
+		Namespace:  proxyPod.Namespace,
+		PodName:    proxyPod.Name,
 		RemotePort: envoyDefaultAdminPort,
 		KubeClient: e.kubernetes,
 		RestConfig: e.restConfig,
@@ -209,9 +246,10 @@ func (e *EnvoyProxyCapture) captureEnvoyProxyPodData(proxyPod proxyPodData) erro
 		endpoint = e.envoyDefaultAdminPortEndpoint
 	}
 	if endpoint == "" {
-		endpoint, err = pf.Open(e.ctx)
-		if err != nil {
-			return fmt.Errorf("error port forwarding %s", err)
+		var pfOpenErr error
+		endpoint, pfOpenErr = pf.Open(e.ctx)
+		if pfOpenErr != nil {
+			return fmt.Errorf("error port forwarding %s", pfOpenErr)
 		}
 		defer pf.Close()
 	}
@@ -242,22 +280,27 @@ func (e *EnvoyProxyCapture) captureEnvoyStats(endpoint string, proxyPod proxyPod
 	defer resp.Body.Close()
 
 	// Create file path and directory for storing logs
-	proxyPodEnvoyStatsPath := filepath.Join(e.output, "proxy", proxyPod.namespace, proxyPod.proxyType, proxyPod.name, "stats.json")
+	proxyPodEnvoyStatsPath := filepath.Join(e.output, "proxy", proxyPod.Namespace, proxyPod.proxyType, proxyPod.Name, "stats.json")
 
 	var statsJson bytes.Buffer
 	if err := json.Indent(&statsJson, stats, "", "\t"); err != nil {
 		return fmt.Errorf("error indenting JSON proxy stats output: %w", err)
 	}
+
+	// return if context is cancelled before writing files
+	if e.ctx.Err() == context.Canceled {
+		return errSignalInterrupt
+	}
 	err = fileWriter(proxyPodEnvoyStatsPath, statsJson.Bytes())
 	if err != nil {
-		return fmt.Errorf("error writing envoy stats to json file for pod '%s': %v", proxyPod.name, err)
+		return fmt.Errorf("error writing envoy stats to json file for pod '%s': %v", proxyPod.Name, err)
 	}
 	return nil
 }
 
 // captureEnvoyConfig
 //   - captures the configuration from the config dump endpoint (by opening a port forwarder to the Envoy admin API).
-//   - captures the raw config dumps (json) that are currently loaded configuration including EDS.
+//   - captures the raw config dumps (in json format) that are currently loaded configuration in envoy including EDS.
 func (e *EnvoyProxyCapture) captureEnvoyConfig(proxyPod proxyPodData) error {
 	adminPorts, err := e.fetchAdminPorts(proxyPod)
 	if err != nil {
@@ -268,8 +311,8 @@ func (e *EnvoyProxyCapture) captureEnvoyConfig(proxyPod proxyPodData) error {
 
 	for name, adminPort := range adminPorts {
 		pf := common.PortForward{
-			Namespace:  proxyPod.namespace,
-			PodName:    proxyPod.name,
+			Namespace:  proxyPod.Namespace,
+			PodName:    proxyPod.Name,
 			RemotePort: adminPort,
 			KubeClient: e.kubernetes,
 			RestConfig: e.restConfig,
@@ -299,10 +342,14 @@ func (e *EnvoyProxyCapture) captureEnvoyConfig(proxyPod proxyPodData) error {
 		return fmt.Errorf("error marshalling the config json: %v", err)
 	}
 
-	configPath := filepath.Join(e.output, "proxy", proxyPod.namespace, proxyPod.proxyType, proxyPod.name, "config.json")
+	// return if context is cancelled before writing files
+	if e.ctx.Err() == context.Canceled {
+		return errSignalInterrupt
+	}
+	configPath := filepath.Join(e.output, "proxy", proxyPod.Namespace, proxyPod.proxyType, proxyPod.Name, "config.json")
 	err = fileWriter(configPath, configJson)
 	if err != nil {
-		return fmt.Errorf("error writing envoy config to json file for pod '%s': %v", proxyPod.name, err)
+		return fmt.Errorf("error writing envoy config to json file for pod '%s': %v", proxyPod.Name, err)
 	}
 
 	// raw config_dumps
@@ -319,17 +366,21 @@ func (e *EnvoyProxyCapture) captureEnvoyConfig(proxyPod proxyPodData) error {
 		return fmt.Errorf("error marshalling the config dump json: %v", err)
 	}
 
-	rawConfigDumpsPath := filepath.Join(e.output, "proxy", proxyPod.namespace, proxyPod.proxyType, proxyPod.name, "config_dumps.json")
+	// return if context is cancelled before writing files
+	if e.ctx.Err() == context.Canceled {
+		return errSignalInterrupt
+	}
+	rawConfigDumpsPath := filepath.Join(e.output, "proxy", proxyPod.Namespace, proxyPod.proxyType, proxyPod.Name, "config_dumps.json")
 	err = fileWriter(rawConfigDumpsPath, configDumpsJson)
 	if err != nil {
-		return fmt.Errorf("error writing envoy config dumps to json file for pod '%s': %v", proxyPod.name, err)
+		return fmt.Errorf("error writing envoy config dumps to json file for pod '%s': %v", proxyPod.Name, err)
 	}
 	return nil
 }
 
 func (e *EnvoyProxyCapture) fetchAdminPorts(proxyPod proxyPodData) (map[string]int, error) {
 	adminPorts := make(map[string]int, 0)
-	p, err := e.kubernetes.CoreV1().Pods(proxyPod.namespace).Get(e.ctx, proxyPod.name, metav1.GetOptions{})
+	p, err := e.kubernetes.CoreV1().Pods(proxyPod.Namespace).Get(e.ctx, proxyPod.Name, metav1.GetOptions{})
 	if err != nil {
 		return adminPorts, err
 	}
@@ -338,7 +389,7 @@ func (e *EnvoyProxyCapture) fetchAdminPorts(proxyPod proxyPodData) (map[string]i
 
 	if !isMultiport {
 		// Return the default port configuration.
-		adminPorts[proxyPod.name] = envoyDefaultAdminPort
+		adminPorts[proxyPod.Name] = envoyDefaultAdminPort
 		return adminPorts, nil
 	}
 

@@ -243,7 +243,7 @@ func TestCaptureHelmConfig(t *testing.T) {
 			if tc.expectedError != nil {
 				return
 			}
-			expectedFilePath := filepath.Join(c.output, "helm-config.json")
+			expectedFilePath := filepath.Join(c.output, helmConfigFileName)
 			_, statErr := os.Stat(expectedFilePath)
 			require.NoError(t, statErr, "expected helm config file to be created")
 
@@ -304,14 +304,14 @@ func TestCaptureConsulInjectedSidecarPods(t *testing.T) {
 		},
 		"no injected pods found": {
 			initialPods:   []runtime.Object{},
-			expectedError: notFoundError,
+			expectedError: errNotFound,
 			expectFile:    false,
 		},
 		"pod exists but without correct label": {
 			initialPods: []runtime.Object{
 				&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "unrelated-pod"}},
 			},
-			expectedError: notFoundError,
+			expectedError: errNotFound,
 			expectFile:    false,
 		},
 	}
@@ -332,7 +332,7 @@ func TestCaptureConsulInjectedSidecarPods(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			jsonFilePath := filepath.Join(c.output, "sidecarPods.json")
+			jsonFilePath := filepath.Join(c.output, sidecarPodsFileName)
 			_, statErr := os.Stat(jsonFilePath)
 
 			if !tc.expectFile {
@@ -405,7 +405,7 @@ func TestListAndCaptureCRDResources(t *testing.T) {
 			crdObjects:    []runtime.Object{},
 			crObjects:     []runtime.Object{},
 			namespace:     "default",
-			expectedError: notFoundError,
+			expectedError: errNotFound,
 		},
 		"crd exists but no resources": {
 			crdObjects: []runtime.Object{crd},
@@ -448,12 +448,12 @@ func TestListAndCaptureCRDResources(t *testing.T) {
 			err = c.captureCRDResources()
 			if name == "no CRDs found" {
 				require.Error(t, err)
-				require.True(t, errors.Is(err, notFoundError))
+				require.True(t, errors.Is(err, errNotFound))
 				return
 			}
 			require.NoError(t, err)
 
-			jsonFilePath := filepath.Join(c.output, "CRDsResources.json")
+			jsonFilePath := filepath.Join(c.output, crdResourcesFileName)
 			_, statErr := os.Stat(jsonFilePath)
 			require.NoError(t, statErr, "expected JSON file to be created")
 
@@ -570,7 +570,7 @@ func TestDebugRun(t *testing.T) {
 			expectedReturnCode: 1,
 			expectDebugArchive: false,
 			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured", "CRD resources captured",
-				"Consul Sidecar Pods captured", "error capturing Envoy Proxy data", oneOrMoreErrorOccured.Error(),
+				"Consul Sidecar Pods captured", "error capturing Envoy Proxy data", errMultipleErrorsOccuredAndWritten.Error(),
 				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug directory"},
 		},
 		"log capture fail": {
@@ -591,7 +591,7 @@ func TestDebugRun(t *testing.T) {
 			expectDebugArchive: true,
 			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured", "CRD resources captured",
 				"Consul Sidecar Pods captured", "Envoy Proxy data captured", "Capturing pods logs.....", "error capturing Pods Logs",
-				oneOrMoreErrorOccured.Error(), "Index captured", "Saved debug archive"},
+				errMultipleErrorsOccuredAndWritten.Error(), "Index captured", "Saved debug archive"},
 		},
 	}
 

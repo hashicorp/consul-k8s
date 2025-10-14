@@ -24,8 +24,8 @@ func TestCaptureEnvoyStats(t *testing.T) {
 	proxyPod := proxyPodData{
 		pod:       pod,
 		proxyType: "dummyProxyType",
-		namespace: pod.Namespace,
-		name:      pod.Name,
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
 	}
 
 	mockJSONResponse := `{"server":{"stats_recent_lookups":0}}`
@@ -60,12 +60,12 @@ func TestCaptureEnvoyConfig(t *testing.T) {
 	proxyPod := proxyPodData{
 		pod:       pod,
 		proxyType: "dummyProxyType",
-		namespace: pod.Namespace,
-		name:      pod.Name,
+		Namespace: pod.Namespace,
+		Name:      pod.Name,
 	}
 
 	expectedConfig := map[string]interface{}{
-		proxyPod.name: map[string]interface{}{
+		proxyPod.Name: map[string]interface{}{
 			"clusters":  testEnvoyConfig.Clusters,
 			"endpoints": testEnvoyConfig.Endpoints,
 			"listeners": testEnvoyConfig.Listeners,
@@ -124,11 +124,19 @@ func TestGetEnvoyProxyPodsList(t *testing.T) {
 	}
 	err := p.getEnvoyProxyPodsList()
 	require.NoError(t, err)
-	// "Not-a-proxy-pod" is not a proxy pod and should be filtered out.
-	require.Equal(t, len(p.proxyPods), len(pods)-1)
-	for _, pod := range p.proxyPods {
-		require.NotEqual(t, "Not-a-proxy-pod", pod.name, "Not-a-proxy-pod should not be in the returned list")
+
+	// Calculate the total number of pods found across all groups.
+	totalPodsFound := 0
+	for _, group := range p.proxyPodsList {
+		totalPodsFound += len(group.ProxyPodData)
+		// Check that "Not-a-proxy-pod" is not in the list.
+		for _, pod := range group.ProxyPodData {
+			require.NotEqual(t, "Not-a-proxy-pod", pod.Name, "Not-a-proxy-pod should not be in the returned list")
+		}
 	}
+
+	// "Not-a-proxy-pod" is not a proxy pod and should be filtered out.
+	require.Equal(t, totalPodsFound, len(pods)-1)
 }
 
 func TestGetAndWriteEnvoyProxyPodList(t *testing.T) {
@@ -142,11 +150,18 @@ func TestGetAndWriteEnvoyProxyPodList(t *testing.T) {
 	// getproxypods
 	err := p.getEnvoyProxyPodsList()
 	require.NoError(t, err)
-	// "Not-a-proxy-pod" is not a proxy pod and should be filtered out.
-	require.Equal(t, len(p.proxyPods), len(pods)-1)
-	for _, pod := range p.proxyPods {
-		require.NotEqual(t, "Not-a-proxy-pod", pod.name, "Not-a-proxy-pod should not be in the returned list")
+
+	// Calculate the total number of pods found across all groups.
+	totalPodsFound := 0
+	for _, group := range p.proxyPodsList {
+		totalPodsFound += len(group.ProxyPodData)
+		// Check that "Not-a-proxy-pod" is not in the list.
+		for _, pod := range group.ProxyPodData {
+			require.NotEqual(t, "Not-a-proxy-pod", pod.Name, "Not-a-proxy-pod should not be in the returned list")
+		}
 	}
+	// "Not-a-proxy-pod" is not a proxy pod and should be filtered out.
+	require.Equal(t, totalPodsFound, len(pods)-1)
 
 	// writeproxypods
 	err = p.writeEnvoyProxyPodList()
@@ -158,30 +173,30 @@ func TestGetAndWriteEnvoyProxyPodList(t *testing.T) {
 
 	actualFileContent, err := os.ReadFile(expectedFilePath)
 	require.NoError(t, err)
-	type podDataType map[string]map[string]string
-	type proxyPodsDataType map[string][]podDataType
-	proxyPodsFromFile := make(proxyPodsDataType)
+
+	// Unmarshal into the new struct type.
+	var proxyPodsFromFile []proxyPods
 	err = json.Unmarshal(actualFileContent, &proxyPodsFromFile)
 	require.NoError(t, err)
-	var sidecars, ingressGW, apiGW, depricated_apiGW, meshGW, termGW = 1, 2, 1, 1, 1, 1
-	for proxyType, proxyArray := range proxyPodsFromFile {
-		if proxyType == "Sidecar" {
-			require.Equal(t, len(proxyArray), sidecars, "sidecars mismatched")
-		}
-		if proxyType == "Mesh Gateway" {
-			require.Equal(t, len(proxyArray), meshGW, "meshGW mismatched")
-		}
-		if proxyType == "API Gateway" {
-			require.Equal(t, len(proxyArray), apiGW, "apiGW mismatched")
-		}
-		if proxyType == "API Gateway(Depricated)" {
-			require.Equal(t, len(proxyArray), depricated_apiGW, "depricated_apiGW mismatched")
-		}
-		if proxyType == "Terminating Gateway" {
-			require.Equal(t, len(proxyArray), termGW, "termGW mismatched")
-		}
-		if proxyType == "Ingress Gateway" {
-			require.Equal(t, len(proxyArray), ingressGW, "ingressGW mismatched")
+
+	// Check that the counts for each proxy type are correct.
+	var sidecars, ingressGW, apiGW, deprecated_apiGW, meshGW, termGW = 1, 2, 1, 1, 1, 1
+	for _, proxyGroup := range proxyPodsFromFile {
+		switch proxyGroup.ProxyPodType {
+		case "Sidecar":
+			require.Equal(t, sidecars, len(proxyGroup.ProxyPodData), "sidecars mismatched")
+		case "Mesh Gateway":
+			require.Equal(t, meshGW, len(proxyGroup.ProxyPodData), "meshGW mismatched")
+		case "API Gateway":
+			require.Equal(t, apiGW, len(proxyGroup.ProxyPodData), "apiGW mismatched")
+		case "API Gateway(Deprecated)":
+			require.Equal(t, deprecated_apiGW, len(proxyGroup.ProxyPodData), "deprecated_apiGW mismatched")
+		case "Terminating Gateway":
+			require.Equal(t, termGW, len(proxyGroup.ProxyPodData), "termGW mismatched")
+		case "Ingress Gateway":
+			require.Equal(t, ingressGW, len(proxyGroup.ProxyPodData), "ingressGW mismatched")
+		default:
+			t.Fatalf("unexpected proxy type found in JSON: %s", proxyGroup.ProxyPodType)
 		}
 	}
 }

@@ -32,10 +32,12 @@ func main() {
 
 	// Below channel is required to handle cleanup on signal interrupt
 	// - By default, main assumes that no command requires cleanup, so it sends false to the channel
-	// - If a command requires cleanup, it should read from this channel BEFORE context cancellation ,
-	// so channel will be empty and "signal handler goroutine" in main will wait unitll command sends true to the channel at line- 54
-	// and send true to the channel only AFTER cleanup is completed,
-	// so that the signal handler goroutine in main can proceed to exit.
+	// - If a command requires cleanup,
+	// 	1. It should read from this channel BEFORE context cancellation,
+	// 		so channel will be empty and "signal handler goroutine" in main will wait unitl
+	// 		command sends true to this channel.
+	//  2. Command will/should sends true to the channel only AFTER cleanup is completed,
+	// 		so that the signal handler goroutine in main can proceed to exit.
 	cleanupReqAndCompleted := make(chan bool, 1)
 	cleanupReqAndCompleted <- false // by default no cleanup required
 
@@ -47,11 +49,12 @@ func main() {
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	// Signal handler goroutine
 	go func() {
 		<-ch
 		// Any cleanups, such as cancelling contexts
 		cancel()
-		<-cleanupReqAndCompleted // by default this will be false, so this will proceed to exit, but if a command requires cleanup, it will wait here(emply channel)
+		<-cleanupReqAndCompleted // by default this will be false, so this will proceed to exit, but if a command requires cleanup, it will wait here(empty channel)
 		_ = basecmd.Close()
 		os.Exit(1)
 	}()

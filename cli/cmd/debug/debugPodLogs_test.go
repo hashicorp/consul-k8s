@@ -66,7 +66,17 @@ func TestCapturePodLogs(t *testing.T) {
 			fetchLogsFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
 				return nil, fmt.Errorf("testing log fetch error")
 			},
-			expectedOutputBuffer: []string{oneOrMoreErrorOccured.Error()},
+			expectedOutputBuffer: []string{errMultipleErrorsOccuredAndWritten.Error()},
+			errorExpected:        true,
+		},
+		"no pod found": {
+			namespace: "consul",
+			duration:  10 * time.Second,
+			fetchLogsFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
+				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
+				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
+			},
+			expectedOutputBuffer: []string{errNotFound.Error()},
 			errorExpected:        true,
 		},
 	}
@@ -85,9 +95,11 @@ func TestCapturePodLogs(t *testing.T) {
 				namespace:   tc.namespace,
 				ctx:         c.Ctx,
 			}
-			err := createConsulResources(l.ctx, l.kubernetes)
-			require.NoError(t, err, "failed to create consul resources")
-
+			var err error
+			if name != "no pod found" {
+				err = createConsulResources(l.ctx, l.kubernetes)
+				require.NoError(t, err, "failed to create consul resources")
+			}
 			// Mock the log fetching function.
 			l.fetchLogsFunc = tc.fetchLogsFunc
 
@@ -96,6 +108,9 @@ func TestCapturePodLogs(t *testing.T) {
 			if tc.errorExpected {
 				require.Error(t, err, "expected error capturing pod logs")
 				require.Contains(t, err.Error(), tc.expectedOutputBuffer[0], "expected err but mismatch")
+				if name == "no pod found" {
+					return
+				}
 				expectedErrorFile := filepath.Join(l.output, "logs", "logCaptureErrors.txt")
 				_, statErr := os.Stat(expectedErrorFile)
 				require.NoError(t, statErr, "expected error file to be created: %s", expectedErrorFile)

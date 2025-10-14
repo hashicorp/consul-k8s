@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -22,6 +23,14 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/go-multierror"
+)
+
+const (
+	logCaptureAuditFileHeader = "WORKLOAD-KIND\tWORKLOAD-NAME\tPOD-NAME\tCONTAINER-NAME\tSTATUS\tDETAILS"
+
+	// file names
+	logCaptureAuditFileName  = "logCaptureAudit.txt"
+	logCaptureErrorsFileName = "logCaptureErrors.txt"
 )
 
 type logCollectionResult struct {
@@ -65,6 +74,15 @@ type LogCapture struct {
 	components          consulK8sComponents
 	workloads           []workload
 	k8sSinceSecondParam int64
+
+	// Channels for log collection
+
+	// containerChan will be pushed with all containers of all pods of all workload items
+	// and will be consumed by getContainerLogAndUpdateResult workers.
+	containersChan chan containerData
+	// resultsChan will be pushed with logCollectionResult of each container
+	// and will be consumed by resultCollectorAndAuditor.
+	resultsChan chan logCollectionResult
 
 	// Workload Metadata
 	totalContainers int
@@ -142,6 +160,37 @@ func (l *LogCapture) getComponentsWorkload() error {
 	return errs
 }
 
+// pushWorkloadContainers - pushes all containers of all pods of all workload items to containersChan
+func (l *LogCapture) pushWorkloadContainers() {
+	for _, workload := range l.workloads {
+		if len(workload.podsList.Items) == 0 {
+			l.resultsChan <- logCollectionResult{
+				StatusLine: fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.kind, workload.name, "", "", "No Pods Found", "No Pods Found"),
+			}
+			continue
+		}
+		for _, pod := range workload.podsList.Items {
+			containerData := containerData{
+				pod:          pod,
+				podName:      pod.Name,
+				workloadName: workload.name,
+				workloadKind: workload.kind,
+				namespace:    pod.Namespace,
+			}
+			for _, container := range pod.Spec.Containers {
+				containerData.container = container
+				containerData.containerName = container.Name
+				l.containersChan <- containerData
+			}
+			for _, container := range pod.Spec.InitContainers {
+				containerData.container = container
+				containerData.containerName = container.Name
+				l.containersChan <- containerData
+			}
+		}
+	}
+}
+
 // captureLogs
 // - retrieves consul-k8s components (server, client, injector, sidecar) pods
 // - and fetches log for each of the pods and write it to /pod dir within debug archive
@@ -168,6 +217,9 @@ func (l *LogCapture) captureLogs() error {
 			l.totalContainers += len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
 		}
 	}
+	if l.totalPods == 0 {
+		return errNotFound
+	}
 
 	// Output metadata about workload
 	l.outputLogCaptureMetadata()
@@ -184,7 +236,7 @@ func (l *LogCapture) captureLogs() error {
 		case <-durationChn:
 			err = l.getWorkloadLogs()
 		case <-l.ctx.Done():
-			return signalInterruptError
+			return errSignalInterrupt
 		}
 	}
 	if err != nil {
@@ -193,86 +245,80 @@ func (l *LogCapture) captureLogs() error {
 	return nil
 }
 
-// =======================================================
-
 // getWorkloadLogs - fetches logs 'of each containers' 'of each pods' 'of each workload items'.
 // write log status to logCaptureAudit file and errors to logCaptureErrors file.
 func (l *LogCapture) getWorkloadLogs() error {
 
 	// create logCaptureAudit file for each container logs collection
-	auditFilePath := filepath.Join(l.output, "logs", "logCaptureAudit.txt")
-	if err := os.MkdirAll(filepath.Dir(auditFilePath), dirPerm); err != nil {
+	logCaptureAuditFilePath := filepath.Join(l.output, "logs", logCaptureAuditFileName)
+	if err := os.MkdirAll(filepath.Dir(logCaptureAuditFilePath), dirPerm); err != nil {
 		return fmt.Errorf("error creating logCaptureAudit directory: %v", err)
 	}
-	auditFile, err := os.OpenFile(auditFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, filePerm)
+	auditFile, err := os.OpenFile(logCaptureAuditFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, filePerm)
 	if err != nil {
 		return fmt.Errorf("error creating logCaptureAudit file: %v", err)
 	}
 	w := tabwriter.NewWriter(auditFile, 1, 3, 2, ' ', 0)
-	fmt.Fprintln(w, "WORKLOAD-KIND\tWORKLOAD-NAME\tPOD-NAME\tCONTAINER-NAME\tSTATUS\tDETAILS")
+	fmt.Fprintln(w, logCaptureAuditFileHeader)
 	defer auditFile.Close()
 	defer w.Flush()
 
-	// log collection
-	resultsChan := make(chan logCollectionResult, l.totalContainers)
-	var wg sync.WaitGroup
+	// initialize channels
+	l.resultsChan = make(chan logCollectionResult, l.totalContainers)
+	l.containersChan = make(chan containerData, l.totalContainers)
 
-	l.logCollector(&wg, resultsChan)
+	// initialize worker pool of log collector - getContainerLogAndUpdateResult
+	var wg sync.WaitGroup
+	numWorkers := int(math.Min(10, float64(l.totalContainers)))
+	for i := 0; i < numWorkers; i++ {
+		wg.Go(func() {
+			l.getContainerLogAndUpdateResult()
+		})
+	}
+
+	// fetch all containers of the workload and push it to containersChan
+	l.pushWorkloadContainers()
+	close(l.containersChan)
+
+	// seperate goroutine to close resultsChan
+	// as soon as all logCollector workers are done.
 	go func() {
 		wg.Wait()
-		close(resultsChan)
+		close(l.resultsChan)
 	}()
-	return l.resultCollectorAndAuditor(w, resultsChan)
-}
 
-// logCollector -  fetch logs for each container in each pod for all workload items
-func (l *LogCapture) logCollector(wg *sync.WaitGroup, resultsChan chan<- logCollectionResult) {
-	for _, workload := range l.workloads {
-		if len(workload.podsList.Items) == 0 {
-			resultsChan <- logCollectionResult{
-				StatusLine: fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.kind, workload.name, "", "", "No Pods Found", "No Pods Found"),
-			}
-			continue
-		}
-		for _, pod := range workload.podsList.Items {
-			containerData := containerData{
-				pod:          pod,
-				podName:      pod.Name,
-				workloadName: workload.name,
-				workloadKind: workload.kind,
-				namespace:    pod.Namespace,
-			}
-			for _, container := range pod.Spec.Containers {
-				containerData.container = container
-				containerData.containerName = container.Name
-				l.getContainerLogAndUpdateResult(wg, resultsChan, containerData)
-			}
-			for _, container := range pod.Spec.InitContainers {
-				containerData.container = container
-				containerData.containerName = container.Name
-				l.getContainerLogAndUpdateResult(wg, resultsChan, containerData)
-			}
-		}
-	}
+	// resultCollectorAndAuditor-
+	// read from resultsChan and write to audit file and error file.
+	// Please Note: this function is blocking and will return only when
+	// resultsChan is closed and all results are read from it or SIGINT is received.
+	return l.resultCollectorAndAuditor(w)
 }
 
 // resultCollectorAndAuditor - collects results & errors of each resource (from logCollector) and writes to audit & error file resp.
-func (l *LogCapture) resultCollectorAndAuditor(w *tabwriter.Writer, resultsChan <-chan logCollectionResult) error {
+func (l *LogCapture) resultCollectorAndAuditor(w *tabwriter.Writer) error {
 	var logCaptureErrors *multierror.Error
 	var tabWriterMutex sync.Mutex
 	var auditWriteErrOnce sync.Once
 
-ReadLoop:
 	for {
 		select {
 		case <-l.ctx.Done():
-			return signalInterruptError
-		case result, ok := <-resultsChan:
+			return errSignalInterrupt
+		case result, ok := <-l.resultsChan:
 			if !ok {
-				break ReadLoop
+				if logCaptureErrors.ErrorOrNil() != nil {
+					logCaptureErrorsFilePath := filepath.Join(l.output, "logs", logCaptureErrorsFileName)
+					errorContent := []byte(logCaptureErrors.Error())
+					if err := os.WriteFile(logCaptureErrorsFilePath, errorContent, filePerm); err != nil {
+						return fmt.Errorf("error writing log capture errors to file: %v\n Collected Errors:\n%v", err, errorContent)
+					}
+					return errMultipleErrorsOccuredAndWritten
+				}
+				return nil
 			}
+
 			if l.ctx.Err() != nil {
-				return signalInterruptError
+				return errSignalInterrupt
 			}
 			if result.Err != nil {
 				logCaptureErrors = multierror.Append(logCaptureErrors, result.Err)
@@ -293,27 +339,11 @@ ReadLoop:
 			}
 		}
 	}
-
-	if logCaptureErrors.ErrorOrNil() != nil {
-		errorFilePath := filepath.Join(l.output, "logs", "logCaptureErrors.txt")
-		errorContent := []byte(logCaptureErrors.Error())
-		if err := os.WriteFile(errorFilePath, errorContent, filePerm); err != nil {
-			return fmt.Errorf("error writing log capture errors to file: %v\n Collected Errors:\n%v", err, errorContent)
-		}
-		return oneOrMoreErrorOccured
-	}
-	return nil
 }
 
-// getContainerLogAndUpdateResult - spawns goroutine to fetch logs for a container in a pod and write its status to results channel
-func (l *LogCapture) getContainerLogAndUpdateResult(wg *sync.WaitGroup, resultsChan chan<- logCollectionResult, cd containerData) {
-	sem := make(chan struct{}, 10) // Buffered Channel Semaphore: limit to 10 concurrent goroutines
-	wg.Add(1)
-	sem <- struct{}{} // aquire semaphore {blocks if full}
-
-	go func() {
-		defer wg.Done()
-		defer func() { <-sem }() // release semaphore when done
+// getContainerLogAndUpdateResult - is a worker to fetch logs for a container from containersChan and write its status to resultsChan
+func (l *LogCapture) getContainerLogAndUpdateResult() {
+	for cd := range l.containersChan {
 		logErr := l.getContainerLogs(cd)
 
 		// write log status to results channel
@@ -324,8 +354,8 @@ func (l *LogCapture) getContainerLogAndUpdateResult(wg *sync.WaitGroup, resultsC
 		} else {
 			statusLine = fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", cd.workloadKind, cd.workloadName, cd.podName, cd.containerName, "Successful", "")
 		}
-		resultsChan <- logCollectionResult{StatusLine: statusLine, Err: logErr}
-	}()
+		l.resultsChan <- logCollectionResult{StatusLine: statusLine, Err: logErr}
+	}
 }
 
 // getContainerLogs - fetches logs for a container and write it to log file.
@@ -375,7 +405,6 @@ func (l *LogCapture) fetchLogs(namespace, podName string, podLogOptions *corev1.
 	return podLogStream, nil
 }
 
-// =======================================================
 func (l *LogCapture) outputLogCaptureMetadata() {
 	l.UI.Output(fmt.Sprintf(" - Total Pods:        %d", l.totalPods))
 	l.UI.Output(fmt.Sprintf(" - Total Containers:  %d", l.totalContainers))
