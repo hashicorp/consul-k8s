@@ -1152,7 +1152,7 @@ func TestHandlerHandle(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.ConsulDualStackEnvVar),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 				// Note: no DNS policy/config additions.
 			},
@@ -1335,7 +1335,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				},
 				{
 					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.ConsulDualStackEnvVar),
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
