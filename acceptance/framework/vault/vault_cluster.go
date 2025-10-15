@@ -158,7 +158,7 @@ func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 		tunnel.Close()
 	})
 
-	config.Address = fmt.Sprintf("https://127.0.0.1:%d", localPort)
+	config.Address = fmt.Sprintf("https://localhost:%d", localPort)
 	// We don't need to verify TLS for localhost traffic.
 	err := config.ConfigureTLS(&vapi.TLSConfig{Insecure: true})
 	require.NoError(t, err)
