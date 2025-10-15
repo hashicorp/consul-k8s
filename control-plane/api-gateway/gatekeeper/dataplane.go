@@ -5,7 +5,6 @@ package gatekeeper
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -156,18 +155,10 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
-	envoyAdminBindAddress := "127.0.0.1"
-	consulDPBindAddress := "127.0.0.1"
-	xdsBindAddress := "127.0.0.1"
-	consulDNSBindAddress := consulDataplaneDNSBindHost
-
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
-		envoyAdminBindAddress = "::1"
-		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
-		consulDPBindAddress = "::1"
-		xdsBindAddress = "::1"
-
-	}
+	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
 
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,

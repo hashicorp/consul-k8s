@@ -269,6 +269,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/spec/containers/0/env",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 
@@ -354,6 +358,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 
@@ -412,6 +420,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -491,6 +503,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 		{
@@ -554,6 +570,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -643,6 +663,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -789,131 +813,9 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "replace",
 					Path:      "/spec/containers/0/readinessProbe/httpGet/port",
 				},
-			},
-		},
-		{
-			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref",
-			MeshWebhook{
-				Log:                   logrtest.New(t),
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				Clientset:             testClientWithServiceAccountAndSecretRefs(),
-				AuthMethod:            "k8s",
-			},
-			admission.Request{
-				AdmissionRequest: admissionv1.AdmissionRequest{
-					Namespace: namespaces.DefaultNamespace,
-					Object: encodeRaw(t, &corev1.Pod{
-						Spec: basicSpec,
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								constants.AnnotationService: "web,web-admin",
-							},
-						},
-					}),
-				},
-			},
-			"",
-			[]jsonpatch.Operation{
 				{
 					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/1",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/2",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
-				},
-			},
-		},
-		{
-			"multiport pod kube 1.24 with AuthMethod, serviceaccount does not have secret ref",
-			MeshWebhook{
-				Log:                   logrtest.New(t),
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				Clientset:             testClientWithServiceAccountAndSecrets(),
-				AuthMethod:            "k8s",
-			},
-			admission.Request{
-				AdmissionRequest: admissionv1.AdmissionRequest{
-					Namespace: namespaces.DefaultNamespace,
-					Object: encodeRaw(t, &corev1.Pod{
-						Spec: basicSpec,
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								constants.AnnotationService: "web,web-admin",
-							},
-						},
-					}),
-				},
-			},
-			"",
-			[]jsonpatch.Operation{
-				{
-					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/1",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/2",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -1004,6 +906,170 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
+			},
+		},
+		{
+			"multiport pod kube 1.24 with AuthMethod, serviceaccount does not have secret ref",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             testClientWithServiceAccountAndSecrets(),
+				AuthMethod:            "k8s",
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationService: "web,web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
+			},
+		},
+		{
+			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref, lifecycle enabled",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             testClientWithServiceAccountAndSecretRefs(),
+				AuthMethod:            "k8s",
+				LifecycleConfig:       lifecycle.Config{DefaultEnableProxyLifecycle: true},
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationService: "web,web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 		{
@@ -1061,7 +1127,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyTransparentProxyStatus),
 				},
-
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
@@ -1081,6 +1146,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/dnsConfig",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -1149,6 +1218,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 				// Note: no DNS policy/config additions.
 			},
@@ -1328,6 +1401,10 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
