@@ -13,14 +13,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/envoy"
 	"github.com/hashicorp/go-multierror"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/envoy"
 )
 
 const (
@@ -140,7 +141,7 @@ func (e *EnvoyProxyCapture) getEnvoyProxyPodsList() error {
 		}
 	}
 	if len(uniquePods) == 0 {
-		return errNotFound
+		return fmt.Errorf("No envoy proxy pods found in the cluster: %w", errNotFound)
 	}
 
 	// Group pods by their proxyType

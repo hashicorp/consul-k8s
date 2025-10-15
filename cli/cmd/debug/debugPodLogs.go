@@ -94,24 +94,24 @@ type LogCapture struct {
 
 func (l *LogCapture) getConsulK8sComponents() error {
 	var comp consulK8sComponents
-	var errs error
+	var allErrors error
 	var err error
 	comp.clientList, err = l.kubernetes.AppsV1().DaemonSets(l.namespace).List(l.ctx,
 		metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=client"})
 	if err != nil {
-		err = multierror.Append(errs, fmt.Errorf("Unable to list consul-k8s clients, %s", err))
+		allErrors = multierror.Append(allErrors, fmt.Errorf("Unable to list consul-k8s clients, %s", err))
 	}
 	comp.serverList, err = l.kubernetes.AppsV1().StatefulSets(l.namespace).List(l.ctx,
 		metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=server"})
 	if err != nil {
-		err = multierror.Append(errs, fmt.Errorf("Unable to list consul-k8s servers, %s", err))
+		allErrors = multierror.Append(allErrors, fmt.Errorf("Unable to list consul-k8s servers, %s", err))
 	}
 	comp.deploymentList, err = l.kubernetes.AppsV1().Deployments(l.namespace).List(l.ctx, metav1.ListOptions{})
 	if err != nil {
-		err = multierror.Append(errs, fmt.Errorf("Unable to list consul-k8s deployments, %s", err))
+		allErrors = multierror.Append(allErrors, fmt.Errorf("Unable to list consul-k8s deployments, %s", err))
 	}
 	l.components = comp
-	return errs
+	return allErrors
 }
 func (l *LogCapture) getPodsForWorkload(selector *metav1.LabelSelector) (*corev1.PodList, error) {
 	labelSelector := labels.SelectorFromSet(selector.MatchLabels).String()
@@ -120,50 +120,56 @@ func (l *LogCapture) getPodsForWorkload(selector *metav1.LabelSelector) (*corev1
 	})
 }
 func (l *LogCapture) getComponentsWorkload() error {
-	var errs error
+	var allErrors error
 	workloads := []workload{}
 
 	// statefulsets
-	for _, server := range l.components.serverList.Items {
-		podsList, err := l.getPodsForWorkload(server.Spec.Selector)
-		if err != nil {
-			err = multierror.Append(errs, fmt.Errorf("Unable to list pods for Consul Server- '%s': %v\n", server.Name, err))
+	if l.components.serverList != nil {
+		for _, server := range l.components.serverList.Items {
+			podsList, err := l.getPodsForWorkload(server.Spec.Selector)
+			if err != nil {
+				allErrors = multierror.Append(allErrors, fmt.Errorf("Unable to list pods for Consul Server- '%s': %v\n", server.Name, err))
+			}
+			workloads = append(workloads, workload{server.Name, "statefulsets", podsList})
 		}
-		workloads = append(workloads, workload{server.Name, "statefulsets", podsList})
 	}
 	// daemonset
-	for _, client := range l.components.clientList.Items {
-		podsList, err := l.getPodsForWorkload(client.Spec.Selector)
-		if err != nil {
-			err = multierror.Append(errs, fmt.Errorf("Unable to list pods for Consul Clients- '%s': %v\n", client.Name, err))
+	if l.components.clientList != nil {
+		for _, client := range l.components.clientList.Items {
+			podsList, err := l.getPodsForWorkload(client.Spec.Selector)
+			if err != nil {
+				allErrors = multierror.Append(allErrors, fmt.Errorf("Unable to list pods for Consul Clients- '%s': %v\n", client.Name, err))
+			}
+			workloads = append(workloads, workload{client.Name, "daemonsets", podsList})
 		}
-		workloads = append(workloads, workload{client.Name, "daemonsets", podsList})
 	}
 	// deployments
-	for _, deployment := range l.components.deploymentList.Items {
-		podsList, err := l.getPodsForWorkload(deployment.Spec.Selector)
-		if err != nil {
-			err = multierror.Append(errs, fmt.Errorf("Unable to list pods for Consul deployments- '%s': %v\n", deployment.Name, err))
+	if l.components.deploymentList != nil {
+		for _, deployment := range l.components.deploymentList.Items {
+			podsList, err := l.getPodsForWorkload(deployment.Spec.Selector)
+			if err != nil {
+				allErrors = multierror.Append(allErrors, fmt.Errorf("Unable to list pods for Consul deployments- '%s': %v\n", deployment.Name, err))
+			}
+			workloads = append(workloads, workload{deployment.Name, "deployments", podsList})
 		}
-		workloads = append(workloads, workload{deployment.Name, "deployments", podsList})
 	}
 	// sidecars
 	proxyPodList, err := l.kubernetes.CoreV1().Pods("").List(l.ctx, metav1.ListOptions{
 		LabelSelector: "consul.hashicorp.com/connect-inject-status=injected",
 	})
 	if err != nil {
-		err = multierror.Append(errs, fmt.Errorf("Unable to list pods for consul-injected-proxy: %v\n", err))
+		allErrors = multierror.Append(allErrors, fmt.Errorf("Unable to list pods for consul-injected-proxy: %v\n", err))
 	}
 	workloads = append(workloads, workload{"sidecar", "sidecars", proxyPodList})
 
 	l.workloads = workloads
-	return errs
+	return allErrors
 }
 
 // pushWorkloadContainers - pushes all containers of all pods of all workload items to containersChan
 func (l *LogCapture) pushWorkloadContainers() {
 	for _, workload := range l.workloads {
-		if len(workload.podsList.Items) == 0 {
+		if workload.podsList == nil || len(workload.podsList.Items) == 0 {
 			l.resultsChan <- logCollectionResult{
 				StatusLine: fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s", workload.kind, workload.name, "", "", "No Pods Found", "No Pods Found"),
 			}
@@ -206,19 +212,21 @@ func (l *LogCapture) captureLogs() error {
 		l.UI.Output("%s", err, terminal.WithWarningStyle())
 	}
 	if len(l.workloads) == 0 {
-		l.UI.Output("No Consul Component Found! \n")
-		return nil
+		return fmt.Errorf("No consul components found to capture logs: %w", errNotFound)
 	}
 
 	l.totalPods, l.totalContainers = 0, 0
 	for _, workload := range l.workloads {
+		if workload.podsList == nil {
+			continue
+		}
 		for _, pod := range workload.podsList.Items {
 			l.totalPods++
 			l.totalContainers += len(pod.Spec.Containers) + len(pod.Spec.InitContainers)
 		}
 	}
 	if l.totalPods == 0 {
-		return errNotFound
+		return fmt.Errorf("No pods found to capture logs: %w", errNotFound)
 	}
 
 	// Output metadata about workload

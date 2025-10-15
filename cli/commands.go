@@ -6,13 +6,12 @@ package main
 import (
 	"context"
 
-	debug "github.com/hashicorp/consul-k8s/cli/cmd/debug"
-
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/config"
 	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
+	debug "github.com/hashicorp/consul-k8s/cli/cmd/debug"
 	gwlist "github.com/hashicorp/consul-k8s/cli/cmd/gateway/list"
 	gwread "github.com/hashicorp/consul-k8s/cli/cmd/gateway/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"

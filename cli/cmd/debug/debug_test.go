@@ -13,11 +13,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/envoy"
-	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
-	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +20,6 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/release"
 	helmRelease "helm.sh/helm/v3/pkg/release"
 	helmTime "helm.sh/helm/v3/pkg/time"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,9 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicFake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 
-	dynamicFake "k8s.io/client-go/dynamic/fake"
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/envoy"
+	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 )
 
 func TestFlagParsingFails(t *testing.T) {
@@ -81,7 +80,7 @@ func TestFlagParsingFails(t *testing.T) {
 		})
 	}
 }
-func TestPreChecks(t *testing.T) {
+func TestPrepareForDebug(t *testing.T) {
 	cases := map[string]struct {
 		output        string
 		setup         func(t *testing.T, testDir string)
@@ -117,7 +116,7 @@ func TestPreChecks(t *testing.T) {
 			c := initializeDebugCommands(new(bytes.Buffer))
 			c.output = filepath.Join(tempDir, tc.output)
 
-			err := c.preChecks()
+			err := c.prepareForDebug()
 
 			if tc.expectedError != "" {
 				require.Error(t, err)
@@ -224,7 +223,6 @@ func TestCaptureHelmConfig(t *testing.T) {
 				},
 			},
 			expectedError: nil,
-			// expectedOutputBuffer: "Helm config captured",
 		},
 	}
 	for name, tc := range cases {
@@ -472,9 +470,9 @@ func TestListAndCaptureCRDResources(t *testing.T) {
 }
 func TestDebugRun(t *testing.T) {
 	// test environment setup
-	helmRelease := &release.Release{
+	testHelmRelease := &helmRelease.Release{
 		Name: "consul", Namespace: "consul",
-		Info:   &release.Info{Status: "deployed"},
+		Info:   &helmRelease.Info{Status: "deployed"},
 		Chart:  &chart.Chart{Metadata: &chart.Metadata{Version: "1.0.0"}},
 		Config: make(map[string]interface{}),
 	}
@@ -496,8 +494,8 @@ func TestDebugRun(t *testing.T) {
 		"success case with all targets with duration": {
 			args: []string{"-archive=true", "-duration=10s", "-output=tc1"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
-					return helmRelease, nil
+				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+					return testHelmRelease, nil
 				},
 			},
 			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
@@ -509,15 +507,15 @@ func TestDebugRun(t *testing.T) {
 			expectedOutputPath: "tc1",
 			expectedReturnCode: 0,
 			expectDebugArchive: true,
-			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured",
-				"CRD resources captured", "Consul Sidecar Pods captured", "Envoy Proxy data captured",
-				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug archive"},
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
+				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
+				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug archive"},
 		},
 		"success case with all targets with since": {
 			args: []string{"-archive=false", "-since=10s", "-output=tc2"}, // Default is all capture targets
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
-					return helmRelease, nil
+				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+					return testHelmRelease, nil
 				},
 			},
 			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
@@ -529,14 +527,14 @@ func TestDebugRun(t *testing.T) {
 			expectedOutputPath: "tc2",
 			expectedReturnCode: 0,
 			expectDebugArchive: false,
-			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured",
-				"CRD resources captured", "Consul Sidecar Pods captured", "Envoy Proxy data captured",
-				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug directory"},
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
+				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
+				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
 		},
 		"helm capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc3"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
 					return nil, errors.New("testing helm error")
 				},
 			},
@@ -549,15 +547,15 @@ func TestDebugRun(t *testing.T) {
 			expectedOutputPath: "tc3",
 			expectedReturnCode: 1,
 			expectDebugArchive: false,
-			expectedOutputBuffer: []string{"Starting debugger:", "error capturing Helm config", "testing helm error",
-				"CRD resources captured", "Consul Sidecar Pods captured", "Envoy Proxy data captured",
-				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug directory"},
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture failed with error", "testing helm error",
+				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
+				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
 		},
 		"envoy proxy data capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc4"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
-					return helmRelease, nil
+				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+					return testHelmRelease, nil
 				},
 			},
 			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
@@ -569,15 +567,15 @@ func TestDebugRun(t *testing.T) {
 			expectedOutputPath: "tc4",
 			expectedReturnCode: 1,
 			expectDebugArchive: false,
-			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured", "CRD resources captured",
-				"Consul Sidecar Pods captured", "error capturing Envoy Proxy data", errMultipleErrorsOccuredAndWritten.Error(),
-				"Capturing pods logs.....", "Pods Logs captured", "Index captured", "Saved debug directory"},
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
+				"Crds capture successful", "Sidecar capture successful", "Proxy capture failed with error", errMultipleErrorsOccuredAndWritten.Error(),
+				"Capturing pods logs.....", "Logs capture successful", "Index capture successful", "Saved debug directory"},
 		},
 		"log capture fail": {
 			args: []string{"-archive=true", "-duration=10s", "-output=tc5"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*release.Release, error) {
-					return helmRelease, nil
+				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+					return testHelmRelease, nil
 				},
 			},
 			fetchLogFunc: func(ns string, podName string, opts *corev1.PodLogOptions) (io.ReadCloser, error) {
@@ -589,9 +587,10 @@ func TestDebugRun(t *testing.T) {
 			expectedOutputPath: "tc5",
 			expectedReturnCode: 1,
 			expectDebugArchive: true,
-			expectedOutputBuffer: []string{"Starting debugger:", "Helm config captured", "CRD resources captured",
-				"Consul Sidecar Pods captured", "Envoy Proxy data captured", "Capturing pods logs.....", "error capturing Pods Logs",
-				errMultipleErrorsOccuredAndWritten.Error(), "Index captured", "Saved debug archive"},
+			expectedOutputBuffer: []string{"Starting debugger:", "Helm capture successful",
+				"Crds capture successful", "Sidecar capture successful", "Proxy capture successful",
+				"Capturing pods logs.....", "Logs capture failed with error", errMultipleErrorsOccuredAndWritten.Error(),
+				"Index capture successful", "Saved debug archive"},
 		},
 	}
 
@@ -610,6 +609,7 @@ func TestDebugRun(t *testing.T) {
 
 			buf := new(bytes.Buffer)
 			c := initializeDebugCommands(buf)
+			c.output = tc.expectedOutputPath
 
 			c.helmActionsRunner = tc.helmRunner
 			c.helmEnvSettings = helmCLI.New()

@@ -81,6 +81,7 @@ func TestCapturePodLogs(t *testing.T) {
 		},
 	}
 	for name, tc := range cases {
+		name, tc := name, tc // avoid race condition in parallel tests
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

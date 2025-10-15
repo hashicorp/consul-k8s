@@ -6,21 +6,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strconv"
-
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
-	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/go-multierror"
 	"github.com/posener/complete"
 	"helm.sh/helm/v3/pkg/action"
@@ -35,6 +30,11 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/helm"
 )
 
 const (
@@ -80,13 +80,6 @@ const (
 	targetLogs        = "logs"
 	targetProxy       = "proxy"
 
-	// capture Targets Not Found Error Messages
-	noHelmReleaseFound = "No helm release found"
-	noCRDsFound        = "No consul CRDs found in the cluster"
-	noSidecarPodsFound = "No consul injected sidecar pods found in all namespace"
-	noProxiesFound     = "No envoy proxy pods found in the cluster"
-	noPodsFound        = "No pods found to capture log"
-
 	// constant filenames for various debug info files
 	// Please Note, some filenames cannot be constants like log/proxy captures files
 	// as they will be fetched dynamically based on pods/containers found
@@ -105,8 +98,7 @@ var (
 	// ErrMultipleErrorsOccuredAndWritten is returned to stricly indicate that one or more errors occurred
 	// during a single capture task and they (multiple errors) are written successfully to debug bundle,
 	// In case if errors are not written, whole error would be printed on terminal
-	errMultipleErrorsOccuredAndWritten = errors.New(fmt.Sprint("one or more errors occurred during capture for this target",
-		"\n\tplease check the respective error file within the debug bundle for details"))
+	errMultipleErrorsOccuredAndWritten = errors.New("one or more errors occurred during capture for this target \n\tplease check the respective error file within the debug bundle for details")
 
 	// defaultTargets specifies the list of targets that will be captured by default
 	defaultTargets = []string{
@@ -129,12 +121,10 @@ type debugIndex struct {
 }
 
 // captureTask defines a single capture task to be performed by the debugger
-// including its name, target identifier, the function to call to perform the capture
+// takes target identifier, the function to call to perform the capture
 type captureTask struct {
-	name        string
-	target      string
-	captureFxn  func() error
-	notFoundMsg string
+	target     string
+	captureFxn func() error
 }
 
 type DebugCommand struct {
@@ -181,21 +171,21 @@ func (c *DebugCommand) init() {
 		Name:    flagDuration,
 		Target:  &c.duration,
 		Default: debugDuration,
-		Usage:   "To capture the logs of consul cluster for the a given duration",
+		Usage:   "Capture logs of consul cluster for a given duration. (e.g., '5m' for the logs of next 5 minutes).",
 		Aliases: []string{"d"},
 	})
 	f.DurationVar(&flag.DurationVar{
 		Name:    flagSince,
 		Target:  &c.since,
 		Default: 0,
-		Usage:   "The time duration since when to capture logs from pods",
+		Usage:   "Time duration from which to start capturing logs from consul cluster. (e.g., '5m' for the logs of last 5 minutes).",
 		Aliases: []string{"s"},
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagOutput,
 		Target:  &c.output,
 		Default: defaultOutputFilename,
-		Usage:   "The filename of the debug output archive.",
+		Usage:   "Filename of the debug output archive.",
 		Aliases: []string{"o"},
 	})
 	f.BoolVar(&flag.BoolVar{
@@ -209,14 +199,14 @@ func (c *DebugCommand) init() {
 		Name:    flagCapture,
 		Target:  &c.capture,
 		Default: []string{"all"},
-		Usage:   "A list of components to capture. Supported values are: all, helm, crds, sidecar, pods, proxy. (e.g. -capture pods -capture proxy).",
+		Usage:   "List of components to capture. Supported values are: all, helm, crds, sidecar, pods, proxy. (e.g. -capture pods -capture proxy).",
 		Aliases: []string{"c"},
 	})
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameNamespace,
 		Target:  &c.flagNamespace,
 		Default: "consul",
-		Usage:   "The namespace where the target Pod can be found.",
+		Usage:   "Namespace where the target Pod can be found.",
 		Aliases: []string{"n"},
 	})
 
@@ -256,10 +246,10 @@ func (c *DebugCommand) Run(args []string) int {
 		c.UI.Output("Invalid argument: %v", err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
-	// Checks if cwd have write permissions and
+	// Checks if cwd- current working directory have write permissions and
 	// if output directory already exists
-	if err := c.preChecks(); err != nil {
-		c.UI.Output("Pre-checks failed: %v", err.Error(), terminal.WithErrorStyle())
+	if err := c.prepareForDebug(); err != nil {
+		c.UI.Output("Debug prepare failed: %v", err.Error(), terminal.WithErrorStyle())
 		return 1
 	}
 
@@ -281,7 +271,7 @@ func (c *DebugCommand) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return fmt.Errorf("should have no non-flag arguments")
 	}
-	// Namespace name validation
+	// Namespace name validation (k8s NameIsDNSLabel)
 	if c.flagNamespace != "" {
 		if errs := validation.ValidateNamespaceName(c.flagNamespace, false); len(errs) > 0 {
 			return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
@@ -294,8 +284,8 @@ func (c *DebugCommand) validateFlags() error {
 	if c.since != 0 && c.since < debugLeastSince {
 		return fmt.Errorf("since must be longer than %s", debugLeastSince)
 	}
-
-	// If none are specified in capture, we will collect information from all by default
+	// Validate & Update capture targets
+	// If none are specified in capture, we will collect information from all target by default
 	// otherwise, validate that the specified targets are known/valid
 	if len(c.capture) == 0 || (len(c.capture) == 1 && c.capture[0] == "all") {
 		c.capture = make([]string, len(defaultTargets))
@@ -310,8 +300,10 @@ func (c *DebugCommand) validateFlags() error {
 	return nil
 }
 
-func (c *DebugCommand) preChecks() error {
-	// Ensure the output directory can be created (have write permissions and it does not already exist
+func (c *DebugCommand) prepareForDebug() error {
+	// Ensure the given output directory can be created
+	// (current working dir should have write permissions)
+	// and it does not already exist
 	if _, err := os.Stat(c.output); os.IsNotExist(err) {
 		err := os.MkdirAll(c.output, 0755)
 		if err != nil {
@@ -439,12 +431,12 @@ func (c *DebugCommand) debugger() int {
 	// each task has a resource name to be captured, target identifier,
 	// method to call and resourceNotFound message.
 	tasks := []captureTask{
-		{name: "Helm config", target: targetHelmConfig, captureFxn: c.captureHelmConfig, notFoundMsg: noHelmReleaseFound},
-		{name: "CRD resources", target: targetCRDs, captureFxn: c.captureCRDResources, notFoundMsg: noCRDsFound},
-		{name: "Consul Sidecar Pods", target: targetSidecarPods, captureFxn: c.captureSidecarPods, notFoundMsg: noSidecarPodsFound},
-		{name: "Envoy Proxy data", target: targetProxy, captureFxn: c.proxyCapturer.captureEnvoyProxyData, notFoundMsg: noProxiesFound},
-		{name: "Pods Logs", target: targetLogs, captureFxn: c.logCapturer.captureLogs, notFoundMsg: noPodsFound},
-		{name: "Index", target: "index", captureFxn: c.captureIndex, notFoundMsg: ""},
+		{target: targetHelmConfig, captureFxn: c.captureHelmConfig},
+		{target: targetCRDs, captureFxn: c.captureCRDResources},
+		{target: targetSidecarPods, captureFxn: c.captureSidecarPods},
+		{target: targetProxy, captureFxn: c.proxyCapturer.captureEnvoyProxyData},
+		{target: targetLogs, captureFxn: c.logCapturer.captureLogs},
+		{target: "index", captureFxn: c.captureIndex},
 	}
 
 	// errorsOccuredDuringCapture -
@@ -525,6 +517,7 @@ func (c *DebugCommand) cleanup() {
 				c.UI.Output(fmt.Sprint("Please delete it and re-run the debug command for completed capture"), terminal.WithWarningStyle())
 			}
 			c.UI.Output(" - Cleanup completed")
+			c.UI.Output("Please re-run the debug command for complete capture", terminal.WithLibraryStyle())
 			return
 		}
 	}
@@ -536,9 +529,9 @@ func (c *DebugCommand) cleanup() {
 // If signal interrupt is received during capture, it calls cleanup
 // and returns 1 (to exit debugger with correct exit code)
 func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
-	captureName := task.name
+	captureName := task.target
+	captureName = strings.ToUpper(captureName[:1]) + captureName[1:] // capitalize first letter for output
 	captureFunction := task.captureFxn
-	notFoundMsg := task.notFoundMsg
 	err := captureFunction()
 	if c.Ctx.Err() == context.Canceled || errors.Is(err, errSignalInterrupt) {
 		c.cleanup()
@@ -547,13 +540,17 @@ func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 	if err != nil {
 		switch {
 		case errors.Is(err, errNotFound):
-			c.UI.Output(notFoundMsg, terminal.WithWarningStyle())
+			// extract contextual part of the error as warning msg, ignore `errNotFound` part.
+			// `errNotFound` is wrapped just for comparison.
+			// TODO: ideally we should have custom error types for simple errors.
+			warnMsg := strings.Split(err.Error(), ":")[0]
+			c.UI.Output(fmt.Sprintf("%s capture: %v", captureName, warnMsg), terminal.WithWarningStyle())
 		default:
 			*errorsOccured = true
-			c.UI.Output(fmt.Sprintf("error capturing %s: %v", captureName, err), terminal.WithErrorStyle())
+			c.UI.Output(fmt.Sprintf("%s capture failed with error: %v", captureName, err), terminal.WithErrorStyle())
 		}
 	} else {
-		c.UI.Output(fmt.Sprintf("%s captured", captureName), terminal.WithSuccessStyle())
+		c.UI.Output(fmt.Sprintf("%s capture successful", captureName), terminal.WithSuccessStyle())
 	}
 	return 0
 }
@@ -622,7 +619,8 @@ func (c *DebugCommand) captureCRDResources() error {
 	// and return "errMultipleErrorsOccuredAndWritten" error to indicate this.
 
 	if listCRDError != nil {
-		if errors.Is(listCRDError, errNotFound) || strings.Contains(listCRDError.Error(), "couldn't retrive CRDs") {
+		if errors.Is(listCRDError, errNotFound) ||
+			strings.Contains(listCRDError.Error(), "couldn't retrive CRDs") {
 			return listCRDError
 		}
 	}
@@ -679,7 +677,7 @@ func (c *DebugCommand) listCRDResources() (map[string][]unstructured.Unstructure
 		return nil, fmt.Errorf("couldn't retrive CRDs: %w", err)
 	}
 	if len(crdList.Items) == 0 {
-		return nil, errNotFound
+		return nil, fmt.Errorf("No consul CRDs found in the cluster: %w", errNotFound)
 	}
 
 	crdResourcesMap := make(map[string][]unstructured.Unstructured)
@@ -733,7 +731,8 @@ func (c *DebugCommand) captureSidecarPods() error {
 	}
 
 	if len(pods.Items) == 0 {
-		return errNotFound
+		// Wrapping errNotFound with more context
+		return fmt.Errorf("No consul injected sidecar pods found in all namespace: %w", errNotFound)
 	}
 	podsData := make(map[string]map[string]string)
 	for _, pod := range pods.Items {
@@ -785,12 +784,10 @@ func (c *DebugCommand) captureIndex() error {
 			Since:    c.since.String(),
 		}
 	}
-	index = debugIndex{
-		Targets:   c.capture,
-		Timestamp: time.Now().Format(time.RFC3339),
-	}
+	index.Targets = c.capture
+	index.Timestamp = time.Now().Format(time.RFC3339)
 
-	// return if context is cancelled before writing fil
+	// return if context is cancelled before writing file
 	if c.Ctx.Err() == context.Canceled {
 		return errSignalInterrupt
 	}
@@ -804,10 +801,10 @@ func (c *DebugCommand) captureIndex() error {
 // captureTarget returns true if the target capture type is enabled.
 // (Otherwords, is the target given in capture flag in command line?)
 func (c *DebugCommand) captureTarget(target string) bool {
-	if c.capture == nil || slices.Contains(c.capture, "all") || slices.Contains(c.capture, target) || target == "index" {
+	if target == "index" {
 		return true
 	}
-	return false
+	return slices.Contains(c.capture, target)
 }
 
 func writeJSONFile(filename string, content interface{}) error {
