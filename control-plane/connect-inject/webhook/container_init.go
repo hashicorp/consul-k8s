@@ -56,6 +56,34 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 		LogLevel:   w.LogLevel,
 		LogJSON:    w.LogJSON,
 	}
+	// temp for testing --> volumes cannot be passed to initi containers, they take the volumes from the pod spec.
+	// volumes := []corev1.Volume{
+	// 	{
+	// 		Name: "consul-server-cert",
+	// 		VolumeSource: corev1.VolumeSource{
+	// 			Secret: &corev1.SecretVolumeSource{
+	// 				SecretName: "consul-consul-server-cert",
+	// 			},
+	// 		},
+	// 	},
+	// 	{
+	// 		Name: "consul-ca-cert",
+	// 		VolumeSource: corev1.VolumeSource{
+	// 			Secret: &corev1.SecretVolumeSource{
+	// 				SecretName: "consul-consul-ca-cert",
+	// 			},
+	// 		},
+	// 	},
+	// }
+	/*
+
+			- name: consul-ca-cert
+		              mountPath: /consul/tls/ca/
+		              readOnly: true
+		            - name: consul-server-cert
+		              mountPath: /consul/tls/server
+		              readOnly: true
+	*/
 
 	// Create expected volume mounts
 	volMounts := []corev1.VolumeMount{
@@ -63,6 +91,16 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			Name:      volumeName,
 			MountPath: "/consul/connect-inject",
 		},
+		// {
+		// 	Name:      "consul-ca-cert",
+		// 	MountPath: "/consul/tls/ca/",
+		// 	ReadOnly:  true,
+		// },
+		// {
+		// 	Name:      "consul-server-cert",
+		// 	MountPath: "/consul/tls/server",
+		// 	ReadOnly:  true,
+		// },
 	}
 
 	if multiPort {
@@ -169,6 +207,14 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				Value: w.ConsulTLSServerName,
 			})
 	}
+	// If using a Consul image with FIPS support, then we enable mTLS on both side, verify_incoming under tls-config.defaults set to true.
+	// if w.TLSEnabled && strings.Contains(w.ImageConsulK8S, "fips") {
+	// 	container.Env = append(container.Env,
+	// 		corev1.EnvVar{
+	// 			Name:  "CC",
+	// 			Value: "true",
+	// 		})
+	// }
 
 	if w.AuthMethod != "" {
 		container.Env = append(container.Env,
