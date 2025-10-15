@@ -178,7 +178,7 @@ func TestConsulDNS_PrivilegedPort(t *testing.T) {
 			}
 
 			updateCoreDNSWithConsulDomain_PrivilegedPort(t, ctx, releaseName, c.enableDNSProxy)
-			verifyDNS(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
+			verifyDNS(t, suite.Config(), releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
 	}
