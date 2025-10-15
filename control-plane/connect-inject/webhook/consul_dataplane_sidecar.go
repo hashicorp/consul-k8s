@@ -6,7 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"net"
 	"strconv"
 	"strings"
 
@@ -325,7 +325,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		envoyAdminBindAddress = "::1"
 		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
 		consulDPBindAddress = "::1"
@@ -460,7 +460,12 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+			addr := "127.0.0.1"
+			if constants.IsDualStack() {
+				addr = "::1"
+			}
+			addr = net.JoinHostPort(addr, serviceMetricsPort)
+			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, serviceMetricsPath))
 		}
 
 		// Pull the TLS config from the relevant annotations.

@@ -498,6 +498,13 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
+	err = w.addDualStackAnnotation(&pod)
+	if err != nil {
+		m := "unable to set dual stack annotation to pod"
+		w.Log.Error(err, m, "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("%s with error: %s", m, err))
+	}
+
 	// Marshall the pod into JSON after it has the desired envs, annotations, labels,
 	// sidecars and initContainers appended to it.
 	updatedPodJson, err := json.Marshal(pod)
@@ -573,6 +580,16 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 			}
 			idx++
 		}
+	}
+	return nil
+}
+
+// addDualStackAnnotation adds the dual stack annotation.
+func (w *MeshWebhook) addDualStackAnnotation(pod *corev1.Pod) error {
+	if constants.IsDualStack() {
+		pod.Annotations[constants.AnnotationDualStack] = "true"
+	} else {
+		pod.Annotations[constants.AnnotationDualStack] = "false"
 	}
 	return nil
 }

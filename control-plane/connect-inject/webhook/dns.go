@@ -5,7 +5,6 @@ package webhook
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -46,7 +45,7 @@ func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 
 	nameserver := consulDataplaneDNSBindHost
 
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		nameserver = ipv6ConsulDataplaneDNSBindHost
 	}
 

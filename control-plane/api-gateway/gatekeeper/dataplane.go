@@ -5,7 +5,6 @@ package gatekeeper
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -161,7 +160,7 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	xdsBindAddress := "127.0.0.1"
 	consulDNSBindAddress := consulDataplaneDNSBindHost
 
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		envoyAdminBindAddress = "::1"
 		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
 		consulDPBindAddress = "::1"

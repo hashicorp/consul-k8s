@@ -6,7 +6,6 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/hashicorp/consul/sdk/iptables"
@@ -132,7 +131,7 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		cfg.ConsulDNSIP = consulDataplaneDNSBindHost
 		cfg.ConsulDNSPort = consulDataplaneDNSBindPort
 
-		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+		if constants.IsDualStack() {
 			cfg.ConsulDNSIP = ipv6ConsulDataplaneDNSBindHost
 		}
 	}

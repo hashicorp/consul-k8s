@@ -396,7 +396,7 @@ func (c *Command) Run(args []string) int {
 
 	healthProbeBindAddress := "0.0.0.0:9445"
 	metricsServiceBindAddress := "0.0.0.0:9444"
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+	if constants.IsDualStack() {
 		healthProbeBindAddress = "[::]:9445"
 		metricsServiceBindAddress = "[::]:9444"
 	}

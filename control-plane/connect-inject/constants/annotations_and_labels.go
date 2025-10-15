@@ -189,6 +189,9 @@ const (
 	// iptables rules.
 	AnnotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
+	// AnnotationDualStack stores if pod need to run in dualstack mode.
+	AnnotationDualStack = "consul.hashicorp.com/dual-stack"
+
 	// AnnotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/meshWebhook.
 	AnnotationOriginalPod = "consul.hashicorp.com/original-pod"

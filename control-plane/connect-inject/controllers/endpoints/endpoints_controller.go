@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -542,7 +541,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 			return nil, nil, err
 		}
 		prometheusScrapeAddr := "0.0.0.0"
-		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+		if constants.IsDualStack() {
 			prometheusScrapeAddr = "::"
 		}
 		prometheusScrapeListener := net.JoinHostPort(prometheusScrapeAddr, prometheusScrapePort)
@@ -555,6 +554,9 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 
 	if consulServicePort > 0 {
 		proxyConfig.LocalServiceAddress = "127.0.0.1"
+		if constants.IsDualStack() {
+			proxyConfig.LocalServiceAddress = "::1"
+		}
 		proxyConfig.LocalServicePort = consulServicePort
 	}
 
@@ -817,9 +819,13 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 			},
 		}
 		service.Proxy.Config["envoy_gateway_no_default_bind"] = true
+		addr := "0.0.0.0"
+		if constants.IsDualStack() {
+			addr = "::"
+		}
 		service.Proxy.Config["envoy_gateway_bind_addresses"] = map[string]interface{}{
 			"all-interfaces": map[string]interface{}{
-				"address": "0.0.0.0",
+				"address": addr,
 			},
 		}
 	case apiGateway:
