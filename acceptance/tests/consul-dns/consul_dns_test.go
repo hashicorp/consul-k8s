@@ -331,8 +331,20 @@ func verifyDNS(
 		"run", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
 	}
 
+	// Cleanup pod at the end of the test or if it fails
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found")
+	})
+
 	var logs string
 	retry.RunWith(&retry.Counter{Wait: 30 * time.Second, Count: 10}, t, func(r *retry.R) {
+		// Delete existing pod if it already exists from previous retry attempt
+		_, _ = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), "delete", "pod", dnsUtilsPod, "--ignore-not-found")
+		// Wait a moment for the deletion to complete
+		time.Sleep(2 * time.Second)
+		
+		// Now create and run the dig command
 		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
 		logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)

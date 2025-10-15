@@ -161,6 +161,15 @@ func TestConsulDNS_PrivilegedPort(t *testing.T) {
 			if c.enableDNSProxy {
 				helmValues["dns.proxy.enabled"] = strconv.FormatBool(c.enableDNSProxy)
 			}
+			
+			// Delete any existing gateway-resources job that might cause conflicts during upgrade
+			gatewayJobName := fmt.Sprintf("%s-consul-gateway-resources", releaseName)
+			logger.Logf(t, "Cleaning up any existing gateway job: %s", gatewayJobName)
+			_, _ = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "job", gatewayJobName, "--ignore-not-found")
+			
+			// Give a moment for the deletion to complete
+			time.Sleep(2 * time.Second)
+			
 			// Upgrade the cluster to apply the changes created above.  This will
 			// also start the DNS proxy if it is enabled and it will pick up the ACL token
 			// saved in the secret.
