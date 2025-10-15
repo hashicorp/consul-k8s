@@ -162,7 +162,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	}
 
 	if t.DualStack {
-		setIfNotEmpty(helmValues, "global.dualStack.defaultEnabled", "true")
+		setIfNotEmpty(helmValues, "global.dualStack.enabled", "true")
 	}
 
 	// UseGKEAutopilot is a temporary hack that we need in place as GKE Autopilot is already installing
