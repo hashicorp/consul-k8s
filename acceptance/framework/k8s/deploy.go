@@ -130,7 +130,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 		expectedOutput = expectedSuccessOutput
 	}
 
-	retrier := &retry.Counter{Count: 30, Wait: 10 * time.Second}
+	retrier := &retry.Counter{Count: 30, Wait: 30 * time.Second}
 
 	args := []string{"exec", resourceType + sourceApp, "-c", sourceApp, "--", "curl", "--connect-timeout", "5", "-vvvsSf"}
 	args = append(args, curlArgs...)

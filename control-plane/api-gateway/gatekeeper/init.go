@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -72,10 +71,7 @@ func (g *Gatekeeper) initContainer(config common.HelmConfig, name, namespace str
 	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
 
 	initContainerName := injectInitContainerName
-	dualStack := "false"
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
-		dualStack = "true"
-	}
+	dualStack := constants.Getv4orv6Str("false", "true")
 	container := corev1.Container{
 		Name:            initContainerName,
 		Image:           config.ImageConsulK8S,
