@@ -320,17 +320,10 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
-	envoyAdminBindAddress := "127.0.0.1"
-	consulDNSBindAddress := consulDataplaneDNSBindHost
-	consulDPBindAddress := "127.0.0.1"
-	xdsBindAddress := "127.0.0.1"
-
-	if constants.IsDualStack() {
-		envoyAdminBindAddress = "::1"
-		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
-		consulDPBindAddress = "::1"
-		xdsBindAddress = "::1"
-	}
+	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
+	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	args := []string{
 		"-addresses", w.ConsulAddress,
 		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
@@ -460,10 +453,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			addr := "127.0.0.1"
-			if constants.IsDualStack() {
-				addr = "::1"
-			}
+			addr := constants.Getv4orv6Str("127.0.0.1", "::1")
 			addr = net.JoinHostPort(addr, serviceMetricsPort)
 			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, serviceMetricsPath))
 		}

@@ -421,10 +421,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// baseNode and baseService are the base that should be modified with
 	// service-type specific changes. These are not pointers, they should be
 	// shallow copied for each instance.
-	addr := "127.0.0.1"
-	if constants.IsDualStack() {
-		addr = "::1"
-	}
+
+	addr := constants.Getv4orv6Str("127.0.0.1", "::1")
 	baseNode := consulapi.CatalogRegistration{
 		SkipNodeUpdate: true,
 		Node:           t.ConsulNodeName,

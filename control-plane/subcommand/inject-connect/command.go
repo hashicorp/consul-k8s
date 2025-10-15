@@ -394,12 +394,8 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	healthProbeBindAddress := "0.0.0.0:9445"
-	metricsServiceBindAddress := "0.0.0.0:9444"
-	if constants.IsDualStack() {
-		healthProbeBindAddress = "[::]:9445"
-		metricsServiceBindAddress = "[::]:9444"
-	}
+	healthProbeBindAddress := constants.Getv4orv6Str("0.0.0.0:9445", "[::]:9445")
+	metricsServiceBindAddress := constants.Getv4orv6Str("0.0.0.0:9444", "[::]:9444")
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,

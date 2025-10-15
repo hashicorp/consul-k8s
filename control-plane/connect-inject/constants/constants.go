@@ -122,3 +122,10 @@ func GetNormalizedConsulPeer(peer string) string {
 func IsDualStack() bool {
 	return os.Getenv(ConsulDualStackEnvVar) == "true"
 }
+
+func Getv4orv6Str(v4, v6 string) string {
+	if IsDualStack() {
+		return v6
+	}
+	return v4
+}

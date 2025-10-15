@@ -103,10 +103,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
-	dualStack := "false"
-	if constants.IsDualStack() {
-		dualStack = "true"
-	}
+	dualStack := constants.Getv4orv6Str("false", "true")
 
 	container := corev1.Container{
 		Name:            initContainerName,

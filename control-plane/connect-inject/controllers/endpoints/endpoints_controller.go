@@ -540,10 +540,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		if err != nil {
 			return nil, nil, err
 		}
-		prometheusScrapeAddr := "0.0.0.0"
-		if constants.IsDualStack() {
-			prometheusScrapeAddr = "::"
-		}
+		prometheusScrapeAddr := constants.Getv4orv6Str("0.0.0.0", "::")
 		prometheusScrapeListener := net.JoinHostPort(prometheusScrapeAddr, prometheusScrapePort)
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
@@ -553,10 +550,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	}
 
 	if consulServicePort > 0 {
-		proxyConfig.LocalServiceAddress = "127.0.0.1"
-		if constants.IsDualStack() {
-			proxyConfig.LocalServiceAddress = "::1"
-		}
+		proxyConfig.LocalServiceAddress = constants.Getv4orv6Str("127.0.0.1", "::1")
 		proxyConfig.LocalServicePort = consulServicePort
 	}
 
@@ -819,10 +813,7 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 			},
 		}
 		service.Proxy.Config["envoy_gateway_no_default_bind"] = true
-		addr := "0.0.0.0"
-		if constants.IsDualStack() {
-			addr = "::"
-		}
+		addr := constants.Getv4orv6Str("0.0.0.0", "::")
 		service.Proxy.Config["envoy_gateway_bind_addresses"] = map[string]interface{}{
 			"all-interfaces": map[string]interface{}{
 				"address": addr,
