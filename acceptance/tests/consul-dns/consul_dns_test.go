@@ -82,27 +82,6 @@ func TestConsulDNS(t *testing.T) {
 			if c.aclsEnabled && !c.manageSystemACLs {
 				helmValues["server.extraConfig"] = fmt.Sprintf(`"{\"acl\": {\"enabled\": true\, \"default_policy\": \"deny\"\, \"tokens\": {\"initial_management\": \"%s\"}}}"`,
 					initialManagementToken)
-
-				// Set ACL token for connect-injector
-				helmValues["connectInject.aclInjectToken.secretName"] = "consul-connect-inject-acl-token"
-
-				// Create the secret that will hold this token
-				secretName := "consul-connect-inject-acl-token"
-				_, err := ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(
-					context.Background(),
-					&corev1.Secret{
-						ObjectMeta: metav1.ObjectMeta{Name: secretName},
-						StringData: map[string]string{"token": initialManagementToken},
-						Type:       corev1.SecretTypeOpaque,
-					},
-					metav1.CreateOptions{},
-				)
-				require.NoError(t, err)
-
-				t.Cleanup(func() {
-					_ = ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Delete(
-						context.Background(), secretName, metav1.DeleteOptions{})
-				})
 			}
 
 			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
@@ -125,15 +104,6 @@ func TestConsulDNS(t *testing.T) {
 					  policy = "read"
 					}
 					service_prefix "" {
-					  policy = "read"
-					}
-					agent_prefix "" {
-					  policy = "read"
-					}
-					// Add operator permissions for dataplane
-					operator = "read"
-					// Add config entries access
-					config_entry_prefix "" {
 					  policy = "read"
 					}
 				`
@@ -170,17 +140,6 @@ func TestConsulDNS(t *testing.T) {
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
 
-			// Wait for DNS proxy pods if enabled
-			if c.enableDNSProxy {
-				logger.Log(t, "waiting for DNS proxy pod to become ready")
-				k8s.WaitForAllPodsToBeReady(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace,
-					fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName))
-
-				// Force a short delay to ensure token propagation
-				logger.Log(t, "pausing for token propagation")
-				time.Sleep(5 * time.Second)
-			}
-
 			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
 			verifyDNS(t, cfg, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
@@ -189,69 +148,29 @@ func TestConsulDNS(t *testing.T) {
 }
 
 func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, policyRules string, initialManagementToken string, configAddress string) (error, *api.ACLToken) {
-	// Log detailed information for debugging
-	logger.Logf(t, "Creating ACL policy and token for DNS proxy using management token '%s'", initialManagementToken)
-	logger.Logf(t, "Policy rules:\n%s", policyRules)
+	_, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{}, &api.WriteOptions{
+		Token: initialManagementToken,
+	})
+	require.NoError(t, err)
 
 	// Create the policy and token _before_ we enable dns proxy and upgrade the cluster.
+	require.NoError(t, err)
 	policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
 		Name:        "dns-proxy-token",
 		Description: "DNS Proxy Policy",
 		Rules:       policyRules,
-	}, &api.WriteOptions{
-		Token: initialManagementToken,
-	})
+	}, nil)
 	require.NoError(t, err)
-	logger.Logf(t, "Created ACL policy '%s' with ID '%s'", policy.Name, policy.ID)
-
-	// Add a short description to the token
-	tokenDescription := fmt.Sprintf("DNS Proxy Token for %s", strings.Split(configAddress, ":")[0])
-	logger.Logf(t, "Creating token with description: %s", tokenDescription)
-
 	dnsProxyToken, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{
-		Description: tokenDescription,
+		Description: fmt.Sprintf("DNS Proxy Token for %s", strings.Split(configAddress, ":")[0]),
 		Policies: []*api.ACLTokenPolicyLink{
 			{
 				Name: policy.Name,
 			},
 		},
-	}, &api.WriteOptions{
-		Token: initialManagementToken,
-	})
+	}, nil)
 	require.NoError(t, err)
-	logger.Logf(t, "Created DNS Proxy token with AccessorID '%s' and SecretID '%s'",
-		dnsProxyToken.AccessorID, dnsProxyToken.SecretID)
-
-	// Verify token was created successfully by listing it
-	token, _, err := consulClient.ACL().TokenRead(dnsProxyToken.AccessorID, &api.QueryOptions{
-		Token: initialManagementToken,
-	})
-	require.NoError(t, err)
-	logger.Logf(t, "Verified token exists with description: %s", token.Description)
-
-	// Print out the policies attached to this token for debugging
-	logger.Log(t, "Token has the following policies:")
-	for i, policy := range token.Policies {
-		logger.Logf(t, "  Policy %d: %s (ID: %s)", i+1, policy.Name, policy.ID)
-	}
-
-	// Try to use the token to ensure it has the correct permissions
-	// Configure a test client with the new token
-	apiConfig := api.DefaultConfig()
-	apiConfig.Address = configAddress
-	apiConfig.Token = dnsProxyToken.SecretID
-
-	if strings.Contains(configAddress, "https://") {
-		apiConfig.Scheme = "https"
-		apiConfig.TLSConfig = api.TLSConfig{
-			InsecureSkipVerify: true,
-		}
-	}
-
-	// We don't actually need to do anything with this client, just
-	// log that we're attempting to verify the token works
-	logger.Log(t, "Configuring verification of token permissions (just logging, not actually testing)")
-
+	logger.Log(t, "created DNS Proxy token", "token", dnsProxyToken)
 	return err, dnsProxyToken
 }
 
@@ -328,23 +247,15 @@ func verifyDNS(
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 	dnsTestPodArgs := []string{
-		"run", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
+		"run", "-i", dnsUtilsPod, "--rm",
+		"--restart", "Never",
+		"--image", "anubhavmishra/tiny-tools",
+		"--labels", "release=" + releaseName,
+		"--", "dig", svcName, "ANY",
 	}
-
-	// Cleanup pod at the end of the test or if it fails
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		// Note: this delete command won't wait for pods to be fully terminated.
-		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found")
-	})
 
 	var logs string
 	retry.RunWith(&retry.Counter{Wait: 30 * time.Second, Count: 10}, t, func(r *retry.R) {
-		// Delete existing pod if it already exists from previous retry attempt
-		_, _ = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), "delete", "pod", dnsUtilsPod, "--ignore-not-found")
-		// Wait a moment for the deletion to complete
-		time.Sleep(2 * time.Second)
-		
-		// Now create and run the dig command
 		logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
 		logger.Logf(t, "verify the DNS results. with logs: \n%s", logs)
