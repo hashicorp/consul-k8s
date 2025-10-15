@@ -48,71 +48,71 @@ const defaultNamespace = "default"
 // - returning the local partition's service when tenancy is not included in the DNS question.
 // - properly not resolving DNS for unexported services when ACLs are enabled.
 // - properly resolving DNS for exported services when ACLs are enabled.
-// func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
-// 	env := suite.Environment()
-// 	cfg := suite.Config()
+func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
+	env := suite.Environment()
+	cfg := suite.Config()
 
-// 	if cfg.EnableCNI {
-// 		t.Skipf("skipping because -enable-cni is set")
-// 	}
-// 	if !cfg.EnableEnterprise {
-// 		t.Skipf("skipping this test because -enable-enterprise is not set")
-// 	}
+	if cfg.EnableCNI {
+		t.Skipf("skipping because -enable-cni is set")
+	}
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
 
-// 	cases := []dnsWithPartitionsTestCase{
-// 		{
-// 			name:   "not secure - ACLs and auto-encrypt not enabled",
-// 			secure: false,
-// 		},
-// 		{
-// 			name:   "secure - ACLs and auto-encrypt enabled",
-// 			secure: true,
-// 		},
-// 	}
+	cases := []dnsWithPartitionsTestCase{
+		{
+			name:   "not secure - ACLs and auto-encrypt not enabled",
+			secure: false,
+		},
+		{
+			name:   "secure - ACLs and auto-encrypt enabled",
+			secure: true,
+		},
+	}
 
-// 	for _, c := range cases {
-// 		t.Run(c.name, func(t *testing.T) {
-// 			defaultClusterContext := env.DefaultContext(t)
-// 			secondaryClusterContext := env.Context(t, 1)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			defaultClusterContext := env.DefaultContext(t)
+			secondaryClusterContext := env.Context(t, 1)
 
-// 			// Setup the clusters and the static service.
-// 			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
-// 				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
-// 				defaultPartition)
+			// Setup the clusters and the static service.
+			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
+				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
+				defaultPartition)
 
-// 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
-// 			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
-// 			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true)
+			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
+			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
+			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true)
 
-// 			podLabelSelector := "app=static-server"
-// 			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
-// 			dnsUtilsPodIndex := 0
+			podLabelSelector := "app=static-server"
+			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
+			dnsUtilsPodIndex := 0
 
-// 			// When ACLs are enabled, the unexported service should not resolve.
-// 			shouldResolveUnexportedCrossPartitionDNSRecord := true
-// 			if c.secure {
-// 				shouldResolveUnexportedCrossPartitionDNSRecord = false
-// 			}
+			// When ACLs are enabled, the unexported service should not resolve.
+			shouldResolveUnexportedCrossPartitionDNSRecord := true
+			if c.secure {
+				shouldResolveUnexportedCrossPartitionDNSRecord = false
+			}
 
-// 			// Verify that the service is in the catalog under each partition.
-// 			verifyServiceInCatalog(t, consulClient, defaultPartitionOpts)
-// 			verifyServiceInCatalog(t, consulClient, secondaryPartitionQueryOpts)
+			// Verify that the service is in the catalog under each partition.
+			verifyServiceInCatalog(t, consulClient, defaultPartitionOpts)
+			verifyServiceInCatalog(t, consulClient, secondaryPartitionQueryOpts)
 
-// 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
-// 			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
-// 				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster) {
-// 				t.Run(v.name, func(t *testing.T) {
-// 					if v.preProcessingFunc != nil {
-// 						v.preProcessingFunc(t)
-// 					}
-// 					verifyDNS(t, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
-// 						podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
-// 					dnsUtilsPodIndex++
-// 				})
-// 			}
-// 		})
-// 	}
-// }
+			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
+			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
+				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster) {
+				t.Run(v.name, func(t *testing.T) {
+					if v.preProcessingFunc != nil {
+						v.preProcessingFunc(t)
+					}
+					verifyDNS(t, cfg, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
+						podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
+					dnsUtilsPodIndex++
+				})
+			}
+		})
+	}
+}
 
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
 	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, releaseName string, defaultConsulCluster *consul.HelmCluster) []dnsVerification {

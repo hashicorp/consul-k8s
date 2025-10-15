@@ -394,15 +394,22 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	healthProbeBindAddress := "0.0.0.0:9445"
+	metricsServiceBindAddress := "0.0.0.0:9444"
+	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
+		healthProbeBindAddress = "[::]:9445"
+		metricsServiceBindAddress = "[::]:9444"
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:           scheme,
 		LeaderElection:   true,
 		LeaderElectionID: "consul-controller-lock",
 		Logger:           zapLogger,
 		Metrics: metricsserver.Options{
-			BindAddress: "0.0.0.0:9444",
+			BindAddress: metricsServiceBindAddress,
 		},
-		HealthProbeBindAddress: "0.0.0.0:9445",
+		HealthProbeBindAddress: healthProbeBindAddress,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			CertDir: c.flagCertDir,
 			Host:    listenSplits[0],
