@@ -329,7 +329,7 @@ spec:
           {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.skipServerWatch }}
           - -server-watch-disabled=true
           {{- end }}
-          {{- if $root.Values.global.dualStack.defaultEnabled }}
+          {{- if $root.Values.global.dualStack.enabled }}
           - "-envoy-admin-bind-address=::1"
           - "-xds-bind-addr=::1"
           - "-graceful-addr=::1"
