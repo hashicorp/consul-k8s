@@ -19,13 +19,13 @@ data:
       {{- if and .Values.global.secretsBackend.vault.enabled }}
       "auto_reload_config": true,
       {{- end }}
-      {{- if .Values.global.dualStack.defaultEnabled }}
+      {{- if .Values.global.dualStack.enabled }}
       "bind_addr": "::",
       {{- else }}
       "bind_addr": "0.0.0.0",
       {{- end }}
       "bootstrap_expect": {{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }},
-      {{- if .Values.global.dualStack.defaultEnabled }}
+      {{- if .Values.global.dualStack.enabled }}
       "client_addr": "::",
       {{- else }}
       "client_addr": "0.0.0.0",

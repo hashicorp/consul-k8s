@@ -320,7 +320,7 @@ spec:
         {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
         - -server-watch-disabled=true
         {{- end }}
-        {{- if .Values.global.dualStack.defaultEnabled }}
+        {{- if .Values.global.dualStack.enabled }}
         - "-envoy-admin-bind-address=::1"
         - "-xds-bind-addr=::1"
         - "-graceful-addr=::1"
