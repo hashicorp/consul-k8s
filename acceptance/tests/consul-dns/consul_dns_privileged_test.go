@@ -6,7 +6,6 @@ package consuldns
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"slices"
 	"strconv"
@@ -160,15 +159,9 @@ func updateCoreDNSFile_Privileged(t *testing.T, ctx environment.TestContext, rel
 	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
-	// For privileged test, we use the default port 53 (not 8053 like in non-privileged)
-	dnsTarget := dnsIP
-	if enableDNSProxy {
-		dnsTarget = net.JoinHostPort(dnsIP, "53")
-	}
-
 	input, err := os.ReadFile("coredns-template.yaml")
 	require.NoError(t, err)
-	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
+	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsIP, -1)
 	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
 	require.NoError(t, err)
 }
