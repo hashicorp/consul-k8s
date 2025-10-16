@@ -165,7 +165,7 @@ func (c *DebugCommand) init() {
 	c.set = flag.NewSets()
 
 	f := c.set.NewSet("Command Options")
-	defaultOutputFilename := fmt.Sprintf("consul-debug-%v", time.Now().Format(timeDateFormat))
+	defaultOutputFilename := fmt.Sprintf("consul-k8s-debug-%v", time.Now().Format(timeDateFormat))
 
 	f.DurationVar(&flag.DurationVar{
 		Name:    flagDuration,
@@ -185,14 +185,14 @@ func (c *DebugCommand) init() {
 		Name:    flagOutput,
 		Target:  &c.output,
 		Default: defaultOutputFilename,
-		Usage:   "Filename of the debug output archive.",
+		Usage:   "Full filepath of where to write the debug archive.",
 		Aliases: []string{"o"},
 	})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagArchive,
 		Target:  &c.archive,
 		Default: true,
-		Usage:   "Whether to archive the output debug directory to a .tar.gz.",
+		Usage:   "Whether to archive the debug directory into a compressed .tar.gz file.",
 		Aliases: []string{"a"},
 	})
 	f.StringSliceVar(&flag.StringSliceVar{
