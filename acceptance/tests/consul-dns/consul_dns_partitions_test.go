@@ -78,7 +78,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 			// Setup the clusters and the static service.
 			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
 				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
-				defaultPartition)
+				defaultPartition, "8053")
 
 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
 			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
@@ -274,7 +274,7 @@ func verifyServiceInCatalog(t *testing.T, consulClient *api.Client, queryOpts *a
 
 func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, defaultClusterContext environment.TestContext,
 	secondaryClusterContext environment.TestContext, c dnsWithPartitionsTestCase, secondaryPartition string,
-	defaultPartition string) (string, *api.Client, *api.QueryOptions, *api.QueryOptions, *consul.HelmCluster) {
+	defaultPartition string, port string) (string, *api.Client, *api.QueryOptions, *api.QueryOptions, *consul.HelmCluster) {
 	commonHelmValues := map[string]string{
 		"global.adminPartitions.enabled": "true",
 		"global.enableConsulNamespaces":  "true",
@@ -294,8 +294,7 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 		"dns.proxy.enabled":     "true",
 		"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 
-		// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
-		"dns.proxy.port": "8053",
+		"dns.proxy.port": port,
 	}
 
 	serverHelmValues := map[string]string{

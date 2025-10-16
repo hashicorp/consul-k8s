@@ -220,7 +220,7 @@ func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, r
 	for _, port := range dnsProxyContainer.Ports {
 		if port.ContainerPort == 53 {
 			foundPort53 = true
-			require.Contains(t, "dns", port.Name)
+			require.Contains(t, port.Name, "dns")
 			logger.Log(t, "validated DNS proxy uses port 53", "port", port.ContainerPort, "name", port.Name)
 			break
 		}

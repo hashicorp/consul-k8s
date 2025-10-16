@@ -45,7 +45,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSyncPrivileged(t *testing.T) {
 			// Setup the clusters and the static service.
 			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
 				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
-				defaultPartition)
+				defaultPartition, "53")
 
 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
 			updateCoreDNSWithConsulDomain_Privileged(t, defaultClusterContext, releaseName, true)
