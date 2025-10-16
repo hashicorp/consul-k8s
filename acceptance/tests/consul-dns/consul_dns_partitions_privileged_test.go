@@ -4,8 +4,14 @@
 package consuldns
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
@@ -74,7 +80,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSyncPrivileged(t *testing.T) {
 			verifyServiceInCatalog(t, consulClient, secondaryPartitionQueryOpts)
 
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
-			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
+			for _, v := range getVerificationsPrivileged(defaultClusterContext, secondaryClusterContext,
 				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster) {
 				t.Run(v.name, func(t *testing.T) {
 					if v.preProcessingFunc != nil {
@@ -87,4 +93,141 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSyncPrivileged(t *testing.T) {
 			}
 		})
 	}
+}
+
+func getVerificationsPrivileged(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
+	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, releaseName string, defaultConsulCluster *consul.HelmCluster) []dnsVerification {
+	serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
+	serviceRequestInDefaultPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition)
+	serviceRequestInSecondaryPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition)
+	verifications := []dnsVerification{
+		{
+			name:             "verify static-server.service.consul from default partition resolves the default partition ip address.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestWithNoPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify static-server.service.default.ap.consul resolves the default partition ip address.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify the unexported static-server.service.secondary.ap.consul from the default partition. With ACLs turned on, this should not resolve. Otherwise, it will resolve.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: shouldResolveUnexportedCrossPartitionDNSRecord,
+		},
+		{
+			name:             "verify static-server.service.secondary.ap.consul from the secondary partition.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify static-server.service.consul from the secondary partition should return the ip in the secondary.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestWithNoPartition,
+			shouldResolveDNS: true,
+		},
+		{
+			name:             "verify static-server.service.default.ap.consul from the secondary partition. With ACLs turned on, this should not resolve. Otherwise, it will resolve.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: shouldResolveUnexportedCrossPartitionDNSRecord,
+		},
+		{
+			name:             "verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				})
+			},
+		},
+		{
+			name:             "verify static-server.service.default.ap.consul from the secondary partition once the service is exported.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				k8s.KubectlApplyK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				})
+			},
+		},
+		{
+			name:             "after rollout restart of dns-proxy in default partition - verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				restartDNSProxy(t, releaseName, defaultClusterContext)
+				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				})
+			},
+		},
+		{
+			name:             "after rollout restart of dns-proxy in secondary partition - verify static-server.service.default.ap.consul from the secondary partition once the service is exported.",
+			requestingCtx:    secondaryClusterContext,
+			svcContext:       defaultClusterContext,
+			svcName:          serviceRequestInDefaultPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				restartDNSProxy(t, releaseName, secondaryClusterContext)
+				k8s.KubectlApplyK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, defaultClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default")
+				})
+			},
+		},
+		{
+			name:             "flip default cluster to use DNS service instead - verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "false"})
+				updateCoreDNSWithConsulDomain_Privileged(t, defaultClusterContext, releaseName, false)
+				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				})
+			},
+		},
+		{
+			name:             "flip default cluster back to using DNS Proxy - verify static-server.service.secondary.ap.consul from the default partition once the service is exported.",
+			requestingCtx:    defaultClusterContext,
+			svcContext:       secondaryClusterContext,
+			svcName:          serviceRequestInSecondaryPartition,
+			shouldResolveDNS: true,
+			preProcessingFunc: func(t *testing.T) {
+				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "true"})
+				updateCoreDNSWithConsulDomain_Privileged(t, defaultClusterContext, releaseName, true)
+				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
+				})
+			},
+		},
+	}
+
+	return verifications
 }
