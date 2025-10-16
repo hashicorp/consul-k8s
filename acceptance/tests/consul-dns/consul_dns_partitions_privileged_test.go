@@ -48,8 +48,12 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSyncPrivileged(t *testing.T) {
 				defaultPartition)
 
 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
-			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
-			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true)
+			updateCoreDNSWithConsulDomain_Privileged(t, defaultClusterContext, releaseName, true)
+			updateCoreDNSWithConsulDomain_Privileged(t, secondaryClusterContext, releaseName, true)
+
+			// Validate DNS proxy privileged port configuration.
+			validateDNSProxyPrivilegedPort(t, defaultClusterContext, releaseName)
+			validateDNSProxyPrivilegedPort(t, secondaryClusterContext, releaseName)
 
 			podLabelSelector := "app=static-server"
 			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
