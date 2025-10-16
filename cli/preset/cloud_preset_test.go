@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/hcp-sdk-go/clients/cloud-global-network-manager-service/preview/2022-02-15/models"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -262,12 +263,24 @@ func TestGetValueMap(t *testing.T) {
 					bsConfig.BootstrapResponse.Bootstrap.ServerTLS.CertificateAuthorities[0], corev1.SecretTypeOpaque)
 
 				// Check that HCP scada address, auth url, and api hostname are not saved
+<<<<<<< HEAD
 				hcpAuthURLSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAuthURL, metav1.GetOptions{})
 				require.Nil(t, hcpAuthURLSecret.Data)
 				hcpApiHostnameSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAPIHostname, metav1.GetOptions{})
 				require.Nil(t, hcpApiHostnameSecret.Data)
 				hcpScadaAddress, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPScadaAddress, metav1.GetOptions{})
 				require.Nil(t, hcpScadaAddress.Data)
+=======
+				hcpAuthURLSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAuthURL, metav1.GetOptions{ResourceVersion: "0"})
+				require.True(t, k8serrors.IsNotFound(err))
+				require.Empty(t, hcpAuthURLSecret.Name) // Check if returned secret is empty
+				hcpApiHostnameSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPAPIHostname, metav1.GetOptions{})
+				require.True(t, k8serrors.IsNotFound(err))
+				require.Empty(t, hcpApiHostnameSecret.Name) // Check if returned secret is empty
+				hcpScadaAddress, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secretNameHCPScadaAddress, metav1.GetOptions{})
+				require.True(t, k8serrors.IsNotFound(err))
+				require.Empty(t, hcpScadaAddress.Name) // Check if returned secret is empty
+>>>>>>> a9123580e (cloud tests return empty secret with error and needs to be fixed for require checks correctly)
 			},
 		},
 	}
