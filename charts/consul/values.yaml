@@ -921,7 +921,7 @@ global:
   experiments: []
 
   dualStack:
-    defaultEnabled: false
+    enabled: false
 
 # Server, when enabled, configures a server cluster to run. This should
 # be disabled if you plan on connecting to a Consul cluster external to
