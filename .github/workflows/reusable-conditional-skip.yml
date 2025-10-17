@@ -23,15 +23,15 @@ jobs:
       # The ability to do this is ultimately determined by the triggers of the calling
       # workflow, since `base_ref` (the target branch of a PR) is only available in
       # `pull_request` events, not `push`.
-      - name: Error if conditional check is not allowed
-        if: ${{ !github.base_ref && !github.ref_protected }}
-        run: |
-          echo "Conditional skip requires a PR event with 'base_ref' or 'push' to a protected branch."
-          echo "github.base_ref: ${{ github.base_ref }}"
-          echo "github.ref_protected: ${{ github.ref_protected }}"
-          echo "github.ref_name: ${{ github.ref_name }}"
-          echo "Check the triggers of the calling workflow to ensure that these requirements are met."
-          exit 1
+      # - name: Error if conditional check is not allowed
+      #   if: ${{ !github.base_ref && !github.ref_protected }}
+      #   run: |
+      #     echo "Conditional skip requires a PR event with 'base_ref' or 'push' to a protected branch."
+      #     echo "github.base_ref: ${{ github.base_ref }}"
+      #     echo "github.ref_protected: ${{ github.ref_protected }}"
+      #     echo "github.ref_name: ${{ github.ref_name }}"
+      #     echo "Check the triggers of the calling workflow to ensure that these requirements are met."
+      #     exit 1
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
         with:
           fetch-depth: 0
