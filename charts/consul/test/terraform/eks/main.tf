@@ -39,7 +39,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "4.0.0"
+  version = "5.8.1"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
