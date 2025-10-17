@@ -71,9 +71,8 @@ func TestConsulDNS(t *testing.T) {
 				"global.logLevel":              "debug",
 			}
 
-			// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
 			if c.enableDNSProxy {
-				helmValues["dns.proxy.port"] = "8053"
+				helmValues["dns.proxy.port"] = non_privileged_port
 			}
 
 			// If ACLs are enabled and we are not managing system ACLs, we need to
@@ -189,10 +188,9 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
-	// If we're using the DNS proxy, we need to use port 8053 (non-privileged) in K8s 1.30+
 	dnsTarget := dnsIP
 	if enableDNSProxy {
-		dnsTarget = net.JoinHostPort(dnsIP, "8053")
+		dnsTarget = net.JoinHostPort(dnsIP, non_privileged_port)
 	}
 
 	input, err := os.ReadFile("coredns-template.yaml")
