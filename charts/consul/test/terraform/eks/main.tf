@@ -4,10 +4,14 @@
 terraform {
   required_providers {
     aws = {
-      version = ">= 4.0.0"
+      source  = "hashicorp/aws"
+      version = ">= 5.0.0"
     }
   }
+
+  required_version = ">= 1.5.0"
 }
+
 
 provider "aws" {
   region = var.region
@@ -35,7 +39,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "4.0.0"
+  version = "5.8.1"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
@@ -64,7 +68,7 @@ module "eks" {
   count = var.cluster_count
 
   source                 = "terraform-aws-modules/eks/aws"
-  version                = "17.24.0"
+  version                = "19.21.0"
   kubeconfig_api_version = "client.authentication.k8s.io/v1beta1"
 
   cluster_name    = "consul-k8s-${random_id.suffix[count.index].dec}"
