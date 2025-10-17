@@ -145,6 +145,7 @@ jobs:
           CGO_ENABLED: 0
         working-directory: ${{ matrix.component }}
         run: |
+          rm -rf dist out
           mkdir -p dist out
           cp $GITHUB_WORKSPACE/LICENSE dist/LICENSE.txt
 
