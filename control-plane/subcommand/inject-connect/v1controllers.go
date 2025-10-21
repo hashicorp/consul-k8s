@@ -73,7 +73,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
-
+	fmt.Printf("schema name isssssss %+v", mgr.GetScheme())
 	if err := (&endpoints.Controller{
 		Client:                     mgr.GetClient(),
 		ConsulClientConfig:         consulConfig,

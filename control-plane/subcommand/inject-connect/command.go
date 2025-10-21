@@ -174,7 +174,7 @@ func init() {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-
+	fmt.Printf("added to the scheme")
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -415,6 +415,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	err = c.configureControllers(ctx, mgr, watcher)
+
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1
