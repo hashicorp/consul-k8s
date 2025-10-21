@@ -47,15 +47,27 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
-	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
+# 	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
+# 	   --no-cache \
+#        --target=dev \
+#        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
+#        --build-arg 'TARGETARCH=$(GOARCH)' \
+#        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
+#        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
+#        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
+#        -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+	@podman build \
+	   --log-level=debug \
 	   --no-cache \
-       --target=dev \
-       --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
-       --build-arg 'TARGETARCH=$(GOARCH)' \
-       --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
-       --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
-       --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+	   --platform=$(GOOS)/$(GOARCH) \
+	   -t '$(DEV_IMAGE)' \
+	   --target=dev \
+	   --build-arg GOLANG_VERSION=$(GOLANG_VERSION) \
+	   --build-arg TARGETARCH=$(GOARCH) \
+	   --build-arg GIT_COMMIT=$(GIT_COMMIT) \
+	   --build-arg GIT_DIRTY=$(GIT_DIRTY) \
+	   --build-arg GIT_DESCRIBE=$(GIT_DESCRIBE) \
+	   -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
 
 .PHONY: control-plane-dev-skaffold
 # DANGER: this target is experimental and could be modified/removed at any time.
