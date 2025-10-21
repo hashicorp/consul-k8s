@@ -5,8 +5,8 @@ on:
     types: [opened, synchronize]
     # Runs on PRs to main and all release branches
     branches:
-      - main
-      - "release/**"
+      
+      - fix-eks-acceptance-consul-k8s
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.event.pull_request.head.ref }}
@@ -22,6 +22,6 @@ jobs:
         with:
           workflow: cloud.yml
           repo: hashicorp/consul-k8s-workflows
-          ref: main
+          ref: fix-consul-k8s
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
           inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
