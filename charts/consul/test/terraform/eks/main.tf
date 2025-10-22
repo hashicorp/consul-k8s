@@ -4,18 +4,13 @@
 terraform {
   required_providers {
     aws = {
-      version = "~>= 6.4.1"
+      version = "~> 5.0"
     }
   }
 }
 
 provider "aws" {
   region = var.region
-
-  assume_role {
-    role_arn = var.role_arn
-    duration = "2700s"
-  }
 }
 
 resource "random_id" "suffix" {
@@ -35,7 +30,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "4.0.0"
+  version = "5.0.0"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
