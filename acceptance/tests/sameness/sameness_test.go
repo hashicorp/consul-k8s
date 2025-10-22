@@ -366,23 +366,23 @@ func TestFailover_Connect(t *testing.T) {
 				 Dialer -> 3a          1b -> acceptor
 				                       2a -> acceptor
 			*/
-			
+
 			// Step 1: Create all acceptor resources
 			for _, v := range []*cluster{testClusters[keyCluster02a], testClusters[keyCluster03a]} {
 				logger.Logf(t, "creating acceptor resources on %s", v.name)
 				applyResources(t, cfg, fmt.Sprintf("../fixtures/bases/sameness/peering/%s-acceptor", v.name), v.context.KubectlOptions(t))
 			}
-			
+
 			// Step 2: Wait for all acceptors to be ready before retrieving secrets
 			for _, v := range []*cluster{testClusters[keyCluster02a], testClusters[keyCluster03a]} {
 				for _, vv := range testClusters {
 					if isAcceptor(v.name, vv.acceptors) {
 						logger.Logf(t, "waiting for PeeringAcceptor %s to be ready on cluster %s", vv.name, v.name)
-						v.waitForPeeringAcceptorReady(t, vv.name)
+						v.waitForPeeringAcceptorReady(t, cfg, vv.name)
 					}
 				}
 			}
-			
+
 			// Step 3: Copy secrets to the necessary peers
 			for _, v := range []*cluster{testClusters[keyCluster02a], testClusters[keyCluster03a]} {
 				for _, vv := range testClusters {
@@ -721,8 +721,50 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 }
 
 // waitForPeeringAcceptorReady waits for a PeeringAcceptor to be fully processed and ready
-func (c *cluster) waitForPeeringAcceptorReady(t *testing.T, acceptorName string) {
-	timer := &retry.Timer{Timeout: retryTimeout, Wait: 2 * time.Second}
+// If it doesn't become ready in a reasonable time, it will delete and recreate the resource
+func (c *cluster) waitForPeeringAcceptorReady(t *testing.T, cfg *config.TestConfig, acceptorName string) {
+	maxRetries := 3
+	shortTimeout := 5 * time.Minute // Try for 5 minutes before recreating
+
+	for attempt := range maxRetries {
+		if attempt > 0 {
+			logger.Logf(t, "Attempt %d: Trying to delete and recreate PeeringAcceptor %s on cluster %s", attempt+1, acceptorName, c.name)
+
+			// Delete the stuck PeeringAcceptor
+			k8s.RunKubectl(t, c.context.KubectlOptions(t), "delete", "peeringacceptor", acceptorName, "--ignore-not-found=true")
+
+			// Wait a moment for deletion to complete
+			time.Sleep(10 * time.Second)
+
+			// Recreate the PeeringAcceptor by reapplying the resources
+			// We need to reapply the acceptor resources for this cluster
+			acceptorDir := fmt.Sprintf("../fixtures/bases/sameness/peering/%s-acceptor", c.name)
+			applyResources(t, cfg, acceptorDir, c.context.KubectlOptions(t))
+
+			// Wait a moment for the resource to be created
+			time.Sleep(5 * time.Second)
+		}
+
+		ready := c.checkPeeringAcceptorReady(t, acceptorName, shortTimeout)
+		if ready {
+			logger.Logf(t, "PeeringAcceptor %s is ready on cluster %s", acceptorName, c.name)
+			return
+		}
+
+		if attempt < maxRetries-1 {
+			logger.Logf(t, "PeeringAcceptor %s failed to become ready on cluster %s, will retry with delete/recreate", acceptorName, c.name)
+		}
+	}
+
+	// If we get here, all attempts failed
+	require.Fail(t, fmt.Sprintf("PeeringAcceptor %s failed to become ready on cluster %s after %d attempts", acceptorName, c.name, maxRetries))
+}
+
+// checkPeeringAcceptorReady checks if a PeeringAcceptor becomes ready within the given timeout
+func (c *cluster) checkPeeringAcceptorReady(t *testing.T, acceptorName string, timeout time.Duration) bool {
+	timer := &retry.Timer{Timeout: timeout, Wait: 2 * time.Second}
+	ready := false
+
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// First, verify the peeringacceptor resource exists
 		_, err := k8s.RunKubectlAndGetOutputE(r, c.context.KubectlOptions(r), "get", "peeringacceptor", acceptorName)
@@ -748,7 +790,7 @@ func (c *cluster) waitForPeeringAcceptorReady(t *testing.T, acceptorName string)
 			r.Logf("Failed to get secret name from PeeringAcceptor %s on cluster %s: %v", acceptorName, c.name, err)
 			r.FailNow()
 		}
-		
+
 		secretName = strings.TrimSpace(secretName)
 		if secretName == "" {
 			r.Logf("PeeringAcceptor %s secret name is not populated yet on cluster %s", acceptorName, c.name)
@@ -763,7 +805,10 @@ func (c *cluster) waitForPeeringAcceptorReady(t *testing.T, acceptorName string)
 		}
 
 		r.Logf("PeeringAcceptor %s is ready on cluster %s with secret %s", acceptorName, c.name, secretName)
+		ready = true
 	})
+
+	return ready
 }
 
 // getPeeringAcceptorSecret assures that the secret is created and retrieves the secret from the provided acceptor.
