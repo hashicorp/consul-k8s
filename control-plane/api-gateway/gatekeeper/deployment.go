@@ -164,7 +164,31 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 
 func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
+		// Save existing probe configurations before template replacement
+		existingProbes := make(map[int]*corev1.Container)
+		for i, container := range b.Spec.Template.Spec.Containers {
+			existingProbes[i] = container.DeepCopy()
+		}
+
+		// Replace template
 		b.Spec.Template = a.Spec.Template
+
+		// Restore probe configurations from existing deployment
+		for i, container := range b.Spec.Template.Spec.Containers {
+			if existingContainer, exists := existingProbes[i]; exists {
+				if existingContainer.ReadinessProbe != nil {
+					container.ReadinessProbe = existingContainer.ReadinessProbe
+				}
+				if existingContainer.LivenessProbe != nil {
+					container.LivenessProbe = existingContainer.LivenessProbe
+				}
+				if existingContainer.StartupProbe != nil {
+					container.StartupProbe = existingContainer.StartupProbe
+				}
+				b.Spec.Template.Spec.Containers[i] = container
+			}
+		}
+
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
 	}
 
@@ -208,6 +232,36 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 			if port.Protocol != otherPort.Protocol {
 				return false
 			}
+		}
+
+		// Compare probe initialDelaySeconds for rollout restart functionality
+		otherContainer := b.Spec.Template.Spec.Containers[i]
+
+		// Compare readiness probe initialDelaySeconds
+		if container.ReadinessProbe != nil && otherContainer.ReadinessProbe != nil {
+			if container.ReadinessProbe.InitialDelaySeconds != otherContainer.ReadinessProbe.InitialDelaySeconds {
+				return false
+			}
+		} else if (container.ReadinessProbe == nil) != (otherContainer.ReadinessProbe == nil) {
+			return false
+		}
+
+		// Compare liveness probe initialDelaySeconds
+		if container.LivenessProbe != nil && otherContainer.LivenessProbe != nil {
+			if container.LivenessProbe.InitialDelaySeconds != otherContainer.LivenessProbe.InitialDelaySeconds {
+				return false
+			}
+		} else if (container.LivenessProbe == nil) != (otherContainer.LivenessProbe == nil) {
+			return false
+		}
+
+		// Compare startup probe initialDelaySeconds
+		if container.StartupProbe != nil && otherContainer.StartupProbe != nil {
+			if container.StartupProbe.InitialDelaySeconds != otherContainer.StartupProbe.InitialDelaySeconds {
+				return false
+			}
+		} else if (container.StartupProbe == nil) != (otherContainer.StartupProbe == nil) {
+			return false
 		}
 	}
 
