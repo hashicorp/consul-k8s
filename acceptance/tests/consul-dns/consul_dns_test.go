@@ -72,7 +72,7 @@ func TestConsulDNS(t *testing.T) {
 			}
 
 			if c.enableDNSProxy {
-				helmValues["dns.proxy.port"] = non_privileged_port
+				helmValues["dns.proxy.port"] = nonPrivilegedPort
 			}
 
 			// If ACLs are enabled and we are not managing system ACLs, we need to
@@ -190,7 +190,7 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 
 	dnsTarget := dnsIP
 	if enableDNSProxy {
-		dnsTarget = net.JoinHostPort(dnsIP, non_privileged_port)
+		dnsTarget = net.JoinHostPort(dnsIP, nonPrivilegedPort)
 	}
 
 	input, err := os.ReadFile("coredns-template.yaml")

@@ -41,8 +41,8 @@ type dnsVerification struct {
 const defaultPartition = "default"
 const secondaryPartition = "secondary"
 const defaultNamespace = "default"
-const privileged_port = "53"
-const non_privileged_port = "8053"
+const privilegedPort = "53"
+const nonPrivilegedPort = "8053"
 
 // TestConsulDNSProxy_WithPartitionsAndCatalogSync verifies DNS queries for services across partitions
 // when DNS proxy is enabled. It configures CoreDNS to use configure consul domain queries to
@@ -80,7 +80,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 			// Setup the clusters and the static service.
 			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
 				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
-				defaultPartition, non_privileged_port)
+				defaultPartition, nonPrivilegedPort)
 
 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
 			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
