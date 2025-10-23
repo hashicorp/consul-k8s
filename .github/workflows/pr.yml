@@ -28,7 +28,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: enable-dual-stack-tests
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
 
@@ -49,6 +49,9 @@ jobs:
           - check-name: acceptance
           - check-name: acceptance-cni
           - check-name: acceptance-tproxy
+          - check-name: acceptance-dual-stack
+          - check-name: acceptance-dual-stack-cni
+          - check-name: acceptance-dual-stack-tproxy
     steps:
     - name: Update final status
       uses: docker://ghcr.io/curtbushko/commit-status-action:e1d661c757934ab35c74210b4b70c44099ec747a
