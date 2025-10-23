@@ -200,7 +200,7 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	require.NoError(t, err)
 
 	dnsTarget := dnsIP
-	if enableDNSProxy && isPrivilegedPort {
+	if enableDNSProxy && !isPrivilegedPort {
 		dnsTarget = net.JoinHostPort(dnsIP, nonPrivilegedPort)
 	}
 
