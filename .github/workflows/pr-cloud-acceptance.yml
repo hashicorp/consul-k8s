@@ -5,8 +5,8 @@ on:
     types: [opened, synchronize]
     # Runs on PRs to main and all release branches
     branches:
-      
-      - fix-eks-acceptance-consul-k8s
+      - main
+      - "release/**"
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.event.pull_request.head.ref }}
