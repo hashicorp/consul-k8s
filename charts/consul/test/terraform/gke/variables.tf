@@ -70,6 +70,6 @@ variable "shared_network_cidr" {
 
 variable "subnet_region" {
   type        = string
-  default     = "us-central1"
+  default     = "asia-south1"
   description = "Region where subnets will be created inside the shared network."
 }
