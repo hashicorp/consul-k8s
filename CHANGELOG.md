@@ -18,6 +18,7 @@ cni: cleanup of cni binary on previous pod deletion to improve security posture 
 BUG FIXES:
 
 * api-gateway: Fixed an issue where the gateway controller failed to detect annotation changes in deployments triggered by rollout restarts, preventing restarts from completing successfully. [[GH-4767](https://github.com/hashicorp/consul-k8s/issues/4767)]
+* acceptance-tests: Fixed EKS acceptance test Terraform configuration by updating AWS provider version from invalid "~>= 6.4.1" to "~> 5.0" and VPC module version from "4.0.0" to "5.0.0" to resolve compatibility issues. [[GH-4898](https://github.com/hashicorp/consul-k8s/issues/4898)]
 
 ## 1.8.1 (August 20, 2025)
 
