@@ -358,6 +358,8 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	c.policyMutex.Lock()
 	defer c.policyMutex.Unlock()
 
+	c.logger.V(1).Info("ensuring gateway ACL policy", "gateway", gatewayName)
+
 	createPolicy := func() (string, error) {
 		policy := c.gatewayPolicy(gatewayName)
 
@@ -374,6 +376,8 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 			return existing.ID, nil
 		}
 
+		c.logger.V(1).Info("created gateway ACL policy", "gateway", gatewayName, "policyName", policy.Name)
+
 		if err != nil {
 			return "", err
 		}
@@ -389,17 +393,17 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName string) (string, er
 	}
 
 	existing, _, err := client.ACL().PolicyReadByName(cachedPolicy.Name, &api.QueryOptions{})
+	if err != nil {
+		return "", err
+	}
 
 	if existing == nil {
 		return createPolicy()
 	}
 
-	if err != nil {
-		return "", err
-	}
-
 	// update cache with existing policy
 	c.gatewayNameToACLPolicy[gatewayName] = existing
+	c.logger.V(1).Info("reused existing gateway ACL policy", "gateway", gatewayName, "policyName", existing.Name)
 	return existing.ID, nil
 }
 
@@ -415,6 +419,8 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 
 	c.aclRoleMutex.Lock()
 	defer c.aclRoleMutex.Unlock()
+
+	c.logger.V(1).Info("ensuring gateway ACL role", "gateway", gatewayName)
 
 	createRole := func() (string, error) {
 		aclRoleName := getACLRoleName(gatewayName)
@@ -437,6 +443,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 			}
 
 			role.Policies = []*api.ACLLink{{ID: policyID}}
+			c.logger.V(1).Info("updating existing ACL role with policy", "gateway", gatewayName, "roleName", role.Name, "policyID", policyID)
 			role, _, err = client.ACL().RoleUpdate(role, &api.WriteOptions{})
 			if err != nil {
 				return "", err
@@ -446,6 +453,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 			return aclRoleName, err
 		}
 
+		c.logger.V(1).Info("created gateway ACL role", "gateway", gatewayName, "roleName", aclRoleName, "policyID", policyID)
 		c.gatewayNameToACLRole[gatewayName] = role
 		return aclRoleName, nil
 	}
@@ -463,6 +471,7 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string) (string, erro
 
 	if aclRole != nil {
 		c.gatewayNameToACLRole[gatewayName] = aclRole
+		c.logger.V(1).Info("reused existing gateway ACL role", "gateway", gatewayName, "roleName", aclRole.Name)
 		return aclRole.Name, nil
 	}
 
@@ -549,6 +558,8 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 		return err
 	}
 
+	c.logger.V(1).Info("ensuring gateway ACL binding rule", "authMethod", authMethod, "namespace", namespace, "service", service)
+
 	role, err := c.ensureRole(client, service)
 	if err != nil {
 		return ignoreACLsDisabled(err)
@@ -583,6 +594,7 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 		defer c.bindingRuleMutex.Unlock()
 		c.gatewayNameToACLBindingRule[service] = bindingRule
 
+		c.logger.V(1).Info("created gateway ACL binding rule", "authMethod", authMethod, "namespace", namespace, "service", service, "roleName", role)
 		return nil
 	}
 	_, _, err = client.ACL().BindingRuleUpdate(bindingRule, &api.WriteOptions{})
@@ -593,6 +605,8 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 	c.bindingRuleMutex.Lock()
 	defer c.bindingRuleMutex.Unlock()
 	c.gatewayNameToACLBindingRule[service] = bindingRule
+
+	c.logger.V(1).Info("updated gateway ACL binding rule", "authMethod", authMethod, "namespace", namespace, "service", service, "roleName", role)
 
 	return nil
 }
@@ -609,6 +623,8 @@ func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 	if err != nil {
 		return err
 	}
+
+	c.logger.V(1).Info("removing gateway ACL binding rule", "authMethod", authMethod, "namespace", namespace, "service", service)
 
 	// acquire locks
 	c.bindingRuleMutex.Lock()
@@ -644,6 +660,8 @@ func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 		}
 	}
 
+	c.logger.V(1).Info("removed gateway ACL binding rule and related ACL objects", "authMethod", authMethod, "namespace", namespace, "service", service)
+
 	return nil
 }
 
@@ -664,6 +682,7 @@ func (c *Cache) bindingRuleDelete(client *api.Client, rule *api.ACLBindingRule, 
 		}
 
 		delete(c.gatewayNameToACLBindingRule, service)
+		c.logger.V(1).Info("deleted gateway ACL binding rule", "service", service, "bindingRuleID", rule.ID)
 
 		return nil
 	}
@@ -685,6 +704,7 @@ func (c *Cache) roleDelete(client *api.Client, role *api.ACLRole, service string
 			return fmt.Errorf("%w: %s", ErrFailedToDeleteRole, err)
 		}
 		delete(c.gatewayNameToACLRole, service)
+		c.logger.V(1).Info("deleted gateway ACL role", "service", service, "roleID", role.ID)
 
 		return nil
 	}
@@ -706,6 +726,7 @@ func (c *Cache) policyDelete(client *api.Client, policy *api.ACLPolicy, service 
 			return fmt.Errorf("%w: %s", ErrFailedToDeletePolicy, err)
 		}
 		delete(c.gatewayNameToACLPolicy, service)
+		c.logger.V(1).Info("deleted gateway ACL policy", "service", service, "policyID", policy.ID)
 
 		return nil
 	}

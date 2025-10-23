@@ -210,10 +210,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	updates := binder.Snapshot()
 
 	if updates.UpsertGatewayDeployment {
+		log.V(1).Info("ensuring ACL resources for gateway", "authMethod", r.HelmConfig.AuthMethod, "namespace", gateway.Namespace, "name", gateway.Name)
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
 			return ctrl.Result{}, err
 		}
+		log.V(1).Info("finished ensuring ACL resources for gateway", "namespace", gateway.Namespace, "name", gateway.Name)
 
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
@@ -245,11 +247,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
+		log.V(1).Info("removing ACL resources for gateway", "authMethod", r.HelmConfig.AuthMethod, "namespace", gateway.Namespace, "name", gateway.Name)
 		err = r.cache.RemoveRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace)
 		if err != nil {
 			log.Error(err, "error removing acl role bindings")
 			return ctrl.Result{}, err
 		}
+		log.V(1).Info("finished removing ACL resources for gateway", "namespace", gateway.Namespace, "name", gateway.Name)
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
