@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -48,12 +49,18 @@ func TestConsulDNS(t *testing.T) {
 		enableDNSProxy       bool
 		aclsEnabled          bool
 		manageSystemACLs     bool
+		isPrivilegedPort     bool
 	}{
-		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false},
-		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: true},
-		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: false},
-		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true},
-		{tlsEnabled: true, connectInjectEnabled: false, aclsEnabled: true, manageSystemACLs: false, enableDNSProxy: true},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false, isPrivilegedPort: true},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: true, isPrivilegedPort: true},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: false, isPrivilegedPort: true},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true, isPrivilegedPort: true},
+		{tlsEnabled: true, connectInjectEnabled: false, aclsEnabled: true, manageSystemACLs: false, enableDNSProxy: true, isPrivilegedPort: true},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false, isPrivilegedPort: false},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: true, isPrivilegedPort: false},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: false, isPrivilegedPort: false},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true, isPrivilegedPort: false},
+		{tlsEnabled: true, connectInjectEnabled: false, aclsEnabled: true, manageSystemACLs: false, enableDNSProxy: true, isPrivilegedPort: false},
 	}
 
 	for _, c := range cases {
@@ -71,7 +78,7 @@ func TestConsulDNS(t *testing.T) {
 				"global.logLevel":              "debug",
 			}
 
-			if c.enableDNSProxy {
+			if c.enableDNSProxy && !c.isPrivilegedPort {
 				helmValues["dns.proxy.port"] = nonPrivilegedPort
 			}
 
@@ -139,7 +146,11 @@ func TestConsulDNS(t *testing.T) {
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
 
-			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
+			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy, c.isPrivilegedPort)
+			// Validate DNS proxy privileged port configuration when DNS proxy is enabled
+			if c.enableDNSProxy && c.isPrivilegedPort {
+				validateDNSProxyPrivilegedPort(t, ctx, releaseName)
+			}
 			verifyDNS(t, cfg, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
@@ -173,8 +184,8 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 	return err, dnsProxyToken
 }
 
-func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
-	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, "coredns-custom.yaml")
+func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy, isPrivilegedPort bool) {
+	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, isPrivilegedPort, "coredns-custom.yaml")
 	updateCoreDNS(t, ctx, "coredns-custom.yaml")
 
 	t.Cleanup(func() {
@@ -184,12 +195,12 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
 }
 
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
-	enableDNSProxy bool, dnsFileName string) {
+	enableDNSProxy, isPrivilegedPort bool, dnsFileName string) {
 	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
 	dnsTarget := dnsIP
-	if enableDNSProxy {
+	if enableDNSProxy && isPrivilegedPort {
 		dnsTarget = net.JoinHostPort(dnsIP, nonPrivilegedPort)
 	}
 
@@ -301,4 +312,72 @@ func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext,
 	dnsService, err := requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
 	require.NoError(t, err)
 	return dnsService.Spec.ClusterIP, err
+}
+
+// validateDNSProxyPrivilegedPort validates that the consul-dns-proxy pod is correctly configured
+// to use privileged port 53 with appropriate command and envoy arguments.
+func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string) {
+	logger.Log(t, "validating DNS proxy pod uses privileged port 53 configuration")
+
+	var pod corev1.Pod
+
+	// Wait for DNS proxy pod to be created and ready with retry
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName),
+		})
+		require.NoError(r, err)
+		require.NotEmpty(r, pods.Items, "DNS proxy pod should exist")
+
+		pod = pods.Items[0]
+		require.Equal(r, corev1.PodRunning, pod.Status.Phase, "DNS proxy pod should be running")
+	})
+
+	logger.Log(t, "found DNS proxy pod", "name", pod.Name)
+
+	// Find the consul-dns-proxy container
+	var dnsProxyContainer *corev1.Container
+	for i, container := range pod.Spec.Containers {
+		if container.Name == "dns-proxy" {
+			dnsProxyContainer = &pod.Spec.Containers[i]
+			break
+		}
+	}
+	require.NotNil(t, dnsProxyContainer, "dns-proxy container should exist")
+
+	// Validate command arguments include port 53
+	commandArgs := strings.Join(dnsProxyContainer.Args, " ")
+	require.Contains(t, commandArgs, "-consul-dns-bind-port=53", "DNS proxy command should include -consul-dns-bind-port=53 argument")
+	logger.Log(t, "validated DNS proxy command includes -consul-dns-bind-port=53", "args", commandArgs)
+
+	// Validate privileged-envoy executable is used
+	require.Contains(t, commandArgs, "-envoy-executable-path=/usr/local/bin/privileged-envoy", "Envoy should have admin port configured")
+	logger.Log(t, "validated envoy configuration in DNS proxy")
+
+	logger.Log(t, "successfully validated DNS proxy privileged port 53 configuration")
+
+	// Validate port 53 is configured
+	var foundPort53 bool
+	for _, port := range dnsProxyContainer.Ports {
+		if port.ContainerPort == 53 {
+			foundPort53 = true
+			require.Contains(t, port.Name, "dns")
+			logger.Log(t, "validated DNS proxy uses port 53", "port", port.ContainerPort, "name", port.Name)
+			break
+		}
+	}
+	require.True(t, foundPort53, "DNS proxy container should expose port 53")
+
+	// Validate security context has privileged capabilities
+	require.NotNil(t, dnsProxyContainer.SecurityContext, "DNS proxy container should have security context")
+	require.NotNil(t, dnsProxyContainer.SecurityContext.Capabilities, "DNS proxy container should have capabilities configured")
+	require.NotNil(t, dnsProxyContainer.SecurityContext.Capabilities.Add, "DNS proxy container should have added capabilities")
+
+	// Check for NET_BIND_SERVICE capability (required for privileged ports)
+	var hasNetBindService bool
+	if slices.Contains(dnsProxyContainer.SecurityContext.Capabilities.Add, "NET_BIND_SERVICE") {
+		hasNetBindService = true
+		logger.Log(t, "validated DNS proxy has NET_BIND_SERVICE capability")
+	}
+	require.True(t, hasNetBindService, "DNS proxy container should have NET_BIND_SERVICE capability for privileged port")
 }

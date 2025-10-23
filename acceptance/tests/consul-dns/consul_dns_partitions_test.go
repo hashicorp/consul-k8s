@@ -25,8 +25,9 @@ const staticServerName = "static-server"
 const staticServerNamespace = "ns1"
 
 type dnsWithPartitionsTestCase struct {
-	name   string
-	secure bool
+	name             string
+	secure           bool
+	isPrivilegedPort bool
 }
 
 type dnsVerification struct {
@@ -63,12 +64,24 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 
 	cases := []dnsWithPartitionsTestCase{
 		{
-			name:   "not secure - ACLs and auto-encrypt not enabled",
-			secure: false,
+			name:             "not secure - ACLs and auto-encrypt not enabled",
+			secure:           false,
+			isPrivilegedPort: true,
 		},
 		{
-			name:   "secure - ACLs and auto-encrypt enabled",
-			secure: true,
+			name:             "secure - ACLs and auto-encrypt enabled",
+			secure:           true,
+			isPrivilegedPort: true,
+		},
+		{
+			name:             "not secure - ACLs and auto-encrypt not enabled",
+			secure:           false,
+			isPrivilegedPort: false,
+		},
+		{
+			name:             "secure - ACLs and auto-encrypt enabled",
+			secure:           true,
+			isPrivilegedPort: false,
 		},
 	}
 
@@ -77,15 +90,25 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 			defaultClusterContext := env.DefaultContext(t)
 			secondaryClusterContext := env.Context(t, 1)
 
+			port := nonPrivilegedPort
+			if c.isPrivilegedPort {
+				port = privilegedPort
+			}
+
 			// Setup the clusters and the static service.
 			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
 				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
-				defaultPartition, nonPrivilegedPort)
+				defaultPartition, port)
 
 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
-			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
-			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true)
+			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true, c.isPrivilegedPort)
+			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true, c.isPrivilegedPort)
 
+			if c.isPrivilegedPort {
+				// Validate DNS proxy privileged port configuration.
+				validateDNSProxyPrivilegedPort(t, defaultClusterContext, releaseName)
+				validateDNSProxyPrivilegedPort(t, secondaryClusterContext, releaseName)
+			}
 			podLabelSelector := "app=static-server"
 			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
 			dnsUtilsPodIndex := 0
@@ -102,7 +125,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
 			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
-				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster) {
+				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster, c.isPrivilegedPort) {
 				t.Run(v.name, func(t *testing.T) {
 					if v.preProcessingFunc != nil {
 						v.preProcessingFunc(t)
@@ -117,7 +140,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 }
 
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
-	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, releaseName string, defaultConsulCluster *consul.HelmCluster) []dnsVerification {
+	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, releaseName string, defaultConsulCluster *consul.HelmCluster, isPrivilegedPort bool) []dnsVerification {
 	serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
 	serviceRequestInDefaultPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition)
 	serviceRequestInSecondaryPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition)
@@ -226,7 +249,7 @@ func getVerifications(defaultClusterContext environment.TestContext, secondaryCl
 			shouldResolveDNS: true,
 			preProcessingFunc: func(t *testing.T) {
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "false"})
-				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, false)
+				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, false, isPrivilegedPort)
 				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
@@ -241,7 +264,7 @@ func getVerifications(defaultClusterContext environment.TestContext, secondaryCl
 			shouldResolveDNS: true,
 			preProcessingFunc: func(t *testing.T) {
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "true"})
-				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
+				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true, isPrivilegedPort)
 				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
