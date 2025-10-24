@@ -35,7 +35,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "4.0.0"
+  version = "5.21.0"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
@@ -79,8 +79,12 @@ module "eks" {
       desired_capacity = 3
       max_capacity     = 3
       min_capacity     = 3
-
-      instance_type = "m5.xlarge"
+      instance_type    = "m5.xlarge"
+      metadata_options = {
+        http_endpoint               = "enabled"
+        http_put_response_hop_limit = 2
+        http_tokens                 = "required"
+      }
     }
   }
 
