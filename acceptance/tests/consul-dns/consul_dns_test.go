@@ -315,9 +315,9 @@ func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext,
 }
 
 // validateDNSProxyPrivilegedPort validates that the consul-dns-proxy pod is correctly configured
-// to use privileged port 53 with appropriate command and envoy arguments.
+// to use privileged port with appropriate command and envoy arguments.
 func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string) {
-	logger.Log(t, "validating DNS proxy pod uses privileged port 53 configuration")
+	logger.Log(t, "validating DNS proxy pod uses privileged port", privilegedPort)
 
 	var pod corev1.Pod
 
@@ -345,28 +345,28 @@ func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, r
 	}
 	require.NotNil(t, dnsProxyContainer, "dns-proxy container should exist")
 
-	// Validate command arguments include port 53
+	// Validate command arguments include privilegedPort
 	commandArgs := strings.Join(dnsProxyContainer.Args, " ")
-	require.Contains(t, commandArgs, "-consul-dns-bind-port=53", "DNS proxy command should include -consul-dns-bind-port=53 argument")
-	logger.Log(t, "validated DNS proxy command includes -consul-dns-bind-port=53", "args", commandArgs)
+	require.Contains(t, commandArgs, fmt.Sprintf("-consul-dns-bind-port=%s", privilegedPort), fmt.Sprintf("DNS proxy command should include -consul-dns-bind-port=%s argument", privilegedPort))
+	logger.Log(t, "validated DNS proxy command includes -consul-dns-bind-port=", privilegedPort, "args", commandArgs)
 
 	// Validate privileged-envoy executable is used
 	require.Contains(t, commandArgs, "-envoy-executable-path=/usr/local/bin/privileged-envoy", "Envoy should have admin port configured")
 	logger.Log(t, "validated envoy configuration in DNS proxy")
 
-	logger.Log(t, "successfully validated DNS proxy privileged port 53 configuration")
+	logger.Log(t, "successfully validated DNS proxy privileged port", privilegedPort)
 
 	// Validate port 53 is configured
-	var foundPort53 bool
+	var foundPrivilegedPort bool
 	for _, port := range dnsProxyContainer.Ports {
-		if port.ContainerPort == 53 {
-			foundPort53 = true
+		if string(port.ContainerPort) == privilegedPort {
+			foundPrivilegedPort = true
 			require.Contains(t, port.Name, "dns")
-			logger.Log(t, "validated DNS proxy uses port 53", "port", port.ContainerPort, "name", port.Name)
+			logger.Log(t, "validated DNS proxy uses port", privilegedPort, "port", port.ContainerPort, "name", port.Name)
 			break
 		}
 	}
-	require.True(t, foundPort53, "DNS proxy container should expose port 53")
+	require.True(t, foundPrivilegedPort, fmt.Sprintf("DNS proxy container should expose port %s", privilegedPort))
 
 	// Validate security context has privileged capabilities
 	require.NotNil(t, dnsProxyContainer.SecurityContext, "DNS proxy container should have security context")
