@@ -14,9 +14,6 @@ provider "google" {
   zone    = var.zone
 }
 
-# -----------------------------
-# Random Identifiers
-# -----------------------------
 resource "random_id" "suffix" {
   count       = var.cluster_count
   byte_length = 4
@@ -28,79 +25,56 @@ resource "random_string" "cluster_prefix" {
   special = false
 }
 
-# -----------------------------
-# Get Available GKE Versions
-# -----------------------------
 data "google_container_engine_versions" "main" {
   location       = var.zone
   version_prefix = var.kubernetes_version_prefix
+
 }
 
-# -----------------------------
-# Network and Subnet Logic
-# -----------------------------
-# Create a network only if create_network = true
 resource "google_compute_network" "custom_network" {
-  count                   = var.create_network ? 1 : 0
   name                    = "network-${random_string.cluster_prefix.result}"
   auto_create_subnetworks = false
-
   lifecycle {
-    prevent_destroy = false
-    ignore_changes  = [name]
-  }
+  prevent_destroy = false
+  ignore_changes  = [name]
+}
 }
 
-# Determine which network name to use (created or existing)
-locals {
-  active_network_name = var.create_network ? google_compute_network.custom_network[0].name : var.shared_network_name
-}
-
-# Create subnets only when new network is created
 resource "google_compute_subnetwork" "subnet" {
-  count         = var.create_network ? var.cluster_count : 0
-  name          = "subnet-${random_string.cluster_prefix.result}-${count.index}"
-  ip_cidr_range = cidrsubnet(var.shared_network_cidr, 8, count.index)
-  region        = var.subnet_region
-  network       = local.active_network_name
+  count         = var.cluster_count
+  name          = "subnet-${random_string.cluster_prefix.result}-${count.index}" // Ensure valid name
+  ip_cidr_range = cidrsubnet("10.0.0.0/8", 8, count.index)
+  network       = google_compute_network.custom_network.name
 }
 
-# -----------------------------
-# GKE Cluster(s)
-# -----------------------------
 resource "google_container_cluster" "cluster" {
-  count    = var.cluster_count
   provider = google
+  count    = var.cluster_count
 
   name               = "consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"
   project            = var.project
-  location           = var.zone
   initial_node_count = 3
-
+  location           = var.zone
   min_master_version = data.google_container_engine_versions.main.latest_master_version
   node_version       = data.google_container_engine_versions.main.latest_master_version
-
-  network    = local.active_network_name
-  subnetwork = var.create_network ? google_compute_subnetwork.subnet[count.index].self_link : var.subnet
-
+  network            = google_compute_network.custom_network.name
   node_config {
-    machine_type = "e2-standard-8"
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
+    machine_type = "e2-standard-8"
   }
-
+  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
   resource_labels     = var.labels
   deletion_protection = false
 }
 
-# -----------------------------
-# Firewall Rules (only when new network created)
-# -----------------------------
-resource "google_compute_firewall" "firewall_rules" {
-  count       = var.create_network && var.cluster_count > 1 ? var.cluster_count : 0
+
+resource "google_compute_firewall" "firewall-rules" {
   project     = var.project
   name        = format("firewall-%s-%d", substr(random_string.cluster_prefix.result, 0, 8), count.index)
-  network     = local.active_network_name
+  network     = google_compute_network.custom_network.name
   description = "Firewall rule for cluster ${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}."
+
+  count = var.cluster_count > 1 ? var.cluster_count : 0
 
   allow {
     protocol = "all"
@@ -111,9 +85,6 @@ resource "google_compute_firewall" "firewall_rules" {
   target_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index}"]
 }
 
-# -----------------------------
-# Optional kubectl Initialization
-# -----------------------------
 resource "null_resource" "kubectl" {
   count = var.init_cli ? var.cluster_count : 0
 
@@ -121,10 +92,16 @@ resource "null_resource" "kubectl" {
     cluster = google_container_cluster.cluster[count.index].id
   }
 
+  # On creation, we want to setup the kubectl credentials. The easiest way
+  # to do this is to shell out to gcloud.
   provisioner "local-exec" {
     command = "KUBECONFIG=$HOME/.kube/${google_container_cluster.cluster[count.index].name} gcloud container clusters get-credentials --zone=${var.zone} ${google_container_cluster.cluster[count.index].name}"
   }
 
+  # On destroy we want to try to clean up the kubectl credentials. This
+  # might fail if the credentials are already cleaned up or something so we
+  # want this to continue on failure. Generally, this works just fine since
+  # it only operates on local data.
   provisioner "local-exec" {
     when       = destroy
     on_failure = continue
