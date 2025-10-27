@@ -6,6 +6,7 @@ package sameness
 import (
 	ctx "context"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -593,7 +594,7 @@ func TestFailover_Connect(t *testing.T) {
 						sc.server.dnsFailoverCheck(t, cfg, releaseName, v.failoverServer)
 
 						logger.Log(t, "verifying prepared query", i)
-						sc.server.preparedQueryFailoverCheck(t, releaseName, v.expectedPQ, v.failoverServer)
+						sc.server.preparedQueryFailoverCheck(t, cfg, releaseName, v.expectedPQ, v.failoverServer)
 
 						// Scale down static-server on the current failover, will fail over to the next.
 						logger.Logf(t, "scaling server down on %s", v.failoverServer.name)
@@ -656,7 +657,7 @@ func (c *cluster) serviceTargetCheck(t *testing.T, expectedName string, curlAddr
 
 // preparedQueryFailoverCheck verifies that failover occurs when executing the prepared query. It also assures that
 // executing the prepared query via DNS also provides expected results.
-func (c *cluster) preparedQueryFailoverCheck(t *testing.T, releaseName string, epq expectedPQ, failover *cluster) {
+func (c *cluster) preparedQueryFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, epq expectedPQ, failover *cluster) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
 	resp, _, err := c.client.PreparedQuery().Execute(*c.pqID, &api.QueryOptions{Namespace: staticServerNamespace, Partition: c.partition})
 	require.NoError(t, err)
@@ -665,14 +666,15 @@ func (c *cluster) preparedQueryFailoverCheck(t *testing.T, releaseName string, e
 	assert.Equal(t, epq.partition, resp.Nodes[0].Service.Partition)
 	assert.Equal(t, epq.peerName, resp.Nodes[0].Service.PeerName)
 	assert.Equal(t, epq.namespace, resp.Nodes[0].Service.Namespace)
-	assert.Equal(t, *failover.staticServerIP, resp.Nodes[0].Service.Address)
+	addr := strings.ReplaceAll(resp.Nodes[0].Service.Address, ":0:", "::")
+	assert.Equal(t, *failover.staticServerIP, addr)
 
 	// Verify that dns lookup is successful, there is no guarantee that the ip address is unique, so for PQ this is
 	// just verifying that we can query using DNS and that the ip address is correct. It does not however prove
 	// that failover occurred, that is left to client `Execute`
 	dnsPQLookup := []string{fmt.Sprintf("%s.query.consul", *c.pqName)}
 	retry.RunWith(timer, t, func(r *retry.R) {
-		logs := dnsQuery(r, releaseName, dnsPQLookup, c.primaryCluster, failover)
+		logs := dnsQuery(r, cfg, releaseName, dnsPQLookup, c.primaryCluster, failover)
 		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
 		assert.Contains(r, logs, "ANSWER SECTION:")
 		assert.Contains(r, logs, *failover.staticServerIP)
@@ -686,7 +688,7 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 	retry.RunWith(timer, t, func(r *retry.R) {
 		// Use the primary cluster when performing a DNS lookup, this mostly affects cases
 		// where we are verifying DNS for a partition
-		logs := dnsQuery(r, releaseName, dnsLookup, c.primaryCluster, failover)
+		logs := dnsQuery(r, cfg, releaseName, dnsLookup, c.primaryCluster, failover)
 
 		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
 		assert.Contains(r, logs, "ANSWER SECTION:")
@@ -772,10 +774,11 @@ func (c clusters) setServerIP(t *testing.T) {
 			require.Len(t, podList.Items, 1)
 			require.Len(t, podList.Items[0].Spec.Containers, 2)
 			if labelSelector == "app=static-server" {
-				ip := &podList.Items[0].Status.PodIP
+				ip := net.ParseIP(podList.Items[0].Status.PodIP)
 				require.NotNil(t, ip)
-				logger.Logf(t, "%s-static-server-ip: %s", v.name, *ip)
-				c[k].staticServerIP = ip
+				ipStr := strings.ReplaceAll(ip.String(), ":0:", "::")
+				logger.Logf(t, "%s-static-server-ip: %s", v.name, ip.String())
+				c[k].staticServerIP = &ipStr
 			}
 		}
 	}
@@ -830,14 +833,14 @@ func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluste
 }
 
 // dnsQuery performs a dns query with the provided query string.
-func dnsQuery(t testutil.TestingTB, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
+func dnsQuery(t testutil.TestingTB, cfg *config.TestConfig, releaseName string, dnsQuery []string, dnsServer, failover *cluster) string {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}
 	var logs string
 
 	retry.RunWith(timer, t, func(r *retry.R) {
 		args := []string{"exec", "-i",
 			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
-				releaseName)}
+				releaseName), "ANY"}
 		args = append(args, dnsQuery...)
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)

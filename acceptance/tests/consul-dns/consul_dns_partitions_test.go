@@ -105,7 +105,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 					if v.preProcessingFunc != nil {
 						v.preProcessingFunc(t)
 					}
-					verifyDNS(t, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
+					verifyDNS(t, cfg, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
 						podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
 					dnsUtilsPodIndex++
 				})
@@ -293,6 +293,9 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 		"dns.enabled":           "true",
 		"dns.proxy.enabled":     "true",
 		"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+
+		// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
+		"dns.proxy.port": "8053",
 	}
 
 	serverHelmValues := map[string]string{

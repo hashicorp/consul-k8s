@@ -5,7 +5,17 @@
 - {runner: 0, test-packages: "partitions"}
 - {runner: 1, test-packages: "peering"}
 - {runner: 2, test-packages: "sameness"}
-- {runner: 3, test-packages: "connect snapshot-agent wan-federation"}
-- {runner: 4, test-packages: "cli vault metrics server"}
-- {runner: 5, test-packages: "api-gateway ingress-gateway sync example consul-dns"}
-- {runner: 6, test-packages: "config-entries terminating-gateway basic"}
+- {runner: 3, test-packages: "connect"}
+- {runner: 4, test-packages: "snapshot-agent"}
+- {runner: 5, test-packages: "wan-federation"}
+- {runner: 6, test-packages: "cli"}
+- {runner: 7, test-packages: "vault"}
+- {runner: 8, test-packages: "metrics"}
+- {runner: 9, test-packages: "server"}
+- {runner: 10, test-packages: "api-gateway"}
+- {runner: 12, test-packages: "sync"}
+- {runner: 13, test-packages: "example"}
+- {runner: 14, test-packages: "consul-dns"}
+- {runner: 15, test-packages: "config-entries"}
+- {runner: 16, test-packages: "terminating-gateway"}
+- {runner: 17, test-packages: "basic"}

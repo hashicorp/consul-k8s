@@ -426,7 +426,11 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - --volume-dir=/etc/config
+            {{- if .Values.global.dualStack.enabled }}
             - --webhook-url=http://127.0.0.1:9090/-/reload
+            {{- else }}
+            - --webhook-url=http://[::1]:9090/-/reload
+            {{- end }}
           resources:
             {}
           volumeMounts:

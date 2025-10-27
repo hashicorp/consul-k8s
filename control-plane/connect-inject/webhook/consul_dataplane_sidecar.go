@@ -6,6 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 
@@ -20,8 +21,9 @@ import (
 )
 
 const (
-	consulDataplaneDNSBindHost = "127.0.0.1"
-	consulDataplaneDNSBindPort = 8600
+	consulDataplaneDNSBindHost     = "127.0.0.1"
+	ipv6ConsulDataplaneDNSBindHost = "::1"
+	consulDataplaneDNSBindPort     = 8600
 )
 
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
@@ -268,10 +270,7 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
-		// consul-dataplane requires the NET_BIND_SERVICE capability regardless of binding port #.
-		// See https://developer.hashicorp.com/consul/docs/connect/dataplane#technical-constraints
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{"NET_BIND_SERVICE"},
 			Drop: []corev1.Capability{"ALL"},
 		},
 		ReadOnlyRootFilesystem: ptr.To(true),
@@ -321,14 +320,21 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
-
+	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
+	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	args := []string{
 		"-addresses", w.ConsulAddress,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-consul-dns-bind-addr=" + consulDNSBindAddress,
+		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-graceful-addr=" + consulDPBindAddress,
 	}
 
 	if w.SkipServerWatch {
@@ -390,6 +396,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	if mpi.serviceName != "" {
 		gracefulPort = gracefulPort + mpi.serviceIndex
 	}
+
 	args = append(args, fmt.Sprintf("-graceful-port=%d", gracefulPort))
 
 	enableProxyLifecycle, err := w.LifecycleConfig.EnableProxyLifecycle(pod)
@@ -446,7 +453,9 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+			addr := constants.Getv4orv6Str("127.0.0.1", "::1")
+			addr = net.JoinHostPort(addr, serviceMetricsPort)
+			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, serviceMetricsPath))
 		}
 
 		// Pull the TLS config from the relevant annotations.

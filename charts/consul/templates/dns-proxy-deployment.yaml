@@ -81,6 +81,23 @@ spec:
       containers:
         - name: dns-proxy
           image: {{ .Values.global.imageConsulDataplane | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            {{- if lt (int .Values.dns.proxy.port) 1024 }}
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+            {{- else }}
+            capabilities:
+              drop:
+                - ALL
+            {{- end }}
           volumeMounts:
             - mountPath: /consul/service
               name: consul-service
@@ -123,10 +140,22 @@ spec:
                   name: {{ .Values.dns.proxy.aclToken.secretName }}
                   key: {{ .Values.dns.proxy.aclToken.secretKey }}
       {{- end }}
+          {{- if lt (int .Values.dns.proxy.port) 1024 }}
+          command:
+            - privileged-consul-dataplane
+          {{- else }}
           command:
             - consul-dataplane
+          {{- end }}
           args:
+            {{- if lt (int .Values.dns.proxy.port) 1024 }}
+            - -envoy-executable-path=/usr/local/bin/privileged-envoy
+            {{- end }}
+            {{- if .Values.global.dualStack.enabled }}
+            - "-consul-dns-bind-addr=::"
+            {{- else }}
             - -consul-dns-bind-addr=0.0.0.0
+            {{- end}}
             - -consul-dns-bind-port={{ .Values.dns.proxy.port }}
         {{- if .Values.externalServers.enabled }}
             - -addresses={{ .Values.externalServers.hosts | first }}
