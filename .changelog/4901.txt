@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: The gateway controller now detects and responds to changes in deployment health probes
+```
