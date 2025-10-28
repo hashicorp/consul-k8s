@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/google/uuid"
 	capi "github.com/hashicorp/consul/api"
 	"golang.org/x/time/rate"
 	corev1 "k8s.io/api/core/v1"
@@ -112,9 +113,12 @@ type ConfigEntryController struct {
 // need to call back into their own update methods to ensure they update their
 // internal state.
 func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Controller, req ctrl.Request, configEntry common.ConfigEntryResource) (ctrl.Result, error) {
-	logger := crdCtrl.Logger(req.NamespacedName)
+	correlationID := uuid.NewString()
+	logger := crdCtrl.Logger(req.NamespacedName).WithValues("correlationID", correlationID)
+	logger.Info("starting reconcile for config entry", "name", req.Name, "namespace", req.Namespace)
 	err := crdCtrl.Get(ctx, req.NamespacedName, configEntry)
 	if k8serr.IsNotFound(err) {
+		logger.Info("kubernetes resource missing, skipping reconcile", "name", req.Name, "namespace", req.Namespace)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	} else if err != nil {
 		logger.Error(err, "retrieving resource")
@@ -133,6 +137,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		return ctrl.Result{}, err
 	}
 
+	logger.Info("generated consul representation", "consulKind", configEntry.ConsulKind(), "consulName", configEntry.ConsulName())
 	consulEntry := configEntry.ToConsul(r.DatacenterName)
 
 	if configEntry.GetDeletionTimestamp().IsZero() {
@@ -140,6 +145,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		// then let's add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
 		if !containsString(configEntry.GetFinalizers(), FinalizerName) {
+			logger.Info("adding finalizer", "finalizer", FinalizerName)
 			addPatch := crdCtrl.AddFinalizersPatch(configEntry, FinalizerName)
 			err := crdCtrl.Patch(ctx, configEntry, addPatch)
 			if err != nil {
@@ -150,6 +156,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			if err := r.syncUnknown(ctx, crdCtrl, configEntry); err != nil {
 				return ctrl.Result{}, err
 			}
+			logger.Info("finalizer added", "finalizer", FinalizerName)
 		}
 	} else {
 		// The object is being deleted
@@ -188,6 +195,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 
 		// Stop reconciliation as the item is being deleted
+		logger.Info("finished reconcile for config entry (deleted)", "name", req.Name, "namespace", req.Namespace)
 		return ctrl.Result{}, nil
 	}
 
@@ -212,6 +220,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 
 		// Create the config entry
+		logger.Info("creating config entry in consul", "kind", consulEntry.GetKind(), "name", consulEntry.GetName(), "namespace", consulEntry.GetNamespace(), "partition", consulEntry.GetPartition())
 		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 		if err != nil {
 			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -253,6 +262,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			r.nonMatchingMigrationError(configEntry, entryFromConsul))
 	case !matchesConsul:
 		logger.Info("config entry does not match consul", "modify-index", entryFromConsul.GetModifyIndex())
+		logger.Info("updating config entry in consul", "kind", consulEntry.GetKind(), "name", consulEntry.GetName(), "namespace", consulEntry.GetNamespace(), "partition", consulEntry.GetPartition())
 		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 		if err != nil {
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -265,6 +275,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		// matches the entry in Kubernetes. We just need to update the metadata
 		// of the entry in Consul to say that it's now managed by Kubernetes.
 		logger.Info("migrating config entry to be managed by Kubernetes")
+		logger.Info("updating config entry metadata for migration", "kind", consulEntry.GetKind(), "name", consulEntry.GetName(), "namespace", consulEntry.GetNamespace(), "partition", consulEntry.GetPartition())
 		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 		if err != nil {
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
@@ -285,6 +296,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 	}
 
+	logger.Info("finished reconcile for config entry", "name", req.Name, "namespace", req.Namespace)
 	return ctrl.Result{}, nil
 }
 
