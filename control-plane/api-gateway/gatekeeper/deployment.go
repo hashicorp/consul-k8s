@@ -173,18 +173,19 @@ func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) 
 		// Replace template
 		b.Spec.Template = a.Spec.Template
 
-		// Restore probe configurations from existing deployment
+		// Always preserve existing probe configurations (manual edits)
 		for i, container := range b.Spec.Template.Spec.Containers {
 			if existingContainer, exists := existingProbes[i]; exists {
+				// Always preserve existing readiness probe if it exists
 				if existingContainer.ReadinessProbe != nil {
 					container.ReadinessProbe = existingContainer.ReadinessProbe
 				}
-				if existingContainer.LivenessProbe != nil {
-					container.LivenessProbe = existingContainer.LivenessProbe
-				}
+
+				// Always preserve existing startup probe if it exists
 				if existingContainer.StartupProbe != nil {
 					container.StartupProbe = existingContainer.StartupProbe
 				}
+
 				b.Spec.Template.Spec.Containers[i] = container
 			}
 		}
@@ -243,15 +244,6 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 				return false
 			}
 		} else if (container.ReadinessProbe == nil) != (otherContainer.ReadinessProbe == nil) {
-			return false
-		}
-
-		// Compare liveness probe initialDelaySeconds
-		if container.LivenessProbe != nil && otherContainer.LivenessProbe != nil {
-			if container.LivenessProbe.InitialDelaySeconds != otherContainer.LivenessProbe.InitialDelaySeconds {
-				return false
-			}
-		} else if (container.LivenessProbe == nil) != (otherContainer.LivenessProbe == nil) {
 			return false
 		}
 
