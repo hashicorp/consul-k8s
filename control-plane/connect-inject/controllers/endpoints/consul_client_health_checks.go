@@ -4,8 +4,10 @@
 package endpoints
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-version"
@@ -91,7 +93,8 @@ func (r *Controller) consulClientCfgForNodeAgent(serverClient *api.Client, pod c
 	return ccCfg, nil
 }
 
-func (r *Controller) updateHealthCheckOnConsulClient(consulClientCfg *api.Config, pod corev1.Pod, endpoints corev1.Endpoints, status string) error {
+func (r *Controller) updateHealthCheckOnConsulClient(ctx context.Context, baseLogger logr.Logger, consulClientCfg *api.Config, pod corev1.Pod, endpoints corev1.Endpoints, status string) error {
+	logger := baseLogger.WithValues("pod", pod.Name, "podNamespace", pod.Namespace)
 	consulClient, err := consul.NewClient(consulClientCfg, r.ConsulClientConfig.APITimeout)
 	if err != nil {
 		return err
@@ -105,7 +108,7 @@ func (r *Controller) updateHealthCheckOnConsulClient(consulClientCfg *api.Config
 		return fmt.Errorf("more than one Kubernetes health check found")
 	}
 	if len(checks) == 0 {
-		r.Log.Info("detected no health checks to update", "name", endpoints.Name, "ns", endpoints.Namespace, "service-id", serviceID(pod, endpoints))
+		logger.Info("detected no health checks to update", "endpoint", endpoints.Name, "namespace", endpoints.Namespace, "serviceID", serviceID(pod, endpoints))
 		return nil
 	}
 	for checkID := range checks {
@@ -113,7 +116,7 @@ func (r *Controller) updateHealthCheckOnConsulClient(consulClientCfg *api.Config
 		if status == api.HealthCritical {
 			output = fmt.Sprintf(`Pod "%s/%s" is not ready`, pod.Namespace, pod.Name)
 		}
-		r.Log.Info("updating health check status", "name", endpoints.Name, "ns", endpoints.Namespace, "status", status)
+		logger.Info("updating health check status", "status", status)
 		err = consulClient.Agent().UpdateTTL(checkID, output, status)
 		if err != nil {
 			return err

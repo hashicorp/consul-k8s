@@ -161,7 +161,11 @@ func ConsulLogin(client *api.Client, params LoginParams, log hclog.Logger) (stri
 		return "", err
 	}
 
-	log.Info("Consul login complete")
+	if token != nil {
+		log.Info("Consul login complete", "authMethod", params.AuthMethod, "datacenter", params.Datacenter, "namespace", params.Namespace, "accessorID", token.AccessorID)
+	} else {
+		log.Info("Consul login complete", "authMethod", params.AuthMethod, "datacenter", params.Datacenter, "namespace", params.Namespace)
+	}
 
 	// A workaround to check that the ACL token is replicated to other Consul servers.
 	//
