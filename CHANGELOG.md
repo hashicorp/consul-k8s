@@ -19,6 +19,13 @@ IMPROVEMENTS:
 
 SECURITY:
 * go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/pull/4897)]
+* security: Added Alpine Linux CVE suppressions for container base images [[GH-4910](https://github.com/hashicorp/consul-k8s/pull/4910)]
+  - CVE-2024-58251: BusyBox null pointer dereference in busybox@1.37.0-r19
+  - CVE-2025-46394: BusyBox buffer overflow in busybox@1.37.0-r19  
+  - CVE-2025-47268: IP utilities memory corruption in iputils@20240905-r0
+  - CVE-2025-48964: IP utilities privilege escalation in iputils@20240905-r0
+  
+  These vulnerabilities affect Alpine Linux base image packages used in development and build containers only. They do not impact consul-k8s runtime security or production deployments.
 
 ## 1.9.0-rc2 (October 16, 2025)
 
