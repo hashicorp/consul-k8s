@@ -11,9 +11,13 @@ terraform {
 
 provider "aws" {
   region = var.region
-  assume_role {
-    role_arn = var.role_arn
-    duration = "2700s"
+  
+  dynamic "assume_role" {
+    for_each = var.role_arn != "" ? [1] : []
+    content {
+      role_arn = var.role_arn
+      duration = "2700s"
+    }
   }
 }
 
