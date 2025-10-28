@@ -45,3 +45,13 @@ variable "kubernetes_version_prefix" {
   default     = "1.32."
   description = "Kubernetes version supported on EKS"
 }
+
+variable "shared_network_name" {
+  type        = string
+  description = "Existing shared VPC network name"
+}
+
+variable "shared_subnet_name" {
+  type        = string
+  description = "Existing shared subnet name"
+}
