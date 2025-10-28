@@ -55,7 +55,7 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane --load
 
 .PHONY: control-plane-dev-skaffold
 # DANGER: this target is experimental and could be modified/removed at any time.
