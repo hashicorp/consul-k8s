@@ -42,13 +42,18 @@ module "vpc" {
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
-  cidr                 = format("10.%s.0.0/16", count.index)
-  azs                  = data.aws_availability_zones.available.names
-  private_subnets      = [format("10.%s.1.0/24", count.index), format("10.%s.2.0/24", count.index), format("10.%s.3.0/24", count.index)]
-  public_subnets       = [format("10.%s.4.0/24", count.index), format("10.%s.5.0/24", count.index), format("10.%s.6.0/24", count.index)]
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
+  cidr               = format("10.%s.0.0/16", count.index)
+  azs                = data.aws_availability_zones.available.names
+  private_subnets    = [format("10.%s.1.0/24", count.index), format("10.%s.2.0/24", count.index), format("10.%s.3.0/24", count.index)]
+  public_subnets     = [format("10.%s.4.0/24", count.index), format("10.%s.5.0/24", count.index), format("10.%s.6.0/24", count.index)]
+  enable_nat_gateway = true
+  single_nat_gateway = true
+
+  # Enable dual-stack (IPv4 + IPv6) support for acceptance tests
+  enable_ipv6                  = true
+  public_subnet_ipv6_prefixes  = [0, 1, 2]
+  private_subnet_ipv6_prefixes = [3, 4, 5]
+  enable_dns_hostnames         = true
 
   public_subnet_tags = {
     "kubernetes.io/cluster/consul-k8s-${random_id.suffix[count.index].dec}" = "shared"
