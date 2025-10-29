@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -143,43 +144,93 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		httpRoute      gwv1beta1.HTTPRoute
 	)
 
+	// hasStatusCondition checks if a condition exists with the expected status and reason
+	hasStatusCondition := func(conditions []metav1.Condition, toCheck metav1.Condition) bool {
+		for _, c := range conditions {
+			if c.Type == toCheck.Type {
+				return c.Reason == toCheck.Reason && c.Status == toCheck.Status
+			}
+		}
+		return false
+	}
+
 	// checkGatewayReady checks if the Gateway resource is ready using existing retry logic
 	checkGatewayReady := func() bool {
-		defer func() {
-			if r := recover(); r != nil {
-				// Gateway not ready, will return false
-				logger.Log(t, "Gateway not ready")
-			}
-		}()
-
+		var success bool
 		gatewayCounter := &retry.Counter{Count: 10, Wait: 6 * time.Second}
-		retry.RunWith(gatewayCounter, t, func(r *retry.R) {
+
+		// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails
+		for i := 0; i < gatewayCounter.Count; i++ {
 			var gateway gwv1beta1.Gateway
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
-			require.NoError(r, err)
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+			if err != nil {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: failed to get gateway: %v", i+1, err))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
 
-			//CHECK TO MAKE SURE EVERYTHING WAS SET UP CORRECTLY BEFORE RUNNING TESTS
-			require.Len(r, gateway.Finalizers, 1)
-			require.EqualValues(r, gatewayFinalizer, gateway.Finalizers[0])
+			// Check all conditions, if any fail we'll continue to next attempt
+			if len(gateway.Finalizers) != 1 {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: wrong number of finalizers", i+1))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
 
-			// check our statuses
-			checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
-			checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
-			require.Len(r, gateway.Status.Listeners, 2)
+			if gateway.Finalizers[0] != gatewayFinalizer {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: wrong finalizer", i+1))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
 
-			require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
-			checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
-			checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
-			checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			// Check status conditions
+			if !hasStatusCondition(gateway.Status.Conditions, trueCondition("Accepted", "Accepted")) ||
+				!hasStatusCondition(gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted")) {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: missing required status conditions", i+1))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
 
-			// check that we have an address to use
-			require.Len(r, gateway.Status.Addresses, 2)
-			// now we know we have an address, set it so we can use it
+			if len(gateway.Status.Listeners) != 2 {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: wrong number of listeners", i+1))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
+
+			if gateway.Status.Listeners[0].AttachedRoutes != 1 {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: wrong number of attached routes", i+1))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
+
+			// Check listener conditions
+			if !hasStatusCondition(gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted")) ||
+				!hasStatusCondition(gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts")) ||
+				!hasStatusCondition(gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs")) {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: missing required listener conditions", i+1))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
+
+			// Check that we have an address to use
+			if len(gateway.Status.Addresses) < 2 {
+				logger.Log(t, fmt.Sprintf("Gateway check attempt %d: not enough addresses", i+1))
+				time.Sleep(gatewayCounter.Wait)
+				continue
+			}
+
+			// All checks passed
 			gatewayAddress = gateway.Status.Addresses[0].Value
-		})
+			success = true
+			break
+		}
 
-		// If we reach here without panicking, the gateway is ready
-		return true
+		if success {
+			logger.Log(t, "Gateway check succeeded")
+		} else {
+			logger.Log(t, "Gateway check failed after all attempts")
+		}
+
+		return success
 	}
 
 	// waitForGatewayReady waits for Gateway to be ready with recreation attempts
@@ -221,33 +272,71 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 	// checkHTTPRouteReady checks if the HTTPRoute resource is ready using existing retry logic
 	checkHTTPRouteReady := func() bool {
-		defer func() {
-			if r := recover(); r != nil {
-				// HTTPRoute not ready, will return false
-				logger.Log(t, "HTTPRoute not ready")
-			}
-		}()
-
+		var success bool
 		httpRouteCounter := &retry.Counter{Count: 25, Wait: 2 * time.Second}
-		retry.RunWith(httpRouteCounter, t, func(r *retry.R) {
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
-			require.NoError(r, err)
 
-			// check our finalizers
-			require.Len(r, httpRoute.Finalizers, 1)
-			require.EqualValues(r, gatewayFinalizer, httpRoute.Finalizers[0])
+		// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails
+		for i := 0; i < httpRouteCounter.Count; i++ {
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
+			if err != nil {
+				logger.Log(t, fmt.Sprintf("HTTPRoute check attempt %d: failed to get httproute: %v", i+1, err))
+				time.Sleep(httpRouteCounter.Wait)
+				continue
+			}
 
-			// check parent status
-			require.Len(r, httpRoute.Status.Parents, 1)
-			require.EqualValues(r, gatewayClassControllerName, httpRoute.Status.Parents[0].ControllerName)
-			require.EqualValues(r, "gateway", httpRoute.Status.Parents[0].ParentRef.Name)
-			checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-			checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-			checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
-		})
+			// Check all conditions, if any fail we'll continue to next attempt
+			if len(httpRoute.Finalizers) != 1 {
+				logger.Log(t, fmt.Sprintf("HTTPRoute check attempt %d: wrong number of finalizers", i+1))
+				time.Sleep(httpRouteCounter.Wait)
+				continue
+			}
 
-		// If we reach here without panicking, the HTTPRoute is ready
-		return true
+			if httpRoute.Finalizers[0] != gatewayFinalizer {
+				logger.Log(t, fmt.Sprintf("HTTPRoute check attempt %d: wrong finalizer", i+1))
+				time.Sleep(httpRouteCounter.Wait)
+				continue
+			}
+
+			// Check parent status
+			if len(httpRoute.Status.Parents) != 1 {
+				logger.Log(t, fmt.Sprintf("HTTPRoute check attempt %d: wrong number of parents", i+1))
+				time.Sleep(httpRouteCounter.Wait)
+				continue
+			}
+
+			if string(httpRoute.Status.Parents[0].ControllerName) != gatewayClassControllerName {
+				logger.Log(t, fmt.Sprintf("HTTPRoute check attempt %d: wrong controller name", i+1))
+				time.Sleep(httpRouteCounter.Wait)
+				continue
+			}
+
+			if string(httpRoute.Status.Parents[0].ParentRef.Name) != "gateway" {
+				logger.Log(t, fmt.Sprintf("HTTPRoute check attempt %d: wrong parent ref name", i+1))
+				time.Sleep(httpRouteCounter.Wait)
+				continue
+			}
+
+			// Check parent conditions
+			if !hasStatusCondition(httpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted")) ||
+				!hasStatusCondition(httpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs")) ||
+				!hasStatusCondition(httpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted")) {
+				logger.Log(t, fmt.Sprintf("HTTPRoute check attempt %d: missing required parent conditions", i+1))
+				time.Sleep(httpRouteCounter.Wait)
+				continue
+			}
+
+			// All checks passed
+			success = true
+			break
+		}
+
+		if success {
+			logger.Log(t, "HTTPRoute check succeeded")
+		} else {
+			logger.Log(t, "HTTPRoute check failed after all attempts")
+		}
+
+		return success
 	}
 
 	// waitForHTTPRouteReady waits for HTTPRoute to be ready with recreation attempts
