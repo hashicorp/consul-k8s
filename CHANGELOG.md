@@ -25,14 +25,20 @@ SECURITY:
 FEATURES:
 
 * api-gateway: Added boolean annotation "consul.hashicorp.com/enable-consul-dataplane-as-sidecar" for registering consul-dataplane as init container so that consul-dataplane container is initialised and started before application container. Default value is "false" i.e the feature is disabled by default. Also made the probe properties configurable through annotations. [[GH-4678](https://github.com/hashicorp/consul-k8s/issues/4678)]
+* control-plane: Added support to sync multiple ports of a service from k8s to consul. [[GH-4778](https://github.com/hashicorp/consul-k8s/issues/4778)]
+* helm: add dual stack flag for IPv6 support. [[GH-4776](https://github.com/hashicorp/consul-k8s/issues/4776)]
+* ipv6: Addition of ipv6 changes for consul-k8s connect inject and cni [[GH-4779](https://github.com/hashicorp/consul-k8s/issues/4779)]
 
 IMPROVEMENTS:
 
+* consul-dataplane: now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used. [[GH-4745](https://github.com/hashicorp/consul-k8s/issues/4745)]
+* cni: fixed race conditions with older versions where no cleanup was done for binary. cleanup of cni binary on previous pod deletion to improve security posture [[GH-4757](https://github.com/hashicorp/consul-k8s/issues/4757)]
 * control-plane: updated endpoints controller to use podIP from endpoint object [[GH-4809](https://github.com/hashicorp/consul-k8s/issues/4809)]
 * updated consul image version to 1.22.0-dev [[GH-4792](https://github.com/hashicorp/consul-k8s/issues/4792)]
 
 BUG FIXES:
 
+* api-gateway: Fixed an issue where the gateway controller failed to detect annotation changes in deployments triggered by rollout restarts, preventing restarts from completing successfully. [[GH-4767](https://github.com/hashicorp/consul-k8s/issues/4767)]
 * control-plane: fix duplicate health check registrations for API Gateways and Mesh Gateways when node assignment is delayed [[GH-4715](https://github.com/hashicorp/consul-k8s/issues/4715)]
 
 SECURITY:
