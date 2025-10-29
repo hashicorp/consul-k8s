@@ -34,7 +34,6 @@ data "google_container_engine_versions" "main" {
 # SHARED NETWORK & SUBNET SECTION
 # ---------------------------------------------------------------------------
 
-# Shared VPC network (created once, reused by all clusters)
 resource "google_compute_network" "shared_network" {
   name                    = "shared-network-${random_string.cluster_prefix.result}"
   auto_create_subnetworks = false
@@ -45,7 +44,6 @@ resource "google_compute_network" "shared_network" {
   }
 }
 
-# Shared subnet (single subnet reused across clusters)
 resource "google_compute_subnetwork" "shared_subnet" {
   name          = "shared-subnet-${random_string.cluster_prefix.result}"
   ip_cidr_range = "10.0.0.0/16"
@@ -58,8 +56,8 @@ resource "google_compute_subnetwork" "shared_subnet" {
 # ---------------------------------------------------------------------------
 
 resource "google_container_cluster" "cluster" {
-  provider = google
   count    = var.cluster_count
+  provider = google
 
   name               = "consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"
   project            = var.project
@@ -68,11 +66,11 @@ resource "google_container_cluster" "cluster" {
   min_master_version = data.google_container_engine_versions.main.latest_master_version
   node_version       = data.google_container_engine_versions.main.latest_master_version
 
-  network    = data.google_compute_network.shared_network.self_link
-  subnetwork = data.google_compute_subnetwork.shared_subnet.self_link
+  network    = google_compute_network.shared_network.self_link
+  subnetwork = google_compute_subnetwork.shared_subnet.self_link
 
   node_config {
-    tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
+    tags         = ["shared-firewall-${random_string.cluster_prefix.result}"]
     machine_type = "e2-standard-8"
   }
 
@@ -95,7 +93,7 @@ resource "google_compute_firewall" "shared_firewall" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = [for idx in range(var.cluster_count) : "cluster-${random_string.cluster_prefix.result}-${idx}"]
+  target_tags   = ["shared-firewall-${random_string.cluster_prefix.result}"]
 }
 
 # ---------------------------------------------------------------------------

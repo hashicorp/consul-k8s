@@ -35,23 +35,7 @@ variable "labels" {
   description = "Labels to attach to the created resources."
 }
 
-variable "subnet" {
-  type        = string
-  default     = "default"
-  description = "Subnet to create the cluster in. Currently all clusters use the default subnet and we are running out of IPs"
-}
-
 variable "kubernetes_version_prefix" {
   default     = "1.32."
   description = "Kubernetes version supported on EKS"
-}
-
-variable "shared_network_name" {
-  type        = string
-  description = "Existing shared VPC network name"
-}
-
-variable "shared_subnet_name" {
-  type        = string
-  description = "Existing shared subnet name"
 }
