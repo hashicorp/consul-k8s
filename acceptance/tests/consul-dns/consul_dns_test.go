@@ -6,7 +6,9 @@ package consuldns
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +17,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -45,12 +48,18 @@ func TestConsulDNS(t *testing.T) {
 		enableDNSProxy       bool
 		aclsEnabled          bool
 		manageSystemACLs     bool
+		port                 string
 	}{
-		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false},
-		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: true},
-		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: false},
-		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true},
-		{tlsEnabled: true, connectInjectEnabled: false, aclsEnabled: true, manageSystemACLs: false, enableDNSProxy: true},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false, port: privilegedPort},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: true, port: privilegedPort},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: false, port: privilegedPort},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true, port: privilegedPort},
+		{tlsEnabled: true, connectInjectEnabled: false, aclsEnabled: true, manageSystemACLs: false, enableDNSProxy: true, port: privilegedPort},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false, port: nonPrivilegedPort},
+		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: true, port: nonPrivilegedPort},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: false, port: nonPrivilegedPort},
+		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true, port: nonPrivilegedPort},
+		{tlsEnabled: true, connectInjectEnabled: false, aclsEnabled: true, manageSystemACLs: false, enableDNSProxy: true, port: nonPrivilegedPort},
 	}
 
 	for _, c := range cases {
@@ -68,9 +77,8 @@ func TestConsulDNS(t *testing.T) {
 				"global.logLevel":              "debug",
 			}
 
-			// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
 			if c.enableDNSProxy {
-				helmValues["dns.proxy.port"] = "8053"
+				helmValues["dns.proxy.port"] = c.port
 			}
 
 			// If ACLs are enabled and we are not managing system ACLs, we need to
@@ -137,8 +145,12 @@ func TestConsulDNS(t *testing.T) {
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
 
-			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy)
-			verifyDNS(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
+			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy, c.port)
+			// Validate DNS proxy privileged port configuration when DNS proxy is enabled
+			if c.enableDNSProxy && c.port == privilegedPort {
+				validateDNSProxyPrivilegedPort(t, ctx, releaseName)
+			}
+			verifyDNS(t, cfg, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
 	}
@@ -171,8 +183,8 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 	return err, dnsProxyToken
 }
 
-func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
-	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, "coredns-custom.yaml")
+func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
+	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, port, "coredns-custom.yaml")
 	updateCoreDNS(t, ctx, "coredns-custom.yaml")
 
 	t.Cleanup(func() {
@@ -182,14 +194,13 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
 }
 
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
-	enableDNSProxy bool, dnsFileName string) {
+	enableDNSProxy bool, port string, dnsFileName string) {
 	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
-	// If we're using the DNS proxy, we need to use port 8053 (non-privileged) in K8s 1.30+
 	dnsTarget := dnsIP
 	if enableDNSProxy {
-		dnsTarget = fmt.Sprintf("%s:8053", dnsIP)
+		dnsTarget = net.JoinHostPort(dnsIP, port)
 	}
 
 	input, err := os.ReadFile("coredns-template.yaml")
@@ -221,7 +232,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 
-func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
+func verifyDNS(t *testing.T, cfg *config.TestConfig, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
 	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
 	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: podLabelSelector,
@@ -294,4 +305,73 @@ func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext,
 	dnsService, err := requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
 	require.NoError(t, err)
 	return dnsService.Spec.ClusterIP, err
+}
+
+// validateDNSProxyPrivilegedPort validates that the consul-dns-proxy pod is correctly configured
+// to use privileged port with appropriate command and envoy arguments.
+func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string) {
+	logger.Log(t, "validating DNS proxy pod uses privileged port", privilegedPort)
+
+	var pod corev1.Pod
+
+	// Wait for DNS proxy pod to be created and ready with retry
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("app=consul,component=dns-proxy,release=%s", releaseName),
+		})
+		require.NoError(r, err)
+		require.NotEmpty(r, pods.Items, "DNS proxy pod should exist")
+
+		pod = pods.Items[0]
+		require.Equal(r, corev1.PodRunning, pod.Status.Phase, "DNS proxy pod should be running")
+	})
+
+	logger.Log(t, "found DNS proxy pod", "name", pod.Name)
+
+	// Find the consul-dns-proxy container
+	var dnsProxyContainer *corev1.Container
+	for i, container := range pod.Spec.Containers {
+		if container.Name == "dns-proxy" {
+			dnsProxyContainer = &pod.Spec.Containers[i]
+			break
+		}
+	}
+	require.NotNil(t, dnsProxyContainer, "dns-proxy container should exist")
+
+	// Validate command arguments include privilegedPort
+	commandArgs := strings.Join(dnsProxyContainer.Args, " ")
+	require.Contains(t, commandArgs, fmt.Sprintf("-consul-dns-bind-port=%s", privilegedPort), fmt.Sprintf("DNS proxy command should include -consul-dns-bind-port=%s argument", privilegedPort))
+	logger.Log(t, "validated DNS proxy command includes -consul-dns-bind-port=", privilegedPort, "args", commandArgs)
+
+	// Validate privileged-envoy executable is used
+	require.Contains(t, commandArgs, "-envoy-executable-path=/usr/local/bin/privileged-envoy", "Envoy should have admin port configured")
+	logger.Log(t, "validated envoy configuration in DNS proxy")
+
+	logger.Log(t, "successfully validated DNS proxy privileged port", privilegedPort)
+
+	// Validate privileged port is configured
+	var foundPrivilegedPort bool
+	privilegedPortInt, _ := strconv.Atoi(privilegedPort)
+	for _, port := range dnsProxyContainer.Ports {
+		if port.ContainerPort == int32(privilegedPortInt) {
+			foundPrivilegedPort = true
+			require.Contains(t, port.Name, "dns")
+			logger.Log(t, "validated DNS proxy uses port", privilegedPort, "port", port.ContainerPort, "name", port.Name)
+			break
+		}
+	}
+	require.True(t, foundPrivilegedPort, fmt.Sprintf("DNS proxy container should expose port %s", privilegedPort))
+
+	// Validate security context has privileged capabilities
+	require.NotNil(t, dnsProxyContainer.SecurityContext, "DNS proxy container should have security context")
+	require.NotNil(t, dnsProxyContainer.SecurityContext.Capabilities, "DNS proxy container should have capabilities configured")
+	require.NotNil(t, dnsProxyContainer.SecurityContext.Capabilities.Add, "DNS proxy container should have added capabilities")
+
+	// Check for NET_BIND_SERVICE capability (required for privileged ports)
+	var hasNetBindService bool
+	if slices.Contains(dnsProxyContainer.SecurityContext.Capabilities.Add, "NET_BIND_SERVICE") {
+		hasNetBindService = true
+		logger.Log(t, "validated DNS proxy has NET_BIND_SERVICE capability")
+	}
+	require.True(t, hasNetBindService, "DNS proxy container should have NET_BIND_SERVICE capability for privileged port")
 }
