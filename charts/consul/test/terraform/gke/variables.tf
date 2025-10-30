@@ -29,6 +29,12 @@ variable "cluster_count" {
   }
 }
 
+variable "subnet" {
+  type        = string
+  default     = "default"
+  description = "Legacy variable (unused) to maintain backward compatibility."
+}
+
 variable "labels" {
   type        = map(any)
   default     = {}
