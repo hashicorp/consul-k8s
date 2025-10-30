@@ -98,6 +98,10 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 	})
 
+	// Wait for the httproute to be created before patching
+	logger.Log(t, "waiting for httproute to be created")
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=jsonpath='{.metadata.name}'=http-route", "httproute", "http-route", "--timeout=60s")
+
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
 

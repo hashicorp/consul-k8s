@@ -313,6 +313,10 @@ func TestPeering_Gateway(t *testing.T) {
 		k8s.KubectlDeleteK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
 	})
 
+	// Wait for the httproute to be created before patching
+	logger.Log(t, "waiting for httproute to be created")
+	k8s.RunKubectl(t, staticClientOpts, "wait", "--for=jsonpath='{.metadata.name}'=http-route", "httproute", "http-route", "--timeout=60s")
+
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
