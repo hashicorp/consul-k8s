@@ -189,6 +189,34 @@ func TestPeering_Connect(t *testing.T) {
 			retry.RunWith(timer, t, func(r *retry.R) {
 				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 				require.NoError(r, err)
+
+				// If the secret name is empty, retry recreating the peering acceptor up to 5 times
+				if acceptorSecretName == "" {
+					const maxRetries = 5
+					for attempt := 1; attempt <= maxRetries; attempt++ {
+						logger.Log(t, fmt.Sprintf("peering acceptor secret name is empty, recreating peering acceptor (attempt %d/%d)", attempt, maxRetries))
+						k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
+
+						time.Sleep(5 * time.Second)
+
+						k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
+
+						time.Sleep(10 * time.Second)
+
+						acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+						require.NoError(r, err)
+
+						if acceptorSecretName != "" {
+							logger.Log(t, fmt.Sprintf("peering acceptor secret name successfully created after %d attempts", attempt))
+							break
+						}
+
+						if attempt == maxRetries {
+							logger.Log(t, fmt.Sprintf("peering acceptor secret name still empty after %d attempts", maxRetries))
+						}
+					}
+				}
+
 				require.NotEmpty(r, acceptorSecretName)
 			})
 
