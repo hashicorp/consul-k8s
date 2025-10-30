@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -96,6 +97,14 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
+	})
+
+	// Wait for the httproute to exist before patching
+	logger.Log(t, "waiting for httproute to be created")
+	routeCounter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+	retry.RunWith(routeCounter, t, func(r *retry.R) {
+		_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "httproute", "http-route")
+		require.NoError(r, err, "httproute http-route does not exist yet")
 	})
 
 	logger.Log(t, "patching route to target server")

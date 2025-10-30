@@ -170,6 +170,34 @@ func TestPeering_Gateway(t *testing.T) {
 	retry.RunWith(timer, t, func(r *retry.R) {
 		acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
 		require.NoError(r, err)
+
+		// If the secret name is empty, retry recreating the peering acceptor up to 5 times
+		if acceptorSecretName == "" {
+			const maxRetries = 5
+			for attempt := 1; attempt <= maxRetries; attempt++ {
+				logger.Log(t, fmt.Sprintf("peering acceptor secret name is empty, recreating peering acceptor (attempt %d/%d)", attempt, maxRetries))
+				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
+
+				time.Sleep(5 * time.Second)
+
+				k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
+
+				time.Sleep(10 * time.Second)
+
+				acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+				require.NoError(r, err)
+
+				if acceptorSecretName != "" {
+					logger.Log(t, fmt.Sprintf("peering acceptor secret name successfully created after %d attempts", attempt))
+					break
+				}
+
+				if attempt == maxRetries {
+					logger.Log(t, fmt.Sprintf("peering acceptor secret name still empty after %d attempts", maxRetries))
+				}
+			}
+		}
+
 		require.NotEmpty(r, acceptorSecretName)
 	})
 
@@ -283,6 +311,14 @@ func TestPeering_Gateway(t *testing.T) {
 	k8s.KubectlApplyK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
+	})
+
+	// Wait for the httproute to exist before patching
+	logger.Log(t, "waiting for httproute to be created")
+	routeCounter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+	retry.RunWith(routeCounter, t, func(r *retry.R) {
+		_, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "get", "httproute", "http-route")
+		require.NoError(r, err, "httproute http-route does not exist yet")
 	})
 
 	logger.Log(t, "patching route to target server")

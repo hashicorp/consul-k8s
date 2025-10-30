@@ -156,6 +156,10 @@ func TestWANFederation_Gateway(t *testing.T) {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc1-to-dc2-resolver")
 		})
 
+		// Wait for the httproute to be created before patching
+		logger.Log(t, "waiting for httproute to be created")
+		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "wait", "--for=jsonpath='{.metadata.name}'=http-route", "httproute", "http-route", "--timeout=60s")
+
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
 		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
@@ -181,6 +185,14 @@ func TestWANFederation_Gateway(t *testing.T) {
 		k8s.KubectlApplyK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc2-to-dc1-resolver")
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc2-to-dc1-resolver")
+		})
+
+		// Wait for the httproute to exist before patching
+		logger.Log(t, "waiting for httproute to be created")
+		routeCounter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+		retry.RunWith(routeCounter, t, func(r *retry.R) {
+			_, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "get", "httproute", "http-route")
+			require.NoError(r, err, "httproute http-route does not exist yet")
 		})
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this

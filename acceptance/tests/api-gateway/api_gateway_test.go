@@ -155,6 +155,14 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "creating static-client pod")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
+			// Wait for the httproute to exist before patching
+			logger.Log(t, "waiting for httproute to be created")
+			routeCounter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+			retry.RunWith(routeCounter, t, func(r *retry.R) {
+				_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "httproute", "http-route")
+				require.NoError(r, err, "httproute http-route does not exist yet")
+			})
+
 			logger.Log(t, "patching route to target http server")
 			// Use retries to handle intermittent failures when patching the httproute
 			retry.Run(t, func(r *retry.R) {
@@ -405,6 +413,17 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth")
 	})
 
+	// Wait for all the httproutes to be created immediately after applying the main resources
+	logger.Log(t, "waiting for httproutes to be created")
+	routeNames := []string{"http-route", "http-route-auth", "http-route-no-auth-on-auth-listener", "http-route2-auth", "http-route-auth-invalid"}
+	routeCounter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+	for _, routeName := range routeNames {
+		retry.RunWith(routeCounter, t, func(r *retry.R) {
+			_, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "get", "httproute", routeName)
+			require.NoError(r, err, "httproute %s should exist", routeName)
+		})
+	}
+
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -444,6 +463,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
+
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
 	k8sClient := ctx.ControllerRuntimeClient(t)
