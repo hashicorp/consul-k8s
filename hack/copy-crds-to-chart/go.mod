@@ -1,3 +1,3 @@
 module github.com/hashicorp/consul-k8s/hack/copy-crds-to-chart
 
-go 1.24.5
+go 1.25.3
