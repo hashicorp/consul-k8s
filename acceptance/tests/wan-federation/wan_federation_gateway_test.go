@@ -156,6 +156,10 @@ func TestWANFederation_Gateway(t *testing.T) {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc1-to-dc2-resolver")
 		})
 
+		// Wait for the httproute to be created before patching
+		logger.Log(t, "waiting for httproute to be created")
+		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "wait", "--for=jsonpath='{.metadata.name}'=http-route", "httproute", "http-route", "--timeout=60s")
+
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
 		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
@@ -182,6 +186,10 @@ func TestWANFederation_Gateway(t *testing.T) {
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc2-to-dc1-resolver")
 		})
+
+		// Wait for the httproute to be created before patching
+		logger.Log(t, "waiting for httproute to be created")
+		k8s.RunKubectl(t, secondaryContext.KubectlOptions(t), "wait", "--for=jsonpath='{.metadata.name}'=http-route", "httproute", "http-route", "--timeout=60s")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.

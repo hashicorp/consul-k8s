@@ -5,6 +5,7 @@
 - {runner: 0, test-packages: "api-gateway"}
 - {runner: 1, test-packages: "peering"}
 - {runner: 2, test-packages: "sameness"}
+- {runner: 3, test-packages: "wan-federation"}
 # - {runner: 0, test-packages: "partitions"}
 # - {runner: 1, test-packages: "peering"}
 # - {runner: 2, test-packages: "sameness"}
