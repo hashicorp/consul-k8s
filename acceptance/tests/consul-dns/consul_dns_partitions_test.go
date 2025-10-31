@@ -27,6 +27,7 @@ const staticServerNamespace = "ns1"
 type dnsWithPartitionsTestCase struct {
 	name   string
 	secure bool
+	port   string
 }
 
 type dnsVerification struct {
@@ -41,6 +42,8 @@ type dnsVerification struct {
 const defaultPartition = "default"
 const secondaryPartition = "secondary"
 const defaultNamespace = "default"
+const privilegedPort = "53"
+const nonPrivilegedPort = "8053"
 
 // TestConsulDNSProxy_WithPartitionsAndCatalogSync verifies DNS queries for services across partitions
 // when DNS proxy is enabled. It configures CoreDNS to use configure consul domain queries to
@@ -63,10 +66,22 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 		{
 			name:   "not secure - ACLs and auto-encrypt not enabled",
 			secure: false,
+			port:   privilegedPort,
 		},
 		{
 			name:   "secure - ACLs and auto-encrypt enabled",
 			secure: true,
+			port:   privilegedPort,
+		},
+		{
+			name:   "not secure - ACLs and auto-encrypt not enabled",
+			secure: false,
+			port:   nonPrivilegedPort,
+		},
+		{
+			name:   "secure - ACLs and auto-encrypt enabled",
+			secure: true,
+			port:   nonPrivilegedPort,
 		},
 	}
 
@@ -78,12 +93,17 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 			// Setup the clusters and the static service.
 			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
 				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
-				defaultPartition)
+				defaultPartition, c.port)
 
 			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
-			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
-			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true)
+			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true, c.port)
+			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true, c.port)
 
+			if c.port == privilegedPort {
+				// Validate DNS proxy privileged port configuration.
+				validateDNSProxyPrivilegedPort(t, defaultClusterContext, releaseName)
+				validateDNSProxyPrivilegedPort(t, secondaryClusterContext, releaseName)
+			}
 			podLabelSelector := "app=static-server"
 			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
 			dnsUtilsPodIndex := 0
@@ -100,7 +120,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 
 			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
 			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
-				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster) {
+				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster, c.port) {
 				t.Run(v.name, func(t *testing.T) {
 					if v.preProcessingFunc != nil {
 						v.preProcessingFunc(t)
@@ -115,7 +135,7 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 }
 
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
-	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, releaseName string, defaultConsulCluster *consul.HelmCluster) []dnsVerification {
+	shouldResolveUnexportedCrossPartitionDNSRecord bool, cfg *config.TestConfig, releaseName string, defaultConsulCluster *consul.HelmCluster, port string) []dnsVerification {
 	serviceRequestWithNoPartition := fmt.Sprintf("%s.service.consul", staticServerName)
 	serviceRequestInDefaultPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, defaultPartition)
 	serviceRequestInSecondaryPartition := fmt.Sprintf("%s.service.%s.ap.consul", staticServerName, secondaryPartition)
@@ -224,7 +244,7 @@ func getVerifications(defaultClusterContext environment.TestContext, secondaryCl
 			shouldResolveDNS: true,
 			preProcessingFunc: func(t *testing.T) {
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "false"})
-				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, false)
+				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, false, port)
 				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
@@ -239,7 +259,7 @@ func getVerifications(defaultClusterContext environment.TestContext, secondaryCl
 			shouldResolveDNS: true,
 			preProcessingFunc: func(t *testing.T) {
 				defaultConsulCluster.Upgrade(t, map[string]string{"dns.proxy.enabled": "true"})
-				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true)
+				updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true, port)
 				k8s.KubectlApplyK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, secondaryClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default")
@@ -274,7 +294,7 @@ func verifyServiceInCatalog(t *testing.T, consulClient *api.Client, queryOpts *a
 
 func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, defaultClusterContext environment.TestContext,
 	secondaryClusterContext environment.TestContext, c dnsWithPartitionsTestCase, secondaryPartition string,
-	defaultPartition string) (string, *api.Client, *api.QueryOptions, *api.QueryOptions, *consul.HelmCluster) {
+	defaultPartition string, port string) (string, *api.Client, *api.QueryOptions, *api.QueryOptions, *consul.HelmCluster) {
 	commonHelmValues := map[string]string{
 		"global.adminPartitions.enabled": "true",
 		"global.enableConsulNamespaces":  "true",
@@ -294,8 +314,7 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 		"dns.proxy.enabled":     "true",
 		"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 
-		// Configure DNS proxy to use a non-privileged port to work with K8s 1.30+
-		"dns.proxy.port": "8053",
+		"dns.proxy.port": port,
 	}
 
 	serverHelmValues := map[string]string{
