@@ -1,3 +1,73 @@
+## 1.9.0 (October 27, 2025)
+
+> **NOTE**: Consul K8s 1.9.x is compatible with Consul 1.22.x and Consul Dataplane 1.9.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+**RELEASE HIGHLIGHTS:**
+* **Enhanced IPv6 Support**: Improved CNI kubeconfig generation with better Kubernetes API server URL handling for IPv6 environments
+* **Updated Dependencies**: All Consul submodules updated to their latest GA versions for improved stability and compatibility
+* **Security Improvements**: Go runtime upgraded to 1.25.3 with latest security patches
+
+BUG FIXES:
+* control-plane: Enhanced IPv6 support in CNI kubeconfig generation for better Kubernetes API server URL handling [[GH-4897](https://github.com/hashicorp/consul-k8s/pull/4897)]
+
+IMPROVEMENTS:
+* deps: update consul/api to v1.33.0  
+* deps: update consul/sdk to v0.17.0  
+* deps: update consul/proto-public to v0.7.0  
+* deps: update consul/envoyextensions to v0.9.0  
+* deps: update consul/troubleshoot to v0.8.0   
+
+SECURITY:
+* go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/pull/4897)]
+
+## 1.9.0-rc2 (October 16, 2025)
+
+FEATURES:
+
+* api-gateway: Added boolean annotation "consul.hashicorp.com/enable-consul-dataplane-as-sidecar" for registering consul-dataplane as init container so that consul-dataplane container is initialised and started before application container. Default value is "false" i.e the feature is disabled by default. Also made the probe properties configurable through annotations. [[GH-4678](https://github.com/hashicorp/consul-k8s/issues/4678)]
+* control-plane: Added support to sync multiple ports of a service from k8s to consul. [[GH-4778](https://github.com/hashicorp/consul-k8s/issues/4778)]
+* helm: add dual stack flag for IPv6 support. [[GH-4776](https://github.com/hashicorp/consul-k8s/issues/4776)]
+* ipv6: Addition of ipv6 changes for consul-k8s connect inject and cni [[GH-4779](https://github.com/hashicorp/consul-k8s/issues/4779)]
+
+IMPROVEMENTS:
+
+* consul-dataplane: now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used. [[GH-4745](https://github.com/hashicorp/consul-k8s/issues/4745)]
+* cni: fixed race conditions with older versions where no cleanup was done for binary. cleanup of cni binary on previous pod deletion to improve security posture [[GH-4757](https://github.com/hashicorp/consul-k8s/issues/4757)]
+* control-plane: updated endpoints controller to use podIP from endpoint object [[GH-4809](https://github.com/hashicorp/consul-k8s/issues/4809)]
+* updated consul image version to 1.22.0-dev [[GH-4792](https://github.com/hashicorp/consul-k8s/issues/4792)]
+
+BUG FIXES:
+
+* api-gateway: Fixed an issue where the gateway controller failed to detect annotation changes in deployments triggered by rollout restarts, preventing restarts from completing successfully. [[GH-4767](https://github.com/hashicorp/consul-k8s/issues/4767)]
+* control-plane: fix duplicate health check registrations for API Gateways and Mesh Gateways when node assignment is delayed [[GH-4715](https://github.com/hashicorp/consul-k8s/issues/4715)]
+
+SECURITY:
+
+* cve: upgrade helm.sh/helm/v3 to v3.18.5 to fix CVE-2025-55198, CVE-2025-55199 [[GH-4696](https://github.com/hashicorp/consul-k8s/issues/4696)]
+* go: upgrade go version to 1.25.1 [[GH-4762](https://github.com/hashicorp/consul-k8s/issues/4762)]
+* security: Updated AWS SDK dependencies and added CVE suppressions. Upgraded github.com/aws/aws-sdk-go from v1.38.63 to v1.55.8 in hack/aws-acceptance-test-cleanup utilities and suppressed CVEs: [GO-2022-0635](https://pkg.go.dev/vuln/GO-2022-0635) (AWS S3 Crypto SDK - in-band key negotiation issue) [GO-2022-0646](https://pkg.go.dev/vuln/GO-2022-0646) (AWS S3 Crypto SDK - CBC padding oracle issue). These vulnerabilities affect only test cleanup utilities in unused S3 crypto components. They do not impact production consul-k8s deployments. [[GH-4870](https://github.com/hashicorp/consul-k8s/issues/4870)]
+
+## 1.9.0-rc1 (October 5, 2025)
+
+> NOTE: Consul K8s 1.9.x is compatible with Consul 1.22.x and Consul Dataplane 1.9.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+FEATURES:
+
+* control-plane: Added support to sync multiple ports of a service from k8s to consul. [[GH-4778](https://github.com/hashicorp/consul-k8s/issues/4778)]
+* helm: add dual stack flag for IPv6 support. [[GH-4776](https://github.com/hashicorp/consul-k8s/issues/4776)]
+* ipv6: Addition of ipv6 changes for consul-k8s connect inject and cni [[GH-4779](https://github.com/hashicorp/consul-k8s/issues/4779)]
+
+IMPROVEMENTS:
+
+* Consul-dataplane now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used. [[GH-4745](https://github.com/hashicorp/consul-k8s/issues/4745)]
+* cni: fixed race conditions with older versions where no cleanup was done for binary
+cni: cleanup of cni binary on previous pod deletion to improve security posture [[GH-4757](https://github.com/hashicorp/consul-k8s/issues/4757)]
+
+BUG FIXES:
+
+* api-gateway: Fixed an issue where the gateway controller failed to detect annotation changes in deployments triggered by rollout restarts, preventing restarts from completing successfully. [[GH-4767](https://github.com/hashicorp/consul-k8s/issues/4767)]
+
 ## 1.8.1 (August 20, 2025)
 
 SECURITY:
