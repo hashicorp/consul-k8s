@@ -315,31 +315,43 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
 	logger.Log(t, "waiting for httproute to be created")
-	for attempt := 1; attempt <= 3; attempt++ {
-		logger.Log(t, "httproute existence check attempt %d/3", attempt)
-		found := false
-		shortCounter := &retry.Counter{Count: 5, Wait: 2 * time.Second} // 10 seconds total
-		retry.RunWith(shortCounter, t, func(r *retry.R) {
-			_, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "httproute", "http-route")
+	found := false
+	maxAttempts := 3
+	checksPerAttempt := 5
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		logger.Log(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
+
+		// Check for httproute existence using simple loop (like kitchen sink test)
+		for i := range checksPerAttempt {
+			_, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "get", "httproute", "http-route")
 			if err == nil {
 				found = true
+				logger.Log(t, "httproute http-route found successfully")
+				break
 			}
-			require.NoError(r, err, "httproute http-route does not exist yet")
-		})
-		
+			logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
+			time.Sleep(2 * time.Second)
+		}
+
 		if found {
-			logger.Log(t, "httproute http-route found successfully")
 			break
 		}
-		
-		if attempt < 3 {
-			logger.Log(t, "httproute not found after 10s, attempting delete/recreate (attempt %d/3)", attempt)
+
+		if attempt < maxAttempts {
+			logger.Log(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
 			// Delete the httproute if it exists in a bad state
 			k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "httproute", "http-route", "--ignore-not-found=true")
 			// Recreate by reapplying the base resources
 			out, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 			require.NoError(t, err, out)
+			// Brief pause to let the recreation start
+			time.Sleep(2 * time.Second)
 		}
+	}
+
+	if !found {
+		require.Fail(t, "httproute http-route was not found after 3 attempts with delete/recreate")
 	}
 
 	logger.Log(t, "patching route to target server")
