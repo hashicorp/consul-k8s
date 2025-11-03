@@ -17,7 +17,6 @@ import (
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -150,7 +149,7 @@ func TestConsulDNS(t *testing.T) {
 			if c.enableDNSProxy && c.port == privilegedPort {
 				validateDNSProxyPrivilegedPort(t, ctx, releaseName)
 			}
-			verifyDNS(t, cfg, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
+			verifyDNS(t, releaseName, ctx.KubectlOptions(t).Namespace, ctx, ctx, "app=consul,component=server",
 				"consul.service.consul", true, 0)
 		})
 	}
@@ -232,7 +231,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 
-func verifyDNS(t *testing.T, cfg *config.TestConfig, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
+func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
 	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
 	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: podLabelSelector,
