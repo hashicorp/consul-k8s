@@ -94,6 +94,19 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// Early return if this gateway doesn't belong to the consul controller
+	if gatewayClass == nil || string(gatewayClass.Spec.ControllerName) != common.GatewayClassControllerName {
+		log.Info("Skipping gateway reconciliation - not controlled by consul",
+			"gatewayClassName", gateway.Spec.GatewayClassName,
+			"controllerName", func() string {
+				if gatewayClass != nil {
+					return string(gatewayClass.Spec.ControllerName)
+				}
+				return "unknown"
+			}())
+		return ctrl.Result{}, nil
+	}
+
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
 	if err != nil {
