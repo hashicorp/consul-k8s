@@ -509,11 +509,6 @@ func TestFailover_Connect(t *testing.T) {
 				v.checkLocalities(t)
 			}
 
-			// Allow extra time for the mesh to stabilize after any PeeringAcceptor retries
-			// This ensures sameness groups and service discovery are fully synchronized
-			logger.Log(t, "allowing mesh to stabilize before failover validation")
-			time.Sleep(30 * time.Second)
-
 			// Verify all the failover Scenarios
 			logger.Log(t, "verifying failover scenarios")
 
@@ -585,11 +580,6 @@ func TestFailover_Connect(t *testing.T) {
 					testClusters.verifyServerUpState(t, cfg.EnableTransparentProxy)
 					// We're resetting the scale, so make sure we have all the new IP addresses saved
 					testClusters.setServerIP(t)
-
-					// Allow time for services to be fully registered and propagated across the mesh
-					// after scaling operations, especially important after PeeringAcceptor recreations
-					logger.Logf(t, "allowing services to stabilize for %s perspective", sc.name)
-					time.Sleep(15 * time.Second)
 
 					for i, v := range sc.failovers {
 						// Verify Failover (If this is the first check, then just verifying we're starting with the right server)
@@ -665,40 +655,25 @@ func (c *cluster) serviceTargetCheck(t *testing.T, expectedName string, curlAddr
 		// This silences extra output like the request progress bar, but preserves errors.
 		resp, err = k8s.RunKubectlAndGetOutputE(r, c.clientOpts, "exec", "-i",
 			staticClientDeployment, "-c", staticClientName, "--", "curl", "-sS", curlAddress)
-		if err != nil {
-			logger.Logf(r, "serviceTargetCheck curl failed from cluster %s to %s: %v", c.name, curlAddress, err)
-		} else {
-			logger.Logf(r, "serviceTargetCheck response from cluster %s: %s", c.name, resp)
-		}
 		require.NoError(r, err)
 		assert.Contains(r, resp, expectedName)
 	})
-	logger.Logf(t, "serviceTargetCheck final response for cluster %s: %s", c.name, resp)
+	logger.Log(t, resp)
 }
 
 // preparedQueryFailoverCheck verifies that failover occurs when executing the prepared query. It also assures that
 // executing the prepared query via DNS also provides expected results.
 func (c *cluster) preparedQueryFailoverCheck(t *testing.T, cfg *config.TestConfig, releaseName string, epq expectedPQ, failover *cluster) {
 	timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
+	resp, _, err := c.client.PreparedQuery().Execute(*c.pqID, &api.QueryOptions{Namespace: staticServerNamespace, Partition: c.partition})
+	require.NoError(t, err)
+	require.Len(t, resp.Nodes, 1)
 
-	// Use retry for prepared query execution to handle timing issues
-	var resp *api.PreparedQueryExecuteResponse
-	retry.RunWith(timer, t, func(r *retry.R) {
-		var err error
-		resp, _, err = c.client.PreparedQuery().Execute(*c.pqID, &api.QueryOptions{Namespace: staticServerNamespace, Partition: c.partition})
-		require.NoError(r, err)
-		require.Len(r, resp.Nodes, 1, "Expected exactly 1 node in prepared query response")
-
-		// Validate the response matches expected failover target
-		assert.Equal(r, epq.partition, resp.Nodes[0].Service.Partition)
-		assert.Equal(r, epq.peerName, resp.Nodes[0].Service.PeerName)
-		assert.Equal(r, epq.namespace, resp.Nodes[0].Service.Namespace)
-		addr := strings.ReplaceAll(resp.Nodes[0].Service.Address, ":0:", "::")
-		assert.Equal(r, *failover.staticServerIP, addr)
-
-		logger.Logf(r, "Prepared query validation succeeded for cluster %s: partition=%s, peer=%s, addr=%s",
-			c.name, resp.Nodes[0].Service.Partition, resp.Nodes[0].Service.PeerName, addr)
-	})
+	assert.Equal(t, epq.partition, resp.Nodes[0].Service.Partition)
+	assert.Equal(t, epq.peerName, resp.Nodes[0].Service.PeerName)
+	assert.Equal(t, epq.namespace, resp.Nodes[0].Service.Namespace)
+	addr := strings.ReplaceAll(resp.Nodes[0].Service.Address, ":0:", "::")
+	assert.Equal(t, *failover.staticServerIP, addr)
 
 	// Verify that dns lookup is successful, there is no guarantee that the ip address is unique, so for PQ this is
 	// just verifying that we can query using DNS and that the ip address is correct. It does not however prove
@@ -721,8 +696,6 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 		// where we are verifying DNS for a partition
 		logs := dnsQuery(r, cfg, releaseName, dnsLookup, c.primaryCluster, failover)
 
-		logger.Logf(r, "DNS query from cluster %s for failover target %s: %s", c.name, failover.name, logs)
-
 		assert.Contains(r, logs, fmt.Sprintf("SERVER: %s", *c.primaryCluster.dnsIP))
 		assert.Contains(r, logs, "ANSWER SECTION:")
 		assert.Contains(r, logs, *failover.staticServerIP)
@@ -737,16 +710,14 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 			expectedName = strings.Replace(expectedName, "kind-", "", -1)
 		}
 		assert.Contains(r, logs, expectedName)
-
-		logger.Logf(r, "DNS failover check successful for cluster %s -> %s", c.name, failover.name)
 	})
 }
 
 // waitForPeeringAcceptorReady waits for a PeeringAcceptor to be fully processed and ready
-// If it doesn't become ready in ~24 minutes, it will delete and recreate the resource.
+// If it doesn't become ready in ~15 minutes, it will delete and recreate the resource.
 func (c *cluster) waitForPeeringAcceptorReady(t *testing.T, cfg *config.TestConfig, acceptorName string) {
 	maxRetries := 3
-	shortTimeout := 8 * time.Minute // Try for 8 minutes before recreating
+	shortTimeout := 5 * time.Minute // Try for 5 minutes before recreating
 
 	for attempt := range maxRetries {
 		if attempt > 0 {
@@ -763,8 +734,8 @@ func (c *cluster) waitForPeeringAcceptorReady(t *testing.T, cfg *config.TestConf
 			acceptorDir := fmt.Sprintf("../fixtures/bases/sameness/peering/%s-acceptor", c.name)
 			applyResources(t, cfg, acceptorDir, c.context.KubectlOptions(t))
 
-			// Wait for the resource to be fully created and processed
-			time.Sleep(10 * time.Second)
+			// Wait a moment for the resource to be created
+			time.Sleep(5 * time.Second)
 		}
 
 		ready := c.checkPeeringAcceptorReady(t, acceptorName, shortTimeout)
@@ -787,78 +758,48 @@ func (c *cluster) waitForPeeringAcceptorReady(t *testing.T, cfg *config.TestConf
 func (c *cluster) checkPeeringAcceptorReady(t *testing.T, acceptorName string, timeout time.Duration) bool {
 	// Keep checking until timeout for peeringAcceptor to be ready
 	endTime := time.Now().Add(timeout)
-	sleepInterval := 5 * time.Second
-	maxSleepInterval := 30 * time.Second
-	logInterval := 30 * time.Second
-	lastLogTime := time.Now().Add(-logInterval) // Force initial log
-
 	for time.Now().Before(endTime) {
 		// Verify the peeringacceptor resource exists
 		_, err := k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName)
 		if err != nil {
-			if time.Since(lastLogTime) >= logInterval {
-				logger.Logf(t, "PeeringAcceptor %s does not exist yet on cluster %s: %v", acceptorName, c.name, err)
-				lastLogTime = time.Now()
-			}
-			time.Sleep(sleepInterval)
-			// Exponential backoff up to maxSleepInterval
-			if sleepInterval < maxSleepInterval {
-				sleepInterval = sleepInterval * 3 / 2
-				if sleepInterval > maxSleepInterval {
-					sleepInterval = maxSleepInterval
-				}
-			}
+			logger.Logf(t, "PeeringAcceptor %s does not exist yet on cluster %s: %v", acceptorName, c.name, err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
 		// Check if the peeringacceptor has a status with conditions
 		statusOutput, err := k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status}")
 		if err != nil {
-			if time.Since(lastLogTime) >= logInterval {
-				logger.Logf(t, "Failed to get PeeringAcceptor %s status on cluster %s: %v", acceptorName, c.name, err)
-				lastLogTime = time.Now()
-			}
-			time.Sleep(sleepInterval)
+			logger.Logf(t, "Failed to get PeeringAcceptor %s status on cluster %s: %v", acceptorName, c.name, err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 		if strings.TrimSpace(statusOutput) == "" || strings.TrimSpace(statusOutput) == "{}" {
-			if time.Since(lastLogTime) >= logInterval {
-				logger.Logf(t, "PeeringAcceptor %s does not have status populated yet on cluster %s", acceptorName, c.name)
-				lastLogTime = time.Now()
-			}
-			time.Sleep(sleepInterval)
+			logger.Logf(t, "PeeringAcceptor %s does not have status populated yet on cluster %s", acceptorName, c.name)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
 		// Check if the secret name is populated
 		secretName, err := k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "peeringacceptor", acceptorName, "-o", "jsonpath={.status.secret.name}")
 		if err != nil {
-			if time.Since(lastLogTime) >= logInterval {
-				logger.Logf(t, "Failed to get secret name from PeeringAcceptor %s on cluster %s: %v", acceptorName, c.name, err)
-				lastLogTime = time.Now()
-			}
-			time.Sleep(sleepInterval)
+			logger.Logf(t, "Failed to get secret name from PeeringAcceptor %s on cluster %s: %v", acceptorName, c.name, err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
 		secretName = strings.TrimSpace(secretName)
 		if secretName == "" {
-			if time.Since(lastLogTime) >= logInterval {
-				logger.Logf(t, "PeeringAcceptor %s secret name is not populated yet on cluster %s", acceptorName, c.name)
-				lastLogTime = time.Now()
-			}
-			time.Sleep(sleepInterval)
+			logger.Logf(t, "PeeringAcceptor %s secret name is not populated yet on cluster %s", acceptorName, c.name)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
 		// Verify the secret actually exists
 		_, err = k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "secret", secretName)
 		if err != nil {
-			if time.Since(lastLogTime) >= logInterval {
-				logger.Logf(t, "Secret %s referenced by PeeringAcceptor %s does not exist yet on cluster %s: %v", secretName, acceptorName, c.name, err)
-				lastLogTime = time.Now()
-			}
-			time.Sleep(sleepInterval)
+			logger.Logf(t, "Secret %s referenced by PeeringAcceptor %s does not exist yet on cluster %s: %v", secretName, acceptorName, c.name, err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
@@ -866,14 +807,7 @@ func (c *cluster) checkPeeringAcceptorReady(t *testing.T, acceptorName string, t
 		return true
 	}
 
-	// Add diagnostic information when failing
 	logger.Logf(t, "PeeringAcceptor %s failed to become ready within %v on cluster %s", acceptorName, timeout, c.name)
-
-	// Get detailed status for debugging
-	if statusOutput, err := k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "describe", "peeringacceptor", acceptorName); err == nil {
-		logger.Logf(t, "PeeringAcceptor %s description on cluster %s:\n%s", acceptorName, c.name, statusOutput)
-	}
-
 	return false
 }
 
@@ -888,10 +822,6 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 	// Verify the secret exists (final safety check)
 	_, err = k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "secret", acceptorSecretName)
 	require.NoError(t, err, "Secret %s should exist on cluster %s", acceptorSecretName, c.name)
-
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, c.context.KubectlOptions(t), "delete", "secret", acceptorSecretName)
-	})
 
 	return acceptorSecretName
 }
