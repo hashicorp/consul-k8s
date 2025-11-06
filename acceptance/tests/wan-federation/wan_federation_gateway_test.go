@@ -157,45 +157,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		})
 
 		// Wait for the httproute to exist before patching, with delete/recreate fallback
-		logger.Log(t, "waiting for httproute to be created")
-		found := false
-		maxAttempts := 3
-		checksPerAttempt := 5
-
-		for attempt := 1; attempt <= maxAttempts; attempt++ {
-			logger.Log(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
-
-			// Check for httproute existence using simple loop (like kitchen sink test)
-			for i := 0; i < checksPerAttempt; i++ {
-				_, err := k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "get", "httproute", "http-route")
-				if err == nil {
-					found = true
-					logger.Log(t, "httproute http-route found successfully")
-					break
-				}
-				logger.Log(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
-				time.Sleep(2 * time.Second)
-			}
-
-			if found {
-				break
-			}
-
-			if attempt < maxAttempts {
-				logger.Log(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
-				// Delete the httproute if it exists in a bad state
-				k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "delete", "httproute", "http-route", "--ignore-not-found=true")
-				// Recreate by reapplying the base resources
-				out, err := k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-				require.NoError(t, err, out)
-				// Brief pause to let the recreation start
-				time.Sleep(2 * time.Second)
-			}
-		}
-
-		if !found {
-			require.Fail(t, "httproute http-route was not found after 3 attempts with delete/recreate")
-		}
+		helpers.WaitForHTTPRouteWithRetry(t, primaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
@@ -225,45 +187,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		})
 
 		// Wait for the httproute to exist before patching, with delete/recreate fallback
-		logger.Log(t, "waiting for httproute to be created")
-		found := false
-		maxAttempts := 3
-		checksPerAttempt := 5
-
-		for attempt := 1; attempt <= maxAttempts; attempt++ {
-			logger.Log(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
-
-			// Check for httproute existence using simple loop (like kitchen sink test)
-			for i := range checksPerAttempt {
-				_, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "get", "httproute", "http-route")
-				if err == nil {
-					found = true
-					logger.Log(t, "httproute http-route found successfully")
-					break
-				}
-				logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
-				time.Sleep(2 * time.Second)
-			}
-
-			if found {
-				break
-			}
-
-			if attempt < maxAttempts {
-				logger.Log(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
-				// Delete the httproute if it exists in a bad state
-				k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "delete", "httproute", "http-route", "--ignore-not-found=true")
-				// Recreate by reapplying the base resources
-				out, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-				require.NoError(t, err, out)
-				// Brief pause to let the recreation start
-				time.Sleep(2 * time.Second)
-			}
-		}
-
-		if !found {
-			require.Fail(t, "httproute http-route was not found after 3 attempts with delete/recreate")
-		}
+		helpers.WaitForHTTPRouteWithRetry(t, secondaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.

@@ -397,3 +397,51 @@ func WaitForInput(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// WaitForHTTPRouteWithRetry waits for an HTTPRoute to exist with retry logic
+// and delete/recreate fallback to make the tests more robust against intermittent issues.
+// It checks for the HTTPRoute's existence multiple times per attempt, and if
+// not found, attempts to delete and recreate the resource by reapplying the kustomize manifest.
+func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, routeName, kustomizeDir string) {
+	t.Helper()
+
+	logger.Log(t, "waiting for httproute to be created")
+	found := false
+	maxAttempts := 3
+	checksPerAttempt := 5
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		logger.Logf(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
+
+		// Check for httproute existence using simple loop
+		for i := range checksPerAttempt {
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
+			if err == nil {
+				found = true
+				logger.Logf(t, "httproute %s found successfully", routeName)
+				break
+			}
+			logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
+			time.Sleep(2 * time.Second)
+		}
+
+		if found {
+			break
+		}
+
+		if attempt < maxAttempts {
+			logger.Logf(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
+			// Delete the httproute if it exists in a bad state
+			k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", "httproute", routeName, "--ignore-not-found=true")
+			// Recreate by reapplying the base resources
+			out, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "apply", "-k", kustomizeDir)
+			require.NoError(t, err, out)
+			// Brief pause to let the recreation start
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if !found {
+		require.Failf(t, "httproute %s was not found after %d attempts with delete/recreate", routeName, maxAttempts)
+	}
+}

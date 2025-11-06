@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -100,45 +99,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
-	logger.Log(t, "waiting for httproute to be created")
-	found := false
-	maxAttempts := 3
-	checksPerAttempt := 5
-
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		logger.Log(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
-
-		// Check for httproute existence using simple loop (like kitchen sink test)
-		for i := range checksPerAttempt {
-			_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "httproute", "http-route")
-			if err == nil {
-				found = true
-				logger.Log(t, "httproute http-route found successfully")
-				break
-			}
-			logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
-			time.Sleep(2 * time.Second)
-		}
-
-		if found {
-			break
-		}
-
-		if attempt < maxAttempts {
-			logger.Log(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
-			// Delete the httproute if it exists in a bad state
-			k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "httproute", "http-route", "--ignore-not-found=true")
-			// Recreate by reapplying the base resources
-			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-			require.NoError(t, err, out)
-			// Brief pause to let the recreation start
-			time.Sleep(2 * time.Second)
-		}
-	}
-
-	if !found {
-		require.Fail(t, "httproute http-route was not found after 3 attempts with delete/recreate")
-	}
+	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")

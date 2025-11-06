@@ -156,45 +156,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 			// Wait for the httproute to exist before patching, with delete/recreate fallback
-			logger.Log(t, "waiting for httproute to be created")
-			found := false
-			maxAttempts := 3
-			checksPerAttempt := 5
-
-			for attempt := 1; attempt <= maxAttempts; attempt++ {
-				logger.Log(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
-
-				// Check for httproute existence using simple loop (like kitchen sink test)
-				for i := range checksPerAttempt {
-					_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "httproute", "http-route")
-					if err == nil {
-						found = true
-						logger.Log(t, "httproute http-route found successfully")
-						break
-					}
-					logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
-					time.Sleep(2 * time.Second)
-				}
-
-				if found {
-					break
-				}
-
-				if attempt < maxAttempts {
-					logger.Log(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
-					// Delete the httproute if it exists in a bad state
-					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "httproute", "http-route", "--ignore-not-found=true")
-					// Recreate by reapplying the base resources
-					out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-					require.NoError(t, err, out)
-					// Brief pause to let the recreation start
-					time.Sleep(2 * time.Second)
-				}
-			}
-
-			if !found {
-				require.Fail(t, "httproute http-route was not found after 3 attempts with delete/recreate")
-			}
+			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 			logger.Log(t, "patching route to target http server")
 			// Use retries to handle intermittent failures when patching the httproute
@@ -449,42 +411,8 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	// Wait for all the httproutes to be created immediately after applying the main resources
 	logger.Log(t, "waiting for httproutes to be created")
 	routeNames := []string{"http-route", "http-route-auth", "http-route-no-auth-on-auth-listener", "http-route2-auth", "http-route-auth-invalid"}
-	maxAttempts, checksPerAttempt := 3, 5
 	for _, routeName := range routeNames {
-		found := false
-		for attempt := 1; attempt <= maxAttempts; attempt++ {
-			logger.Logf(t, "checking for httproute %s existence check attempt %d/%d", routeName, attempt, maxAttempts)
-
-			for i := range checksPerAttempt {
-				_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "httproute", routeName)
-				if err == nil {
-					found = true
-					logger.Logf(t, "httproute %s found successfully", routeName)
-					break
-				}
-				logger.Logf(t, "httproute %s check %d/%d: %v", routeName, i+1, checksPerAttempt, err)
-				time.Sleep(2 * time.Second)
-			}
-
-			if found {
-				break
-			}
-
-			if attempt < maxAttempts {
-				logger.Logf(t, "httproute %s not found after %d seconds, attempting delete/recreate (attempt %d/%d)", routeName, checksPerAttempt*2, attempt, maxAttempts)
-				// Delete the httproute if it exists in a bad state
-				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "httproute", routeName, "--ignore-not-found=true")
-				// Recreate by reapplying the base resources
-				out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/api-gateways/jwt-auth")
-				require.NoError(t, err, out)
-				// Brief pause to let the recreation start
-				time.Sleep(2 * time.Second)
-			}
-		}
-
-		if !found {
-			require.Failf(t, "httproute %s was not found after %d attempts with delete/recreate", routeName, maxAttempts)
-		}
+		helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), routeName, "../fixtures/cases/api-gateways/jwt-auth")
 	}
 
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")
