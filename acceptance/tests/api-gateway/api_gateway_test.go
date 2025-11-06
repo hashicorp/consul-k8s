@@ -121,18 +121,24 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "creating api-gateway resources")
-			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-			require.NoError(t, err, out)
+			// Apply api-gateway resources with retry logic to handle intermittent failures
+			retry.Run(t, func(r *retry.R) {
+				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/api-gateway")
+				require.NoError(r, err, out)
+			})
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				// Ignore errors here because if the test ran as expected
 				// the custom resources will have been deleted.
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 			})
 
+			// Wait for the httproute to exist before patching, with delete/recreate fallback
+			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+
 			// Create certificate secret, we do this separately since
 			// applying the secret will make an invalid certificate that breaks other tests
 			logger.Log(t, "creating certificate secret")
-			out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 			require.NoError(t, err, out)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				// Ignore errors here because if the test ran as expected
@@ -154,9 +160,6 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// via kubectl exec without needing a route into the cluster from the test machine.
 			logger.Log(t, "creating static-client pod")
 			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
-
-			// Wait for the httproute to exist before patching, with delete/recreate fallback
-			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 			logger.Log(t, "patching route to target http server")
 			// Use retries to handle intermittent failures when patching the httproute
