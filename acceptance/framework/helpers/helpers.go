@@ -445,3 +445,43 @@ func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions,
 		require.Failf(t, "httproute %s was not found after %d attempts with delete/recreate", routeName, maxAttempts)
 	}
 }
+
+// EnsurePeeringAcceptorSecret ensures that a peering acceptor secret is created,
+// retrying by deleting and recreating the peering acceptor if the secret name is empty.
+// This is a helper function to handle flakiness in peering acceptor secret creation.
+func EnsurePeeringAcceptorSecret(t *testing.T, r *retry.R, kubectlOptions *k8s.KubectlOptions, peeringAcceptorPath string) string {
+	t.Helper()
+
+	acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, kubectlOptions, "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+	require.NoError(r, err)
+
+	// If the secret name is empty, retry recreating the peering acceptor up to 5 times
+	if acceptorSecretName == "" {
+		const maxRetries = 5
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			logger.Logf(t, "peering acceptor secret name is empty, recreating peering acceptor (attempt %d/%d)", attempt, maxRetries)
+			k8s.KubectlDelete(t, kubectlOptions, peeringAcceptorPath)
+
+			time.Sleep(5 * time.Second)
+
+			k8s.KubectlApply(t, kubectlOptions, peeringAcceptorPath)
+
+			time.Sleep(10 * time.Second)
+
+			acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(r, kubectlOptions, "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+			require.NoError(r, err)
+
+			if acceptorSecretName != "" {
+				logger.Logf(t, "peering acceptor secret name successfully created after %d attempts", attempt)
+				break
+			}
+
+			if attempt == maxRetries {
+				logger.Logf(t, "peering acceptor secret name still empty after %d attempts", maxRetries)
+			}
+		}
+	}
+
+	require.NotEmpty(r, acceptorSecretName)
+	return acceptorSecretName
+}
