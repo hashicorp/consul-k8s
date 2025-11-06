@@ -1,3 +1,3 @@
 ```release-note:feature
-api-gateway: The gateway controller now detects and responds to changes in deployment health probes
+api-gateway: Added support for configuring Kubernetes health probes (liveness, readiness, startup) on managed Gateway pods via Helm values `connectInject.apiGateway.managedGatewayClass.probes`. The gateway controller now automatically detects and applies probe configuration changes from GatewayClassConfig to Gateway deployments.
 ```
