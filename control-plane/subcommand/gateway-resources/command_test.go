@@ -4,6 +4,7 @@
 package gatewayresources
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -377,4 +379,71 @@ func createGatewayConfigFile(t *testing.T, fileContent, filename string) string 
 	}
 
 	return file.Name()
+}
+
+// TestLoadProbesConfig_sanitizes validates that loadProbesConfig trims extra handlers
+// and normalizes successThreshold for liveness/startup probes.
+func TestLoadProbesConfig_sanitizes(t *testing.T) {
+	t.Parallel()
+
+	raw := v1alpha1.ProbesSpec{
+		Liveness: &corev1.Probe{
+			SuccessThreshold: 5, // forced to 1
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet:   &corev1.HTTPGetAction{Path: "/live", Port: intstr.FromInt(8080)},
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(8080)},
+				Exec:      &corev1.ExecAction{Command: []string{"echo", "liveness"}},
+			},
+		},
+		Readiness: &corev1.Probe{
+			SuccessThreshold: 2, // remains 2
+			ProbeHandler: corev1.ProbeHandler{
+				Exec: &corev1.ExecAction{Command: []string{"echo", "readiness"}},
+			},
+		},
+		Startup: &corev1.Probe{
+			SuccessThreshold: 4, // forced to 1
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(9090)},
+				Exec:      &corev1.ExecAction{Command: []string{"echo", "startup"}},
+			},
+		},
+	}
+
+	data, err := json.Marshal(raw)
+	require.NoError(t, err)
+
+	f, err := os.CreateTemp(t.TempDir(), "probes-*.json")
+	require.NoError(t, err)
+	defer f.Close()
+
+	_, err = f.WriteString(string(data))
+	require.NoError(t, err)
+
+	ui := cli.NewMockUi()
+	c := &Command{UI: ui}
+	got, err := c.loadProbesConfig(f.Name())
+	require.NoError(t, err)
+	require.NotNil(t, got)
+
+	// Liveness: should keep HTTPGet only, normalize successThreshold to 1
+	require.NotNil(t, got.Liveness)
+	require.NotNil(t, got.Liveness.HTTPGet)
+	require.Nil(t, got.Liveness.TCPSocket)
+	require.Nil(t, got.Liveness.Exec)
+	require.Equal(t, int32(1), got.Liveness.SuccessThreshold)
+
+	// Readiness: should keep Exec, preserve successThreshold of 2
+	require.NotNil(t, got.Readiness)
+	require.NotNil(t, got.Readiness.Exec)
+	require.Nil(t, got.Readiness.TCPSocket)
+	require.Nil(t, got.Readiness.HTTPGet)
+	require.Equal(t, int32(2), got.Readiness.SuccessThreshold)
+
+	// Startup: should keep TCPSocket only, normalize successThreshold to 1
+	require.NotNil(t, got.Startup)
+	require.NotNil(t, got.Startup.TCPSocket)
+	require.Nil(t, got.Startup.Exec)
+	require.Nil(t, got.Startup.HTTPGet)
+	require.Equal(t, int32(1), got.Startup.SuccessThreshold)
 }
