@@ -432,7 +432,10 @@ func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions,
 		if attempt < maxAttempts {
 			logger.Logf(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
 			// Delete the httproute if it exists in a bad state
-			k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", "httproute", routeName, "--ignore-not-found=true")
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", "httproute", routeName, "--ignore-not-found=true")
+			if err != nil {
+				logger.Logf(t, "warning: failed to delete httproute %s: %v", routeName, err)
+			}
 			// Recreate by reapplying the base resources
 			out, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "apply", "-k", kustomizeDir)
 			require.NoError(t, err, out)
