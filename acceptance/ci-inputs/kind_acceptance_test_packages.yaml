@@ -2,24 +2,20 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-- {runner: 0, test-packages: "api-gateway"}
+- {runner: 0, test-packages: "partitions"}
 - {runner: 1, test-packages: "peering"}
 - {runner: 2, test-packages: "sameness"}
-- {runner: 3, test-packages: "wan-federation"}
-# - {runner: 0, test-packages: "partitions"}
-# - {runner: 1, test-packages: "peering"}
-# - {runner: 2, test-packages: "sameness"}
-# - {runner: 3, test-packages: "connect"}
-# - {runner: 4, test-packages: "snapshot-agent"}
-# - {runner: 5, test-packages: "wan-federation"}
-# - {runner: 6, test-packages: "cli"}
-# - {runner: 7, test-packages: "vault"}
-# - {runner: 8, test-packages: "metrics"}
-# - {runner: 9, test-packages: "server"}
-# - {runner: 10, test-packages: "api-gateway"}
-# - {runner: 12, test-packages: "sync"}
-# - {runner: 13, test-packages: "example"}
-# - {runner: 14, test-packages: "consul-dns"}
-# - {runner: 15, test-packages: "config-entries"}
-# - {runner: 16, test-packages: "terminating-gateway"}
-# - {runner: 17, test-packages: "basic"}
+- {runner: 3, test-packages: "connect"}
+- {runner: 4, test-packages: "snapshot-agent"}
+- {runner: 5, test-packages: "wan-federation"}
+- {runner: 6, test-packages: "cli"}
+- {runner: 7, test-packages: "vault"}
+- {runner: 8, test-packages: "metrics"}
+- {runner: 9, test-packages: "server"}
+- {runner: 10, test-packages: "api-gateway"}
+- {runner: 12, test-packages: "sync"}
+- {runner: 13, test-packages: "example"}
+- {runner: 14, test-packages: "consul-dns"}
+- {runner: 15, test-packages: "config-entries"}
+- {runner: 16, test-packages: "terminating-gateway"}
+- {runner: 17, test-packages: "basic"}
