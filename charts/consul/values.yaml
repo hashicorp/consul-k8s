@@ -2556,6 +2556,90 @@ connectInject:
       # will be the 80 + the number defined below.
       mapPrivilegedContainerPorts: 0
 
+      # Probe configuration applied to gateway pods created for Gateways that reference this managed gateway class.
+      # Each probe follows the Kubernetes Probe schema. Set `enabled: false` (or leave all fields null) to omit a probe.
+      # Only one action (httpGet, tcpSocket, or exec) should be specified per probe.
+      probes:
+        # Liveness probe checks if the gateway process should be restarted.
+        liveness:
+          # Enables or disables the liveness probe entirely.
+          # @type: boolean
+          enabled: true
+          # HTTP GET action (omit if using tcpSocket or exec).
+          httpGet:
+            # Path to access on the HTTP server.
+            # @type: string
+            path: /ready
+            # Port number or name to access on the container.
+            # @type: integer|string
+            port: 21000
+            # Host header to send. Defaults to pod IP if null.
+            # @type: string
+            host: null
+            # Scheme to use: HTTP or HTTPS.
+            # @type: string
+            scheme: HTTP
+          # TCP socket action (omit if using httpGet or exec).
+          tcpSocket:
+            # Port number or name to access on the container.
+            # @type: integer|string
+            port: null
+            # Optional host.
+            # @type: string
+            host: null
+          # Exec action (omit if using httpGet or tcpSocket).
+          exec:
+            # Command list to execute inside the container.
+            # @type: list[string]
+            command: null
+          # InitialDelaySeconds is the number of seconds after the container starts before probes begin.
+          initialDelaySeconds: 10
+          # PeriodSeconds is the frequency of the probe.
+          periodSeconds: 20
+          # TimeoutSeconds is the probe timeout.
+          timeoutSeconds: 1
+          # SuccessThreshold for liveness is almost always 1.
+          successThreshold: 1
+          # FailureThreshold is number of consecutive failures for restart.
+          failureThreshold: 5
+        # Readiness probe determines if the gateway is ready to serve traffic.
+        readiness:
+          enabled: true
+          httpGet:
+            path: /ready
+            port: 21000
+            host: null
+            scheme: HTTP
+          tcpSocket:
+            port: null
+            host: null
+          exec:
+            command: null
+          initialDelaySeconds: 9
+          periodSeconds: 3
+          timeoutSeconds: 3
+          successThreshold: 3
+          failureThreshold: 5
+        # Startup probe controls container startup; when set it can extend the time before liveness kicks in.
+        startup:
+          enabled: true
+          httpGet:
+            path: /ready
+            port: 21000
+            host: null
+            scheme: HTTP
+          tcpSocket:
+            port: null
+            host: null
+          exec:
+            command: null
+          initialDelaySeconds: 9
+          periodSeconds: 3
+          timeoutSeconds: 3
+          # SuccessThreshold must be 1 for startup probes.
+          successThreshold: 1
+          failureThreshold: 5
+
       # This value contains settings related to the gateway_resources_job that runs on helm install
       resourceJob:
         # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.

@@ -161,6 +161,160 @@ spec:
                     minimum: 1024
                     type: integer
                 type: object
+              probes:
+                description: Default Kubernetes probes applied to gateway pods for this class.
+                properties:
+                  liveness:
+                    description: Liveness probe configuration.
+                    properties:
+                      exec:
+                        properties:
+                          command:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      failureThreshold:
+                        format: int32
+                        type: integer
+                      httpGet:
+                        properties:
+                          host:
+                            type: string
+                          path:
+                            type: string
+                          port:
+                            x-kubernetes-int-or-string: true
+                            anyOf:
+                            - type: integer
+                            - type: string
+                          scheme:
+                            type: string
+                        type: object
+                      initialDelaySeconds:
+                        format: int32
+                        type: integer
+                      periodSeconds:
+                        format: int32
+                        type: integer
+                      successThreshold:
+                        format: int32
+                        type: integer
+                      tcpSocket:
+                        properties:
+                          host:
+                            type: string
+                          port:
+                            x-kubernetes-int-or-string: true
+                            anyOf:
+                            - type: integer
+                            - type: string
+                        type: object
+                      timeoutSeconds:
+                        format: int32
+                        type: integer
+                    type: object
+                  readiness:
+                    description: Readiness probe configuration.
+                    properties:
+                      exec:
+                        properties:
+                          command:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      failureThreshold:
+                        format: int32
+                        type: integer
+                      httpGet:
+                        properties:
+                          host:
+                            type: string
+                          path:
+                            type: string
+                          port:
+                            x-kubernetes-int-or-string: true
+                            anyOf:
+                            - type: integer
+                            - type: string
+                          scheme:
+                            type: string
+                        type: object
+                      initialDelaySeconds:
+                        format: int32
+                        type: integer
+                      periodSeconds:
+                        format: int32
+                        type: integer
+                      successThreshold:
+                        format: int32
+                        type: integer
+                      tcpSocket:
+                        properties:
+                          host:
+                            type: string
+                          port:
+                            x-kubernetes-int-or-string: true
+                            anyOf:
+                            - type: integer
+                            - type: string
+                        type: object
+                      timeoutSeconds:
+                        format: int32
+                        type: integer
+                    type: object
+                  startup:
+                    description: Startup probe configuration.
+                    properties:
+                      exec:
+                        properties:
+                          command:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      failureThreshold:
+                        format: int32
+                        type: integer
+                      httpGet:
+                        properties:
+                          host:
+                            type: string
+                          path:
+                            type: string
+                          port:
+                            x-kubernetes-int-or-string: true
+                            anyOf:
+                            - type: integer
+                            - type: string
+                          scheme:
+                            type: string
+                        type: object
+                      initialDelaySeconds:
+                        format: int32
+                        type: integer
+                      periodSeconds:
+                        format: int32
+                        type: integer
+                      successThreshold:
+                        format: int32
+                        type: integer
+                      tcpSocket:
+                        properties:
+                          host:
+                            type: string
+                          port:
+                            x-kubernetes-int-or-string: true
+                            anyOf:
+                            - type: integer
+                            - type: string
+                        type: object
+                      timeoutSeconds:
+                        format: int32
+                        type: integer
+                    type: object
+                type: object
               nodeSelector:
                 additionalProperties:
                   type: string

@@ -7,6 +7,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -59,7 +60,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme())
+	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme(), g.Log)
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -162,35 +163,30 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}, nil
 }
 
-func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
+func mergeDeployments(log logr.Logger, gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
-		// Save existing probe configurations before template replacement
-		existingProbes := make(map[int]*corev1.Container)
-		for i, container := range b.Spec.Template.Spec.Containers {
-			existingProbes[i] = container.DeepCopy()
-		}
-
 		// Replace template
 		b.Spec.Template = a.Spec.Template
-
-		// Always preserve existing probe configurations (manual edits)
-		for i, container := range b.Spec.Template.Spec.Containers {
-			if existingContainer, exists := existingProbes[i]; exists {
-				// Always preserve existing readiness probe if it exists
-				if existingContainer.ReadinessProbe != nil {
-					container.ReadinessProbe = existingContainer.ReadinessProbe
-				}
-
-				// Always preserve existing startup probe if it exists
-				if existingContainer.StartupProbe != nil {
-					container.StartupProbe = existingContainer.StartupProbe
-				}
-
-				b.Spec.Template.Spec.Containers[i] = container
-			}
-		}
-
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
+	}
+
+	// Always apply probes from GatewayClassConfig to ensure they stay in sync
+	if gcc.Spec.Probes != nil {
+		for i, c := range b.Spec.Template.Spec.Containers {
+			if i > 0 { // only primary container gets managed probes
+				continue
+			}
+			if gcc.Spec.Probes.Liveness != nil {
+				c.LivenessProbe = gcc.Spec.Probes.Liveness.DeepCopy()
+			}
+			if gcc.Spec.Probes.Readiness != nil {
+				c.ReadinessProbe = gcc.Spec.Probes.Readiness.DeepCopy()
+			}
+			if gcc.Spec.Probes.Startup != nil {
+				c.StartupProbe = gcc.Spec.Probes.Startup.DeepCopy()
+			}
+			b.Spec.Template.Spec.Containers[i] = c
+		}
 	}
 
 	return b
@@ -280,9 +276,9 @@ func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
 
 }
 
-func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(gcc, deployment, mutated)
+		mutated = mergeDeployments(log, gcc, deployment, mutated)
 		if deploymentExists {
 			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
 		}
