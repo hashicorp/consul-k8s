@@ -1,3 +1,35 @@
+## 1.8.4 (November 5, 2023)
+
+SECURITY:
+
+* Updated AWS SDK dependencies and added CVE suppressions. Upgraded github.com/aws/aws-sdk-go from v1.38.63 to v1.55.8 in hack/aws-acceptance-test-cleanup utilities and suppressed CVEs:
+[GO-2022-0635](https://pkg.go.dev/vuln/GO-2022-0635) (AWS S3 Crypto SDK - in-band key negotiation issue)
+[GO-2022-0646](https://pkg.go.dev/vuln/GO-2022-0646) (AWS S3 Crypto SDK - CBC padding oracle issue)
+
+These vulnerabilities affect only test cleanup utilities in unused S3 crypto components. They do not impact production consul-k8s deployments. [[GH-4870](https://github.com/hashicorp/consul-k8s/issues/4870)]
+* go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/issues/4897)]
+
+IMPROVEMENTS:
+
+* Consul-dataplane now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used. [[GH-4745](https://github.com/hashicorp/consul-k8s/issues/4745)]
+* control-plane: updated endpoints controller to use podIP from endpoint object [[GH-4809](https://github.com/hashicorp/consul-k8s/issues/4809)]
+
+## 1.7.7 (November 5, 2023)
+
+SECURITY:
+
+* Updated AWS SDK dependencies and added CVE suppressions. Upgraded github.com/aws/aws-sdk-go from v1.38.63 to v1.55.8 in hack/aws-acceptance-test-cleanup utilities and suppressed CVEs:
+[GO-2022-0635](https://pkg.go.dev/vuln/GO-2022-0635) (AWS S3 Crypto SDK - in-band key negotiation issue)
+[GO-2022-0646](https://pkg.go.dev/vuln/GO-2022-0646) (AWS S3 Crypto SDK - CBC padding oracle issue)
+
+These vulnerabilities affect only test cleanup utilities in unused S3 crypto components. They do not impact production consul-k8s deployments. [[GH-4870](https://github.com/hashicorp/consul-k8s/issues/4870)]
+* go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/issues/4897)]
+
+IMPROVEMENTS:
+
+* Consul-dataplane now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used. [[GH-4745](https://github.com/hashicorp/consul-k8s/issues/4745)]
+* control-plane: updated endpoints controller to use podIP from endpoint object [[GH-4809](https://github.com/hashicorp/consul-k8s/issues/4809)]
+
 ## 1.9.0 (October 27, 2025)
 
 > **NOTE**: Consul K8s 1.9.x is compatible with Consul 1.22.x and Consul Dataplane 1.9.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
