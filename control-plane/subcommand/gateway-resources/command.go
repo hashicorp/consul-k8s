@@ -419,7 +419,11 @@ func (c *Command) loadProbesConfig(filename string) (*v1alpha1.ProbesSpec, error
 		c.UI.Info("No probes.json found, skipping probes config")
 		return nil, nil
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			c.UI.Warn(fmt.Sprintf("Failed to close probes.json: %s", closeErr))
+		}
+	}()
 	data, err := io.ReadAll(file)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Unable to read probes.json, skipping: %s", err))
@@ -462,13 +466,13 @@ func (c *Command) loadProbesConfig(filename string) (*v1alpha1.ProbesSpec, error
 
 		// Count non-nil handlers; if more than one, keep the first in order: HTTPGet, TCPSocket, Exec.
 		// Drop others and log.
-		chosen := 0
+		hasHandler := false
 		if probe.HTTPGet != nil {
-			chosen = 1
+			hasHandler = true
 		}
 		if probe.TCPSocket != nil {
-			if chosen == 0 {
-				chosen = 2
+			if !hasHandler {
+				hasHandler = true
 			} else {
 				// drop tcpSocket
 				probe.TCPSocket = nil
@@ -476,8 +480,8 @@ func (c *Command) loadProbesConfig(filename string) (*v1alpha1.ProbesSpec, error
 			}
 		}
 		if probe.Exec != nil {
-			if chosen == 0 {
-				chosen = 3
+			if !hasHandler {
+				hasHandler = true
 			} else {
 				probe.Exec = nil
 				c.UI.Info(fmt.Sprintf("sanitising %s probe: dropping exec because another handler is set", name))
