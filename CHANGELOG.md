@@ -1,3 +1,25 @@
+## 1.9.0 (October 27, 2025)
+
+> **NOTE**: Consul K8s 1.9.x is compatible with Consul 1.22.x and Consul Dataplane 1.9.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+**RELEASE HIGHLIGHTS:**
+* **Enhanced IPv6 Support**: Improved CNI kubeconfig generation with better Kubernetes API server URL handling for IPv6 environments
+* **Updated Dependencies**: All Consul submodules updated to their latest GA versions for improved stability and compatibility
+* **Security Improvements**: Go runtime upgraded to 1.25.3 with latest security patches
+
+BUG FIXES:
+* control-plane: Enhanced IPv6 support in CNI kubeconfig generation for better Kubernetes API server URL handling [[GH-4897](https://github.com/hashicorp/consul-k8s/pull/4897)]
+
+IMPROVEMENTS:
+* deps: update consul/api to v1.33.0  
+* deps: update consul/sdk to v0.17.0  
+* deps: update consul/proto-public to v0.7.0  
+* deps: update consul/envoyextensions to v0.9.0  
+* deps: update consul/troubleshoot to v0.8.0   
+
+SECURITY:
+* go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/pull/4897)]
+
 ## 1.9.0-rc2 (October 16, 2025)
 
 FEATURES:
