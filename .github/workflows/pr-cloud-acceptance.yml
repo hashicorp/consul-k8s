@@ -22,7 +22,7 @@ jobs:
         with:
           workflow: cloud.yml
           repo: hashicorp/consul-k8s-workflows
-          # ref: 
+          # ref: main
           # TODO: change ref to main after testing
           ref: abhishek/temp-eks-only
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
