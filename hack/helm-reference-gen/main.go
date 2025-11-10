@@ -75,7 +75,7 @@ var (
 
 func main() {
 	validateFlag := flag.Bool("validate", false, "only validate that the markdown can be generated, don't actually generate anything")
-	consulRepoPath := "../../../consul"
+	docsRepoPath := "../../../web-unified-docs"
 	flag.Parse()
 
 	if len(os.Args) > 3 {
@@ -86,17 +86,17 @@ func main() {
 	if !*validateFlag {
 		// Only argument is path to Consul repo. If not set then we default.
 		if len(os.Args) < 2 {
-			abs, _ := filepath.Abs(consulRepoPath)
+			abs, _ := filepath.Abs(docsRepoPath)
 			fmt.Printf("Defaulting to Consul repo path: %s\n", abs)
 		} else {
 			// Support absolute and relative paths to the Consul repo.
 			if filepath.IsAbs(os.Args[1]) {
-				consulRepoPath = os.Args[1]
+				docsRepoPath = os.Args[1]
 			} else {
-				consulRepoPath = filepath.Join("../..", os.Args[1])
+				docsRepoPath = filepath.Join("../..", os.Args[1])
 			}
-			abs, _ := filepath.Abs(consulRepoPath)
-			fmt.Printf("Using Consul repo path: %s\n", abs)
+			abs, _ := filepath.Abs(docsRepoPath)
+			fmt.Printf("Using docs repo path: %s\n", abs)
 		}
 	}
 
@@ -119,7 +119,7 @@ func main() {
 	}
 
 	// Otherwise we'll go on to write the changes to the helm docs.
-	helmReferenceFile := filepath.Join(consulRepoPath, "website/content/docs/reference/k8s/helm.mdx")
+	helmReferenceFile := filepath.Join(docsRepoPath, "website/content/docs/reference/k8s/helm.mdx")
 	helmReferenceBytes, err := os.ReadFile(helmReferenceFile)
 	if err != nil {
 		fmt.Println(err.Error())
