@@ -22,6 +22,7 @@ import (
 	"text/template"
 
 	"gopkg.in/yaml.v3"
+	"encoding/json"
 )
 
 const (
@@ -87,7 +88,7 @@ func main() {
 		// Only argument is path to Consul repo. If not set then we default.
 		if len(os.Args) < 2 {
 			abs, _ := filepath.Abs(docsRepoPath)
-			fmt.Printf("Defaulting to Consul repo path: %s\n", abs)
+			fmt.Printf("Defaulting to docs repo path: %s\n", abs)
 		} else {
 			// Support absolute and relative paths to the Consul repo.
 			if filepath.IsAbs(os.Args[1]) {
@@ -118,8 +119,45 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Otherwise we'll go on to write the changes to the helm docs.
-	helmReferenceFile := filepath.Join(docsRepoPath, "website/content/docs/reference/k8s/helm.mdx")
+	// Open the JSON file containing our list of Consul versions. If this doesn't
+	// exist, you'll need to generate it by running `npm run build --onlyVersionMetadata`
+	// in the web-unified-docs repo.
+	versionMetadataPath := filepath.Join(docsRepoPath, "app/api/versionMetadata.json")
+	versionMetadataBytes, err := os.ReadFile(versionMetadataPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Parse versionMetadata.json so we can choose a Consul docs version if desired
+	// Expected shape: { "consul": [{"version":"v1.22.x","releaseStage":"stable","isLatest":true}, ...], ... }
+	type ProductVersion struct {
+		Version      string `json:"version"`
+		ReleaseStage string `json:"releaseStage"`
+		IsLatest     bool   `json:"isLatest"`
+	}
+
+	var (
+		versionMap      map[string][]ProductVersion
+		latestVersion string
+	)
+	if len(versionMetadataBytes) > 0 {
+		if err := json.Unmarshal(versionMetadataBytes, &versionMap); err != nil {
+			fmt.Println("failed to parse versionMetadata.json:", err)
+		} else {
+			if consulList, ok := versionMap["consul"]; ok {
+				for _, pv := range consulList {
+					if pv.IsLatest {
+						latestVersion = pv.Version
+						break
+					}
+				}
+				if latestVersion == "" && len(consulList) > 0 {
+					latestVersion = consulList[0].Version
+				}
+			}
+		}
+	}
+	helmReferenceFile := filepath.Join(docsRepoPath, "content/consul", latestVersion, "content/docs/reference/k8s/helm.mdx")
 	helmReferenceBytes, err := os.ReadFile(helmReferenceFile)
 	if err != nil {
 		fmt.Println(err.Error())
