@@ -11,7 +11,7 @@ on:
 env:
   BRANCH: ${{ github.event.pull_request.head.ref }}
   CONTEXT: "pr"
-# test with manisha branch
+# test with manisha branch code
 jobs:
   cloud-acceptance:
     name: cloud-acceptance

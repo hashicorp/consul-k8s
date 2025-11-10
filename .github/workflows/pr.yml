@@ -16,7 +16,7 @@ env:
 jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
-# test with manisha branch
+# test with manisha branch code
   test:
     name: test
     needs: [ conditional-skip ]
