@@ -10,7 +10,7 @@ EOF
 }
 
 variable "zone" {
-  default     = "us-central1-b"
+  default     = "asia-south1"
   description = "The zone to launch all the GKE nodes in."
 }
 
