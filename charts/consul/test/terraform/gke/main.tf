@@ -35,9 +35,9 @@ resource "google_compute_network" "custom_network" {
   name                    = "network-${random_string.cluster_prefix.result}"
   auto_create_subnetworks = false
   lifecycle {
-  prevent_destroy = false
-  ignore_changes  = [name]
-}
+    prevent_destroy = false
+    ignore_changes  = [name]
+  }
 }
 
 resource "google_compute_subnetwork" "subnet" {
