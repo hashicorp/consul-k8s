@@ -1,10 +1,12 @@
 # Dispatch to the consul-k8s-workflows with a nightly cron
 name: nightly-cleanup
 on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    # Run nightly at 12PM UTC/8AM EST/5AM PST
-    - cron: '0 12 * * *'
+  pull_request:
+    types: [opened, synchronize]
+    # Runs on PRs to main and all release branches
+    branches:
+      - main
+      - "release/**"
 
 # these should be the only settings that you will ever need to change
 env:
