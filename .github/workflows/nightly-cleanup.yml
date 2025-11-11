@@ -21,6 +21,6 @@ jobs:
       with:
         workflow: cleanup.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: shani/update-max-parallel
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
