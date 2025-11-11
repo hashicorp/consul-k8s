@@ -51,9 +51,9 @@ module "vpc" {
   enable_dns_hostnames = true
 
   # Enable dual-stack (IPv4 + IPv6) support for acceptance tests
-  enable_ipv6                  = true
-  public_subnet_ipv6_prefixes  = [0, 1, 2]
-  private_subnet_ipv6_prefixes = [3, 4, 5]
+  # enable_ipv6                  = true
+  # public_subnet_ipv6_prefixes  = [0, 1, 2]
+  # private_subnet_ipv6_prefixes = [3, 4, 5]
 
   public_subnet_tags = {
     "kubernetes.io/cluster/consul-k8s-${random_id.suffix[count.index].dec}" = "shared"

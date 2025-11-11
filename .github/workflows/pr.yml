@@ -17,6 +17,7 @@ jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
 
+  # TODO: enable tests once eks issues are resolved
   # test:
   #   name: test
   #   needs: [ conditional-skip ]
