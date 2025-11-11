@@ -7,7 +7,7 @@ on:
     branches:
       - main
       - "release/**"
-# these should be the only settings that you will ever need to change
+# these should be the only settings that you will ever need to changes
 env:
   BRANCH: ${{ github.event.pull_request.head.ref }}
   CONTEXT: "pr"
