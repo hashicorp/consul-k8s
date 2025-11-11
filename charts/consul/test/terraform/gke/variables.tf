@@ -29,12 +29,6 @@ variable "cluster_count" {
   }
 }
 
-variable "subnet" {
-  type        = string
-  default     = "default"
-  description = "Legacy variable (unused) to maintain backward compatibility."
-}
-
 variable "labels" {
   type        = map(any)
   default     = {}
@@ -44,4 +38,10 @@ variable "labels" {
 variable "kubernetes_version_prefix" {
   default     = "1.32."
   description = "Kubernetes version supported on EKS"
+}
+
+variable "subnet" {
+  type        = string
+  default     = "default"
+  description = "Legacy variable (unused) to maintain backward compatibility."
 }
