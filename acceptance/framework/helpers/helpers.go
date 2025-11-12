@@ -488,3 +488,13 @@ func EnsurePeeringAcceptorSecret(t *testing.T, r *retry.R, kubectlOptions *k8s.K
 	require.NotEmpty(r, acceptorSecretName)
 	return acceptorSecretName
 }
+
+// HasStatusCondition checks if a condition exists with the expected status and reason.
+func HasStatusCondition(conditions []metav1.Condition, toCheck metav1.Condition) bool {
+	for _, c := range conditions {
+		if c.Type == toCheck.Type {
+			return c.Reason == toCheck.Reason && c.Status == toCheck.Status
+		}
+	}
+	return false
+}
