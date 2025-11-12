@@ -211,13 +211,13 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	}
 }
 
-// checkGatewayReady checks if the Gateway resource is ready using existing retry logic
+// checkGatewayReady checks if the Gateway resource is ready using existing retry logic.
 func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, namespace string) (bool, string) {
 	var success bool
 	var gatewayAddress string
 	gatewayCounter := &retry.Counter{Count: 10, Wait: 6 * time.Second}
 
-	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails
+	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails.
 	for i := 0; i < gatewayCounter.Count; i++ {
 		var gateway gwv1beta1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &gateway)
@@ -227,7 +227,7 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 			continue
 		}
 
-		// Check all conditions, if any fail we'll continue to next attempt
+		// Check all conditions, if any fail we'll continue to next attempt.
 		if len(gateway.Finalizers) != 1 {
 			logger.Log(t, fmt.Sprintf("Gateway check attempt %d: wrong number of finalizers", i+1))
 			time.Sleep(gatewayCounter.Wait)
@@ -240,7 +240,7 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 			continue
 		}
 
-		// Check status conditions
+		// Check status conditions.
 		if !helpers.HasStatusCondition(gateway.Status.Conditions, trueCondition("Accepted", "Accepted")) ||
 			!helpers.HasStatusCondition(gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted")) {
 			logger.Log(t, fmt.Sprintf("Gateway check attempt %d: missing required status conditions", i+1))
@@ -260,7 +260,7 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 			continue
 		}
 
-		// Check listener conditions
+		// Check listener conditions.
 		if !helpers.HasStatusCondition(gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted")) ||
 			!helpers.HasStatusCondition(gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts")) ||
 			!helpers.HasStatusCondition(gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs")) {
@@ -269,14 +269,14 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 			continue
 		}
 
-		// Check that we have an address to use
+		// Check that we have an address to use.
 		if len(gateway.Status.Addresses) < 2 {
 			logger.Log(t, fmt.Sprintf("Gateway check attempt %d: not enough addresses", i+1))
 			time.Sleep(gatewayCounter.Wait)
 			continue
 		}
 
-		// All checks passed
+		// All checks passed.
 		gatewayAddress = gateway.Status.Addresses[0].Value
 		success = true
 		break
@@ -291,7 +291,7 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 	return success, gatewayAddress
 }
 
-// waitForGatewayReady waits for Gateway to be ready with recreation attempts
+// waitForGatewayReady waits for Gateway to be ready with recreation attempts.
 func waitForGatewayReady(t *testing.T, ctx environment.TestContext, k8sClient client.Client, gatewayName, namespace, fixturePath string, applyCounter *retry.Counter) string {
 	maxRetries := 5
 
@@ -330,13 +330,13 @@ func waitForGatewayReady(t *testing.T, ctx environment.TestContext, k8sClient cl
 	return ""
 }
 
-// checkHTTPRouteReady checks if the HTTPRoute resource is ready using existing retry logic
+// checkHTTPRouteReady checks if the HTTPRoute resource is ready using existing retry logic.
 func checkHTTPRouteReady(t *testing.T, k8sClient client.Client, routeName, namespace string) bool {
 	var success bool
 	var httpRoute gwv1beta1.HTTPRoute
 	httpRouteCounter := &retry.Counter{Count: 10, Wait: 6 * time.Second}
 
-	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails
+	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails.
 	for i := 0; i < httpRouteCounter.Count; i++ {
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: routeName, Namespace: namespace}, &httpRoute)
 		if err != nil {
