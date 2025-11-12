@@ -13,17 +13,24 @@ env:
   CONTEXT: "pr"
 
 jobs:
-  cloud-acceptance:
-    name: cloud-acceptance
-    runs-on: ubuntu-24.04
+
+  # TODO: delete the dummy job and uncomment cloud-acceptance job after cleanup
+  cleanup-dummy:
+    runs-on: ubuntu-latest
     steps:
-      - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
-        name: cloud
-        with:
-          workflow: cloud.yml
-          repo: hashicorp/consul-k8s-workflows
-          # ref: main
-          # TODO: change ref to main after testing
-          ref: abhishek/temp-eks-only
-          token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-          inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+      - run: echo "Cleanup in progress. This is a dummy job to disable cloud acceptance tests during eks cleanup. It runs successfully and does nothing."
+
+  # cloud-acceptance:
+  #   name: cloud-acceptance
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+  #       name: cloud
+  #       with:
+  #         workflow: cloud.yml
+  #         repo: hashicorp/consul-k8s-workflows
+  #         # ref: main
+  #         # TODO: change ref to main after testing
+  #         ref: abhishek/temp-eks-only
+  #         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+  #         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
