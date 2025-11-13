@@ -6,6 +6,10 @@ terraform {
     aws = {
       version = "~> 5.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.27.0"
+    }
   }
 }
 
@@ -99,6 +103,27 @@ module "eks" {
   tags = var.tags
 }
 
+
+# K8s Provider for the FIRST cluster (cluster 0)
+provider "kubernetes" {
+  alias = "cluster0"
+  host                   = module.eks[0].cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster[0].token
+}
+
+# Provider for the SECOND cluster (cluster 1)
+provider "kubernetes" {
+  alias = "cluster1"
+
+  # Use null to disable the provider configuration if cluster_count is not > 1
+  # This avoids errors from empty string credentials.
+  host                   = var.cluster_count > 1 ? module.eks[1].cluster_endpoint : null
+  cluster_ca_certificate = var.cluster_count > 1 ? base64decode(module.eks[1].cluster_certificate_authority_data) : null
+  token                  = var.cluster_count > 1 ? data.aws_eks_cluster_auth.cluster[1].token : null
+}
+
+
 resource "aws_iam_role" "csi-driver-role" {
   count = var.cluster_count
   assume_role_policy = jsonencode({
@@ -154,7 +179,12 @@ data "aws_eks_cluster_auth" "cluster" {
 # Add a default StorageClass for dynamic volume provisioning
 # This is the primary fix for the "unbound PersistentVolumeClaims" issue 
 # as we do not specify storage class in default helm values.yaml.
-resource "kubernetes_storage_class" "ebs_gp3" {
+
+# StorageClass for the FIRST cluster
+resource "kubernetes_storage_class" "ebs_gp3_cluster0" {
+  provider = kubernetes.cluster0
+  depends_on = [module.eks, aws_eks_addon.csi-driver[0]]
+
   metadata {
     name = "gp3"
     annotations = {
@@ -169,6 +199,25 @@ resource "kubernetes_storage_class" "ebs_gp3" {
   volume_binding_mode = "WaitForFirstConsumer"
 }
 
+# StorageClass for the SECOND cluster
+resource "kubernetes_storage_class" "ebs_gp3_cluster1" {
+  count = var.cluster_count > 1 ? 1 : 0
+
+  provider = kubernetes.cluster1 
+  depends_on = [module.eks, aws_eks_addon.csi-driver[1]]
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  parameters = {
+    type = "gp3"
+  }
+  reclaim_policy      = "Delete"
+  volume_binding_mode = "WaitForFirstConsumer"
+}
 
 # The following resources are only applied when cluster_count=2 to set up vpc peering and the appropriate routes and
 # security groups so traffic between VPCs is allowed. There is validation to ensure cluster_count can be 1 or 2.
