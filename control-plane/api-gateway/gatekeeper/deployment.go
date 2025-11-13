@@ -5,7 +5,9 @@ package gatekeeper
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -21,6 +23,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	capi "github.com/hashicorp/consul/api"
 )
 
 const (
@@ -108,6 +112,18 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}
 
 	volumes, mounts := volumesAndMounts(gateway)
+
+	//Checking whether an additional volume is required for access logs defined in the proxy-defaults.
+	accessLogPath, err := g.getAccessLogPathFromProxyDefaults()
+	if err != nil {
+		g.Log.Error(err, "error fetching proxy defaults for access logs")
+		return nil, err
+	}
+
+	if accessLogPath != "" {
+		volumes = append(volumes, accessLogVolume())
+		mounts = append(mounts, accessLogVolumeMount(accessLogPath))
+	}
 
 	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, mounts)
 	if err != nil {
@@ -272,4 +288,35 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 
 	}
 	return &instanceValue
+}
+
+// fetches the global proxy-defaults config from consul and checks if access logs are enabled.
+// If enabled and of type file, it returns the access log path to be used for creating volume mount.
+func (g *Gatekeeper) getAccessLogPathFromProxyDefaults() (string, error) {
+
+	consulClient, err := consul.NewClient(g.ConsulConfig.APIClientConfig, g.ConsulConfig.APITimeout)
+	if err != nil {
+		return "", fmt.Errorf("unable to connect with consul client %s", err)
+	}
+
+	cfgEntry, _, err := consulClient.ConfigEntries().Get(capi.ProxyDefaults, capi.ProxyConfigGlobal, nil)
+	if err != nil && !strings.Contains(err.Error(), "404") {
+		return "", fmt.Errorf("error checking global proxy-defaults: %s", err)
+	}
+
+	if err != nil && strings.Contains(err.Error(), "404") {
+		return "", nil
+	}
+
+	proxyDefaults, ok := cfgEntry.(*capi.ProxyConfigEntry)
+	if !ok {
+		return "", fmt.Errorf("unexpected type for proxy-defaults: %T", cfgEntry)
+	}
+
+	if proxyDefaults.AccessLogs.Enabled {
+		if proxyDefaults.AccessLogs.Type == capi.FileLogSinkType {
+			return proxyDefaults.AccessLogs.Path, nil
+		}
+	}
+	return "", nil
 }
