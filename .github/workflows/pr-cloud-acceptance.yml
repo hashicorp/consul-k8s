@@ -12,6 +12,7 @@ env:
   BRANCH: ${{ github.event.pull_request.head.ref }}
   CONTEXT: "pr"
 
+# test with other branch
 jobs:
   cloud-acceptance:
     name: cloud-acceptance
