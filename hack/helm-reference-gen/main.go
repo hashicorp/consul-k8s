@@ -137,26 +137,34 @@ func main() {
 		IsLatest     bool   `json:"isLatest"`
 	}
 
-	var (
-		versionMap      map[string][]ProductVersion
-		latestVersion string
-	)
-	if len(versionMetadataBytes) > 0 {
-		if err := json.Unmarshal(versionMetadataBytes, &versionMap); err != nil {
-			fmt.Println("failed to parse versionMetadata.json:", err)
-		} else {
-			if consulList, ok := versionMap["consul"]; ok {
-				for _, pv := range consulList {
-					if pv.IsLatest {
-						latestVersion = pv.Version
-						break
-					}
-				}
-				if latestVersion == "" && len(consulList) > 0 {
-					latestVersion = consulList[0].Version
-				}
-			}
+	// Fail early: require non-empty file, successful parse, and an explicit latest version.
+	if len(versionMetadataBytes) == 0 {
+		fmt.Printf("%s is empty: ", versionMetadataPath)
+		os.Exit(1)
+	}
+
+	var versionMap map[string][]ProductVersion
+	if err := json.Unmarshal(versionMetadataBytes, &versionMap); err != nil {
+		fmt.Printf("failed to parse %s: %v\n", versionMetadataPath, err.Error())
+		os.Exit(1)
+	}
+
+	consulList, ok := versionMap["consul"]
+	if !ok || len(consulList) == 0 {
+		fmt.Printf("no 'consul' key or versions in %s: \n", versionMetadataPath)
+		os.Exit(1)
+	}
+
+	var latestVersion string
+	for _, pv := range consulList {
+		if pv.IsLatest {
+			latestVersion = pv.Version
+			break
 		}
+	}
+	if latestVersion == "" {
+		fmt.Printf("no Consul version marked isLatest=true in %s; cannot continue: \n", versionMetadataPath)
+		os.Exit(1)
 	}
 	helmReferenceFile := filepath.Join(docsRepoPath, "content/consul", latestVersion, "content/docs/reference/k8s/helm.mdx")
 	helmReferenceBytes, err := os.ReadFile(helmReferenceFile)
