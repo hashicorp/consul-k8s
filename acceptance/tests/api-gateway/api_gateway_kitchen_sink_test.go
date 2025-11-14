@@ -400,7 +400,7 @@ func checkHTTPRouteReady(t *testing.T, k8sClient client.Client, routeName, names
 	return success
 }
 
-// waitForHTTPRouteReady waits for HTTPRoute to be ready with recreation attempts
+// waitForHTTPRouteReady waits for HTTPRoute to be ready with recreation attempts.
 func waitForHTTPRouteReady(t *testing.T, ctx environment.TestContext, k8sClient client.Client, routeName, namespace, fixturePath string, applyCounter *retry.Counter) {
 	maxRetries := 5
 
