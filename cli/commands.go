@@ -11,6 +11,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/cli/cmd/config"
 	config_read "github.com/hashicorp/consul-k8s/cli/cmd/config/read"
+	debug "github.com/hashicorp/consul-k8s/cli/cmd/debug"
 	gwlist "github.com/hashicorp/consul-k8s/cli/cmd/gateway/list"
 	gwread "github.com/hashicorp/consul-k8s/cli/cmd/gateway/read"
 	"github.com/hashicorp/consul-k8s/cli/cmd/install"
@@ -74,6 +75,18 @@ func initializeCommands(ctx context.Context, log hclog.Logger, cleanupReqAndComp
 			return &gwread.Command{
 				BaseCommand: baseCommand,
 			}, nil
+		},
+		"debug": func() (cli.Command, error) {
+			// if cleanup is required
+			baseCommandWithCleanup := *baseCommand
+			baseCommandWithCleanup.CleanupReqAndCompleted = cleanupReqAndCompleted
+			return &debug.DebugCommand{
+				BaseCommand: &baseCommandWithCleanup,
+			}, nil
+			// if NO cleanup is required
+			// return &debug.DebugCommand{
+			// 	BaseCommand: baseCommand,
+			// }, nil
 		},
 		"proxy": func() (cli.Command, error) {
 			return &proxy.ProxyCommand{
