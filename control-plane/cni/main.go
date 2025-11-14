@@ -53,6 +53,9 @@ const (
 	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
+
+	// annotationDualStack stores if pod need to run in dualstack mode
+	annotationDualStack = "consul.hashicorp.com/dual-stack"
 )
 
 type Command struct {
@@ -174,7 +177,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	var iptablesCfg iptables.Config
-
+	dualStack := false
 	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
 	if cniArgsIPTablesCfg != "" {
 		var err error
@@ -215,6 +218,10 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		if err != nil {
 			return err
 		}
+		dualStack, err = parseDualStackAnnotation(*pod, annotationDualStack)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Set NetNS passed through the CNI.
@@ -227,7 +234,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Apply the iptables rules.
-	err = iptables.Setup(iptablesCfg)
+	err = iptables.Setup(iptablesCfg, dualStack)
 	if err != nil {
 		return fmt.Errorf("could not apply iptables setup: %v", err)
 	}
@@ -322,6 +329,18 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 		return iptables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
 	}
 	return cfg, nil
+}
+
+// parseDualStackAnnotation parses if pod dualstack annotation.
+func parseDualStackAnnotation(pod corev1.Pod, annotation string) (bool, error) {
+	anno, ok := pod.Annotations[annotation]
+	if !ok {
+		return false, fmt.Errorf("could not find %s annotation for %s pod", annotation, pod.Name)
+	}
+	if anno == "true" {
+		return true, nil
+	}
+	return false, nil
 }
 
 // updateTransparentProxyStatusAnnotation updates the transparent-proxy-status annotation. We use it as a simple inicator of

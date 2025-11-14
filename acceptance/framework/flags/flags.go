@@ -62,6 +62,8 @@ type TestFlags struct {
 
 	flagDisablePeering bool
 
+	flagDualStack bool
+
 	once sync.Once
 }
 
@@ -165,6 +167,8 @@ func (t *TestFlags) init() {
 	flag.BoolVar(&t.flagSkipDatadogTests, "skip-datadog", false,
 		"If true, datadog acceptance tests will not run.")
 
+	flag.BoolVar(&t.flagDualStack, "dual-stack", false, "Dual stack test with both IPv4 and IPv6")
+
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
 	}
@@ -252,6 +256,7 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		UseGKEAutopilot:    t.flagUseGKEAutopilot,
 		UseKind:            t.flagUseKind,
 		UseOpenshift:       t.flagUseOpenshift,
+		DualStack:          t.flagDualStack,
 	}
 
 	return c

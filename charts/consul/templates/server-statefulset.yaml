@@ -645,9 +645,18 @@ spec:
                 - |
                   {{- if .Values.global.tls.enabled }}
                   curl -k \
+                    {{- if .Values.global.dualStack.enabled }}
+                    https://[::1]:8501/v1/status/leader \
+                    {{- else }}
                     https://127.0.0.1:8501/v1/status/leader \
+                    {{- end }}
                   {{- else }}
-                  curl http://127.0.0.1:8500/v1/status/leader \
+                  curl \
+                    {{- if .Values.global.dualStack.enabled }}
+                    http://[::1]:8500/v1/status/leader \
+                    {{- else }}
+                    http://127.0.0.1:8500/v1/status/leader \
+                    {{- end }}
                   {{- end }}
                   2>/dev/null | grep -E '".+"'
             failureThreshold: 2
@@ -683,7 +692,7 @@ spec:
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.defaultEnabled }}
+              {{- if .Values.global.dualStack.enabled }}
               value: https://[::1]:8501
               {{- else }}
               value: https://127.0.0.1:8501
@@ -696,7 +705,7 @@ spec:
               {{- end }}
             {{- else }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.defaultEnabled }}
+              {{- if .Values.global.dualStack.enabled }}
               value: http://[::1]:8500
               {{- else }}
               value: http://127.0.0.1:8500
