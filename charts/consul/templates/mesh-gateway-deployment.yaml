@@ -169,6 +169,10 @@ spec:
         {{- end }}
         - name: CONSUL_NODE_NAME
           value: $(NODE_NAME)-virtual
+        - name: DP_ENVOY_READY_BIND_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         command:
         - "/bin/sh"
         - "-ec"
@@ -202,13 +206,17 @@ spec:
           runAsNonRoot: true
           seccompProfile:
             type: RuntimeDefault
+          {{- if or (not .Values.meshGateway.hostNetwork) (lt (int .Values.meshGateway.containerPort) 1024) }}
           capabilities:
-            {{ if not .Values.meshGateway.hostNetwork}}
+            {{- if not .Values.meshGateway.hostNetwork }}
             drop:
               - ALL
             {{- end }}
+            {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
             add:
               - NET_BIND_SERVICE
+            {{- end }}
+          {{- end }}
         {{- if .Values.meshGateway.resources }}
         resources:
             {{- if eq (typeOf .Values.meshGateway.resources) "string" }}
@@ -251,9 +259,16 @@ spec:
           value: component=mesh-gateway
         - name: DP_SERVICE_NODE_NAME
           value: $(NODE_NAME)-virtual
+        {{- if lt (int .Values.meshGateway.containerPort) 1024 }}
+        command:
+        - privileged-consul-dataplane
+        args:
+        - -envoy-executable-path=/usr/local/bin/privileged-envoy
+        {{- else }}
         command:
         - consul-dataplane
         args:
+        {{- end }}
         {{- if .Values.externalServers.enabled }}
         - -addresses={{ .Values.externalServers.hosts | first }}
         {{- else }}
@@ -304,6 +319,17 @@ spec:
         {{- end }}
         {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
         - -server-watch-disabled=true
+        {{- end }}
+        {{- if .Values.global.dualStack.enabled }}
+        - "-envoy-admin-bind-address=::1"
+        - "-xds-bind-addr=::1"
+        - "-graceful-addr=::1"
+        - "-consul-dns-bind-addr=::1"
+        {{- else }}
+        - -envoy-admin-bind-address=127.0.0.1
+        - -xds-bind-addr=127.0.0.1
+        - -graceful-addr=127.0.0.1
+        - -consul-dns-bind-addr=127.0.0.1
         {{- end }}
         livenessProbe:
           tcpSocket:

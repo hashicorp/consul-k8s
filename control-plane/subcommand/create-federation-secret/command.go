@@ -9,7 +9,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -366,7 +368,7 @@ func (c *Command) meshGatewayAddrs(logger hclog.Logger) ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("no 'wan' key found in tagged addresses for service instance %q", svc.ServiceID)
 		}
-		meshGatewayAddrs[fmt.Sprintf("%s:%d", addr.Address, addr.Port)] = true
+		meshGatewayAddrs[net.JoinHostPort(addr.Address, strconv.Itoa(addr.Port))] = true
 	}
 	var uniqMeshGatewayAddrs []string
 	for addr := range meshGatewayAddrs {

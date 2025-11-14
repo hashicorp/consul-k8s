@@ -13,7 +13,7 @@ jobs:
   backport:
     if: github.event.pull_request.merged
     runs-on: ubuntu-latest
-    container: hashicorpdev/backport-assistant:0.3.5
+    container: hashicorpdev/backport-assistant:v0.5.8
     steps:
       - name: Run Backport Assistant
         run: backport-assistant backport -merge-method=squash -gh-automerge
@@ -21,3 +21,4 @@ jobs:
           BACKPORT_LABEL_REGEXP: "backport/(?P<target>\\d+\\.\\d+\\.x)"
           BACKPORT_TARGET_TEMPLATE: "release/{{.target}}"
           GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          BACKPORT_MERGE_COMMIT: true

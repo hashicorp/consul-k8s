@@ -103,6 +103,8 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	if multiPort {
 		initContainerName = fmt.Sprintf("%s-%s", injectInitContainerName, mpi.serviceName)
 	}
+	dualStack := constants.Getv4orv6Str("false", "true")
+
 	container := corev1.Container{
 		Name:            initContainerName,
 		Image:           w.ImageConsulK8S,
@@ -147,6 +149,10 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			{
 				Name:  "CONSUL_NODE_NAME",
 				Value: "$(NODE_NAME)-virtual",
+			},
+			{
+				Name:  constants.ConsulDualStackEnvVar,
+				Value: dualStack,
 			},
 		},
 		Resources:    w.InitContainerResources,

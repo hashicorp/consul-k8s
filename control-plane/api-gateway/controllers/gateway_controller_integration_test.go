@@ -32,6 +32,7 @@ import (
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	"github.com/hashicorp/consul/agent/netutil"
 	"github.com/hashicorp/consul/api"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
@@ -41,6 +42,7 @@ import (
 )
 
 func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	s := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(s))
 	require.NoError(t, gwv1alpha2.Install(s))
