@@ -21,17 +21,18 @@ func serializeGatewayClassConfig(gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayCl
 		gw.Annotations = make(map[string]string)
 	}
 
-	if annotatedConfig, ok := gw.Annotations[common.AnnotationGatewayClassConfig]; ok {
-		var config v1alpha1.GatewayClassConfig
-		if err := json.Unmarshal([]byte(annotatedConfig), &config.Spec); err == nil {
-			// if we can unmarshal the gateway, return it
-			return &config, false
-		}
+	// Always marshal the current GCC spec and update the annotation
+	// This ensures the annotation reflects the latest GCC from the cluster
+	marshaled, _ := json.Marshal(gwcc.Spec)
+	currentAnnotation := string(marshaled)
+
+	// Check if the annotation needs updating
+	existingAnnotation, exists := gw.Annotations[common.AnnotationGatewayClassConfig]
+	needsUpdate := !exists || existingAnnotation != currentAnnotation
+
+	if needsUpdate {
+		gw.Annotations[common.AnnotationGatewayClassConfig] = currentAnnotation
 	}
 
-	// otherwise if we failed to unmarshal or there was no annotation, marshal it onto
-	// the gateway
-	marshaled, _ := json.Marshal(gwcc.Spec)
-	gw.Annotations[common.AnnotationGatewayClassConfig] = string(marshaled)
-	return gwcc, true
+	return gwcc, needsUpdate
 }

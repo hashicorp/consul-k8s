@@ -6,11 +6,14 @@ package gatekeeper
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func Test_compareDeployments(t *testing.T) {
@@ -216,4 +219,75 @@ func Test_compareDeployments(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMergeDeployments_ProbePropagation(t *testing.T) {
+	t.Parallel()
+
+	log := logr.Discard()
+
+	gcc := v1alpha1.GatewayClassConfig{
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			Probes: &v1alpha1.ProbesSpec{
+				Liveness: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						HTTPGet: &corev1.HTTPGetAction{
+							Path: "/health",
+							Port: intstr.FromInt(8080),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	deployment := &appsv1.Deployment{
+		Spec: appsv1.DeploymentSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "consul-dataplane",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	merged := mergeDeployments(log, gcc, deployment, &appsv1.Deployment{})
+	assert.NotNil(t, merged)
+
+	// Verify probe was applied to the container
+	assert.Len(t, merged.Spec.Template.Spec.Containers, 1)
+	container := merged.Spec.Template.Spec.Containers[0]
+	assert.NotNil(t, container.LivenessProbe)
+	assert.NotNil(t, container.LivenessProbe.HTTPGet)
+	assert.Equal(t, "/health", container.LivenessProbe.HTTPGet.Path)
+	assert.Equal(t, int32(8080), container.LivenessProbe.HTTPGet.Port.IntVal)
+
+	// Now update GCC with different probe (TCPSocket instead of HTTPGet)
+	gccUpdated := v1alpha1.GatewayClassConfig{
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			Probes: &v1alpha1.ProbesSpec{
+				Liveness: &corev1.Probe{
+					ProbeHandler: corev1.ProbeHandler{
+						TCPSocket: &corev1.TCPSocketAction{
+							Port: intstr.FromInt(9090),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	mergedUpdated := mergeDeployments(log, gccUpdated, merged, &appsv1.Deployment{})
+	assert.NotNil(t, mergedUpdated)
+
+	// Verify the probe handler was replaced (TCPSocket instead of HTTPGet)
+	containerUpdated := mergedUpdated.Spec.Template.Spec.Containers[0]
+	assert.NotNil(t, containerUpdated.LivenessProbe)
+	assert.NotNil(t, containerUpdated.LivenessProbe.TCPSocket)
+	assert.Nil(t, containerUpdated.LivenessProbe.HTTPGet)
+	assert.Equal(t, int32(9090), containerUpdated.LivenessProbe.TCPSocket.Port.IntVal)
 }
