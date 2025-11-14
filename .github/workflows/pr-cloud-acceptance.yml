@@ -13,6 +13,13 @@ env:
   CONTEXT: "pr"
 
 jobs:
+
+  # # TODO: delete the cleanup-dummy job and uncomment cloud-acceptance job after cleanup
+  # cleanup-dummy:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - run: echo "Cleanup in progress. This is a dummy job to disable cloud acceptance tests during eks cleanup. It runs successfully and does nothing."
+
   cloud-acceptance:
     name: cloud-acceptance
     runs-on: ubuntu-24.04
@@ -22,6 +29,8 @@ jobs:
         with:
           workflow: cloud.yml
           repo: hashicorp/consul-k8s-workflows
-          ref: main
+          # ref: main
+          # TODO: change ref to main after testing
+          ref: abhishek/temp-eks-only
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
           inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
