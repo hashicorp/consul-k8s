@@ -125,7 +125,8 @@ func main() {
 	versionMetadataPath := filepath.Join(docsRepoPath, "app/api/versionMetadata.json")
 	versionMetadataBytes, err := os.ReadFile(versionMetadataPath)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err.Error())
+		os.Exit(1)
 	}
 
 	// Parse versionMetadata.json so we can choose a Consul docs version if desired
