@@ -191,11 +191,17 @@ acceptance-lint: ## Run linter in the control-plane directory.
 # For CNI acceptance tests, the calico CNI plugin needs to be installed on Kind. Our consul-cni plugin will not work
 # without another plugin installed first
 kind-cni-calico: ## install cni plugin on kind
-	kubectl create namespace calico-system ||true
+	kubectl create namespace calico-system || true
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
-	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml
+	@if [ "$(DUAL_STACK)" = "true" ]; then \
+		echo "Adding IPv6 config..."; \
+		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources-ipv6.yaml; \
+	else \
+		echo "Adding IPv4 config..."; \
+		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml; \
+	fi
 	@sleep 20
 
 .PHONY: kind-delete
@@ -207,21 +213,44 @@ kind-delete:
 
 .PHONY: kind-cni
 kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
-	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE)
-	make kind-cni-calico
+	@if [ "$(DUAL_STACK)" = "true" ]; then \
+		echo "Creating IPv6 clusters..."; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+	else \
+		echo "Creating IPv4 clusters..."; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico; \
+	fi
 
 .PHONY: kind
 kind: kind-delete ## Helper target for doing local acceptance testing (works in all cases)
-	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
-	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
+	@if [ "$(DUAL_STACK)" = "true" ]; then \
+		echo "Creating IPv6 clusters..."; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
+	else \
+		echo "Creating IPv4 clusters..."; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE); \
+	fi
+
 
 .PHONY: kind-small
 kind-small: kind-delete ## Helper target for doing local acceptance testing (when you only need two clusters)

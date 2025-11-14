@@ -1,16 +1,16 @@
 # Dispatch to the consul-k8s-workflows with a weekly cron
 #
 # A separate file is needed for each release because the cron schedules are different for each release.
-name: weekly-acceptance-1-3-x
+name: weekly-acceptance-1-8-x
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
-    # Run weekly on Wednesday at 3AM UTC/11PM EST/8PM PST
-   - cron:  '0 3 * * 3'
+    # Run weekly on Sunday at 3AM UTC/11PM EST/8PM PST
+   - cron:  '0 3 * * 1'
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: "release/1.3.x"
+  BRANCH: "release/1.8.x"
   CONTEXT: "weekly"
 
 jobs:

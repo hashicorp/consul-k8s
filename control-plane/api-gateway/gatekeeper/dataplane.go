@@ -19,13 +19,14 @@ import (
 )
 
 const (
-	allCapabilities              = "ALL"
-	netBindCapability            = "NET_BIND_SERVICE"
-	consulDataplaneDNSBindHost   = "127.0.0.1"
-	consulDataplaneDNSBindPort   = 8600
-	defaultEnvoyProxyConcurrency = 1
-	volumeNameForConnectInject   = "consul-connect-inject-data"
-	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
+	allCapabilities                = "ALL"
+	netBindCapability              = "NET_BIND_SERVICE"
+	consulDataplaneDNSBindHost     = "127.0.0.1"
+	ipv6ConsulDataplaneDNSBindHost = "::1"
+	consulDataplaneDNSBindPort     = 8600
+	defaultEnvoyProxyConcurrency   = 1
+	volumeNameForConnectInject     = "consul-connect-inject-data"
+	volumeNameForTLSCerts          = "consul-gateway-tls-certificates"
 )
 
 func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
@@ -123,21 +124,29 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		}
 	}
 
-	container.SecurityContext = &corev1.SecurityContext{
-		AllowPrivilegeEscalation: ptr.To(usingPrivilegedPorts),
+	// Set up security context with least privilege by default
+	securityContext := &corev1.SecurityContext{
 		ReadOnlyRootFilesystem:   ptr.To(true),
 		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
 		SeccompProfile: &corev1.SeccompProfile{
 			Type: corev1.SeccompProfileTypeRuntimeDefault,
 		},
-		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
-		// NET_BIND_SERVICE is a requirement for consul-dataplane, even though we don't
-		// bind to privileged ports.
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
 	}
+
+	if usingPrivilegedPorts {
+		securityContext.AllowPrivilegeEscalation = ptr.To(true)
+		securityContext.RunAsNonRoot = ptr.To(false)
+		securityContext.Capabilities.Add = []corev1.Capability{netBindCapability}
+		container.Command = []string{"privileged-consul-dataplane"}
+		// Add the envoy executable path argument
+		container.Args = append(container.Args, "-envoy-executable-path=/usr/local/bin/privileged-envoy")
+	}
+
+	container.SecurityContext = securityContext
 
 	return container, nil
 }
@@ -146,16 +155,30 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
+	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
+
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-consul-dns-bind-addr=" + consulDNSBindAddress,
+		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-graceful-addr=" + consulDPBindAddress,
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(
+		namespace, config.EnableNamespaces,
+		config.ConsulDestinationNamespace,
+		config.EnableNamespaceMirroring,
+		config.NamespaceMirroringPrefix,
+	)
 
 	if config.AuthMethod != "" {
 		args = append(args,

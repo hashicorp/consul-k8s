@@ -6,7 +6,7 @@ on:
   schedule:
     # * is a special character in YAML so you have to quote this string
     # Run weekly on Sunday at 3AM UTC/11PM EST/8PM PST
-   - cron:  '0 3 * * 7'
+   - cron:  '0 3 * * 0'
 
 # these should be the only settings that you will ever need to change
 env:

@@ -252,6 +252,7 @@ func RunCommand(t testutil.TestingTB, options *k8s.KubectlOptions, command Comma
 		if res.err != nil {
 			logger.Logf(t, "Output: %v.", res.output)
 		}
+
 		return res.output, res.err
 		// Sometimes this func runs for too long handle timeout if needed.
 	case <-time.After(320 * time.Second):

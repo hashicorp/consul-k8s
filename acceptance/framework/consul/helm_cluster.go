@@ -101,7 +101,8 @@ func NewHelmCluster(
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m"},
+		"install": {"--timeout", "15m", "--debug"},
+		"delete":  {"--timeout", "15m", "--debug"},
 	}
 
 	opts := &helm.Options{
@@ -157,7 +158,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.InstallE(r, h.helmOptions, chartName, h.releaseName)
+		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
 
@@ -169,11 +170,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
-	// Ignore the error returned by the helm delete here so that we can
-	// always idempotently clean up resources in the cluster.
-	h.helmOptions.ExtraArgs = map[string][]string{
-		"--wait": nil,
-	}
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be

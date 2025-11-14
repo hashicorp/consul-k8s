@@ -112,6 +112,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: CONSUL_DUAL_STACK
+              value: "{{ .Values.global.dualStack.enabled }}"
             {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 12 }}
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: CONSUL_LOGIN_AUTH_METHOD

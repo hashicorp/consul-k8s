@@ -72,6 +72,11 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	vaultLicenseSecretName := fmt.Sprintf("%s-enterprise-license", vaultReleaseName)
 	vaultLicenseSecretKey := "license"
 
+	if cfg.DualStack {
+		values["server.service.ipFamilyPolicy"] = "SingleStack"
+		values["server.service.ipFamilies"] = "[\"IPv6\"]"
+	}
+
 	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
 	if cfg.VaultServerVersion != "" {
@@ -153,7 +158,7 @@ func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 		tunnel.Close()
 	})
 
-	config.Address = fmt.Sprintf("https://127.0.0.1:%d", localPort)
+	config.Address = fmt.Sprintf("https://localhost:%d", localPort)
 	// We don't need to verify TLS for localhost traffic.
 	err := config.ConfigureTLS(&vapi.TLSConfig{Insecure: true})
 	require.NoError(t, err)

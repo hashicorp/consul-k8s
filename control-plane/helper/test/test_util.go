@@ -100,7 +100,7 @@ func MockConnMgrForIPAndPort(t *testing.T, ip string, port int, enableGRPCConn b
 	if enableGRPCConn {
 		conn, err := grpc.DialContext(
 			context.Background(),
-			fmt.Sprintf("%s:%d", parsedIP, port),
+			net.JoinHostPort(parsedIP.String(), strconv.Itoa(port)),
 			grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err)
 		mockState.GRPCConn = conn
@@ -131,7 +131,7 @@ func GenerateServerCerts(t *testing.T) (string, string, string) {
 
 	// Generate Server Cert
 	name := "server.dc1.consul"
-	hosts := []string{name, "localhost", "127.0.0.1"}
+	hosts := []string{name, "localhost", "127.0.0.1", "::1"}
 	certPem, keyPem, err := cert.GenerateCert(name, 1*time.Hour, caCertTemplate, signer, hosts)
 	require.NoError(t, err)
 
