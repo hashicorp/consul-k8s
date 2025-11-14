@@ -462,7 +462,7 @@ func (l *LogLevelCommand) fetchPodLogs() error {
 		l.UI.Output("Logs saved to '%s'", proxyLogFilePath, terminal.WithSuccessStyle())
 		return nil
 	case <-l.Ctx.Done():
-		return fmt.Errorf("stopping collection due to shutdown signal recieved")
+		return fmt.Errorf("stopping collection due to shutdown signal received")
 	}
 }
 func (l *LogLevelCommand) getLogs(ctx context.Context, pod *corev1.Pod, podLogOptions *corev1.PodLogOptions) ([]byte, error) {
