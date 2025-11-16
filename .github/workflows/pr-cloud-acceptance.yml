@@ -1,11 +1,12 @@
 # Dispatch to the consul-k8s-workflows with a nightly cron
 name: pr-cloud-acceptance
 on:
-  pull_request:
-    types: [opened, synchronize]
-    # Runs on PRs to main and all release branches
+  push:
+    # Sequence of patterns matched against refs/heads
     branches:
+      # Push events on main branch
       - main
+      # Push events to branches matching refs/heads/release/**
       - "release/**"
 # these should be the only settings that you will ever need to change
 env:
