@@ -396,3 +396,104 @@ func WaitForInput(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// WaitForHTTPRouteWithRetry waits for an HTTPRoute to exist with retry logic
+// and delete/recreate fallback to make the tests more robust against intermittent issues.
+// It checks for the HTTPRoute's existence multiple times per attempt, and if
+// not found, attempts to delete and recreate the resource by reapplying the kustomize manifest.
+func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, routeName, kustomizeDir string) {
+	t.Helper()
+
+	logger.Log(t, "waiting for httproute to be created")
+	found := false
+	maxAttempts := 3
+	checksPerAttempt := 5
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		logger.Logf(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
+
+		// Check for httproute existence using simple loop
+		for i := range checksPerAttempt {
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
+			if err == nil {
+				found = true
+				logger.Logf(t, "httproute %s found successfully", routeName)
+				break
+			}
+			logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
+			time.Sleep(2 * time.Second)
+		}
+
+		if found {
+			break
+		}
+
+		if attempt < maxAttempts {
+			logger.Logf(t, "httproute not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
+			// Delete the httproute if it exists in a bad state
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", "httproute", routeName, "--ignore-not-found=true")
+			if err != nil {
+				logger.Logf(t, "warning: failed to delete httproute %s: %v", routeName, err)
+			}
+			// Recreate by reapplying the base resources
+			out, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "apply", "-k", kustomizeDir)
+			require.NoError(t, err, out)
+			// Brief pause to let the recreation start
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if !found {
+		require.Failf(t, "httproute %s was not found after %d attempts with delete/recreate", routeName, maxAttempts)
+	}
+}
+
+// EnsurePeeringAcceptorSecret ensures that a peering acceptor secret is created,
+// retrying by deleting and recreating the peering acceptor if the secret name is empty.
+// This is a helper function to handle flakiness in peering acceptor secret creation.
+func EnsurePeeringAcceptorSecret(t *testing.T, r *retry.R, kubectlOptions *k8s.KubectlOptions, peeringAcceptorPath string) string {
+	t.Helper()
+
+	acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, kubectlOptions, "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+	require.NoError(r, err)
+
+	// If the secret name is empty, retry recreating the peering acceptor up to 5 times
+	if acceptorSecretName == "" {
+		const maxRetries = 5
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			logger.Logf(t, "peering acceptor secret name is empty, recreating peering acceptor (attempt %d/%d)", attempt, maxRetries)
+			k8s.KubectlDelete(t, kubectlOptions, peeringAcceptorPath)
+
+			time.Sleep(5 * time.Second)
+
+			k8s.KubectlApply(t, kubectlOptions, peeringAcceptorPath)
+
+			time.Sleep(10 * time.Second)
+
+			acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(r, kubectlOptions, "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+			require.NoError(r, err)
+
+			if acceptorSecretName != "" {
+				logger.Logf(t, "peering acceptor secret name successfully created after %d attempts", attempt)
+				break
+			}
+
+			if attempt == maxRetries {
+				logger.Logf(t, "peering acceptor secret name still empty after %d attempts", maxRetries)
+			}
+		}
+	}
+
+	require.NotEmpty(r, acceptorSecretName)
+	return acceptorSecretName
+}
+
+// HasStatusCondition checks if a condition exists with the expected status and reason.
+func HasStatusCondition(conditions []metav1.Condition, toCheck metav1.Condition) bool {
+	for _, c := range conditions {
+		if c.Type == toCheck.Type {
+			return c.Reason == toCheck.Reason && c.Status == toCheck.Status
+		}
+	}
+	return false
+}
