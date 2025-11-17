@@ -99,8 +99,10 @@ func initializeCommands(ctx context.Context, log hclog.Logger, cleanupReqAndComp
 			}, nil
 		},
 		"proxy log": func() (cli.Command, error) {
+			baseCommandWithCleanup := *baseCommand
+			baseCommandWithCleanup.CleanupReqAndCompleted = cleanupReqAndCompleted
 			return &loglevel.LogLevelCommand{
-				BaseCommand: baseCommand,
+				BaseCommand: &baseCommandWithCleanup,
 			}, nil
 		},
 		"proxy read": func() (cli.Command, error) {
