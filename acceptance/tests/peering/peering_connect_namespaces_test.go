@@ -218,11 +218,9 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 
-			// Ensure the secret is created.
+			// Ensure the secret is created with retry logic for recreating the peering acceptor if needed.
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
-				require.NoError(r, err)
-				require.NotEmpty(r, acceptorSecretName)
+				helpers.EnsurePeeringAcceptorSecret(t, r, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 
 			// Copy secret from client peer to server peer.
