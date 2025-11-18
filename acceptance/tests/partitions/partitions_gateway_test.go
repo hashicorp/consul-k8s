@@ -231,8 +231,11 @@ func TestPartitions_Gateway(t *testing.T) {
 	})
 
 	logger.Log(t, "creating api-gateway resources")
-	out, err = k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
-	require.NoError(t, err, out)
+	// Apply api-gateway resources with retry logic to handle intermittent failures
+	retry.Run(t, func(r *retry.R) {
+		out, err := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
+		require.NoError(r, err, out)
+	})
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
