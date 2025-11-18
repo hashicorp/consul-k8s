@@ -443,10 +443,6 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass),
 		).
 		Watches(
-			&v1alpha1.GatewayClassConfig{},
-			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClassConfig),
-		).
-		Watches(
 			&gwv1beta1.HTTPRoute{},
 			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute),
 		).
@@ -526,39 +522,6 @@ func (r *GatewayController) transformGatewayClass(ctx context.Context, o client.
 		return nil
 	}
 	return common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))
-}
-
-// transformGatewayClassConfig will find all GatewayClasses that reference this config,
-// then return a list of reconcile Requests for all Gateways using those classes.
-func (r *GatewayController) transformGatewayClassConfig(ctx context.Context, o client.Object) []reconcile.Request {
-	gatewayClassConfig := o.(*v1alpha1.GatewayClassConfig)
-
-	// Find all GatewayClasses that reference this config
-	gatewayClassList := &gwv1beta1.GatewayClassList{}
-	if err := r.Client.List(ctx, gatewayClassList); err != nil {
-		r.Log.Error(err, "failed to list GatewayClasses")
-		return nil
-	}
-
-	var requests []reconcile.Request
-	for _, gatewayClass := range gatewayClassList.Items {
-		// Check if this GatewayClass references our config
-		if gatewayClass.Spec.ParametersRef != nil &&
-			gatewayClass.Spec.ParametersRef.Name == gatewayClassConfig.Name {
-
-			// Find all Gateways using this class
-			gatewayList := &gwv1beta1.GatewayList{}
-			if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
-				FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gatewayClass.Name),
-			}); err != nil {
-				r.Log.Error(err, "failed to list Gateways for class", "gatewayClass", gatewayClass.Name)
-				continue
-			}
-			requests = append(requests, common.ObjectsToReconcileRequests(pointersOf(gatewayList.Items))...)
-		}
-	}
-
-	return requests
 }
 
 // transformHTTPRoute will check the HTTPRoute object for a matching
