@@ -120,18 +120,24 @@ func TestAPIGateway_Basic(t *testing.T) {
 			require.NoError(t, err)
 
 			logger.Log(t, "creating api-gateway resources")
-			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-			require.NoError(t, err, out)
+			// Apply api-gateway resources with retry logic to handle intermittent failures
+			retry.Run(t, func(r *retry.R) {
+				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/api-gateway")
+				require.NoError(r, err, out)
+			})
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				// Ignore errors here because if the test ran as expected
 				// the custom resources will have been deleted.
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 			})
 
+			// Wait for the httproute to exist before patching, with delete/recreate fallback
+			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+
 			// Create certificate secret, we do this separately since
 			// applying the secret will make an invalid certificate that breaks other tests
 			logger.Log(t, "creating certificate secret")
-			out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
+			out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 			require.NoError(t, err, out)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				// Ignore errors here because if the test ran as expected
@@ -403,6 +409,13 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth")
 	})
 
+	// Wait for all the httproutes to be created immediately after applying the main resources
+	logger.Log(t, "waiting for httproutes to be created")
+	routeNames := []string{"http-route", "http-route-auth", "http-route-no-auth-on-auth-listener", "http-route2-auth", "http-route-auth-invalid"}
+	for _, routeName := range routeNames {
+		helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), routeName, "../fixtures/cases/api-gateways/jwt-auth")
+	}
+
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -442,6 +455,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server"))
+
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
 	k8sClient := ctx.ControllerRuntimeClient(t)
