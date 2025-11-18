@@ -163,27 +163,30 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}, nil
 }
 
-func mergeDeployments(log logr.Logger, gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
+func mergeDeployments(log logr.Logger, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
 		// Replace template
 		b.Spec.Template = a.Spec.Template
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
 	}
 
-	// Always apply probes from GatewayClassConfig to ensure they stay in sync
-	if gcc.Spec.Probes != nil {
+	// Apply probes from Gateway annotations if present
+	probes, err := ProbesFromGateway(&gateway)
+	if err != nil {
+		log.Error(err, "failed to parse probe annotations, skipping probe configuration")
+	} else if probes != nil {
 		for i, c := range b.Spec.Template.Spec.Containers {
 			if i > 0 { // only primary container gets managed probes
 				continue
 			}
-			if gcc.Spec.Probes.Liveness != nil {
-				c.LivenessProbe = gcc.Spec.Probes.Liveness.DeepCopy()
+			if probes.Liveness != nil {
+				c.LivenessProbe = probes.Liveness.DeepCopy()
 			}
-			if gcc.Spec.Probes.Readiness != nil {
-				c.ReadinessProbe = gcc.Spec.Probes.Readiness.DeepCopy()
+			if probes.Readiness != nil {
+				c.ReadinessProbe = probes.Readiness.DeepCopy()
 			}
-			if gcc.Spec.Probes.Startup != nil {
-				c.StartupProbe = gcc.Spec.Probes.Startup.DeepCopy()
+			if probes.Startup != nil {
+				c.StartupProbe = probes.Startup.DeepCopy()
 			}
 			b.Spec.Template.Spec.Containers[i] = c
 		}
@@ -278,7 +281,7 @@ func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
 
 func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(log, gcc, deployment, mutated)
+		mutated = mergeDeployments(log, gcc, gateway, deployment, mutated)
 		if deploymentExists {
 			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
 		}

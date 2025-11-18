@@ -68,17 +68,6 @@ type GatewayClassConfigSpec struct {
 
 	// Metrics defines how to configure the metrics for a gateway.
 	Metrics MetricsSpec `json:"metrics,omitempty"`
-
-	// Probes defines default Kubernetes probes applied to gateway deployments.
-	Probes *ProbesSpec `json:"probes,omitempty"`
-}
-
-// +k8s:deepcopy-gen=true
-// ProbesSpec groups the three standard Kubernetes probes.
-type ProbesSpec struct {
-	Liveness  *corev1.Probe `json:"liveness,omitempty"`
-	Readiness *corev1.Probe `json:"readiness,omitempty"`
-	Startup   *corev1.Probe `json:"startup,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

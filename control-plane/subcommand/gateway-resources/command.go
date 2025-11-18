@@ -249,13 +249,6 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
-	// Attempt to load probes configuration from mounted configmap.
-	if probes, err := c.loadProbesConfig(probesConfigFilename); err != nil {
-		c.UI.Error(fmt.Sprintf("Error loading probes.json: %s", err))
-	} else if probes != nil {
-		classConfig.Spec.Probes = probes
-	}
-
 	if metricsEnabled, isSet := metricsutil.GetMetricsEnabled(c.flagEnableMetrics); isSet {
 		classConfig.Spec.Metrics.Enabled = &metricsEnabled
 		if port, isValid := metricsutil.ParseScrapePort(c.flagMetricsPort); isValid {
@@ -405,109 +398,6 @@ var defaultResourceRequirements = corev1.ResourceRequirements{
 		corev1.ResourceMemory: resource.MustParse("100Mi"),
 		corev1.ResourceCPU:    resource.MustParse("100m"),
 	},
-}
-
-const probesConfigFilename = "/consul/config/probes.json"
-
-// loadProbesConfig loads probes.json if present and unmarshals into ProbesSpec.
-func (c *Command) loadProbesConfig(filename string) (*v1alpha1.ProbesSpec, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, err
-		}
-		c.UI.Info("No probes.json found, skipping probes config")
-		return nil, nil
-	}
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil {
-			c.UI.Warn(fmt.Sprintf("Failed to close probes.json: %s", closeErr))
-		}
-	}()
-	data, err := io.ReadAll(file)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Unable to read probes.json, skipping: %s", err))
-		return nil, err
-	}
-	var raw struct {
-		Liveness  *corev1.Probe `json:"liveness"`
-		Readiness *corev1.Probe `json:"readiness"`
-		Startup   *corev1.Probe `json:"startup"`
-	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, err
-	}
-	// Sanity: if all nil, return nil
-	if raw.Liveness == nil && raw.Readiness == nil && raw.Startup == nil {
-		return nil, nil
-	}
-	// Sanitize each probe to avoid invalid multi-handler or thresholds that would cause Deployment update rejection.
-	sanitizeProbe := func(name string, p *corev1.Probe) *corev1.Probe {
-		if p == nil {
-			return nil
-		}
-
-		// Make a deep copy to avoid modifying the original
-		probe := p.DeepCopy()
-
-		// Check if handlers are actually empty and clear them
-		// HTTPGet is empty if neither Path nor Port is set
-		if probe.HTTPGet != nil && probe.HTTPGet.Path == "" && probe.HTTPGet.Port.IntValue() == 0 && probe.HTTPGet.Port.StrVal == "" {
-			probe.HTTPGet = nil
-		}
-		// TCPSocket is empty if Port is not set
-		if probe.TCPSocket != nil && probe.TCPSocket.Port.IntValue() == 0 && probe.TCPSocket.Port.StrVal == "" {
-			probe.TCPSocket = nil
-		}
-		// Exec is empty if Command is not set
-		if probe.Exec != nil && len(probe.Exec.Command) == 0 {
-			probe.Exec = nil
-		}
-
-		// Count non-nil handlers; if more than one, keep the first in order: HTTPGet, TCPSocket, Exec.
-		// Drop others and log.
-		hasHandler := false
-		if probe.HTTPGet != nil {
-			hasHandler = true
-		}
-		if probe.TCPSocket != nil {
-			if !hasHandler {
-				hasHandler = true
-			} else {
-				// drop tcpSocket
-				probe.TCPSocket = nil
-				c.UI.Info(fmt.Sprintf("sanitising %s probe: dropping tcpSocket because another handler is set", name))
-			}
-		}
-		if probe.Exec != nil {
-			if !hasHandler {
-				hasHandler = true
-			} else {
-				probe.Exec = nil
-				c.UI.Info(fmt.Sprintf("sanitising %s probe: dropping exec because another handler is set", name))
-			}
-		}
-		// SuccessThreshold rules: Kubernetes requires liveness & startup successThreshold == 1.
-		if name == "liveness" && probe.SuccessThreshold != 1 {
-			c.UI.Info(fmt.Sprintf("sanitising liveness probe: adjusting successThreshold %d -> 1", probe.SuccessThreshold))
-			probe.SuccessThreshold = 1
-		}
-		if name == "startup" && probe.SuccessThreshold != 1 {
-			c.UI.Info(fmt.Sprintf("sanitising startup probe: adjusting successThreshold %d -> 1", probe.SuccessThreshold))
-			probe.SuccessThreshold = 1
-		}
-		// If no handler specified, return nil so we omit it entirely.
-		if probe.HTTPGet == nil && probe.TCPSocket == nil && probe.Exec == nil {
-			c.UI.Info(fmt.Sprintf("sanitising %s probe: no handler specified; omitting probe", name))
-			return nil
-		}
-		return probe
-	}
-	return &v1alpha1.ProbesSpec{
-		Liveness:  sanitizeProbe("liveness", raw.Liveness),
-		Readiness: sanitizeProbe("readiness", raw.Readiness),
-		Startup:   sanitizeProbe("startup", raw.Startup),
-	}, nil
 }
 
 func forceClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.GatewayClassConfig) error {

@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -226,17 +227,18 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 
 	log := logr.Discard()
 
-	gcc := v1alpha1.GatewayClassConfig{
-		Spec: v1alpha1.GatewayClassConfigSpec{
-			Probes: &v1alpha1.ProbesSpec{
-				Liveness: &corev1.Probe{
-					ProbeHandler: corev1.ProbeHandler{
-						HTTPGet: &corev1.HTTPGetAction{
-							Path: "/health",
-							Port: intstr.FromInt(8080),
-						},
-					},
-				},
+	gcc := v1alpha1.GatewayClassConfig{}
+
+	gateway := gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-gateway",
+			Annotations: map[string]string{
+				AnnotationLivenessProbe: `{
+					"httpGet": {
+						"path": "/health",
+						"port": 8080
+					}
+				}`,
 			},
 		},
 	}
@@ -255,7 +257,7 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 		},
 	}
 
-	merged := mergeDeployments(log, gcc, deployment, &appsv1.Deployment{})
+	merged := mergeDeployments(log, gcc, gateway, deployment, &appsv1.Deployment{})
 	assert.NotNil(t, merged)
 
 	// Verify probe was applied to the container
@@ -266,22 +268,21 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 	assert.Equal(t, "/health", container.LivenessProbe.HTTPGet.Path)
 	assert.Equal(t, int32(8080), container.LivenessProbe.HTTPGet.Port.IntVal)
 
-	// Now update GCC with different probe (TCPSocket instead of HTTPGet)
-	gccUpdated := v1alpha1.GatewayClassConfig{
-		Spec: v1alpha1.GatewayClassConfigSpec{
-			Probes: &v1alpha1.ProbesSpec{
-				Liveness: &corev1.Probe{
-					ProbeHandler: corev1.ProbeHandler{
-						TCPSocket: &corev1.TCPSocketAction{
-							Port: intstr.FromInt(9090),
-						},
-					},
-				},
+	// Now update Gateway with different probe (TCPSocket instead of HTTPGet)
+	gatewayUpdated := gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-gateway",
+			Annotations: map[string]string{
+				AnnotationLivenessProbe: `{
+					"tcpSocket": {
+						"port": 9090
+					}
+				}`,
 			},
 		},
 	}
 
-	mergedUpdated := mergeDeployments(log, gccUpdated, merged, &appsv1.Deployment{})
+	mergedUpdated := mergeDeployments(log, gcc, gatewayUpdated, merged, &appsv1.Deployment{})
 	assert.NotNil(t, mergedUpdated)
 
 	// Verify the probe handler was replaced (TCPSocket instead of HTTPGet)

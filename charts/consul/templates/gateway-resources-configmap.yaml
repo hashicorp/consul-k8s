@@ -21,12 +21,4 @@ data:
   resources.json: |
     {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
   {{- end }}
-  {{- if .Values.connectInject.apiGateway.managedGatewayClass.probes }}
-  probes.json: |
-    {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.probes }}
-  {{- end }}
-  {{- if not .Values.connectInject.apiGateway.managedGatewayClass.probes }}
-  probes.json: |
-    {}
-  {{- end }}
 {{- end }}

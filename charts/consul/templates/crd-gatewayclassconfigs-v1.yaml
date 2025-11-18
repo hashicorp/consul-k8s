@@ -1,15 +1,18 @@
 {{- if .Values.connectInject.enabled }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
-metadata:
-  annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: gatewayclassconfigs.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -160,160 +163,6 @@ spec:
                     maximum: 65535
                     minimum: 1024
                     type: integer
-                type: object
-              probes:
-                description: Default Kubernetes probes applied to gateway pods for this class.
-                properties:
-                  liveness:
-                    description: Liveness probe configuration.
-                    properties:
-                      exec:
-                        properties:
-                          command:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      failureThreshold:
-                        format: int32
-                        type: integer
-                      httpGet:
-                        properties:
-                          host:
-                            type: string
-                          path:
-                            type: string
-                          port:
-                            x-kubernetes-int-or-string: true
-                            anyOf:
-                            - type: integer
-                            - type: string
-                          scheme:
-                            type: string
-                        type: object
-                      initialDelaySeconds:
-                        format: int32
-                        type: integer
-                      periodSeconds:
-                        format: int32
-                        type: integer
-                      successThreshold:
-                        format: int32
-                        type: integer
-                      tcpSocket:
-                        properties:
-                          host:
-                            type: string
-                          port:
-                            x-kubernetes-int-or-string: true
-                            anyOf:
-                            - type: integer
-                            - type: string
-                        type: object
-                      timeoutSeconds:
-                        format: int32
-                        type: integer
-                    type: object
-                  readiness:
-                    description: Readiness probe configuration.
-                    properties:
-                      exec:
-                        properties:
-                          command:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      failureThreshold:
-                        format: int32
-                        type: integer
-                      httpGet:
-                        properties:
-                          host:
-                            type: string
-                          path:
-                            type: string
-                          port:
-                            x-kubernetes-int-or-string: true
-                            anyOf:
-                            - type: integer
-                            - type: string
-                          scheme:
-                            type: string
-                        type: object
-                      initialDelaySeconds:
-                        format: int32
-                        type: integer
-                      periodSeconds:
-                        format: int32
-                        type: integer
-                      successThreshold:
-                        format: int32
-                        type: integer
-                      tcpSocket:
-                        properties:
-                          host:
-                            type: string
-                          port:
-                            x-kubernetes-int-or-string: true
-                            anyOf:
-                            - type: integer
-                            - type: string
-                        type: object
-                      timeoutSeconds:
-                        format: int32
-                        type: integer
-                    type: object
-                  startup:
-                    description: Startup probe configuration.
-                    properties:
-                      exec:
-                        properties:
-                          command:
-                            items:
-                              type: string
-                            type: array
-                        type: object
-                      failureThreshold:
-                        format: int32
-                        type: integer
-                      httpGet:
-                        properties:
-                          host:
-                            type: string
-                          path:
-                            type: string
-                          port:
-                            x-kubernetes-int-or-string: true
-                            anyOf:
-                            - type: integer
-                            - type: string
-                          scheme:
-                            type: string
-                        type: object
-                      initialDelaySeconds:
-                        format: int32
-                        type: integer
-                      periodSeconds:
-                        format: int32
-                        type: integer
-                      successThreshold:
-                        format: int32
-                        type: integer
-                      tcpSocket:
-                        properties:
-                          host:
-                            type: string
-                          port:
-                            x-kubernetes-int-or-string: true
-                            anyOf:
-                            - type: integer
-                            - type: string
-                        type: object
-                      timeoutSeconds:
-                        format: int32
-                        type: integer
-                    type: object
                 type: object
               nodeSelector:
                 additionalProperties:
