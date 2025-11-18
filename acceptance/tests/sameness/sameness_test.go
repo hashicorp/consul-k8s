@@ -821,10 +821,6 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 	_, err = k8s.RunKubectlAndGetOutputE(t, c.context.KubectlOptions(t), "get", "secret", acceptorSecretName)
 	require.NoError(t, err, "Secret %s should exist on cluster %s", acceptorSecretName, c.name)
 
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, c.context.KubectlOptions(t), "delete", "secret", acceptorSecretName)
-	})
-
 	return acceptorSecretName
 }
 
