@@ -59,7 +59,7 @@ const (
 	AnnotationStartupProbe = "consul.hashicorp.com/startup-probe"
 )
 
-// ProbesConfig groups the three standard Kubernetes probes
+// ProbesConfig groups the three standard Kubernetes probes.
 type ProbesConfig struct {
 	Liveness  *corev1.Probe
 	Readiness *corev1.Probe
