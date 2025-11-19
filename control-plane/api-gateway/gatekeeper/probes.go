@@ -43,19 +43,19 @@ const (
 	// AnnotationLivenessProbe configures the liveness probe for Gateway pods.
 	// Value must be a JSON object conforming to the Kubernetes corev1.Probe specification.
 	// Liveness probes check if the container process should be restarted.
-	// Example: {"httpGet": {"path": "/ready", "port": 20000}, "periodSeconds": 10}
+	// Example: {"httpGet": {"path": "/ready", "port": 20000}, "periodSeconds": 10}.
 	AnnotationLivenessProbe = "consul.hashicorp.com/liveness-probe"
 
 	// AnnotationReadinessProbe configures the readiness probe for Gateway pods.
 	// Value must be a JSON object conforming to the Kubernetes corev1.Probe specification.
 	// Readiness probes determine if the pod is ready to serve traffic.
-	// Example: {"tcpSocket": {"port": 20000}, "initialDelaySeconds": 5}
+	// Example: {"tcpSocket": {"port": 20000}, "initialDelaySeconds": 5}.
 	AnnotationReadinessProbe = "consul.hashicorp.com/readiness-probe"
 
 	// AnnotationStartupProbe configures the startup probe for Gateway pods.
 	// Value must be a JSON object conforming to the Kubernetes corev1.Probe specification.
 	// Startup probes control container startup and can delay liveness checks.
-	// Example: {"exec": {"command": ["cat", "/tmp/healthy"]}, "failureThreshold": 30}
+	// Example: {"exec": {"command": ["cat", "/tmp/healthy"]}, "failureThreshold": 30}.
 	AnnotationStartupProbe = "consul.hashicorp.com/startup-probe"
 )
 
