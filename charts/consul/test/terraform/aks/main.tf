@@ -40,8 +40,8 @@ resource "azurerm_virtual_network" "default" {
   address_space       = ["192.${count.index + 168}.0.0/16"]
 
   subnet {
-    name           = "consul-k8s-${random_id.suffix[count.index].dec}-subnet"
-    address_prefix = "192.${count.index + 168}.1.0/24"
+    name             = "consul-k8s-${random_id.suffix[count.index].dec}-subnet"
+    address_prefixes = ["192.${count.index + 168}.1.0/24"]
   }
 }
 
@@ -72,11 +72,10 @@ resource "azurerm_kubernetes_cluster" "default" {
   // communication is tested, the connections goes through the appropriate gateway
   // rather than directly from pod to pod.
   network_profile {
-    network_plugin     = "kubenet"
-    service_cidr       = "10.0.0.0/16"
-    dns_service_ip     = "10.0.0.10"
-    pod_cidr           = "10.244.0.0/16"
-    docker_bridge_cidr = "172.17.0.1/16"
+    network_plugin = "kubenet"
+    service_cidr   = "10.0.0.0/16"
+    dns_service_ip = "10.0.0.10"
+    pod_cidr       = "10.244.0.0/16"
   }
 
   default_node_pool {
