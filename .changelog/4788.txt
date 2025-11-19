@@ -1,0 +1,3 @@
+```release-note:feature
+cli: added new -capture flag to proxy loglevel command, enabling users to capture logs for certain duration.
+```
