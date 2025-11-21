@@ -287,7 +287,35 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
+	logger.Log(t, "checking for http route")
 	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway")
+
+	// // Wait for MeshService CR to exist (backendRefs target)
+	// retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
+	//     out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts,
+	//         "get", "meshservice", "mesh-service",
+	//         "-o", "jsonpath={.metadata.name}",
+	//     )
+	//     require.NoError(r, err)
+	//     require.Equal(r, "mesh-service", out, "meshservice CR not yet present")
+	// })
+
+	// Wait for exported static-server endpoints to appear via peering.
+	// We look from the client peer at the server peer’s service using Peer=server and the server namespace.
+	logger.Log(t, "checking for exported static-server instances")
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		instances, _, err := staticClientPeerClient.Catalog().Service(
+			staticServerName,
+			"",
+			&api.QueryOptions{
+				Namespace:  staticServerNamespace,
+				Peer:       staticServerPeer, // ask for service from peer dc
+				Datacenter: staticClientPeer, // local dc context
+			},
+		)
+		require.NoError(r, err)
+		require.Greater(r, len(instances), 0, "no exported static-server instances yet")
+	})
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
