@@ -415,8 +415,19 @@ func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions,
 
 		// Check for httproute existence using simple loop
 		for i := range checksPerAttempt {
-			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
-			if err == nil {
+			// _, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
+			// if err == nil {
+			// 	found = true
+			// 	logger.Logf(t, "httproute %s found successfully", routeName)
+			// 	break
+			// }
+			status, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions,
+				"get", "httproute", routeName,
+				"-o", "jsonpath={.status.parents[0].conditions[?(@.type==\"Accepted\")].status}",
+			)
+			// Normalize (in case of stray quotes or whitespace)
+			status = strings.TrimSpace(strings.Trim(status, "'\""))
+			if status == "True" {
 				found = true
 				logger.Logf(t, "httproute %s found successfully", routeName)
 				break
