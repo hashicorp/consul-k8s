@@ -338,6 +338,10 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 // fetches the global proxy-defaults config from consul and checks if access logs are enabled.
 // If enabled and of type file, it returns the access log path to be used for creating volume mount.
 func (g *Gatekeeper) getAccessLogPathFromProxyDefaults() (string, error) {
+	// If no ConsulConfig is provided, skip fetching proxy-defaults.
+	if g.ConsulConfig == nil {
+		return "", nil
+	}
 
 	consulClient, err := consul.NewClient(g.ConsulConfig.APIClientConfig, g.ConsulConfig.APITimeout)
 	if err != nil {
