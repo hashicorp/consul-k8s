@@ -276,14 +276,10 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	w.injectVolumeMount(pod)
 
 	// Optionally mount data volume to envoy sidecar if file based access logs are enabled
-	accessLogPath, err := w.getAccessLogPathFromProxyDefaults()
+	err = w.additionalAccessLogVolumeMount(&pod)
 	if err != nil {
-		w.Log.Error(err, "unable to get access log path from proxy defaults", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("unable to get access log path from proxy defaults: %s", err))
-	}
-
-	if accessLogPath != "" {
-		pod.Spec.Volumes = append(pod.Spec.Volumes, accessLogVolume())
+		w.Log.Error(err, "unable to mount additional access log volume", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("unable to mount additional access log volume: %s", err))
 	}
 
 	// Optionally add any volumes that are to be used by the envoy sidecar.
@@ -344,11 +340,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
 		}
-
-		if accessLogPath != "" {
-			envoySidecar.VolumeMounts = append(envoySidecar.VolumeMounts, accessLogVolumeMount(accessLogPath))
-		}
-
 		//Append the Envoy sidecar before the application container only if lifecycle enabled.
 		if lifecycleEnabled && !consulDataplaneSidecarEnabled && ok == nil {
 			pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
@@ -431,9 +422,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			if err != nil {
 				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
-			}
-			if accessLogPath != "" {
-				envoySidecar.VolumeMounts = append(envoySidecar.VolumeMounts, accessLogVolumeMount(accessLogPath))
 			}
 			// If Lifecycle is enabled, add to the list of sidecar containers to be added
 			// to pod containers at the end in order to preserve relative ordering.
@@ -791,44 +779,43 @@ func sliceContains(slice []string, entry string) bool {
 	return false
 }
 
-// fetches the global proxy-defaults config from consul and checks if access logs are enabled.
-// If enabled and of file type, it returns the access log path to be used for creating volume mount.
-func (w *MeshWebhook) getAccessLogPathFromProxyDefaults() (string, error) {
+// Fetches the global proxy-defaults config from Consul and checks if access logs are enabled.
+// If enabled and of file type, it returns the access log path to be used for creating a volume mount.
+func (w *MeshWebhook) additionalAccessLogVolumeMount(pod *corev1.Pod) error {
 	// If no ConsulConfig is provided, skip fetching proxy-defaults.
 	if w.ConsulConfig == nil || w.ConsulServerConnMgr == nil {
 		w.Log.Info("no ConsulConfig or ConsulServerConnMgr provided, skipping fetching proxy-defaults")
-		return "", nil
+		return nil
 	}
 
-	serverState, err := w.ConsulServerConnMgr.State()
+	proxyDefaults, err := consul.FetchProxyDefaultsFromConsul(w.ConsulConfig, w.ConsulServerConnMgr)
 	if err != nil {
-		return "", fmt.Errorf("unable to get consul server connection state: %s", err)
+		return fmt.Errorf("error fetch proxy-defaults from consul: %s", err.Error())
 	}
 
-	consulClient, err := consul.NewClientFromConnMgrState(w.ConsulConfig, serverState)
-	if err != nil {
-		return "", fmt.Errorf("unable to connect with consul client %s", err)
-	}
-
-	cfgEntry, _, err := consulClient.ConfigEntries().Get(capi.ProxyDefaults, capi.ProxyConfigGlobal, nil)
-	if err != nil && !strings.Contains(err.Error(), "404") {
-		return "", fmt.Errorf("error fetching global proxy-defaults: %s", err)
-	}
-
-	// If proxy-defaults not found, return empty string.
-	if err != nil && strings.Contains(err.Error(), "404") {
-		return "", nil
-	}
-
-	proxyDefaults, ok := cfgEntry.(*capi.ProxyConfigEntry)
-	if !ok {
-		return "", fmt.Errorf("unexpected type for proxy-defaults: %T", cfgEntry)
-	}
-
-	if proxyDefaults.AccessLogs.Enabled {
-		if proxyDefaults.AccessLogs.Type == capi.FileLogSinkType {
-			return proxyDefaults.AccessLogs.Path, nil
+	if proxyDefaults != nil {
+		if proxyDefaults.AccessLogs.Enabled {
+			pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled] = "true"
+			if proxyDefaults.AccessLogs.Type == capi.FileLogSinkType {
+				pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath] = proxyDefaults.AccessLogs.Path
+				pod.Spec.Volumes = append(pod.Spec.Volumes, accessLogVolume())
+			}
 		}
 	}
-	return "", nil
+
+	return nil
+}
+
+func findAccessLogVolumeMount(pod corev1.Pod) (corev1.VolumeMount, bool) {
+	for _, v := range pod.Spec.Volumes {
+		if v.Name == accessLogVolumeName {
+			if pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled] == "true" {
+				if path, ok := pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath]; ok {
+					return accessLogVolumeMount(path), true
+				}
+			}
+		}
+	}
+
+	return corev1.VolumeMount{}, false
 }

@@ -194,6 +194,11 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 		})
 	}
 
+	// Add the access log volume mount if it exists in the pod.
+	if accessLogVolMount, ok := findAccessLogVolumeMount(pod); ok {
+		container.VolumeMounts = append(container.VolumeMounts, accessLogVolMount)
+	}
+
 	// Add any extra VolumeMounts.
 	if userVolMount, ok := pod.Annotations[constants.AnnotationConsulSidecarUserVolumeMount]; ok {
 		var volumeMounts []corev1.VolumeMount
