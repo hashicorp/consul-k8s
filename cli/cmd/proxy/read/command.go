@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -24,14 +26,21 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 )
 
-// defaultAdminPort is the port where the Envoy admin API is exposed.
-const defaultAdminPort int = 19000
-
 const (
-	Table = "table"
-	JSON  = "json"
-	Raw   = "raw"
+	// defaultAdminPort is the port where the Envoy admin API is exposed.
+	defaultAdminPort int = 19000
 
+	// permissions for creating dir & file [before writing envoy config to a file].
+	filePerm = 0644
+	dirPerm  = 0755
+
+	// Output formats
+	Table   = "table"
+	JSON    = "json"
+	Raw     = "raw"
+	Archive = "archive"
+
+	// Flag names
 	flagNameNamespace   = "namespace"
 	flagNameOutput      = "output"
 	flagNameClusters    = "clusters"
@@ -96,7 +105,7 @@ func (c *ReadCommand) init() {
 	f.StringVar(&flag.StringVar{
 		Name:    flagNameOutput,
 		Target:  &c.flagOutput,
-		Usage:   "Output the Envoy configuration as 'table', 'json', or 'raw'.",
+		Usage:   "Output the Envoy configuration as 'table', 'json', 'raw' or 'archive'.",
 		Default: Table,
 		Aliases: []string{"o"},
 	})
@@ -266,7 +275,7 @@ func (c *ReadCommand) validateFlags() error {
 	if errs := validation.ValidateNamespaceName(c.flagNamespace, false); c.flagNamespace != "" && len(errs) > 0 {
 		return fmt.Errorf("invalid namespace name passed for -namespace/-n: %v", strings.Join(errs, "; "))
 	}
-	if outputs := []string{Table, JSON, Raw}; !slices.Contains(outputs, c.flagOutput) {
+	if outputs := []string{Table, JSON, Raw, Archive}; !slices.Contains(outputs, c.flagOutput) {
 		return fmt.Errorf("-output must be one of %s.", strings.Join(outputs, ", "))
 	}
 	return nil
@@ -356,6 +365,8 @@ func (c *ReadCommand) outputConfigs(configs map[string]*envoy.EnvoyConfig) error
 		return c.outputJSON(configs)
 	case Raw:
 		return c.outputRaw(configs)
+	case Archive:
+		return c.outputArchive(configs)
 	}
 
 	return nil
@@ -479,7 +490,6 @@ func (c *ReadCommand) outputRaw(configs map[string]*envoy.EnvoyConfig) error {
 		if err := json.Unmarshal(config.RawCfg, &cfg); err != nil {
 			return err
 		}
-
 		cfgs[name] = cfg
 	}
 
@@ -544,4 +554,39 @@ func (c *ReadCommand) outputSecretsTable(secrets []envoy.Secret) {
 
 	c.UI.Output(fmt.Sprintf("Secrets (%d)", len(secrets)), terminal.WithHeaderStyle())
 	c.UI.Table(formatSecrets(secrets))
+}
+
+func (c *ReadCommand) outputArchive(configs map[string]*envoy.EnvoyConfig) error {
+	cfgs := make(map[string]interface{}, 0)
+	for name, config := range configs {
+		var cfg interface{}
+		if err := json.Unmarshal(config.RawCfg, &cfg); err != nil {
+			return err
+		}
+
+		cfgs[name] = cfg
+	}
+
+	out, err := json.MarshalIndent(cfgs, "", "\t")
+	if err != nil {
+		return err
+	}
+
+	// Create file path and directory for storing proxy read data
+	// NOTE: currently it is writing data file in cwd /proxy dir only. Also, file contents will be overwritten if
+	// the command is run multiple times for the same pod name or if file already exists.
+	fileName := fmt.Sprintf("proxy-read-%s.json", c.flagPodName)
+	proxyReadFilePath := filepath.Join("proxy", fileName)
+	err = os.MkdirAll(filepath.Dir(proxyReadFilePath), dirPerm)
+	if err != nil {
+		return fmt.Errorf("error creating proxy read output directory: %v", err)
+	}
+	err = os.WriteFile(proxyReadFilePath, out, filePerm)
+	if err != nil {
+		// Note: Please do not delete the directory created above even if writing file fails.
+		// This (/proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
+		return fmt.Errorf("error writing proxy read output to json file '%s': %v", proxyReadFilePath, err)
+	}
+	c.UI.Output(fmt.Sprintf("proxy read '%s' output saved to '%s'", c.flagPodName, proxyReadFilePath), terminal.WithSuccessStyle())
+	return nil
 }
