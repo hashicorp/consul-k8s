@@ -38,12 +38,12 @@ import (
 	capi "github.com/hashicorp/consul/api"
 )
 
-type consulServerResponseConfig struct {
-	setProxyDefaults   bool
+type consulServerRespCfg struct {
+	hasProxyDefaults   bool
 	errOnProxyDefaults bool
 	accessLogEnabled   bool
-	fileTypeAccessLog  bool
-	acessLogPath       string
+	fileLogSinkType    bool
+	fileLogPath        string
 }
 
 func TestHandlerHandle(t *testing.T) {
@@ -2437,48 +2437,48 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 
 func TestHandler_additionalAccessLogVolumeMount(t *testing.T) {
 	cases := []struct {
-		Name                 string
-		Webhook              MeshWebhook
-		serverResponseConfig consulServerResponseConfig
-		WantErr              bool
+		Name              string
+		Webhook           MeshWebhook
+		srvResponseConfig consulServerRespCfg
+		WantErr           bool
 	}{
 		{
-			Name: "proxy defaults is not set on consul server",
-			serverResponseConfig: consulServerResponseConfig{
-				setProxyDefaults: false,
+			Name: "no proxy-defaults configured",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: false,
 			},
 		},
 		{
-			Name: "unable to fetch proxy defaults",
-			serverResponseConfig: consulServerResponseConfig{
-				setProxyDefaults:   true,
+			Name: "error fetching proxy-defaults",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults:   true,
 				errOnProxyDefaults: true,
 			},
 			WantErr: true,
 		},
 		{
-			Name: "default access logs enabled in proxy-defaults",
-			serverResponseConfig: consulServerResponseConfig{
-				setProxyDefaults:  true,
-				accessLogEnabled:  true,
-				fileTypeAccessLog: false,
-				acessLogPath:      "/var/log/access-log.txt",
+			Name: "access-logs enabled but sink is not file type",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  false,
+				fileLogPath:      "/var/log/access-log.txt",
 			},
 		},
 		{
-			Name: "file type access logs enabled in proxy-defaults",
-			serverResponseConfig: consulServerResponseConfig{
-				setProxyDefaults:  true,
-				accessLogEnabled:  true,
-				fileTypeAccessLog: true,
-				acessLogPath:      "/var/log/access-log.txt",
+			Name: "file-type access-log enabled with path",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  true,
+				fileLogPath:      "/var/log/access-log.txt",
 			},
 		},
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.Name, func(t *testing.T) {
-			server, testClient := fakeConsulServer(t, tt.serverResponseConfig)
+			server, testClient := fakeConsulServer(t, tt.srvResponseConfig)
 			defer server.Close()
 
 			tt.Webhook.ConsulConfig = testClient.Cfg
@@ -2499,14 +2499,14 @@ func TestHandler_additionalAccessLogVolumeMount(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			if tt.serverResponseConfig.fileTypeAccessLog {
+			if tt.srvResponseConfig.fileLogSinkType {
 				require.Equal(t, 1, len(pod.Spec.Volumes))
 				require.Equal(t, accessLogVolumeName, pod.Spec.Volumes[0].Name)
 				require.Equal(t, 2, len(pod.Annotations))
 				require.Equal(t, "true", pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled])
-				require.Equal(t, tt.serverResponseConfig.acessLogPath, pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath])
+				require.Equal(t, tt.srvResponseConfig.fileLogPath, pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath])
 
-			} else if tt.serverResponseConfig.accessLogEnabled {
+			} else if tt.srvResponseConfig.accessLogEnabled {
 				require.Equal(t, 0, len(pod.Spec.Volumes))
 				require.Equal(t, 1, len(pod.Annotations))
 				require.Equal(t, "true", pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled])
@@ -2613,9 +2613,9 @@ func clientWithNamespace(name string) kubernetes.Interface {
 	return fake.NewSimpleClientset(&ns)
 }
 
-func fakeConsulServer(t *testing.T, serverResponseConfig consulServerResponseConfig) (*httptest.Server, *test.TestServerClient) {
+func fakeConsulServer(t *testing.T, srvResponseConfig consulServerRespCfg) (*httptest.Server, *test.TestServerClient) {
 	t.Helper()
-	mux := buildMux(t, serverResponseConfig)
+	mux := buildMux(t, srvResponseConfig)
 	consulServer := httptest.NewServer(mux)
 
 	parsedURL, err := url.Parse(consulServer.URL)
@@ -2636,7 +2636,7 @@ func fakeConsulServer(t *testing.T, serverResponseConfig consulServerResponseCon
 	return consulServer, testClient
 }
 
-func buildMux(t *testing.T, cfg consulServerResponseConfig) http.Handler {
+func buildMux(t *testing.T, cfg consulServerRespCfg) http.Handler {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/config/proxy-defaults/"+capi.ProxyConfigGlobal, func(w http.ResponseWriter, r *http.Request) {
@@ -2644,20 +2644,20 @@ func buildMux(t *testing.T, cfg consulServerResponseConfig) http.Handler {
 			w.WriteHeader(500)
 			return
 		}
-		if !cfg.setProxyDefaults {
+		if !cfg.hasProxyDefaults {
 			w.WriteHeader(404)
 			return
 		}
 		w.WriteHeader(200)
 		accessLogType := capi.DefaultLogSinkType
-		if cfg.fileTypeAccessLog {
+		if cfg.fileLogSinkType {
 			accessLogType = capi.FileLogSinkType
 		}
 		proxyDefaults := capi.ProxyConfigEntry{
 			AccessLogs: &capi.AccessLogsConfig{
 				Enabled: cfg.accessLogEnabled,
 				Type:    accessLogType,
-				Path:    cfg.acessLogPath,
+				Path:    cfg.fileLogPath,
 			},
 		}
 		val, err := json.Marshal(proxyDefaults)

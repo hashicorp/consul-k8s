@@ -30,11 +30,11 @@ import (
 )
 
 type consulServerRespCfg struct {
-	setProxyDefaults   bool
+	hasProxyDefaults   bool
 	errOnProxyDefaults bool
 	accessLogEnabled   bool
-	fileTypeAccessLog  bool
-	accessLogPath      string
+	fileLogSinkType    bool
+	fileLogPath        string
 }
 
 func Test_compareDeployments(t *testing.T) {
@@ -323,7 +323,7 @@ func TestAdditionalAccessLogVolumeMount(t *testing.T) {
 	cases := map[string]testCase{
 		"no proxy-defaults configured": {
 			srvResponseConfig: consulServerRespCfg{
-				setProxyDefaults: false,
+				hasProxyDefaults: false,
 			},
 		},
 		"error fetching proxy-defaults": {
@@ -333,23 +333,23 @@ func TestAdditionalAccessLogVolumeMount(t *testing.T) {
 		},
 		"access-logs disabled in proxy-defaults": {
 			srvResponseConfig: consulServerRespCfg{
-				setProxyDefaults: true,
+				hasProxyDefaults: true,
 				accessLogEnabled: false,
 			},
 		},
-		"access-logs enabled but sink is not file": {
+		"access-logs enabled but sink is not file type": {
 			srvResponseConfig: consulServerRespCfg{
-				setProxyDefaults:  true,
-				accessLogEnabled:  true,
-				fileTypeAccessLog: false,
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  false,
 			},
 		},
 		"file-type access-log enabled with path": {
 			srvResponseConfig: consulServerRespCfg{
-				setProxyDefaults:  true,
-				accessLogEnabled:  true,
-				fileTypeAccessLog: true,
-				accessLogPath:     "/var/log/envoy/access.log",
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  true,
+				fileLogPath:      "/var/log/envoy/access.log",
 			},
 		},
 	}
@@ -369,24 +369,24 @@ func TestAdditionalAccessLogVolumeMount(t *testing.T) {
 			initialvolume := []corev1.Volume{}
 			initialmount := []corev1.VolumeMount{}
 
-			newVolume, newMount, err := g.additionalAccessLogVolumeMount(initialvolume, initialmount)
+			updatedVolumes, updatedMounts, err := g.additionalAccessLogVolumeMount(initialvolume, initialmount)
 			if tc.srvResponseConfig.errOnProxyDefaults {
 				require.Error(t, err)
 				require.ErrorContains(t, err, "error fetching global proxy-defaults")
 				return
 			}
 			require.NoError(t, err)
-			if tc.srvResponseConfig.setProxyDefaults && tc.srvResponseConfig.accessLogEnabled && tc.srvResponseConfig.fileTypeAccessLog {
+			if tc.srvResponseConfig.hasProxyDefaults && tc.srvResponseConfig.accessLogEnabled && tc.srvResponseConfig.fileLogSinkType {
 				// Expect volume and mount to be added
-				require.Len(t, newVolume, 1)
-				require.Len(t, newMount, 1)
-				require.Equal(t, accessLogVolumeName, newVolume[0].Name)
-				require.Equal(t, accessLogVolumeName, newMount[0].Name)
-				require.Equal(t, filepath.Dir(tc.srvResponseConfig.accessLogPath), newMount[0].MountPath)
+				require.Len(t, updatedVolumes, 1)
+				require.Len(t, updatedMounts, 1)
+				require.Equal(t, accessLogVolumeName, updatedVolumes[0].Name)
+				require.Equal(t, accessLogVolumeName, updatedMounts[0].Name)
+				require.Equal(t, filepath.Dir(tc.srvResponseConfig.fileLogPath), updatedMounts[0].MountPath)
 			} else {
 				// Expect no additional volume or mount to be added
-				require.Len(t, newVolume, 0)
-				require.Len(t, newMount, 0)
+				require.Len(t, updatedVolumes, 0)
+				require.Len(t, updatedMounts, 0)
 			}
 		})
 	}
@@ -423,20 +423,20 @@ func buildMux(t *testing.T, cfg consulServerRespCfg) http.Handler {
 			w.WriteHeader(500)
 			return
 		}
-		if !cfg.setProxyDefaults {
+		if !cfg.hasProxyDefaults {
 			w.WriteHeader(404)
 			return
 		}
 		w.WriteHeader(200)
 		accessLogType := capi.DefaultLogSinkType
-		if cfg.fileTypeAccessLog {
+		if cfg.fileLogSinkType {
 			accessLogType = capi.FileLogSinkType
 		}
 		proxyDefaults := capi.ProxyConfigEntry{
 			AccessLogs: &capi.AccessLogsConfig{
 				Enabled: cfg.accessLogEnabled,
 				Type:    accessLogType,
-				Path:    cfg.accessLogPath,
+				Path:    cfg.fileLogPath,
 			},
 		}
 		val, err := json.Marshal(proxyDefaults)
