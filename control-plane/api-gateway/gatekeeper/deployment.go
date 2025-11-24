@@ -113,17 +113,10 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 
 	volumes, mounts := volumesAndMounts(gateway)
 
-	//Checking whether an additional volume is required for access logs defined in the proxy-defaults.
-	accessLogPath, err := g.fetchAccessLogPathFromProxyDefaults()
+	volumes, mounts, err = g.additionalAccessLogVolumeMount(volumes, mounts)
 	if err != nil {
 		g.Log.Error(err, "error fetching proxy defaults for access logs")
 		return nil, err
-	}
-
-	// If access logs are enabled and of file type, add volume and mount.
-	if accessLogPath != "" {
-		volumes = append(volumes, accessLogVolume())
-		mounts = append(mounts, accessLogVolumeMount(accessLogPath))
 	}
 
 	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, mounts)
@@ -335,26 +328,28 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 	return &instanceValue
 }
 
-// Fetches the global proxy-defaults config from Consul and checks if access logs are enabled.
-// If enabled and of file type, it returns the access log path to be used for creating a volume mount.
-func (g *Gatekeeper) fetchAccessLogPathFromProxyDefaults() (string, error) {
+// Checking whether an additional volume is required for access logs defined in the proxy-defaults.
+func (g *Gatekeeper) additionalAccessLogVolumeMount(volumes []corev1.Volume, mounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount, error) {
 	// If no ConsulConfig is provided, skip fetching proxy-defaults.
 	if g.ConsulConfig == nil {
-		return "", nil
+		return volumes, mounts, nil
 	}
 
 	proxyDefaults, err := consul.FetchProxyDefaultsFromConsul(g.ConsulConfig, nil)
 	if err != nil {
-		return "", fmt.Errorf("error fetch proxy-defaults from consul: %s", err.Error())
+		return volumes, mounts, fmt.Errorf("error fetching proxy-defaults from consul: %s", err.Error())
 	}
 
 	if proxyDefaults != nil {
 		if proxyDefaults.AccessLogs.Enabled {
 			if proxyDefaults.AccessLogs.Type == capi.FileLogSinkType {
-				return proxyDefaults.AccessLogs.Path, nil
+				accessPath := proxyDefaults.AccessLogs.Path
+				volumes = append(volumes, accessLogVolume())
+				mounts = append(mounts, accessLogVolumeMount(accessPath))
+				return volumes, mounts, nil
 			}
 		}
 	}
 
-	return "", nil
+	return volumes, mounts, nil
 }

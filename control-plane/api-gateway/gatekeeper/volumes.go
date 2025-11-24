@@ -12,6 +12,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
 
+const accessLogVolumeName = "envoy-access-logs"
+
 // volumesAndMounts generates the list of volumes for the Deployment and the list of volume
 // mounts for the primary container in the Deployment. There are two volumes that are created:
 // - one empty volume for holding connect-inject data
@@ -49,8 +51,6 @@ func volumesAndMounts(gateway v1beta1.Gateway) ([]corev1.Volume, []corev1.Volume
 
 	return volumes, mounts
 }
-
-const accessLogVolumeName = "envoy-access-logs"
 
 func accessLogVolume() corev1.Volume {
 	return corev1.Volume{
