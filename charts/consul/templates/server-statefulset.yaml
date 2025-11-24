@@ -67,8 +67,12 @@ spec:
         hasDNS: "true"
         {{- if .Values.global.metrics.datadog.enabled }}
         "tags.datadoghq.com/version": {{ template "consul.versionInfo" . }}
+        {{- if ne .Values.global.metrics.datadog.tags.env "" }}
+        "tags.datadoghq.com/env": {{ .Values.global.metrics.datadog.tags.env }}
+        {{- else }}
         "tags.datadoghq.com/env": {{ template "consul.name" . }}
-        "tags.datadoghq.com/service": "consul-server"
+        {{- end }}
+        "tags.datadoghq.com/service": {{ .Values.global.metrics.datadog.tags.service }}
         {{- end }}
         {{- if .Values.server.extraLabels }}
           {{- toYaml .Values.server.extraLabels | nindent 8 }}
