@@ -4,18 +4,38 @@
 package gatekeeper
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	capi "github.com/hashicorp/consul/api"
 )
+
+type consulServerRespCfg struct {
+	setProxyDefaults   bool
+	errOnProxyDefaults bool
+	accessLogEnabled   bool
+	fileTypeAccessLog  bool
+	accessLogPath      string
+}
 
 func Test_compareDeployments(t *testing.T) {
 	testCases := []struct {
@@ -291,4 +311,141 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 	assert.NotNil(t, containerUpdated.LivenessProbe.TCPSocket)
 	assert.Nil(t, containerUpdated.LivenessProbe.HTTPGet)
 	assert.Equal(t, int32(9090), containerUpdated.LivenessProbe.TCPSocket.Port.IntVal)
+}
+
+func TestAdditionalAccessLogVolumeMount(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		srvResponseConfig consulServerRespCfg
+	}
+
+	cases := map[string]testCase{
+		"no proxy-defaults configured": {
+			srvResponseConfig: consulServerRespCfg{
+				setProxyDefaults: false,
+			},
+		},
+		"error fetching proxy-defaults": {
+			srvResponseConfig: consulServerRespCfg{
+				errOnProxyDefaults: true,
+			},
+		},
+		"access-logs disabled in proxy-defaults": {
+			srvResponseConfig: consulServerRespCfg{
+				setProxyDefaults: true,
+				accessLogEnabled: false,
+			},
+		},
+		"access-logs enabled but sink is not file": {
+			srvResponseConfig: consulServerRespCfg{
+				setProxyDefaults:  true,
+				accessLogEnabled:  true,
+				fileTypeAccessLog: false,
+			},
+		},
+		"file-type access-log enabled with path": {
+			srvResponseConfig: consulServerRespCfg{
+				setProxyDefaults:  true,
+				accessLogEnabled:  true,
+				fileTypeAccessLog: true,
+				accessLogPath:     "/var/log/envoy/access.log",
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			client := fake.NewClientBuilder().Build()
+			server, testClient := fakeConsulServer(t, tc.srvResponseConfig)
+			defer server.Close()
+
+			g := &Gatekeeper{
+				Log:          logr.Discard(),
+				Client:       client,
+				ConsulConfig: testClient.Cfg,
+			}
+
+			initialvolume := []corev1.Volume{}
+			initialmount := []corev1.VolumeMount{}
+
+			newVolume, newMount, err := g.additionalAccessLogVolumeMount(initialvolume, initialmount)
+			if tc.srvResponseConfig.errOnProxyDefaults {
+				require.Error(t, err)
+				require.ErrorContains(t, err, "error fetching global proxy-defaults")
+				return
+			}
+			require.NoError(t, err)
+			if tc.srvResponseConfig.setProxyDefaults && tc.srvResponseConfig.accessLogEnabled && tc.srvResponseConfig.fileTypeAccessLog {
+				// Expect volume and mount to be added
+				require.Len(t, newVolume, 1)
+				require.Len(t, newMount, 1)
+				require.Equal(t, accessLogVolumeName, newVolume[0].Name)
+				require.Equal(t, accessLogVolumeName, newMount[0].Name)
+				require.Equal(t, filepath.Dir(tc.srvResponseConfig.accessLogPath), newMount[0].MountPath)
+			} else {
+				// Expect no additional volume or mount to be added
+				require.Len(t, newVolume, 0)
+				require.Len(t, newMount, 0)
+			}
+		})
+	}
+}
+
+func fakeConsulServer(t *testing.T, serverResponseConfig consulServerRespCfg) (*httptest.Server, *test.TestServerClient) {
+	t.Helper()
+	mux := buildMux(t, serverResponseConfig)
+	consulServer := httptest.NewServer(mux)
+
+	parsedURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+	host := strings.Split(parsedURL.Host, ":")[0]
+
+	port, err := strconv.Atoi(parsedURL.Port())
+	require.NoError(t, err)
+
+	cfg := &consul.Config{APIClientConfig: &capi.Config{Address: host}, HTTPPort: port}
+	cfg.APIClientConfig.Address = consulServer.URL
+
+	testClient := &test.TestServerClient{
+		Cfg:     cfg,
+		Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
+	}
+
+	return consulServer, testClient
+}
+
+func buildMux(t *testing.T, cfg consulServerRespCfg) http.Handler {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/config/proxy-defaults/"+capi.ProxyConfigGlobal, func(w http.ResponseWriter, r *http.Request) {
+		if cfg.errOnProxyDefaults {
+			w.WriteHeader(500)
+			return
+		}
+		if !cfg.setProxyDefaults {
+			w.WriteHeader(404)
+			return
+		}
+		w.WriteHeader(200)
+		accessLogType := capi.DefaultLogSinkType
+		if cfg.fileTypeAccessLog {
+			accessLogType = capi.FileLogSinkType
+		}
+		proxyDefaults := capi.ProxyConfigEntry{
+			AccessLogs: &capi.AccessLogsConfig{
+				Enabled: cfg.accessLogEnabled,
+				Type:    accessLogType,
+				Path:    cfg.accessLogPath,
+			},
+		}
+		val, err := json.Marshal(proxyDefaults)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		w.Write(val)
+	})
+
+	return mux
 }
