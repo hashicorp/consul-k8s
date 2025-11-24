@@ -63,17 +63,17 @@ jobs:
         INPUT_DETAILS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         INPUT_OWNER: "hashicorp"
 
-  # cloud-acceptance:
-  #   name: cloud-acceptance
-  #   runs-on: ubuntu-24.04
-  #   steps:
-  #     - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
-  #       name: cloud
-  #       with:
-  #         workflow: cloud.yml
-  #         repo: hashicorp/consul-k8s-workflows
-  #         # ref: main
-  #         # TODO: change ref to main after testing
-  #         ref: abhishek/test-eks-cni
-  #         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-  #         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+  cloud-acceptance:
+    name: cloud-acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+        name: cloud
+        with:
+          workflow: cloud.yml
+          repo: hashicorp/consul-k8s-workflows
+          # ref: main
+          # TODO: change ref to main after testing
+          ref: c1.121eks
+          token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
