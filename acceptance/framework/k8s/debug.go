@@ -169,6 +169,19 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			}
 		}
 
+		// Describe any persistent volume claims in the namespace.
+		// for consul server/storage debugging
+		// This is useful for debugging storage issues, as the describe output includes events.
+		pvcs, err := client.CoreV1().PersistentVolumeClaims(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			logger.Log(t, "unable to get persistentvolumeclaims", "err", err)
+		} else {
+			for _, pvc := range pvcs.Items {
+				// Describe pvc and write it to a file.
+				writeResourceInfoToFile(t, pvc.Name, "pvc", testDebugDirectory, kubectlOptions)
+			}
+		}
+
 		// Describe any endpoints.
 		endpoints, err := client.CoreV1().Endpoints(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
