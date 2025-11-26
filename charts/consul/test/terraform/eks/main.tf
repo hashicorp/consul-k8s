@@ -20,7 +20,7 @@ provider "aws" {
     for_each = var.role_arn != "" ? [1] : []
     content {
       role_arn = var.role_arn
-      duration = "10800s"
+      duration = "14400s"
     }
   }
 }
