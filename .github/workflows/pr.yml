@@ -27,7 +27,8 @@ jobs:
         ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         # set "test-ce" to false when a new minor version is released
-        inputs: '{ "test-ce": false, "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+        # inputs: '{ "test-ce": false, "context":"${{ env.CONTEXT }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
     if: needs.conditional-skip.outputs.skip-ci == 'true'
