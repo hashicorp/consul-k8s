@@ -12,6 +12,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -420,10 +421,12 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// baseNode and baseService are the base that should be modified with
 	// service-type specific changes. These are not pointers, they should be
 	// shallow copied for each instance.
+
+	addr := constants.Getv4orv6Str("127.0.0.1", "::1")
 	baseNode := consulapi.CatalogRegistration{
 		SkipNodeUpdate: true,
 		Node:           t.ConsulNodeName,
-		Address:        "127.0.0.1",
+		Address:        addr,
 		NodeMeta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
 		},

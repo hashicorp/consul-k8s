@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: Add support for configuring Kubernetes probes (liveness, readiness, startup) per-Gateway via annotations. Use `consul.hashicorp.com/liveness-probe`, `consul.hashicorp.com/readiness-probe`, and `consul.hashicorp.com/startup-probe` annotations with JSON probe configuration to customize health checks for individual API Gateways. [[GH-4901](https://github.com/hashicorp/consul-k8s/pull/4901)]
+```

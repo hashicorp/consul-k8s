@@ -6,6 +6,7 @@ package apigateway
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/hashicorp/consul/api"
@@ -89,13 +90,19 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	logger.Log(t, "creating api-gateway resources")
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-	require.NoError(t, err, out)
+	// Apply api-gateway resources with retry logic to handle intermittent failures
+	retry.Run(t, func(r *retry.R) {
+		out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/api-gateway")
+		require.NoError(r, err, out)
+	})
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/api-gateway")
 	})
+
+	// Wait for the httproute to exist before patching, with delete/recreate fallback
+	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
@@ -120,7 +127,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	k8sOptions := ctx.KubectlOptions(t)
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	// check that intentions keep our connection from happening
 	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)

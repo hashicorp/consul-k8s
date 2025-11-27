@@ -6,7 +6,7 @@ package webhook
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"net"
 	"strconv"
 	"strings"
 
@@ -320,17 +320,10 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
-	envoyAdminBindAddress := "127.0.0.1"
-	consulDNSBindAddress := consulDataplaneDNSBindHost
-	consulDPBindAddress := "127.0.0.1"
-	xdsBindAddress := "127.0.0.1"
-
-	if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
-		envoyAdminBindAddress = "::1"
-		consulDNSBindAddress = ipv6ConsulDataplaneDNSBindHost
-		consulDPBindAddress = "::"
-		xdsBindAddress = "::1"
-	}
+	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
+	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	args := []string{
 		"-addresses", w.ConsulAddress,
 		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
@@ -460,7 +453,9 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 
 		if serviceMetricsPath != "" && serviceMetricsPort != "" {
-			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://127.0.0.1:%s%s", serviceMetricsPort, serviceMetricsPath))
+			addr := constants.Getv4orv6Str("127.0.0.1", "::1")
+			addr = net.JoinHostPort(addr, serviceMetricsPort)
+			args = append(args, "-telemetry-prom-service-metrics-url="+fmt.Sprintf("http://%s%s", addr, serviceMetricsPath))
 		}
 
 		// Pull the TLS config from the relevant annotations.

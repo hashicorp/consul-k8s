@@ -21,6 +21,11 @@ import (
 
 const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)"
 
+const ipv6RegEx = `([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])`
+
+// Combine both regexes with an OR operator.
+const ipRegEx = `(` + ipv4RegEx + `|` + ipv6RegEx + `)`
+
 // TestInstall tests that we can install consul service mesh with the CLI
 // and see that services can connect.
 func TestInstall(t *testing.T) {
@@ -83,7 +88,7 @@ func TestInstall(t *testing.T) {
 					// Static Client must have Static Server as a cluster and endpoint.
 					if strings.Contains(podName, "static-client") {
 						require.Regexp(r, "static-server.*static-server\\.default\\.dc1\\.internal.*EDS", output)
-						require.Regexp(r, ipv4RegEx+".*static-server", output)
+						require.Regexp(r, ipRegEx+".*static-server", output)
 					}
 				}
 			})

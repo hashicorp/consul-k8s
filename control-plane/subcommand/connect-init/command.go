@@ -206,12 +206,8 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagRedirectTrafficConfig != "" {
-		dualStack := false
-		if os.Getenv(constants.ConsulDualStackEnvVar) == "true" {
-			dualStack = true
-		}
 		c.watcher.Stop() // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
-		err = c.applyTrafficRedirectionRules(proxyService, dualStack)
+		err = c.applyTrafficRedirectionRules(proxyService, constants.IsDualStack())
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)
 			return 1

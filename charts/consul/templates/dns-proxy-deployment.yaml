@@ -151,8 +151,8 @@ spec:
             {{- if lt (int .Values.dns.proxy.port) 1024 }}
             - -envoy-executable-path=/usr/local/bin/privileged-envoy
             {{- end }}
-            {{- if .Values.global.dualStack.defaultEnabled }}
-            - -consul-dns-bind-addr="[::]"
+            {{- if .Values.global.dualStack.enabled }}
+            - "-consul-dns-bind-addr=::"
             {{- else }}
             - -consul-dns-bind-addr=0.0.0.0
             {{- end}}

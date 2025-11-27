@@ -169,6 +169,10 @@ spec:
         {{- end }}
         - name: CONSUL_NODE_NAME
           value: $(NODE_NAME)-virtual
+        - name: DP_ENVOY_READY_BIND_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         command:
         - "/bin/sh"
         - "-ec"
@@ -315,6 +319,17 @@ spec:
         {{- end }}
         {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
         - -server-watch-disabled=true
+        {{- end }}
+        {{- if .Values.global.dualStack.enabled }}
+        - "-envoy-admin-bind-address=::1"
+        - "-xds-bind-addr=::1"
+        - "-graceful-addr=::1"
+        - "-consul-dns-bind-addr=::1"
+        {{- else }}
+        - -envoy-admin-bind-address=127.0.0.1
+        - -xds-bind-addr=127.0.0.1
+        - -graceful-addr=127.0.0.1
+        - -consul-dns-bind-addr=127.0.0.1
         {{- end }}
         livenessProbe:
           tcpSocket:

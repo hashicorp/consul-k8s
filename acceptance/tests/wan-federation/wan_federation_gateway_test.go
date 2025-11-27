@@ -6,6 +6,8 @@ package wanfederation
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -69,7 +71,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 		kubernetesEndpoint, err := secondaryContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
 		require.NoError(t, err)
-		k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+		k8sAuthMethodHost = net.JoinHostPort(kubernetesEndpoint.Subsets[0].Addresses[0].IP, strconv.Itoa(int(kubernetesEndpoint.Subsets[0].Ports[0].Port)))
 	} else {
 		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
 	}
@@ -140,8 +142,11 @@ func TestWANFederation_Gateway(t *testing.T) {
 		k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 		logger.Log(t, "creating api-gateway resources in dc1")
-		out, err := k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-		require.NoError(t, err, out)
+		// Apply api-gateway resources with retry logic to handle intermittent failures
+		retry.Run(t, func(r *retry.R) {
+			out, err := k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
+			require.NoError(r, err, out)
+		})
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			// Ignore errors here because if the test ran as expected
 			// the custom resources will have been deleted.
@@ -153,6 +158,9 @@ func TestWANFederation_Gateway(t *testing.T) {
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc1-to-dc2-resolver")
 		})
+
+		// Wait for the httproute to exist before patching, with delete/recreate fallback
+		helpers.WaitForHTTPRouteWithRetry(t, primaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
@@ -167,8 +175,11 @@ func TestWANFederation_Gateway(t *testing.T) {
 		k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 		logger.Log(t, "creating api-gateway resources in dc2")
-		out, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-		require.NoError(t, err, out)
+		// Apply api-gateway resources with retry logic to handle intermittent failures
+		retry.Run(t, func(r *retry.R) {
+			out, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
+			require.NoError(r, err, out)
+		})
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			// Ignore errors here because if the test ran as expected
 			// the custom resources will have been deleted.
@@ -180,6 +191,9 @@ func TestWANFederation_Gateway(t *testing.T) {
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc2-to-dc1-resolver")
 		})
+
+		// Wait for the httproute to exist before patching, with delete/recreate fallback
+		helpers.WaitForHTTPRouteWithRetry(t, secondaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
@@ -208,8 +222,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
-
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, targetAddress)
 

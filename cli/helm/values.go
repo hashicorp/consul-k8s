@@ -578,13 +578,55 @@ type CopyAnnotations struct {
 }
 
 type ManagedGatewayClass struct {
-	Enabled                     bool            `yaml:"enabled"`
-	NodeSelector                interface{}     `yaml:"nodeSelector"`
-	ServiceType                 string          `yaml:"serviceType"`
-	UseHostPorts                bool            `yaml:"useHostPorts"`
-	CopyAnnotations             CopyAnnotations `yaml:"copyAnnotations"`
-	OpenshiftSCCName            string          `yaml:"openshiftSCCName"`
-	MapPrivilegedContainerPorts int             `yaml:"mapPrivilegedContainerPorts"`
+	Enabled                     bool                      `yaml:"enabled"`
+	NodeSelector                interface{}               `yaml:"nodeSelector"`
+	ServiceType                 string                    `yaml:"serviceType"`
+	UseHostPorts                bool                      `yaml:"useHostPorts"`
+	CopyAnnotations             CopyAnnotations           `yaml:"copyAnnotations"`
+	OpenshiftSCCName            string                    `yaml:"openshiftSCCName"`
+	MapPrivilegedContainerPorts int                       `yaml:"mapPrivilegedContainerPorts"`
+	Probes                      ManagedGatewayClassProbes `yaml:"probes"`
+}
+
+// ProbeHTTPGet models the HTTP GET action of a Kubernetes Probe.
+type ProbeHTTPGet struct {
+	Path   string      `yaml:"path"`
+	Port   interface{} `yaml:"port"` // int or string (named port)
+	Host   string      `yaml:"host"`
+	Scheme string      `yaml:"scheme"`
+	// Headers intentionally omitted for now; can be added if needed.
+}
+
+// ProbeTCPSocket models the TCP socket action of a Kubernetes Probe.
+type ProbeTCPSocket struct {
+	Port interface{} `yaml:"port"` // int or string
+	Host string      `yaml:"host"`
+}
+
+// ProbeExec models the exec action of a Kubernetes Probe.
+type ProbeExec struct {
+	Command []string `yaml:"command"`
+}
+
+// ProbeSpec is a simplified Kubernetes-style Probe configuration allowing http, tcp, or exec.
+// Only one of HTTPGet, TCPSocket, or Exec should be set. Enabled defaults to true if any action is specified.
+type ProbeSpec struct {
+	Enabled             *bool           `yaml:"enabled"`
+	HTTPGet             *ProbeHTTPGet   `yaml:"httpGet"`
+	TCPSocket           *ProbeTCPSocket `yaml:"tcpSocket"`
+	Exec                *ProbeExec      `yaml:"exec"`
+	InitialDelaySeconds int             `yaml:"initialDelaySeconds"`
+	PeriodSeconds       int             `yaml:"periodSeconds"`
+	TimeoutSeconds      int             `yaml:"timeoutSeconds"`
+	SuccessThreshold    int             `yaml:"successThreshold"`
+	FailureThreshold    int             `yaml:"failureThreshold"`
+}
+
+// ManagedGatewayClassProbes groups the three standard Kubernetes probe types applied to gateway pods.
+type ManagedGatewayClassProbes struct {
+	Liveness  ProbeSpec `yaml:"liveness"`
+	Readiness ProbeSpec `yaml:"readiness"`
+	Startup   ProbeSpec `yaml:"startup"`
 }
 
 type Service struct {
