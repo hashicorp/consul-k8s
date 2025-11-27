@@ -57,7 +57,7 @@ const (
 	flagNameDemo = "demo"
 	defaultDemo  = false
 
-	flagNameHCPResourceID = "hcp-resource-id"
+	//flagNameHCPResourceID = "hcp-resource-id"
 
 	consulDemoChartPath = "demo"
 )
@@ -73,19 +73,19 @@ type Command struct {
 
 	set *flag.Sets
 
-	flagPreset            string
-	flagDryRun            bool
-	flagAutoApprove       bool
-	flagValueFiles        []string
-	flagSetStringValues   []string
-	flagSetValues         []string
-	flagFileValues        []string
-	flagTimeout           string
-	timeoutDuration       time.Duration
-	flagVerbose           bool
-	flagWait              bool
-	flagNameHCPResourceID string
-	flagDemo              bool
+	flagPreset          string
+	flagDryRun          bool
+	flagAutoApprove     bool
+	flagValueFiles      []string
+	flagSetStringValues []string
+	flagSetValues       []string
+	flagFileValues      []string
+	flagTimeout         string
+	timeoutDuration     time.Duration
+	flagVerbose         bool
+	flagWait            bool
+	//flagNameHCPResourceID string
+	flagDemo bool
 
 	flagKubeConfig  string
 	flagKubeContext string
@@ -171,12 +171,12 @@ func (c *Command) init() {
 		Default: "",
 		Usage:   "Set the Kubernetes context to use.",
 	})
-	f.StringVar(&flag.StringVar{
-		Name:    flagNameHCPResourceID,
-		Target:  &c.flagNameHCPResourceID,
-		Default: "",
-		Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
-	})
+	//f.StringVar(&flag.StringVar{
+	//	Name:    flagNameHCPResourceID,
+	//	Target:  &c.flagNameHCPResourceID,
+	//	Default: "",
+	//	Usage:   "Set the HCP resource_id when using the 'cloud' preset.",
+	//})
 	f.BoolVar(&flag.BoolVar{
 		Name:    flagNameDemo,
 		Target:  &c.flagDemo,
@@ -404,7 +404,7 @@ func (c *Command) AutocompleteFlags() complete.Flags {
 		fmt.Sprintf("-%s", flagNameContext):         complete.PredictNothing,
 		fmt.Sprintf("-%s", flagNameKubeconfig):      complete.PredictFiles("*"),
 		fmt.Sprintf("-%s", flagNameDemo):            complete.PredictNothing,
-		fmt.Sprintf("-%s", flagNameHCPResourceID):   complete.PredictNothing,
+		//fmt.Sprintf("-%s", flagNameHCPResourceID):   complete.PredictNothing,
 	}
 }
 
@@ -440,19 +440,19 @@ func (c *Command) validateFlags(args []string) error {
 		}
 	}
 
-	if c.flagPreset == preset.PresetCloud {
-		clientID := os.Getenv(preset.EnvHCPClientID)
-		clientSecret := os.Getenv(preset.EnvHCPClientSecret)
-		if clientID == "" {
-			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientID)
-		} else if clientSecret == "" {
-			return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientSecret)
-		} else if c.flagNameHCPResourceID == "" {
-			return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagNameHCPResourceID)
-		}
-	} else if c.flagNameHCPResourceID != "" {
-		return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagNameHCPResourceID, preset.PresetCloud)
-	}
+	//if c.flagPreset == preset.PresetCloud {
+	//	clientID := os.Getenv(preset.EnvHCPClientID)
+	//	//clientSecret := os.Getenv(preset.EnvHCPClientSecret)
+	//	if clientID == "" {
+	//		return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientID)
+	//	} else if clientSecret == "" {
+	//		return fmt.Errorf("When '%s' is specified as the preset, the '%s' environment variable must also be set", preset.PresetCloud, preset.EnvHCPClientSecret)
+	//	} // else if c.flagNameHCPResourceID == "" {
+	//	//	return fmt.Errorf("When '%s' is specified as the preset, the '%s' flag must also be provided", preset.PresetCloud, flagNameHCPResourceID)
+	//	//}
+	//} //else if c.flagNameHCPResourceID != "" {
+	////	return fmt.Errorf("The '%s' flag can only be used with the '%s' preset", flagNameHCPResourceID, preset.PresetCloud)
+	////}
 
 	return nil
 }
@@ -525,18 +525,18 @@ func (c *Command) createUILogger() func(string, ...interface{}) {
 // implements the Preset interface.  If the string is not recognized an error is
 // returned.
 func (c *Command) getPreset(name string, namespace string) (preset.Preset, error) {
-	hcpConfig := preset.GetHCPPresetFromEnv(c.flagNameHCPResourceID)
+	//hcpConfig := preset.GetHCPPresetFromEnv(c.flagNameHCPResourceID)
 	getPresetConfig := &preset.GetPresetConfig{
 		Name: name,
-		CloudPreset: &preset.CloudPreset{
-			KubernetesClient:    c.kubernetes,
-			KubernetesNamespace: namespace,
-			SkipSavingSecrets:   true,
-			UI:                  c.UI,
-			HTTPClient:          c.httpClient,
-			HCPConfig:           hcpConfig,
-			Context:             c.Ctx,
-		},
+		//  CloudPreset: &preset.CloudPreset{
+		//	KubernetesClient:    c.kubernetes,
+		//	KubernetesNamespace: namespace,
+		//	SkipSavingSecrets:   true,
+		//	UI:                  c.UI,
+		//	HTTPClient:          c.httpClient,
+		//	HCPConfig:           hcpConfig,
+		//	Context: c.Ctx,
+		//},
 	}
 	return preset.GetPreset(getPresetConfig)
 }
