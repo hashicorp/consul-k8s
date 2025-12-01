@@ -173,7 +173,9 @@ ARG TARGETARCH
 # Copy license for Red Hat certification.
 COPY LICENSE /licenses/mozilla.txt
 
-RUN microdnf install -y ca-certificates libcap openssl shadow-utils iptables
+RUN microdnf update -y && \
+    microdnf install -y ca-certificates libcap openssl shadow-utils iptables && \
+    microdnf clean all
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group
