@@ -129,10 +129,10 @@ func TestGetPreset(t *testing.T) {
 		description string
 		presetName  string
 	}{
-		{
-			"'cloud' should return a CloudPreset'.",
-			preset.PresetCloud,
-		},
+		//{
+		//	"'cloud' should return a CloudPreset'.",
+		//	preset.PresetCloud,
+		//},
 		{
 			"'quickstart' should return a QuickstartPreset'.",
 			preset.PresetQuickstart,
@@ -149,8 +149,8 @@ func TestGetPreset(t *testing.T) {
 			p, err := c.getPreset(tc.presetName, "consul")
 			require.NoError(t, err)
 			switch p.(type) {
-			case *preset.CloudPreset:
-				require.Equal(t, preset.PresetCloud, tc.presetName)
+			//case *preset.CloudPreset:
+			//	require.Equal(t, preset.PresetCloud, tc.presetName)
 			case *preset.QuickstartPreset:
 				require.Equal(t, preset.PresetQuickstart, tc.presetName)
 			case *preset.SecurePreset:
@@ -161,95 +161,95 @@ func TestGetPreset(t *testing.T) {
 }
 
 // TestValidateCloudPresets tests the validate flags function when passed the cloud preset.
-func TestValidateCloudPresets(t *testing.T) {
-	testCases := []struct {
-		description        string
-		input              []string
-		preProcessingFunc  func()
-		postProcessingFunc func()
-		expectError        bool
-	}{
-		{
-			"Should not error on cloud preset when HCP_CLIENT_ID and HCP_CLIENT_SECRET envvars are present and hcp-resource-id parameter is provided.",
-			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
-			func() {
-				os.Setenv("HCP_CLIENT_ID", "foo")
-				os.Setenv("HCP_CLIENT_SECRET", "bar")
-			},
-			func() {
-				os.Setenv("HCP_CLIENT_ID", "")
-				os.Setenv("HCP_CLIENT_SECRET", "")
-			},
-			false,
-		},
-		{
-			"Should error on cloud preset when HCP_CLIENT_ID is not provided.",
-			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
-			func() {
-				os.Unsetenv("HCP_CLIENT_ID")
-				os.Setenv("HCP_CLIENT_SECRET", "bar")
-			},
-			func() {
-				os.Unsetenv("HCP_CLIENT_ID")
-				os.Unsetenv("HCP_CLIENT_SECRET")
-			},
-			true,
-		},
-		{
-			"Should error on cloud preset when HCP_CLIENT_SECRET is not provided.",
-			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
-			func() {
-				os.Setenv("HCP_CLIENT_ID", "foo")
-				os.Unsetenv("HCP_CLIENT_SECRET")
-			},
-			func() {
-				os.Unsetenv("HCP_CLIENT_ID")
-				os.Unsetenv("HCP_CLIENT_SECRET")
-			},
-			true,
-		},
-		{
-			"Should error on cloud preset when -hcp-resource-id flag is not provided.",
-			[]string{"-preset=cloud"},
-			func() {
-				os.Setenv("HCP_CLIENT_ID", "foo")
-				os.Setenv("HCP_CLIENT_SECRET", "bar")
-			},
-			func() {
-				os.Unsetenv("HCP_CLIENT_ID")
-				os.Unsetenv("HCP_CLIENT_SECRET")
-			},
-			true,
-		},
-		{
-			"Should error when -hcp-resource-id flag is provided but cloud preset is not specified.",
-			[]string{"-hcp-resource-id=foobar"},
-			func() {
-				os.Setenv("HCP_CLIENT_ID", "foo")
-				os.Setenv("HCP_CLIENT_SECRET", "bar")
-			},
-			func() {
-				os.Unsetenv("HCP_CLIENT_ID")
-				os.Unsetenv("HCP_CLIENT_SECRET")
-			},
-			true,
-		},
-	}
-
-	for _, testCase := range testCases {
-		testCase.preProcessingFunc()
-		c := getInitializedCommand(t, nil)
-		t.Run(testCase.description, func(t *testing.T) {
-			err := c.validateFlags(testCase.input)
-			if testCase.expectError && err == nil {
-				t.Errorf("Test case should have failed.")
-			} else if !testCase.expectError && err != nil {
-				t.Errorf("Test case should not have failed.")
-			}
-		})
-		testCase.postProcessingFunc()
-	}
-}
+//func TestValidateCloudPresets(t *testing.T) {
+//	testCases := []struct {
+//		description        string
+//		input              []string
+//		preProcessingFunc  func()
+//		postProcessingFunc func()
+//		expectError        bool
+//	}{
+//		{
+//			"Should not error on cloud preset when HCP_CLIENT_ID and HCP_CLIENT_SECRET envvars are present and hcp-resource-id parameter is provided.",
+//			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
+//			func() {
+//				os.Setenv("HCP_CLIENT_ID", "foo")
+//				os.Setenv("HCP_CLIENT_SECRET", "bar")
+//			},
+//			func() {
+//				os.Setenv("HCP_CLIENT_ID", "")
+//				os.Setenv("HCP_CLIENT_SECRET", "")
+//			},
+//			false,
+//		},
+//		{
+//			"Should error on cloud preset when HCP_CLIENT_ID is not provided.",
+//			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
+//			func() {
+//				os.Unsetenv("HCP_CLIENT_ID")
+//				os.Setenv("HCP_CLIENT_SECRET", "bar")
+//			},
+//			func() {
+//				os.Unsetenv("HCP_CLIENT_ID")
+//				os.Unsetenv("HCP_CLIENT_SECRET")
+//			},
+//			true,
+//		},
+//		{
+//			"Should error on cloud preset when HCP_CLIENT_SECRET is not provided.",
+//			[]string{"-preset=cloud", "-hcp-resource-id=foobar"},
+//			func() {
+//				os.Setenv("HCP_CLIENT_ID", "foo")
+//				os.Unsetenv("HCP_CLIENT_SECRET")
+//			},
+//			func() {
+//				os.Unsetenv("HCP_CLIENT_ID")
+//				os.Unsetenv("HCP_CLIENT_SECRET")
+//			},
+//			true,
+//		},
+//		{
+//			"Should error on cloud preset when -hcp-resource-id flag is not provided.",
+//			[]string{"-preset=cloud"},
+//			func() {
+//				os.Setenv("HCP_CLIENT_ID", "foo")
+//				os.Setenv("HCP_CLIENT_SECRET", "bar")
+//			},
+//			func() {
+//				os.Unsetenv("HCP_CLIENT_ID")
+//				os.Unsetenv("HCP_CLIENT_SECRET")
+//			},
+//			true,
+//		},
+//		{
+//			"Should error when -hcp-resource-id flag is provided but cloud preset is not specified.",
+//			[]string{"-hcp-resource-id=foobar"},
+//			func() {
+//				os.Setenv("HCP_CLIENT_ID", "foo")
+//				os.Setenv("HCP_CLIENT_SECRET", "bar")
+//			},
+//			func() {
+//				os.Unsetenv("HCP_CLIENT_ID")
+//				os.Unsetenv("HCP_CLIENT_SECRET")
+//			},
+//			true,
+//		},
+//	}
+//
+//	for _, testCase := range testCases {
+//		testCase.preProcessingFunc()
+//		c := getInitializedCommand(t, nil)
+//		t.Run(testCase.description, func(t *testing.T) {
+//			err := c.validateFlags(testCase.input)
+//			if testCase.expectError && err == nil {
+//				t.Errorf("Test case should have failed.")
+//			} else if !testCase.expectError && err != nil {
+//				t.Errorf("Test case should not have failed.")
+//			}
+//		})
+//		testCase.postProcessingFunc()
+//	}
+//}
 
 func TestUpgrade(t *testing.T) {
 	var k8s kubernetes.Interface

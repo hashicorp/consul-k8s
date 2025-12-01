@@ -93,7 +93,7 @@ type TestConfig struct {
 	EnvoyImage             string
 	ConsulCollectorImage   string
 
-	HCPResourceID string
+	//HCPResourceID string
 
 	VaultHelmChartVersion string
 	VaultServerVersion    string
