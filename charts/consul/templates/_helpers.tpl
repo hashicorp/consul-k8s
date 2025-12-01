@@ -279,9 +279,6 @@ This template is for an init container.
       consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
-{{/*        {{- if .Values.global.cloud.enabled }}*/}}
-{{/*        -tls-server-name=server.{{.Values.global.datacenter}}.{{.Values.global.domain}} \*/}}
-{{/*        {{- end}}*/}}
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
@@ -406,10 +403,6 @@ Consul server environment variables for consul-k8s commands.
 {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
 - name: CONSUL_TLS_SERVER_NAME
   value: {{ .Values.externalServers.tlsServerName }}
-{{/*{{- else if .Values.global.cloud.enabled }}*/}}
-{{/*- name: CONSUL_TLS_SERVER_NAME*/}}
-{{/*  value: server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}*/}}
-{{/*{{- end }}*/}}
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
