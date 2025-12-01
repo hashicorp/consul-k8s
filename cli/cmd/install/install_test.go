@@ -180,7 +180,7 @@ func TestValidateFlags(t *testing.T) {
 		{
 			"Should error on invalid presets.",
 			[]string{"-preset=foo"},
-			"'foo' is not a valid preset (valid presets: cloud, quickstart, secure)",
+			"'foo' is not a valid preset (valid presets: quickstart, secure)",
 		},
 		{
 			"Should error on invalid timeout.",
