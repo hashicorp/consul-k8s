@@ -112,7 +112,7 @@ func TestSerializeGatewayClassConfig_HappyPath(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-gw",
 						Annotations: map[string]string{
-							common.AnnotationGatewayClassConfig: `{"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"copyAnnotations":{"service":["service"]}}`,
+							common.AnnotationGatewayClassConfig: `{"serviceType":"serviceType","nodeSelector":{"selector":"of node"},"tolerations":[{"key":"key","operator":"op","value":"120","effect":"to the moon","tolerationSeconds":0}],"deployment":{},"copyAnnotations":{"service":["service"]},"metrics":{}}`,
 						},
 					},
 					Spec:   gwv1beta1.GatewaySpec{},

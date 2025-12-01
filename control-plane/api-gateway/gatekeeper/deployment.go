@@ -7,6 +7,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -59,7 +60,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme())
+	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme(), g.Log)
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -162,10 +163,33 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}, nil
 }
 
-func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
+func mergeDeployments(log logr.Logger, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
+		// Replace template
 		b.Spec.Template = a.Spec.Template
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
+	}
+
+	// Apply probes from Gateway annotations if present
+	probes, err := ProbesFromGateway(&gateway)
+	if err != nil {
+		log.Error(err, "failed to parse probe annotations, skipping probe configuration")
+	} else if probes != nil {
+		for i, c := range b.Spec.Template.Spec.Containers {
+			if i > 0 { // only primary container gets managed probes
+				continue
+			}
+			if probes.Liveness != nil {
+				c.LivenessProbe = probes.Liveness.DeepCopy()
+			}
+			if probes.Readiness != nil {
+				c.ReadinessProbe = probes.Readiness.DeepCopy()
+			}
+			if probes.Startup != nil {
+				c.StartupProbe = probes.Startup.DeepCopy()
+			}
+			b.Spec.Template.Spec.Containers[i] = c
+		}
 	}
 
 	return b
@@ -209,6 +233,27 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 				return false
 			}
 		}
+
+		// Compare probe initialDelaySeconds for rollout restart functionality
+		otherContainer := b.Spec.Template.Spec.Containers[i]
+
+		// Compare readiness probe initialDelaySeconds
+		if container.ReadinessProbe != nil && otherContainer.ReadinessProbe != nil {
+			if container.ReadinessProbe.InitialDelaySeconds != otherContainer.ReadinessProbe.InitialDelaySeconds {
+				return false
+			}
+		} else if (container.ReadinessProbe == nil) != (otherContainer.ReadinessProbe == nil) {
+			return false
+		}
+
+		// Compare startup probe initialDelaySeconds
+		if container.StartupProbe != nil && otherContainer.StartupProbe != nil {
+			if container.StartupProbe.InitialDelaySeconds != otherContainer.StartupProbe.InitialDelaySeconds {
+				return false
+			}
+		} else if (container.StartupProbe == nil) != (otherContainer.StartupProbe == nil) {
+			return false
+		}
 	}
 
 	if b.Spec.Replicas == nil && a.Spec.Replicas == nil {
@@ -234,9 +279,9 @@ func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
 
 }
 
-func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(gcc, deployment, mutated)
+		mutated = mergeDeployments(log, gcc, gateway, deployment, mutated)
 		if deploymentExists {
 			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
 		}

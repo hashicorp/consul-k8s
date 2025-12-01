@@ -1,0 +1,4 @@
+```release-note:security
+crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108
+```
