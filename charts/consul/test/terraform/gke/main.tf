@@ -62,6 +62,17 @@ resource "google_container_cluster" "cluster" {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
+
+  addons_config {
+    kube_dns_config {
+      enabled = true
+    }
+
+    dns_cache_config {
+      enabled = true
+    }
+  }
+
   subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
   resource_labels     = var.labels
   deletion_protection = false

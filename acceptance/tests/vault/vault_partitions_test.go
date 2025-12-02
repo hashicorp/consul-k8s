@@ -19,9 +19,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	crlog "sigs.k8s.io/controller-runtime/pkg/log"
+    "sigs.k8s.io/controller-runtime/pkg/log/zap"
+
 )
 
 func TestVault_Partitions(t *testing.T) {
+	// Set up logger for controller-runtime used by the Vault Helm chart hooks.
+	crlog.SetLogger(zap.New(zap.UseDevMode(true)))
+
+
 	env := suite.Environment()
 	cfg := suite.Config()
 	serverClusterCtx := env.DefaultContext(t)
