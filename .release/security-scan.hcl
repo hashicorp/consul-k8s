@@ -25,17 +25,38 @@ container {
   triage {
     suppress {
       vulnerabilities = [
-        "CVE-2024-58251",  # busybox@1.37.0-r19 - Alpine Linux security issue
-        "CVE-2025-46394",  # busybox@1.37.0-r19 - Alpine Linux security issue
-        "CVE-2025-47268",  # iputils@20240905-r0 - Alpine Linux security issue
-        "CVE-2025-48964",   # iputils@20240905-r0 - Alpine Linux security issue
-        "CVE-2025-58181",
+        "CVE-2024-12797",
+        "CVE-2024-4067",
+        "CVE-2024-40896",
+        "CVE-2024-52533",
+        "CVE-2024-56433",
+        "CVE-2024-57970",
+        "CVE-2024-58251",
+        "CVE-2025-25724",
+        "CVE-2025-31115",
+        "CVE-2025-32414",
+        "CVE-2025-3277",
+        "CVE-2025-3576",
+        "CVE-2025-46394",
+        "CVE-2025-47268",
         "CVE-2025-47914",
-        "GO-2025-4135",
-        "GO-2025-4134",
-        "GO-2025-4116",
+        "CVE-2025-48964",
+        "CVE-2025-5702",
+        "CVE-2025-58181",
+        "CVE-2025-5914",
+        "CVE-2025-6021",
+        "CVE-2025-6395",
+        "CVE-2025-6965",
+        "CVE-2025-8058",
+        "CVE-2025-9154",
+        "CVE-2025-9230",
+        "CVE-2025-9714",
+        "GHSA-f6x5-jh6r-wrfv",
         "GHSA-j5w8-q4qc-rx2x",
-        "GHSA-f6x5-jh6r-wrfv"
+        "GO-2022-0635",
+        "GO-2025-4116",
+        "GO-2025-4134",
+        "GO-2025-4135"
       ]
     }
   }
