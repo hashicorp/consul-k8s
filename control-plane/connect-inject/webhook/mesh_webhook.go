@@ -276,7 +276,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	w.injectVolumeMount(pod)
 
 	// Optionally mount data volume to envoy sidecar if file based access logs are enabled
-	err = w.additionalAccessLogVolumeMount(&pod)
+	err = w.mountAdditionalAccessLogVolume(&pod)
 	if err != nil {
 		w.Log.Error(err, "unable to mount additional access log volume", "request name", req.Name)
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("unable to mount additional access log volume: %s", err))
@@ -780,8 +780,8 @@ func sliceContains(slice []string, entry string) bool {
 }
 
 // Fetches the global proxy-defaults config from Consul and checks if access logs are enabled.
-// If enabled and of file type, it returns the access log path to be used for creating a volume mount.
-func (w *MeshWebhook) additionalAccessLogVolumeMount(pod *corev1.Pod) error {
+// If enabled and of file type, it adds the access log volume to the pod.
+func (w *MeshWebhook) mountAdditionalAccessLogVolume(pod *corev1.Pod) error {
 	// If no ConsulConfig is provided, skip fetching proxy-defaults.
 	if w.ConsulConfig == nil || w.ConsulServerConnMgr == nil {
 		w.Log.Info("no ConsulConfig or ConsulServerConnMgr provided, skipping fetching proxy-defaults")

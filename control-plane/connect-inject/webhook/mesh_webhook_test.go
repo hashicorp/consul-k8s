@@ -2435,7 +2435,7 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 	}
 }
 
-func TestHandler_additionalAccessLogVolumeMount(t *testing.T) {
+func TestHandler_mountAdditionalAccessLogVolumeMount(t *testing.T) {
 	cases := []struct {
 		Name              string
 		Webhook           MeshWebhook
@@ -2491,7 +2491,7 @@ func TestHandler_additionalAccessLogVolumeMount(t *testing.T) {
 				},
 			}
 
-			err := tt.Webhook.additionalAccessLogVolumeMount(pod)
+			err := tt.Webhook.mountAdditionalAccessLogVolume(pod)
 			if tt.WantErr {
 				require.Error(t, err)
 				require.Equal(t, 0, len(pod.Spec.Volumes))
