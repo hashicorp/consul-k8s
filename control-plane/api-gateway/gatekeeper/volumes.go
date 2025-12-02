@@ -4,11 +4,15 @@
 package gatekeeper
 
 import (
+	"path/filepath"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
+
+const accessLogVolumeName = "envoy-access-logs"
 
 // volumesAndMounts generates the list of volumes for the Deployment and the list of volume
 // mounts for the primary container in the Deployment. There are two volumes that are created:
@@ -46,4 +50,20 @@ func volumesAndMounts(gateway v1beta1.Gateway) ([]corev1.Volume, []corev1.Volume
 	}
 
 	return volumes, mounts
+}
+
+func accessLogVolume() corev1.Volume {
+	return corev1.Volume{
+		Name: accessLogVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumDefault},
+		},
+	}
+}
+
+func accessLogVolumeMount(path string) corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      accessLogVolumeName,
+		MountPath: filepath.Dir(path),
+	}
 }

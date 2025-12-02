@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -22,6 +23,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	capi "github.com/hashicorp/consul/api"
 )
 
 const (
@@ -109,6 +112,12 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}
 
 	volumes, mounts := volumesAndMounts(gateway)
+
+	volumes, mounts, err = g.additionalAccessLogVolumeMount(volumes, mounts)
+	if err != nil {
+		g.Log.Error(err, "error fetching proxy defaults for access logs")
+		return nil, err
+	}
 
 	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, mounts)
 	if err != nil {
@@ -317,4 +326,30 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 
 	}
 	return &instanceValue
+}
+
+// Checking whether an additional volume is required for access logs defined in the proxy-defaults.
+func (g *Gatekeeper) additionalAccessLogVolumeMount(volumes []corev1.Volume, mounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount, error) {
+	// If no ConsulConfig is provided, skip fetching proxy-defaults.
+	if g.ConsulConfig == nil {
+		return volumes, mounts, nil
+	}
+
+	proxyDefaults, err := consul.FetchProxyDefaultsFromConsul(g.ConsulConfig, nil)
+	if err != nil {
+		return volumes, mounts, fmt.Errorf("error fetching proxy-defaults from consul: %s", err.Error())
+	}
+
+	if proxyDefaults != nil {
+		if proxyDefaults.AccessLogs.Enabled {
+			if proxyDefaults.AccessLogs.Type == capi.FileLogSinkType {
+				accessPath := proxyDefaults.AccessLogs.Path
+				volumes = append(volumes, accessLogVolume())
+				mounts = append(mounts, accessLogVolumeMount(accessPath))
+				return volumes, mounts, nil
+			}
+		}
+	}
+
+	return volumes, mounts, nil
 }
