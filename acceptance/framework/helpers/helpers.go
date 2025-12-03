@@ -430,6 +430,15 @@ func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions,
 			if status == "True" {
 				found = true
 				logger.Logf(t, "httproute %s found successfully", routeName)
+				httproute, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions,
+					"get", "httproute", routeName,
+					"-o", "yaml",
+				)
+				if err != nil {
+					logger.Logf(t, "error getting httproute %s details: %v", routeName, err)
+				} else {
+					logger.Logf(t, "httproute %s details:\n%s", routeName, httproute)
+				}
 				break
 			}
 			logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)

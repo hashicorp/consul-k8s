@@ -276,9 +276,16 @@ func TestPeering_Gateway(t *testing.T) {
 		require.Len(r, gateway.Status.Addresses, 1)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
+
+		logger.Log(t, "gateway found: %s", gateway)
+		logger.Log(t, "gateway specs")
+		logger.Log(t, "gateway status(condtion, address, listners):", gateway.Status)
+		logger.Log(t, "gateway address lists:", gateway.Status.Addresses)
 	})
 
+	oldTargetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
 	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
+	logger.Log(t, "target address for gateway requests: %s (and old: %s)", targetAddress, oldTargetAddress)
 
 	logger.Log(t, "creating local service resolver")
 	k8s.KubectlApplyK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
@@ -302,20 +309,43 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Wait for exported static-server endpoints to appear via peering.
 	// We look from the client peer at the server peer’s service using Peer=server and the server namespace.
-	// logger.Log(t, "checking for exported static-server instances")
-	// retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-	// 	instances, _, err := staticClientPeerClient.Catalog().Service(
-	// 		staticServerName,
-	// 		"",
-	// 		&api.QueryOptions{
-	// 			Namespace:  staticServerNamespace,
-	// 			Peer:       staticServerPeer, // ask for service from peer dc
-	// 			Datacenter: staticClientPeer, // local dc context
-	// 		},
-	// 	)
-	// 	require.NoError(r, err)
-	// 	require.Greater(r, len(instances), 0, "no exported static-server instances yet")
-	// })
+	logger.Log(t, "checking for exported service static-server config to exist in client peer")
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		instances, _, err := staticClientPeerClient.Catalog().Service(
+			staticServerName,
+			"",
+			&api.QueryOptions{
+				Namespace:  staticServerNamespace,
+				Peer:       staticServerPeer, // ask for service from peer dc
+				Datacenter: staticClientPeer, // local dc context
+			},
+		)
+		if err != nil {
+			logger.Log(t, "error querying for exported static-server service in client peer %q: %v", staticServerPeer, err)
+		} else {
+			logger.Logf(t, "found %d instances of service %q in peer %q", len(instances), staticServerName, staticServerPeer)
+			logger.Logf(t, "instances: %+v", instances)
+		}
+		// require.NoError(r, err)
+		// require.Greater(r, len(instances), 0, "no exported static-server instances yet")
+	})
+
+	logger.Log(t, "checking for exported service static-server config to exist as exported service in server")
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		instances, _, err := staticServerPeerClient.ExportedServices(
+			&api.QueryOptions{
+				Namespace: staticServerNamespace,
+			},
+		)
+		if err != nil {
+			logger.Log(t, "error querying for exported service in server peer %q: %v", staticServerPeer, err)
+		} else {
+			logger.Logf(t, "found %d instances of service %q in peer %q", len(instances), staticServerName, staticServerPeer)
+			logger.Logf(t, "instances: %+v", instances)
+		}
+		// require.NoError(r, err)
+		// require.Greater(r, len(instances), 0, "no exported static-server instances yet")
+	})
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
