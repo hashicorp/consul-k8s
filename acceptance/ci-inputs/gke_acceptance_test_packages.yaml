@@ -6,7 +6,7 @@
 # - {runner: 1, test-packages: "peering"}
 # - {runner: 2, test-packages: "snapshot-agent"}
 # - {runner: 3, test-packages: "wan-federation"}
-# - {runner: 4, test-packages: "consul-dns"}
+ - {runner: 4, test-packages: "consul-dns"}
 # - {runner: 5, test-packages: "example"}
 # - {runner: 6, test-packages: "partitions"}
 # - {runner: 7, test-packages: "metrics"}
@@ -17,6 +17,6 @@
 # - {runner: 12, test-packages: "api-gateway"}
 # - {runner: 13, test-packages: "ingress-gateway"}
 # - {runner: 14, test-packages: "terminating-gateway"}
-- {runner: 15, test-packages: "vault"}
+ - {runner: 15, test-packages: "vault"}
 
 # - {runner: 16, test-packages: "server"}

@@ -371,6 +371,7 @@ func TestVault_Partitions(t *testing.T) {
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
 
+    joinAddress := fmt.Sprintf("%s:8501", partitionSvcAddress)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
@@ -405,7 +406,8 @@ func TestVault_Partitions(t *testing.T) {
 		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
 		"externalServers.enabled":           "true",
-		"externalServers.hosts[0]":          partitionSvcAddress,
+		// "externalServers.hosts[0]":          partitionSvcAddress,
+		"externalServers.hosts[0]":          joinAddress,
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
@@ -414,7 +416,8 @@ func TestVault_Partitions(t *testing.T) {
 
 		"client.enabled":           "true",
 		"client.exposeGossipPorts": "true",
-		"client.join[0]":           partitionSvcAddress,
+		// "client.join[0]":           partitionSvcAddress,
+		"client.join[0]":           joinAddress,
 	}
 
 	if cfg.UseKind {
