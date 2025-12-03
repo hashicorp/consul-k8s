@@ -198,6 +198,7 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	enableDNSProxy bool, port string, dnsFileName string) {
 	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
+    actualName := getCoreDNSConfigMapName(t, ctx)
 
 	dnsTarget := dnsIP
 	if enableDNSProxy {
@@ -207,6 +208,9 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	input, err := os.ReadFile("coredns-template.yaml")
 	require.NoError(t, err)
 	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
+	
+	newContents = strings.ReplaceAll(newContents, "name: coredns", fmt.Sprintf("name: %s", actualName))
+
 	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
 	require.NoError(t, err)
 }
