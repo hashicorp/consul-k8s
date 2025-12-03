@@ -518,6 +518,8 @@ spec:
       {{- if (or .Values.global.acls.manageSystemACLs (and .Values.global.tls.enabled (not .Values.global.tls.enableAutoEncrypt))) }}
       initContainers:
       {{- if .Values.global.acls.manageSystemACLs }}
+      {{- $startupStagger := default (dict "enabled" false "minSeconds" 0 "maxSeconds" 0) .Values.client.aclInit.startupStagger }}
+      {{- $staggerEnabled := and $startupStagger.enabled (gt (int $startupStagger.maxSeconds) 0) }}
       - name: client-acl-init
         image: {{ .Values.global.imageK8S }}
         {{ template "consul.imagePullPolicy" . }}
@@ -543,6 +545,23 @@ spec:
           - "/bin/sh"
           - "-ec"
           - |
+            {{- if $staggerEnabled }}
+            min_delay={{ int $startupStagger.minSeconds }}
+            max_delay={{ int $startupStagger.maxSeconds }}
+            if [ $max_delay -lt $min_delay ]; then
+              echo "client-acl-init: startupStagger.maxSeconds (${max_delay}) must be >= startupStagger.minSeconds (${min_delay})" >&2
+              exit 1
+            fi
+            range=$((max_delay - min_delay))
+            if [ $range -gt 0 ]; then
+              jitter=$((RANDOM % (range + 1)))
+            else
+              jitter=0
+            fi
+            sleep_time=$((min_delay + jitter))
+            echo "client-acl-init: staggering for ${sleep_time}s before ACL login"
+            sleep ${sleep_time}
+            {{- end }}
             exec consul-k8s-control-plane acl-init \
               -log-level={{ default .Values.global.logLevel .Values.client.logLevel }} \
               -log-json={{ .Values.global.logJSON }} \
