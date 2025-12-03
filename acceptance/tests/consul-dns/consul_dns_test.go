@@ -212,8 +212,10 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 }
 
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
+	actualName := getCoreDNSConfigMapName(t, ctx)
+
 	coreDNSCommand := []string{
-		"replace", "-n", "kube-system", "-f", coreDNSConfigFile, "--validate=false",
+		"apply", "-n", "kube-system", "-f", coreDNSConfigFile, "--validate=false",
 	}
 	var logs string
 
@@ -224,13 +226,26 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 		require.NoError(r, err)
 	})
 
-	require.Contains(t, logs, "configmap/coredns replaced")
+	require.Contains(t, logs, fmt.Sprintf("configmap/%s replaced", actualName))
 	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system", "--validate=false"}
 	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
 	// Wait for restart to finish.
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", "deployment/coredns", "-n", "kube-system")
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
+}
+
+func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
+    cms, err := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system").List(context.Background(), metav1.ListOptions{})
+    require.NoError(t, err)
+
+    for _, cm := range cms.Items {
+        if strings.Contains(cm.Name, "coredns") {
+            return cm.Name
+        }
+    }
+    t.Fatalf("no CoreDNS configmap found in kube-system")
+    return ""
 }
 
 func verifyDNS(
