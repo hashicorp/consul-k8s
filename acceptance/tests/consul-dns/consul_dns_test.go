@@ -240,15 +240,53 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 }
 
 func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
-    cms, err := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system").List(context.Background(), metav1.ListOptions{})
-    require.NoError(t, err)
+    client := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system")
+    ctxBg := context.Background()
 
-    for _, cm := range cms.Items {
-        if strings.Contains(cm.Name, "coredns") {
-            return cm.Name
+    // Strategy 1: Search by standard labels (Most reliable across clouds)
+    // GKE and many others use k8s-app=kube-dns even for CoreDNS.
+    // EKS/AKS often use k8s-app=coredns.
+    labelSelectors := []string{
+        "k8s-app=kube-dns",
+        "k8s-app=coredns",
+        "app.kubernetes.io/name=coredns",
+    }
+
+    for _, label := range labelSelectors {
+        cms, err := client.List(ctxBg, metav1.ListOptions{LabelSelector: label})
+        if err == nil && len(cms.Items) > 0 {
+            for _, cm := range cms.Items {
+                if _, ok := cm.Data["Corefile"]; ok {
+                    logger.Log(t, "found DNS configmap via label", "label", label, "name", cm.Name)
+                    return cm.Name
+                }
+            }
         }
     }
-    t.Fatalf("no CoreDNS configmap found in kube-system")
+
+    // Strategy 2: Fallback to known common names if labels fail
+    knownNames := []string{"coredns", "kube-dns", "rke2-coredns"}
+    for _, name := range knownNames {
+        cm, err := client.Get(ctxBg, name, metav1.GetOptions{})
+        if err == nil {
+            if _, ok := cm.Data["Corefile"]; ok {
+                logger.Log(t, "found DNS configmap via name", "name", cm.Name)
+                return cm.Name
+            }
+        }
+    }
+
+    // Debugging: If we are here, we failed. List all CMs to help the user debug.
+    cms, err := client.List(ctxBg, metav1.ListOptions{})
+    var observedNames []string
+    if err == nil {
+        for _, cm := range cms.Items {
+            observedNames = append(observedNames, cm.Name)
+        }
+    }
+
+    t.Fatalf("Failed to find CoreDNS ConfigMap in kube-system. Checked labels: %v, Checked names: %v. Available ConfigMaps: %v", 
+        labelSelectors, knownNames, observedNames)
     return ""
 }
 
