@@ -1356,6 +1356,41 @@ load _helpers
   [ "${actual}" = "true" ]  
 }
 
+@test "client/DaemonSet: acl-init adds startupStagger sleep when enabled" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      --set 'client.aclInit.startupStagger.enabled=true' \
+      --set 'client.aclInit.startupStagger.minSeconds=10' \
+      --set 'client.aclInit.startupStagger.maxSeconds=40' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("min_delay=10"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("max_delay=40"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command | jq -r ' . | any(contains("client-acl-init: staggering for"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "client/DaemonSet: acl-init startupStagger disabled by default" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'global.acls.manageSystemACLs=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "client-acl-init") | .command' | tee /dev/stderr)
+
+  local actual=$(echo $command | jq -r ' . | any(contains("startupStagger"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
 @test "client/DaemonSet: init container is created when global.acls.manageSystemACLs=true and has correct command with Partitions enabled" {
   cd `chart_dir`
   local object=$(helm template \
