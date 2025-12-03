@@ -35,6 +35,8 @@ func TestVault_Partitions(t *testing.T) {
 	clientClusterCtx := env.Context(t, 1)
 	ns := serverClusterCtx.KubectlOptions(t).Namespace
 
+	clientNs := clientClusterCtx.KubectlOptions(t).Namespace
+
 	const secondaryPartition = "secondary"
 
 	ver, err := version.NewVersion("1.12.0")
@@ -93,13 +95,13 @@ func TestVault_Partitions(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: authMethodRBACName,
 			},
-			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: authMethodRBACName, Namespace: ns}},
+			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: authMethodRBACName, Namespace: clientNs}},
 			RoleRef:  rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Name: "system:auth-delegator", Kind: "ClusterRole"},
 		}, metav1.CreateOptions{})
 		require.NoError(t, err)
 
 		// Create service account for the auth method in the secondary cluster.
-		svcAcct, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Create(context.Background(), &corev1.ServiceAccount{
+		svcAcct, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Create(context.Background(), &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: authMethodRBACName,
 			},
@@ -108,7 +110,7 @@ func TestVault_Partitions(t *testing.T) {
 		// In Kubernetes 1.24+ the serviceAccount does not automatically populate secrets with permanent JWT tokens, use this instead.
 		// It will be cleaned up by Kubernetes automatically since it references the ServiceAccount.
 		if len(svcAcct.Secrets) == 0 {
-			_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), &corev1.Secret{
+			_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        authMethodRBACName,
 					Annotations: map[string]string{corev1.ServiceAccountNameKey: authMethodRBACName},
@@ -119,7 +121,7 @@ func TestVault_Partitions(t *testing.T) {
 		}
 		t.Cleanup(func() {
 			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
+			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
 		})
 
 		// Figure out the host for the Kubernetes API. This needs to be reachable from the Vault server
@@ -127,7 +129,7 @@ func TestVault_Partitions(t *testing.T) {
 		k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
 		// Now, configure the auth method in Vault.
-		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, ns)
+		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, clientNs)
 	}
 
 	// -------------------------
@@ -369,15 +371,22 @@ func TestVault_Partitions(t *testing.T) {
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
 
+
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
-	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
-	vaultCASecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
-	vaultCASecret.ResourceVersion = ""
-	require.NoError(t, err)
-	_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
+	// FIX 2: Create the Secret in the Client Context using clientNs
+    // We do this BEFORE installing the Client Helm Chart to prevent FailedMount race conditions
+    logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
+    vaultCASecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
+    vaultCASecret.ResourceVersion = ""
+    require.NoError(t, err)
+    
+    // Ensure we are creating it in the Client Namespace
+    vaultCASecret.Namespace = clientNs 
+    
+	_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
@@ -399,6 +408,9 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.hosts[0]":          partitionSvcAddress,
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
+
+		// FIX: Add this line to ensure GKE connectivity works over HTTPS
+        "externalServers.httpsPort":         "8501",
 
 		"client.enabled":           "true",
 		"client.exposeGossipPorts": "true",
