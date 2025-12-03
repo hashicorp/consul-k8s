@@ -243,40 +243,43 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
     client := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system")
     ctxBg := context.Background()
 
-    // Strategy 1: Search by standard labels (Most reliable across clouds)
-    // GKE and many others use k8s-app=kube-dns even for CoreDNS.
-    // EKS/AKS often use k8s-app=coredns.
+    // Strategy 1: Search by standard labels AND check for "Corefile" key.
+    // This is the "Safe" path for EKS, AKS, and standard CoreDNS installs.
     labelSelectors := []string{
-        "k8s-app=kube-dns",
         "k8s-app=coredns",
         "app.kubernetes.io/name=coredns",
+        "k8s-app=kube-dns", 
     }
 
     for _, label := range labelSelectors {
         cms, err := client.List(ctxBg, metav1.ListOptions{LabelSelector: label})
         if err == nil && len(cms.Items) > 0 {
             for _, cm := range cms.Items {
+                // If we find a CM with the actual data key we need, this is definitely the one.
                 if _, ok := cm.Data["Corefile"]; ok {
-                    logger.Log(t, "found DNS configmap via label", "label", label, "name", cm.Name)
+                    logger.Log(t, "found DNS configmap via label with Corefile key", "label", label, "name", cm.Name)
                     return cm.Name
                 }
             }
         }
     }
 
-    // Strategy 2: Fallback to known common names if labels fail
+    // Strategy 2: Fallback to known names. 
+    // If we find 'kube-dns' (GKE), we accept it even if "Corefile" is missing 
+    // because we are about to inject one.
     knownNames := []string{"coredns", "kube-dns", "rke2-coredns"}
     for _, name := range knownNames {
         cm, err := client.Get(ctxBg, name, metav1.GetOptions{})
         if err == nil {
-            if _, ok := cm.Data["Corefile"]; ok {
-                logger.Log(t, "found DNS configmap via name", "name", cm.Name)
-                return cm.Name
-            }
+            // Found a match by name. 
+            // If it's 'kube-dns', GKE often doesn't expose the Corefile key by default.
+            // We return it anyway so the test can overwrite/configure it.
+            logger.Log(t, "found DNS configmap via name", "name", cm.Name)
+            return cm.Name
         }
     }
 
-    // Debugging: If we are here, we failed. List all CMs to help the user debug.
+    // Debugging: Failed to find anything.
     cms, err := client.List(ctxBg, metav1.ListOptions{})
     var observedNames []string
     if err == nil {
@@ -289,7 +292,6 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
         labelSelectors, knownNames, observedNames)
     return ""
 }
-
 func verifyDNS(
 	t *testing.T,
 	cfg *config.TestConfig,
