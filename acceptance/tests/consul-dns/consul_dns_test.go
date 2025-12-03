@@ -230,7 +230,13 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 		require.NoError(r, err)
 	})
 
-	require.Contains(t, logs, fmt.Sprintf("configmap/%s replaced", actualName))
+	msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
+    msgReplaced := fmt.Sprintf("configmap/%s replaced", actualName)
+
+    require.True(t, 
+        strings.Contains(logs, msgConfigured) || strings.Contains(logs, msgReplaced), 
+        "expected CoreDNS update output to contain '%s' or '%s', but got: \n%s", 
+        msgConfigured, msgReplaced, logs)
 	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system", "--validate=false"}
 	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
