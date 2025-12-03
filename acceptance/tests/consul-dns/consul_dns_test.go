@@ -213,7 +213,7 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
 	coreDNSCommand := []string{
-		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
+		"replace", "-n", "kube-system", "-f", coreDNSConfigFile, "--validate=false",
 	}
 	var logs string
 
@@ -225,7 +225,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 	})
 
 	require.Contains(t, logs, "configmap/coredns replaced")
-	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
+	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system", "--validate=false"}
 	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
 	// Wait for restart to finish.
