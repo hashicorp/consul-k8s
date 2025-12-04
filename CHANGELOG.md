@@ -1,3 +1,18 @@
+## 1.9.1 (2 December, 2025)
+
+SECURITY:
+
+* crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108 [[GH-4990](https://github.com/hashicorp/consul-k8s/issues/4990)]
+
+FEATURES:
+
+* api-gateway: Add support for configuring Kubernetes probes (liveness, readiness, startup) per-Gateway via annotations. Use `consul.hashicorp.com/liveness-probe`, `consul.hashicorp.com/readiness-probe`, and `consul.hashicorp.com/startup-probe` annotations with JSON probe configuration to customize health checks for individual API Gateways. [[GH-4901](https://github.com/hashicorp/consul-k8s/pull/4901)] [[GH-4901](https://github.com/hashicorp/consul-k8s/issues/4901)]
+* cli: Add `debug` command to collect configs, logs, and other data from a Consul on Kubernetes deployment in a archive/dir. [[GH-4800](https://github.com/hashicorp/consul-k8s/issues/4800)]
+* cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
+* cli: added new -capture flag to proxy loglevel command, enabling users to capture logs for certain duration. [[GH-4788](https://github.com/hashicorp/consul-k8s/issues/4788)]
+
+
 ## 1.9.0 (October 27, 2025)
 
 > **NOTE**: Consul K8s 1.9.x is compatible with Consul 1.22.x and Consul Dataplane 1.9.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
