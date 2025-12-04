@@ -220,7 +220,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 
     // 1. Apply the ConfigMap
     coreDNSCommand := []string{
-        "apply", "-n", "kube-system", "-f", coreDNSConfigFile, "--validate=false",
+        "apply", "-n", "kube-system", "-f", coreDNSConfigFile,
     }
     var logs string
 
@@ -253,7 +253,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
     logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
 
     // 4. Restart the correct deployment
-    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system", "--validate=false"}
+    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system"}
     _, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
     require.NoError(t, err)
 
