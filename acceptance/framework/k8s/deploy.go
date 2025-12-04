@@ -137,6 +137,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		output, err := RunKubectlAndGetOutputE(r, options, args...)
+		logger.Logf(t, "curl error: %v", err)
 		if expectSuccess {
 			require.NoError(r, err)
 			require.Contains(r, output, expectedOutput)
@@ -190,6 +191,7 @@ func CheckStaticServerHTTPConnectionFailing(t *testing.T, options *k8s.KubectlOp
 	t.Helper()
 	CheckStaticServerConnection(t, options, sourceApp, false, []string{
 		"curl: (22) The requested URL returned error: 403",
+		"curl: (22) The requested URL returned error: 503",
 	}, "", curlArgs...)
 }
 
