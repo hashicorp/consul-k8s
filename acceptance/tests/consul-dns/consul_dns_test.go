@@ -216,35 +216,50 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 }
 
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
-	actualName := getCoreDNSConfigMapName(t, ctx)
+    actualName := getCoreDNSConfigMapName(t, ctx)
 
-	coreDNSCommand := []string{
-		"apply", "-n", "kube-system", "-f", coreDNSConfigFile, 
-	}
-	var logs string
+    // 1. Apply the ConfigMap
+    coreDNSCommand := []string{
+        "apply", "-n", "kube-system", "-f", coreDNSConfigFile, "--validate=false",
+    }
+    var logs string
 
-	timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
-	retry.RunWith(timer, t, func(r *retry.R) {
-		var err error
-		logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
-		require.NoError(r, err)
-	})
+    timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
+    retry.RunWith(timer, t, func(r *retry.R) {
+        var err error
+        logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
+        require.NoError(r, err)
+    })
 
-	logger.Log(t, "updated CoreDNS configmap", "name", actualName, "output", logs)
-
-	msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
+    // 2. Handle GKE vs Standard output ("configured" vs "replaced")
+    msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
     msgReplaced := fmt.Sprintf("configmap/%s replaced", actualName)
-     
+
     require.True(t, 
         strings.Contains(logs, msgConfigured) || strings.Contains(logs, msgReplaced), 
         "expected CoreDNS update output to contain '%s' or '%s', but got: \n%s", 
         msgConfigured, msgReplaced, logs)
-	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system", }
-	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
-	require.NoError(t, err)
-	// Wait for restart to finish.
-	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", "deployment/coredns", "-n", "kube-system")
-	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
+
+    // 3. Determine the correct Deployment Name
+    // If ConfigMap is "kube-dns" (GKE), the Deployment is also "kube-dns".
+    // If ConfigMap is "coredns" (EKS/AKS), the Deployment is "coredns".
+    deploymentName := "deployment/coredns"
+    if strings.Contains(actualName, "kube-dns") {
+        deploymentName = "deployment/kube-dns"
+    } else if strings.Contains(actualName, "rke2") {
+        deploymentName = "deployment/rke2-coredns"
+    }
+
+    logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
+
+    // 4. Restart the correct deployment
+    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system", "--validate=false"}
+    _, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
+    require.NoError(t, err)
+
+    // 5. Wait for rollout using the correct deployment name
+    out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", deploymentName, "-n", "kube-system")
+    require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 
 func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
