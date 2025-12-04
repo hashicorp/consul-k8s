@@ -254,7 +254,39 @@ data:
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
     actualName := getCoreDNSConfigMapName(t, ctx)
 
-    // 1. Apply the configuration
+    // --- STEP 0: PATCH THE FILE ---
+    // Ensure the YAML file targets the correct ConfigMap name.
+    // If the file says "name: coredns" but we are on GKE (kube-dns), we must change the file.
+    content, err := os.ReadFile(coreDNSConfigFile)
+    require.NoError(t, err)
+
+    strContent := string(content)
+    fileChanged := false
+
+    // Check if the file's defined name matches the cluster's actual name
+    // We strictly check for "name: coredns" vs "name: kube-dns" to avoid accidental replacements elsewhere
+    if actualName == "kube-dns" && strings.Contains(strContent, "name: coredns") {
+        logger.Log(t, "Patching config file to target kube-dns instead of coredns")
+        strContent = strings.ReplaceAll(strContent, "name: coredns", "name: kube-dns")
+        fileChanged = true
+    } else if actualName == "coredns" && strings.Contains(strContent, "name: kube-dns") {
+        logger.Log(t, "Patching config file to target coredns instead of kube-dns")
+        strContent = strings.ReplaceAll(strContent, "name: kube-dns", "name: coredns")
+        fileChanged = true
+    } else if actualName == "rke2-coredns" && !strings.Contains(strContent, "name: rke2-coredns") {
+         // Handle RKE2 edge case if necessary
+         logger.Log(t, "Patching config file to target rke2-coredns")
+         strContent = strings.ReplaceAll(strContent, "name: coredns", "name: rke2-coredns")
+         fileChanged = true
+    }
+
+    // Write the corrected content back to disk before applying
+    if fileChanged {
+        err = os.WriteFile(coreDNSConfigFile, []byte(strContent), 0644)
+        require.NoError(t, err)
+    }
+
+    // --- STEP 1: APPLY ---
     coreDNSCommand := []string{
         "apply", "-n", "kube-system", "-f", coreDNSConfigFile, 
     }
@@ -267,7 +299,8 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
         require.NoError(r, err)
     })
 
-    // 2. Validate output (Accept "configured" for GKE, "replaced" for others)
+    // --- STEP 2: VALIDATE OUTPUT ---
+    // GKE returns "configured". EKS/AKS usually return "replaced".
     msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
     msgReplaced := fmt.Sprintf("configmap/%s replaced", actualName)
 
@@ -276,7 +309,7 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
         "expected CoreDNS update output to contain '%s' or '%s', but got: \n%s", 
         msgConfigured, msgReplaced, logs)
 
-    // 3. Dynamic Deployment Name
+    // --- STEP 3: RESTART DEPLOYMENT ---
     // GKE ConfigMap "kube-dns" -> Deployment "kube-dns"
     // EKS ConfigMap "coredns"  -> Deployment "coredns"
     deploymentName := "deployment/coredns"
@@ -288,12 +321,11 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 
     logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
 
-    // 4. Restart
-    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system", }
-    _, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
+    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system",}
+    _, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
     require.NoError(t, err)
 
-    // 5. Wait for rollout
+    // --- STEP 4: WAIT FOR ROLLOUT ---
     out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", deploymentName, "-n", "kube-system")
     require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
