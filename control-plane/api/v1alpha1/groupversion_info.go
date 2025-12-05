@@ -1,4 +1,4 @@
-// Copyright (c) HashiCorp, Inc.
+// Copyright IBM Corp. 2018, 2025
 // SPDX-License-Identifier: MPL-2.0
 
 // Package v1alpha1 contains API Schema definitions for the consul.hashicorp.com v1alpha1 API group
