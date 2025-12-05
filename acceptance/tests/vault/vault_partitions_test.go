@@ -112,14 +112,13 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        authMethodRBACName,
 					Annotations: map[string]string{corev1.ServiceAccountNameKey: authMethodRBACName},
-					Type:        corev1.SecretTypeServiceAccountToken,
 				},
 			}, metav1.CreateOptions{})
 			require.NoError(t, err)
 		}
 		t.Cleanup(func() {
 			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{}) // Reverted to ns
+			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{}) /
 		})
 
 		// Figure out the host for the Kubernetes API. This needs to be reachable from the Vault server
