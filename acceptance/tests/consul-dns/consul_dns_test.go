@@ -187,15 +187,32 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
     actualName := getCoreDNSConfigMapName(t, ctx)
 
-    // 1. BACKUP: Capture the exact current state of the cluster DNS
-    // We use kubectl get -o yaml to ensure we get the real current config.
+    // 1. BACKUP: Capture the current state
     logger.Log(t, "Backing up original CoreDNS config...")
     originalConfig, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), 
         "get", "configmap", actualName, "-n", "kube-system", "-o", "yaml")
     require.NoError(t, err)
 
-    // Write the backup file
-    err = os.WriteFile("coredns-original.yaml", []byte(originalConfig), 0644)
+    // --- FIX: Sanitize the YAML to remove version locking ---
+    // We remove fields that cause "Conflict" errors during restore.
+    lines := strings.Split(originalConfig, "\n")
+    var sanitizedLines []string
+    for _, line := range lines {
+        trimmed := strings.TrimSpace(line)
+        // Skip metadata fields that tie the file to a specific point in time
+        if strings.HasPrefix(trimmed, "resourceVersion:") ||
+           strings.HasPrefix(trimmed, "uid:") ||
+           strings.HasPrefix(trimmed, "creationTimestamp:") ||
+           strings.HasPrefix(trimmed, "generation:") {
+            continue
+        }
+        sanitizedLines = append(sanitizedLines, line)
+    }
+    cleanConfig := strings.Join(sanitizedLines, "\n")
+    // ---------------------------------------------------------
+
+    // Write the sanitized backup file
+    err = os.WriteFile("coredns-original.yaml", []byte(cleanConfig), 0644)
     require.NoError(t, err)
 
     // 2. GENERATE & APPLY Custom Config
@@ -206,8 +223,6 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
     t.Cleanup(func() {
         logger.Log(t, "Restoring original CoreDNS configuration...")
         updateCoreDNS(t, ctx, "coredns-original.yaml")
-        
-        // Wait a bit for the restore to propagate
         time.Sleep(5 * time.Second)
     })
 }
@@ -269,14 +284,14 @@ data:
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
     actualName := getCoreDNSConfigMapName(t, ctx)
 
-    // --- STEP 0: PATCH THE FILE (Safety Net) ---
-    // Ensure the YAML file targets the correct ConfigMap name.
+    // --- STEP 0: PATCH THE FILE ---
     content, err := os.ReadFile(coreDNSConfigFile)
     require.NoError(t, err)
 
     strContent := string(content)
     fileChanged := false
 
+    // Ensure name matches the cluster (kube-dns vs coredns)
     if actualName == "kube-dns" && strings.Contains(strContent, "name: coredns") {
         logger.Log(t, "Patching config file to target kube-dns instead of coredns")
         strContent = strings.ReplaceAll(strContent, "name: coredns", "name: kube-dns")
@@ -310,7 +325,6 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
     })
 
     // --- STEP 2: VALIDATE OUTPUT ---
-    // We must accept "configured", "replaced", OR "unchanged".
     msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
     msgReplaced := fmt.Sprintf("configmap/%s replaced", actualName)
     msgUnchanged := fmt.Sprintf("configmap/%s unchanged", actualName)
@@ -321,7 +335,6 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
         msgConfigured, msgReplaced, msgUnchanged, logs)
 
     // --- STEP 3: RESTART DEPLOYMENT ---
-    // Target the actual deployment name based on the ConfigMap name
     deploymentName := "deployment/coredns"
     if strings.Contains(actualName, "kube-dns") {
         deploymentName = "deployment/kube-dns"
