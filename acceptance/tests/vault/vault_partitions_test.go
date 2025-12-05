@@ -20,20 +20,19 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	crlog "sigs.k8s.io/controller-runtime/pkg/log"
-    "sigs.k8s.io/controller-runtime/pkg/log/zap"
-
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 func TestVault_Partitions(t *testing.T) {
 	// Set up logger for controller-runtime used by the Vault Helm chart hooks.
-crlog.SetLogger(zap.New(zap.UseDevMode(true)))
+	crlog.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	env := suite.Environment()
 	cfg := suite.Config()
 	serverClusterCtx := env.DefaultContext(t)
 	clientClusterCtx := env.Context(t, 1)
 	ns := serverClusterCtx.KubectlOptions(t).Namespace
-	// clientNs := clientClusterCtx.KubectlOptions(t).Namespace // Reverted: This was removed
+	clientNs := clientClusterCtx.KubectlOptions(t).Namespace
 
 	const secondaryPartition = "secondary"
 	ver, err := version.NewVersion("1.12.0")
@@ -88,17 +87,18 @@ crlog.SetLogger(zap.New(zap.UseDevMode(true)))
 
 		// Use a single name for all RBAC objects.
 		authMethodRBACName := fmt.Sprintf("%s-vault-auth-method", vaultReleaseName)
-_, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
+		// Important: We must create RBAC in the client context using the client namespace (clientNs)
+		_, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: authMethodRBACName,
 			},
-			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: authMethodRBACName, Namespace: ns}}, // Reverted to ns
+			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: authMethodRBACName, Namespace: clientNs}},
 			RoleRef:  rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Name: "system:auth-delegator", Kind: "ClusterRole"},
 		}, metav1.CreateOptions{})
 		require.NoError(t, err)
 
 		// Create service account for the auth method in the secondary cluster.
-		svcAcct, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Create(context.Background(), &corev1.ServiceAccount{ // Reverted to ns
+		svcAcct, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Create(context.Background(), &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: authMethodRBACName,
 			},
@@ -108,7 +108,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 		// In Kubernetes 1.24+ the serviceAccount does not automatically populate secrets with permanent JWT tokens, use this instead.
 		// It will be cleaned up by Kubernetes automatically since it references the ServiceAccount.
 		if len(svcAcct.Secrets) == 0 {
-			_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), &corev1.Secret{ // Reverted to ns
+			_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        authMethodRBACName,
 					Annotations: map[string]string{corev1.ServiceAccountNameKey: authMethodRBACName},
@@ -118,7 +118,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 		}
 		t.Cleanup(func() {
 			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{}) 
+			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
 		})
 
 		// Figure out the host for the Kubernetes API. This needs to be reachable from the Vault server
@@ -126,8 +126,9 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 		k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
 		// Now, configure the auth method in Vault.
-		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, ns) 	
-}
+		// We pass clientNs so the auth method is configured to expect tokens from the client namespace.
+		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, clientNs)
+	}
 
 	// -------------------------
 	// PKI
@@ -195,7 +196,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 	partitionTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/partition",
 		Key:        "token",
-		Value:      partitionToken,
+        Value:      partitionToken,
 		PolicyName: "partition",
 	}
 	partitionTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
@@ -260,7 +261,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 	// client
 	clientAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  consulClientServiceAccountName,
-		KubernetesNamespace: ns,
+		KubernetesNamespace: clientNs, // Use clientNs here
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            consulClientRole,
 		PolicyNames:         gossipSecret.PolicyName,
@@ -270,7 +271,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 	// manageSystemACLs
 	aclAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  manageSystemACLsServiceAccountName,
-		KubernetesNamespace: ns,
+		KubernetesNamespace: clientNs, // Use clientNs here
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            manageSystemACLsRole,
 		PolicyNames:         partitionTokenSecret.PolicyName,
@@ -282,7 +283,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 	partitionInitServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init")
 	prtAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  partitionInitServiceAccountName,
-		KubernetesNamespace: ns,
+		KubernetesNamespace: clientNs, // Use clientNs here
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            adminPartitionsRole,
 		PolicyNames:         partitionTokenSecret.PolicyName,
@@ -292,7 +293,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 	// allow all components to access server ca
 	srvCAAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  "*",
-		KubernetesNamespace: ns,
+		KubernetesNamespace: clientNs, // Use clientNs here
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            serverPKIConfig.RoleName,
 		PolicyNames:         serverPKIConfig.PolicyName,
@@ -365,27 +366,27 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 	consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
 	consulCluster.Create(t)
 
-    partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
+	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
-
-	// Reverted: removed joinAddress variable
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
-	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
+	logger.Log(t, fmt.Sprintf("retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName))
 	vaultCASecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
 	vaultCASecret.ResourceVersion = ""
 	require.NoError(t, err)
-	
-	// Reverted: Creating secret in 'ns' and removed explicit Namespace assignment
-	_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
+
+	// Create secret in clientNs
+	_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
 	require.NoError(t, err)
-	
+
 	t.Cleanup(func() {
-		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
-	})	// Create client cluster.
+		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
+	})
+
+	// Create client cluster.
 	clientHelmValues := map[string]string{
 		"global.enabled": "false",
 
@@ -402,8 +403,8 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
-		// FIX: Add this line to ensure GKE connectivity works over HTTPS
-        "externalServers.httpsPort":         "8501",
+		// Ensure proper port for GKE/cloud load balancers
+		"externalServers.httpsPort":         "8501",
 
 		"client.enabled":           "true",
 		"client.exposeGossipPorts": "true",
@@ -423,11 +424,13 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 	clientConsulCluster.Create(t)
 
 	// Ensure consul clients are created.
-	agentPodList, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientClusterCtx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "app=consul,component=client"})
+	agentPodList, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientNs).List(context.Background(), metav1.ListOptions{LabelSelector: "app=consul,component=client"})
 	require.NoError(t, err)
 	require.NotEmpty(t, agentPodList.Items)
 
-	output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "consul", "-n", clientClusterCtx.KubectlOptions(t).Namespace)
+	output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "consul", "-n", clientNs)
 	require.NoError(t, err)
 	require.Contains(t, output, "Partition: 'secondary'")
 }
+
+
