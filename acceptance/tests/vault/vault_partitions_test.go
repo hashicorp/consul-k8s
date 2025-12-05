@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -113,8 +114,18 @@ func TestVault_Partitions(t *testing.T) {
 					Name:        authMethodRBACName,
 					Annotations: map[string]string{corev1.ServiceAccountNameKey: authMethodRBACName},
 				},
+				Type: corev1.SecretTypeServiceAccountToken, // MUST be set to create a token
 			}, metav1.CreateOptions{})
 			require.NoError(t, err)
+
+			// Wait for the token to be populated in the secret
+			require.Eventually(t, func() bool {
+				s, err := clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Get(context.Background(), authMethodRBACName, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				return len(s.Data["token"]) > 0
+			}, 10*time.Second, 1*time.Second, "Timeout waiting for service account token to be populated")
 		}
 		t.Cleanup(func() {
 			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
@@ -196,7 +207,7 @@ func TestVault_Partitions(t *testing.T) {
 	partitionTokenSecret := &vault.KV2Secret{
 		Path:       "consul/data/secret/partition",
 		Key:        "token",
-        Value:      partitionToken,
+		Value:      partitionToken,
 		PolicyName: "partition",
 	}
 	partitionTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)

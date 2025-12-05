@@ -293,13 +293,13 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	connectInjectorPodAddress := portforward.CreateTunnelToResourcePort(t, connectInjectorPodName, 8080, kubectlOptions, terratestLogger.Discard)
 	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
 	require.NoError(t, err)
-	logger.Logf(t, "Connect Inject Webhook Cert expiry: %s \n", connectInjectorCert.NotAfter.String())
+	logger.Log(t, fmt.Sprintf("Connect Inject Webhook Cert expiry: %s \n", connectInjectorCert.NotAfter.String()))
 
-	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
+	logger.Log(t, fmt.Sprintf("Wait %d seconds for certificates to rotate....", expirationInSeconds))
 	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
 
 	if testAutoBootstrap {
-		logger.Logf(t, "Validating the ACL bootstrap token was stored in Vault.")
+		logger.Log(t, "Validating the ACL bootstrap token was stored in Vault.")
 		timer := &retry.Timer{Timeout: 10 * time.Second, Wait: 1 * time.Second}
 		retry.RunWith(timer, t, func(r *retry.R) {
 			secret, err := vaultClient.Logical().Read("consul/data/secret/bootstrap")
@@ -336,7 +336,7 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	// Validate that consul sever is running correctly and the consul members command works
 	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
 	membersOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, ctx.KubectlOptions(t), terratestLogger.Discard, "exec", fmt.Sprintf("%s-consul-server-0", consulReleaseName), "-c", "consul", "--", "sh", "-c", fmt.Sprintf("CONSUL_HTTP_TOKEN=%s consul members", bootstrapToken))
-	logger.Logf(t, "Members: \n%s", membersOutput)
+	logger.Log(t, fmt.Sprintf("Members: \n%s", membersOutput))
 	require.NoError(t, err)
 	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))
 
@@ -362,6 +362,7 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/intention")
 
 	logger.Log(t, "checking that connection is successful")
+	StaticClientName := "static-client" // Defined here for context
 	if cfg.EnableTransparentProxy {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
@@ -374,3 +375,4 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	// by comparing the NotAfter on the two certs.
 	require.NotEqual(t, connectInjectorCert.NotAfter, connectInjectorCert2.NotAfter)
 }
+
