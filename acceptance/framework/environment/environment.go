@@ -109,7 +109,7 @@ func KubernetesContextFromOptions(t testutil.TestingTB, options *k8s.KubectlOpti
 	return rawConfig.CurrentContext
 }
 
-func (k kubernetesContext) KubectlOptions(t testutil.TestingTB) *k8s.KubectlOptions {
+func (k *kubernetesContext) KubectlOptions(t testutil.TestingTB) *k8s.KubectlOptions {
 	if k.options != nil {
 		return k.options
 	}
@@ -161,7 +161,7 @@ func KubernetesClientFromOptions(t testutil.TestingTB, options *k8s.KubectlOptio
 	return client
 }
 
-func (k kubernetesContext) KubernetesClient(t testutil.TestingTB) kubernetes.Interface {
+func (k *kubernetesContext) KubernetesClient(t testutil.TestingTB) kubernetes.Interface {
 	if k.client != nil {
 		return k.client
 	}
