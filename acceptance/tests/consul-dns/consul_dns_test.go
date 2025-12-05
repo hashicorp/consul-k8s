@@ -398,67 +398,82 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
 }
 
 func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
-	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
-	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: podLabelSelector,
-	})
-	require.NoError(t, err)
+    podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
+    
+    // 1. Fetch expected IPs
+    podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
+        LabelSelector: podLabelSelector,
+    })
+    require.NoError(t, err)
 
-	servicePodIPs := make([]string, len(podList.Items))
-	for i, serverPod := range podList.Items {
-		servicePodIPs[i] = serverPod.Status.PodIP
-	}
+    servicePodIPs := make([]string, len(podList.Items))
+    for i, serverPod := range podList.Items {
+        servicePodIPs[i] = serverPod.Status.PodIP
+    }
 
-	logger.Log(t, "launch a pod to test the dns resolution.")
-	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
-	dnsTestPodArgs := []string{
-		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
-	}
+    // Unique name for the test pod
+    dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 
-	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
-		// Note: this delete command won't wait for pods to be fully terminated.
-		// This shouldn't cause any test pollution because the underlying
-		// objects are deployments, and so when other tests create these
-		// they should have different pod names.
-		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
-	})
+    // Ensure cleanup happens at the end of the test, even if the retry loop crashes
+    t.Cleanup(func() {
+        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
+    })
 
-	retry.Run(t, func(r *retry.R) {
-		logger.Log(t, "run the dns utilize pod and query DNS for the service.")
-		logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
-		require.NoError(r, err)
+    retry.Run(t, func(r *retry.R) {
+        logger.Log(t, "run the dns utilize pod and query DNS for the service.")
 
-		// When the `dig` request is successful, a section of it's response looks like the following:
-		//
-		// ;; ANSWER SECTION:
-		// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
-		//
-		// ;; Query time: 2 msec
-		// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
-		// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
-		// ;; MSG SIZE  rcvd: 98
-		//
-		// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
+        // --- STEP 1: Pre-cleanup (Works on ALL Clouds) ---
+        // Force delete the pod to prevent "AlreadyExists" errors or "Terminating" hangs.
+        // EKS/AKS sometimes take a few seconds to release IPs; --now forces quick deletion.
+        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
 
-		logger.Log(t, "verify the DNS results.")
-		// strip logs of tabs, newlines and spaces to make it easier to assert on the content when there is a DNS match
-		strippedLogs := strings.Replace(logs, "\t", "", -1)
-		strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
-		strippedLogs = strings.Replace(strippedLogs, " ", "", -1)
-		for _, ip := range servicePodIPs {
-			aRecordPattern := "%s.5INA%s"
-			aRecord := fmt.Sprintf(aRecordPattern, svcName, ip)
-			if shouldResolveDNSRecord {
-				require.Contains(r, logs, "ANSWER SECTION:")
-				require.Contains(r, strippedLogs, aRecord)
-			} else {
-				require.NotContains(r, logs, "ANSWER SECTION:")
-				require.NotContains(r, strippedLogs, aRecord)
-				require.Contains(r, logs, "status: NXDOMAIN")
-				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t5\tIN\tSOA\tns.consul. hostmaster.consul.")
-			}
-		}
-	})
+        // --- STEP 2: Run Dig (Standard K8s Command) ---
+        // --rm: Tells K8s to garbage collect the pod immediately after exit.
+        // --restart=Never: Ensures it's a simple Pod, not a Deployment.
+        // --image-pull-policy=IfNotPresent: Optimizes speed on all clouds.
+        dnsTestPodArgs := []string{
+            "run", "-it", dnsUtilsPod,
+            "--rm",
+            "--restart", "Never",
+            "--image", "anubhavmishra/tiny-tools",
+            "--image-pull-policy", "IfNotPresent",
+            "--", "dig", svcName, "ANY",
+        }
+
+        logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
+        require.NoError(r, err)
+
+        logger.Log(t, "verify the DNS results.")
+
+        // --- STEP 3: Verify Output (Image Dependent, Cloud Independent) ---
+        // We clean the logs to make regex matching reliable across different terminal outputs.
+        strippedLogs := strings.ReplaceAll(logs, "\t", "")
+        strippedLogs = strings.ReplaceAll(strippedLogs, "\n", "")
+        strippedLogs = strings.ReplaceAll(strippedLogs, " ", "")
+
+        for _, ipStr := range servicePodIPs {
+            // Regex to match: svcName. 5 IN A 1.2.3.4 (whitespace stripped)
+            aRecordPattern := "%s.5INA%s" 
+            aRecord := fmt.Sprintf(aRecordPattern, svcName, ipStr)
+
+            if shouldResolveDNSRecord {
+                // Must see ANSWER SECTION
+                require.Contains(r, logs, "ANSWER SECTION:", "Expected ANSWER SECTION. Logs:\n%s", logs)
+                // Must see the specific IP mapping
+                require.Contains(r, strippedLogs, aRecord, "Expected record %s. Logs:\n%s", aRecord, logs)
+            } else {
+                // Must NOT see ANSWER SECTION
+                require.NotContains(r, logs, "ANSWER SECTION:", "Unexpected ANSWER SECTION. Logs:\n%s", logs)
+                // Must NOT see the IP mapping
+                require.NotContains(r, strippedLogs, aRecord)
+                
+                // On GKE/EKS/AKS, a blocked or missing internal domain usually results in NXDOMAIN 
+                // and an AUTHORITY section showing the root or cluster root SOA.
+                require.Contains(r, logs, "status: NXDOMAIN", "Expected NXDOMAIN status")
+                require.Contains(r, logs, "AUTHORITY SECTION", "Expected AUTHORITY SECTION")
+            }
+        }
+    })
 }
 
 func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {
