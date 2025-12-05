@@ -359,6 +359,10 @@ func TestVault_Partitions(t *testing.T) {
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,
 		"server.extraVolumes[0].load": "false",
+
+		// Expose HTTPS via the main server LB for externalServers connectivity
+		"server.exposeService.enabled": "true",
+		"server.exposeService.type":    "LoadBalancer",
 	}
 
 	// On Kind, there are no load balancers but since all clusters
@@ -380,11 +384,15 @@ func TestVault_Partitions(t *testing.T) {
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
 
+	// Get the Server LB address for HTTPS traffic (externalServers)
+	serverServiceName := fmt.Sprintf("%s-consul-server", consulReleaseName)
+	serverSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, serverServiceName)
+
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
-	logger.Log(t, fmt.Sprintf("retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName))
+	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
 	vaultCASecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
 	vaultCASecret.ResourceVersion = ""
 	require.NoError(t, err)
@@ -410,7 +418,8 @@ func TestVault_Partitions(t *testing.T) {
 		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
 		"externalServers.enabled":           "true",
-		"externalServers.hosts[0]":          partitionSvcAddress,
+		// Use Server LB (HTTPS/8501) for API calls/CA verification
+		"externalServers.hosts[0]":          serverSvcAddress,
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
@@ -419,6 +428,7 @@ func TestVault_Partitions(t *testing.T) {
 
 		"client.enabled":           "true",
 		"client.exposeGossipPorts": "true",
+		// Use Expose-Servers LB (Gossip/8301) for joining the cluster
 		"client.join[0]":           partitionSvcAddress,
 	}
 
@@ -443,5 +453,6 @@ func TestVault_Partitions(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, output, "Partition: 'secondary'")
 }
+
 
 

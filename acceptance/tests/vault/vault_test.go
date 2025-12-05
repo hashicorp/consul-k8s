@@ -293,9 +293,9 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	connectInjectorPodAddress := portforward.CreateTunnelToResourcePort(t, connectInjectorPodName, 8080, kubectlOptions, terratestLogger.Discard)
 	connectInjectorCert, err := getCertificate(t, connectInjectorPodAddress)
 	require.NoError(t, err)
-	logger.Log(t, fmt.Sprintf("Connect Inject Webhook Cert expiry: %s \n", connectInjectorCert.NotAfter.String()))
+	logger.Logf(t, "Connect Inject Webhook Cert expiry: %s \n", connectInjectorCert.NotAfter.String())
 
-	logger.Log(t, fmt.Sprintf("Wait %d seconds for certificates to rotate....", expirationInSeconds))
+	logger.Logf(t, "Wait %d seconds for certificates to rotate....", expirationInSeconds)
 	time.Sleep(time.Duration(expirationInSeconds) * time.Second)
 
 	if testAutoBootstrap {
@@ -335,8 +335,10 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 
 	// Validate that consul sever is running correctly and the consul members command works
 	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
+	// Note: terratestLogger.Discard needs to be handled if your helpers package doesn't wrap it.
+	// Assuming k8s.RunKubectlAndGetOutputWithLoggerE is available.
 	membersOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, ctx.KubectlOptions(t), terratestLogger.Discard, "exec", fmt.Sprintf("%s-consul-server-0", consulReleaseName), "-c", "consul", "--", "sh", "-c", fmt.Sprintf("CONSUL_HTTP_TOKEN=%s consul members", bootstrapToken))
-	logger.Log(t, fmt.Sprintf("Members: \n%s", membersOutput))
+	logger.Logf(t, "Members: \n%s", membersOutput)
 	require.NoError(t, err)
 	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))
 
@@ -375,4 +377,5 @@ func testVault(t *testing.T, testAutoBootstrap bool) {
 	// by comparing the NotAfter on the two certs.
 	require.NotEqual(t, connectInjectorCert.NotAfter, connectInjectorCert2.NotAfter)
 }
+
 
