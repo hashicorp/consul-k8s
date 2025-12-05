@@ -22,6 +22,11 @@ resource "random_string" "cluster_prefix" {
   special = false
 }
 
+data "google_container_engine_versions" "main" {
+  location       = var.zone
+  version_prefix = var.kubernetes_version_prefix
+}
+
 
 resource "google_compute_network" "custom_network" {
   name                    = "network-${random_string.cluster_prefix.result}"
@@ -52,6 +57,8 @@ resource "google_container_cluster" "cluster" {
   network    = google_compute_network.custom_network.name
   subnetwork = google_compute_subnetwork.subnet[count.index].self_link
 
+  min_master_version = data.google_container_engine_versions.main.latest_master_version
+  node_version       = data.google_container_engine_versions.main.latest_master_version
   node_config {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
