@@ -118,7 +118,7 @@ _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Cre
 		}
 		t.Cleanup(func() {
 			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{}) /
+			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{}) 
 		})
 
 		// Figure out the host for the Kubernetes API. This needs to be reachable from the Vault server
