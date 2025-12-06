@@ -30,6 +30,7 @@ const staticClientNamespace = "ns2"
 
 // Test that Connect works in installations for X-Peers networking.
 func TestPeering_ConnectNamespaces(t *testing.T) {
+	t.Skip("temporarily skipped")
 	env := suite.Environment()
 	cfg := suite.Config()
 

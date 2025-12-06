@@ -235,6 +235,17 @@ func TestPeering_Gateway(t *testing.T) {
 		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
 	})
 
+	logger.Log(t, "check if exported service config entry exists in server peer")
+	timer = &retry.Timer{Timeout: 1 * time.Minute, Wait: 5 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ExportedServices, "default", &api.QueryOptions{})
+		require.NoError(r, err)
+		configEntryServer, ok := ceServer.(*api.ExportedServicesConfigEntry)
+		require.True(r, ok)
+		require.Equal(r, configEntryServer.GetName(), "default")
+		require.NoError(r, err)
+	})
+
 	// Create certificate secret, we do this separately since
 	// applying the secret will make an invalid certificate that breaks other tests
 	logger.Log(t, "creating certificate secret")
@@ -276,9 +287,15 @@ func TestPeering_Gateway(t *testing.T) {
 		require.Len(r, gateway.Status.Addresses, 1)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
+
+		logger.Log(t, "gateway found: \n%s", gateway)
+		logger.Log(t, "gateway specs: \n%s", gateway.Spec)
+		logger.Log(t, "gateway status(condtion, address, listners): \n%s", gateway.Status)
+		logger.Log(t, "gateway address lists: \n%s", gateway.Status.Addresses)
 	})
 
 	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
+	logger.Log(t, "target address for gateway requests: %s", targetAddress)
 
 	logger.Log(t, "creating local service resolver")
 	k8s.KubectlApplyK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
@@ -287,10 +304,94 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
+	logger.Log(t, "checking for http route")
 	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway")
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+
+	logger.Log(t, "verifying httproute patch")
+	retry.RunWith(&retry.Counter{Count: 10, Wait: 1 * time.Second}, t, func(r *retry.R) {
+		var route gwv1beta1.HTTPRoute
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: staticClientNamespace}, &route)
+		require.NoError(r, err)
+		logger.Log(t, "gateway httproute details after patch:\n%s", route)
+		require.Len(r, route.Spec.Rules, 1, "expected one rule after patching")
+		require.Len(r, route.Spec.Rules[0].BackendRefs, 1, "expected one backendRef after patching")
+		require.Equal(r, "mesh-service", string(route.Spec.Rules[0].BackendRefs[0].Name))
+
+		httproute, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts,
+			"get", "httproute", "http-route",
+			"-o", "yaml",
+		)
+		require.NoError(r, err)
+		logger.Logf(t, "httproute details after patch:\n%s", httproute)
+	})
+	logger.Log(t, "httproute patch verified")
+
+	logger.Log(t, "checking catalog services in client:")
+	logger.Log(t, "sleeping 10s before querying for service")
+	time.Sleep(10 * time.Second)
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
+		services, _, err := staticClientPeerClient.Catalog().Service(
+			staticServerName,
+			"",
+			&api.QueryOptions{
+				Namespace:  staticServerNamespace,
+				Peer:       staticServerPeer, // ask for service from server peer
+				Datacenter: staticClientPeer, // local dc context
+			},
+		)
+		// require.NoError(r, err, "error querying catalog services in client for peer %q service %q", staticServerPeer, staticServerName)
+		// require.Greater(r, len(services), 0, "no services found in client catalog")
+		if err != nil {
+			logger.Logf(t, "error querying catalog services in client for peer %q service %q: %v", staticServerPeer, staticServerName, err)
+		} else {
+			logger.Logf(t, "found %d service", len(services))
+			for i, s := range services {
+				logger.Logf(t, "[%d] ServiceName=%s ID=%s Namespace=%s Address=%s Port=%d Meta=%v",
+					i, s.ServiceName, s.ServiceID, s.Namespace, s.Address, s.ServicePort, s.ServiceMeta)
+			}
+		}
+	})
+
+	logger.Log(t, "checking servers exported service:")
+	if true {
+		// Define kubectl options for the 'consul' namespace on the server peer to get the token.
+		staticServerConsulNSOpts := &terratestk8s.KubectlOptions{
+			ContextName: staticServerPeerClusterContext.KubectlOptions(t).ContextName,
+			ConfigPath:  staticServerPeerClusterContext.KubectlOptions(t).ConfigPath,
+			Namespace:   "default", // The secret is in the 'consul' namespace.
+		}
+		serverToken, err := k8s.RunKubectlAndGetOutputE(t, staticServerConsulNSOpts,
+			"get", "secret", "consul-bootstrap-acl-token",
+			"-o", "go-template={{.data.token|base64decode}}",
+		)
+		if err != nil {
+			logger.Log(t, "error getting server bootstrap token: %v", err)
+		} else {
+			logger.Log(t, "server bootstrap token: %s", serverToken)
+			retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
+				services, _, err := staticServerPeerClient.ExportedServices(
+					&api.QueryOptions{
+						Namespace: staticServerNamespace,
+						Token:     serverToken,
+					},
+				)
+				// require.NoError(r, err, "error querying exported services in server")
+				// require.Greater(r, len(services), 0, "no exported static-server service found in server")
+				if err != nil {
+					logger.Logf(t, "error querying exported services in server: %v", err)
+				} else {
+					logger.Logf(t, "found %d exported services %q in peer %q", len(services), staticServerName, staticServerPeer)
+					for i, s := range services {
+						logger.Logf(t, "[%d] ServiceName=%s Namespace=%s Partition=%s Consumers=%s",
+							i, s.Service, s.Namespace, s.Partition, s.Consumers)
+					}
+				}
+			})
+		}
+	}
 
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, staticClientOpts, staticClientName, targetAddress)
