@@ -47,7 +47,6 @@ func TestVault_VaultNamespace(t *testing.T) {
 
 	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
-	logger.Log(t, "Creating secret for Vault license")
 	consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
 	vaultHelmvalues := map[string]string{
 		"server.image.repository":             "docker.mirror.hashicorp.services/hashicorp/vault-enterprise",
@@ -250,8 +249,10 @@ func TestVault_VaultNamespace(t *testing.T) {
 
 	// Validate that consul sever is running correctly and the consul members command works
 	logger.Log(t, "Confirming that we can run Consul commands when exec'ing into server container")
+	// Note: terratestLogger.Discard needs to be handled if your helpers package doesn't wrap it.
+	// Assuming k8s.RunKubectlAndGetOutputWithLoggerE is available.
 	membersOutput, err := k8s.RunKubectlAndGetOutputWithLoggerE(t, ctx.KubectlOptions(t), terratestLogger.Discard, "exec", fmt.Sprintf("%s-consul-server-0", consulReleaseName), "-c", "consul", "--", "sh", "-c", fmt.Sprintf("CONSUL_HTTP_TOKEN=%s consul members", bootstrapToken))
-	logger.Logf(t, "Members: \n%s", membersOutput)
+	logger.Log(t, fmt.Sprintf("Members: \n%s", membersOutput))
 	require.NoError(t, err)
 	require.Contains(t, membersOutput, fmt.Sprintf("%s-consul-server-0", consulReleaseName))
 
@@ -277,6 +278,7 @@ func TestVault_VaultNamespace(t *testing.T) {
 	k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/bases/intention")
 
 	logger.Log(t, "checking that connection is successful")
+	StaticClientName := "static-client" // Defined here for context
 	if cfg.EnableTransparentProxy {
 		k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), StaticClientName, "http://static-server")
 	} else {
