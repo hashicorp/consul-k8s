@@ -406,31 +406,38 @@ func TestVault_Partitions(t *testing.T) {
 	})
 
 	// Create client cluster.
-	clientHelmValues := map[string]string{
-		"global.enabled": "false",
+clientHelmValues := map[string]string{
+        "global.enabled": "false",
 
-		"global.adminPartitions.name": secondaryPartition,
+        "global.adminPartitions.name": secondaryPartition,
 
-		"global.acls.bootstrapToken.secretName": partitionTokenSecret.Path,
-		"global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
+        "global.acls.bootstrapToken.secretName": partitionTokenSecret.Path,
+        "global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
 
-		"global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
-		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
+        "global.secretsBackend.vault.agentAnnotations": fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
+        "global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
-		"externalServers.enabled":           "true",
-		// Use Server LB (HTTPS/8501) for API calls/CA verification
-		"externalServers.hosts[0]":          serverSvcAddress,
-		"externalServers.tlsServerName":     "server.dc1.consul",
-		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
+        "externalServers.enabled":           "true",
+        // Use Server LB (HTTPS/8501) for API calls/CA verification
+        "externalServers.hosts[0]":          serverSvcAddress,
+        
+        // FIX: Match the TLS Server Name to the Kubernetes Service Name defined in serverPKIConfig
+        // Vault creates certs for '<release>-consul-server', not 'server.dc1.consul'
+        "externalServers.tlsServerName": fmt.Sprintf("%s-consul-server", consulReleaseName),
+        "externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
-		// Ensure proper port for GKE/cloud load balancers
-		"externalServers.httpsPort":         "8501",
+        // Ensure proper port for GKE/cloud load balancers
+        "externalServers.httpsPort":         "8501",
 
-		"client.enabled":           "true",
-		"client.exposeGossipPorts": "true",
-		// Use Expose-Servers LB (Gossip/8301) for joining the cluster
-		"client.join[0]":           partitionSvcAddress,
-	}
+        "client.enabled":           "true",
+        "client.exposeGossipPorts": "true",
+        // Use Expose-Servers LB (Gossip/8301) for joining the cluster
+        "client.join[0]":           partitionSvcAddress,
+        
+        // RECOMMENDATION: Explicitly enable transparent proxy defaults to ensure 
+        // the injector behaves correctly in a client-only setup
+        "connectInject.transparentProxy.defaultEnabled": "true",
+    }
 
 	if cfg.UseKind {
 		clientHelmValues["externalServers.httpsPort"] = "30000"
