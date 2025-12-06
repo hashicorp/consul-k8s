@@ -235,6 +235,17 @@ func TestPeering_Gateway(t *testing.T) {
 		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
 	})
 
+	logger.Log(t, "check if exported service config entry exists in server peer")
+	timer = &retry.Timer{Timeout: 1 * time.Minute, Wait: 5 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ExportedServices, "default", &api.QueryOptions{})
+		require.NoError(r, err)
+		configEntryServer, ok := ceServer.(*api.ExportedServicesConfigEntry)
+		require.True(r, ok)
+		require.Equal(r, configEntryServer.GetName(), "default")
+		require.NoError(r, err)
+	})
+
 	// Create certificate secret, we do this separately since
 	// applying the secret will make an invalid certificate that breaks other tests
 	logger.Log(t, "creating certificate secret")
@@ -318,8 +329,6 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 	logger.Log(t, "httproute patch verified")
 
-	// Wait for exported static-server endpoints to appear via peering.
-	// We look from the client peer at the server peer’s service using Peer=server and the server namespace.
 	logger.Log(t, "checking catalog services in client:")
 	logger.Log(t, "sleeping 10s before querying for service")
 	time.Sleep(10 * time.Second)
@@ -329,7 +338,7 @@ func TestPeering_Gateway(t *testing.T) {
 			"",
 			&api.QueryOptions{
 				Namespace:  staticServerNamespace,
-				Peer:       staticServerPeer, // ask for service from peer dc
+				Peer:       staticServerPeer, // ask for service from server peer
 				Datacenter: staticClientPeer, // local dc context
 			},
 		)

@@ -235,7 +235,7 @@ resource "aws_security_group_rule" "allowingressfrom1-0" {
   to_port           = 65535
   protocol          = "tcp"
   cidr_blocks       = [module.vpc[1].vpc_cidr_block]
-  security_group_id = module.eks[0].cluster_primary_security_group_id
+  security_group_id = module.eks[0].worker_security_group_id
 }
 
 resource "aws_security_group_rule" "allowingressfrom0-1" {
@@ -245,7 +245,7 @@ resource "aws_security_group_rule" "allowingressfrom0-1" {
   to_port           = 65535
   protocol          = "tcp"
   cidr_blocks       = [module.vpc[0].vpc_cidr_block]
-  security_group_id = module.eks[1].cluster_primary_security_group_id
+  security_group_id = module.eks[1].worker_security_group_id
 }
 
 # Create a peering connection. This is the requester's side of the connection.
