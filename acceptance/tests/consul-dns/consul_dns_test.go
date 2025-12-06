@@ -400,7 +400,7 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
 
 func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
     podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
-    
+
     // 1. Fetch expected IPs
     podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
         LabelSelector: podLabelSelector,
@@ -415,7 +415,7 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
     // Unique name for the test pod
     dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 
-    // Ensure cleanup happens at the end of the test
+    // Ensure cleanup happens at the end of the test function in case of panic/failure
     t.Cleanup(func() {
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
     })
@@ -423,54 +423,79 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
     retry.Run(t, func(r *retry.R) {
         logger.Log(t, "run the dns utilize pod and query DNS for the service.")
 
-        // --- STEP 1: Pre-cleanup (Works on ALL Clouds) ---
+        // --- STEP 1: Pre-cleanup ---
+        // Force delete any leftover pod from previous retries
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
 
-        // --- STEP 2: Run Dig ---
+        // --- STEP 2: Run Pod (Detached Mode) ---
+        // REMOVED: "-it" (Causes TTY errors in CI)
+        // REMOVED: "--rm" (Causes race condition where logs are lost)
+        // ADDED: "--restart=Never" (Ensures it runs once and stops)
         dnsTestPodArgs := []string{
-            "run", "-it", dnsUtilsPod,
-            "--rm",
+            "run", dnsUtilsPod,
             "--restart", "Never",
             "--image", "anubhavmishra/tiny-tools",
             "--image-pull-policy", "IfNotPresent",
             "--", "dig", svcName, "ANY",
         }
+        
+        // This command returns immediately after the Pod resource is created
+        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), dnsTestPodArgs...)
 
-        logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
-        require.NoError(r, err)
+        // --- STEP 3: Wait for Completion ---
+        // We poll the pod status until it succeeds or fails.
+        // This ensures the command has finished executing before we grab logs.
+        logger.Log(t, "Waiting for DNS pod to complete...")
+        podFinished := false
+        for i := 0; i < 30; i++ { // Wait up to 30 seconds
+            phase, err := k8s.RunKubectlAndGetOutputE(t, requestingCtx.KubectlOptions(t), "get", "pod", dnsUtilsPod, "-o", "jsonpath={.status.phase}")
+            // Ignore transient errors during startup
+            if err == nil && (phase == "Succeeded" || phase == "Failed") {
+                podFinished = true
+                break
+            }
+            time.Sleep(1 * time.Second)
+        }
 
+        if !podFinished {
+            // If it timed out, we log a warning but proceed to try fetching logs (which might contain the error)
+            logger.Log(t, "Warning: DNS pod did not reach Succeeded/Failed phase in time.")
+        }
+
+        // --- STEP 4: Fetch Logs ---
+        // Now that the pod is done (and still exists), we can reliably fetch logs.
+        logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(t), "logs", dnsUtilsPod)
+        if err != nil {
+            r.Fatalf("Failed to retrieve logs from pod %s: %v", dnsUtilsPod, err)
+        }
+
+        // --- STEP 5: Verify Results ---
         logger.Log(t, "verify the DNS results.")
-
-        // --- STEP 3: Verify Output with Regex (Fixes TTL mismatch) ---
-        // We clean the logs to make regex matching reliable across different terminal outputs.
+        
+        // Clean logs for reliable regex matching
         strippedLogs := strings.ReplaceAll(logs, "\t", "")
         strippedLogs = strings.ReplaceAll(strippedLogs, "\n", "")
         strippedLogs = strings.ReplaceAll(strippedLogs, " ", "")
 
         for _, ipStr := range servicePodIPs {
-            // FIX: Use Regex to match ANY TTL (\d+), not just "5"
-            // Pattern matches: [Name] . [AnyDigit] IN A [IP]
-            // Example match: static-server...consul.0INA10.128.0.6
+            // Regex to match ANY TTL (\d+). Fixes 0 vs 5 TTL mismatch.
             regexPattern := fmt.Sprintf(`%s\.\d+INA%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
-            
             matched, _ := regexp.MatchString(regexPattern, strippedLogs)
 
             if shouldResolveDNSRecord {
-                // Must see ANSWER SECTION
                 require.Contains(r, logs, "ANSWER SECTION:", "Expected ANSWER SECTION. Logs:\n%s", logs)
-                
-                // Must see the specific IP mapping (using regex)
                 require.Truef(r, matched, "Expected DNS record matching pattern: %s\nGot logs (stripped): %s", regexPattern, strippedLogs)
             } else {
-                // Must NOT see ANSWER SECTION
                 require.NotContains(r, logs, "ANSWER SECTION:", "Unexpected ANSWER SECTION. Logs:\n%s", logs)
-                // Must NOT see the IP mapping
                 require.Falsef(r, matched, "Unexpected DNS record found matching pattern: %s", regexPattern)
-                
                 require.Contains(r, logs, "status: NXDOMAIN", "Expected NXDOMAIN status")
                 require.Contains(r, logs, "AUTHORITY SECTION", "Expected AUTHORITY SECTION")
             }
         }
+
+        // --- STEP 6: Manual Cleanup ---
+        // Delete the pod to keep the cluster clean for the next retry/test
+        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
     })
 }
 
