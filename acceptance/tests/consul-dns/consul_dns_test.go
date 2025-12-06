@@ -415,41 +415,43 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
     // Unique name for the test pod
     dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 
-    // Ensure cleanup happens at the end of the test function in case of panic/failure
+    // Ensure cleanup happens at the end of the test function
     t.Cleanup(func() {
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
     })
 
-    retry.Run(t, func(r *retry.R) {
+    // --- FIX 1: Increase Retry Timeout ---
+    // Creating/Deleting pods is slow. Default retry is too short. 
+    // We give it 2 minutes with 5s wait between attempts.
+    timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}
+
+    retry.RunWith(timer, t, func(r *retry.R) {
         logger.Log(t, "run the dns utilize pod and query DNS for the service.")
 
         // --- STEP 1: Pre-cleanup ---
-        // Force delete any leftover pod from previous retries
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
 
-        // --- STEP 2: Run Pod (Detached Mode) ---
-        // REMOVED: "-it" (Causes TTY errors in CI)
-        // REMOVED: "--rm" (Causes race condition where logs are lost)
-        // ADDED: "--restart=Never" (Ensures it runs once and stops)
+        // --- STEP 2: Run Pod (Detached Mode with Shell Delay) ---
+        // FIX 2: Use "sh -c" to sleep 5s before dig. Allows network to stabilize.
+        // FIX 3: Add +tries=5 +time=3 to dig to handle transient DNS drops.
+        cmd := fmt.Sprintf("sleep 5; dig %s ANY +tries=5 +time=3", svcName)
+        
         dnsTestPodArgs := []string{
             "run", dnsUtilsPod,
             "--restart", "Never",
             "--image", "anubhavmishra/tiny-tools",
             "--image-pull-policy", "IfNotPresent",
-            "--", "dig", svcName, "ANY",
+            "--command", "--", "sh", "-c", cmd,
         }
         
-        // This command returns immediately after the Pod resource is created
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), dnsTestPodArgs...)
 
         // --- STEP 3: Wait for Completion ---
-        // We poll the pod status until it succeeds or fails.
-        // This ensures the command has finished executing before we grab logs.
         logger.Log(t, "Waiting for DNS pod to complete...")
         podFinished := false
-        for i := 0; i < 30; i++ { // Wait up to 30 seconds
+        // Poll longer (up to 45s) because we added a 5s sleep inside the pod
+        for i := 0; i < 45; i++ { 
             phase, err := k8s.RunKubectlAndGetOutputE(t, requestingCtx.KubectlOptions(t), "get", "pod", dnsUtilsPod, "-o", "jsonpath={.status.phase}")
-            // Ignore transient errors during startup
             if err == nil && (phase == "Succeeded" || phase == "Failed") {
                 podFinished = true
                 break
@@ -458,12 +460,10 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
         }
 
         if !podFinished {
-            // If it timed out, we log a warning but proceed to try fetching logs (which might contain the error)
             logger.Log(t, "Warning: DNS pod did not reach Succeeded/Failed phase in time.")
         }
 
         // --- STEP 4: Fetch Logs ---
-        // Now that the pod is done (and still exists), we can reliably fetch logs.
         logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(t), "logs", dnsUtilsPod)
         if err != nil {
             r.Fatalf("Failed to retrieve logs from pod %s: %v", dnsUtilsPod, err)
@@ -494,7 +494,6 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
         }
 
         // --- STEP 6: Manual Cleanup ---
-        // Delete the pod to keep the cluster clean for the next retry/test
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
     })
 }
