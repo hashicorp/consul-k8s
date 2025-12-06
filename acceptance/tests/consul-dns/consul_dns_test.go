@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -414,7 +415,7 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
     // Unique name for the test pod
     dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
 
-    // Ensure cleanup happens at the end of the test, even if the retry loop crashes
+    // Ensure cleanup happens at the end of the test
     t.Cleanup(func() {
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
     })
@@ -423,14 +424,9 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
         logger.Log(t, "run the dns utilize pod and query DNS for the service.")
 
         // --- STEP 1: Pre-cleanup (Works on ALL Clouds) ---
-        // Force delete the pod to prevent "AlreadyExists" errors or "Terminating" hangs.
-        // EKS/AKS sometimes take a few seconds to release IPs; --now forces quick deletion.
         k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
 
-        // --- STEP 2: Run Dig (Standard K8s Command) ---
-        // --rm: Tells K8s to garbage collect the pod immediately after exit.
-        // --restart=Never: Ensures it's a simple Pod, not a Deployment.
-        // --image-pull-policy=IfNotPresent: Optimizes speed on all clouds.
+        // --- STEP 2: Run Dig ---
         dnsTestPodArgs := []string{
             "run", "-it", dnsUtilsPod,
             "--rm",
@@ -445,30 +441,32 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 
         logger.Log(t, "verify the DNS results.")
 
-        // --- STEP 3: Verify Output (Image Dependent, Cloud Independent) ---
+        // --- STEP 3: Verify Output with Regex (Fixes TTL mismatch) ---
         // We clean the logs to make regex matching reliable across different terminal outputs.
         strippedLogs := strings.ReplaceAll(logs, "\t", "")
         strippedLogs = strings.ReplaceAll(strippedLogs, "\n", "")
         strippedLogs = strings.ReplaceAll(strippedLogs, " ", "")
 
         for _, ipStr := range servicePodIPs {
-            // Regex to match: svcName. 5 IN A 1.2.3.4 (whitespace stripped)
-            aRecordPattern := "%s.5INA%s" 
-            aRecord := fmt.Sprintf(aRecordPattern, svcName, ipStr)
+            // FIX: Use Regex to match ANY TTL (\d+), not just "5"
+            // Pattern matches: [Name] . [AnyDigit] IN A [IP]
+            // Example match: static-server...consul.0INA10.128.0.6
+            regexPattern := fmt.Sprintf(`%s\.\d+INA%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
+            
+            matched, _ := regexp.MatchString(regexPattern, strippedLogs)
 
             if shouldResolveDNSRecord {
                 // Must see ANSWER SECTION
                 require.Contains(r, logs, "ANSWER SECTION:", "Expected ANSWER SECTION. Logs:\n%s", logs)
-                // Must see the specific IP mapping
-                require.Contains(r, strippedLogs, aRecord, "Expected record %s. Logs:\n%s", aRecord, logs)
+                
+                // Must see the specific IP mapping (using regex)
+                require.Truef(r, matched, "Expected DNS record matching pattern: %s\nGot logs (stripped): %s", regexPattern, strippedLogs)
             } else {
                 // Must NOT see ANSWER SECTION
                 require.NotContains(r, logs, "ANSWER SECTION:", "Unexpected ANSWER SECTION. Logs:\n%s", logs)
                 // Must NOT see the IP mapping
-                require.NotContains(r, strippedLogs, aRecord)
+                require.Falsef(r, matched, "Unexpected DNS record found matching pattern: %s", regexPattern)
                 
-                // On GKE/EKS/AKS, a blocked or missing internal domain usually results in NXDOMAIN 
-                // and an AUTHORITY section showing the root or cluster root SOA.
                 require.Contains(r, logs, "status: NXDOMAIN", "Expected NXDOMAIN status")
                 require.Contains(r, logs, "AUTHORITY SECTION", "Expected AUTHORITY SECTION")
             }
