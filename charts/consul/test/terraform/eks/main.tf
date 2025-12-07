@@ -274,19 +274,49 @@ resource "aws_vpc_peering_connection_accepter" "peer" {
 }
 
 # Add routes that so traffic going from VPC 0 to VPC 1 is routed through the peering connection.
-resource "aws_route" "peering0" {
-  # We have 2 route tables to add a route to, the public and private route tables.
-  count                     = var.cluster_count > 1 ? 2 : 0
-  route_table_id            = [module.vpc[0].public_route_table_ids[0], module.vpc[0].private_route_table_ids[0]][count.index]
+#resource "aws_route" "peering0" {
+#  # We have 2 route tables to add a route to, the public and private route tables.
+#  count                     = var.cluster_count > 1 ? 2 : 0
+#  route_table_id            = [module.vpc[0].public_route_table_ids[0], module.vpc[0].private_route_table_ids[0]][count.index]
+#  destination_cidr_block    = module.vpc[1].vpc_cidr_block
+#  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+#}
+
+# Add routes that so traffic going from VPC 1 to VPC 0 is routed through the peering connection.
+#resource "aws_route" "peering1" {
+#  # We have 2 route tables to add a route to, the public and private route tables.
+#  count                     = var.cluster_count > 1 ? 2 : 0
+#  route_table_id            = [module.vpc[1].public_route_table_ids[0], module.vpc[1].private_route_table_ids[0]][count.index]
+#  destination_cidr_block    = module.vpc[0].vpc_cidr_block
+#  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+#}
+
+# Add routes to all route tables in VPC 0 to route traffic to VPC 1 through the peering connection.
+resource "aws_route" "peering_private_0" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[0].private_route_table_ids) : 0
+  route_table_id            = module.vpc[0].private_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[1].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
 }
 
-# Add routes that so traffic going from VPC 1 to VPC 0 is routed through the peering connection.
-resource "aws_route" "peering1" {
-  # We have 2 route tables to add a route to, the public and private route tables.
-  count                     = var.cluster_count > 1 ? 2 : 0
-  route_table_id            = [module.vpc[1].public_route_table_ids[0], module.vpc[1].private_route_table_ids[0]][count.index]
+resource "aws_route" "peering_public_0" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[0].public_route_table_ids) : 0
+  route_table_id            = module.vpc[0].public_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[1].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Add routes to all route tables in VPC 1 to route traffic to VPC 0 through the peering connection.
+resource "aws_route" "peering_private_1" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[1].private_route_table_ids) : 0
+  route_table_id            = module.vpc[1].private_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[0].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+resource "aws_route" "peering_public_1" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[1].public_route_table_ids) : 0
+  route_table_id            = module.vpc[1].public_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[0].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
 }
