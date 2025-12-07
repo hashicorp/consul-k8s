@@ -241,6 +241,7 @@ func TestPeering_Gateway(t *testing.T) {
 		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ExportedServices, "default", &api.QueryOptions{})
 		require.NoError(r, err)
 		configEntryServer, ok := ceServer.(*api.ExportedServicesConfigEntry)
+		logger.Log(t, "Exported service config entry: ", configEntryServer)
 		require.True(r, ok)
 		require.Equal(r, configEntryServer.GetName(), "default")
 		require.NoError(r, err)

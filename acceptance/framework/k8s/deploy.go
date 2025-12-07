@@ -137,7 +137,7 @@ func CheckStaticServerConnectionMultipleFailureMessages(t *testing.T, options *k
 
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		output, err := RunKubectlAndGetOutputE(r, options, args...)
-		logger.Logf(t, "curl error: %v \n error: %s \n output: %s", err, err, output)
+		logger.Logf(t, "curl error: %v", err)
 		if expectSuccess {
 			require.NoError(r, err)
 			require.Contains(r, output, expectedOutput)
