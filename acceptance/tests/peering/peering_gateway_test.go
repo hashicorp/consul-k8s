@@ -358,12 +358,12 @@ func TestPeering_Gateway(t *testing.T) {
 		logger.Logf(r, "Current pods in namespace '%s':\n%s", staticClientOpts.Namespace, podsWithLabels)
 
 		// Try to wait for a short period.
-		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "--timeout=15s")
+		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "gateway.consul.hashicorp.com/name=gateway", "--timeout=15s")
 
 		// If the wait fails, get descriptive information for debugging then fail the retry.
 		if err != nil {
 			logger.Log(r, "api-gateway pod not ready, getting description and events...")
-			podName, podErr := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "-o", "jsonpath={.items[0].metadata.name}")
+			podName, podErr := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "pod", "-l", "gateway.consul.hashicorp.com/name=gateway", "-o", "jsonpath={.items[0].metadata.name}")
 			if podErr == nil && podName != "" {
 				describeOut, _ := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "describe", "pod", podName)
 				logger.Logf(r, "Description of api-gateway pod '%s':\n%s", podName, describeOut)
