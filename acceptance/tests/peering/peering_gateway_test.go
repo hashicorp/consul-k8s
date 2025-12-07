@@ -347,21 +347,31 @@ func TestPeering_Gateway(t *testing.T) {
 	// k8s.RunKubectl(t, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "--timeout=2m")
 	// logger.Log(t, "api-gateway pod is ready")
 
+	logger.Log(t, "waiting for api-gateway pod to be created...")
+	time.Sleep(10 * time.Second)
+
 	logger.Log(t, "verifying api-gateway pod is ready in client peer")
 	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 15 * time.Second}, t, func(r *retry.R) {
+
+		// List all pods and their labels in the namespace for debugging.
+		podsWithLabels, _ := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "pods", "--show-labels")
+		logger.Logf(r, "Current pods in namespace '%s':\n%s", staticClientOpts.Namespace, podsWithLabels)
+
 		// Try to wait for a short period.
 		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "--timeout=15s")
+
+		// If the wait fails, get descriptive information for debugging then fail the retry.
 		if err != nil {
-			// If the wait fails, get descriptive information for debugging.
 			logger.Log(r, "api-gateway pod not ready, getting description and events...")
 			podName, podErr := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "-o", "jsonpath={.items[0].metadata.name}")
 			if podErr == nil && podName != "" {
 				describeOut, _ := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "describe", "pod", podName)
 				logger.Logf(r, "Description of api-gateway pod '%s':\n%s", podName, describeOut)
 			}
-			// Fail the current retry attempt to trigger the next one.
-			r.Fatalf("api-gateway pod not ready yet: %s, %v", out, err)
 		}
+		// Use require.NoError which will fail the current retry attempt without stopping the whole test.
+		require.NoError(r, err, "api-gateway pod not ready yet: %s", out)
+		logger.Log(t, "api-gw details", out)
 	})
 	logger.Log(t, "api-gateway pod is ready")
 
