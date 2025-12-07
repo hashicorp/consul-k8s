@@ -235,7 +235,7 @@ func TestPeering_Gateway(t *testing.T) {
 		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
 	})
 
-	logger.Log(t, "check if exported service config entry exists in server peer")
+	logger.Log(t, "CHECK: if exported service config entry exists in server peer")
 	timer = &retry.Timer{Timeout: 1 * time.Minute, Wait: 5 * time.Second}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ExportedServices, "default", &api.QueryOptions{})
@@ -245,6 +245,7 @@ func TestPeering_Gateway(t *testing.T) {
 		require.True(r, ok)
 		require.Equal(r, configEntryServer.GetName(), "default")
 		require.NoError(r, err)
+		logger.Log(t, "exported service config entry exists")
 	})
 
 	// Create certificate secret, we do this separately since
@@ -305,13 +306,13 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
-	logger.Log(t, "checking for http route")
+	logger.Log(t, "CHECK if http-route exist before patching")
 	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway")
 
-	logger.Log(t, "patching route to target server")
+	logger.Log(t, "patching http-route to target server")
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
-	logger.Log(t, "verifying httproute patch")
+	logger.Log(t, "CHECK if http-route is patched")
 	retry.RunWith(&retry.Counter{Count: 10, Wait: 1 * time.Second}, t, func(r *retry.R) {
 		var route gwv1beta1.HTTPRoute
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: staticClientNamespace}, &route)
@@ -328,9 +329,9 @@ func TestPeering_Gateway(t *testing.T) {
 		require.NoError(r, err)
 		logger.Logf(t, "httproute details after patch:\n%s", httproute)
 	})
-	logger.Log(t, "httproute patch verified")
+	logger.Log(t, "http-route patch verified")
 
-	logger.Log(t, "verifying service-resolver config entry exists in client peer")
+	logger.Log(t, "CHECK if service-resolver config entry exists in client peer")
 	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		ce, _, err := staticClientPeerClient.ConfigEntries().Get(api.ServiceResolver, "static-server", &api.QueryOptions{Namespace: staticClientNamespace})
 		require.NoError(r, err, "error getting service-resolver config entry")
@@ -343,24 +344,13 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 	logger.Log(t, "service-resolver config entry verified")
 
-	// logger.Log(t, "verifying api-gateway pod is ready in client peer")
-	// k8s.RunKubectl(t, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "--timeout=2m")
-	// logger.Log(t, "api-gateway pod is ready")
+	// List all pods and their labels in the namespace for debugging.
+	podsWithLabels, _ := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "get", "pods", "--show-labels", "-o", "wide")
+	logger.Logf(t, "Current pods in namespace '%s':\n%s", staticClientOpts.Namespace, podsWithLabels)
 
-	logger.Log(t, "waiting for api-gateway pod to be created...")
-	time.Sleep(10 * time.Second)
-
-	logger.Log(t, "verifying api-gateway pod is ready in client peer")
+	logger.Log(t, "CHECK if api-gateway pod is ready in client peer")
 	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 15 * time.Second}, t, func(r *retry.R) {
-
-		// List all pods and their labels in the namespace for debugging.
-		podsWithLabels, _ := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "pods", "--show-labels")
-		logger.Logf(r, "Current pods in namespace '%s':\n%s", staticClientOpts.Namespace, podsWithLabels)
-
-		// Try to wait for a short period.
 		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "gateway.consul.hashicorp.com/name=gateway", "--timeout=15s")
-
-		// If the wait fails, get descriptive information for debugging then fail the retry.
 		if err != nil {
 			logger.Log(r, "api-gateway pod not ready, getting description and events...")
 			podName, podErr := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "pod", "-l", "gateway.consul.hashicorp.com/name=gateway", "-o", "jsonpath={.items[0].metadata.name}")
@@ -369,13 +359,18 @@ func TestPeering_Gateway(t *testing.T) {
 				logger.Logf(r, "Description of api-gateway pod '%s':\n%s", podName, describeOut)
 			}
 		}
-		// Use require.NoError which will fail the current retry attempt without stopping the whole test.
 		require.NoError(r, err, "api-gateway pod not ready yet: %s", out)
-		logger.Log(t, "api-gw details", out)
 	})
 	logger.Log(t, "api-gateway pod is ready")
 
-	logger.Log(t, "verifying mesh-gateway pods are ready in both peers")
+	// Get and log the pod name and IP.
+	podName, podErr := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "get", "pod", "-l", "gateway.consul.hashicorp.com/name=gateway", "-o", "jsonpath={.items[0].metadata.name}")
+	require.NoError(t, podErr)
+	podIP, ipErr := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "get", "pod", "-l", "gateway.consul.hashicorp.com/name=gateway", "-o", "jsonpath={.items[0].status.podIP}")
+	require.NoError(t, ipErr)
+	logger.Logf(t, "api-gateway pod '%s' is ready with IP: %s", podName, podIP)
+
+	logger.Log(t, "CHECK if mesh-gateway pods are ready in both peers")
 	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 10 * time.Second}, t, func(r *retry.R) {
 		_, err := k8s.RunKubectlAndGetOutputE(r, staticServerPeerClusterContext.KubectlOptions(t), "wait", "--for=condition=Ready", "pod", "-l", "app=consul,component=mesh-gateway", "--timeout=10s")
 		require.NoError(r, err, "server peer mesh-gateway not ready")
@@ -386,67 +381,23 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 	logger.Log(t, "mesh-gateway pods are ready")
 
-	logger.Log(t, "checking catalog services in client:")
-	logger.Log(t, "sleeping 10s before querying for service")
-	time.Sleep(10 * time.Second)
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
-		services, _, err := staticClientPeerClient.Catalog().Service(
-			staticServerName,
-			"",
-			&api.QueryOptions{
-				Namespace:  staticServerNamespace,
-				Peer:       staticServerPeer, // ask for service from server peer
-				Datacenter: staticClientPeer, // local dc context
-			},
-		)
-		// require.NoError(r, err, "error querying catalog services in client for peer %q service %q", staticServerPeer, staticServerName)
-		// require.Greater(r, len(services), 0, "no services found in client catalog")
-		if err != nil {
-			logger.Logf(t, "error querying catalog services in client for peer %q service %q: %v", staticServerPeer, staticServerName, err)
-		} else {
-			logger.Logf(t, "found %d service", len(services))
-			for i, s := range services {
-				logger.Logf(t, "[%d] ServiceName=%s ID=%s Namespace=%s Address=%s Port=%d Meta=%v",
-					i, s.ServiceName, s.ServiceID, s.Namespace, s.Address, s.ServicePort, s.ServiceMeta)
-			}
-		}
-	})
-
-	logger.Log(t, "checking servers exported service:")
-	if true {
-		// Define kubectl options for the 'consul' namespace on the server peer to get the token.
-		staticServerConsulNSOpts := &terratestk8s.KubectlOptions{
-			ContextName: staticServerPeerClusterContext.KubectlOptions(t).ContextName,
-			ConfigPath:  staticServerPeerClusterContext.KubectlOptions(t).ConfigPath,
-			Namespace:   "default", // The secret is in the 'consul' namespace.
-		}
-		serverToken, err := k8s.RunKubectlAndGetOutputE(t, staticServerConsulNSOpts,
-			"get", "secret", "consul-bootstrap-acl-token",
-			"-o", "go-template={{.data.token|base64decode}}",
-		)
-		if err != nil {
-			logger.Log(t, "error getting server bootstrap token: %v", err)
-		} else {
-			logger.Log(t, "server bootstrap token: %s", serverToken)
-			retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
-				services, _, err := staticServerPeerClient.ExportedServices(
-					&api.QueryOptions{
-						Namespace: staticServerNamespace,
-						Token:     serverToken,
-					},
-				)
-				// require.NoError(r, err, "error querying exported services in server")
-				// require.Greater(r, len(services), 0, "no exported static-server service found in server")
-				if err != nil {
-					logger.Logf(t, "error querying exported services in server: %v", err)
-				} else {
-					logger.Logf(t, "found %d exported services %q in peer %q", len(services), staticServerName, staticServerPeer)
-					for i, s := range services {
-						logger.Logf(t, "[%d] ServiceName=%s Namespace=%s Partition=%s Consumers=%s",
-							i, s.Service, s.Namespace, s.Partition, s.Consumers)
-					}
-				}
-			})
+	logger.Log(t, "CHECK if catalog services in client able to discover server exported services")
+	services, _, err := staticClientPeerClient.Catalog().Service(
+		staticServerName,
+		"",
+		&api.QueryOptions{
+			Namespace:  staticServerNamespace,
+			Peer:       staticServerPeer, // ask for service from server peer
+			Datacenter: staticClientPeer, // local dc context
+		},
+	)
+	if err != nil {
+		logger.Logf(t, "error querying catalog services in client for peer %q service %q: %v", staticServerPeer, staticServerName, err)
+	} else {
+		logger.Logf(t, "found %d service", len(services))
+		for i, s := range services {
+			logger.Logf(t, "[%d] ServiceName=%s ID=%s Namespace=%s Address=%s Port=%d Meta=%v",
+				i, s.ServiceName, s.ServiceID, s.Namespace, s.Address, s.ServicePort, s.ServiceMeta)
 		}
 	}
 
