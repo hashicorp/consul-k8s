@@ -21,6 +21,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"                                        // NEW import
+	gatewayclientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned" // NEW import
 )
 
 // WritePodsDebugInfoIfFailed calls kubectl describe and kubectl logs --all-containers
@@ -31,6 +33,12 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 	if t.Failed() {
 		// Create k8s client from kubectl options.
 		client := environment.KubernetesClientFromOptions(t, kubectlOptions)
+
+		// NEW: Create a separate clientset for the Gateway API resources.
+		config, err := clientcmd.BuildConfigFromFlags("", kubectlOptions.ConfigPath)
+		require.NoError(t, err)
+		gatewayClient, err := gatewayclientset.NewForConfig(config)
+		require.NoError(t, err)
 
 		contextName := environment.KubernetesContextFromOptions(t, kubectlOptions)
 
@@ -106,11 +114,25 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 					clusters = string(clustersRespBytes)
 				}
 
+				// NEW: Add a call to the Consul agent's catalog services endpoint.
+				// This is very useful for debugging service discovery and peering issues.
+				catalogServicesResp, err := http.DefaultClient.Get(fmt.Sprintf("http://%s/v1/catalog/services", localPort))
+				var catalogServices string
+				if err != nil {
+					catalogServices = fmt.Sprintf("Error getting /v1/catalog/services: %s", err)
+				} else {
+					catalogServicesRespBytes, err := io.ReadAll(catalogServicesResp.Body)
+					require.NoError(t, err)
+					catalogServices = string(catalogServicesRespBytes)
+				}
+
 				// Write config/clusters or err to file name <pod.Name>-envoy-[configdump/clusters].json
 				configDumpFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-envoy-configdump.json", pod.Name))
 				clustersFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-envoy-clusters.json", pod.Name))
+				catalogServicesFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-consul-catalog-services.json", pod.Name)) // NEW
 				require.NoError(t, os.WriteFile(configDumpFilename, []byte(configDump), 0600))
 				require.NoError(t, os.WriteFile(clustersFilename, []byte(clusters), 0600))
+				require.NoError(t, os.WriteFile(catalogServicesFilename, []byte(catalogServices), 0600)) // NEW
 			}
 		}
 
@@ -209,6 +231,39 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 				require.NoError(t, os.WriteFile(endpointYAMLFilename, []byte(endpointYAML), 0600))
 			}
 		}
+
+		// can we add here logs and resource info for apiGatway too?
+		// NEW: Add specific debugging for API Gateway resources.
+		logger.Log(t, "dumping API Gateway resource info")
+		gwcList, err := gatewayClient.GatewayV1beta1().GatewayClasses().List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			logger.Log(t, "unable to list GatewayClasses", "err", err)
+		} else {
+			for _, gwc := range gwcList.Items {
+				writeResourceInfoToFile(t, gwc.Name, "gatewayclass", testDebugDirectory, kubectlOptions)
+				writeResourceYAMLToFile(t, gwc.Name, "gatewayclass", testDebugDirectory, kubectlOptions)
+			}
+		}
+
+		gwList, err := gatewayClient.GatewayV1beta1().Gateways(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			logger.Log(t, "unable to list Gateways", "err", err)
+		} else {
+			for _, gw := range gwList.Items {
+				writeResourceInfoToFile(t, gw.Name, "gateway", testDebugDirectory, kubectlOptions)
+				writeResourceYAMLToFile(t, gw.Name, "gateway", testDebugDirectory, kubectlOptions)
+			}
+		}
+
+		httpRouteList, err := gatewayClient.GatewayV1beta1().HTTPRoutes(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			logger.Log(t, "unable to list HTTPRoutes", "err", err)
+		} else {
+			for _, route := range httpRouteList.Items {
+				writeResourceInfoToFile(t, route.Name, "httproute", testDebugDirectory, kubectlOptions)
+				writeResourceYAMLToFile(t, route.Name, "httproute", testDebugDirectory, kubectlOptions)
+			}
+		}
 	}
 }
 
@@ -226,4 +281,17 @@ func writeResourceInfoToFile(t *testing.T, resourceName, resourceType, testDebug
 	}
 	descFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-%s.txt", resourceName, resourceType))
 	require.NoError(t, os.WriteFile(descFilename, []byte(desc), 0600))
+}
+
+// NEW: Add a helper function to get the YAML for a resource.
+// writeResourceYAMLToFile takes a Kubernetes resource name and type, runs 'kubectl get -o yaml'
+// and writes the output to a file.
+func writeResourceYAMLToFile(t *testing.T, resourceName, resourceType, testDebugDirectory string, kubectlOptions *k8s.KubectlOptions) {
+	t.Helper()
+	yaml, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", resourceType, resourceName, "-o", "yaml")
+	if err != nil {
+		yaml = fmt.Sprintf("Error getting YAML for %s/%s: %s: %s", resourceType, resourceName, err, yaml)
+	}
+	yamlFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-%s.yaml", resourceName, resourceType))
+	require.NoError(t, os.WriteFile(yamlFilename, []byte(yaml), 0600))
 }

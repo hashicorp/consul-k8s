@@ -330,6 +330,52 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 	logger.Log(t, "httproute patch verified")
 
+	logger.Log(t, "verifying service-resolver config entry exists in client peer")
+	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		ce, _, err := staticClientPeerClient.ConfigEntries().Get(api.ServiceResolver, "static-server", &api.QueryOptions{Namespace: staticClientNamespace})
+		require.NoError(r, err, "error getting service-resolver config entry")
+		require.NotNil(r, ce, "service-resolver config entry should not be nil")
+
+		serviceResolverConfig, ok := ce.(*api.ServiceResolverConfigEntry)
+		require.True(r, ok, "config entry is not a service-resolver")
+		logger.Logf(t, "service-resolver config entry: %+v", serviceResolverConfig)
+		require.Equal(r, "static-server", serviceResolverConfig.Name, "service-resolver name mismatch")
+	})
+	logger.Log(t, "service-resolver config entry verified")
+
+	// logger.Log(t, "verifying api-gateway pod is ready in client peer")
+	// k8s.RunKubectl(t, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "--timeout=2m")
+	// logger.Log(t, "api-gateway pod is ready")
+
+	logger.Log(t, "verifying api-gateway pod is ready in client peer")
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 15 * time.Second}, t, func(r *retry.R) {
+		// Try to wait for a short period.
+		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "--timeout=15s")
+		if err != nil {
+			// If the wait fails, get descriptive information for debugging.
+			logger.Log(r, "api-gateway pod not ready, getting description and events...")
+			podName, podErr := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "pod", "-l", "consul.hashicorp.com/gateway-name=gateway", "-o", "jsonpath={.items[0].metadata.name}")
+			if podErr == nil && podName != "" {
+				describeOut, _ := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "describe", "pod", podName)
+				logger.Logf(r, "Description of api-gateway pod '%s':\n%s", podName, describeOut)
+			}
+			// Fail the current retry attempt to trigger the next one.
+			r.Fatalf("api-gateway pod not ready yet: %s, %v", out, err)
+		}
+	})
+	logger.Log(t, "api-gateway pod is ready")
+
+	logger.Log(t, "verifying mesh-gateway pods are ready in both peers")
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 10 * time.Second}, t, func(r *retry.R) {
+		_, err := k8s.RunKubectlAndGetOutputE(r, staticServerPeerClusterContext.KubectlOptions(t), "wait", "--for=condition=Ready", "pod", "-l", "app=consul,component=mesh-gateway", "--timeout=10s")
+		require.NoError(r, err, "server peer mesh-gateway not ready")
+	})
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 10 * time.Second}, t, func(r *retry.R) {
+		_, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(t), "wait", "--for=condition=Ready", "pod", "-l", "app=consul,component=mesh-gateway", "--timeout=10s")
+		require.NoError(r, err, "client peer mesh-gateway not ready")
+	})
+	logger.Log(t, "mesh-gateway pods are ready")
+
 	logger.Log(t, "checking catalog services in client:")
 	logger.Log(t, "sleeping 10s before querying for service")
 	time.Sleep(10 * time.Second)
