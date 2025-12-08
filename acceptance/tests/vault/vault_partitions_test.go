@@ -302,6 +302,8 @@ func TestVault_Partitions(t *testing.T) {
 		"global.acls.manageSystemACLs":                     "true",
 		"global.tls.enabled":                               "true",
 		"global.tls.enableAutoEncrypt":                     "true",
+		"connectInject.certManager.enabled":                "false",
+         "connectInject.webhook.createCert":                 "true",
 		"global.tls.caCert.secretName":                     serverPKIConfig.CAPath,
 		"global.gossipEncryption.secretName":               gossipSecret.Path,
 		"global.gossipEncryption.secretKey":                gossipSecret.Key,
