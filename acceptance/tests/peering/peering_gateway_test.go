@@ -334,7 +334,7 @@ func TestPeering_Gateway(t *testing.T) {
 	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway")
 
 	logger.Log(t, "patching http-route to target server")
-	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":8080}]}]}}`, "--type=merge")
 
 	logger.Log(t, "CHECK if http-route is patched")
 	retry.RunWith(&retry.Counter{Count: 10, Wait: 1 * time.Second}, t, func(r *retry.R) {
@@ -416,7 +416,7 @@ func TestPeering_Gateway(t *testing.T) {
 		// Log detailed peer info
 		peerInfo, _, err := staticServerPeerClient.Peerings().Read(context.Background(), serverPeers[0].Name, &api.QueryOptions{})
 		require.NoError(r, err)
-		logger.Logf(t, "Client peer details: ID=%s, Name=%s, State=%s, Meta=%v, PeerServerName=%s, PeerServerAddress=%s, PeerExportedService=%s, PeerImportedService=%s", peerInfo.ID, peerInfo.Name, peerInfo.State, peerInfo.Meta, peerInfo.PeerServerName, peerInfo.PeerServerAddresses, peerInfo.StreamStatus.ExportedServices, peerInfo.StreamStatus.ImportedServices)
+		logger.Logf(t, "Server peer details: ID=%s, Name=%s, State=%s, Meta=%v, PeerServerName=%s, PeerServerAddress=%s, PeerExportedService=%s, PeerImportedService=%s", peerInfo.ID, peerInfo.Name, peerInfo.State, peerInfo.Meta, peerInfo.PeerServerName, peerInfo.PeerServerAddresses, peerInfo.StreamStatus.ExportedServices, peerInfo.StreamStatus.ImportedServices)
 
 		// Check from client to server
 		clientPeers, _, err := staticClientPeerClient.Peerings().List(context.Background(), &api.QueryOptions{})
