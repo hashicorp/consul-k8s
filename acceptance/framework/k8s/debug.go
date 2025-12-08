@@ -21,8 +21,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd"                                        // NEW import
-	gatewayclientset "sigs.k8s.io/gateway-api/pkg/client/clientset/versioned" // NEW import
 )
 
 // WritePodsDebugInfoIfFailed calls kubectl describe and kubectl logs --all-containers
@@ -33,12 +31,6 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 	if t.Failed() {
 		// Create k8s client from kubectl options.
 		client := environment.KubernetesClientFromOptions(t, kubectlOptions)
-
-		// NEW: Create a separate clientset for the Gateway API resources.
-		config, err := clientcmd.BuildConfigFromFlags("", kubectlOptions.ConfigPath)
-		require.NoError(t, err)
-		gatewayClient, err := gatewayclientset.NewForConfig(config)
-		require.NoError(t, err)
 
 		contextName := environment.KubernetesContextFromOptions(t, kubectlOptions)
 
@@ -52,11 +44,36 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 		testDebugDirectory := filepath.Join(debugDirectory, tn, contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
 
+		logger.Log(t, "collecting api gateway logs")
+		// collect logs and describe for gateway resources
+		apiGwPods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "gateway.consul.hashicorp.com/name=gateway"})
+		if err != nil {
+			logger.Log(t, "unable to list API Gateway pods", "err", err)
+		} else {
+			logger.Logf(t, "found %d api gateway pods to collect logs from", len(apiGwPods.Items))
+			logger.Log(t, "api-gw are", apiGwPods)
+			for _, pod := range apiGwPods.Items {
+				// Describe pod and write it to a file.
+				writeResourceInfoToFile(t, pod.Name, "pod", testDebugDirectory, kubectlOptions)
+
+				// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
+				logs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "--all-containers=true", pod.Name)
+				if err != nil {
+					logs = fmt.Sprintf("Error getting logs for pod %s: %s\n%s", pod.Name, err.Error(), logs)
+					logger.Log(t, "unable to fetch log from api gw pod: ", pod.Name, "\n err: ", err)
+				}
+				// Write logs or err to file name <pod.Name>.log
+				logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
+				require.NoError(t, os.WriteFile(logFilename, []byte(logs), 0600))
+			}
+		}
+
 		logger.Logf(t, "dumping logs, pod info, and envoy config for %s to %s", labelSelector, testDebugDirectory)
 
 		// Describe and get logs for any pods.
 		pods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
 		require.NoError(t, err)
+		logger.Log(t, "\nall pods: \n", pods)
 
 		for _, pod := range pods.Items {
 			// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
@@ -215,38 +232,6 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 				// Write endpoints YAML or err to file name <endpoint.Name>-endpoints.yaml
 				endpointYAMLFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s-endpoints.yaml", endpoint.Name))
 				require.NoError(t, os.WriteFile(endpointYAMLFilename, []byte(endpointYAML), 0600))
-			}
-		}
-
-		// Add specific debugging for API Gateway resources. (used for peering gateway tests)
-		logger.Log(t, "dumping API Gateway resource info")
-		gwcList, err := gatewayClient.GatewayV1beta1().GatewayClasses().List(context.Background(), metav1.ListOptions{})
-		if err != nil {
-			logger.Log(t, "unable to list GatewayClasses", "err", err)
-		} else {
-			for _, gwc := range gwcList.Items {
-				writeResourceInfoToFile(t, gwc.Name, "gatewayclass", testDebugDirectory, kubectlOptions)
-			}
-		}
-
-		// collect logs and describe for gateway resources
-		apiGwPods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "gateway.consul.hashicorp.com/name=gateway"})
-		if err != nil {
-			logger.Log(t, "unable to list API Gateway pods", "err", err)
-		} else {
-			for _, pod := range apiGwPods.Items {
-				// Describe pod and write it to a file.
-				writeResourceInfoToFile(t, pod.Name, "pod", testDebugDirectory, kubectlOptions)
-
-				// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
-				logs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "--all-containers=true", pod.Name)
-				if err != nil {
-					logs = fmt.Sprintf("Error getting logs for pod %s: %s\n%s", pod.Name, err.Error(), logs)
-					logger.Log(t, "unable to fetch log from api gw pod: ", pod.Name, "\n err: ", err)
-				}
-				// Write logs or err to file name <pod.Name>.log
-				logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
-				require.NoError(t, os.WriteFile(logFilename, []byte(logs), 0600))
 			}
 		}
 	}

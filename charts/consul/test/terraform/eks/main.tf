@@ -232,8 +232,8 @@ resource "aws_security_group_rule" "allowingressfrom1-0" {
   count             = var.cluster_count > 1 ? 1 : 0
   type              = "ingress"
   from_port         = 0
-  to_port           = 65535
-  protocol          = "tcp"
+  to_port           = 0
+  protocol          = "-1"
   cidr_blocks       = [module.vpc[1].vpc_cidr_block]
   security_group_id = module.eks[0].worker_security_group_id
 }
@@ -242,8 +242,8 @@ resource "aws_security_group_rule" "allowingressfrom0-1" {
   count             = var.cluster_count > 1 ? 1 : 0
   type              = "ingress"
   from_port         = 0
-  to_port           = 65535
-  protocol          = "tcp"
+  to_port           = 0
+  protocol          = "-1"
   cidr_blocks       = [module.vpc[0].vpc_cidr_block]
   security_group_id = module.eks[1].worker_security_group_id
 }
