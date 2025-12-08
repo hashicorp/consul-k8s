@@ -303,7 +303,7 @@ func TestVault_Partitions(t *testing.T) {
 		"global.tls.enabled":                               "true",
 		"global.tls.enableAutoEncrypt":                     "true",
 		"connectInject.certManager.enabled":                "false",
-         "connectInject.webhook.createCert":                 "true",
+        "connectInject.webhook.createCert":                 "true",
 		"global.tls.caCert.secretName":                     serverPKIConfig.CAPath,
 		"global.gossipEncryption.secretName":               gossipSecret.Path,
 		"global.gossipEncryption.secretKey":                gossipSecret.Key,
@@ -311,23 +311,27 @@ func TestVault_Partitions(t *testing.T) {
 		"global.enterpriseLicense.secretKey":               licenseSecret.Key,
 	}
 
-	serverHelmValues := map[string]string{
-		"global.secretsBackend.vault.consulServerRole":              consulServerRole,
-		"global.secretsBackend.vault.connectCA.address":             serverClusterVault.Address(),
-		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
-		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
-		"global.acls.bootstrapToken.secretName":                     bootstrapTokenSecret.Path,
-		"global.acls.bootstrapToken.secretKey":                      bootstrapTokenSecret.Key,
-		"global.acls.partitionToken.secretName":                     partitionTokenSecret.Path,
-		"global.acls.partitionToken.secretKey":                      partitionTokenSecret.Key,
-		"server.exposeGossipAndRPCPorts":                            "true",
-		"server.serverCert.secretName":                              serverPKIConfig.CertPath,
-		"server.extraVolumes[0].type":                               "secret",
-		"server.extraVolumes[0].name":                               vaultCASecretName,
-		"server.extraVolumes[0].load":                               "false",
-		"server.exposeService.enabled":                              "true",
-		"server.exposeService.type":                                 "LoadBalancer",
-	}
+serverHelmValues := map[string]string{
+    "global.secretsBackend.vault.consulServerRole":              consulServerRole,
+    "global.secretsBackend.vault.connectCA.address":             serverClusterVault.Address(),
+    "global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
+    "global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
+    "global.acls.bootstrapToken.secretName":                     bootstrapTokenSecret.Path,
+    "global.acls.bootstrapToken.secretKey":                      bootstrapTokenSecret.Key,
+    "global.acls.partitionToken.secretName":                     partitionTokenSecret.Path,
+    "global.acls.partitionToken.secretKey":                      partitionTokenSecret.Key,
+    "server.exposeGossipAndRPCPorts":                            "true",
+    "server.serverCert.secretName":                              serverPKIConfig.CertPath,
+    "server.extraVolumes[0].type":                               "secret",
+    "server.extraVolumes[0].name":                               vaultCASecretName,
+    "server.extraVolumes[0].load":                               "false",
+    "server.exposeService.enabled":                              "true",
+    "server.exposeService.type":                                 "LoadBalancer",
+
+    // ADD THESE TWO LINES
+    "connectInject.certManager.enabled": "false",
+    "connectInject.webhook.createCert":  "true",
+}
 
 	if cfg.UseKind {
 		serverHelmValues["meshGateway.service.type"] = "NodePort"
