@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
@@ -229,12 +230,28 @@ func TestPeering_Gateway(t *testing.T) {
 	logger.Log(t, "creating static-server in server peer")
 	k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
-	logger.Log(t, "CHECK if static-server pod is ready in server peer")
+	logger.Log(t, "CHECK if static-server and static-client pods are ready")
 	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
-		out, err := k8s.RunKubectlAndGetOutputE(r, staticServerOpts, "wait", "--for=condition=Ready", "pod", "-l", "app=static-server", "--timeout=60s")
-		require.NoError(r, err, "static-server pod not ready: %s", out)
+		serverPod, err := k8s.RunKubectlAndGetOutputE(r, staticServerOpts, "wait", "--for=condition=Ready", "pod", "-l", "app=static-server", "--timeout=60s")
+		require.NoError(r, err, "static-server pod not ready: %s", serverPod)
+		clientPod, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "wait", "--for=condition=Ready", "pod", "-l", "app=static-client", "--timeout=60s")
+		require.NoError(r, err, "static-client pod not ready: %s", clientPod)
 	})
-	logger.Log(t, "static-server pod is ready")
+	logger.Log(t, "static-server and static-client pods are ready")
+
+	// Verify that the static-server and static-client pods have two containers (app + sidecar).
+	podList, err := staticServerPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app=static-server",
+	})
+	require.NoError(t, err)
+	require.Len(t, podList.Items, 1)
+	require.Len(t, podList.Items[0].Spec.Containers, 2)
+	podList, err = staticClientPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app=static-client",
+	})
+	require.NoError(t, err)
+	require.Len(t, podList.Items, 1)
+	require.Len(t, podList.Items[0].Spec.Containers, 2)
 
 	logger.Log(t, "creating exported services")
 	k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
@@ -388,25 +405,51 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 	logger.Log(t, "mesh-gateway pods are ready")
 
+	logger.Log(t, "CHECK if peering connection is active on both peers")
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		// Check from server to client
+		serverPeers, _, err := staticServerPeerClient.Peerings().List(context.Background(), &api.QueryOptions{})
+		require.NoError(r, err, "error listing peers from server")
+		require.Len(r, serverPeers, 1, "server should have one peer")
+		require.Equal(r, api.PeeringStateActive, serverPeers[0].State, "peering connection from server is not active")
+
+		// Log detailed peer info
+		peerInfo, _, err := staticServerPeerClient.Peerings().Read(context.Background(), serverPeers[0].Name, &api.QueryOptions{})
+		require.NoError(r, err)
+		logger.Logf(t, "Client peer details: ID=%s, Name=%s, State=%s, Meta=%v, PeerServerName=%s, PeerServerAddress=%s, PeerExportedService=%s, PeerImportedService=%s", peerInfo.ID, peerInfo.Name, peerInfo.State, peerInfo.Meta, peerInfo.PeerServerName, peerInfo.PeerServerAddresses, peerInfo.StreamStatus.ExportedServices, peerInfo.StreamStatus.ImportedServices)
+
+		// Check from client to server
+		clientPeers, _, err := staticClientPeerClient.Peerings().List(context.Background(), &api.QueryOptions{})
+		require.NoError(r, err, "error listing peers from client")
+		require.Len(r, clientPeers, 1, "client should have one peer")
+		require.Equal(r, api.PeeringStateActive, clientPeers[0].State, "peering connection from client is not active")
+
+		// Log detailed peer info
+		peerInfo, _, err = staticClientPeerClient.Peerings().Read(context.Background(), clientPeers[0].Name, &api.QueryOptions{})
+		require.NoError(r, err)
+		logger.Logf(t, "Client peer details: ID=%s, Name=%s, State=%s, Meta=%v, PeerServerName=%s, PeerServerAddress=%s, PeerExportedService=%s, PeerImportedService=%s", peerInfo.ID, peerInfo.Name, peerInfo.State, peerInfo.Meta, peerInfo.PeerServerName, peerInfo.PeerServerAddresses, peerInfo.StreamStatus.ExportedServices, peerInfo.StreamStatus.ImportedServices)
+	})
+	logger.Log(t, "peering connection is active")
+
 	logger.Log(t, "CHECK if catalog services in client able to discover server exported services")
-	services, _, err := staticClientPeerClient.Catalog().Service(
-		staticServerName,
-		"",
-		&api.QueryOptions{
-			Namespace:  staticServerNamespace,
-			Peer:       staticServerPeer, // ask for service from server peer
-			Datacenter: staticClientPeer, // local dc context
-		},
-	)
-	if err != nil {
-		logger.Logf(t, "error querying catalog services in client for peer %q service %q: %v", staticServerPeer, staticServerName, err)
-	} else {
+	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		services, _, err := staticClientPeerClient.Catalog().Service(
+			staticServerName,
+			"",
+			&api.QueryOptions{
+				Namespace:  staticServerNamespace,
+				Peer:       staticServerPeer, // ask for service from server peer
+				Datacenter: staticClientPeer, // local dc context
+			},
+		)
+		require.NoError(r, err, "error querying catalog services in client for peer %q service %q", staticServerPeer, staticServerName)
+		require.GreaterOrEqual(r, len(services), 1, "expected to find at least one service instance from peer")
 		logger.Logf(t, "found %d service", len(services))
 		for i, s := range services {
 			logger.Logf(t, "[%d] ServiceName=%s ID=%s Namespace=%s Address=%s Port=%d Meta=%v",
 				i, s.ServiceName, s.ServiceID, s.Namespace, s.Address, s.ServicePort, s.ServiceMeta)
 		}
-	}
+	})
 
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, staticClientOpts, staticClientName, targetAddress)
