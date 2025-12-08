@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
 
-	// [FIX] Added this import for EnableAuthOptions
 	"github.com/hashicorp/vault/api"
 
 	corev1 "k8s.io/api/core/v1"
@@ -76,15 +75,16 @@ func TestVault_Partitions(t *testing.T) {
 	serverClusterVault := vault.NewVaultCluster(t, serverClusterCtx, cfg, vaultReleaseName, serverClusterVaultHelmValues)
 	serverClusterVault.Create(t, serverClusterCtx, "")
 	
-	// Access the client via the cluster object
 	vaultClient := serverClusterVault.VaultClient(t)
 
-	// [CLOUD FIX] Wait for LoadBalancer IP/Hostname
+	// [FIX] Wait for LoadBalancer IP/Hostname
+	// Changed from "-vault-active" to "-vault" because HA is not enabled in this test config.
 	var externalVaultAddress string
 	if cfg.UseKind {
 		externalVaultAddress = serverClusterVault.Address()
 	} else {
-		externalVaultAddress = waitForServiceLB(t, serverClusterCtx.KubectlOptions(t), vaultReleaseName+"-vault-active")
+		// The service name in non-HA Vault Helm is just [ReleaseName]-vault
+		externalVaultAddress = waitForServiceLB(t, serverClusterCtx.KubectlOptions(t), vaultReleaseName+"-vault")
 		externalVaultAddress = fmt.Sprintf("http://%s:8200", externalVaultAddress)
 	}
 	logger.Logf(t, "Vault External Address: %s", externalVaultAddress)
@@ -108,7 +108,6 @@ func TestVault_Partitions(t *testing.T) {
 		authMethodRBACName := fmt.Sprintf("%s-vault-auth-method", vaultReleaseName)
 		createVaultAuthRBAC(t, clientClusterCtx.KubectlOptions(t), clientNs, authMethodRBACName)
 
-		// [FIX] Load RestConfig manually to get Host and CA
 		k8sOpts := clientClusterCtx.KubectlOptions(t)
 		restConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 			&clientcmd.ClientConfigLoadingRules{ExplicitPath: k8sOpts.ConfigPath},
@@ -124,7 +123,6 @@ func TestVault_Partitions(t *testing.T) {
 		authPath := "kubernetes-" + secondaryPartition
 
 		// 1. Enable Auth Method (Idempotent check)
-		// [FIX] Used api.EnableAuthOptions instead of vault.EnableAuthOptions
 		err = vaultClient.Sys().EnableAuthWithOptions(authPath, &api.EnableAuthOptions{Type: "kubernetes"})
 		if err != nil && !strings.Contains(err.Error(), "path is already in use") {
 			require.NoError(t, err)
@@ -209,8 +207,14 @@ func TestVault_Partitions(t *testing.T) {
 	// -----------------------------------------------------------------------
 	syncSecret(t, serverClusterCtx.KubectlOptions(t), ns, clientClusterCtx.KubectlOptions(t), clientNs, vaultCASecretName)
 
-	serverSvcName := fmt.Sprintf("%s-consul-server", consulReleaseName)
-	partitionSvcName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
+	// Note: Standard Consul Helm charts name the service [ReleaseName]-server
+	serverSvcName := fmt.Sprintf("%s-server", consulReleaseName)
+	partitionSvcName := fmt.Sprintf("%s-expose-servers", consulReleaseName) 
+    // ^ Assuming the chart uses this convention. If your chart uses "-consul-server", revert this line.
+    // Based on standard behavior, it is usually just "-server".
+    // If the test framework overrides this, check helpers. But typically:
+    serverSvcName = fmt.Sprintf("%s-consul-server", consulReleaseName) // Reverting to your original convention to be safe
+    partitionSvcName = fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 
 	var serverSvcAddress, partitionSvcAddress string
 
@@ -486,7 +490,7 @@ func waitForServiceLB(t *testing.T, ctx *k8s.KubectlOptions, serviceName string)
 		if svc.Spec.Type == corev1.ServiceTypeNodePort {
 			nodes, _ := k8s.GetNodesE(t, ctx)
 			if len(nodes) > 0 {
-				addr = "localhost" 
+				addr = "localhost"
 				return true
 			}
 		}
@@ -497,7 +501,6 @@ func waitForServiceLB(t *testing.T, ctx *k8s.KubectlOptions, serviceName string)
 }
 
 func createVaultAuthRBAC(t *testing.T, ctx *k8s.KubectlOptions, namespace, name string) {
-	// [FIXED] k8s.GetKubernetesClientE returns (client, error)
 	client, err := k8s.GetKubernetesClientE(t)
 	require.NoError(t, err)
 
@@ -533,7 +536,6 @@ func createVaultAuthRBAC(t *testing.T, ctx *k8s.KubectlOptions, namespace, name 
 
 func getServiceAccountToken(t *testing.T, ctx *k8s.KubectlOptions, namespace, name string) string {
 	var token string
-	// [FIXED] k8s.GetKubernetesClientE returns (client, error)
 	client, err := k8s.GetKubernetesClientE(t)
 	require.NoError(t, err)
 
