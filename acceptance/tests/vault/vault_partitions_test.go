@@ -287,7 +287,7 @@ func TestVault_Partitions(t *testing.T) {
 	srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
 	secondaryServerPKIConfig := &vault.PKIAndAuthRoleConfiguration{
-    BaseURL:             serverPKIConfig.BaseURL,
+    BaseURL:             "pki-secondary",
     PolicyName:          serverPKIConfig.PolicyName,
     RoleName:            serverPKIConfig.RoleName,
     KubernetesNamespace: clientNs,
@@ -345,6 +345,7 @@ serverHelmValues := map[string]string{
     // ADD THESE TWO LINES
     "connectInject.certManager.enabled": "false",
     "connectInject.webhook.createCert":  "true",
+	"global.secretsBackend.vault.consulCAMountPath": "pki",
 }
 
 	if cfg.UseKind {
@@ -389,7 +390,6 @@ serverHelmValues := map[string]string{
 
 		"global.acls.bootstrapToken.secretName": partitionTokenSecret.Path,
 		"global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
-
 		"global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
 		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
@@ -418,10 +418,10 @@ serverHelmValues := map[string]string{
 		"client.join[0]":           partitionSvcAddress,
 
 		"connectInject.transparentProxy.defaultEnabled": "true",
-		"global.secretsBackend.vault.consulServerMountPath": "kubernetes-" + secondaryPartition,
+		"global.secretsBackend.vault.consulCAMountPath": "pki-secondary",
 
 		// Ensure sidecar injector also knows the correct auth path if sidecars are injected
-		"connectInject.vault.authMethodPath": "kubernetes-" + secondaryPartition,
+		 "connectInject.vault.pkiMountPath": "pki-secondary",
 
 	}
 
