@@ -229,23 +229,25 @@ resource "kubernetes_storage_class" "ebs_gp3_cluster1" {
 
 # Each EKS cluster needs to allow ingress traffic from the other VPC.
 resource "aws_security_group_rule" "allowingressfrom1-0" {
-  count             = var.cluster_count > 1 ? 1 : 0
+  count             = var.cluster_count > 1 ? length(module.vpc[1].private_subnets_cidr_blocks) : 0
   type              = "ingress"
   from_port         = 0
   to_port           = 0
   protocol          = "-1"
-  cidr_blocks       = [module.vpc[1].vpc_cidr_block]
+  cidr_blocks       = [module.vpc[1].private_subnets_cidr_blocks[count.index]]
   security_group_id = module.eks[0].worker_security_group_id
+  description       = "Allow node traffic from cluster 1 private subnet ${count.index}"
 }
 
 resource "aws_security_group_rule" "allowingressfrom0-1" {
-  count             = var.cluster_count > 1 ? 1 : 0
+  count             = var.cluster_count > 1 ? length(module.vpc[0].private_subnets_cidr_blocks) : 0
   type              = "ingress"
   from_port         = 0
   to_port           = 0
   protocol          = "-1"
-  cidr_blocks       = [module.vpc[0].vpc_cidr_block]
+  cidr_blocks       = [module.vpc[0].private_subnets_cidr_blocks[count.index]]
   security_group_id = module.eks[1].worker_security_group_id
+  description       = "Allow node traffic from cluster 0 private subnet ${count.index}"
 }
 
 # Create a peering connection. This is the requester's side of the connection.
