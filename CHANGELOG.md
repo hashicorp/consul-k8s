@@ -1,3 +1,50 @@
+## 1.9.1 (2 December, 2025)
+
+SECURITY:
+
+* crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108 [[GH-4990](https://github.com/hashicorp/consul-k8s/issues/4990)]
+
+FEATURES:
+
+* api-gateway: Add support for configuring Kubernetes probes (liveness, readiness, startup) per-Gateway via annotations. Use `consul.hashicorp.com/liveness-probe`, `consul.hashicorp.com/readiness-probe`, and `consul.hashicorp.com/startup-probe` annotations with JSON probe configuration to customize health checks for individual API Gateways. [[GH-4901](https://github.com/hashicorp/consul-k8s/pull/4901)] [[GH-4901](https://github.com/hashicorp/consul-k8s/issues/4901)]
+* cli: Add `debug` command to collect configs, logs, and other data from a Consul on Kubernetes deployment in a archive/dir. [[GH-4800](https://github.com/hashicorp/consul-k8s/issues/4800)]
+* cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
+* cli: added new -capture flag to proxy loglevel command, enabling users to capture logs for certain duration. [[GH-4788](https://github.com/hashicorp/consul-k8s/issues/4788)]
+
+## 1.8.6 (2 December, 2025)
+
+SECURITY:
+
+* crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108 [[GH-4990](https://github.com/hashicorp/consul-k8s/issues/4990)]
+
+FEATURES:
+
+* api-gateway: Add support for configuring Kubernetes probes (liveness, readiness, startup) per-Gateway via annotations. Use `consul.hashicorp.com/liveness-probe`, `consul.hashicorp.com/readiness-probe`, and `consul.hashicorp.com/startup-probe` annotations with JSON probe configuration to customize health checks for individual API Gateways. [[GH-4901](https://github.com/hashicorp/consul-k8s/pull/4901)] [[GH-4901](https://github.com/hashicorp/consul-k8s/issues/4901)]
+* cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
+
+IMPROVEMENTS:
+
+* cni: fixed race conditions with older versions where no cleanup was done for binary
+cni: cleanup of cni binary on previous pod deletion to improve security posture [[GH-4757](https://github.com/hashicorp/consul-k8s/issues/4757)]
+
+## 1.7.8 (2 December, 2025)
+
+SECURITY:
+
+* crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108 [[GH-4990](https://github.com/hashicorp/consul-k8s/issues/4990)]
+
+FEATURES:
+
+* cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
+
+IMPROVEMENTS:
+
+* cni: fixed race conditions with older versions where no cleanup was done for binary
+cni: cleanup of cni binary on previous pod deletion to improve security posture [[GH-4757](https://github.com/hashicorp/consul-k8s/issues/4757)]
+
 ## 1.8.4 (November 5, 2023)
 
 SECURITY:
