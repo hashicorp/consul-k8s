@@ -286,6 +286,20 @@ func TestVault_Partitions(t *testing.T) {
 	}
 	srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
+	secondaryServerPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+    BaseURL:             serverPKIConfig.BaseURL,
+    PolicyName:          serverPKIConfig.PolicyName,
+    RoleName:            serverPKIConfig.RoleName,
+    KubernetesNamespace: clientNs,
+    DataCenter:          "dc1", 
+    ServiceAccountName:  "*",    // secondary accepts all SAs
+    AllowedSubdomain:    serverPKIConfig.AllowedSubdomain,
+    MaxTTL:              serverPKIConfig.MaxTTL,
+    AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+}
+
+secondaryServerPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+
 	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 
 	commonHelmValues := map[string]string{
@@ -404,9 +418,11 @@ serverHelmValues := map[string]string{
 		"client.join[0]":           partitionSvcAddress,
 
 		"connectInject.transparentProxy.defaultEnabled": "true",
+		"global.secretsBackend.vault.consulServerMountPath": "kubernetes-" + secondaryPartition,
 
 		// Ensure sidecar injector also knows the correct auth path if sidecars are injected
 		"connectInject.vault.authMethodPath": "kubernetes-" + secondaryPartition,
+
 	}
 
 	if cfg.UseKind {
