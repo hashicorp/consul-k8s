@@ -229,6 +229,13 @@ func TestPeering_Gateway(t *testing.T) {
 	logger.Log(t, "creating static-server in server peer")
 	k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
+	logger.Log(t, "CHECK if static-server pod is ready in server peer")
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		out, err := k8s.RunKubectlAndGetOutputE(r, staticServerOpts, "wait", "--for=condition=Ready", "pod", "-l", "app=static-server", "--timeout=60s")
+		require.NoError(r, err, "static-server pod not ready: %s", out)
+	})
+	logger.Log(t, "static-server pod is ready")
+
 	logger.Log(t, "creating exported services")
 	k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/cases/crd-peers/non-default-namespace")
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
