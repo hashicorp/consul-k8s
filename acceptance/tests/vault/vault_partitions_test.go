@@ -334,21 +334,44 @@ func TestVault_Partitions(t *testing.T) {
 
 func setupPKI(t *testing.T, cluster *vault.VaultCluster, ns, consulReleaseName, connectCAPolicy string) *vault.PKIAndAuthRoleConfiguration {
 	client := cluster.VaultClient(t)
+
+	// create pki mounts (idempotent)
+	err:= EnablePKIMount(client, "connect_root")
+	require.NoError(t, err)
+	err = EnablePKIMount(client, "dc1/connect_inter")
+    require.NoError(t, err)
 	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, client, connectCAPolicy, "connect_root", "dc1/connect_inter")
 
-	config := &vault.PKIAndAuthRoleConfiguration{
-		BaseURL:             "pki",
-		PolicyName:          "consul-ca-policy",
-		RoleName:            "consul-ca-role",
+	pki := &vault.PKIAndAuthRoleConfiguration{
+		BaseURL:             "connect_root",
+		PolicyName:          connectCAPolicy,
+		RoleName:            "connect-ca-role",
 		KubernetesNamespace: ns,
-		DataCenter:          "dc1",
-		ServiceAccountName:  fmt.Sprintf("%s-consul-server", consulReleaseName),
-		AllowedSubdomain:    fmt.Sprintf("%s-consul-server", consulReleaseName),
-		MaxTTL:              "1h",
+		ServiceAccountName:  "*",
 		AuthMethodPath:      KubernetesAuthMethodPath,
 	}
-	config.ConfigurePKIAndAuthRole(t, client)
-	return config
+
+	pki.ConfigurePKIAndAuthRole(t, client)
+	return pki
+}
+
+func EnablePKIMount(client *api.Client, path string) error {
+    // Normalize path (Vault mount keys always end with a "/")
+    path = strings.Trim(path, "/")
+
+    // Check if mount already exists
+    mounts, err := client.Sys().ListMounts()
+    if err != nil {
+        return err
+    }
+    if _, ok := mounts[path+"/"]; ok {
+        return nil
+    }
+
+    // Create mount if not present
+    return client.Sys().Mount(path, &api.MountInput{
+        Type: "pki",
+    })
 }
 
 func setupGossip(t *testing.T, cluster *vault.VaultCluster) *vault.KV2Secret {
