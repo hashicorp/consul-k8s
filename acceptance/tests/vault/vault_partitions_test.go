@@ -54,6 +54,18 @@ func TestVault_Partitions(t *testing.T) {
 		t.Skip("skipping: enterprise and multi-cluster required")
 	}
 
+	// [FIX] Consolidate KubectlOptions
+	// Ensure secondary cluster has the correct ConfigPath.
+	// In some environments, the secondary context struct might have an empty ConfigPath
+	// even if it shares the file with the primary.
+	serverK8sOpts := serverClusterCtx.KubectlOptions(t)
+	clientK8sOpts := clientClusterCtx.KubectlOptions(t)
+
+	if clientK8sOpts.ConfigPath == "" {
+		t.Logf("Client ConfigPath is empty, inheriting from Server: %s", serverK8sOpts.ConfigPath)
+		clientK8sOpts.ConfigPath = serverK8sOpts.ConfigPath
+	}
+
 	vaultReleaseName := helpers.RandomName()
 	consulReleaseName := helpers.RandomName()
 
@@ -77,14 +89,15 @@ func TestVault_Partitions(t *testing.T) {
 	
 	vaultClient := serverClusterVault.VaultClient(t)
 
-	// [FIX] Wait for LoadBalancer IP/Hostname
-	// Changed from "-vault-active" to "-vault" because HA is not enabled in this test config.
+	// [FIX] Service Name Check
+	// In Standalone mode (default), the service is named "[Release]-vault".
+	// It is only named "[Release]-vault-active" in HA mode.
 	var externalVaultAddress string
 	if cfg.UseKind {
 		externalVaultAddress = serverClusterVault.Address()
 	} else {
-		// The service name in non-HA Vault Helm is just [ReleaseName]-vault
-		externalVaultAddress = waitForServiceLB(t, serverClusterCtx.KubectlOptions(t), vaultReleaseName+"-vault")
+		// Use serverK8sOpts
+		externalVaultAddress = waitForServiceLB(t, serverK8sOpts, vaultReleaseName+"-vault")
 		externalVaultAddress = fmt.Sprintf("http://%s:8200", externalVaultAddress)
 	}
 	logger.Logf(t, "Vault External Address: %s", externalVaultAddress)
@@ -102,16 +115,18 @@ func TestVault_Partitions(t *testing.T) {
 	secondaryVaultCluster.Create(t, clientClusterCtx, "")
 
 	// -----------------------------------------------------------------------
-	// 4. Configure Vault Auth (Fixed for GKE/EKS)
+	// 4. Configure Vault Auth (Fixed for GKE/EKS & Config Path)
 	// -----------------------------------------------------------------------
 	{
 		authMethodRBACName := fmt.Sprintf("%s-vault-auth-method", vaultReleaseName)
-		createVaultAuthRBAC(t, clientClusterCtx.KubectlOptions(t), clientNs, authMethodRBACName)
+		
+		// [FIX] Use clientK8sOpts (with valid ConfigPath)
+		createVaultAuthRBAC(t, clientK8sOpts, clientNs, authMethodRBACName)
 
-		k8sOpts := clientClusterCtx.KubectlOptions(t)
+		// [FIX] Load RestConfig using the valid clientK8sOpts
 		restConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: k8sOpts.ConfigPath},
-			&clientcmd.ConfigOverrides{CurrentContext: k8sOpts.ContextName},
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: clientK8sOpts.ConfigPath},
+			&clientcmd.ConfigOverrides{CurrentContext: clientK8sOpts.ContextName},
 		).ClientConfig()
 		require.NoError(t, err)
 
@@ -132,7 +147,7 @@ func TestVault_Partitions(t *testing.T) {
 		_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
 			"kubernetes_host":    k8sAuthMethodHost,
 			"kubernetes_ca_cert": k8sAuthMethodCA,
-			"token_reviewer_jwt": getServiceAccountToken(t, clientClusterCtx.KubectlOptions(t), clientNs, authMethodRBACName),
+			"token_reviewer_jwt": getServiceAccountToken(t, clientK8sOpts, clientNs, authMethodRBACName),
 		})
 		require.NoError(t, err)
 	}
@@ -205,38 +220,33 @@ func TestVault_Partitions(t *testing.T) {
 	// -----------------------------------------------------------------------
 	// 7. Sync Secrets & Get Addresses
 	// -----------------------------------------------------------------------
-	syncSecret(t, serverClusterCtx.KubectlOptions(t), ns, clientClusterCtx.KubectlOptions(t), clientNs, vaultCASecretName)
+	// [FIX] Use correct K8s Options (clientK8sOpts)
+	syncSecret(t, serverK8sOpts, ns, clientK8sOpts, clientNs, vaultCASecretName)
 
-	// Note: Standard Consul Helm charts name the service [ReleaseName]-server
-	serverSvcName := fmt.Sprintf("%s-server", consulReleaseName)
-	partitionSvcName := fmt.Sprintf("%s-expose-servers", consulReleaseName) 
-    // ^ Assuming the chart uses this convention. If your chart uses "-consul-server", revert this line.
-    // Based on standard behavior, it is usually just "-server".
-    // If the test framework overrides this, check helpers. But typically:
-    serverSvcName = fmt.Sprintf("%s-consul-server", consulReleaseName) // Reverting to your original convention to be safe
-    partitionSvcName = fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
+	serverSvcName := fmt.Sprintf("%s-consul-server", consulReleaseName) 
+	partitionSvcName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 
 	var serverSvcAddress, partitionSvcAddress string
 
 	if cfg.UseKind {
-		nodeIP, err := k8s.GetNodesE(t, serverClusterCtx.KubectlOptions(t))
+		nodeIP, err := k8s.GetNodesE(t, serverK8sOpts)
 		require.NoError(t, err)
 		if len(nodeIP) > 0 {
-			serverSvcAddress = waitForServiceLB(t, serverClusterCtx.KubectlOptions(t), serverSvcName)
-			partitionSvcAddress = waitForServiceLB(t, serverClusterCtx.KubectlOptions(t), partitionSvcName)
+			serverSvcAddress = waitForServiceLB(t, serverK8sOpts, serverSvcName)
+			partitionSvcAddress = waitForServiceLB(t, serverK8sOpts, partitionSvcName)
 		}
 	} else {
-		serverSvcAddress = waitForServiceLB(t, serverClusterCtx.KubectlOptions(t), serverSvcName)
-		partitionSvcAddress = waitForServiceLB(t, serverClusterCtx.KubectlOptions(t), partitionSvcName)
+		serverSvcAddress = waitForServiceLB(t, serverK8sOpts, serverSvcName)
+		partitionSvcAddress = waitForServiceLB(t, serverK8sOpts, partitionSvcName)
 	}
 
 	// -----------------------------------------------------------------------
 	// 8. Deploy Consul Partition (Secondary)
 	// -----------------------------------------------------------------------
-	k8sOptsClient := clientClusterCtx.KubectlOptions(t)
+	// Use clientK8sOpts for loading config
 	restConfigClient, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: k8sOptsClient.ConfigPath},
-		&clientcmd.ConfigOverrides{CurrentContext: k8sOptsClient.ContextName},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: clientK8sOpts.ConfigPath},
+		&clientcmd.ConfigOverrides{CurrentContext: clientK8sOpts.ContextName},
 	).ClientConfig()
 	require.NoError(t, err)
 
@@ -312,7 +322,7 @@ func TestVault_Partitions(t *testing.T) {
 	}, 5*time.Minute, 5*time.Second, "Timeout waiting for secondary consul clients")
 
 	agentPodList, _ := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientNs).List(context.Background(), metav1.ListOptions{LabelSelector: "app=consul,component=client"})
-	output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "consul", "-n", clientNs)
+	output, err := k8s.RunKubectlAndGetOutputE(t, clientK8sOpts, "logs", agentPodList.Items[0].Name, "consul", "-n", clientNs)
 	require.NoError(t, err)
 	require.Contains(t, output, "Partition: 'secondary'")
 }
