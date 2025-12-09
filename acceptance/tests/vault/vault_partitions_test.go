@@ -419,7 +419,7 @@ serverHelmValues := map[string]string{
         }
 
         // Attempt to delete the job in the client namespace
-        err := clientClusterCtx.KubernetesClient(t).BatchV1().Jobs(clientNs).Delete(context.Background(), jobName, delOpts)
+        err := serverClusterCtx.KubernetesClient(t).BatchV1().Jobs(ns).Delete(context.Background(), jobName, delOpts)
         
         // We only care if the error is NOT "NotFound". 
         // If it returns "NotFound", that's good (it means it's clean).
