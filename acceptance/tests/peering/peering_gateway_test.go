@@ -289,7 +289,14 @@ func TestPeering_Gateway(t *testing.T) {
 		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 		require.NoError(r, err, out)
 	})
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+	// helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+	// 	// Ignore errors here because if the test ran as expected
+	// 	// the custom resources will have been deleted.
+	// 	k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-k", "../fixtures/bases/api-gateway")
+	// })
+
+	// TODO: re-enable cleanup above once we resolve issues with deleting gateway api resources in tests.
+	helpers.Cleanup(t, true, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-k", "../fixtures/bases/api-gateway")
@@ -328,6 +335,19 @@ func TestPeering_Gateway(t *testing.T) {
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
 	})
+	logger.Log(t, "CHECK if MeshService 'mesh-service' exists and is synced")
+	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		// Check that the MeshService exists in Kubernetes
+		meshServiceYAML, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "meshservice", "mesh-service", "-o", "yaml")
+		require.NoError(r, err, "MeshService 'mesh-service' not found")
+		logger.Logf(t, "MeshService YAML:\n%s", meshServiceYAML)
+
+		// Verify the MeshService status shows it's synced
+		statusConditions, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "get", "meshservice", "mesh-service", "-o", "jsonpath={.status.conditions}")
+		require.NoError(r, err)
+		logger.Logf(t, "MeshService status conditions: %s", statusConditions)
+	})
+	logger.Log(t, "MeshService verification complete")
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
 	logger.Log(t, "CHECK if http-route exist before patching")
