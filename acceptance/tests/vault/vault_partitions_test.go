@@ -358,19 +358,26 @@ func setupPKI(t *testing.T, cluster *vault.VaultCluster, ns, consulReleaseName, 
 func EnablePKIMount(client *api.Client, path string) error {
     // Normalize path (Vault mount keys always end with a "/")
     path = strings.Trim(path, "/")
-
+    
     // Check if mount already exists
     mounts, err := client.Sys().ListMounts()
     if err != nil {
         return err
     }
-    if _, ok := mounts[path+"/"]; ok {
+    
+    // Check if mount exists at path or at path+"/"
+    mountPath := path + "/"
+    if _, exists := mounts[mountPath]; exists {
+        // Mount already exists, nothing to do
         return nil
     }
-
+    
     // Create mount if not present
     return client.Sys().Mount(path, &api.MountInput{
         Type: "pki",
+        Config: api.MountConfigInput{
+            MaxLeaseTTL: "87600h",
+        },
     })
 }
 
@@ -460,46 +467,57 @@ func setupPrimaryRoles(t *testing.T, cluster *vault.VaultCluster, ns, consulRele
 }
 
 func setupSecondaryRoles(t *testing.T, cluster *vault.VaultCluster, ns, consulReleaseName, partition string,
-	pki *vault.PKIAndAuthRoleConfiguration, gossip *vault.KV2Secret, partToken *vault.KV2Secret) {
+    pki *vault.PKIAndAuthRoleConfiguration, gossip *vault.KV2Secret, partToken *vault.KV2Secret) {
 
-	client := cluster.VaultClient(t)
-	authPath := "kubernetes-" + partition
+    client := cluster.VaultClient(t)
+    authPath := "kubernetes-" + partition
 
-	(&vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole),
-		KubernetesNamespace: ns,
-		AuthMethodPath:      authPath,
-		RoleName:            ClientRole,
-		PolicyNames:         gossip.PolicyName,
-	}).ConfigureK8SAuthRole(t, client)
+    // For secondary partition, we only need to set up auth roles, not the PKI mount
+    // since it's already set up by the primary
+    
+    // Set up client role
+    (&vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole),
+        KubernetesNamespace: ns,
+        AuthMethodPath:      authPath,
+        RoleName:            ClientRole,
+        PolicyNames:         gossip.PolicyName,
+    }).ConfigureK8SAuthRole(t, client)
 
-	(&vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole),
-		KubernetesNamespace: ns,
-		AuthMethodPath:      authPath,
-		RoleName:            ManageSystemACLsRole,
-		PolicyNames:         partToken.PolicyName,
-	}).ConfigureK8SAuthRole(t, client)
+    // Set up manage system ACLs role
+    (&vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole),
+        KubernetesNamespace: ns,
+        AuthMethodPath:      authPath,
+        RoleName:            ManageSystemACLsRole,
+        PolicyNames:         partToken.PolicyName,
+    }).ConfigureK8SAuthRole(t, client)
 
-	(&vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init"),
-		KubernetesNamespace: ns,
-		AuthMethodPath:      authPath,
-		RoleName:            "partition-init",
-		PolicyNames:         partToken.PolicyName,
-	}).ConfigureK8SAuthRole(t, client)
+    // Set up partition init role
+    (&vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init"),
+        KubernetesNamespace: ns,
+        AuthMethodPath:      authPath,
+        RoleName:            "partition-init",
+        PolicyNames:         partToken.PolicyName,
+    }).ConfigureK8SAuthRole(t, client)
 
-	(&vault.PKIAndAuthRoleConfiguration{
-		BaseURL:             pki.BaseURL,
-		PolicyName:          pki.PolicyName,
-		RoleName:            pki.RoleName,
-		KubernetesNamespace: ns,
-		DataCenter:          "dc1",
-		ServiceAccountName:  "*",
-		AllowedSubdomain:    pki.AllowedSubdomain,
-		MaxTTL:              pki.MaxTTL,
-		AuthMethodPath:      authPath,
-	}).ConfigurePKIAndAuthRole(t, client)
+    // For the PKI auth role, we need to configure it for the secondary auth method
+    // but we don't need to set up the PKI mount again
+    pkiConfig := &vault.PKIAndAuthRoleConfiguration{
+        BaseURL:             pki.BaseURL,
+        PolicyName:          pki.PolicyName,
+        RoleName:            pki.RoleName,
+        KubernetesNamespace: ns,
+        DataCenter:          "dc1",
+        ServiceAccountName:  "*",
+        AllowedSubdomain:    pki.AllowedSubdomain,
+        MaxTTL:              pki.MaxTTL,
+        AuthMethodPath:      authPath,
+    }
+    
+    // Only configure the auth role, not the PKI mount
+    pkiConfig.ConfigurePKIAndAuthRole(t, client)
 }
 
 func waitForServiceLB(t *testing.T, ctx *k8s.KubectlOptions, serviceName string) string {
