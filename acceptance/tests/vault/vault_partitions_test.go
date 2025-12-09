@@ -440,7 +440,7 @@ func setupSecondaryRoles(t *testing.T, cluster *vault.VaultCluster, ns, consulRe
 	pki *vault.PKIAndAuthRoleConfiguration, gossip *vault.KV2Secret, partToken *vault.KV2Secret) {
 
 	client := cluster.VaultClient(t)
-	authPath := "auth/kubernetes-" + partition
+	authPath := "kubernetes-" + partition
 
 	(&vault.KubernetesAuthRoleConfiguration{
 		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole),
