@@ -158,6 +158,14 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		    jobName := fmt.Sprintf("%s-consul-gateway-resources", h.releaseName)
+    policy := metav1.DeletePropagationBackground
+
+    _ = h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(
+        context.Background(),
+        jobName,
+        metav1.DeleteOptions{PropagationPolicy: &policy},
+    )
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
