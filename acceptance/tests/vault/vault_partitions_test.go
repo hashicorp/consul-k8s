@@ -25,268 +25,309 @@ import (
 )
 
 func TestVault_Partitions(t *testing.T) {
-	// Set up logger for controller-runtime used by the Vault Helm chart hooks.
-	crlog.SetLogger(zap.New(zap.UseDevMode(true)))
+    // [DEBUG] START
+    t.Log("\n\n================================================================")
+    t.Log(">>> [STEP 1] TEST STARTED - INITIALIZATION")
+    t.Log("================================================================")
 
-	env := suite.Environment()
-	cfg := suite.Config()
-	serverClusterCtx := env.DefaultContext(t)
-	clientClusterCtx := env.Context(t, 1)
-	ns := serverClusterCtx.KubectlOptions(t).Namespace
-	clientNs := clientClusterCtx.KubectlOptions(t).Namespace
+    // Set up logger for controller-runtime used by the Vault Helm chart hooks.
+    crlog.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	const secondaryPartition = "secondary"
+    env := suite.Environment()
+    cfg := suite.Config()
+    serverClusterCtx := env.DefaultContext(t)
+    clientClusterCtx := env.Context(t, 1)
+    ns := serverClusterCtx.KubectlOptions(t).Namespace
+    clientNs := clientClusterCtx.KubectlOptions(t).Namespace
 
-	ver, err := version.NewVersion("1.12.0")
-	require.NoError(t, err)
-	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
-		t.Skipf("skipping this test because vault secrets backend is not supported in version %v", cfg.ConsulVersion.String())
-	}
-	if !cfg.EnableEnterprise {
-		t.Skipf("skipping this test because -enable-enterprise is not set")
-	}
-	if !cfg.EnableMultiCluster {
-		t.Skipf("skipping this test because -enable-multi-cluster is not set")
-	}
-	vaultReleaseName := helpers.RandomName()
-	consulReleaseName := helpers.RandomName()
+    t.Logf(">>> [INFO] Primary Namespace: %s | Secondary Namespace: %s", ns, clientNs)
 
-	// In the primary cluster, we will expose Vault server as a Load balancer
-	// or a NodePort service so that the secondary can connect to it.
-	serverClusterVaultHelmValues := map[string]string{
-		"server.service.type": "LoadBalancer",
-	}
-	if cfg.UseKind {
-		serverClusterVaultHelmValues["server.service.type"] = "NodePort"
-		serverClusterVaultHelmValues["server.service.nodePort"] = "31000"
-	}
-	serverClusterVault := vault.NewVaultCluster(t, serverClusterCtx, cfg, vaultReleaseName, serverClusterVaultHelmValues)
-	serverClusterVault.Create(t, serverClusterCtx, "")
+    const secondaryPartition = "secondary"
 
-	externalVaultAddress := vaultAddress(t, cfg, serverClusterCtx, vaultReleaseName)
+    ver, err := version.NewVersion("1.12.0")
+    require.NoError(t, err)
+    if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
+        t.Skipf("skipping this test because vault secrets backend is not supported in version %v", cfg.ConsulVersion.String())
+    }
+    if !cfg.EnableEnterprise {
+        t.Skipf("skipping this test because -enable-enterprise is not set")
+    }
+    if !cfg.EnableMultiCluster {
+        t.Skipf("skipping this test because -enable-multi-cluster is not set")
+    }
+    vaultReleaseName := helpers.RandomName()
+    consulReleaseName := helpers.RandomName()
 
-	// In the secondary cluster, we will only deploy the agent injector and provide
-	// it with the primary's Vault address. We also want to configure the injector with
-	// a different k8s auth method path since the secondary cluster will need its own auth method.
-	clientClusterVaultHelmValues := map[string]string{
-		"server.enabled":             "false",
-		"injector.externalVaultAddr": externalVaultAddress,
-		"injector.authPath":          "auth/kubernetes-" + secondaryPartition,
-	}
+    // ----------------------------------------------------------------
+    // [DEBUG] PRIMARY VAULT
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 2] Deploying Primary Vault Cluster...")
 
-	secondaryVaultCluster := vault.NewVaultCluster(t, clientClusterCtx, cfg, vaultReleaseName, clientClusterVaultHelmValues)
-	secondaryVaultCluster.Create(t, clientClusterCtx, "")
+    // In the primary cluster, we will expose Vault server as a Load balancer
+    // or a NodePort service so that the secondary can connect to it.
+    serverClusterVaultHelmValues := map[string]string{
+        "server.service.type": "LoadBalancer",
+    }
+    if cfg.UseKind {
+        serverClusterVaultHelmValues["server.service.type"] = "NodePort"
+        serverClusterVaultHelmValues["server.service.nodePort"] = "31000"
+    }
+    serverClusterVault := vault.NewVaultCluster(t, serverClusterCtx, cfg, vaultReleaseName, serverClusterVaultHelmValues)
+    serverClusterVault.Create(t, serverClusterCtx, "")
 
-	vaultClient := serverClusterVault.VaultClient(t)
+    externalVaultAddress := vaultAddress(t, cfg, serverClusterCtx, vaultReleaseName)
+    t.Logf(">>> [INFO] Primary Vault Address: %s", externalVaultAddress)
 
-	// Configure Vault Kubernetes auth method for the secondary cluster.
-	{
-		// Create auth method service account and ClusterRoleBinding.
-		authMethodRBACName := fmt.Sprintf("%s-vault-auth-method", vaultReleaseName)
+    // ----------------------------------------------------------------
+    // [DEBUG] SECONDARY VAULT
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 3] Deploying Secondary Vault (Injector Only)...")
 
-		_, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: authMethodRBACName,
-			},
-			Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: authMethodRBACName, Namespace: clientNs}},
-			RoleRef:  rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Name: "system:auth-delegator", Kind: "ClusterRole"},
-		}, metav1.CreateOptions{})
-		require.NoError(t, err)
+    // In the secondary cluster, we will only deploy the agent injector and provide
+    // it with the primary's Vault address. We also want to configure the injector with
+    // a different k8s auth method path since the secondary cluster will need its own auth method.
+    clientClusterVaultHelmValues := map[string]string{
+        "server.enabled":             "false",
+        "injector.externalVaultAddr": externalVaultAddress,
+        "injector.authPath":          "auth/kubernetes-" + secondaryPartition,
+    }
 
-		// Create service account for the auth method in the secondary cluster.
-		svcAcct, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Create(context.Background(), &corev1.ServiceAccount{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: authMethodRBACName,
-			},
-		}, metav1.CreateOptions{})
-		require.NoError(t, err)
+    secondaryVaultCluster := vault.NewVaultCluster(t, clientClusterCtx, cfg, vaultReleaseName, clientClusterVaultHelmValues)
+    secondaryVaultCluster.Create(t, clientClusterCtx, "")
 
-		if len(svcAcct.Secrets) == 0 {
-			_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        authMethodRBACName,
-					Annotations: map[string]string{corev1.ServiceAccountNameKey: authMethodRBACName},
-				},
-				Type: corev1.SecretTypeServiceAccountToken,
-			}, metav1.CreateOptions{})
-			require.NoError(t, err)
+    vaultClient := serverClusterVault.VaultClient(t)
 
-			require.Eventually(t, func() bool {
-				s, err := clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Get(context.Background(), authMethodRBACName, metav1.GetOptions{})
-				if err != nil {
-					return false
-				}
-				return len(s.Data["token"]) > 0
-			}, 10*time.Second, 1*time.Second, "Timeout waiting for service account token to be populated")
-		}
-		t.Cleanup(func() {
-			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
-		})
+    // ----------------------------------------------------------------
+    // [DEBUG] AUTH METHOD
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 4] Configuring Auth Method & Service Accounts...")
 
-		k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
-		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, clientNs)
-	}
+    // Declare this variable OUTSIDE the block so it is available for Helm values later
+    var k8sAuthMethodHost string 
 
-	// -------------------------
-	// PKI
-	// -------------------------
-	connectCAPolicy := "connect-ca-dc1"
-	connectCARootPath := "connect_root"
-	connectCAIntermediatePath := "dc1/connect_inter"
-	vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
+    // Configure Vault Kubernetes auth method for the secondary cluster.
+    {
+        // Create auth method service account and ClusterRoleBinding.
+        authMethodRBACName := fmt.Sprintf("%s-vault-auth-method", vaultReleaseName)
 
-	// Configure Server PKI
-	serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
-		BaseURL:             "pki",
-		PolicyName:          "consul-ca-policy",
-		RoleName:            "consul-ca-role",
-		KubernetesNamespace: ns,
-		DataCenter:          "dc1",
-		ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
-		// AllowedSubdomain limits the certificate to the Service Name only
-		AllowedSubdomain: fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
-		MaxTTL:           "1h",
-		AuthMethodPath:   KubernetesAuthMethodPath,
-	}
-	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+        t.Log(">>> [DEBUG] Creating ClusterRoleBindings...")
+        _, err = clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
+            ObjectMeta: metav1.ObjectMeta{
+                Name: authMethodRBACName,
+            },
+            Subjects: []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: authMethodRBACName, Namespace: clientNs}},
+            RoleRef:  rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Name: "system:auth-delegator", Kind: "ClusterRole"},
+        }, metav1.CreateOptions{})
+        require.NoError(t, err)
 
-	// -------------------------
-	// KV2 secrets
-	// -------------------------
-	gossipKey, err := vault.GenerateGossipSecret()
-	require.NoError(t, err)
-	gossipSecret := &vault.KV2Secret{
-		Path:       "consul/data/secret/gossip",
-		Key:        "gossip",
-		Value:      gossipKey,
-		PolicyName: "gossip",
-	}
-	gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+        // Create service account for the auth method in the secondary cluster.
+        t.Log(">>> [DEBUG] Creating ServiceAccount...")
+        svcAcct, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Create(context.Background(), &corev1.ServiceAccount{
+            ObjectMeta: metav1.ObjectMeta{
+                Name: authMethodRBACName,
+            },
+        }, metav1.CreateOptions{})
+        require.NoError(t, err)
 
-	licenseSecret := &vault.KV2Secret{
-		Path: "consul/data/secret/license",
-		Key:  "license",
-		// Check for empty license to avoid saving empty secret
-		Value:      cfg.EnterpriseLicense,
-		PolicyName: "license",
-	}
-	if cfg.EnableEnterprise && cfg.EnterpriseLicense != "" {
-		licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
-	}
+        if len(svcAcct.Secrets) == 0 {
+            t.Log(">>> [DEBUG] Creating Secret for ServiceAccount...")
+            _, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), &corev1.Secret{
+                ObjectMeta: metav1.ObjectMeta{
+                    Name:        authMethodRBACName,
+                    Annotations: map[string]string{corev1.ServiceAccountNameKey: authMethodRBACName},
+                },
+                Type: corev1.SecretTypeServiceAccountToken,
+            }, metav1.CreateOptions{})
+            require.NoError(t, err)
 
-	bootstrapToken, err := uuid.GenerateUUID()
-	require.NoError(t, err)
-	bootstrapTokenSecret := &vault.KV2Secret{
-		Path:       "consul/data/secret/bootstrap",
-		Key:        "token",
-		Value:      bootstrapToken,
-		PolicyName: "bootstrap",
-	}
-	bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+            t.Log(">>> [DEBUG] Waiting for ServiceAccount Token population...")
+            require.Eventually(t, func() bool {
+                s, err := clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Get(context.Background(), authMethodRBACName, metav1.GetOptions{})
+                if err != nil {
+                    return false
+                }
+                return len(s.Data["token"]) > 0
+            }, 10*time.Second, 1*time.Second, "Timeout waiting for service account token to be populated")
+        }
+        t.Cleanup(func() {
+            clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
+            clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(clientNs).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
+        })
 
-	partitionToken, err := uuid.GenerateUUID()
-	require.NoError(t, err)
-	partitionTokenSecret := &vault.KV2Secret{
-		Path:       "consul/data/secret/partition",
-		Key:        "token",
-		Value:      partitionToken,
-		PolicyName: "partition",
-	}
-	partitionTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+        // Assign to the variable declared outside the block
+        k8sAuthMethodHost = k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
+        t.Logf(">>> [INFO] K8s Auth Host: %s", k8sAuthMethodHost)
 
-	// -------------------------------------------
-	// Additional Auth Roles in Primary Datacenter
-	// -------------------------------------------
-	serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
-	if cfg.EnableEnterprise && cfg.EnterpriseLicense != "" {
-		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
-	}
+        secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, clientNs)
+    }
 
-	consulServerRole := "server"
-	srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  serverPKIConfig.ServiceAccountName,
-		KubernetesNamespace: ns,
-		AuthMethodPath:      KubernetesAuthMethodPath,
-		RoleName:            consulServerRole,
-		PolicyNames:         serverPolicies,
-	}
-	srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+    // ----------------------------------------------------------------
+    // [DEBUG] PKI & SECRETS
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 5] Configuring PKI, Secrets, and Roles...")
 
-	consulClientRole := ClientRole
-	consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
-	clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  consulClientServiceAccountName,
-		KubernetesNamespace: ns,
-		AuthMethodPath:      KubernetesAuthMethodPath,
-		RoleName:            consulClientRole,
-		PolicyNames:         gossipSecret.PolicyName,
-	}
-	clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+    // -------------------------
+    // PKI
+    // -------------------------
+    connectCAPolicy := "connect-ca-dc1"
+    connectCARootPath := "connect_root"
+    connectCAIntermediatePath := "dc1/connect_inter"
+    vault.CreateConnectCARootAndIntermediatePKIPolicy(t, vaultClient, connectCAPolicy, connectCARootPath, connectCAIntermediatePath)
 
-	manageSystemACLsRole := ManageSystemACLsRole
-	manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
-	aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  manageSystemACLsServiceAccountName,
-		KubernetesNamespace: ns,
-		AuthMethodPath:      KubernetesAuthMethodPath,
-		RoleName:            manageSystemACLsRole,
-		PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, partitionTokenSecret.PolicyName),
-	}
-	aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+    // Configure Server PKI
+    serverPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+        BaseURL:             "pki",
+        PolicyName:          "consul-ca-policy",
+        RoleName:            "consul-ca-role",
+        KubernetesNamespace: ns,
+        DataCenter:          "dc1",
+        ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+        // AllowedSubdomain limits the certificate to the Service Name only
+        AllowedSubdomain: fmt.Sprintf("%s-consul-%s", consulReleaseName, "server"),
+        MaxTTL:           "1h",
+        AuthMethodPath:   KubernetesAuthMethodPath,
+    }
+    serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
-	srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  "*",
-		KubernetesNamespace: ns,
-		AuthMethodPath:      KubernetesAuthMethodPath,
-		RoleName:            serverPKIConfig.RoleName,
-		PolicyNames:         serverPKIConfig.PolicyName,
-	}
-	srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+    // -------------------------
+    // KV2 secrets
+    // -------------------------
+    gossipKey, err := vault.GenerateGossipSecret()
+    require.NoError(t, err)
+    gossipSecret := &vault.KV2Secret{
+        Path:       "consul/data/secret/gossip",
+        Key:        "gossip",
+        Value:      gossipKey,
+        PolicyName: "gossip",
+    }
+    gossipSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
-	// ---------------------------------------------
-	// Additional Auth Roles in Secondary Datacenter
-	// ---------------------------------------------
+    licenseSecret := &vault.KV2Secret{
+        Path: "consul/data/secret/license",
+        Key:  "license",
+        // Check for empty license to avoid saving empty secret
+        Value:      cfg.EnterpriseLicense,
+        PolicyName: "license",
+    }
+    if cfg.EnableEnterprise && cfg.EnterpriseLicense != "" {
+        licenseSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
+    }
 
-	clientAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  consulClientServiceAccountName,
-		KubernetesNamespace: clientNs,
-		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
-		RoleName:            consulClientRole,
-		PolicyNames:         gossipSecret.PolicyName,
-	}
-	clientAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+    bootstrapToken, err := uuid.GenerateUUID()
+    require.NoError(t, err)
+    bootstrapTokenSecret := &vault.KV2Secret{
+        Path:       "consul/data/secret/bootstrap",
+        Key:        "token",
+        Value:      bootstrapToken,
+        PolicyName: "bootstrap",
+    }
+    bootstrapTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
-	aclAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  manageSystemACLsServiceAccountName,
-		KubernetesNamespace: clientNs,
-		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
-		RoleName:            manageSystemACLsRole,
-		PolicyNames:         partitionTokenSecret.PolicyName,
-	}
-	aclAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+    partitionToken, err := uuid.GenerateUUID()
+    require.NoError(t, err)
+    partitionTokenSecret := &vault.KV2Secret{
+        Path:       "consul/data/secret/partition",
+        Key:        "token",
+        Value:      partitionToken,
+        PolicyName: "partition",
+    }
+    partitionTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
-	adminPartitionsRole := "partition-init"
-	partitionInitServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init")
-	prtAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  partitionInitServiceAccountName,
-		KubernetesNamespace: clientNs,
-		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
-		RoleName:            adminPartitionsRole,
-		PolicyNames:         partitionTokenSecret.PolicyName,
-	}
-	prtAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+    // -------------------------------------------
+    // Additional Auth Roles in Primary Datacenter
+    // -------------------------------------------
+    t.Log(">>> [DEBUG] configuring Primary Roles...")
 
-	srvCAAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
-		ServiceAccountName:  "*",
-		KubernetesNamespace: clientNs,
-		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
-		RoleName:            serverPKIConfig.RoleName,
-		PolicyNames:         serverPKIConfig.PolicyName,
-	}
-	srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+    serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+    if cfg.EnableEnterprise && cfg.EnterpriseLicense != "" {
+        serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
+    }
 
-	secondaryServerPKIConfig := &vault.PKIAndAuthRoleConfiguration{
+    consulServerRole := "server"
+    srvAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  serverPKIConfig.ServiceAccountName,
+        KubernetesNamespace: ns,
+        AuthMethodPath:      KubernetesAuthMethodPath,
+        RoleName:            consulServerRole,
+        PolicyNames:         serverPolicies,
+    }
+    srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+    consulClientRole := ClientRole
+    consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
+    clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  consulClientServiceAccountName,
+        KubernetesNamespace: ns,
+        AuthMethodPath:      KubernetesAuthMethodPath,
+        RoleName:            consulClientRole,
+        PolicyNames:         gossipSecret.PolicyName,
+    }
+    clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+    manageSystemACLsRole := ManageSystemACLsRole
+    manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
+    aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  manageSystemACLsServiceAccountName,
+        KubernetesNamespace: ns,
+        AuthMethodPath:      KubernetesAuthMethodPath,
+        RoleName:            manageSystemACLsRole,
+        PolicyNames:         fmt.Sprintf("%s,%s", bootstrapTokenSecret.PolicyName, partitionTokenSecret.PolicyName),
+    }
+    aclAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+    srvCAAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  "*",
+        KubernetesNamespace: ns,
+        AuthMethodPath:      KubernetesAuthMethodPath,
+        RoleName:            serverPKIConfig.RoleName,
+        PolicyNames:         serverPKIConfig.PolicyName,
+    }
+    srvCAAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
+    // ---------------------------------------------
+    // Additional Auth Roles in Secondary Datacenter
+    // ---------------------------------------------
+    t.Log(">>> [DEBUG] configuring Secondary Roles...")
+
+    clientAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  consulClientServiceAccountName,
+        KubernetesNamespace: clientNs,
+        AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+        RoleName:            consulClientRole,
+        PolicyNames:         gossipSecret.PolicyName,
+    }
+    clientAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+    aclAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  manageSystemACLsServiceAccountName,
+        KubernetesNamespace: clientNs,
+        AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+        RoleName:            manageSystemACLsRole,
+        PolicyNames:         partitionTokenSecret.PolicyName,
+    }
+    aclAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+    adminPartitionsRole := "partition-init"
+    partitionInitServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init")
+    prtAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  partitionInitServiceAccountName,
+        KubernetesNamespace: clientNs,
+        AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+        RoleName:            adminPartitionsRole,
+        PolicyNames:         partitionTokenSecret.PolicyName,
+    }
+    prtAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+    srvCAAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+        ServiceAccountName:  "*",
+        KubernetesNamespace: clientNs,
+        AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+        RoleName:            serverPKIConfig.RoleName,
+        PolicyNames:         serverPKIConfig.PolicyName,
+    }
+    srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
+
+    secondaryServerPKIConfig := &vault.PKIAndAuthRoleConfiguration{
     BaseURL:             "pki-secondary",
     PolicyName:          serverPKIConfig.PolicyName,
     RoleName:            serverPKIConfig.RoleName,
@@ -300,30 +341,35 @@ func TestVault_Partitions(t *testing.T) {
 
 secondaryServerPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
-	vaultCASecretName := vault.CASecretName(vaultReleaseName)
+    vaultCASecretName := vault.CASecretName(vaultReleaseName)
 
-	commonHelmValues := map[string]string{
-		"global.adminPartitions.enabled":                   "true",
-		"global.enableConsulNamespaces":                    "true",
-		"connectInject.enabled":                            "true",
-		"connectInject.replicas":                           "1",
-		"global.secretsBackend.vault.enabled":              "true",
-		"global.secretsBackend.vault.consulClientRole":     consulClientRole,
-		"global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
-		"global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
-		"global.secretsBackend.vault.ca.secretName":        vaultCASecretName,
-		"global.secretsBackend.vault.ca.secretKey":         "tls.crt",
-		"global.acls.manageSystemACLs":                     "true",
-		"global.tls.enabled":                               "true",
-		"global.tls.enableAutoEncrypt":                     "true",
-		"connectInject.certManager.enabled":                "false",
+    // ----------------------------------------------------------------
+    // [DEBUG] PRIMARY CONSUL DEPLOY
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 6] Deploying Primary Consul Cluster...")
+
+    commonHelmValues := map[string]string{
+        "global.adminPartitions.enabled":                   "true",
+        "global.enableConsulNamespaces":                    "true",
+        "connectInject.enabled":                            "true",
+        "connectInject.replicas":                           "1",
+        "global.secretsBackend.vault.enabled":              "true",
+        "global.secretsBackend.vault.consulClientRole":     consulClientRole,
+        "global.secretsBackend.vault.consulCARole":         serverPKIConfig.RoleName,
+        "global.secretsBackend.vault.manageSystemACLsRole": manageSystemACLsRole,
+        "global.secretsBackend.vault.ca.secretName":        vaultCASecretName,
+        "global.secretsBackend.vault.ca.secretKey":         "tls.crt",
+        "global.acls.manageSystemACLs":                     "true",
+        "global.tls.enabled":                               "true",
+        "global.tls.enableAutoEncrypt":                     "true",
+        "connectInject.certManager.enabled":                "false",
         "connectInject.webhook.createCert":                 "true",
-		"global.tls.caCert.secretName":                     serverPKIConfig.CAPath,
-		"global.gossipEncryption.secretName":               gossipSecret.Path,
-		"global.gossipEncryption.secretKey":                gossipSecret.Key,
-		"global.enterpriseLicense.secretName":              licenseSecret.Path,
-		"global.enterpriseLicense.secretKey":               licenseSecret.Key,
-	}
+        "global.tls.caCert.secretName":                     serverPKIConfig.CAPath,
+        "global.gossipEncryption.secretName":               gossipSecret.Path,
+        "global.gossipEncryption.secretKey":                gossipSecret.Key,
+        "global.enterpriseLicense.secretName":              licenseSecret.Path,
+        "global.enterpriseLicense.secretKey":               licenseSecret.Key,
+    }
 
 serverHelmValues := map[string]string{
     "global.secretsBackend.vault.consulServerRole":              consulServerRole,
@@ -345,134 +391,152 @@ serverHelmValues := map[string]string{
     // ADD THESE TWO LINES
     "connectInject.certManager.enabled": "false",
     "connectInject.webhook.createCert":  "true",
-	"global.secretsBackend.vault.consulCAMountPath": "pki",
+    "global.secretsBackend.vault.consulCAMountPath": "pki",
 }
 
-	if cfg.UseKind {
-		serverHelmValues["meshGateway.service.type"] = "NodePort"
-		serverHelmValues["meshGateway.service.nodePort"] = "30100"
-		serverHelmValues["server.exposeService.type"] = "NodePort"
-		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
-	}
+    if cfg.UseKind {
+        serverHelmValues["meshGateway.service.type"] = "NodePort"
+        serverHelmValues["meshGateway.service.nodePort"] = "30100"
+        serverHelmValues["server.exposeService.type"] = "NodePort"
+        serverHelmValues["server.exposeService.nodePort.https"] = "30000"
+    }
 
-	helpers.MergeMaps(serverHelmValues, commonHelmValues)
+    helpers.MergeMaps(serverHelmValues, commonHelmValues)
 
-	logger.Log(t, "Installing Consul")
-	consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
-	consulCluster.Create(t)
+    logger.Log(t, "Installing Consul")
+    consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
+    consulCluster.Create(t)
 
-	// Retrieve both the Partition (Gossip) Service and the Server (HTTPS) Service
-	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
-	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
+    // Retrieve both the Partition (Gossip) Service and the Server (HTTPS) Service
+    partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
+    partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
 
-	serverServiceName := fmt.Sprintf("%s-consul-server", consulReleaseName)
-	serverSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, serverServiceName)
+    serverServiceName := fmt.Sprintf("%s-consul-server", consulReleaseName)
+    serverSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, serverServiceName)
 
-	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
+    t.Logf(">>> [INFO] Partition Service Address: %s", partitionSvcAddress)
+    t.Logf(">>> [INFO] Server Service Address: %s", serverSvcAddress)
 
-	logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
-	vaultCASecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
-	require.NoError(t, err)
-	vaultCASecret.ResourceVersion = ""
+    // ----------------------------------------------------------------
+    // [DEBUG] SECRET TRANSFER
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 7] Transferring Vault CA Secret to Secondary Cluster...")
 
-	_, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
-	require.NoError(t, err)
+    logger.Logf(t, "retrieving Vault CA secret %s from the primary cluster and applying to the secondary", vaultCASecretName)
+    vaultCASecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), vaultCASecretName, metav1.GetOptions{})
+    require.NoError(t, err)
+    vaultCASecret.ResourceVersion = ""
 
-	t.Cleanup(func() {
-		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
-	})
+    _, err = clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Create(context.Background(), vaultCASecret, metav1.CreateOptions{})
+    require.NoError(t, err)
 
-	// Create client cluster.
-	clientHelmValues := map[string]string{
-		"global.enabled": "false",
+    t.Cleanup(func() {
+        clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(clientNs).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
+    })
 
-		"global.adminPartitions.name": secondaryPartition,
+    // ----------------------------------------------------------------
+    // [DEBUG] SECONDARY CONSUL DEPLOY
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 8] Deploying Secondary Consul Cluster...")
 
-		"global.acls.bootstrapToken.secretName": partitionTokenSecret.Path,
-		"global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
-		"global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
-		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
+    // Create client cluster.
+    clientHelmValues := map[string]string{
+        "global.enabled": "false",
 
-		// ------------------------------------------------------------------
-		// CRITICAL FIX: Explicitly set the Auth Mount Path for the client
-		// ------------------------------------------------------------------
-		// The client pods default to "kubernetes", but we set up "kubernetes-secondary" in Vault.
-		"global.secretsBackend.vault.consulClientMountPath": "kubernetes-" + secondaryPartition,
+        "global.adminPartitions.name": secondaryPartition,
 
-		// The admin partitions init job also needs to know which auth mount to use.
-		"global.secretsBackend.vault.adminPartitionsMountPath": "kubernetes-" + secondaryPartition,
+        "global.acls.bootstrapToken.secretName": partitionTokenSecret.Path,
+        "global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
+        "global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
+        "global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
-		// Ensure the Consul Agents and Init containers know exactly where Vault is
-		"global.secretsBackend.vault.address": externalVaultAddress,
+        // ------------------------------------------------------------------
+        // CRITICAL FIX: Explicitly set the Auth Mount Path for the client
+        // ------------------------------------------------------------------
+        // The client pods default to "kubernetes", but we set up "kubernetes-secondary" in Vault.
+        "global.secretsBackend.vault.consulClientMountPath": "kubernetes-" + secondaryPartition,
 
-		"externalServers.enabled":           "true",
-		"externalServers.hosts[0]":          serverSvcAddress,
-		"externalServers.tlsServerName":     fmt.Sprintf("%s-consul-server", consulReleaseName),
-		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
-		"externalServers.httpsPort":         "8501",
+        // The admin partitions init job also needs to know which auth mount to use.
+        "global.secretsBackend.vault.adminPartitionsMountPath": "kubernetes-" + secondaryPartition,
 
-		"client.enabled":           "true",
-		"client.grpc":              "true",
-		"client.dataPlane":         "false",
-		"client.exposeGossipPorts": "true",
-		"client.join[0]":           partitionSvcAddress,
+        // Ensure the Consul Agents and Init containers know exactly where Vault is
+        "global.secretsBackend.vault.address": externalVaultAddress,
 
-		"connectInject.transparentProxy.defaultEnabled": "true",
-		"global.secretsBackend.vault.consulCAMountPath": "pki-secondary",
+        "externalServers.enabled":           "true",
+        "externalServers.hosts[0]":          serverSvcAddress,
+        "externalServers.tlsServerName":     fmt.Sprintf("%s-consul-server", consulReleaseName),
+        "externalServers.k8sAuthMethodHost": k8sAuthMethodHost, // Variable from Step 4
+        "externalServers.httpsPort":         "8501",
 
-		// Ensure sidecar injector also knows the correct auth path if sidecars are injected
-		 "connectInject.vault.pkiMountPath": "pki-secondary",
+        "client.enabled":           "true",
+        "client.grpc":              "true",
+        "client.dataPlane":         "false",
+        "client.exposeGossipPorts": "true",
+        "client.join[0]":           partitionSvcAddress,
 
-	}
+        "connectInject.transparentProxy.defaultEnabled": "true",
+        "global.secretsBackend.vault.consulCAMountPath": "pki-secondary",
 
-	if cfg.UseKind {
-		clientHelmValues["externalServers.httpsPort"] = "30000"
-		clientHelmValues["meshGateway.service.type"] = "NodePort"
-		clientHelmValues["meshGateway.service.nodePort"] = "30100"
-	}
+        // Ensure sidecar injector also knows the correct auth path if sidecars are injected
+         "connectInject.vault.pkiMountPath": "pki-secondary",
 
-	helpers.MergeMaps(clientHelmValues, commonHelmValues)
+    }
 
-	// Install the consul cluster without servers in the client cluster kubernetes context.
-	clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterCtx, cfg, consulReleaseName)
-	clientConsulCluster.Create(t)
+    if cfg.UseKind {
+        clientHelmValues["externalServers.httpsPort"] = "30000"
+        clientHelmValues["meshGateway.service.type"] = "NodePort"
+        clientHelmValues["meshGateway.service.nodePort"] = "30100"
+    }
 
-	// Ensure consul clients are created.
-	// Use a broader LabelSelector to debug if specific labels are missing
-	agentPodList, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientNs).List(context.Background(), metav1.ListOptions{LabelSelector: "app=consul,component=client"})
-	require.NoError(t, err)
+    helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
-	// ------------------------------------------------------------------
-	// DEBUGGING BLOCK: Inspect pods if list is empty
-	// ------------------------------------------------------------------
-	if len(agentPodList.Items) == 0 {
-		t.Logf("!!! DEBUG: agentPodList is empty. Listing ALL pods in namespace %s to debug...", clientNs)
-		allPods, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientNs).List(context.Background(), metav1.ListOptions{})
-		if err == nil {
-			for _, p := range allPods.Items {
-				t.Logf("Found Pod: Name=%s, Status=%s, Labels=%v", p.Name, p.Status.Phase, p.Labels)
-				// If pod is stuck in Init, print InitContainerStatuses
-				for _, ic := range p.Status.InitContainerStatuses {
-					t.Logf("  InitContainer %s: State=%v", ic.Name, ic.State)
-					if ic.State.Terminated != nil && ic.State.Terminated.ExitCode != 0 {
-						// Attempt to fetch logs for failed init container
-						logs, _ := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", p.Name, "-c", ic.Name, "-n", clientNs)
-						t.Logf("  Logs for %s:\n%s", ic.Name, logs)
-					}
-				}
-			}
-		} else {
-			t.Logf("!!! DEBUG: Failed to list pods: %v", err)
-		}
+    // Install the consul cluster without servers in the client cluster kubernetes context.
+    clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterCtx, cfg, consulReleaseName)
+    clientConsulCluster.Create(t)
 
-		// Check Events
-		events, _ := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "get", "events", "-n", clientNs, "--sort-by=.lastTimestamp")
-		t.Logf("!!! DEBUG: Events in namespace:\n%s", events)
-	}
+    // ----------------------------------------------------------------
+    // [DEBUG] VERIFICATION & LOGGING
+    // ----------------------------------------------------------------
+    t.Log(">>> [STEP 9] Verifying Deployment & Pods...")
 
-	require.NotEmpty(t, agentPodList.Items, "Consul Client pods should be present in the secondary cluster")
+    // Ensure consul clients are created.
+    // Use a broader LabelSelector to debug if specific labels are missing
+    agentPodList, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientNs).List(context.Background(), metav1.ListOptions{LabelSelector: "app=consul,component=client"})
+    require.NoError(t, err)
 
-	output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "consul", "-n", clientNs)
-	require.NoError(t, err)
-	require.Contains(t, output, "Partition: 'secondary'")
+    // ------------------------------------------------------------------
+    // DEBUGGING BLOCK: Inspect pods if list is empty
+    // ------------------------------------------------------------------
+    if len(agentPodList.Items) == 0 {
+        t.Logf("!!! DEBUG: agentPodList is empty. Listing ALL pods in namespace %s to debug...", clientNs)
+        allPods, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientNs).List(context.Background(), metav1.ListOptions{})
+        if err == nil {
+            for _, p := range allPods.Items {
+                t.Logf("Found Pod: Name=%s, Status=%s, Labels=%v", p.Name, p.Status.Phase, p.Labels)
+                // If pod is stuck in Init, print InitContainerStatuses
+                for _, ic := range p.Status.InitContainerStatuses {
+                    t.Logf("  InitContainer %s: State=%v", ic.Name, ic.State)
+                    if ic.State.Terminated != nil && ic.State.Terminated.ExitCode != 0 {
+                        // Attempt to fetch logs for failed init container
+                        logs, _ := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", p.Name, "-c", ic.Name, "-n", clientNs)
+                        t.Logf("  Logs for %s:\n%s", ic.Name, logs)
+                    }
+                }
+            }
+        } else {
+            t.Logf("!!! DEBUG: Failed to list pods: %v", err)
+        }
+
+        // Check Events
+        events, _ := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "get", "events", "-n", clientNs, "--sort-by=.lastTimestamp")
+        t.Logf("!!! DEBUG: Events in namespace:\n%s", events)
+    }
+
+    require.NotEmpty(t, agentPodList.Items, "Consul Client pods should be present in the secondary cluster")
+
+    output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "consul", "-n", clientNs)
+    require.NoError(t, err)
+    require.Contains(t, output, "Partition: 'secondary'")
+
+    t.Log(">>> [SUCCESS] TestVault_Partitions Completed Successfully")
 }
