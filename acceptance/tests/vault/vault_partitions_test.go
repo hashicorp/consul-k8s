@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	crlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -121,7 +122,7 @@ func TestVault_Partitions(t *testing.T) {
 		authMethodRBACName := fmt.Sprintf("%s-vault-auth-method", vaultReleaseName)
 		
 		// [FIX] Use clientK8sOpts (with valid ConfigPath)
-		createVaultAuthRBAC(t, clientK8sOpts, clientNs, authMethodRBACName)
+		createVaultAuthRBAC(t, clientClusterCtx, clientNs, authMethodRBACName)
 
 		// [FIX] Load RestConfig using the valid clientK8sOpts
 		restConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -147,7 +148,7 @@ func TestVault_Partitions(t *testing.T) {
 		_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
 			"kubernetes_host":    k8sAuthMethodHost,
 			"kubernetes_ca_cert": k8sAuthMethodCA,
-			"token_reviewer_jwt": getServiceAccountToken(t, clientK8sOpts, clientNs, authMethodRBACName),
+			"token_reviewer_jwt": getServiceAccountToken(t, clientClusterCtx, clientNs, authMethodRBACName),
 		})
 		require.NoError(t, err)
 	}
@@ -221,7 +222,7 @@ func TestVault_Partitions(t *testing.T) {
 	// 7. Sync Secrets & Get Addresses
 	// -----------------------------------------------------------------------
 	// [FIX] Use correct K8s Options (clientK8sOpts)
-	syncSecret(t, serverK8sOpts, ns, clientK8sOpts, clientNs, vaultCASecretName)
+	syncSecret(t, serverClusterCtx,clientClusterCtx, ns, clientNs, vaultCASecretName)
 
 	serverSvcName := fmt.Sprintf("%s-consul-server", consulReleaseName) 
 	partitionSvcName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
@@ -510,45 +511,61 @@ func waitForServiceLB(t *testing.T, ctx *k8s.KubectlOptions, serviceName string)
 	return addr
 }
 
-func createVaultAuthRBAC(t *testing.T, ctx *k8s.KubectlOptions, namespace, name string) {
-	client, err := k8s.GetKubernetesClientFromOptionsE(t,ctx)
-	require.NoError(t, err)
+func createVaultAuthRBAC(t *testing.T, ctx environment.TestContext, namespace, name string) {
+    client := ctx.KubernetesClient(t)
 
-	_, err = client.RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Subjects:   []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: name, Namespace: namespace}},
-		RoleRef:    rbacv1.RoleRef{APIGroup: "rbac.authorization.k8s.io", Name: "system:auth-delegator", Kind: "ClusterRole"},
-	}, metav1.CreateOptions{})
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		require.NoError(t, err)
-	}
+    _, err := client.RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
+        ObjectMeta: metav1.ObjectMeta{Name: name},
+        Subjects: []rbacv1.Subject{
+            {
+                Kind:      rbacv1.ServiceAccountKind,
+                Name:      name,
+                Namespace: namespace,
+            },
+        },
+        RoleRef: rbacv1.RoleRef{
+            APIGroup: "rbac.authorization.k8s.io",
+            Kind:     "ClusterRole",
+            Name:     "system:auth-delegator",
+        },
+    }, metav1.CreateOptions{})
+    if err != nil && !strings.Contains(err.Error(), "already exists") {
+        require.NoError(t, err)
+    }
 
-	svcAcct, err := client.CoreV1().ServiceAccounts(namespace).Create(context.Background(), &corev1.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-	}, metav1.CreateOptions{})
-	if err != nil && !strings.Contains(err.Error(), "already exists") {
-		require.NoError(t, err)
-	}
+    svcAcct, err := client.CoreV1().ServiceAccounts(namespace).Create(
+        context.Background(),
+        &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}},
+        metav1.CreateOptions{},
+    )
+    if err != nil && !strings.Contains(err.Error(), "already exists") {
+        require.NoError(t, err)
+    }
 
-	if svcAcct != nil && len(svcAcct.Secrets) == 0 {
-		_, err = client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        name,
-				Annotations: map[string]string{corev1.ServiceAccountNameKey: name},
-			},
-			Type: corev1.SecretTypeServiceAccountToken,
-		}, metav1.CreateOptions{})
-		if err != nil && !strings.Contains(err.Error(), "already exists") {
-			require.NoError(t, err)
-		}
-	}
+    if svcAcct != nil && len(svcAcct.Secrets) == 0 {
+        _, err = client.CoreV1().Secrets(namespace).Create(
+            context.Background(),
+            &corev1.Secret{
+                ObjectMeta: metav1.ObjectMeta{
+                    Name:        name,
+                    Annotations: map[string]string{corev1.ServiceAccountNameKey: name},
+                },
+                Type: corev1.SecretTypeServiceAccountToken,
+            },
+            metav1.CreateOptions{},
+        )
+        if err != nil && !strings.Contains(err.Error(), "already exists") {
+            require.NoError(t, err)
+        }
+    }
 }
 
-func getServiceAccountToken(t *testing.T, ctx *k8s.KubectlOptions, namespace, name string) string {
-	var token string
-	client, err := k8s.GetKubernetesClientFromOptionsE(t, ctx)
-	require.NoError(t, err)
 
+
+func getServiceAccountToken(t *testing.T, ctx environment.TestContext, namespace, name string) string {
+	var token string
+	client := ctx.KubernetesClient(t)
+	
 	require.Eventually(t, func() bool {
 		s, err := client.CoreV1().Secrets(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
@@ -563,18 +580,24 @@ func getServiceAccountToken(t *testing.T, ctx *k8s.KubectlOptions, namespace, na
 	return token
 }
 
-func syncSecret(t *testing.T, srcCtx *k8s.KubectlOptions, srcNs string, dstCtx *k8s.KubectlOptions, dstNs string, secretName string) {
-	srcClient, err := k8s.GetKubernetesClientFromOptionsE(t, srcCtx)
-	require.NoError(t, err)
-	dstClient, err := k8s.GetKubernetesClientFromOptionsE(t, dstCtx)
-	require.NoError(t, err)
+func syncSecret(t *testing.T, srcCtx, dstCtx environment.TestContext, srcNs, dstNs, secretName string) {
+    srcClient := srcCtx.KubernetesClient(t)
+    dstClient := dstCtx.KubernetesClient(t)
 
-	s, err := srcClient.CoreV1().Secrets(srcNs).Get(context.Background(), secretName, metav1.GetOptions{})
-	require.NoError(t, err)
+    s, err := srcClient.CoreV1().Secrets(srcNs).Get(context.Background(), secretName, metav1.GetOptions{})
+    require.NoError(t, err)
 
-	s.ResourceVersion = ""
-	s.Namespace = dstNs
+    // Clear cluster-specific metadata and set target namespace
+    s.ResourceVersion = ""
+    s.Namespace = dstNs
+    s.ObjectMeta = metav1.ObjectMeta{
+        Name: s.Name,
+        Labels: s.Labels,
+        Annotations: s.Annotations,
+    }
 
-	_, err = dstClient.CoreV1().Secrets(dstNs).Create(context.Background(), s, metav1.CreateOptions{})
-	require.NoError(t, err)
+    _, err = dstClient.CoreV1().Secrets(dstNs).Create(context.Background(), s, metav1.CreateOptions{})
+    if err != nil && !strings.Contains(err.Error(), "already exists") {
+        require.NoError(t, err)
+    }
 }
