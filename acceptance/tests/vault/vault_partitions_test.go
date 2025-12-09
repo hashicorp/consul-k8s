@@ -472,9 +472,6 @@ func setupSecondaryRoles(t *testing.T, cluster *vault.VaultCluster, ns, consulRe
     client := cluster.VaultClient(t)
     authPath := "kubernetes-" + partition
 
-    // For secondary partition, we only need to set up auth roles, not the PKI mount
-    // since it's already set up by the primary
-    
     // Set up client role
     (&vault.KubernetesAuthRoleConfiguration{
         ServiceAccountName:  fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole),
@@ -502,24 +499,16 @@ func setupSecondaryRoles(t *testing.T, cluster *vault.VaultCluster, ns, consulRe
         PolicyNames:         partToken.PolicyName,
     }).ConfigureK8SAuthRole(t, client)
 
-    // For the PKI auth role, we need to configure it for the secondary auth method
-    // but we don't need to set up the PKI mount again
-    pkiConfig := &vault.PKIAndAuthRoleConfiguration{
-        BaseURL:             pki.BaseURL,
-        PolicyName:          pki.PolicyName,
-        RoleName:            pki.RoleName,
-        KubernetesNamespace: ns,
-        DataCenter:          "dc1",
+    // For the PKI role in secondary partition, only set up the auth role
+    // The PKI itself (mounts, policies) is already set up by the primary
+    (&vault.KubernetesAuthRoleConfiguration{
         ServiceAccountName:  "*",
-        AllowedSubdomain:    pki.AllowedSubdomain,
-        MaxTTL:              pki.MaxTTL,
+        KubernetesNamespace: ns,
         AuthMethodPath:      authPath,
-    }
-    
-    // Only configure the auth role, not the PKI mount
-    pkiConfig.ConfigurePKIAndAuthRole(t, client)
+        RoleName:            pki.RoleName, // "connect-ca-role"
+        PolicyNames:         pki.PolicyName, // "connect-ca-dc1"
+    }).ConfigureK8SAuthRole(t, client)
 }
-
 func waitForServiceLB(t *testing.T, ctx *k8s.KubectlOptions, serviceName string) string {
 	var addr string
 	require.Eventually(t, func() bool {
