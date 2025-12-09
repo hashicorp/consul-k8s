@@ -307,6 +307,7 @@ spec:
           {{- else }}
           - -tls-disabled
           {{- end }}
+          {{- end }}
           {{- if $root.Values.global.acls.manageSystemACLs }}
           - -credential-type=login
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
