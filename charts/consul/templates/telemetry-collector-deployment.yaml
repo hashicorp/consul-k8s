@@ -279,6 +279,7 @@ spec:
           {{- else }}
           - -tls-disabled
           {{- end }}
+          {{- end }}
           # credentials
           {{- if .Values.global.acls.manageSystemACLs }}
           - -credential-type=login
