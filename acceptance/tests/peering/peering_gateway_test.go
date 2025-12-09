@@ -289,18 +289,12 @@ func TestPeering_Gateway(t *testing.T) {
 		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 		require.NoError(r, err, out)
 	})
+	// TODO: re-enable cleanup once we can debug gateway deletion issues
 	// helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 	// 	// Ignore errors here because if the test ran as expected
 	// 	// the custom resources will have been deleted.
 	// 	k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-k", "../fixtures/bases/api-gateway")
 	// })
-
-	// TODO: re-enable cleanup above once we resolve issues with deleting gateway api resources in tests.
-	helpers.Cleanup(t, true, cfg.NoCleanup, func() {
-		// Ignore errors here because if the test ran as expected
-		// the custom resources will have been deleted.
-		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-k", "../fixtures/bases/api-gateway")
-	})
 
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
