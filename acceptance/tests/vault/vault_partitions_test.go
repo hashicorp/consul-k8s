@@ -511,7 +511,7 @@ func waitForServiceLB(t *testing.T, ctx *k8s.KubectlOptions, serviceName string)
 }
 
 func createVaultAuthRBAC(t *testing.T, ctx *k8s.KubectlOptions, namespace, name string) {
-	client, err := k8s.GetKubernetesClientE(t)
+	client, err := k8s.GetKubernetesClientFromOptionsE(t,ctx)
 	require.NoError(t, err)
 
 	_, err = client.RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
@@ -546,7 +546,7 @@ func createVaultAuthRBAC(t *testing.T, ctx *k8s.KubectlOptions, namespace, name 
 
 func getServiceAccountToken(t *testing.T, ctx *k8s.KubectlOptions, namespace, name string) string {
 	var token string
-	client, err := k8s.GetKubernetesClientE(t)
+	client, err := k8s.GetKubernetesClientFromOptionsE(t, ctx)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -564,9 +564,9 @@ func getServiceAccountToken(t *testing.T, ctx *k8s.KubectlOptions, namespace, na
 }
 
 func syncSecret(t *testing.T, srcCtx *k8s.KubectlOptions, srcNs string, dstCtx *k8s.KubectlOptions, dstNs string, secretName string) {
-	srcClient, err := k8s.GetKubernetesClientE(t)
+	srcClient, err := k8s.GetKubernetesClientFromOptionsE(t, srcCtx)
 	require.NoError(t, err)
-	dstClient, err := k8s.GetKubernetesClientE(t)
+	dstClient, err := k8s.GetKubernetesClientFromOptionsE(t, dstCtx)
 	require.NoError(t, err)
 
 	s, err := srcClient.CoreV1().Secrets(srcNs).Get(context.Background(), secretName, metav1.GetOptions{})
