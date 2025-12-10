@@ -405,12 +405,12 @@ serverHelmValues := map[string]string{
     helpers.MergeMaps(serverHelmValues, commonHelmValues)
 
     logger.Log(t, "Installing Consul")
-	{
+logger.Log(t, "Installing Consul")
+    {
         // Construct the specific Job name that is failing
-        // Format is usually: <release-name>-consul-gateway-resources
         jobName := fmt.Sprintf("%s-consul-gateway-resources", consulReleaseName)
         
-        t.Logf(">>> [FIX] Attempting to clean up potential stale Job: %s", jobName)
+        t.Logf(">>> [FIX] Attempting to clean up potential stale Job: %s in namespace: %s", jobName, ns)
 
         // Define a propagation policy to ensure Pods created by the Job are also deleted
         background := metav1.DeletePropagationBackground
@@ -418,26 +418,24 @@ serverHelmValues := map[string]string{
             PropagationPolicy: &background,
         }
 
-        // Attempt to delete the job in the client namespace
+        // 1. Delete the job in the PRIMARY namespace (ns)
         err := serverClusterCtx.KubernetesClient(t).BatchV1().Jobs(ns).Delete(context.Background(), jobName, delOpts)
         
-        // We only care if the error is NOT "NotFound". 
-        // If it returns "NotFound", that's good (it means it's clean).
         if err != nil {
             if k8serrors.IsNotFound(err) {
                 t.Logf(">>> [FIX] Job %s did not exist (clean state).", jobName)
             } else {
-                // If it's a permission error or network error, we should probably fail
                 require.NoError(t, err, "Failed to clean up stale gateway-resources job")
             }
         } else {
-            t.Logf(">>> [FIX] Successfully deleted stale Job %s. Waiting for deletion...", jobName)
+            t.Logf(">>> [FIX] Successfully issued delete for Job %s. Waiting for deletion...", jobName)
             
-            // Optional: Short wait to ensure K8s registers the deletion before Helm starts
+            // 2. Wait for the job to vanish from the PRIMARY namespace (ns)
+            // ERROR WAS HERE: You were checking clientClusterCtx/clientNs
             require.Eventually(t, func() bool {
-                _, err := clientClusterCtx.KubernetesClient(t).BatchV1().Jobs(clientNs).Get(context.Background(), jobName, metav1.GetOptions{})
+                _, err := serverClusterCtx.KubernetesClient(t).BatchV1().Jobs(ns).Get(context.Background(), jobName, metav1.GetOptions{})
                 return k8serrors.IsNotFound(err)
-            }, 10*time.Second, 1*time.Second, "Timeout waiting for stale job to be deleted")
+            }, 30*time.Second, 1*time.Second, "Timeout waiting for stale job to be deleted")
         }
     }
     consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
