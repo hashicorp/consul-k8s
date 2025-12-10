@@ -92,7 +92,8 @@ func TestPeering_Gateway(t *testing.T) {
 
 		if cfg.UseEKS {
 			// staticServerPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal:true"
-			staticServerPeerHelmValues["meshGateway.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-internal"] = "true"
+			// staticServerPeerHelmValues["meshGateway.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-internal"] = "true"
+			staticServerPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal: \"true\""
 		}
 		helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
 
@@ -121,7 +122,8 @@ func TestPeering_Gateway(t *testing.T) {
 
 		if cfg.UseEKS {
 			// staticClientPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal:true"
-			staticClientPeerHelmValues["meshGateway.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-internal"] = "true"
+			// staticClientPeerHelmValues["meshGateway.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-internal"] = "true"
+			staticClientPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal: \"true\""
 		}
 		helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
 
