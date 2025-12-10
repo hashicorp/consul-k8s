@@ -304,9 +304,9 @@ spec:
           {{- end }}
           {{- if and $root.Values.externalServers.enabled $root.Values.externalServers.tlsServerName }}
           - -tls-server-name={{$root.Values.externalServers.tlsServerName }}
+          {{- end }}
           {{- else }}
           - -tls-disabled
-          {{- end }}
           {{- end }}
           {{- if $root.Values.global.acls.manageSystemACLs }}
           - -credential-type=login
