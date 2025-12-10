@@ -395,4 +395,5 @@ func TestPeering_Connect(t *testing.T) {
 			}
 		})
 	}
+	t.Fatal("Forcing failure to inspect resources")
 }
