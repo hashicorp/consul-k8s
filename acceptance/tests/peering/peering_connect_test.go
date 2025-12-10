@@ -392,8 +392,9 @@ func TestPeering_Connect(t *testing.T) {
 					logger.Log(r, "trying calls to terminating gateway")
 					k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerHostnameURL)
 				})
+				t.Fatal("Forcing failure to inspect resources")
 			}
+			t.Fatal("Forcing failure to inspect resources")
 		})
 	}
-	t.Fatal("Forcing failure to inspect resources")
 }
