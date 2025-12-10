@@ -413,11 +413,12 @@ serverHelmValues := map[string]string{
     "global.secretsBackend.vault.consulCAMountPath": "pki",
     
     // -----------------------------------------------------------------------
-    // [FIX] Disable Managed Gateway Class to prevent Job collision on Retry
+    // [FIX] Disable API Gateway correctly (Top-Level Keys)
     // -----------------------------------------------------------------------
-    // This job is causing the "already exists" error when the test framework 
-    // retries the Helm install after a timeout.
-    "connectInject.apiGateway.managedGatewayClass.enabled": "false",
+    // REMOVE "connectInject." from the beginning of these keys.
+    // "apiGateway" is a root configuration in the Helm chart.
+    "apiGateway.enabled":                     "false",
+    "apiGateway.managedGatewayClass.enabled": "false",
 }
 
     if cfg.UseKind {
