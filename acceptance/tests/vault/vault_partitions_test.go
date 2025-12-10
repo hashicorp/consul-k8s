@@ -237,24 +237,28 @@ func TestVault_Partitions(t *testing.T) {
     // -------------------------------------------
     // Additional Auth Roles in Primary Datacenter
     // -------------------------------------------
-    t.Log(">>> [DEBUG] configuring Primary Roles...")
+t.Log(">>> [DEBUG] configuring Primary Roles...")
 
-	caReadPolicyName := "read-pki-ca"
-caReadPolicyRules := fmt.Sprintf(`
+    // [FIX] 1. Update Policy to allow BOTH Primary (pki) and Secondary (pki-secondary) paths
+    caReadPolicyName := "read-pki-ca"
+    caReadPolicyRules := fmt.Sprintf(`
 path "%s/cert/ca*" {
   capabilities = ["read"]
 }
-`, serverPKIConfig.BaseURL) // Uses "pki" from your config
+path "pki-secondary/cert/ca*" {
+  capabilities = ["read"]
+}
+`, serverPKIConfig.BaseURL)
 
     err = vaultClient.Sys().PutPolicy(caReadPolicyName, caReadPolicyRules)
     require.NoError(t, err)
 
-serverPolicies := fmt.Sprintf("%s,%s,%s,%s,%s", 
+    serverPolicies := fmt.Sprintf("%s,%s,%s,%s,%s", 
         gossipSecret.PolicyName, 
         connectCAPolicy, 
         serverPKIConfig.PolicyName, 
         bootstrapTokenSecret.PolicyName,
-        caReadPolicyName, // <--- ADDED HERE
+        caReadPolicyName,
     )
 
     if cfg.EnableEnterprise && cfg.EnterpriseLicense != "" {
@@ -271,7 +275,7 @@ serverPolicies := fmt.Sprintf("%s,%s,%s,%s,%s",
     }
     srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
-consulClientRole := ClientRole
+    consulClientRole := ClientRole
     consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)   
 
     clientPolicies := fmt.Sprintf("%s,%s", gossipSecret.PolicyName, caReadPolicyName)
@@ -284,6 +288,7 @@ consulClientRole := ClientRole
         PolicyNames:         clientPolicies,
     }
     clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
+
     manageSystemACLsRole := ManageSystemACLsRole
     manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
     aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
@@ -309,12 +314,14 @@ consulClientRole := ClientRole
     // ---------------------------------------------
     t.Log(">>> [DEBUG] configuring Secondary Roles...")
 
+    // [FIX] 2. Add the CA Read Policy to the SECONDARY Client Role
     clientAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
         ServiceAccountName:  consulClientServiceAccountName,
         KubernetesNamespace: clientNs,
         AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
         RoleName:            consulClientRole,
-        PolicyNames:         gossipSecret.PolicyName,
+        // The secondary clients ALSO need to read the CA to start
+        PolicyNames:         fmt.Sprintf("%s,%s", gossipSecret.PolicyName, caReadPolicyName),
     }
     clientAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
@@ -348,20 +355,19 @@ consulClientRole := ClientRole
     srvCAAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
     secondaryServerPKIConfig := &vault.PKIAndAuthRoleConfiguration{
-    BaseURL:             "pki-secondary",
-    PolicyName:          serverPKIConfig.PolicyName,
-    RoleName:            serverPKIConfig.RoleName,
-    KubernetesNamespace: clientNs,
-    DataCenter:          "dc1", 
-    ServiceAccountName:  "*",    // secondary accepts all SAs
-    AllowedSubdomain:    serverPKIConfig.AllowedSubdomain,
-    MaxTTL:              serverPKIConfig.MaxTTL,
-    AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
-}
+        BaseURL:             "pki-secondary",
+        PolicyName:          serverPKIConfig.PolicyName,
+        RoleName:            serverPKIConfig.RoleName,
+        KubernetesNamespace: clientNs,
+        DataCenter:          "dc1", 
+        ServiceAccountName:  "*",    // secondary accepts all SAs
+        AllowedSubdomain:    serverPKIConfig.AllowedSubdomain,
+        MaxTTL:              serverPKIConfig.MaxTTL,
+        AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
+    }
 
-secondaryServerPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
-
-    vaultCASecretName := vault.CASecretName(vaultReleaseName)
+    secondaryServerPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
+	vaultCASecretName := vault.CASecretName(vaultReleaseName)
 
     // ----------------------------------------------------------------
     // [DEBUG] PRIMARY CONSUL DEPLOY
@@ -430,7 +436,6 @@ serverHelmValues := map[string]string{
     helpers.MergeMaps(serverHelmValues, commonHelmValues)
 
     logger.Log(t, "Installing Consul")
-logger.Log(t, "Installing Consul")
     {
         // Construct the specific Job name that is failing
         jobName := fmt.Sprintf("%s-consul-gateway-resources", consulReleaseName)
