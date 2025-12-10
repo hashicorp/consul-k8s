@@ -389,10 +389,16 @@ serverHelmValues := map[string]string{
     "server.exposeService.enabled":                              "true",
     "server.exposeService.type":                                 "LoadBalancer",
 
-    // ADD THESE TWO LINES
     "connectInject.certManager.enabled": "false",
     "connectInject.webhook.createCert":  "true",
     "global.secretsBackend.vault.consulCAMountPath": "pki",
+    
+    // -----------------------------------------------------------------------
+    // [FIX] Disable Managed Gateway Class to prevent Job collision on Retry
+    // -----------------------------------------------------------------------
+    // This job is causing the "already exists" error when the test framework 
+    // retries the Helm install after a timeout.
+    "connectInject.apiGateway.managedGatewayClass.enabled": "false",
 }
 
     if cfg.UseKind {
