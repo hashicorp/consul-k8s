@@ -239,7 +239,24 @@ func TestVault_Partitions(t *testing.T) {
     // -------------------------------------------
     t.Log(">>> [DEBUG] configuring Primary Roles...")
 
-    serverPolicies := fmt.Sprintf("%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName)
+	caReadPolicyName := "read-pki-ca"
+    caReadPolicyRules := fmt.Sprintf(`
+path "%s/cert/ca" {
+  capabilities = ["read"]
+}
+`, serverPKIConfig.BaseURL) // Uses "pki" from your config
+
+    err = vaultClient.Sys().PutPolicy(caReadPolicyName, caReadPolicyRules)
+    require.NoError(t, err)
+
+serverPolicies := fmt.Sprintf("%s,%s,%s,%s,%s", 
+        gossipSecret.PolicyName, 
+        connectCAPolicy, 
+        serverPKIConfig.PolicyName, 
+        bootstrapTokenSecret.PolicyName,
+        caReadPolicyName, // <--- ADDED HERE
+    )
+
     if cfg.EnableEnterprise && cfg.EnterpriseLicense != "" {
         serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
     }
@@ -254,17 +271,19 @@ func TestVault_Partitions(t *testing.T) {
     }
     srvAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
 
-    consulClientRole := ClientRole
-    consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)
+consulClientRole := ClientRole
+    consulClientServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ClientRole)   
+
+    clientPolicies := fmt.Sprintf("%s,%s", gossipSecret.PolicyName, caReadPolicyName)
+
     clientAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
         ServiceAccountName:  consulClientServiceAccountName,
         KubernetesNamespace: ns,
         AuthMethodPath:      KubernetesAuthMethodPath,
         RoleName:            consulClientRole,
-        PolicyNames:         gossipSecret.PolicyName,
+        PolicyNames:         clientPolicies,
     }
     clientAuthRoleConfig.ConfigureK8SAuthRole(t, vaultClient)
-
     manageSystemACLsRole := ManageSystemACLsRole
     manageSystemACLsServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, ManageSystemACLsRole)
     aclAuthRoleConfig := &vault.KubernetesAuthRoleConfiguration{
