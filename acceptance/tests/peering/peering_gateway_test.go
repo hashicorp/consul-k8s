@@ -27,7 +27,6 @@ import (
 )
 
 func TestPeering_Gateway(t *testing.T) {
-	t.Skip("temporarily skipped TestPeering_Gateway")
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -91,6 +90,9 @@ func TestPeering_Gateway(t *testing.T) {
 			staticServerPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 		}
 
+		if cfg.UseEKS {
+			staticServerPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal:true"
+		}
 		helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
 
 		// Install the first peer where static-server will be deployed in the static-server kubernetes context.
@@ -116,6 +118,9 @@ func TestPeering_Gateway(t *testing.T) {
 			staticClientPeerHelmValues["meshGateway.service.nodePort"] = "30100"
 		}
 
+		if cfg.UseEKS {
+			staticClientPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal:true"
+		}
 		helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
 
 		// Install the second peer where static-client will be deployed in the static-client kubernetes context.

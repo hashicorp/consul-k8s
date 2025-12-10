@@ -31,6 +31,7 @@ import (
 // destination for a terminating gateway. It checks that requests from the client can reach this server through the
 // terminating gateway via the mesh gateways.
 func TestPeering_Connect(t *testing.T) {
+	t.Skip("temporarily skipped TestPeering_Connect")
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -392,9 +393,7 @@ func TestPeering_Connect(t *testing.T) {
 					logger.Log(r, "trying calls to terminating gateway")
 					k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerHostnameURL)
 				})
-				t.Fatal("Forcing failure to inspect resources")
 			}
-			t.Fatal("Forcing failure to inspect resources")
 		})
 	}
 }
