@@ -6,9 +6,12 @@ package vault
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -19,12 +22,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	    crlog "sigs.k8s.io/controller-runtime/pkg/log"
-    "sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"k8s.io/apimachinery/pkg/util/rand"
+	crlog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 func TestVault_Partitions(t *testing.T) {
-    crlog.SetLogger(zap.New(zap.UseDevMode(true)))
+	crlog.SetLogger(zap.New(zap.UseDevMode(true)))
 	env := suite.Environment()
 	cfg := suite.Config()
 	serverClusterCtx := env.DefaultContext(t)
@@ -379,7 +383,118 @@ func TestVault_Partitions(t *testing.T) {
 		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
 	})
 
-	// Create client cluster.
+	// DEBUG: Verify Vault CA secret was copied successfully
+	logger.Logf(t, "DEBUG: Verifying Vault CA secret in secondary cluster...")
+	copiedCASecret, err := clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(
+		context.Background(), vaultCASecretName, metav1.GetOptions{})
+	if err != nil {
+		logger.Logf(t, "ERROR: Failed to retrieve copied Vault CA secret: %v", err)
+	} else {
+		logger.Logf(t, "DEBUG: Vault CA secret successfully copied to secondary cluster")
+		logger.Logf(t, "  Secret Name: %s", copiedCASecret.Name)
+		logger.Logf(t, "  Secret Data Keys: %v", getSecretKeys(copiedCASecret.Data))
+
+		// Check for required CA cert
+		if caCert, ok := copiedCASecret.Data["ca.crt"]; ok {
+			logger.Logf(t, "  CA Cert Size: %d bytes", len(caCert))
+			// Log first 100 chars for verification
+			if len(caCert) > 100 {
+				logger.Logf(t, "  CA Cert Preview: %s...", string(caCert[:100]))
+			}
+		} else if caCert, ok := copiedCASecret.Data["cert"]; ok {
+			logger.Logf(t, "  Using 'cert' key instead of 'ca.crt', Size: %d bytes", len(caCert))
+		} else {
+			logger.Logf(t, "ERROR: No CA certificate found in secret. Available keys: %v", getSecretKeys(copiedCASecret.Data))
+		}
+	}
+
+	// DEBUG: Verify partition token secret exists
+	logger.Logf(t, "DEBUG: Verifying partition token secret...")
+	if partitionTokenSecret != nil {
+		tokenSecret, err := clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(
+			context.Background(), partitionTokenSecret.Path, metav1.GetOptions{})
+		if err != nil {
+			logger.Logf(t, "ERROR: Partition token secret not found: %s, error: %v", partitionTokenSecret.Path, err)
+		} else {
+			logger.Logf(t, "DEBUG: Partition token secret found")
+			if tokenData, ok := tokenSecret.Data[partitionTokenSecret.Key]; ok {
+				logger.Logf(t, "  Token Size: %d bytes", len(tokenData))
+				// Log token prefix for debugging (not full token for security)
+				if len(tokenData) > 10 {
+					logger.Logf(t, "  Token Prefix: %s...", string(tokenData[:10]))
+				}
+			} else {
+				logger.Logf(t, "ERROR: Key '%s' not found in token secret. Available keys: %v",
+					partitionTokenSecret.Key, getSecretKeys(tokenSecret.Data))
+			}
+		}
+	} else {
+		logger.Logf(t, "ERROR: partitionTokenSecret is nil")
+	}
+
+	// DEBUG: Parse and verify service address
+	logger.Logf(t, "DEBUG: Parsing service address: %s", partitionSvcAddress)
+	if partitionSvcAddress == "" {
+		logger.Logf(t, "ERROR: partitionSvcAddress is empty")
+	} else {
+		// Try to parse host and port
+		parts := strings.Split(partitionSvcAddress, ":")
+		if len(parts) >= 2 {
+			host, port := parts[0], parts[1]
+			logger.Logf(t, "  Host: %s", host)
+			logger.Logf(t, "  Port: %s", port)
+
+			// Check if it's a full service name
+			if strings.Contains(host, ".svc.") {
+				logger.Logf(t, "  Service FQDN detected")
+				serviceName := strings.Split(host, ".")[0]
+				logger.Logf(t, "  Service Name: %s", serviceName)
+
+				// Try to get service from primary cluster
+				svc, err := serverClusterCtx.KubernetesClient(t).CoreV1().Services(ns).Get(
+					context.Background(), serviceName, metav1.GetOptions{})
+				if err != nil {
+					logger.Logf(t, "WARN: Service %s not found in primary cluster: %v", serviceName, err)
+				} else {
+					logger.Logf(t, "  Service exists in primary cluster:")
+					logger.Logf(t, "    Type: %s", svc.Spec.Type)
+					logger.Logf(t, "    ClusterIP: %s", svc.Spec.ClusterIP)
+					for _, port := range svc.Spec.Ports {
+						logger.Logf(t, "    Port: %s -> %d/%s", port.Name, port.Port, port.Protocol)
+					}
+
+					// Check endpoints
+					endpoints, err := serverClusterCtx.KubernetesClient(t).CoreV1().Endpoints(ns).Get(
+						context.Background(), serviceName, metav1.GetOptions{})
+					if err != nil {
+						logger.Logf(t, "WARN: Failed to get endpoints: %v", err)
+					} else if len(endpoints.Subsets) == 0 {
+						logger.Logf(t, "ERROR: Service has no endpoints")
+					} else {
+						logger.Logf(t, "  Service has %d endpoint subsets", len(endpoints.Subsets))
+					}
+				}
+			}
+		} else {
+			logger.Logf(t, "WARN: Could not parse host:port from address")
+		}
+	}
+
+	// DEBUG: Verify Vault configuration
+	logger.Logf(t, "DEBUG: Verifying Vault configuration...")
+	logger.Logf(t, "  Vault Release Name: %s", vaultReleaseName)
+	logger.Logf(t, "  Vault TLS Server Name: %s-vault", vaultReleaseName)
+	logger.Logf(t, "  Admin Partitions Role: %s", adminPartitionsRole)
+	logger.Logf(t, "  k8sAuthMethodHost: %s", k8sAuthMethodHost)
+
+	if adminPartitionsRole == "" {
+		logger.Logf(t, "ERROR: adminPartitionsRole is empty")
+	}
+	if k8sAuthMethodHost == "" {
+		logger.Logf(t, "ERROR: k8sAuthMethodHost is empty")
+	}
+
+	// Create client cluster configuration
 	clientHelmValues := map[string]string{
 		"global.enabled": "false",
 
@@ -405,14 +520,43 @@ func TestVault_Partitions(t *testing.T) {
 		clientHelmValues["externalServers.httpsPort"] = "30000"
 		clientHelmValues["meshGateway.service.type"] = "NodePort"
 		clientHelmValues["meshGateway.service.nodePort"] = "30100"
+
+		logger.Logf(t, "DEBUG: Using Kind-specific configuration:")
+		logger.Logf(t, "  HTTPS Port: %s", clientHelmValues["externalServers.httpsPort"])
+		logger.Logf(t, "  Mesh Gateway NodePort: %s", clientHelmValues["meshGateway.service.nodePort"])
 	}
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
+	// DEBUG: Log all helm values (masking sensitive ones)
+	logger.Logf(t, "DEBUG: Final Helm values for client cluster:")
+	for key, value := range clientHelmValues {
+		// Mask tokens and secrets in logs
+		if strings.Contains(strings.ToLower(key), "token") ||
+			strings.Contains(strings.ToLower(key), "secret") ||
+			strings.Contains(strings.ToLower(key), "key") {
+			if len(value) > 0 {
+				logger.Logf(t, "  %s: [MASKED]", key)
+			} else {
+				logger.Logf(t, "  %s: [EMPTY]", key)
+			}
+		} else {
+			logger.Logf(t, "  %s: %s", key, value)
+		}
+	}
+
+	// DEBUG: Quick network connectivity test
+	logger.Logf(t, "DEBUG: Testing basic network connectivity...")
+	testConnectivity(t, serverClusterCtx, clientClusterCtx, ns, partitionSvcAddress)
+
 	// Install the consul cluster without servers in the client cluster kubernetes context.
+	logger.Logf(t, "DEBUG: Creating client Consul cluster...")
 	clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterCtx, cfg, consulReleaseName)
 	clientConsulCluster.Create(t)
+	// debug after cluster creation
 
+	time.Sleep(30 * time.Second)
+	debugVaultPartitions(t, clientClusterCtx, ns)
 	// Ensure consul clients are created.
 	agentPodList, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientClusterCtx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "app=consul,component=client"})
 	require.NoError(t, err)
@@ -421,4 +565,99 @@ func TestVault_Partitions(t *testing.T) {
 	output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "consul", "-n", clientClusterCtx.KubectlOptions(t).Namespace)
 	require.NoError(t, err)
 	require.Contains(t, output, "Partition: 'secondary'")
+}
+
+func debugVaultPartitions(t *testing.T, clientClusterCtx environment.TestContext, ns string) {
+	logger.Logf(t, "DEBUG: Checking client cluster state...")
+
+	// List all pods in the namespace
+	pods, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(ns).List(
+		context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Logf(t, "ERROR: Failed to list pods: %v", err)
+		return
+	}
+
+	for _, pod := range pods.Items {
+		logger.Logf(t, "Pod: %s, Status: %s", pod.Name, pod.Status.Phase)
+		if pod.Status.Phase != corev1.PodRunning {
+			logger.Logf(t, "  Container Statuses:")
+			for _, cs := range pod.Status.ContainerStatuses {
+				logger.Logf(t, "    %s: Ready=%v, Restarts=%d",
+					cs.Name, cs.Ready, cs.RestartCount)
+				if cs.State.Waiting != nil {
+					logger.Logf(t, "      Waiting Reason: %s, Message: %s",
+						cs.State.Waiting.Reason, cs.State.Waiting.Message)
+				}
+			}
+
+			// Get pod events
+			events, err := clientClusterCtx.KubernetesClient(t).CoreV1().Events(ns).List(
+				context.Background(), metav1.ListOptions{
+					FieldSelector: fmt.Sprintf("involvedObject.name=%s", pod.Name),
+				})
+			if err == nil && len(events.Items) > 0 {
+				for _, event := range events.Items {
+					logger.Logf(t, "  Event: %s - %s", event.Reason, event.Message)
+				}
+			}
+		}
+	}
+
+	// Check for failed init containers
+	for _, pod := range pods.Items {
+		for _, status := range pod.Status.InitContainerStatuses {
+			if !status.Ready && status.State.Terminated != nil {
+				logger.Logf(t, "ERROR: Init container %s in pod %s failed: %s",
+					status.Name, pod.Name, status.State.Terminated.Message)
+			}
+		}
+	}
+}
+
+// Helper function to get keys from a map
+func getSecretKeys(data map[string][]byte) []string {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// Helper function to test connectivity
+func testConnectivity(t *testing.T, serverCtx, clientCtx environment.TestContext, ns, targetAddress string) {
+	// Create a simple test pod in client cluster
+	testPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "network-test-" + strings.ToLower(rand.String(5)),
+			Namespace: ns,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:    "test",
+					Image:   "busybox:latest",
+					Command: []string{"sleep", "30"},
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyNever,
+		},
+	}
+
+	// Try to create test pod
+	clientK8s := clientCtx.KubernetesClient(t)
+	_, err := clientK8s.CoreV1().Pods(ns).Create(context.Background(), testPod, metav1.CreateOptions{})
+	if err != nil {
+		logger.Logf(t, "WARN: Could not create network test pod: %v", err)
+		return
+	}
+
+	// Clean up after test
+	defer func() {
+		clientK8s.CoreV1().Pods(ns).Delete(context.Background(), testPod.Name, metav1.DeleteOptions{})
+	}()
+
+	// Wait for pod to be ready
+	time.Sleep(2 * time.Second)
+
 }
