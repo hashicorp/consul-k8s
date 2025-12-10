@@ -240,8 +240,8 @@ func TestVault_Partitions(t *testing.T) {
     t.Log(">>> [DEBUG] configuring Primary Roles...")
 
 	caReadPolicyName := "read-pki-ca"
-    caReadPolicyRules := fmt.Sprintf(`
-path "%s/cert/ca" {
+caReadPolicyRules := fmt.Sprintf(`
+path "%s/cert/ca*" {
   capabilities = ["read"]
 }
 `, serverPKIConfig.BaseURL) // Uses "pki" from your config
@@ -413,14 +413,13 @@ serverHelmValues := map[string]string{
     "global.secretsBackend.vault.consulCAMountPath": "pki",
     
     // -----------------------------------------------------------------------
-    // [FIX] Disable API Gateway correctly (Top-Level Keys)
+    // [FIX] Disable API Gateway using the correct nesting
     // -----------------------------------------------------------------------
-    // REMOVE "connectInject." from the beginning of these keys.
-    // "apiGateway" is a root configuration in the Helm chart.
-    "apiGateway.enabled":                     "false",
-    "apiGateway.managedGatewayClass.enabled": "false",
+    // We revert to "connectInject." prefix because the chart requires it.
+    // The previous failure was due to the Vault policy causing a retry.
+    // With the policy fixed, this will work and no retry will trigger.
+    "connectInject.apiGateway.managedGatewayClass.enabled": "false",
 }
-
     if cfg.UseKind {
         serverHelmValues["meshGateway.service.type"] = "NodePort"
         serverHelmValues["meshGateway.service.nodePort"] = "30100"
