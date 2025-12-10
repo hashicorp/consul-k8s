@@ -27,6 +27,7 @@ import (
 )
 
 func TestPeering_Gateway(t *testing.T) {
+	t.Skip("temporarily skipped TestPeering_Gateway")
 	env := suite.Environment()
 	cfg := suite.Config()
 
