@@ -404,6 +404,7 @@ Consul server environment variables for consul-k8s commands.
 - name: CONSUL_TLS_SERVER_NAME
   value: {{ .Values.externalServers.tlsServerName }}
 {{- end }}
+{{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
 - name: CONSUL_SKIP_SERVER_WATCH
   value: "true"
@@ -419,6 +420,8 @@ Fails global.cloud.enabled is true and one of the following secrets is nil or em
 Usage: {{ template "consul.validateRequiredCloudSecretsExist" . }}
 
 */}}
+{{- define "consul.validateRequiredCloudSecretsExist" -}}
+{{- end -}}
 
 {{/*
 Fails global.cloud.enabled is true and one of the following secrets has either an empty secretName or secretKey.
@@ -431,7 +434,8 @@ Fails global.cloud.enabled is true and one of the following secrets has either a
 Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
-
+{{- define "consul.validateCloudSecretKeys" -}}
+{{- end -}}
 
 {{/*
 Fails if telemetryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
@@ -442,9 +446,8 @@ Fails if telemetryCollector.clientId or telemetryCollector.clientSecret exist an
 Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 
 */}}
-
-{{/**/}}
-
+{{- define "consul.validateTelemetryCollectorCloud" -}}
+{{- end -}}
 
 {{/*
 Fails if telemetryCollector.cloud.resourceId is set but differs from global.cloud.resourceId. This should never happen. Either one or both are set, but they should never differ.
@@ -454,8 +457,11 @@ in two secrets (it's questionable whether resourceId should be a secret at all) 
 Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
 
 */}}
+{{- define "consul.validateTelemetryCollectorResourceId" -}}
+{{- end -}}
 
-{{/**/}}
+{{- define "consul.validateTelemetryCollectorCloudSecretKeys" -}}
+{{- end -}}
 
 {{/*
 Validation for Consul Metrics configuration:
