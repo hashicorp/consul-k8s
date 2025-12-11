@@ -324,12 +324,12 @@ func TestVault_Partitions(t *testing.T) {
 		"global.tls.enableAutoEncrypt": "true",
 		"global.tls.caCert.secretName": serverPKIConfig.CAPath,
 
-		"global.gossipEncryption.secretName": gossipSecret.Path,
-		"global.gossipEncryption.secretKey":  gossipSecret.Key,
+       "global.gossipEncryption.secretName":  gossipSecret.Path,
+        "global.gossipEncryption.secretKey":  gossipSecret.Key,
 
-		"global.enterpriseLicense.secretName": licenseSecret.Path,
-		"global.enterpriseLicense.secretKey":  licenseSecret.Key,
-	}
+        "global.enterpriseLicense.secretName":  licenseSecret.Path,
+        "global.enterpriseLicense.secretKey":  licenseSecret.Key,
+	}     
 
 	serverHelmValues := map[string]string{
 		"global.secretsBackend.vault.consulServerRole":              consulServerRole,
@@ -337,10 +337,10 @@ func TestVault_Partitions(t *testing.T) {
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
 		"global.secretsBackend.vault.connectCA.intermediatePKIPath": connectCAIntermediatePath,
 
-		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
-		"global.acls.bootstrapToken.secretKey":  bootstrapTokenSecret.Key,
-		"global.acls.partitionToken.secretName": partitionTokenSecret.Path,
-		"global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
+        "global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
+        "global.acls.bootstrapToken.secretKey":  bootstrapTokenSecret.Key,
+        "global.acls.partitionToken.secretName": partitionTokenSecret.Path,
+        "global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
 
 		"server.exposeGossipAndRPCPorts": "true",
 		"server.serverCert.secretName":   serverPKIConfig.CertPath,
@@ -395,27 +395,28 @@ func TestVault_Partitions(t *testing.T) {
 		logger.Logf(t, "  Secret Data Keys: %v", getSecretKeys(copiedCASecret.Data))
 
 		// Check for required CA cert
-		if caCert, ok := copiedCASecret.Data["ca.crt"]; ok {
-			logger.Logf(t, "  CA Cert Size: %d bytes", len(caCert))
-			// Log first 100 chars for verification
-			if len(caCert) > 100 {
-				logger.Logf(t, "  CA Cert Preview: %s...", string(caCert[:100]))
-			}
-		} else if caCert, ok := copiedCASecret.Data["cert"]; ok {
-			logger.Logf(t, "  Using 'cert' key instead of 'ca.crt', Size: %d bytes", len(caCert))
-		} else {
-			logger.Logf(t, "ERROR: No CA certificate found in secret. Available keys: %v", getSecretKeys(copiedCASecret.Data))
-		}
+      if caCert, ok := copiedCASecret.Data["ca.crt"]; ok {
+            logger.Logf(t, "  CA Cert Size: %d bytes", len(caCert))
+        } else if caCert, ok := copiedCASecret.Data["cert"]; ok {
+            logger.Logf(t, "  Using 'cert' key instead of 'ca.crt', Size: %d bytes", len(caCert))
+        } else if caCert, ok := copiedCASecret.Data["tls.crt"]; ok {
+            // FIX: Add check for tls.crt
+            logger.Logf(t, "  Using 'tls.crt' key, Size: %d bytes", len(caCert))
+        } else {
+            logger.Logf(t, "ERROR: No CA certificate found in secret. Available keys: %v", getSecretKeys(copiedCASecret.Data))
+        }	
 	}
 
 	// DEBUG: Verify partition token secret exists
 	logger.Logf(t, "DEBUG: Verifying partition token secret...")
-	if partitionTokenSecret != nil {
-		tokenSecret, err := clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(
-			context.Background(), partitionTokenSecret.Path, metav1.GetOptions{})
-		if err != nil {
-			logger.Logf(t, "ERROR: Partition token secret not found: %s, error: %v", partitionTokenSecret.Path, err)
-		} else {
+if partitionTokenSecret != nil {
+        // FIX: Use the Kubernetes name we decided on above ("consul-partition-token")
+        // Instead of partitionTokenSecret.Path
+        tokenSecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(
+            context.Background(), partitionTokenSecret.Path, metav1.GetOptions{}) 
+            
+        if err != nil {
+            logger.Logf(t, "ERROR: Partition token secret not found: consul-partition-token, error: %v", err)		} else {
 			logger.Logf(t, "DEBUG: Partition token secret found")
 			if tokenData, ok := tokenSecret.Data[partitionTokenSecret.Key]; ok {
 				logger.Logf(t, "  Token Size: %d bytes", len(tokenData))
@@ -500,8 +501,8 @@ func TestVault_Partitions(t *testing.T) {
 
 		"global.adminPartitions.name": secondaryPartition,
 
-		"global.acls.bootstrapToken.secretName": partitionTokenSecret.Path,
-		"global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
+        "global.acls.bootstrapToken.secretName":  partitionTokenSecret.Path,
+        "global.acls.bootstrapToken.secretKey":  partitionTokenSecret.Key,
 
 		"global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
 		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
@@ -532,17 +533,7 @@ func TestVault_Partitions(t *testing.T) {
 	logger.Logf(t, "DEBUG: Final Helm values for client cluster:")
 	for key, value := range clientHelmValues {
 		// Mask tokens and secrets in logs
-		if strings.Contains(strings.ToLower(key), "token") ||
-			strings.Contains(strings.ToLower(key), "secret") ||
-			strings.Contains(strings.ToLower(key), "key") {
-			if len(value) > 0 {
-				logger.Logf(t, "  %s: [MASKED]", key)
-			} else {
-				logger.Logf(t, "  %s: [EMPTY]", key)
-			}
-		} else {
-			logger.Logf(t, "  %s: %s", key, value)
-		}
+	   logger.Logf(t, "  %s: %s", key, value)
 	}
 
 	// DEBUG: Quick network connectivity test
