@@ -341,8 +341,7 @@ func TestVault_Partitions(t *testing.T) {
 		"global.acls.partitionToken.secretName": partitionTokenSecret.Path,
 		"global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
 
-		"server.exposeGossipAndRPCPorts": "true",
-		"server.serverCert.secretName":   serverPKIConfig.CertPath,
+		"server.serverCert.secretName": serverPKIConfig.CertPath,
 
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,
@@ -512,9 +511,7 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
-		"client.enabled":           "true",
-		"client.exposeGossipPorts": "true",
-		"client.join[0]":           partitionSvcAddress,
+		"client.enabled": "true",
 	}
 
 	if cfg.UseKind {
