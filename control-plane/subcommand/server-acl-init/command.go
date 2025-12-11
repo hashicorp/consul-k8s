@@ -725,7 +725,7 @@ func (c *Command) configureLocalComponentAuthMethod(client *consul.DynamicClient
 	if err != nil {
 		return err
 	}
-	return c.createAuthMethod(client, &authMethod, &api.WriteOptions{Partition: c.consulFlags.Partition})
+	return c.createAuthMethod(client, &authMethod, &api.WriteOptions{})
 }
 
 // createAuthMethod creates the desired Authmethod.
