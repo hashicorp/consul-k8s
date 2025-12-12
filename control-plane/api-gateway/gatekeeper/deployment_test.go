@@ -4,13 +4,19 @@
 package gatekeeper
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -291,4 +297,144 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 	assert.NotNil(t, containerUpdated.LivenessProbe.TCPSocket)
 	assert.Nil(t, containerUpdated.LivenessProbe.HTTPGet)
 	assert.Equal(t, int32(9090), containerUpdated.LivenessProbe.TCPSocket.Port.IntVal)
+}
+
+func TestAdditionalAccessLogVolumeMount(t *testing.T) {
+	t.Parallel()
+
+	type expectedResponse struct {
+		hasProxyDefaults   bool
+		errOnProxyDefaults bool
+		accessLogEnabled   bool
+		fileLogSinkType    bool
+		fileLogPath        string
+	}
+
+	type testCase struct {
+		expectedResponse     expectedResponse
+		proxyDefaultResource *v1alpha1.ProxyDefaults
+	}
+
+	cases := map[string]testCase{
+		"no proxy-defaults configured": {
+			proxyDefaultResource: nil,
+			expectedResponse: expectedResponse{
+				hasProxyDefaults: false,
+			},
+		},
+		"error fetching proxy-defaults": {
+			proxyDefaultResource: nil,
+			expectedResponse: expectedResponse{
+				errOnProxyDefaults: true,
+			},
+		},
+		"access-logs disabled in proxy-defaults": {
+			proxyDefaultResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGateway{
+						Mode: "remote",
+					},
+					AccessLogs: &v1alpha1.AccessLogs{
+						Enabled: false,
+					},
+				},
+			},
+			expectedResponse: expectedResponse{
+				hasProxyDefaults: true,
+				accessLogEnabled: false,
+			},
+		},
+		"access-logs enabled but sink is not file type": {
+			proxyDefaultResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGateway{
+						Mode: "remote",
+					},
+					AccessLogs: &v1alpha1.AccessLogs{
+						Enabled: true,
+						Type:    v1alpha1.DefaultLogSinkType,
+					},
+				},
+			},
+			expectedResponse: expectedResponse{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  false,
+			},
+		},
+		"file-type access-log enabled with path": {
+			proxyDefaultResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGateway{
+						Mode: "remote",
+					},
+					AccessLogs: &v1alpha1.AccessLogs{
+						Enabled: true,
+						Type:    v1alpha1.FileLogSinkType,
+						Path:    "/var/log/envoy/access.log",
+					},
+				},
+			},
+			expectedResponse: expectedResponse{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  true,
+				fileLogPath:      "/var/log/envoy/access.log",
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			var fakeClient client.WithWatch
+			s := runtime.NewScheme()
+			require.NoError(t, v1alpha1.AddToScheme(s))
+			if tc.proxyDefaultResource != nil {
+				fakeClient = fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.proxyDefaultResource).Build()
+			} else if tc.expectedResponse.errOnProxyDefaults {
+				fakeClient = fake.NewClientBuilder().Build()
+			} else {
+				fakeClient = fake.NewClientBuilder().WithScheme(s).Build()
+			}
+
+			g := &Gatekeeper{
+				Log:          logr.Discard(),
+				Client:       fakeClient,
+				ConsulConfig: nil,
+			}
+
+			initialvolume := []corev1.Volume{}
+			initialmount := []corev1.VolumeMount{}
+
+			updatedVolumes, updatedMounts, err := g.additionalAccessLogVolumeMount(ctx, initialvolume, initialmount)
+			if tc.expectedResponse.errOnProxyDefaults {
+				require.Error(t, err)
+				require.ErrorContains(t, err, "error fetching proxy-defaults")
+				return
+			}
+			require.NoError(t, err)
+			if tc.expectedResponse.hasProxyDefaults && tc.expectedResponse.accessLogEnabled && tc.expectedResponse.fileLogSinkType {
+				// Expect volume and mount to be added
+				require.Len(t, updatedVolumes, 1)
+				require.Len(t, updatedMounts, 1)
+				require.Equal(t, accessLogVolumeName, updatedVolumes[0].Name)
+				require.Equal(t, accessLogVolumeName, updatedMounts[0].Name)
+				require.Equal(t, filepath.Dir(tc.expectedResponse.fileLogPath), updatedMounts[0].MountPath)
+			} else {
+				// Expect no additional volume or mount to be added
+				require.Len(t, updatedVolumes, 0)
+				require.Len(t, updatedMounts, 0)
+			}
+		})
+	}
 }

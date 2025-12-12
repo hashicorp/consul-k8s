@@ -235,6 +235,10 @@ const (
 	AnnotationSidecarProbePeriodSeconds            = "consul.hashicorp.com/sidecar-probe-period-seconds"
 	AnnotationSidecarProbeFailureThreshold         = "consul.hashicorp.com/sidecar-probe-failure-threshold"
 	AnnotationSidecarProbeCheckTimeoutSeconds      = "consul.hashicorp.com/sidecar-probe-check-timeout-seconds"
+
+	// annotations for sidecar access volumes.
+	AnnotationConsulSidecarAccessLogEnabled = "consul.hashicorp.com/consul-sidecar-access-log-enabled"
+	AnnotationConsulSidecarAccessLogPath    = "consul.hashicorp.com/consul-sidecar-access-log-path"
 )
 
 // Annotations used by Prometheus.
