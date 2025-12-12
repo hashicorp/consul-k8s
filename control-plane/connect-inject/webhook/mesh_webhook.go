@@ -32,6 +32,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul-k8s/version"
+	capi "github.com/hashicorp/consul/api"
 )
 
 const (
@@ -273,6 +274,13 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// Optionally mount data volume to other containers
 	w.injectVolumeMount(pod)
+
+	// Optionally mount data volume to envoy sidecar if file based access logs are enabled
+	err = w.mountAdditionalAccessLogVolume(&pod)
+	if err != nil {
+		w.Log.Error(err, "unable to mount additional access log volume", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("unable to mount additional access log volume: %s", err))
+	}
 
 	// Optionally add any volumes that are to be used by the envoy sidecar.
 	if _, ok := pod.Annotations[constants.AnnotationConsulSidecarUserVolume]; ok {
@@ -756,4 +764,45 @@ func sliceContains(slice []string, entry string) bool {
 		}
 	}
 	return false
+}
+
+// Fetches the global proxy-defaults config from Consul and checks if access logs are enabled.
+// If enabled and of file type, it adds the access log volume to the pod.
+func (w *MeshWebhook) mountAdditionalAccessLogVolume(pod *corev1.Pod) error {
+	// If no ConsulConfig is provided, skip fetching proxy-defaults.
+	if w.ConsulConfig == nil || w.ConsulServerConnMgr == nil {
+		w.Log.Info("no ConsulConfig or ConsulServerConnMgr provided, skipping fetching proxy-defaults")
+		return nil
+	}
+
+	proxyDefaults, err := consul.FetchProxyDefaultsFromConsul(w.ConsulConfig, w.ConsulServerConnMgr)
+	if err != nil {
+		return fmt.Errorf("error fetch proxy-defaults from consul: %s", err.Error())
+	}
+
+	if proxyDefaults != nil {
+		if proxyDefaults.AccessLogs.Enabled {
+			pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled] = "true"
+			if proxyDefaults.AccessLogs.Type == capi.FileLogSinkType {
+				pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath] = proxyDefaults.AccessLogs.Path
+				pod.Spec.Volumes = append(pod.Spec.Volumes, accessLogVolume())
+			}
+		}
+	}
+
+	return nil
+}
+
+func findAccessLogVolumeMount(pod corev1.Pod) (corev1.VolumeMount, bool) {
+	for _, v := range pod.Spec.Volumes {
+		if v.Name == accessLogVolumeName {
+			if pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled] == "true" {
+				if path, ok := pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath]; ok {
+					return accessLogVolumeMount(path), true
+				}
+			}
+		}
+	}
+
+	return corev1.VolumeMount{}, false
 }
