@@ -111,7 +111,7 @@ func TestPeering_Gateway(t *testing.T) {
 		}
 
 		if !cfg.UseKind {
-			staticClientPeerHelmValues["server.replicas"] = "1"
+			staticClientPeerHelmValues["server.replicas"] = "3"
 		}
 
 		if cfg.UseKind {
