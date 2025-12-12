@@ -327,6 +327,7 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 }
 
 // Checking whether an additional volume is required for access logs defined in the proxy-defaults.
+// fetch the proxy-defaults resource and check if access logs are enabled and of type file.
 func (g *Gatekeeper) additionalAccessLogVolumeMount(ctx context.Context, volumes []corev1.Volume, mounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount, error) {
 
 	var proxyDefaultsList v1alpha1.ProxyDefaultsList
