@@ -1734,6 +1734,16 @@ client:
     # @recurse: false
     tlsInit: null
 
+  aclInit:
+    startupStagger:
+      # When true, adds a randomized sleep before running acl-init to avoid login storms
+      # against the Consul servers in large clusters. Defaults set to 0 for no sleep.
+      enabled: false
+      # Minimum seconds to sleep before attempting the ACL login.
+      minSeconds: 0
+      # Maximum seconds to sleep before attempting the ACL login.
+      maxSeconds: 0
+
   # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
   # client agents. This can be used to add additional configuration that
