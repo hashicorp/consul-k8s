@@ -4,13 +4,8 @@
 package gatekeeper
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
+	"context"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -19,23 +14,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	capi "github.com/hashicorp/consul/api"
 )
-
-type consulServerRespCfg struct {
-	hasProxyDefaults   bool
-	errOnProxyDefaults bool
-	accessLogEnabled   bool
-	fileLogSinkType    bool
-	fileLogPath        string
-}
 
 func Test_compareDeployments(t *testing.T) {
 	testCases := []struct {
@@ -316,36 +302,89 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 func TestAdditionalAccessLogVolumeMount(t *testing.T) {
 	t.Parallel()
 
+	type expectedResponse struct {
+		hasProxyDefaults   bool
+		errOnProxyDefaults bool
+		accessLogEnabled   bool
+		fileLogSinkType    bool
+		fileLogPath        string
+	}
+
 	type testCase struct {
-		srvResponseConfig consulServerRespCfg
+		expectedResponse     expectedResponse
+		proxyDefaultResource *v1alpha1.ProxyDefaults
 	}
 
 	cases := map[string]testCase{
 		"no proxy-defaults configured": {
-			srvResponseConfig: consulServerRespCfg{
+			proxyDefaultResource: nil,
+			expectedResponse: expectedResponse{
 				hasProxyDefaults: false,
 			},
 		},
 		"error fetching proxy-defaults": {
-			srvResponseConfig: consulServerRespCfg{
+			proxyDefaultResource: nil,
+			expectedResponse: expectedResponse{
 				errOnProxyDefaults: true,
 			},
 		},
 		"access-logs disabled in proxy-defaults": {
-			srvResponseConfig: consulServerRespCfg{
+			proxyDefaultResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGateway{
+						Mode: "remote",
+					},
+					AccessLogs: &v1alpha1.AccessLogs{
+						Enabled: false,
+					},
+				},
+			},
+			expectedResponse: expectedResponse{
 				hasProxyDefaults: true,
 				accessLogEnabled: false,
 			},
 		},
 		"access-logs enabled but sink is not file type": {
-			srvResponseConfig: consulServerRespCfg{
+			proxyDefaultResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGateway{
+						Mode: "remote",
+					},
+					AccessLogs: &v1alpha1.AccessLogs{
+						Enabled: true,
+						Type:    v1alpha1.DefaultLogSinkType,
+					},
+				},
+			},
+			expectedResponse: expectedResponse{
 				hasProxyDefaults: true,
 				accessLogEnabled: true,
 				fileLogSinkType:  false,
 			},
 		},
 		"file-type access-log enabled with path": {
-			srvResponseConfig: consulServerRespCfg{
+			proxyDefaultResource: &v1alpha1.ProxyDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: v1alpha1.ProxyDefaultsSpec{
+					MeshGateway: v1alpha1.MeshGateway{
+						Mode: "remote",
+					},
+					AccessLogs: &v1alpha1.AccessLogs{
+						Enabled: true,
+						Type:    v1alpha1.FileLogSinkType,
+						Path:    "/var/log/envoy/access.log",
+					},
+				},
+			},
+			expectedResponse: expectedResponse{
 				hasProxyDefaults: true,
 				accessLogEnabled: true,
 				fileLogSinkType:  true,
@@ -356,33 +395,41 @@ func TestAdditionalAccessLogVolumeMount(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewClientBuilder().Build()
-			server, testClient := fakeConsulServer(t, tc.srvResponseConfig)
-			defer server.Close()
+			ctx := context.Background()
+			var fakeClient client.WithWatch
+			s := runtime.NewScheme()
+			require.NoError(t, v1alpha1.AddToScheme(s))
+			if tc.proxyDefaultResource != nil {
+				fakeClient = fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tc.proxyDefaultResource).Build()
+			} else if tc.expectedResponse.errOnProxyDefaults {
+				fakeClient = fake.NewClientBuilder().Build()
+			} else {
+				fakeClient = fake.NewClientBuilder().WithScheme(s).Build()
+			}
 
 			g := &Gatekeeper{
 				Log:          logr.Discard(),
-				Client:       client,
-				ConsulConfig: testClient.Cfg,
+				Client:       fakeClient,
+				ConsulConfig: nil,
 			}
 
 			initialvolume := []corev1.Volume{}
 			initialmount := []corev1.VolumeMount{}
 
-			updatedVolumes, updatedMounts, err := g.additionalAccessLogVolumeMount(initialvolume, initialmount)
-			if tc.srvResponseConfig.errOnProxyDefaults {
+			updatedVolumes, updatedMounts, err := g.additionalAccessLogVolumeMount(ctx, initialvolume, initialmount)
+			if tc.expectedResponse.errOnProxyDefaults {
 				require.Error(t, err)
-				require.ErrorContains(t, err, "error fetching global proxy-defaults")
+				require.ErrorContains(t, err, "error fetching proxy-defaults")
 				return
 			}
 			require.NoError(t, err)
-			if tc.srvResponseConfig.hasProxyDefaults && tc.srvResponseConfig.accessLogEnabled && tc.srvResponseConfig.fileLogSinkType {
+			if tc.expectedResponse.hasProxyDefaults && tc.expectedResponse.accessLogEnabled && tc.expectedResponse.fileLogSinkType {
 				// Expect volume and mount to be added
 				require.Len(t, updatedVolumes, 1)
 				require.Len(t, updatedMounts, 1)
 				require.Equal(t, accessLogVolumeName, updatedVolumes[0].Name)
 				require.Equal(t, accessLogVolumeName, updatedMounts[0].Name)
-				require.Equal(t, filepath.Dir(tc.srvResponseConfig.fileLogPath), updatedMounts[0].MountPath)
+				require.Equal(t, filepath.Dir(tc.expectedResponse.fileLogPath), updatedMounts[0].MountPath)
 			} else {
 				// Expect no additional volume or mount to be added
 				require.Len(t, updatedVolumes, 0)
@@ -390,62 +437,4 @@ func TestAdditionalAccessLogVolumeMount(t *testing.T) {
 			}
 		})
 	}
-}
-
-func fakeConsulServer(t *testing.T, serverResponseConfig consulServerRespCfg) (*httptest.Server, *test.TestServerClient) {
-	t.Helper()
-	mux := buildMux(t, serverResponseConfig)
-	consulServer := httptest.NewServer(mux)
-
-	parsedURL, err := url.Parse(consulServer.URL)
-	require.NoError(t, err)
-	host := strings.Split(parsedURL.Host, ":")[0]
-
-	port, err := strconv.Atoi(parsedURL.Port())
-	require.NoError(t, err)
-
-	cfg := &consul.Config{APIClientConfig: &capi.Config{Address: host}, HTTPPort: port}
-	cfg.APIClientConfig.Address = consulServer.URL
-
-	testClient := &test.TestServerClient{
-		Cfg:     cfg,
-		Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
-	}
-
-	return consulServer, testClient
-}
-
-func buildMux(t *testing.T, cfg consulServerRespCfg) http.Handler {
-	t.Helper()
-	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/config/proxy-defaults/"+capi.ProxyConfigGlobal, func(w http.ResponseWriter, r *http.Request) {
-		if cfg.errOnProxyDefaults {
-			w.WriteHeader(500)
-			return
-		}
-		if !cfg.hasProxyDefaults {
-			w.WriteHeader(404)
-			return
-		}
-		w.WriteHeader(200)
-		accessLogType := capi.DefaultLogSinkType
-		if cfg.fileLogSinkType {
-			accessLogType = capi.FileLogSinkType
-		}
-		proxyDefaults := capi.ProxyConfigEntry{
-			AccessLogs: &capi.AccessLogsConfig{
-				Enabled: cfg.accessLogEnabled,
-				Type:    accessLogType,
-				Path:    cfg.fileLogPath,
-			},
-		}
-		val, err := json.Marshal(proxyDefaults)
-		if err != nil {
-			w.WriteHeader(500)
-			return
-		}
-		w.Write(val)
-	})
-
-	return mux
 }
