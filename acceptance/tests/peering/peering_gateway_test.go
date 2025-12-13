@@ -171,6 +171,42 @@ func TestPeering_Gateway(t *testing.T) {
 		require.NoError(r, err)
 	})
 
+	// Create a ProxyDefaults resource to configure services to use the mesh
+	// gateways.
+	logger.Log(t, "creating proxy-defaults config")
+	kustomizeDir := "../fixtures/cases/api-gateways/mesh"
+
+	k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
+	})
+
+	k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
+	})
+
+	// CHECK if proxy default config for mesh is applied successfully
+	logger.Log(t, "CHECK if proxy-defaults config for mesh is applied successfully")
+	retry.RunWith(timer, t, func(r *retry.R) {
+		// Check server peer
+		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
+		require.NoError(r, err)
+		configEntryServer, ok := ceServer.(*api.ProxyConfigEntry)
+		logger.Logf(t, "Server Proxy default config entry: %+v", configEntryServer)
+		require.True(r, ok)
+		require.Equal(r, api.MeshGatewayModeLocal, configEntryServer.MeshGateway.Mode)
+
+		// Check client peer
+		ceClient, _, err := staticClientPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
+		require.NoError(r, err)
+		configEntryClient, ok := ceClient.(*api.ProxyConfigEntry)
+		logger.Logf(t, "Client Proxy default config entry: %+v", configEntryClient)
+		require.True(r, ok)
+		require.Equal(r, api.MeshGatewayModeLocal, configEntryClient.MeshGateway.Mode)
+	})
+	logger.Log(t, "proxy-defaults config applied successfully")
+
 	// Create the peering acceptor on the client peer.
 	k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -214,42 +250,6 @@ func TestPeering_Gateway(t *testing.T) {
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "delete", "ns", staticClientNamespace)
 	})
-
-	// Create a ProxyDefaults resource to configure services to use the mesh
-	// gateways.
-	logger.Log(t, "creating proxy-defaults config")
-	kustomizeDir := "../fixtures/cases/api-gateways/mesh"
-
-	k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeDir)
-	})
-
-	k8s.KubectlApplyK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
-	})
-
-	// CHECK if proxy default config for mesh is applied successfully
-	logger.Log(t, "CHECK if proxy-defaults config for mesh is applied successfully")
-	retry.RunWith(timer, t, func(r *retry.R) {
-		// Check server peer
-		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
-		require.NoError(r, err)
-		configEntryServer, ok := ceServer.(*api.ProxyConfigEntry)
-		logger.Logf(t, "Server Proxy default config entry: %+v", configEntryServer)
-		require.True(r, ok)
-		require.Equal(r, api.MeshGatewayModeLocal, configEntryServer.MeshGateway.Mode)
-
-		// Check client peer
-		ceClient, _, err := staticClientPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
-		require.NoError(r, err)
-		configEntryClient, ok := ceClient.(*api.ProxyConfigEntry)
-		logger.Logf(t, "Client Proxy default config entry: %+v", configEntryClient)
-		require.True(r, ok)
-		require.Equal(r, api.MeshGatewayModeLocal, configEntryClient.MeshGateway.Mode)
-	})
-	logger.Log(t, "proxy-defaults config applied successfully")
 
 	// We use the static-client pod so that we can make calls to the api gateway
 	// via kubectl exec without needing a route into the cluster from the test machine.
