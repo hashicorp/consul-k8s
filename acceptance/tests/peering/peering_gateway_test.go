@@ -237,7 +237,7 @@ func TestPeering_Gateway(t *testing.T) {
 		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
 		require.NoError(r, err)
 		configEntryServer, ok := ceServer.(*api.ProxyConfigEntry)
-		logger.Log(t, "Server Proxy default config entry: ", configEntryServer)
+		logger.Logf(t, "Server Proxy default config entry: %+v", configEntryServer)
 		require.True(r, ok)
 		require.Equal(r, api.MeshGatewayModeLocal, configEntryServer.MeshGateway.Mode)
 
@@ -245,7 +245,7 @@ func TestPeering_Gateway(t *testing.T) {
 		ceClient, _, err := staticClientPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
 		require.NoError(r, err)
 		configEntryClient, ok := ceClient.(*api.ProxyConfigEntry)
-		logger.Log(t, "Client Proxy default config entry: ", configEntryClient)
+		logger.Logf(t, "Client Proxy default config entry: %+v", configEntryClient)
 		require.True(r, ok)
 		require.Equal(r, api.MeshGatewayModeLocal, configEntryClient.MeshGateway.Mode)
 	})
@@ -296,7 +296,7 @@ func TestPeering_Gateway(t *testing.T) {
 		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ExportedServices, "default", &api.QueryOptions{})
 		require.NoError(r, err)
 		configEntryServer, ok := ceServer.(*api.ExportedServicesConfigEntry)
-		logger.Log(t, "Exported service config entry: ", configEntryServer)
+		logger.Logf(t, "Exported service config entry: %+v", configEntryServer)
 		require.True(r, ok)
 		require.Equal(r, configEntryServer.GetName(), "default")
 		require.NoError(r, err)
@@ -346,10 +346,10 @@ func TestPeering_Gateway(t *testing.T) {
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
 
-		logger.Log(t, "gateway found: \n%s", gateway)
-		logger.Log(t, "gateway specs: \n%s", gateway.Spec)
-		logger.Log(t, "gateway status(condtion, address, listners): \n%s", gateway.Status)
-		logger.Log(t, "gateway address lists: \n%s", gateway.Status.Addresses)
+		logger.Logf(t, "gateway found: \n%+v", gateway)
+		logger.Logf(t, "gateway specs: \n%+v", gateway.Spec)
+		logger.Logf(t, "gateway status(condition, address, listeners): \n%+v", gateway.Status)
+		logger.Logf(t, "gateway address lists: \n%+v", gateway.Status.Addresses)
 	})
 
 	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
