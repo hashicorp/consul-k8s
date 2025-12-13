@@ -230,6 +230,27 @@ func TestPeering_Gateway(t *testing.T) {
 		k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
 	})
 
+	// CHECK if proxy default config for mesh is applied successfully
+	logger.Log(t, "CHECK if proxy-defaults config for mesh is applied successfully")
+	retry.RunWith(timer, t, func(r *retry.R) {
+		// Check server peer
+		ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
+		require.NoError(r, err)
+		configEntryServer, ok := ceServer.(*api.ProxyConfigEntry)
+		logger.Log(t, "Server Proxy default config entry: ", configEntryServer)
+		require.True(r, ok)
+		require.Equal(r, api.MeshGatewayModeLocal, configEntryServer.MeshGateway.Mode)
+
+		// Check client peer
+		ceClient, _, err := staticClientPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
+		require.NoError(r, err)
+		configEntryClient, ok := ceClient.(*api.ProxyConfigEntry)
+		logger.Log(t, "Client Proxy default config entry: ", configEntryClient)
+		require.True(r, ok)
+		require.Equal(r, api.MeshGatewayModeLocal, configEntryClient.MeshGateway.Mode)
+	})
+	logger.Log(t, "proxy-defaults config applied successfully")
+
 	// We use the static-client pod so that we can make calls to the api gateway
 	// via kubectl exec without needing a route into the cluster from the test machine.
 	// Since we're deploying the gateway in the secondary cluster, we create the static client
@@ -339,6 +360,7 @@ func TestPeering_Gateway(t *testing.T) {
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
 	})
+
 	logger.Log(t, "CHECK if MeshService 'mesh-service' exists and is synced")
 	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		// Check that the MeshService exists in Kubernetes
@@ -361,14 +383,32 @@ func TestPeering_Gateway(t *testing.T) {
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 	logger.Log(t, "CHECK if http-route is patched")
-	retry.RunWith(&retry.Counter{Count: 10, Wait: 1 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Count: 10, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		var route gwv1beta1.HTTPRoute
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: staticClientNamespace}, &route)
 		require.NoError(r, err)
-		logger.Log(t, "gateway httproute details after patch:\n%s", route)
 		require.Len(r, route.Spec.Rules, 1, "expected one rule after patching")
 		require.Len(r, route.Spec.Rules[0].BackendRefs, 1, "expected one backendRef after patching")
 		require.Equal(r, "mesh-service", string(route.Spec.Rules[0].BackendRefs[0].Name))
+
+		// Check if the route status and parents exist before trying to access them.
+		require.NotEmpty(r, route.Status.RouteStatus.Parents, "http-route status.parents should not be empty")
+
+		// Find the 'Synced' condition.
+		var syncedCondition metav1.Condition
+		synced := false
+		for _, cond := range route.Status.RouteStatus.Parents[0].Conditions {
+			if cond.Type == string(gwv1beta1.RouteConditionType("Synced")) {
+				syncedCondition = cond
+				synced = true
+				break
+			}
+		}
+
+		// Require that the 'Synced' condition is present and its status is 'True'.
+		// If not, the retry.R will automatically trigger a retry.
+		require.True(r, synced, "The 'Synced' condition is not yet present on the HTTPRoute status")
+		require.Equal(r, metav1.ConditionTrue, syncedCondition.Status, "HTTPRoute 'Synced' condition is not 'True'. Current status: %s, Reason: %s, Message: %s", syncedCondition.Status, syncedCondition.Reason, syncedCondition.Message)
 
 		httproute, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts,
 			"get", "httproute", "http-route",

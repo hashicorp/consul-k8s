@@ -9,4 +9,4 @@ spec:
   config:
     protocol: http
   meshGateway:
-    mode: remote
+    mode: local
