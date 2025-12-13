@@ -394,21 +394,21 @@ func TestPeering_Gateway(t *testing.T) {
 		// Check if the route status and parents exist before trying to access them.
 		require.NotEmpty(r, route.Status.RouteStatus.Parents, "http-route status.parents should not be empty")
 
-		// Find the 'Synced' condition.
-		var syncedCondition metav1.Condition
-		synced := false
+		// Build a map of conditions for easy lookup.
+		conditionMap := make(map[string]metav1.Condition)
 		for _, cond := range route.Status.RouteStatus.Parents[0].Conditions {
-			if cond.Type == string(gwv1beta1.RouteConditionType("Synced")) {
-				syncedCondition = cond
-				synced = true
-				break
-			}
+			conditionMap[cond.Type] = cond
 		}
 
-		// Require that the 'Synced' condition is present and its status is 'True'.
-		// If not, the retry.R will automatically trigger a retry.
-		require.True(r, synced, "The 'Synced' condition is not yet present on the HTTPRoute status")
-		require.Equal(r, metav1.ConditionTrue, syncedCondition.Status, "HTTPRoute 'Synced' condition is not 'True'. Current status: %s, Reason: %s, Message: %s", syncedCondition.Status, syncedCondition.Reason, syncedCondition.Message)
+		// 1. Require that the 'Synced' condition is present and its status is 'True'.
+		syncedCond, ok := conditionMap[string(gwv1beta1.RouteConditionType("Synced"))]
+		require.True(r, ok, "The 'Synced' condition is not yet present on the HTTPRoute status")
+		require.Equal(r, metav1.ConditionTrue, syncedCond.Status, "HTTPRoute 'Synced' condition is not 'True'. Reason: %s, Message: %s", syncedCond.Reason, syncedCond.Message)
+
+		// 2. If 'ConsulAccepted' condition exists, ensure it is not 'False'.
+		if consulAcceptedCond, ok := conditionMap["ConsulAccepted"]; ok {
+			require.NotEqual(r, metav1.ConditionFalse, consulAcceptedCond.Status, "HTTPRoute has a failing 'ConsulAccepted' condition. Reason: %s, Message: %s", consulAcceptedCond.Reason, consulAcceptedCond.Message)
+		}
 
 		httproute, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts,
 			"get", "httproute", "http-route",
