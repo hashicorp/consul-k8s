@@ -429,6 +429,15 @@ func TestPeering_Gateway(t *testing.T) {
 		require.True(r, ok, "config entry is not a service-resolver")
 		logger.Logf(t, "service-resolver config entry: %+v", serviceResolverConfig)
 		require.Equal(r, "static-server", serviceResolverConfig.Name, "service-resolver name mismatch")
+
+		// Verify the redirect is not nil and points to the correct destination.
+		require.NotNil(r, serviceResolverConfig.Redirect, "service-resolver redirect should not be nil")
+		redirect := serviceResolverConfig.Redirect
+		logger.Logf(t, "service-resolver redirect: %+v", redirect)
+
+		require.Equal(r, staticServerName, redirect.Service, "redirect service name mismatch")
+		require.Equal(r, staticServerPeer, redirect.Peer, "redirect peer name mismatch")
+		require.Equal(r, staticServerNamespace, redirect.Namespace, "redirect namespace mismatch")
 	})
 	logger.Log(t, "service-resolver config entry verified")
 
