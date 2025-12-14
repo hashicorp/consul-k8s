@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -27,8 +26,6 @@ import (
 	crlog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
-
-const partitionTokenK8sSecretName = "consul-partition-token"
 
 func TestVault_Partitions(t *testing.T) {
 	crlog.SetLogger(zap.New(zap.UseDevMode(true)))
@@ -204,33 +201,6 @@ func TestVault_Partitions(t *testing.T) {
 	}
 	partitionTokenSecret.SaveSecretAndAddReadPolicy(t, vaultClient)
 
-	_, err = serverClusterCtx.KubernetesClient(t).
-	CoreV1().
-	Secrets(ns).
-	Create(context.Background(), &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      partitionTokenK8sSecretName,
-			Namespace: ns,
-		},
-		StringData: map[string]string{
-			partitionTokenSecret.Key: partitionToken,
-		},
-	}, metav1.CreateOptions{})
-     require.NoError(t, err)
-
-	 pkiReadPolicy := `
-path "pki/*" {
-  capabilities = ["read", "list"]
-}
-
-path "sys/internal/ui/mounts/pki/*" {
-  capabilities = ["read", "list"]
-}
-`
-err = vaultClient.Sys().PutPolicy("consul-pki-read", pkiReadPolicy)
-require.NoError(t, err, "failed to create consul-pki-read policy in Vault")
-logger.Logf(t, "DEBUG: created/updated Vault policy 'consul-pki-read'")
-
 	// -------------------------------------------
 	// Additional Auth Roles in Primary Datacenter
 	// -------------------------------------------
@@ -293,7 +263,7 @@ logger.Logf(t, "DEBUG: created/updated Vault policy 'consul-pki-read'")
 		KubernetesNamespace: ns,
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            consulClientRole,
-		PolicyNames:         fmt.Sprintf("%s,%s,consul-pki-read", gossipSecret.PolicyName, partitionTokenSecret.PolicyName),
+		PolicyNames:         fmt.Sprintf("%s,%s", gossipSecret.PolicyName, partitionTokenSecret.PolicyName),
 	}
 	clientAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
@@ -303,7 +273,7 @@ logger.Logf(t, "DEBUG: created/updated Vault policy 'consul-pki-read'")
 		KubernetesNamespace: ns,
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            manageSystemACLsRole,
-		PolicyNames:         fmt.Sprintf("%s,consul-pki-read", partitionTokenSecret.PolicyName),
+		PolicyNames:         partitionTokenSecret.PolicyName,
 	}
 	aclAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
@@ -315,7 +285,7 @@ logger.Logf(t, "DEBUG: created/updated Vault policy 'consul-pki-read'")
 		KubernetesNamespace: ns,
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            adminPartitionsRole,
-		PolicyNames:         fmt.Sprintf("%s,consul-pki-read", partitionTokenSecret.PolicyName),
+		PolicyNames:         partitionTokenSecret.PolicyName,
 	}
 	prtAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
@@ -368,7 +338,7 @@ logger.Logf(t, "DEBUG: created/updated Vault policy 'consul-pki-read'")
 
 		"global.acls.bootstrapToken.secretName": bootstrapTokenSecret.Path,
 		"global.acls.bootstrapToken.secretKey":  bootstrapTokenSecret.Key,
-		"global.acls.partitionToken.secretName": partitionTokenK8sSecretName,
+		"global.acls.partitionToken.secretName": partitionTokenSecret.Path,
 		"global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
 
 		"server.serverCert.secretName": serverPKIConfig.CertPath,
@@ -395,13 +365,8 @@ logger.Logf(t, "DEBUG: created/updated Vault policy 'consul-pki-read'")
 	consulCluster.Create(t)
 
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
-partitionSvcAddress := getExternalServiceAddress(
-    t,
-    cfg,
-    serverClusterCtx,
-    ns,
-    partitionServiceName,
-)
+	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
+
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
@@ -446,7 +411,7 @@ partitionSvcAddress := getExternalServiceAddress(
 		// FIX: Use the Kubernetes name we decided on above ("consul-partition-token")
 		// Instead of partitionTokenSecret.Path
 		tokenSecret, err := serverClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(
-			context.Background(), partitionTokenK8sSecretName, metav1.GetOptions{})
+			context.Background(), partitionTokenSecret.Path, metav1.GetOptions{})
 
 		if err != nil {
 			logger.Logf(t, "ERROR: Partition token secret not found: consul-partition-token, error: %v", err)
@@ -686,64 +651,3 @@ func testConnectivity(t *testing.T, serverCtx, clientCtx environment.TestContext
 }
 
 
-func getExternalServiceAddress(
-	t *testing.T,
-	cfg *config.TestConfig,
-	ctx environment.TestContext,
-	namespace string,
-	serviceName string,
-) string {
-	t.Helper()
-
-	svc, err := ctx.KubernetesClient(t).
-		CoreV1().
-		Services(namespace).
-		Get(context.Background(), serviceName, metav1.GetOptions{})
-	require.NoError(t, err)
-
-	// Kind → NodePort
-	if cfg.UseKind {
-    require.NotEmpty(t, svc.Spec.Ports)
-    nodePort := svc.Spec.Ports[0].NodePort
-    require.NotZero(t, nodePort)
-
-    // Use the helper on the env/context to return a reachable node IP.
-    // The environment helper should exist in your framework (previous suggestions used ctx.NodeIP(t)).
-    // If your ctx has a NodeIP method, use it; otherwise query the first node's address below.
-    if getter, ok := interface{}(ctx).(interface{ NodeIP(*testing.T) string }); ok {
-        nodeIP := getter.NodeIP(t)
-        return fmt.Sprintf("%s:%d", nodeIP, nodePort)
-    }
-
-    // Fallback: look up the first node's address from the API
-    nodes, err := ctx.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-    require.NoError(t, err)
-    require.NotEmpty(t, nodes.Items)
-    // pick first external/internal address available
-    var nodeIP string
-    for _, addr := range nodes.Items[0].Status.Addresses {
-        if addr.Type == corev1.NodeExternalIP || addr.Type == corev1.NodeInternalIP {
-            nodeIP = addr.Address
-            break
-        }
-    }
-    require.NotEmpty(t, nodeIP)
-    return fmt.Sprintf("%s:%d", nodeIP, nodePort)
-}
-
-	// Non-kind → LoadBalancer
-	require.NotEmpty(t, svc.Status.LoadBalancer.Ingress)
-	ingress := svc.Status.LoadBalancer.Ingress[0]
-
-	port := svc.Spec.Ports[0].Port
-
-	if ingress.IP != "" {
-		return fmt.Sprintf("%s:%d", ingress.IP, port)
-	}
-	if ingress.Hostname != "" {
-		return fmt.Sprintf("%s:%d", ingress.Hostname, port)
-	}
-
-	t.Fatalf("service %s has no external address", serviceName)
-	return ""
-}
