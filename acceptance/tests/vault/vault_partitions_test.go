@@ -293,7 +293,7 @@ path "%s/cert/ca" {
 		KubernetesNamespace: ns,
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            consulClientRole,
-		PolicyNames:         fmt.Sprintf("%s,%s", gossipSecret.PolicyName, partitionTokenSecret.PolicyName),
+        PolicyNames:         fmt.Sprintf("%s,%s,%s", gossipSecret.PolicyName, partitionTokenSecret.PolicyName, pkiCAReadPolicyName),
 	}
 	clientAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
@@ -315,7 +315,7 @@ path "%s/cert/ca" {
 		KubernetesNamespace: ns,
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
 		RoleName:            adminPartitionsRole,
-		PolicyNames:         partitionTokenSecret.PolicyName,
+		PolicyNames:         fmt.Sprintf("%s,%s", partitionTokenSecret.PolicyName, pkiCAReadPolicyName),
 	}
 	prtAuthRoleConfigSecondary.ConfigureK8SAuthRole(t, vaultClient)
 
@@ -395,8 +395,40 @@ path "%s/cert/ca" {
 	consulCluster.Create(t)
 
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
-	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
+var partitionSvcAddress string
 
+    // Wait for LoadBalancer IP to be assigned (retry for up to 2 minutes)
+    logger.Logf(t, "Waiting for Service %s to be assigned an external IP...", partitionServiceName)
+    require.Eventually(t, func() bool {
+        svc, err := serverClusterCtx.KubernetesClient(t).CoreV1().Services(ns).Get(
+            context.Background(), partitionServiceName, metav1.GetOptions{})
+        if err != nil {
+            return false
+        }
+
+        // 1. Check for Cloud LoadBalancer IP
+        if len(svc.Status.LoadBalancer.Ingress) > 0 {
+            if svc.Status.LoadBalancer.Ingress[0].IP != "" {
+                partitionSvcAddress = svc.Status.LoadBalancer.Ingress[0].IP
+            } else {
+                partitionSvcAddress = svc.Status.LoadBalancer.Ingress[0].Hostname
+            }
+            partitionSvcAddress = fmt.Sprintf("%s:8501", partitionSvcAddress)
+            return true
+        }
+
+        // 2. Fallback for Kind (NodePort)
+        if cfg.UseKind {
+            // In Kind, we don't wait for Ingress status, we just use the helper
+            partitionSvcAddress = k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
+            return true
+        }
+
+        return false
+    }, 2*time.Minute, 5*time.Second, "Service %s did not receive a LoadBalancer IP", partitionServiceName)
+
+    logger.Logf(t, "Using Partition Service Address: %s", partitionSvcAddress)
+	
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
