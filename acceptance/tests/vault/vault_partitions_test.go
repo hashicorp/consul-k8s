@@ -169,6 +169,15 @@ func TestVault_Partitions(t *testing.T) {
 	}
 	serverPKIConfig.ConfigurePKIAndAuthRole(t, vaultClient)
 
+	pkiCAReadPolicyName := "read-pki-ca"
+    pkiCAReadPolicy := fmt.Sprintf(`
+path "%s/cert/ca" {
+    capabilities = ["read"]
+}
+`, serverPKIConfig.BaseURL)
+    err = vaultClient.Sys().PutPolicy(pkiCAReadPolicyName, pkiCAReadPolicy)
+    require.NoError(t, err)
+
 	// -------------------------
 	// KV2 secrets
 	// -------------------------
@@ -220,7 +229,13 @@ func TestVault_Partitions(t *testing.T) {
 	// Additional Auth Roles in Primary Datacenter
 	// -------------------------------------------
 	consulServerRole := "server"
-	serverPolicies := fmt.Sprintf("%s,%s,%s,%s,%s", gossipSecret.PolicyName, connectCAPolicy, serverPKIConfig.PolicyName, bootstrapTokenSecret.PolicyName, partitionTokenSecret.PolicyName)
+	serverPolicies := fmt.Sprintf("%s,%s,%s,%s,%s,%s", 
+        gossipSecret.PolicyName, 
+        connectCAPolicy, 
+        serverPKIConfig.PolicyName, 
+        bootstrapTokenSecret.PolicyName, 
+        partitionTokenSecret.PolicyName,
+        pkiCAReadPolicyName)
 	if cfg.EnableEnterprise {
 		serverPolicies += fmt.Sprintf(",%s", licenseSecret.PolicyName)
 	}
