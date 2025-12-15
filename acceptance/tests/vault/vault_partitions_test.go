@@ -396,13 +396,13 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
 		"client.enabled": "true",
-		"client.join[0]": partitionSvcAddress,
+		// client.join is intentionally NOT set for admin partitions.
+		// Clients in non-default partitions communicate with servers via gRPC (externalServers.hosts),
+		// not via Serf gossip. Setting client.join would cause clients to attempt gossip communication
+		// with server IPs that may not be routable across clusters.
 	}
 
 	if cfg.UseKind {
-		// On Kind, expose gossip ports as hostPorts so clients can communicate
-		// using the hostIP which is routable on the shared docker bridge network.
-		clientHelmValues["client.exposeGossipPorts"] = "true"
 		clientHelmValues["externalServers.httpsPort"] = "30000"
 		clientHelmValues["meshGateway.service.type"] = "NodePort"
 		clientHelmValues["meshGateway.service.nodePort"] = "30100"
