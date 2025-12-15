@@ -335,8 +335,7 @@ func TestVault_Partitions(t *testing.T) {
 		"global.acls.partitionToken.secretName": partitionTokenSecret.Path,
 		"global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
 
-		"server.exposeGossipAndRPCPorts": "true",
-		"server.serverCert.secretName":   serverPKIConfig.CertPath,
+		"server.serverCert.secretName": serverPKIConfig.CertPath,
 
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,
@@ -346,7 +345,10 @@ func TestVault_Partitions(t *testing.T) {
 	// On Kind, there are no load balancers but since all clusters
 	// share the same node network (docker bridge), we can use
 	// a NodePort service so that we can access node(s) in a different Kind cluster.
+	// We also need to expose gossip and RPC ports as hostPorts so that the hostIP
+	// (which is routable across Kind clusters on the docker bridge) is advertised.
 	if cfg.UseKind {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 		serverHelmValues["meshGateway.service.type"] = "NodePort"
 		serverHelmValues["meshGateway.service.nodePort"] = "30100"
 		serverHelmValues["server.exposeService.type"] = "NodePort"
@@ -393,12 +395,14 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
-		"client.enabled":           "true",
-		"client.exposeGossipPorts": "true",
-		"client.join[0]":           partitionSvcAddress,
+		"client.enabled": "true",
+		"client.join[0]": partitionSvcAddress,
 	}
 
 	if cfg.UseKind {
+		// On Kind, expose gossip ports as hostPorts so clients can communicate
+		// using the hostIP which is routable on the shared docker bridge network.
+		clientHelmValues["client.exposeGossipPorts"] = "true"
 		clientHelmValues["externalServers.httpsPort"] = "30000"
 		clientHelmValues["meshGateway.service.type"] = "NodePort"
 		clientHelmValues["meshGateway.service.nodePort"] = "30100"
