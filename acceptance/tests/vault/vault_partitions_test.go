@@ -395,6 +395,7 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
+		"server.enabled": "false",
 		"client.enabled": "true",
 		// client.join is intentionally NOT set for admin partitions.
 		// Clients in non-default partitions communicate with servers via gRPC (externalServers.hosts),
