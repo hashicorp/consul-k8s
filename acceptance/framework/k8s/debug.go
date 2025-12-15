@@ -51,8 +51,8 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			logger.Log(t, "unable to list API Gateway pods", "err", err)
 		} else {
 			logger.Logf(t, "found %d api gateway pods to collect logs from", len(apiGwPods.Items))
-			logger.Log(t, "api-gw are", apiGwPods)
 			for _, pod := range apiGwPods.Items {
+				logger.Log(t, "api-gw: ", pod.Name)
 				// Describe pod and write it to a file.
 				writeResourceInfoToFile(t, pod.Name, "pod", testDebugDirectory, kubectlOptions)
 
