@@ -117,6 +117,21 @@ func TestVault_Partitions(t *testing.T) {
 			}, metav1.CreateOptions{})
 			require.NoError(t, err)
 		}
+		
+		logger.Logf(t, "Waiting for ServiceAccount token secret %s to be populated...", authMethodRBACName)
+        require.Eventually(t, func() bool {
+            secret, err := clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Get(context.Background(), authMethodRBACName, metav1.GetOptions{})
+            if err != nil {
+                return false
+            }
+            // Check if data exists and "token" key is present and not empty
+            if secret.Data == nil {
+                return false
+            }
+            token, ok := secret.Data["token"]
+            return ok && len(token) > 0
+        }, 30*time.Second, 1*time.Second, "ServiceAccount token was not populated in time")
+
 		t.Cleanup(func() {
 			clientClusterCtx.KubernetesClient(t).RbacV1().ClusterRoleBindings().Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
 			clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).Delete(context.Background(), authMethodRBACName, metav1.DeleteOptions{})
