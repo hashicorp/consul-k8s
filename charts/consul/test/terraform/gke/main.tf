@@ -61,14 +61,14 @@ resource "google_container_cluster" "cluster" {
   subnetwork = google_compute_subnetwork.subnet[count.index].self_link
   
   # Explicitly set pod CIDR ranges to ensure they don't overlap and can be routed
+  # GKE requires at least /21 for cluster CIDR
   ip_allocation_policy {
-    cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/16", 8, count.index)
+    cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/14", 2, count.index)
   }
   
   resource_labels     = var.labels
   deletion_protection = false
 }
-
 
 resource "google_compute_firewall" "firewall-rules" {
   project     = var.project
