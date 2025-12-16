@@ -90,28 +90,8 @@ resource "google_compute_firewall" "firewall-rules" {
   target_tags = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
 }
 
-# Add routes so that pod traffic from one cluster can reach pods in the other cluster
-resource "google_compute_route" "pod-route-0-to-1" {
-  count            = var.cluster_count > 1 ? 1 : 0
-  name             = "pod-route-0-to-1-${random_string.cluster_prefix.result}"
-  dest_range       = google_container_cluster.cluster[1].cluster_ipv4_cidr
-  network          = google_compute_network.custom_network.name
-  next_hop_gateway = "default-internet-gateway"
-  priority         = 1000
-  
-  depends_on = [google_container_cluster.cluster]
-}
-
-resource "google_compute_route" "pod-route-1-to-0" {
-  count            = var.cluster_count > 1 ? 1 : 0
-  name             = "pod-route-1-to-0-${random_string.cluster_prefix.result}"
-  dest_range       = google_container_cluster.cluster[0].cluster_ipv4_cidr
-  network          = google_compute_network.custom_network.name
-  next_hop_gateway = "default-internet-gateway"
-  priority         = 1000
-  
-  depends_on = [google_container_cluster.cluster]
-}
+# GKE automatically creates routes for Pod CIDR ranges within the same VPC network
+# No manual routes needed - the firewall rules above allow the traffic
 
 resource "null_resource" "kubectl" {
   count = var.init_cli ? var.cluster_count : 0
