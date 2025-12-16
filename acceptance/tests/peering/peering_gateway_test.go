@@ -95,6 +95,12 @@ func TestPeering_Gateway(t *testing.T) {
 		// 	// staticServerPeerHelmValues["meshGateway.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-internal"] = "true"
 		// 	staticServerPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal: \"true\""
 		// }
+
+		if cfg.UseEKS {
+			staticServerPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-type: \"external\""
+			staticServerPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: \"instance\""
+		}
+
 		helpers.MergeMaps(staticServerPeerHelmValues, commonHelmValues)
 
 		// Install the first peer where static-server will be deployed in the static-server kubernetes context.
@@ -125,6 +131,12 @@ func TestPeering_Gateway(t *testing.T) {
 		// 	// staticClientPeerHelmValues["meshGateway.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-internal"] = "true"
 		// 	staticClientPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-internal: \"true\""
 		// }
+
+		if cfg.UseEKS {
+			staticClientPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-type: \"external\""
+			staticClientPeerHelmValues["meshGateway.service.annotations"] = "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: \"instance\""
+		}
+
 		helpers.MergeMaps(staticClientPeerHelmValues, commonHelmValues)
 
 		// Install the second peer where static-client will be deployed in the static-client kubernetes context.
