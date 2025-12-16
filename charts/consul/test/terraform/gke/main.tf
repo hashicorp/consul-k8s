@@ -63,6 +63,9 @@ resource "google_container_cluster" "cluster" {
     machine_type = "e2-standard-8"
   }
   subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
+    ip_allocation_policy {
+    cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/14", 2, count.index)
+  }
   resource_labels     = var.labels
   deletion_protection = false
 }
@@ -80,9 +83,11 @@ resource "google_compute_firewall" "firewall-rules" {
     protocol = "all"
   }
 
-  source_ranges = [google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr]
-  source_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index == 0 ? 1 : 0}"]
-  target_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index}"]
+  source_ranges = [
+    google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr,
+    google_compute_subnetwork.subnet[count.index == 0 ? 1 : 0].ip_cidr_range
+  ]
+  target_tags = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
 }
 
 resource "null_resource" "kubectl" {
