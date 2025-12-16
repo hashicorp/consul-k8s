@@ -194,8 +194,7 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
 
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
 	enableDNSProxy bool, port string, dnsFileName string) {
-	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
-	require.NoError(t, err)
+	dnsIP := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 
 	dnsTarget := dnsIP
 	if enableDNSProxy {
@@ -295,15 +294,26 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 	})
 }
 
-func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {
+func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) string {
 	logger.Log(t, "get the in cluster dns service or proxy.")
 	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
 	if enableDNSProxy {
 		dnsSvcName += "-proxy"
 	}
-	dnsService, err := requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
-	require.NoError(t, err)
-	return dnsService.Spec.ClusterIP, err
+	
+	var dnsService *corev1.Service
+	var clusterIP string
+	
+	// Retry getting the DNS service with timeout as it might not be immediately available
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
+		var err error
+		dnsService, err = requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
+		require.NoError(r, err)
+		require.NotEmpty(r, dnsService.Spec.ClusterIP, "DNS service ClusterIP should not be empty")
+		clusterIP = dnsService.Spec.ClusterIP
+	})
+	
+	return clusterIP
 }
 
 // validateDNSProxyPrivilegedPort validates that the consul-dns-proxy pod is correctly configured
