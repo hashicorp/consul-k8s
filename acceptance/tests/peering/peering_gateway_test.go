@@ -195,7 +195,7 @@ func TestPeering_Gateway(t *testing.T) {
 		configEntryServer, ok := ceServer.(*api.ProxyConfigEntry)
 		logger.Logf(t, "Server Proxy default config entry: %+v", configEntryServer)
 		require.True(r, ok)
-		require.Equal(r, api.MeshGatewayModeRemote, configEntryServer.MeshGateway.Mode)
+		require.Equal(r, api.MeshGatewayModeLocal, configEntryServer.MeshGateway.Mode)
 
 		// Check client peer
 		ceClient, _, err := staticClientPeerClient.ConfigEntries().Get(api.ProxyDefaults, "global", &api.QueryOptions{})
@@ -203,7 +203,7 @@ func TestPeering_Gateway(t *testing.T) {
 		configEntryClient, ok := ceClient.(*api.ProxyConfigEntry)
 		logger.Logf(t, "Client Proxy default config entry: %+v", configEntryClient)
 		require.True(r, ok)
-		require.Equal(r, api.MeshGatewayModeRemote, configEntryClient.MeshGateway.Mode)
+		require.Equal(r, api.MeshGatewayModeLocal, configEntryClient.MeshGateway.Mode)
 	})
 	logger.Log(t, "proxy-defaults config applied successfully")
 
