@@ -361,8 +361,20 @@ path "%s/cert/ca" {
     partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
 
     // --- FIX: Split IP and Port for Helm values ---
-    partitionHost, partitionPort, err := net.SplitHostPort(partitionSvcAddress)
-    require.NoError(t, err, "failed to split partition service address")
+var partitionHost, partitionPort string
+    if strings.Contains(partitionSvcAddress, ":") {
+        // Case: NodePort or explicit port (e.g., 10.0.0.1:30000)
+        host, port, err := net.SplitHostPort(partitionSvcAddress)
+        require.NoError(t, err, "failed to split partition service address")
+        partitionHost = host
+        partitionPort = port
+    } else {
+        // Case: LoadBalancer IP only (e.g., 35.193.139.65)
+        // We default to 8501 because that is the standard HTTPS port for the exposed server service
+        partitionHost = partitionSvcAddress
+        partitionPort = "8501"
+    }
+    logger.Logf(t, "Partition Service Config - Host: %s, Port: %s", partitionHost, partitionPort)
     // ----------------------------------------------
 
     k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
