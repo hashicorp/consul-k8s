@@ -91,6 +91,7 @@ resource "null_resource" "kubectl" {
   # might fail if the credentials are already cleaned up or something so we
   # want this to continue on failure. Generally, this works just fine since
   # it only operates on local data.
+
   provisioner "local-exec" {
     when       = destroy
     on_failure = continue
