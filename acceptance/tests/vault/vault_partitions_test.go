@@ -325,8 +325,6 @@ func TestVault_Partitions(t *testing.T) {
 	}
 
 	serverHelmValues := map[string]string{
-		"server.replicas": "1",
-
 		"global.secretsBackend.vault.consulServerRole":              consulServerRole,
 		"global.secretsBackend.vault.connectCA.address":             serverClusterVault.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
@@ -337,7 +335,8 @@ func TestVault_Partitions(t *testing.T) {
 		"global.acls.partitionToken.secretName": partitionTokenSecret.Path,
 		"global.acls.partitionToken.secretKey":  partitionTokenSecret.Key,
 
-		"server.serverCert.secretName": serverPKIConfig.CertPath,
+		"server.exposeGossipAndRPCPorts": "true",
+		"server.serverCert.secretName":   serverPKIConfig.CertPath,
 
 		"server.extraVolumes[0].type": "secret",
 		"server.extraVolumes[0].name": vaultCASecretName,
@@ -347,18 +346,11 @@ func TestVault_Partitions(t *testing.T) {
 	// On Kind, there are no load balancers but since all clusters
 	// share the same node network (docker bridge), we can use
 	// a NodePort service so that we can access node(s) in a different Kind cluster.
-	// We also need to expose gossip and RPC ports as hostPorts so that the hostIP
-	// (which is routable across Kind clusters on the docker bridge) is advertised.
 	if cfg.UseKind {
-		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 		serverHelmValues["meshGateway.service.type"] = "NodePort"
 		serverHelmValues["meshGateway.service.nodePort"] = "30100"
 		serverHelmValues["server.exposeService.type"] = "NodePort"
 		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
-	} else {
-		// On GKE/cloud providers, enable exposeService so servers advertise the LoadBalancer IP
-		// instead of their pod IPs, making them reachable from clients in other clusters.
-		serverHelmValues["server.exposeService.enabled"] = "true"
 	}
 
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)
@@ -401,8 +393,9 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
-		"client.enabled": "true",
-		"server.enabled": "false",
+		"client.enabled":           "true",
+		"client.exposeGossipPorts": "true",
+		"client.join[0]":           partitionSvcAddress,
 	}
 
 	if cfg.UseKind {

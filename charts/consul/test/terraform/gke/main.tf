@@ -58,7 +58,13 @@ resource "google_container_cluster" "cluster" {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
-  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
+  subnetwork = google_compute_subnetwork.subnet[count.index].self_link
+  
+  # Explicitly set pod CIDR ranges to ensure they don't overlap and can be routed
+  ip_allocation_policy {
+    cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/16", 8, count.index)
+  }
+  
   resource_labels     = var.labels
   deletion_protection = false
 }
@@ -76,9 +82,35 @@ resource "google_compute_firewall" "firewall-rules" {
     protocol = "all"
   }
 
-  source_ranges = [google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr]
-  source_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index == 0 ? 1 : 0}"]
-  target_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index}"]
+  # Allow traffic from the other cluster's pod CIDR and subnet CIDR
+  source_ranges = [
+    google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr,
+    google_compute_subnetwork.subnet[count.index == 0 ? 1 : 0].ip_cidr_range
+  ]
+  target_tags = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
+}
+
+# Add routes so that pod traffic from one cluster can reach pods in the other cluster
+resource "google_compute_route" "pod-route-0-to-1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  name             = "pod-route-0-to-1-${random_string.cluster_prefix.result}"
+  dest_range       = google_container_cluster.cluster[1].cluster_ipv4_cidr
+  network          = google_compute_network.custom_network.name
+  next_hop_gateway = "default-internet-gateway"
+  priority         = 1000
+  
+  depends_on = [google_container_cluster.cluster]
+}
+
+resource "google_compute_route" "pod-route-1-to-0" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  name             = "pod-route-1-to-0-${random_string.cluster_prefix.result}"
+  dest_range       = google_container_cluster.cluster[0].cluster_ipv4_cidr
+  network          = google_compute_network.custom_network.name
+  next_hop_gateway = "default-internet-gateway"
+  priority         = 1000
+  
+  depends_on = [google_container_cluster.cluster]
 }
 
 resource "null_resource" "kubectl" {
