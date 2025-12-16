@@ -325,6 +325,8 @@ func TestVault_Partitions(t *testing.T) {
 	}
 
 	serverHelmValues := map[string]string{
+		"server.replicas": "1",
+
 		"global.secretsBackend.vault.consulServerRole":              consulServerRole,
 		"global.secretsBackend.vault.connectCA.address":             serverClusterVault.Address(),
 		"global.secretsBackend.vault.connectCA.rootPKIPath":         connectCARootPath,
@@ -353,6 +355,10 @@ func TestVault_Partitions(t *testing.T) {
 		serverHelmValues["meshGateway.service.nodePort"] = "30100"
 		serverHelmValues["server.exposeService.type"] = "NodePort"
 		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
+	} else {
+		// On GKE/cloud providers, enable exposeService so servers advertise the LoadBalancer IP
+		// instead of their pod IPs, making them reachable from clients in other clusters.
+		serverHelmValues["server.exposeService.enabled"] = "true"
 	}
 
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)
@@ -394,18 +400,6 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.hosts[0]":          partitionSvcAddress,
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
-
-		"server.enabled": "false",
-		"client.enabled": "true",
-		// client.join is intentionally NOT set for admin partitions.
-		// Clients in non-default partitions communicate with servers via gRPC (externalServers.hosts),
-		// not via Serf gossip. Setting client.join would cause clients to attempt gossip communication
-		// with server IPs that may not be routable across clusters.
-
-		// Disable auto-encrypt for clients in secondary partitions.
-		// Auto-encrypt requires local servers to obtain certificates, but secondary partition clients
-		// have no local servers. Instead, they use Vault-provided certificates.
-		"global.tls.enableAutoEncrypt": "false",
 	}
 
 	if cfg.UseKind {
