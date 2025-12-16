@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -184,318 +183,116 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 }
 
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
-    actualName := getCoreDNSConfigMapName(t, ctx)
+	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, port, "coredns-custom.yaml")
+	updateCoreDNS(t, ctx, "coredns-custom.yaml")
 
-    // 1. BACKUP: Capture the current state
-    logger.Log(t, "Backing up original CoreDNS config...")
-    originalConfig, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), 
-        "get", "configmap", actualName, "-n", "kube-system", "-o", "yaml")
-    require.NoError(t, err)
-
-    // --- FIX: Sanitize the YAML to remove version locking ---
-    // We remove fields that cause "Conflict" errors during restore.
-    lines := strings.Split(originalConfig, "\n")
-    var sanitizedLines []string
-    for _, line := range lines {
-        trimmed := strings.TrimSpace(line)
-        // Skip metadata fields that tie the file to a specific point in time
-        if strings.HasPrefix(trimmed, "resourceVersion:") ||
-           strings.HasPrefix(trimmed, "uid:") ||
-           strings.HasPrefix(trimmed, "creationTimestamp:") ||
-           strings.HasPrefix(trimmed, "generation:") {
-            continue
-        }
-        sanitizedLines = append(sanitizedLines, line)
-    }
-    cleanConfig := strings.Join(sanitizedLines, "\n")
-    // ---------------------------------------------------------
-
-    // Write the sanitized backup file
-    err = os.WriteFile("coredns-original.yaml", []byte(cleanConfig), 0644)
-    require.NoError(t, err)
-
-    // 2. GENERATE & APPLY Custom Config
-    updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, port, "coredns-custom.yaml")
-    updateCoreDNS(t, ctx, "coredns-custom.yaml")
-
-    // 3. CLEANUP: Restore the backup
-    t.Cleanup(func() {
-        logger.Log(t, "Restoring original CoreDNS configuration...")
-        updateCoreDNS(t, ctx, "coredns-original.yaml")
-        time.Sleep(5 * time.Second)
-    })
+	t.Cleanup(func() {
+		updateCoreDNS(t, ctx, "coredns-original.yaml")
+		time.Sleep(5 * time.Second)
+	})
 }
 
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
-    enableDNSProxy bool, port string, dnsFileName string) {
-    
-    // Calculate target IP
-    dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
-    require.NoError(t, err)
-    
-    actualName := getCoreDNSConfigMapName(t, ctx)
+	enableDNSProxy bool, port string, dnsFileName string) {
+	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
+	require.NoError(t, err)
 
-    dnsTarget := dnsIP
-    if enableDNSProxy {
-        dnsTarget = net.JoinHostPort(dnsIP, port)
-    }
+	dnsTarget := dnsIP
+	if enableDNSProxy {
+		dnsTarget = net.JoinHostPort(dnsIP, port)
+	}
 
-    // --- STRATEGY A: GKE / Legacy (kube-dns) ---
-    // GKE ignores Corefile changes or breaks if we overwrite it. We must use stubDomains.
-    if strings.Contains(actualName, "kube-dns") {
-        logger.Log(t, "Detected GKE/kube-dns. Using stubDomains strategy.", "target", dnsTarget)
-        
-        // stubDomains expects a JSON map: domain -> [ips]
-        stubDomainJSON := fmt.Sprintf(`{"consul": ["%s"]}`, dnsTarget)
-        
-        // We create a ConfigMap that ONLY updates the "stubDomains" key.
-        // This merges safely with GKE's internal config.
-        configMapYAML := fmt.Sprintf(`
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: %s
-  namespace: kube-system
-data:
-  stubDomains: |
-    %s
-`, actualName, stubDomainJSON)
-
-        err = os.WriteFile(dnsFileName, []byte(configMapYAML), 0644)
-        require.NoError(t, err)
-        return
-    }
-
-    // --- STRATEGY B: EKS / AKS / Standard (coredns) ---
-    // Standard clusters allow us to overwrite the Corefile.
-    logger.Log(t, "Detected Standard CoreDNS. Using Corefile template strategy.", "target", dnsTarget)
-
-    input, err := os.ReadFile("coredns-template.yaml")
-    require.NoError(t, err)
-    
-    newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
-    newContents = strings.ReplaceAll(newContents, "name: coredns", fmt.Sprintf("name: %s", actualName))
-
-    err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
-    require.NoError(t, err)
+	input, err := os.ReadFile("coredns-template.yaml")
+	require.NoError(t, err)
+	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
+	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
+	require.NoError(t, err)
 }
 
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
-    actualName := getCoreDNSConfigMapName(t, ctx)
+	coreDNSCommand := []string{
+		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
+	}
+	var logs string
 
-    // --- STEP 0: PATCH THE FILE ---
-    content, err := os.ReadFile(coreDNSConfigFile)
-    require.NoError(t, err)
+	timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		var err error
+		logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
+		require.NoError(r, err)
+	})
 
-    strContent := string(content)
-    fileChanged := false
-
-    // Ensure name matches the cluster (kube-dns vs coredns)
-    if actualName == "kube-dns" && strings.Contains(strContent, "name: coredns") {
-        logger.Log(t, "Patching config file to target kube-dns instead of coredns")
-        strContent = strings.ReplaceAll(strContent, "name: coredns", "name: kube-dns")
-        fileChanged = true
-    } else if actualName == "coredns" && strings.Contains(strContent, "name: kube-dns") {
-        logger.Log(t, "Patching config file to target coredns instead of kube-dns")
-        strContent = strings.ReplaceAll(strContent, "name: kube-dns", "name: coredns")
-        fileChanged = true
-    } else if actualName == "rke2-coredns" && !strings.Contains(strContent, "name: rke2-coredns") {
-         logger.Log(t, "Patching config file to target rke2-coredns")
-         strContent = strings.ReplaceAll(strContent, "name: coredns", "name: rke2-coredns")
-         fileChanged = true
-    }
-
-    if fileChanged {
-        err = os.WriteFile(coreDNSConfigFile, []byte(strContent), 0644)
-        require.NoError(t, err)
-    }
-
-    // --- STEP 1: APPLY ---
-    coreDNSCommand := []string{
-        "apply", "-n", "kube-system", "-f", coreDNSConfigFile, 
-    }
-    var logs string
-
-    timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
-    retry.RunWith(timer, t, func(r *retry.R) {
-        var err error
-        logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
-        require.NoError(r, err)
-    })
-
-    // --- STEP 2: VALIDATE OUTPUT ---
-    msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
-    msgReplaced := fmt.Sprintf("configmap/%s replaced", actualName)
-    msgUnchanged := fmt.Sprintf("configmap/%s unchanged", actualName)
-
-    require.True(t, 
-        strings.Contains(logs, msgConfigured) || strings.Contains(logs, msgReplaced) || strings.Contains(logs, msgUnchanged), 
-        "expected CoreDNS update output to contain '%s', '%s', or '%s' but got: \n%s", 
-        msgConfigured, msgReplaced, msgUnchanged, logs)
-
-    // --- STEP 3: RESTART DEPLOYMENT ---
-    deploymentName := "deployment/coredns"
-    if strings.Contains(actualName, "kube-dns") {
-        deploymentName = "deployment/kube-dns"
-    } else if strings.Contains(actualName, "rke2") {
-        deploymentName = "deployment/rke2-coredns"
-    }
-
-    logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
-
-    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system"}
-    _, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
-    require.NoError(t, err)
-
-    // --- STEP 4: WAIT FOR ROLLOUT ---
-    out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", deploymentName, "-n", "kube-system")
-    require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
-}
-
-func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
-    client := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system")
-    ctxBg := context.Background()
-
-    // 1. Check Labels (Standard method)
-    labelSelectors := []string{
-        "k8s-app=coredns",
-        "app.kubernetes.io/name=coredns",
-        "k8s-app=kube-dns", 
-    }
-
-    for _, label := range labelSelectors {
-        cms, err := client.List(ctxBg, metav1.ListOptions{LabelSelector: label})
-        if err == nil && len(cms.Items) > 0 {
-            for _, cm := range cms.Items {
-                if _, ok := cm.Data["Corefile"]; ok {
-                    logger.Log(t, "found DNS configmap via label with Corefile", "label", label, "name", cm.Name)
-                    return cm.Name
-                }
-            }
-        }
-    }
-
-    // 2. Check Known Names (Fallback for GKE)
-    knownNames := []string{"coredns", "kube-dns", "rke2-coredns"}
-    for _, name := range knownNames {
-        cm, err := client.Get(ctxBg, name, metav1.GetOptions{})
-        if err == nil {
-            logger.Log(t, "found DNS configmap via name", "name", cm.Name)
-            return cm.Name
-        }
-    }
-
-    // Debugging failure
-    cms, err := client.List(ctxBg, metav1.ListOptions{})
-    var observedNames []string
-    if err == nil {
-        for _, cm := range cms.Items {
-            observedNames = append(observedNames, cm.Name)
-        }
-    }
-    t.Fatalf("Failed to find CoreDNS ConfigMap. Checked labels: %v, Checked names: %v. Available: %v", 
-        labelSelectors, knownNames, observedNames)
-    return ""
+	require.Contains(t, logs, "configmap/coredns replaced")
+	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
+	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
+	require.NoError(t, err)
+	// Wait for restart to finish.
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "1m", "--watch", "deployment/coredns", "-n", "kube-system")
+	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 
 func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
-    podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
+	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
+	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: podLabelSelector,
+	})
+	require.NoError(t, err)
 
-    // 1. Fetch expected IPs
-    podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
-        LabelSelector: podLabelSelector,
-    })
-    require.NoError(t, err)
+	servicePodIPs := make([]string, len(podList.Items))
+	for i, serverPod := range podList.Items {
+		servicePodIPs[i] = serverPod.Status.PodIP
+	}
 
-    servicePodIPs := make([]string, len(podList.Items))
-    for i, serverPod := range podList.Items {
-        servicePodIPs[i] = serverPod.Status.PodIP
-    }
+	logger.Log(t, "launch a pod to test the dns resolution.")
+	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
+	dnsTestPodArgs := []string{
+		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
+	}
 
-    // Unique name for the test pod
-    dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
+	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
+	})
 
-    // Ensure cleanup happens at the end of the test function
-    t.Cleanup(func() {
-        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
-    })
+	retry.Run(t, func(r *retry.R) {
+		logger.Log(t, "run the dns utilize pod and query DNS for the service.")
+		logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
+		require.NoError(r, err)
 
-    // --- FIX 1: Increase Retry Timeout ---
-    // Creating/Deleting pods is slow. Default retry is too short. 
-    // We give it 2 minutes with 5s wait between attempts.
-    timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}
+		// When the `dig` request is successful, a section of it's response looks like the following:
+		//
+		// ;; ANSWER SECTION:
+		// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
+		//
+		// ;; Query time: 2 msec
+		// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
+		// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
+		// ;; MSG SIZE  rcvd: 98
+		//
+		// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
 
-    retry.RunWith(timer, t, func(r *retry.R) {
-        logger.Log(t, "run the dns utilize pod and query DNS for the service.")
-
-        // --- STEP 1: Pre-cleanup ---
-        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
-
-        // --- STEP 2: Run Pod (Detached Mode with Shell Delay) ---
-        // FIX 2: Use "sh -c" to sleep 5s before dig. Allows network to stabilize.
-        // FIX 3: Add +tries=5 +time=3 to dig to handle transient DNS drops.
-        cmd := fmt.Sprintf("sleep 5; dig %s ANY +tries=5 +time=3", svcName)
-        
-        dnsTestPodArgs := []string{
-            "run", dnsUtilsPod,
-            "--restart", "Never",
-            "--image", "anubhavmishra/tiny-tools",
-            "--image-pull-policy", "IfNotPresent",
-            "--command", "--", "sh", "-c", cmd,
-        }
-        
-        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), dnsTestPodArgs...)
-
-        // --- STEP 3: Wait for Completion ---
-        logger.Log(t, "Waiting for DNS pod to complete...")
-        podFinished := false
-        // Poll longer (up to 45s) because we added a 5s sleep inside the pod
-        for i := 0; i < 45; i++ { 
-            phase, err := k8s.RunKubectlAndGetOutputE(t, requestingCtx.KubectlOptions(t), "get", "pod", dnsUtilsPod, "-o", "jsonpath={.status.phase}")
-            if err == nil && (phase == "Succeeded" || phase == "Failed") {
-                podFinished = true
-                break
-            }
-            time.Sleep(1 * time.Second)
-        }
-
-        if !podFinished {
-            logger.Log(t, "Warning: DNS pod did not reach Succeeded/Failed phase in time.")
-        }
-
-        // --- STEP 4: Fetch Logs ---
-        logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(t), "logs", dnsUtilsPod)
-        if err != nil {
-            r.Fatalf("Failed to retrieve logs from pod %s: %v", dnsUtilsPod, err)
-        }
-
-        // --- STEP 5: Verify Results ---
-        logger.Log(t, "verify the DNS results.")
-        
-        // Clean logs for reliable regex matching
-        strippedLogs := strings.ReplaceAll(logs, "\t", "")
-        strippedLogs = strings.ReplaceAll(strippedLogs, "\n", "")
-        strippedLogs = strings.ReplaceAll(strippedLogs, " ", "")
-
-        for _, ipStr := range servicePodIPs {
-            // Regex to match ANY TTL (\d+). Fixes 0 vs 5 TTL mismatch.
-            regexPattern := fmt.Sprintf(`%s\.\d+INA%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
-            matched, _ := regexp.MatchString(regexPattern, strippedLogs)
-
-            if shouldResolveDNSRecord {
-                require.Contains(r, logs, "ANSWER SECTION:", "Expected ANSWER SECTION. Logs:\n%s", logs)
-                require.Truef(r, matched, "Expected DNS record matching pattern: %s\nGot logs (stripped): %s", regexPattern, strippedLogs)
-            } else {
-                require.NotContains(r, logs, "ANSWER SECTION:", "Unexpected ANSWER SECTION. Logs:\n%s", logs)
-                require.Falsef(r, matched, "Unexpected DNS record found matching pattern: %s", regexPattern)
-                require.Contains(r, logs, "status: NXDOMAIN", "Expected NXDOMAIN status")
-                require.Contains(r, logs, "AUTHORITY SECTION", "Expected AUTHORITY SECTION")
-            }
-        }
-
-        // --- STEP 6: Manual Cleanup ---
-        k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
-    })
+		logger.Log(t, "verify the DNS results.")
+		// strip logs of tabs, newlines and spaces to make it easier to assert on the content when there is a DNS match
+		strippedLogs := strings.Replace(logs, "\t", "", -1)
+		strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
+		strippedLogs = strings.Replace(strippedLogs, " ", "", -1)
+		for _, ip := range servicePodIPs {
+			aRecordPattern := "%s.5INA%s"
+			aRecord := fmt.Sprintf(aRecordPattern, svcName, ip)
+			if shouldResolveDNSRecord {
+				require.Contains(r, logs, "ANSWER SECTION:")
+				require.Contains(r, strippedLogs, aRecord)
+			} else {
+				require.NotContains(r, logs, "ANSWER SECTION:")
+				require.NotContains(r, strippedLogs, aRecord)
+				require.Contains(r, logs, "status: NXDOMAIN")
+				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t5\tIN\tSOA\tns.consul. hostmaster.consul.")
+			}
+		}
+	})
 }
 
 func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {
