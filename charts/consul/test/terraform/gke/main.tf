@@ -34,23 +34,42 @@ resource "google_compute_network" "custom_network" {
 }
 
 resource "google_compute_subnetwork" "subnet" {
-@@ -59,6 +63,9 @@ resource "google_container_cluster" "cluster" {
+  count         = var.cluster_count
+  name          = "subnet-${random_string.cluster_prefix.result}-${count.index}" // Ensure valid name
+  ip_cidr_range = cidrsubnet("10.0.0.0/8", 8, count.index)
+  network       = google_compute_network.custom_network.name
+}
+resource "google_container_cluster" "cluster" {
+  provider           = google
+  count              = var.cluster_count
+  name               = "consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"
+  project            = var.project
+  initial_node_count = 3
+  location           = var.zone
+  min_master_version = data.google_container_engine_versions.main.latest_master_version
+  node_version       = data.google_container_engine_versions.main.latest_master_version
+  network            = google_compute_network.custom_network.name
+  node_config {
+    tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
-  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
-    ip_allocation_policy {
+  subnetwork = google_compute_subnetwork.subnet[count.index].self_link
+  ip_allocation_policy {
     cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/14", 2, count.index)
   }
   resource_labels     = var.labels
   deletion_protection = false
 }
-@@ -76,9 +83,11 @@ resource "google_compute_firewall" "firewall-rules" {
+resource "google_compute_firewall" "firewall-rules" {
+  project     = var.project
+  name        = format("firewall-%s-%d", substr(random_string.cluster_prefix.result, 0, 8), count.index)
+  network     = google_compute_network.custom_network.name
+  description = "Firewall rule for cluster ${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}."
+  count       = var.cluster_count > 1 ? var.cluster_count : 0
+  allow {
     protocol = "all"
   }
 
-  source_ranges = [google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr]
-  source_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index == 0 ? 1 : 0}"]
-  target_tags   = ["cluster-${random_string.cluster_prefix.result}-${count.index}"]
   source_ranges = [
     google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr,
     google_compute_subnetwork.subnet[count.index == 0 ? 1 : 0].ip_cidr_range
