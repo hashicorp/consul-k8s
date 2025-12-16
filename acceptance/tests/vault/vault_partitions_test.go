@@ -401,6 +401,11 @@ func TestVault_Partitions(t *testing.T) {
 		// Clients in non-default partitions communicate with servers via gRPC (externalServers.hosts),
 		// not via Serf gossip. Setting client.join would cause clients to attempt gossip communication
 		// with server IPs that may not be routable across clusters.
+
+		// Disable auto-encrypt for clients in secondary partitions.
+		// Auto-encrypt requires local servers to obtain certificates, but secondary partition clients
+		// have no local servers. Instead, they use Vault-provided certificates.
+		"global.tls.enableAutoEncrypt": "false",
 	}
 
 	if cfg.UseKind {
