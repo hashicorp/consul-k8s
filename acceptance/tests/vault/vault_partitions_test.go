@@ -400,6 +400,9 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.hosts[0]":          partitionSvcAddress,
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
+
+		"client.enabled": "true",
+		"server.enabled": "false",
 	}
 
 	if cfg.UseKind {
