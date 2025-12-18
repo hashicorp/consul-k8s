@@ -96,7 +96,8 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				require.Len(t, podList.Items[0].Spec.Containers, 2)
 			}
 
-			if secure {
+			
+		if secure {
 				consulClient, _ := consulServerCluster.SetupConsulClient(t, true)
 
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
