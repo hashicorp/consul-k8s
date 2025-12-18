@@ -196,6 +196,17 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 				require.NoError(t, os.WriteFile(endpointYAMLFilename, []byte(endpointYAML), 0600))
 			}
 		}
+
+		configMaps, err := client.CoreV1().ConfigMaps(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+		if err != nil {
+			logger.Log(t, "unable to get configmaps", "err", err)
+		} else {
+			for _, configMap := range configMaps.Items {
+				// Describe service and write it to a file.
+				writeResourceInfoToFile(t, configMap.Name, "configmap", testDebugDirectory, kubectlOptions)
+			}
+		}
+
 	}
 }
 
