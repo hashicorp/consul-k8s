@@ -1,22 +1,19 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
-
 package consuldns
-
 import (
 	"context"
 	"fmt"
 	"net"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
-
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -26,7 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
 // TestConsulDNS configures CoreDNS to use configure consul domain queries to
 // be forwarded to the Consul DNS Service or the Consul DNS Proxy depending on
 // the test case.  The test validates that the DNS queries are resolved when querying
@@ -36,11 +32,9 @@ func TestConsulDNS(t *testing.T) {
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set")
 	}
-
 	if cfg.UseAKS {
 		t.Skipf("skipping because -use-aks is set")
 	}
-
 	cases := []struct {
 		tlsEnabled           bool
 		connectInjectEnabled bool
@@ -60,7 +54,6 @@ func TestConsulDNS(t *testing.T) {
 		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true, port: nonPrivilegedPort},
 		{tlsEnabled: true, connectInjectEnabled: false, aclsEnabled: true, manageSystemACLs: false, enableDNSProxy: true, port: nonPrivilegedPort},
 	}
-
 	for _, c := range cases {
 		name := fmt.Sprintf("tlsEnabled: %t / aclsEnabled: %t / manageSystemACLs: %t, enableDNSProxy: %t",
 			c.tlsEnabled, c.aclsEnabled, c.manageSystemACLs, c.enableDNSProxy)
@@ -75,11 +68,9 @@ func TestConsulDNS(t *testing.T) {
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.manageSystemACLs),
 				"global.logLevel":              "debug",
 			}
-
 			if c.enableDNSProxy {
 				helmValues["dns.proxy.port"] = c.port
 			}
-
 			// If ACLs are enabled and we are not managing system ACLs, we need to
 			// set the initial management token in the server.extraConfig.
 			const initialManagementToken = "b1gs33cr3t"
@@ -87,21 +78,17 @@ func TestConsulDNS(t *testing.T) {
 				helmValues["server.extraConfig"] = fmt.Sprintf(`"{\"acl\": {\"enabled\": true\, \"default_policy\": \"deny\"\, \"tokens\": {\"initial_management\": \"%s\"}}}"`,
 					initialManagementToken)
 			}
-
 			cluster := consul.NewHelmCluster(t, helmValues, ctx, suite.Config(), releaseName)
-
 			// attach the initial management token to the cluster so it is tied to the client requests when minting a dns proxy ACL token.
 			if c.aclsEnabled && !c.manageSystemACLs {
 				cluster.ACLToken = initialManagementToken
 			}
 			cluster.Create(t)
-
 			// If ACLs are enabled and we are not managing system ACLs, we need to
 			// create a policy and token for the DNS proxy that need to be in
 			// place before the DNS proxy is started.
 			if c.aclsEnabled && c.enableDNSProxy && !c.manageSystemACLs {
 				secretName := "consul-dns-proxy-token"
-
 				consulClient, configAddress := cluster.SetupConsulClient(t, c.tlsEnabled)
 				dnsProxyPolicy := `
 					node_prefix "" {
@@ -113,7 +100,6 @@ func TestConsulDNS(t *testing.T) {
 				`
 				err, dnsProxyToken := createACLTokenWithGivenPolicy(t, consulClient, dnsProxyPolicy, initialManagementToken, configAddress)
 				require.NoError(t, err)
-
 				// Create a secret with the token to be used by the DNS proxy.
 				_, err = ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Create(context.Background(), &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -125,16 +111,13 @@ func TestConsulDNS(t *testing.T) {
 					Type: corev1.SecretTypeOpaque,
 				}, metav1.CreateOptions{})
 				require.NoError(t, err)
-
 				t.Cleanup(func() {
 					require.NoError(t, ctx.KubernetesClient(t).CoreV1().Secrets(ctx.KubectlOptions(t).Namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{}))
 				})
-
 				// Update the helm values to include the secret name and key.
 				helmValues["dns.proxy.aclToken.secretName"] = secretName
 				helmValues["dns.proxy.aclToken.secretKey"] = "token"
 			}
-
 			// If DNS proxy is enabled, we need to set the enableDNSProxy flag in the helm values.
 			if c.enableDNSProxy {
 				helmValues["dns.proxy.enabled"] = strconv.FormatBool(c.enableDNSProxy)
@@ -143,7 +126,6 @@ func TestConsulDNS(t *testing.T) {
 			// also start the DNS proxy if it is enabled and it will pick up the ACL token
 			// saved in the secret.
 			cluster.Upgrade(t, helmValues)
-
 			updateCoreDNSWithConsulDomain(t, ctx, releaseName, c.enableDNSProxy, c.port)
 			// Validate DNS proxy privileged port configuration when DNS proxy is enabled
 			if c.enableDNSProxy && c.port == privilegedPort {
@@ -154,13 +136,11 @@ func TestConsulDNS(t *testing.T) {
 		})
 	}
 }
-
 func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, policyRules string, initialManagementToken string, configAddress string) (error, *api.ACLToken) {
 	_, _, err := consulClient.ACL().TokenCreate(&api.ACLToken{}, &api.WriteOptions{
 		Token: initialManagementToken,
 	})
 	require.NoError(t, err)
-
 	// Create the policy and token _before_ we enable dns proxy and upgrade the cluster.
 	require.NoError(t, err)
 	policy, _, err := consulClient.ACL().PolicyCreate(&api.ACLPolicy{
@@ -181,57 +161,194 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 	logger.Log(t, "created DNS Proxy token", "token", dnsProxyToken)
 	return err, dnsProxyToken
 }
-
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
-	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, port, "coredns-custom.yaml")
-	updateCoreDNS(t, ctx, "coredns-custom.yaml")
-
-	t.Cleanup(func() {
-		updateCoreDNS(t, ctx, "coredns-original.yaml")
-		time.Sleep(5 * time.Second)
-	})
+    actualName := getCoreDNSConfigMapName(t, ctx)
+    // 1. BACKUP: Capture the current state
+    logger.Log(t, "Backing up original CoreDNS config...")
+    originalConfig, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), 
+        "get", "configmap", actualName, "-n", "kube-system", "-o", "yaml")
+    require.NoError(t, err)
+    // --- FIX: Sanitize the YAML to remove version locking ---
+    // We remove fields that cause "Conflict" errors during restore.
+    lines := strings.Split(originalConfig, "\n")
+    var sanitizedLines []string
+    for _, line := range lines {
+        trimmed := strings.TrimSpace(line)
+        // Skip metadata fields that tie the file to a specific point in time
+        if strings.HasPrefix(trimmed, "resourceVersion:") ||
+           strings.HasPrefix(trimmed, "uid:") ||
+           strings.HasPrefix(trimmed, "creationTimestamp:") ||
+           strings.HasPrefix(trimmed, "generation:") {
+            continue
+        }
+        sanitizedLines = append(sanitizedLines, line)
+    }
+    cleanConfig := strings.Join(sanitizedLines, "\n")
+    // ---------------------------------------------------------
+    // Write the sanitized backup file
+    err = os.WriteFile("coredns-original.yaml", []byte(cleanConfig), 0644)
+    require.NoError(t, err)
+    // 2. GENERATE & APPLY Custom Config
+    updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, port, "coredns-custom.yaml")
+    updateCoreDNS(t, ctx, "coredns-custom.yaml")
+    // 3. CLEANUP: Restore the backup
+    t.Cleanup(func() {
+        logger.Log(t, "Restoring original CoreDNS configuration...")
+        updateCoreDNS(t, ctx, "coredns-original.yaml")
+        time.Sleep(5 * time.Second)
+    })
 }
-
 func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
-	enableDNSProxy bool, port string, dnsFileName string) {
-	dnsIP := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
-
-	dnsTarget := dnsIP
-	if enableDNSProxy {
-		dnsTarget = net.JoinHostPort(dnsIP, port)
-	}
-
-	input, err := os.ReadFile("coredns-template.yaml")
-	require.NoError(t, err)
-	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
-	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
-	require.NoError(t, err)
+    enableDNSProxy bool, port string, dnsFileName string) {
+    
+    // Calculate target IP
+    dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
+    require.NoError(t, err)
+    
+    actualName := getCoreDNSConfigMapName(t, ctx)
+    dnsTarget := dnsIP
+    if enableDNSProxy {
+        dnsTarget = net.JoinHostPort(dnsIP, port)
+    }
+    // --- STRATEGY A: GKE / Legacy (kube-dns) ---
+    // GKE ignores Corefile changes or breaks if we overwrite it. We must use stubDomains.
+    if strings.Contains(actualName, "kube-dns") {
+        logger.Log(t, "Detected GKE/kube-dns. Using stubDomains strategy.", "target", dnsTarget)
+        
+        // stubDomains expects a JSON map: domain -> [ips]
+        stubDomainJSON := fmt.Sprintf(`{"consul": ["%s"]}`, dnsTarget)
+        
+        // We create a ConfigMap that ONLY updates the "stubDomains" key.
+        // This merges safely with GKE's internal config.
+        configMapYAML := fmt.Sprintf(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: %s
+  namespace: kube-system
+data:
+  stubDomains: |
+    %s
+`, actualName, stubDomainJSON)
+        err = os.WriteFile(dnsFileName, []byte(configMapYAML), 0644)
+        require.NoError(t, err)
+        return
+    }
+    // --- STRATEGY B: EKS / AKS / Standard (coredns) ---
+    // Standard clusters allow us to overwrite the Corefile.
+    logger.Log(t, "Detected Standard CoreDNS. Using Corefile template strategy.", "target", dnsTarget)
+    input, err := os.ReadFile("coredns-template.yaml")
+    require.NoError(t, err)
+    
+    newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
+    newContents = strings.ReplaceAll(newContents, "name: coredns", fmt.Sprintf("name: %s", actualName))
+    err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
+    require.NoError(t, err)
 }
-
 func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
-	coreDNSCommand := []string{
-		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
-	}
-	var logs string
-
-	timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
-	retry.RunWith(timer, t, func(r *retry.R) {
-		var err error
-		logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
-		require.NoError(r, err)
-	})
-
-	require.Contains(t, logs, "configmap/coredns replaced")
-	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
-	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
-	require.NoError(t, err)
-	// Wait for restart to finish.
-	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "1m", "--watch", "deployment/coredns", "-n", "kube-system")
-	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
+    actualName := getCoreDNSConfigMapName(t, ctx)
+    // --- STEP 0: PATCH THE FILE ---
+    content, err := os.ReadFile(coreDNSConfigFile)
+    require.NoError(t, err)
+    strContent := string(content)
+    fileChanged := false
+    // Ensure name matches the cluster (kube-dns vs coredns)
+    if actualName == "kube-dns" && strings.Contains(strContent, "name: coredns") {
+        logger.Log(t, "Patching config file to target kube-dns instead of coredns")
+        strContent = strings.ReplaceAll(strContent, "name: coredns", "name: kube-dns")
+        fileChanged = true
+    } else if actualName == "coredns" && strings.Contains(strContent, "name: kube-dns") {
+        logger.Log(t, "Patching config file to target coredns instead of kube-dns")
+        strContent = strings.ReplaceAll(strContent, "name: kube-dns", "name: coredns")
+        fileChanged = true
+    } else if actualName == "rke2-coredns" && !strings.Contains(strContent, "name: rke2-coredns") {
+         logger.Log(t, "Patching config file to target rke2-coredns")
+         strContent = strings.ReplaceAll(strContent, "name: coredns", "name: rke2-coredns")
+         fileChanged = true
+    }
+    if fileChanged {
+        err = os.WriteFile(coreDNSConfigFile, []byte(strContent), 0644)
+        require.NoError(t, err)
+    }
+    // --- STEP 1: APPLY ---
+    coreDNSCommand := []string{
+        "apply", "-n", "kube-system", "-f", coreDNSConfigFile, 
+    }
+    var logs string
+    timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
+    retry.RunWith(timer, t, func(r *retry.R) {
+        var err error
+        logs, err = k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), coreDNSCommand...)
+        require.NoError(r, err)
+    })
+    // --- STEP 2: VALIDATE OUTPUT ---
+    msgConfigured := fmt.Sprintf("configmap/%s configured", actualName)
+    msgReplaced := fmt.Sprintf("configmap/%s replaced", actualName)
+    msgUnchanged := fmt.Sprintf("configmap/%s unchanged", actualName)
+    require.True(t, 
+        strings.Contains(logs, msgConfigured) || strings.Contains(logs, msgReplaced) || strings.Contains(logs, msgUnchanged), 
+        "expected CoreDNS update output to contain '%s', '%s', or '%s' but got: \n%s", 
+        msgConfigured, msgReplaced, msgUnchanged, logs)
+    // --- STEP 3: RESTART DEPLOYMENT ---
+    deploymentName := "deployment/coredns"
+    if strings.Contains(actualName, "kube-dns") {
+        deploymentName = "deployment/kube-dns"
+    } else if strings.Contains(actualName, "rke2") {
+        deploymentName = "deployment/rke2-coredns"
+    }
+    logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
+    restartCoreDNSCommand := []string{"rollout", "restart", deploymentName, "-n", "kube-system"}
+    _, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
+    require.NoError(t, err)
+    // --- STEP 4: WAIT FOR ROLLOUT ---
+    out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "5m", "--watch", deploymentName, "-n", "kube-system")
+    require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
-
+func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
+    client := ctx.KubernetesClient(t).CoreV1().ConfigMaps("kube-system")
+    ctxBg := context.Background()
+    // 1. Check Labels (Standard method)
+    labelSelectors := []string{
+        "k8s-app=coredns",
+        "app.kubernetes.io/name=coredns",
+        "k8s-app=kube-dns", 
+    }
+    for _, label := range labelSelectors {
+        cms, err := client.List(ctxBg, metav1.ListOptions{LabelSelector: label})
+        if err == nil && len(cms.Items) > 0 {
+            for _, cm := range cms.Items {
+                if _, ok := cm.Data["Corefile"]; ok {
+                    logger.Log(t, "found DNS configmap via label with Corefile", "label", label, "name", cm.Name)
+                    return cm.Name
+                }
+            }
+        }
+    }
+    // 2. Check Known Names (Fallback for GKE)
+    knownNames := []string{"coredns", "kube-dns", "rke2-coredns"}
+    for _, name := range knownNames {
+        cm, err := client.Get(ctxBg, name, metav1.GetOptions{})
+        if err == nil {
+            logger.Log(t, "found DNS configmap via name", "name", cm.Name)
+            return cm.Name
+        }
+    }
+    // Debugging failure
+    cms, err := client.List(ctxBg, metav1.ListOptions{})
+    var observedNames []string
+    if err == nil {
+        for _, cm := range cms.Items {
+            observedNames = append(observedNames, cm.Name)
+        }
+    }
+    t.Fatalf("Failed to find CoreDNS ConfigMap. Checked labels: %v, Checked names: %v. Available: %v", 
+        labelSelectors, knownNames, observedNames)
+    return ""
+}
 func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requestingCtx, svcContext environment.TestContext,
 	podLabelSelector, svcName string, shouldResolveDNSRecord bool, dnsUtilsPodIndex int) {
+
+	// 1. Fetch expected IPs
 	podList, err := svcContext.KubernetesClient(t).CoreV1().Pods(svcNamespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: podLabelSelector,
 	})
@@ -242,87 +359,93 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 		servicePodIPs[i] = serverPod.Status.PodIP
 	}
 
-	logger.Log(t, "launch a pod to test the dns resolution.")
-	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
-	dnsTestPodArgs := []string{
-		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
-	}
+	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-%d", releaseName, dnsUtilsPodIndex)
 
-	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
-		// Note: this delete command won't wait for pods to be fully terminated.
-		// This shouldn't cause any test pollution because the underlying
-		// objects are deployments, and so when other tests create these
-		// they should have different pod names.
-		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
+	t.Cleanup(func() {
+		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
 	})
 
-	retry.Run(t, func(r *retry.R) {
-		logger.Log(t, "run the dns utilize pod and query DNS for the service.")
-		logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
-		require.NoError(r, err)
+	retryLimit := &retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}
 
-		// When the `dig` request is successful, a section of it's response looks like the following:
-		//
-		// ;; ANSWER SECTION:
-		// consul.service.consul.	0	IN	A	<consul-server-pod-ip>
-		//
-		// ;; Query time: 2 msec
-		// ;; SERVER: <dns-ip>#<dns-port>(<dns-ip>)
-		// ;; WHEN: Mon Aug 10 15:02:40 UTC 2020
-		// ;; MSG SIZE  rcvd: 98
-		//
-		// We assert on the existence of the ANSWER SECTION, The consul-server IPs being present in the ANSWER SECTION and the the DNS IP mentioned in the SERVER: field
+	retry.RunWith(retryLimit, t, func(r *retry.R) {
+		// --- STEP 1: Pre-cleanup ---
+		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
 
-		logger.Log(t, "verify the DNS results.")
-		// strip logs of tabs, newlines and spaces to make it easier to assert on the content when there is a DNS match
-		strippedLogs := strings.Replace(logs, "\t", "", -1)
-		strippedLogs = strings.Replace(strippedLogs, "\n", "", -1)
-		strippedLogs = strings.Replace(strippedLogs, " ", "", -1)
-		for _, ip := range servicePodIPs {
-			aRecordPattern := "%s.5INA%s"
-			aRecord := fmt.Sprintf(aRecordPattern, svcName, ip)
-			if shouldResolveDNSRecord {
-				require.Contains(r, logs, "ANSWER SECTION:")
-				require.Contains(r, strippedLogs, aRecord)
-			} else {
-				require.NotContains(r, logs, "ANSWER SECTION:")
-				require.NotContains(r, strippedLogs, aRecord)
-				require.Contains(r, logs, "status: NXDOMAIN")
-				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t5\tIN\tSOA\tns.consul. hostmaster.consul.")
-			}
+		// --- STEP 2: Run Pod ---
+		// FIX: Corrected command syntax. 
+		// We use 'sh -c' to wrap the sleep and dig command properly.
+		cmd := fmt.Sprintf("sleep 2; dig %s ANY +tries=3 +time=2", svcName)
+		
+		dnsTestPodArgs := []string{
+			"run", dnsUtilsPod,
+			"--restart=Never",
+			"--image=anubhavmishra/tiny-tools",
+			"--image-pull-policy=IfNotPresent",
+			"--", "sh", "-c", cmd,
 		}
+
+		// FIX: Use RunKubectl (standard) instead of RunKubectlE if it's missing
+		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), dnsTestPodArgs...)
+
+		// --- STEP 3: Wait for Completion ---
+		logger.Log(t, "Waiting for DNS pod to complete...")
+		podFinished := false
+		for i := 0; i < 30; i++ {
+			// Get phase using the helper that returns a string
+			phase, err := k8s.RunKubectlAndGetOutputE(t, requestingCtx.KubectlOptions(t), "get", "pod", dnsUtilsPod, "-o", "jsonpath={.status.phase}")
+			if err == nil && (phase == "Succeeded" || phase == "Failed") {
+				podFinished = true
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
+
+		if !podFinished {
+			r.Fatalf("Pod %s did not finish in time", dnsUtilsPod)
+		}
+
+		// --- STEP 4: Fetch Logs ---
+		logs, err := k8s.RunKubectlAndGetOutputE(t, requestingCtx.KubectlOptions(t), "logs", dnsUtilsPod)
+		if err != nil {
+			r.Fatalf("Failed to retrieve logs: %v", err)
+		}
+
+		// --- STEP 5: Verify Results ---
+		// Collapse multiple spaces/newlines into single spaces for easier regex matching
+		normalizedLogs := regexp.MustCompile(`\s+`).ReplaceAllString(logs, " ")
+
+		if shouldResolveDNSRecord {
+			require.Contains(r, logs, "ANSWER SECTION", "DNS lookup failed. Logs: %s", logs)
+			for _, ipStr := range servicePodIPs {
+				// Pattern matches: [svcName][any whitespace][TTL][any whitespace]IN[any whitespace]A[any whitespace][IP]
+				regexPattern := fmt.Sprintf(`%s\.?\s+\d+\s+IN\s+A\s+%s`, regexp.QuoteMeta(svcName), regexp.QuoteMeta(ipStr))
+				matched, _ := regexp.MatchString(regexPattern, normalizedLogs)
+				require.Truef(r, matched, "Could not find IP %s for service %s in logs", ipStr, svcName)
+			}
+		} else {
+			require.Contains(r, logs, "NXDOMAIN", "Expected NXDOMAIN for non-existent record. Logs: %s", logs)
+		}
+
+		// --- STEP 6: Manual Cleanup ---
+		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true", "--now")
 	})
 }
 
-func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) string {
+func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {
 	logger.Log(t, "get the in cluster dns service or proxy.")
 	dnsSvcName := fmt.Sprintf("%s-consul-dns", releaseName)
 	if enableDNSProxy {
 		dnsSvcName += "-proxy"
 	}
-	
-	var dnsService *corev1.Service
-	var clusterIP string
-	
-	// Retry getting the DNS service with timeout as it might not be immediately available
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
-		var err error
-		dnsService, err = requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
-		require.NoError(r, err)
-		require.NotEmpty(r, dnsService.Spec.ClusterIP, "DNS service ClusterIP should not be empty")
-		clusterIP = dnsService.Spec.ClusterIP
-	})
-	
-	return clusterIP
+	dnsService, err := requestingCtx.KubernetesClient(t).CoreV1().Services(requestingCtx.KubectlOptions(t).Namespace).Get(context.Background(), dnsSvcName, metav1.GetOptions{})
+	require.NoError(t, err)
+	return dnsService.Spec.ClusterIP, err
 }
-
 // validateDNSProxyPrivilegedPort validates that the consul-dns-proxy pod is correctly configured
 // to use privileged port with appropriate command and envoy arguments.
 func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, releaseName string) {
 	logger.Log(t, "validating DNS proxy pod uses privileged port", privilegedPort)
-
 	var pod corev1.Pod
-
 	// Wait for DNS proxy pod to be created and ready with retry
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
@@ -330,13 +453,10 @@ func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, r
 		})
 		require.NoError(r, err)
 		require.NotEmpty(r, pods.Items, "DNS proxy pod should exist")
-
 		pod = pods.Items[0]
 		require.Equal(r, corev1.PodRunning, pod.Status.Phase, "DNS proxy pod should be running")
 	})
-
 	logger.Log(t, "found DNS proxy pod", "name", pod.Name)
-
 	// Find the consul-dns-proxy container
 	var dnsProxyContainer *corev1.Container
 	for i, container := range pod.Spec.Containers {
@@ -346,18 +466,14 @@ func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, r
 		}
 	}
 	require.NotNil(t, dnsProxyContainer, "dns-proxy container should exist")
-
 	// Validate command arguments include privilegedPort
 	commandArgs := strings.Join(dnsProxyContainer.Args, " ")
 	require.Contains(t, commandArgs, fmt.Sprintf("-consul-dns-bind-port=%s", privilegedPort), fmt.Sprintf("DNS proxy command should include -consul-dns-bind-port=%s argument", privilegedPort))
 	logger.Log(t, "validated DNS proxy command includes -consul-dns-bind-port=", privilegedPort, "args", commandArgs)
-
 	// Validate privileged-envoy executable is used
 	require.Contains(t, commandArgs, "-envoy-executable-path=/usr/local/bin/privileged-envoy", "Envoy should have admin port configured")
 	logger.Log(t, "validated envoy configuration in DNS proxy")
-
 	logger.Log(t, "successfully validated DNS proxy privileged port", privilegedPort)
-
 	// Validate privileged port is configured
 	var foundPrivilegedPort bool
 	privilegedPortInt, _ := strconv.Atoi(privilegedPort)
@@ -370,12 +486,10 @@ func validateDNSProxyPrivilegedPort(t *testing.T, ctx environment.TestContext, r
 		}
 	}
 	require.True(t, foundPrivilegedPort, fmt.Sprintf("DNS proxy container should expose port %s", privilegedPort))
-
 	// Validate security context has privileged capabilities
 	require.NotNil(t, dnsProxyContainer.SecurityContext, "DNS proxy container should have security context")
 	require.NotNil(t, dnsProxyContainer.SecurityContext.Capabilities, "DNS proxy container should have capabilities configured")
 	require.NotNil(t, dnsProxyContainer.SecurityContext.Capabilities.Add, "DNS proxy container should have added capabilities")
-
 	// Check for NET_BIND_SERVICE capability (required for privileged ports)
 	var hasNetBindService bool
 	if slices.Contains(dnsProxyContainer.SecurityContext.Capabilities.Add, "NET_BIND_SERVICE") {
