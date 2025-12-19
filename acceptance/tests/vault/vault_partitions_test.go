@@ -376,7 +376,6 @@ func TestVault_Partitions(t *testing.T) {
 		clientClusterCtx.KubernetesClient(t).CoreV1().Secrets(ns).Delete(context.Background(), vaultCASecretName, metav1.DeleteOptions{})
 	})
 
-	// Create client cluster.
 	clientHelmValues := map[string]string{
 		"global.enabled": "false",
 
