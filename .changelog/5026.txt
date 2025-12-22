@@ -1,0 +1,3 @@
+```release-note:improvement
+api-gateway: Added backward compatibility support for file-based Envoy access log sinks via proxy-defaults.
+```
