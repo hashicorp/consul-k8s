@@ -50,7 +50,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 	if options.ConfigPath != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
 	}
-	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") {
+	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") && !sliceContains(args, "-A") {
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
 	cmdArgs = append(cmdArgs, args...)
@@ -87,16 +87,16 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 // applies it to the cluster by running 'kubectl apply -f'.
 // If there's an error applying the file, fail the test.
 func KubectlApply(t *testing.T, options *k8s.KubectlOptions, configPath string) {
-	_, err := RunKubectlAndGetOutputE(t, options, "apply", "-f", configPath)
-	require.NoError(t, err)
+	out, err := RunKubectlAndGetOutputE(t, options, "apply", kubectlTimeout, "-f", configPath)
+	require.NoError(t, err, out)
 }
 
 // KubectlApplyK takes a path to a kustomize directory and
 // applies it to the cluster by running 'kubectl apply -k'.
 // If there's an error applying the file, fail the test.
 func KubectlApplyK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir string) {
-	_, err := RunKubectlAndGetOutputE(t, options, "apply", "-k", kustomizeDir)
-	require.NoError(t, err)
+	out, err := RunKubectlAndGetOutputE(t, options, "apply", "--server-side=false", kubectlTimeout, "-k", kustomizeDir)
+	require.NoError(t, err, out)
 }
 
 // KubectlDelete takes a path to a Kubernetes YAML file and

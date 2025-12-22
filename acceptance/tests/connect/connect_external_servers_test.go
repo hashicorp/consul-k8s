@@ -67,20 +67,24 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				helmValues["global.acls.bootstrapToken.secretKey"] = "token"
 				helmValues["externalServers.httpsPort"] = "8501"
 			}
+		releaseName := helpers.RandomName()
+		consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+		consulCluster.SkipCheckForPreviousInstallations = true
 
-			releaseName := helpers.RandomName()
-			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-			consulCluster.SkipCheckForPreviousInstallations = true
+		consulCluster.Create(t)
 
-			consulCluster.Create(t)
+		// Wait for the connect-inject deployment to be ready before deploying workloads
+		// as the webhook needs to be available to mutate the pods
+		logger.Log(t, "waiting for connect-inject deployment to be ready")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=2m", fmt.Sprintf("deploy/%s-connect-injector", releaseName))
 
-			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-			} else {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
-			}
+		logger.Log(t, "creating static-server and static-client deployments")
+		k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+		if cfg.EnableTransparentProxy {
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+		} else {
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+		}
 
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
@@ -92,7 +96,8 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				require.Len(t, podList.Items[0].Spec.Containers, 2)
 			}
 
-			if secure {
+			
+		if secure {
 				consulClient, _ := consulServerCluster.SetupConsulClient(t, true)
 
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
