@@ -10,11 +10,11 @@ env:
   SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
-  conditional-skip:
-    uses: ./.github/workflows/reusable-conditional-skip.yml
+  # conditional-skip:
+  #   uses: ./.github/workflows/reusable-conditional-skip.yml
 
 
-    name: pr-cloud-acceptance
+    # name: pr-cloud-acceptance
 on:
   pull_request:
     types: [opened, synchronize]
