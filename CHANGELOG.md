@@ -1,3 +1,17 @@
+## 1.9.2 (December 23, 2025)
+
+SECURITY:
+
+* Add microdnf upgrade in dockerfile to include future security fixes [[GH-4982](https://github.com/hashicorp/consul-k8s/issues/4982)]
+* go: upgrade go version to 1.25.5 [[GH-5052](https://github.com/hashicorp/consul-k8s/issues/5052)]
+
+IMPROVEMENTS:
+
+* api-gateway: Add support for file-based Envoy access log sinks via proxy-defaults. Previously, only stdout logging was supported.
+connect-inject: When proxy-defaults enables file-based access logs, automatically inject an emptyDir volume and volumeMount into the consul-dataplane container. [[GH-5008](https://github.com/hashicorp/consul-k8s/issues/5008)]
+* api-gateway: Added backward compatibility support for file-based Envoy access log sinks via proxy-defaults. [[GH-5026](https://github.com/hashicorp/consul-k8s/issues/5026)]
+* client: Add optional startup staggering for client ACL init to spread /v1/acl/login calls and reduce login storms on large clusters. Controlled via client.aclInit.startupStagger.* values (disabled by default). [[GH-5021](https://github.com/hashicorp/consul-k8s/issues/5021)]
+
 ## 1.9.1 (2 December, 2025)
 
 SECURITY:
