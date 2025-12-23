@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	ocpgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/custom-gateway-api/apis/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -79,6 +80,9 @@ type PolicyTargetReference struct {
 
 	// SectionName refers to the listener targeted by this policy.
 	SectionName *gwv1beta1.SectionName `json:"sectionName,omitempty"`
+
+	// OCP SectionName refers to the listener targeted by this policy.
+	OCPSectionName *ocpgwv1beta1.SectionName `json:"ocpSectionName,omitempty"`
 }
 
 type GatewayPolicyConfig struct {
