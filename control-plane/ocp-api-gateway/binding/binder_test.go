@@ -63,7 +63,7 @@ type resourceMapResources struct {
 	meshServices                 []v1alpha1.MeshService
 	services                     []types.NamespacedName
 	jwtProviders                 []*v1alpha1.JWTProvider
-	gatewayPolicies              []*v1alpha1.GatewayPolicy
+	gatewayPolicies              []*v1alpha1.OCPGatewayPolicy
 	externalAuthFilters          []*v1alpha1.RouteAuthFilter
 	consulFileSystemCertificates []api.FileSystemCertificateConfigEntry
 	consulHTTPRoutes             []api.HTTPRouteConfigEntry
@@ -795,19 +795,19 @@ func TestBinder_Lifecycle(t *testing.T) {
 						},
 					},
 				},
-				Policies: []v1alpha1.GatewayPolicy{
+				Policies: []v1alpha1.OCPGatewayPolicy{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "p1",
 						},
-						Spec: v1alpha1.GatewayPolicySpec{
-							TargetRef: v1alpha1.PolicyTargetReference{
+						Spec: v1alpha1.OCPGatewayPolicySpec{
+							TargetRef: v1alpha1.OCPPolicyTargetReference{
 								Kind:        "Gateway",
 								Name:        "gateway-deleted",
 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 							},
 						},
-						Status: v1alpha1.GatewayPolicyStatus{
+						Status: v1alpha1.OCPGatewayPolicyStatus{
 							Conditions: []metav1.Condition{
 								{
 									Type:               "Accepted",
@@ -830,14 +830,14 @@ func TestBinder_Lifecycle(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "p2",
 						},
-						Spec: v1alpha1.GatewayPolicySpec{
-							TargetRef: v1alpha1.PolicyTargetReference{
+						Spec: v1alpha1.OCPGatewayPolicySpec{
+							TargetRef: v1alpha1.OCPPolicyTargetReference{
 								Kind:        "Gateway",
 								Name:        "gateway-deleted",
 								SectionName: common.PointerTo(gwv1beta1.SectionName("l2")),
 							},
 						},
-						Status: v1alpha1.GatewayPolicyStatus{
+						Status: v1alpha1.OCPGatewayPolicyStatus{
 							Conditions: []metav1.Condition{
 								{
 									Type:               "Accepted",
@@ -873,24 +873,24 @@ func TestBinder_Lifecycle(t *testing.T) {
 				},
 			},
 			expectedStatusUpdates: []client.Object{
-				&v1alpha1.GatewayPolicy{
+				&v1alpha1.OCPGatewayPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "p1",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Kind:        "Gateway",
 							Name:        "gateway-deleted",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
 					},
 				},
-				&v1alpha1.GatewayPolicy{
+				&v1alpha1.OCPGatewayPolicy{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "p2",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Kind:        "Gateway",
 							Name:        "gateway-deleted",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l2")),

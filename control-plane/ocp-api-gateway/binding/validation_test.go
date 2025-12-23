@@ -658,10 +658,10 @@ func TestValidateListeners(t *testing.T) {
 						},
 					},
 				},
-				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+				gatewayPolicies: []*v1alpha1.OCPGatewayPolicy{
 					{
-						Spec: v1alpha1.GatewayPolicySpec{
-							TargetRef: v1alpha1.PolicyTargetReference{
+						Spec: v1alpha1.OCPGatewayPolicySpec{
+							TargetRef: v1alpha1.OCPPolicyTargetReference{
 								Group:       gwv1beta1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
@@ -700,10 +700,10 @@ func TestValidateListeners(t *testing.T) {
 						},
 					},
 				},
-				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+				gatewayPolicies: []*v1alpha1.OCPGatewayPolicy{
 					{
-						Spec: v1alpha1.GatewayPolicySpec{
-							TargetRef: v1alpha1.PolicyTargetReference{
+						Spec: v1alpha1.OCPGatewayPolicySpec{
+							TargetRef: v1alpha1.OCPPolicyTargetReference{
 								Group:       gwv1beta1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
@@ -742,10 +742,10 @@ func TestValidateListeners(t *testing.T) {
 						},
 					},
 				},
-				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+				gatewayPolicies: []*v1alpha1.OCPGatewayPolicy{
 					{
-						Spec: v1alpha1.GatewayPolicySpec{
-							TargetRef: v1alpha1.PolicyTargetReference{
+						Spec: v1alpha1.OCPGatewayPolicySpec{
+							TargetRef: v1alpha1.OCPPolicyTargetReference{
 								Group:       gwv1beta1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
@@ -784,10 +784,10 @@ func TestValidateListeners(t *testing.T) {
 						},
 					},
 				},
-				gatewayPolicies: []*v1alpha1.GatewayPolicy{
+				gatewayPolicies: []*v1alpha1.OCPGatewayPolicy{
 					{
-						Spec: v1alpha1.GatewayPolicySpec{
-							TargetRef: v1alpha1.PolicyTargetReference{
+						Spec: v1alpha1.OCPGatewayPolicySpec{
+							TargetRef: v1alpha1.OCPPolicyTargetReference{
 								Group:       gwv1beta1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
@@ -1051,7 +1051,7 @@ func TestRouteKindIsAllowedForListener(t *testing.T) {
 func TestValidateGatewayPolicies(t *testing.T) {
 	for name, tc := range map[string]struct {
 		gateway   gwv1beta1.Gateway
-		policies  []v1alpha1.GatewayPolicy
+		policies  []v1alpha1.OCPGatewayPolicy
 		resources *common.ResourceMap
 		expected  gatewayPolicyValidationResults
 	}{
@@ -1068,13 +1068,13 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					},
 				},
 			},
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-policy",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Name:        "gw",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
@@ -1143,13 +1143,13 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					},
 				},
 			},
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-policy",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Name:        "gw",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
 						},
@@ -1198,13 +1198,13 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					},
 				},
 			},
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-policy",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Name:        "gw",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
@@ -1253,13 +1253,13 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					},
 				},
 			},
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-policy",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Name:        "gw",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
@@ -1308,13 +1308,13 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					},
 				},
 			},
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-policy",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Name:        "gw",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
@@ -1372,13 +1372,13 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					},
 				},
 			},
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-policy",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Name:        "gw",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
@@ -1436,13 +1436,13 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					},
 				},
 			},
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-policy",
 					},
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Name:        "gw",
 							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
 						},

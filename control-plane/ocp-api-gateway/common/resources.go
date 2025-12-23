@@ -118,7 +118,7 @@ type ResourceMap struct {
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
 	externalFilters       map[corev1.ObjectReference]client.Object
-	gatewayPolicies       map[api.ResourceReference]*v1alpha1.GatewayPolicy
+	gatewayPolicies       map[api.ResourceReference]*v1alpha1.OCPGatewayPolicy
 
 	// consul resources for a gateway
 	consulTCPRoutes  map[api.ResourceReference]*consulTCPRoute
@@ -144,7 +144,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
-		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
+		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.OCPGatewayPolicy),
 		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
 }
@@ -417,7 +417,7 @@ func (s *ResourceMap) GetExternalAuthFilters() []*v1alpha1.RouteAuthFilter {
 	return filters
 }
 
-func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v1alpha1.GatewayPolicy {
+func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.OCPGatewayPolicy) *v1alpha1.OCPGatewayPolicy {
 	SectionName := ""
 	if gatewayPolicy.Spec.TargetRef.SectionName != nil {
 		SectionName = string(*gatewayPolicy.Spec.TargetRef.SectionName)
@@ -436,7 +436,7 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v
 	}
 
 	if s.gatewayPolicies == nil {
-		s.gatewayPolicies = make(map[api.ResourceReference]*v1alpha1.GatewayPolicy)
+		s.gatewayPolicies = make(map[api.ResourceReference]*v1alpha1.OCPGatewayPolicy)
 	}
 
 	s.gatewayPolicies[key] = gatewayPolicy
@@ -462,7 +462,7 @@ func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.Gat
 	return value, exists
 }
 
-func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.OCPGatewayPolicy, bool) {
 	key := api.ResourceReference{
 		Name:        gateway.Name,
 		Kind:        gateway.Kind,

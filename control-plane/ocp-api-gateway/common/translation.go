@@ -184,7 +184,7 @@ func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.Rou
 	}
 }
 
-func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
+func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.OCPGatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
 	if policy == nil {
 		return nil, nil
 	}

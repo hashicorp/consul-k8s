@@ -67,7 +67,7 @@ type BinderConfig struct {
 	Resources *common.ResourceMap
 
 	// Policies is a list containing all GatewayPolicies that are part of the Gateway Deployment
-	Policies []v1alpha1.GatewayPolicy
+	Policies []v1alpha1.OCPGatewayPolicy
 
 	// Configuration from helm.
 	HelmConfig common.HelmConfig
@@ -252,7 +252,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		for idx, policy := range b.config.Policies {
 			policy := policy
 
-			var policyStatus v1alpha1.GatewayPolicyStatus
+			var policyStatus v1alpha1.OCPGatewayPolicyStatus
 
 			policyStatus.Conditions = policyValidation.Conditions(policy.Generation, idx)
 			// only mark the policy as needing a status update if there's a diff with its old status
@@ -294,7 +294,7 @@ func (b *Binder) Snapshot() *Snapshot {
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
 			for _, policy := range b.config.Policies {
 				policy := policy
-				policy.Status = v1alpha1.GatewayPolicyStatus{}
+				policy.Status = v1alpha1.OCPGatewayPolicyStatus{}
 				snapshot.Kubernetes.StatusUpdates.Add(&policy)
 			}
 		}

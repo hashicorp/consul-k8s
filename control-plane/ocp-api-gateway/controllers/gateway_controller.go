@@ -493,7 +493,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&handler.EnqueueRequestForObject{},
 		).
 		Watches(
-			&v1alpha1.GatewayPolicy{},
+			&v1alpha1.OCPGatewayPolicy{},
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayPolicy),
 		).
 		Watches(
@@ -615,7 +615,7 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 
 // transformGatewayPolicy will return a list of all gateways that need to be reconcilled.
 func (r *GatewayController) transformGatewayPolicy(ctx context.Context, o client.Object) []reconcile.Request {
-	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+	gatewayPolicy := o.(*v1alpha1.OCPGatewayPolicy)
 	gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
 	if gwNamespace == "" {
 		gwNamespace = gatewayPolicy.Namespace
@@ -960,8 +960,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 	return externalFilters, nil
 }
 
-func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]v1alpha1.GatewayPolicy, error) {
-	var list v1alpha1.GatewayPolicyList
+func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]v1alpha1.OCPGatewayPolicy, error) {
+	var list v1alpha1.OCPGatewayPolicyList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Gatewaypolicy_GatewayIndex, gateway.String()),

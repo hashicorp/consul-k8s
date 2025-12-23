@@ -1768,16 +1768,16 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     args
-		policies []v1alpha1.GatewayPolicy
+		policies []v1alpha1.OCPGatewayPolicy
 		want     api.APIGatewayListener
 		want1    bool
 	}{
 		{
 			name: "listener with jwt auth",
-			policies: []v1alpha1.GatewayPolicy{
+			policies: []v1alpha1.OCPGatewayPolicy{
 				{
-					Spec: v1alpha1.GatewayPolicySpec{
-						TargetRef: v1alpha1.PolicyTargetReference{
+					Spec: v1alpha1.OCPGatewayPolicySpec{
+						TargetRef: v1alpha1.OCPPolicyTargetReference{
 							Kind:        KindGateway,
 							Name:        "test",
 							Namespace:   "test",

@@ -132,7 +132,7 @@ var indexes = []index{
 	},
 	{
 		name:        Gatewaypolicy_GatewayIndex,
-		target:      &v1alpha1.GatewayPolicy{},
+		target:      &v1alpha1.OCPGatewayPolicy{},
 		indexerFunc: gatewayForGatewayPolicy,
 	},
 }
@@ -346,7 +346,7 @@ func filtersForHTTPRoute(o client.Object) []string {
 }
 
 func gatewayForGatewayPolicy(o client.Object) []string {
-	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+	gatewayPolicy := o.(*v1alpha1.OCPGatewayPolicy)
 
 	targetGateway := gatewayPolicy.Spec.TargetRef
 	if targetGateway.Group == gwv1beta1.GroupVersion.String() && targetGateway.Kind == common.KindGateway {

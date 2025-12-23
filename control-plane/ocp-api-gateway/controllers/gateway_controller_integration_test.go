@@ -1601,15 +1601,15 @@ func createJWTProvider(t *testing.T, ctx context.Context, k8sClient client.WithW
 }
 
 func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, providerName string) {
-	policy := &v1alpha1.GatewayPolicy{
+	policy := &v1alpha1.OCPGatewayPolicy{
 		TypeMeta: metav1.TypeMeta{
-			Kind: "GatewayPolicy",
+			Kind: "OCPGatewayPolicy",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gw-policy",
 		},
-		Spec: v1alpha1.GatewayPolicySpec{
-			TargetRef: v1alpha1.PolicyTargetReference{
+		Spec: v1alpha1.OCPGatewayPolicySpec{
+			TargetRef: v1alpha1.OCPPolicyTargetReference{
 				Group:       gw.GroupVersionKind().Group,
 				Kind:        gw.GroupVersionKind().Kind,
 				Name:        gw.Name,

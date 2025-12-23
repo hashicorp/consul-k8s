@@ -174,7 +174,7 @@ func stringOrEmtpy(s *gwv1beta1.SectionName) string {
 	return string(*s)
 }
 
-func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
+func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.OCPGatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
 	results := make(gatewayPolicyValidationResults, 0, len(policies))
 
 	for _, policy := range policies {
@@ -219,7 +219,7 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 	return results
 }
 
-func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
+func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.OCPGatewayPolicy) bool {
 	if policy.Spec.TargetRef.SectionName == nil {
 		return false
 	}

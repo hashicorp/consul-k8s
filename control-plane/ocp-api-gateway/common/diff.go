@@ -22,7 +22,7 @@ func GatewayStatusesEqual(a, b gwv1beta1.GatewayStatus) bool {
 		slices.EqualFunc(a.Listeners, b.Listeners, gatewayStatusesListenersEqual)
 }
 
-func GatewayPolicyStatusesEqual(a, b v1alpha1.GatewayPolicyStatus) bool {
+func GatewayPolicyStatusesEqual(a, b v1alpha1.OCPGatewayPolicyStatus) bool {
 	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
