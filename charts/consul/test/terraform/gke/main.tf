@@ -62,8 +62,8 @@ resource "google_container_cluster" "cluster" {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
-  subnetwork          = google_compute_subnetwork.subnet[count.index].self_link
-    ip_allocation_policy {
+  subnetwork = google_compute_subnetwork.subnet[count.index].self_link
+  ip_allocation_policy {
     cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/14", 2, count.index)
   }
   resource_labels     = var.labels
