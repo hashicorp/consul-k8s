@@ -24,9 +24,11 @@ container {
 
   triage {
     suppress {
-      vulnerabilites = [
-        "CVE-2025-47268",
-        "CVE-2025-48964",
+      vulnerabilities = [
+        "CVE-2024-58251",  # busybox@1.37.0-r19 - Alpine Linux security issue
+        "CVE-2025-46394",  # busybox@1.37.0-r19 - Alpine Linux security issue
+        "CVE-2025-47268",  # iputils@20240905-r0 - Alpine Linux security issue
+        "CVE-2025-48964",   # iputils@20240905-r0 - Alpine Linux security issue
         "CVE-2025-58181",
         "CVE-2025-47914",
         "GO-2022-0635",
@@ -135,8 +137,23 @@ binary {
 
   triage {
     suppress {
-      vulnerabilites = [
-        "GO-2022-0635" # aws-sdk-gov2 dependency
+      vulnerabilities = [
+        "GO-2022-0635",
+        "GO-2022-0646"
+      ]
+    }
+  }
+}
+
+repository {
+  go_modules = true
+  osv        = true
+
+  triage {
+    suppress {
+      vulnerabilities = [
+        "GO-2022-0635",
+        "GO-2022-0646"
       ]
     }
   }
