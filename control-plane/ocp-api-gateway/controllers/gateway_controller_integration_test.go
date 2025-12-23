@@ -36,9 +36,9 @@ import (
 	"github.com/hashicorp/consul/agent/netutil"
 	"github.com/hashicorp/consul/api"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
-	"github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/common"
 )
 

@@ -26,6 +26,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
 	controllers "github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
+	ocpgatewaycommon "github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/common"
+	ocpgatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/controllers"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
@@ -128,7 +130,8 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 
-	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
+	// Setup Gateway Controller
+	cache, gatewayCache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: gatewaycommon.HelmConfig{
 			ConsulConfig: gatewaycommon.ConsulConfig{
 				Address:    c.consul.Addresses,
@@ -171,6 +174,79 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
 		return err
 	}
+
+	// New OCP API Gateway Controllers
+	if err := ocpgatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to register field indexes")
+		return err
+	}
+
+	// Need to check if its required to have separate instance of GatewayClassConfigController for OCP API Gateway
+	// Register GatewayClassConfigController again for OCP API Gateway
+	if err := (&ocpgatewaycontrollers.GatewayClassConfigController{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("ocpcontroller").WithName("ocpgateways"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create ocp controller", "ocpcontroller", ocpgatewaycontrollers.GatewayClassConfigController{})
+		return err
+	}
+
+	// Need to check if its required to have separate instance of GatewayClassController for OCP API Gateway
+	// Register GatewayClassController again for OCP API Gateway
+	if err := (&ocpgatewaycontrollers.GatewayClassController{
+		ControllerName: gatewaycommon.GatewayClassControllerName,
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("ocpcontrollers").WithName("OCPGatewayClass"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "ocpcontroller", "OCPGatewayClass")
+		return err
+	}
+
+	// Setup Gateway Controller
+	err = ocpgatewaycontrollers.SetupGatewayControllerWithManager(ctx, cache, gatewayCache, mgr, ocpgatewaycontrollers.GatewayControllerConfig{
+		HelmConfig: ocpgatewaycommon.HelmConfig{
+			ConsulConfig: ocpgatewaycommon.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:              c.flagConsulDataplaneImage,
+			ImageConsulK8S:              c.flagConsulK8sImage,
+			ImagePullSecrets:            cfgFile.ImagePullSecrets,
+			GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
+			ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
+			NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
+			EnableNamespaces:            c.flagEnableNamespaces,
+			PeeringEnabled:              c.flagEnablePeering,
+			EnableOpenShift:             c.flagEnableOpenShift,
+			EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
+			AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
+			LogLevel:                    c.flagLogLevel,
+			LogJSON:                     c.flagLogJSON,
+			TLSEnabled:                  c.consul.UseTLS,
+			ConsulTLSServerName:         c.consul.TLSServerName,
+			ConsulPartition:             c.consul.Partition,
+			ConsulCACert:                string(c.caCertPem),
+			EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+			InitContainerResources:      &c.initContainerResources,
+		},
+		AllowK8sNamespacesSet:   allowK8sNamespaces,
+		DenyK8sNamespacesSet:    denyK8sNamespaces,
+		ConsulClientConfig:      consulConfig,
+		ConsulServerConnMgr:     watcher,
+		NamespacesEnabled:       c.flagEnableNamespaces,
+		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
+		Partition:               c.consul.Partition,
+		Datacenter:              c.consul.Datacenter,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create ocpcontroller", "ocpcontroller", "OCPGateway")
+		return err
+	}
+	// Start the consul cache and cleaner for API Gateway
 
 	go cache.Run(ctx)
 	go cleaner.Run(ctx)

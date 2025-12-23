@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 
+	customgwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/custom-gateway-api/apis/v1alpha2"
+	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/custom-gateway-api/apis/v1beta1"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
@@ -174,7 +176,9 @@ func init() {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-
+	// Add Custom Gateway API types to scheme
+	utilruntime.Must(customgwv1beta1.AddToScheme(scheme))
+	utilruntime.Must(customgwv1alpha2.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 

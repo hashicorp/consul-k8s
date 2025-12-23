@@ -34,10 +34,10 @@ import (
 
 	"github.com/hashicorp/consul/api"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/binding"
-	"github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/ocp-api-gateway/gatekeeper"
 )
@@ -386,17 +386,7 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 }
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
-func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
-	cacheConfig := cache.Config{
-		ConsulClientConfig:      config.ConsulClientConfig,
-		ConsulServerConnMgr:     config.ConsulServerConnMgr,
-		NamespacesEnabled:       config.NamespacesEnabled,
-		Datacenter:              config.Datacenter,
-		CrossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
-		Logger:                  mgr.GetLogger(),
-	}
-	c := cache.New(cacheConfig)
-	gwc := cache.NewGatewayCache(ctx, cacheConfig)
+func SetupGatewayControllerWithManager(ctx context.Context, c *cache.Cache, gwc *cache.GatewayCache, mgr ctrl.Manager, config GatewayControllerConfig) error {
 
 	predicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
@@ -423,14 +413,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ConsulConfig:          config.ConsulClientConfig,
 	}
 
-	cleaner := binding.Cleaner{
-		Logger:       mgr.GetLogger(),
-		ConsulConfig: config.ConsulClientConfig,
-		ServerMgr:    config.ConsulServerConnMgr,
-		AuthMethod:   config.HelmConfig.AuthMethod,
-	}
-
-	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
+	return ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).

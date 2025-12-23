@@ -41,7 +41,7 @@ const (
 	Gatewaypolicy_GatewayIndex = "__gatewaypolicy_referencing_gateway"
 )
 
-// RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
+// RegisterFieldIndexes registers all of the field indexes for the OCP API gateway controllers.
 // These indexes are similar to indexes used in databases to speed up queries.
 // They allow us to quickly find objects based on a field value.
 func RegisterFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
