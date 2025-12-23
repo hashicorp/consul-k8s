@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/custom-gateway-api/apis/v1beta1"
 	"github.com/mitchellh/cli"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -155,9 +156,22 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 		return err
 	}
 
+	ocpGatewayClass := &customgwv1beta1.GatewayClass{}
+	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, ocpGatewayClass)
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			// no ocp gateway class, just ignore and return
+			return nil
+		}
+		c.UI.Error(err.Error())
+		return err
+	}
+
 	// ignore any returned errors
 	_ = c.k8sClient.Delete(context.Background(), gatewayClass)
+	_ = c.k8sClient.Delete(context.Background(), ocpGatewayClass)
 
+	// now poll and wait for both to be gone,
 	// make sure they're gone
 	if err := backoff.Retry(func() error {
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
@@ -168,6 +182,11 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
 		if err == nil || !k8serrors.IsNotFound(err) {
 			return errors.New("gateway class still exists")
+		}
+
+		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, ocpGatewayClass)
+		if err == nil || !k8serrors.IsNotFound(err) {
+			return errors.New("ocp gateway class still exists")
 		}
 
 		return nil

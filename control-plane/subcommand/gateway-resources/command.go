@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
+	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/custom-gateway-api/apis/v1beta1"
 	"github.com/mitchellh/cli"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -209,6 +210,11 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Could not add api-gateway schema: %s", err))
 			return 1
 		}
+		//Installing the schema for custom gateway api
+		if err := customgwv1beta1.Install(s); err != nil {
+			c.UI.Error(fmt.Sprintf("Could not add ocp-api-gateway schema: %s", err))
+			return 1
+		}
 		if err := v1alpha1.AddToScheme(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add consul-k8s schema: %s", err))
 			return 1
@@ -272,11 +278,27 @@ func (c *Command) Run(args []string) int {
 		},
 	}
 
+	customClass := &customgwv1beta1.GatewayClass{
+		ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
+		Spec: customgwv1beta1.GatewayClassSpec{
+			ControllerName: customgwv1beta1.GatewayController(c.flagControllerName),
+			ParametersRef: &customgwv1beta1.ParametersReference{
+				Group: customgwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+				Kind:  customgwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
+				Name:  c.flagGatewayClassConfigName,
+			},
+		},
+	}
+
 	if err := forceClassConfig(context.Background(), c.k8sClient, classConfig); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
 	if err := forceClass(context.Background(), c.k8sClient, class); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+	if err := forceCustomClass(context.Background(), c.k8sClient, customClass); err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
@@ -422,6 +444,25 @@ func forceClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.
 func forceClass(ctx context.Context, k8sClient client.Client, o *gwv1beta1.GatewayClass) error {
 	return backoff.Retry(func() error {
 		var existing gwv1beta1.GatewayClass
+		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return err
+		}
+
+		if k8serrors.IsNotFound(err) {
+			return k8sClient.Create(ctx, o)
+		}
+
+		existing.Spec = o.Spec
+		existing.Labels = o.Labels
+
+		return k8sClient.Update(ctx, &existing)
+	}, exponentialBackoffWithMaxIntervalAndTime())
+}
+
+func forceCustomClass(ctx context.Context, k8sClient client.Client, o *customgwv1beta1.GatewayClass) error {
+	return backoff.Retry(func() error {
+		var existing customgwv1beta1.GatewayClass
 		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			return err

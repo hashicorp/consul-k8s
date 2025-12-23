@@ -202,7 +202,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 
-	// Setup Gateway Controller
+	// Setup OCP Gateway Controller
 	err = ocpgatewaycontrollers.SetupGatewayControllerWithManager(ctx, cache, gatewayCache, mgr, ocpgatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: ocpgatewaycommon.HelmConfig{
 			ConsulConfig: ocpgatewaycommon.ConsulConfig{

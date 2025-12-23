@@ -144,6 +144,7 @@ rules:
   - use
 - apiGroups:
   - gateway.networking.k8s.io
+  - dinesh.networking.io
   resources:
   - gatewayclasses
   - gateways
@@ -160,6 +161,7 @@ rules:
   - watch
 - apiGroups:
   - gateway.networking.k8s.io
+  - dinesh.networking.io
   resources:
   - gatewayclasses/finalizers
   - gateways/finalizers
@@ -169,6 +171,7 @@ rules:
   - update
 - apiGroups:
   - gateway.networking.k8s.io
+  - dinesh.networking.io
   resources:
   - gatewayclasses/status
   - gateways/status
