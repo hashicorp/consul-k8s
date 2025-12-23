@@ -123,8 +123,8 @@ container {
         "CVE-2025-9230",
         "CVE-2025-9714",
         # busybox@1.37.0-r19
-        "ALPINE-CVE-2025-46394",
-        "ALPINE-CVE-2024-58251",
+        "CVE-2025-46394",
+        "CVE-2024-58251",
       ]
     }
   }
@@ -140,7 +140,24 @@ binary {
 
   triage {
     suppress {
-      vulnerabilites = []
+      vulnerabilities = [
+        "GO-2022-0635",
+        "GO-2022-0646"
+      ]
+    }
+  }
+}
+
+repository {
+  go_modules = true
+  osv        = true
+
+  triage {
+    suppress {
+      vulnerabilities = [
+        "GO-2022-0635",
+        "GO-2022-0646"
+      ]
     }
   }
 }
