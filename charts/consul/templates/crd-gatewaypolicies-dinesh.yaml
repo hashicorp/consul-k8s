@@ -17,7 +17,7 @@ spec:
     kind: OCPGatewayPolicy
     listKind: OCPGatewayPolicyList
     plural: ocpgatewaypolicies
-    singular: OCPGatewayPolicy
+    singular: ocpgatewaypolicy
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

@@ -111,11 +111,6 @@ var indexes = []index{
 		indexerFunc: meshServicesForTCPRoute,
 	},
 	{
-		name:        MeshService_PeerIndex,
-		target:      &v1alpha1.MeshService{},
-		indexerFunc: peersForMeshService,
-	},
-	{
 		name:        HTTPRoute_RouteRetryFilterIndex,
 		target:      &gwv1beta1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
