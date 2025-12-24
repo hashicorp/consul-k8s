@@ -45,6 +45,7 @@ spec:
           args:
             - gateway-cleanup
             - -gateway-class-name=consul
+            - -ocp-gateway-class-name=ocp-consul
             - -gateway-class-config-name=consul-api-gateway
           resources:
             requests:

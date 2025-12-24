@@ -74,6 +74,7 @@ type Command struct {
 	flagControllerName         string
 	flagOCPControllerName      string
 	flagGatewayClassName       string
+	flagOCPGatewayClassName    string
 	flagGatewayClassConfigName string
 
 	flagServiceType                string
@@ -114,6 +115,8 @@ func (c *Command) init() {
 
 	c.flags.StringVar(&c.flagGatewayClassName, "gateway-class-name", "",
 		"Name of Kubernetes GatewayClass to ensure is created.")
+	c.flags.StringVar(&c.flagOCPGatewayClassName, "ocp-gateway-class-name", "",
+		"Name of OCP Kubernetes GatewayClass to ensure is created.")
 	c.flags.StringVar(&c.flagGatewayClassConfigName, "gateway-class-config-name", "",
 		"Name of Kubernetes GatewayClassConfig to ensure is created.")
 	c.flags.StringVar(&c.flagHeritage, "heritage", "",
@@ -282,7 +285,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	customClass := &customgwv1beta1.GatewayClass{
-		ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
+		ObjectMeta: metav1.ObjectMeta{Name: c.flagOCPGatewayClassName, Labels: labels},
 		Spec: customgwv1beta1.GatewayClassSpec{
 			ControllerName: customgwv1beta1.GatewayController(c.flagOCPControllerName),
 			ParametersRef: &customgwv1beta1.ParametersReference{
@@ -315,6 +318,9 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagGatewayClassName == "" {
 		return errors.New("-gateway-class-name must be set")
+	}
+	if c.flagOCPGatewayClassName == "" {
+		return errors.New("-ocp-gateway-class-name must be set")
 	}
 	if c.flagHeritage == "" {
 		return errors.New("-heritage must be set")

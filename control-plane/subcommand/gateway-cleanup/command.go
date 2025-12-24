@@ -38,6 +38,7 @@ type Command struct {
 	k8s   *flags.K8SFlags
 
 	flagGatewayClassName           string
+	flagOCPGatewayClassName        string
 	flagGatewayClassConfigName     string
 	flagGatewayConfigLocation      string
 	flagResourceConfigFileLocation string
@@ -55,6 +56,8 @@ func (c *Command) init() {
 
 	c.flags.StringVar(&c.flagGatewayClassName, "gateway-class-name", "",
 		"Name of Kubernetes GatewayClass to delete.")
+	c.flags.StringVar(&c.flagOCPGatewayClassName, "ocp-gateway-class-name", "",
+		"Name of OCP Kubernetes GatewayClass to delete.")
 	c.flags.StringVar(&c.flagGatewayClassConfigName, "gateway-class-config-name", "",
 		"Name of Kubernetes GatewayClassConfig to delete.")
 
@@ -100,6 +103,10 @@ func (c *Command) Run(args []string) int {
 		}
 		if err := gwv1beta1.Install(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add api-gateway schema: %s", err))
+			return 1
+		}
+		if err := customgwv1beta1.Install(s); err != nil {
+			c.UI.Error(fmt.Sprintf("Could not add ocp api-gateway schema: %s", err))
 			return 1
 		}
 		if err := v1alpha1.AddToScheme(s); err != nil {
@@ -157,7 +164,7 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 	}
 
 	ocpGatewayClass := &customgwv1beta1.GatewayClass{}
-	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, ocpGatewayClass)
+	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagOCPGatewayClassName}, ocpGatewayClass)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
 			// no ocp gateway class, just ignore and return
@@ -204,6 +211,9 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagGatewayClassName == "" {
 		return errors.New("-gateway-class-name must be set")
+	}
+	if c.flagOCPGatewayClassName == "" {
+		return errors.New("-ocp-gateway-class-name must be set")
 	}
 
 	return nil

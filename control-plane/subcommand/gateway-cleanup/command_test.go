@@ -6,6 +6,8 @@ package gatewaycleanup
 import (
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/custom-gateway-api/apis/v1beta1"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,8 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func TestRun(t *testing.T) {
@@ -51,6 +51,7 @@ func TestRun(t *testing.T) {
 
 			s := runtime.NewScheme()
 			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, customgwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			objs := []client.Object{}
@@ -70,12 +71,14 @@ func TestRun(t *testing.T) {
 				UI:                         ui,
 				k8sClient:                  client,
 				flagGatewayClassName:       "gateway-class",
+				flagOCPGatewayClassName:    "ocp-gateway-class",
 				flagGatewayClassConfigName: "gateway-class-config",
 			}
 
 			code := cmd.Run([]string{
 				"-gateway-class-config-name", "gateway-class-config",
 				"-gateway-class-name", "gateway-class",
+				"-ocp-gateway-class-name", "ocp-gateway-class",
 			})
 
 			require.Equal(t, 0, code)

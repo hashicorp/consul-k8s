@@ -37,10 +37,18 @@ func TestRun_flagValidation(t *testing.T) {
 			},
 			expectedErr: "-gateway-class-name must be set",
 		},
+		"required ocp gateway class name": {
+			cmd: &Command{
+				flagGatewayClassConfigName: "test",
+				flagGatewayClassName:       "test",
+			},
+			expectedErr: "-ocp-gateway-class-name must be set",
+		},
 		"required heritage": {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 			},
 			expectedErr: "-heritage must be set",
 		},
@@ -48,6 +56,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 			},
 			expectedErr: "-chart must be set",
@@ -56,6 +65,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 			},
@@ -65,6 +75,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -75,6 +86,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -86,6 +98,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -98,6 +111,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -111,6 +125,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -126,6 +141,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -141,6 +157,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -156,6 +173,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",
@@ -169,6 +187,7 @@ func TestRun_flagValidation(t *testing.T) {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
 				flagGatewayClassName:       "test",
+				flagOCPGatewayClassName:    "test",
 				flagHeritage:               "test",
 				flagChart:                  "test",
 				flagApp:                    "test",

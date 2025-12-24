@@ -46,6 +46,7 @@ spec:
           args:
             - gateway-resources
             - -gateway-class-name=consul
+            - -ocp-gateway-class-name=ocp-consul
             - -gateway-class-config-name=consul-api-gateway
             - -controller-name=consul.hashicorp.com/gateway-controller
             - -ocp-controller-name=consul.hashicorp.com/ocp-gateway-controller
