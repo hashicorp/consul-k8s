@@ -20,25 +20,25 @@ import (
 
 const (
 	// Naming convention: TARGET_REFERENCE.
-	GatewayClass_GatewayClassConfigIndex = "__gatewayclass_referencing_gatewayclassconfig"
-	GatewayClass_ControllerNameIndex     = "__gatewayclass_controller_name"
+	GatewayClass_GatewayClassConfigIndex = "__ocp_gatewayclass_referencing_gatewayclassconfig"
+	GatewayClass_ControllerNameIndex     = "__ocp_gatewayclass_controller_name"
 
-	Gateway_GatewayClassIndex = "__gateway_referencing_gatewayclass"
+	Gateway_GatewayClassIndex = "__ocp_gateway_referencing_gatewayclass"
 
-	HTTPRoute_GatewayIndex            = "__httproute_referencing_gateway"
-	HTTPRoute_ServiceIndex            = "__httproute_referencing_service"
-	HTTPRoute_MeshServiceIndex        = "__httproute_referencing_mesh_service"
-	HTTPRoute_RouteRetryFilterIndex   = "__httproute_referencing_retryfilter"
-	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
-	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
+	HTTPRoute_GatewayIndex            = "__ocp_httproute_referencing_gateway"
+	HTTPRoute_ServiceIndex            = "__ocp_httproute_referencing_service"
+	HTTPRoute_MeshServiceIndex        = "__ocp_httproute_referencing_mesh_service"
+	HTTPRoute_RouteRetryFilterIndex   = "__ocp_httproute_referencing_retryfilter"
+	HTTPRoute_RouteTimeoutFilterIndex = "__ocp_httproute_referencing_timeoutfilter"
+	HTTPRoute_RouteAuthFilterIndex    = "__ocp_httproute_referencing_routeauthfilter"
 
-	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
-	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
-	TCPRoute_MeshServiceIndex = "__tcproute_referencing_mesh_service"
+	TCPRoute_GatewayIndex     = "__ocp_tcproute_referencing_gateway"
+	TCPRoute_ServiceIndex     = "__ocp_tcproute_referencing_service"
+	TCPRoute_MeshServiceIndex = "__ocp_tcproute_referencing_mesh_service"
 
-	MeshService_PeerIndex      = "__meshservice_referencing_peer"
-	Secret_GatewayIndex        = "__secret_referencing_gateway"
-	Gatewaypolicy_GatewayIndex = "__gatewaypolicy_referencing_gateway"
+	MeshService_PeerIndex      = "__ocp_meshservice_referencing_peer"
+	Secret_GatewayIndex        = "__ocp_secret_referencing_gateway"
+	Gatewaypolicy_GatewayIndex = "__ocp_gatewaypolicy_referencing_gateway"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the OCP API gateway controllers.
@@ -109,6 +109,11 @@ var indexes = []index{
 		name:        TCPRoute_MeshServiceIndex,
 		target:      &gwv1alpha2.TCPRoute{},
 		indexerFunc: meshServicesForTCPRoute,
+	},
+	{
+		name:        MeshService_PeerIndex,
+		target:      &v1alpha1.MeshService{},
+		indexerFunc: peersForMeshService,
 	},
 	{
 		name:        HTTPRoute_RouteRetryFilterIndex,
