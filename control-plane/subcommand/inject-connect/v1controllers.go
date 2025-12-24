@@ -177,7 +177,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 
 	// New OCP API Gateway Controllers
 	if err := ocpgatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to register field indexes")
+		setupLog.Error(err, "ocp: unable to register field indexes")
 		return err
 	}
 
@@ -187,7 +187,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("ocpcontroller").WithName("ocpgateways"),
 	}).SetupWithManager(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to create ocp controller", "ocpcontroller", ocpgatewaycontrollers.GatewayClassConfigController{})
+		setupLog.Error(err, "ocp: unable to create controller", "ocpcontroller", ocpgatewaycontrollers.GatewayClassConfigController{})
 		return err
 	}
 
@@ -198,7 +198,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("ocpcontrollers").WithName("OCPGatewayClass"),
 	}).SetupWithManager(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "ocpcontroller", "OCPGatewayClass")
+		setupLog.Error(err, "ocp: unable to create controller", "ocpcontroller", "OCPGatewayClass")
 		return err
 	}
 
@@ -243,7 +243,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Datacenter:              c.consul.Datacenter,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to create ocpcontroller", "ocpcontroller", "OCPGateway")
+		setupLog.Error(err, "ocp: unable to create controller", "ocpcontroller", "OCPGateway")
 		return err
 	}
 	// Start the consul cache and cleaner for API Gateway

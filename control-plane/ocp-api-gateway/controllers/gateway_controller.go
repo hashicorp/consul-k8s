@@ -78,12 +78,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	var gateway gwv1beta1.Gateway
 
 	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling Gateway")
+	log.Info("OCP Reconciling Gateway")
 
 	// get the gateway
 	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
 		if !k8serrors.IsNotFound(err) {
-			log.Error(err, "unable to get Gateway")
+			log.Error(err, "ocp: unable to get Gateway")
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -91,41 +91,41 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
 	if err != nil {
-		log.Error(err, "unable to get GatewayClass")
+		log.Error(err, "ocp: unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
 
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
 	if err != nil {
-		log.Error(err, "error fetching the gateway class config")
+		log.Error(err, "ocp: error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
 
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
 	if err != nil {
-		log.Error(err, "unable to list Namespaces")
+		log.Error(err, "ocp: unable to list Namespaces")
 		return ctrl.Result{}, err
 	}
 
 	// get all reference grants
 	grants, err := r.getReferenceGrants(ctx)
 	if err != nil {
-		log.Error(err, "unable to list ReferenceGrants")
+		log.Error(err, "ocp: unable to list ReferenceGrants")
 		return ctrl.Result{}, err
 	}
 
 	// get related gateway service
 	service, err := r.getDeployedGatewayService(ctx, req.NamespacedName)
 	if err != nil {
-		log.Error(err, "unable to fetch service for Gateway")
+		log.Error(err, "ocp: unable to fetch service for Gateway")
 	}
 
 	// get related gateway pods
 	pods, err := r.getDeployedGatewayPods(ctx, gateway)
 	if err != nil {
-		log.Error(err, "unable to list Pods for Gateway")
+		log.Error(err, "ocp: unable to list Pods for Gateway")
 		return ctrl.Result{}, err
 	}
 
@@ -134,7 +134,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	resources := common.NewResourceMap(r.Translator, referenceValidator, log)
 
 	if err := r.fetchCertificatesForGateway(ctx, resources, gateway); err != nil {
-		log.Error(err, "unable to fetch certificates for gateway")
+		log.Error(err, "ocp: unable to fetch certificates for gateway")
 		return ctrl.Result{}, err
 	}
 
@@ -148,39 +148,39 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	resources.ReferenceCountGateway(gateway)
 
 	if err := r.fetchControlledGateways(ctx, resources); err != nil {
-		log.Error(err, "unable to fetch controlled gateways")
+		log.Error(err, "ocp: unable to fetch controlled gateways")
 		return ctrl.Result{}, err
 	}
 
 	// get all http routes referencing this gateway
 	httpRoutes, err := r.getRelatedHTTPRoutes(ctx, req.NamespacedName, resources)
 	if err != nil {
-		log.Error(err, "unable to list HTTPRoutes")
+		log.Error(err, "ocp: unable to list HTTPRoutes")
 		return ctrl.Result{}, err
 	}
 
 	// get all tcp routes referencing this gateway
 	tcpRoutes, err := r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
 	if err != nil {
-		log.Error(err, "unable to list TCPRoutes")
+		log.Error(err, "ocp:unable to list TCPRoutes")
 		return ctrl.Result{}, err
 	}
 
 	if err := r.fetchServicesForRoutes(ctx, resources, tcpRoutes, httpRoutes); err != nil {
-		log.Error(err, "unable to fetch services for routes")
+		log.Error(err, "ocp: unable to fetch services for routes")
 		return ctrl.Result{}, err
 	}
 
 	// get all gatewaypolicies referencing this gateway
 	policies, err := r.getRelatedGatewayPolicies(ctx, req.NamespacedName, resources)
 	if err != nil {
-		log.Error(err, "unable to list gateway policies")
+		log.Error(err, "ocp: unable to list gateway policies")
 		return ctrl.Result{}, err
 	}
 
 	_, err = r.getJWTProviders(ctx, resources)
 	if err != nil {
-		log.Error(err, "unable to list JWT providers")
+		log.Error(err, "ocp: unable to list JWT providers")
 		return ctrl.Result{}, err
 	}
 
@@ -213,18 +213,18 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
-			log.Error(err, "error creating role binding")
+			log.Error(err, "ocp: error creating role binding")
 			return ctrl.Result{}, err
 		}
 
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
-				log.Info("error updating object when updating gateway resources, will try to re-reconcile")
+				log.Info("ocp: error updating object when updating gateway resources, will try to re-reconcile")
 
 				return ctrl.Result{Requeue: true}, nil
 			}
-			log.Error(err, "unable to update gateway resources")
+			log.Error(err, "ocp: unable to update gateway resources")
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.EnsureSubscribed(nonNormalizedConsulKey, req.NamespacedName)
@@ -232,39 +232,39 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
-				log.Info("error updating object when deleting gateway resources, will try to re-reconcile")
+				log.Info("ocp: error updating object when deleting gateway resources, will try to re-reconcile")
 
 				return ctrl.Result{Requeue: true}, nil
 			}
-			log.Error(err, "unable to delete gateway resources")
+			log.Error(err, "ocp: unable to delete gateway resources")
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
 		// make sure we have deregistered all services even if they haven't
 		// hit cache yet
 		if err := r.deregisterAllServices(ctx, nonNormalizedConsulKey); err != nil {
-			log.Error(err, "error deregistering services")
+			log.Error(err, "ocp: error deregistering services")
 			return ctrl.Result{}, err
 		}
 
 		err = r.cache.RemoveRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace)
 		if err != nil {
-			log.Error(err, "error removing acl role bindings")
+			log.Error(err, "ocp: error removing acl role bindings")
 			return ctrl.Result{}, err
 		}
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
-		log.Info("deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
+		log.Info("ocp deleting from Consul", "kind", deletion.Kind, "namespace", deletion.Namespace, "name", deletion.Name)
 		if err := r.cache.Delete(ctx, deletion); err != nil {
-			log.Error(err, "error deleting config entry")
+			log.Error(err, "ocp: error deleting config entry")
 			return ctrl.Result{}, err
 		}
 	}
 
 	for _, update := range updates.Consul.Updates {
 		entry := update.Entry
-		log.Info("updating in Consul", "kind", entry.GetKind(), "namespace", entry.GetNamespace(), "name", entry.GetName())
+		log.Info("ocp: updating in Consul", "kind", entry.GetKind(), "namespace", entry.GetNamespace(), "name", entry.GetName())
 		err := r.cache.Write(ctx, entry)
 		if update.OnUpdate != nil {
 			// swallow any potential error with our handler if one is provided
@@ -273,7 +273,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		if err != nil {
-			log.Error(err, "error updating config entry")
+			log.Error(err, "ocp:error updating config entry")
 			return ctrl.Result{}, err
 		}
 	}
@@ -283,44 +283,44 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// otherwise, we've already deregistered everything related to the gateway, so
 		// no need to do any of the following.
 		for _, registration := range updates.Consul.Registrations {
-			log.Info("registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
+			log.Info("ocp: registering service in Consul", "service", registration.Service.Service, "id", registration.Service.ID)
 			if err := r.cache.Register(ctx, registration); err != nil {
-				log.Error(err, "error registering service")
+				log.Error(err, "ocp: error registering service")
 				return ctrl.Result{}, err
 			}
 		}
 
 		for _, deregistration := range updates.Consul.Deregistrations {
-			log.Info("deregistering service in Consul", "id", deregistration.ServiceID)
+			log.Info("ocp: deregistering service in Consul", "id", deregistration.ServiceID)
 			if err := r.cache.Deregister(ctx, deregistration); err != nil {
-				log.Error(err, "error deregistering service")
+				log.Error(err, "ocp: error deregistering service")
 				return ctrl.Result{}, err
 			}
 		}
 	}
 
 	for _, update := range updates.Kubernetes.Updates.Operations() {
-		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
+		log.Info("ocp update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.updateAndResetStatus(ctx, update); err != nil {
 			if k8serrors.IsConflict(err) {
-				log.Info("error updating object for gateway, will try to re-reconcile")
+				log.Info("ocp: error updating object for gateway, will try to re-reconcile")
 
 				return ctrl.Result{Requeue: true}, nil
 			}
-			log.Error(err, "error updating object")
+			log.Error(err, "ocp: error updating object")
 			return ctrl.Result{}, err
 		}
 	}
 
 	for _, update := range updates.Kubernetes.StatusUpdates.Operations() {
-		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
+		log.Info("ocp: update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
 		if err := r.Client.Status().Update(ctx, update); err != nil {
 			if k8serrors.IsConflict(err) {
-				log.Info("error updating status for gateway, will try to re-reconcile")
+				log.Info("ocp: error updating status for gateway, will try to re-reconcile")
 
 				return ctrl.Result{Requeue: true}, nil
 			}
-			log.Error(err, "error updating status")
+			log.Error(err, "ocp: error updating status")
 			return ctrl.Result{}, err
 		}
 	}
@@ -676,16 +676,16 @@ func (r *GatewayController) transformConsulJWTProvider(ctx context.Context) func
 		var gateways []types.NamespacedName
 
 		jwtEntry := entry.(*api.JWTProviderConfigEntry)
-		r.Log.Info("gatewaycontroller", "gateway items", r.cache.List(api.APIGateway))
+		r.Log.Info("ocp: gatewaycontroller", "gateway items", r.cache.List(api.APIGateway))
 		for _, gwEntry := range r.cache.List(api.APIGateway) {
 			gateway := gwEntry.(*api.APIGatewayConfigEntry)
 		LISTENER_LOOP:
 			for _, listener := range gateway.Listeners {
 
-				r.Log.Info("override names", "listener", fmt.Sprintf("%#v", listener))
+				r.Log.Info("ocp: override names", "listener", fmt.Sprintf("%#v", listener))
 				if listener.Override != nil && listener.Override.JWT != nil {
 					for _, provider := range listener.Override.JWT.Providers {
-						r.Log.Info("override names", "provider", provider.Name, "entry", jwtEntry.Name)
+						r.Log.Info("ocp: override names", "provider", provider.Name, "entry", jwtEntry.Name)
 						if provider.Name == jwtEntry.Name {
 							gateways = append(gateways, common.EntryToNamespacedName(gateway))
 							continue LISTENER_LOOP
@@ -753,7 +753,7 @@ func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tc
 		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
 		}); err != nil {
-			r.Log.Error(err, "unable to list TCPRoutes")
+			r.Log.Error(err, "ocp: unable to list TCPRoutes")
 		}
 		for _, route := range tcpRouteList.Items {
 			for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
@@ -766,7 +766,7 @@ func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tc
 	if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(httpIndex, key),
 	}); err != nil {
-		r.Log.Error(err, "unable to list HTTPRoutes")
+		r.Log.Error(err, "ocp:unable to list HTTPRoutes")
 	}
 	for _, route := range httpRouteList.Items {
 		for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
@@ -870,7 +870,7 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 
 		_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources)
 		if err != nil {
-			c.Log.Error(err, "unable to list HTTPRoute ExternalFilters")
+			c.Log.Error(err, "ocp:unable to list HTTPRoute ExternalFilters")
 			return nil, err
 		}
 	}
@@ -928,7 +928,7 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 		}, externalFilter)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				c.Log.Info(fmt.Sprintf("externalref %s:%s not found: %v", filter.ExtensionRef.Kind, filter.ExtensionRef.Name, err))
+				c.Log.Info(fmt.Sprintf("ocp: externalref %s:%s not found: %v", filter.ExtensionRef.Kind, filter.ExtensionRef.Name, err))
 				// ignore, the validation call should mark this route as error
 				continue
 			} else {

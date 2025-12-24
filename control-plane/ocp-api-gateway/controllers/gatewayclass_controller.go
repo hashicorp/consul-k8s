@@ -42,8 +42,8 @@ type GatewayClassController struct {
 
 // Reconcile handles the reconciliation loop for GatewayClass objects.
 func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("gatewayClass", req.NamespacedName.Name)
-	log.V(1).Info("Reconciling GatewayClass")
+	log := r.Log.WithValues("ocpGatewayClass", req.NamespacedName.Name)
+	log.V(1).Info("ocp: Reconciling GatewayClass")
 
 	gc := &gwv1beta1.GatewayClass{}
 
@@ -52,7 +52,7 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		if k8serrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "unable to get GatewayClass")
+		log.Error(err, "ocp: unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
 
@@ -60,7 +60,7 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		// This GatewayClass is not for this controller.
 		_, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
 		if err != nil {
-			log.Error(err, "unable to remove finalizer")
+			log.Error(err, "ocp: unable to remove finalizer")
 		}
 
 		return ctrl.Result{}, err
@@ -70,21 +70,21 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 		// We have a deletion request. Ensure we are not in use.
 		used, err := r.isGatewayClassInUse(ctx, gc)
 		if err != nil {
-			log.Error(err, "unable to check if GatewayClass is in use")
+			log.Error(err, "ocp: unable to check if GatewayClass is in use")
 			return ctrl.Result{}, err
 		}
 		if used {
-			log.Info("GatewayClass is in use, cannot delete")
+			log.Info("ocp: GatewayClass is in use, cannot delete")
 			return ctrl.Result{}, nil
 		}
 		// Remove our finalizer.
 		if _, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer); err != nil {
 			if k8serrors.IsConflict(err) {
-				log.V(1).Info("error removing finalizer for gatewayClass, will try to re-reconcile")
+				log.V(1).Info("ocp: error removing finalizer for gatewayClass, will try to re-reconcile")
 
 				return ctrl.Result{Requeue: true}, nil
 			}
-			log.Error(err, "unable to remove finalizer")
+			log.Error(err, "ocp: unable to remove finalizer")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
@@ -94,11 +94,11 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
 	if err != nil {
 		if k8serrors.IsConflict(err) {
-			log.V(1).Info("error adding finalizer for gatewayClass, will try to re-reconcile")
+			log.V(1).Info("ocp: error adding finalizer for gatewayClass, will try to re-reconcile")
 
 			return ctrl.Result{Requeue: true}, nil
 		}
-		log.Error(err, "unable to add finalizer")
+		log.Error(err, "ocp: unable to add finalizer")
 		return ctrl.Result{}, err
 	}
 	if didUpdate {
@@ -110,17 +110,17 @@ func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request
 	if didUpdate {
 		if err := r.Client.Status().Update(ctx, gc); err != nil {
 			if k8serrors.IsConflict(err) {
-				log.V(1).Info("error updating status for gatewayClass, will try to re-reconcile")
+				log.V(1).Info("ocp: error updating status for gatewayClass, will try to re-reconcile")
 
 				return ctrl.Result{Requeue: true}, nil
 			}
-			log.Error(err, "unable to update status for GatewayClass")
+			log.Error(err, "ocp: unable to update status for GatewayClass")
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 	if err != nil {
-		log.Error(err, "unable to validate ParametersRef")
+		log.Error(err, "ocp: unable to validate ParametersRef")
 	}
 
 	return ctrl.Result{}, err
@@ -175,7 +175,7 @@ func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *
 			return didUpdate, nil
 		}
 		if err != nil {
-			log.Error(err, "unable to fetch GatewayClassConfig")
+			log.Error(err, "ocp: unable to fetch GatewayClassConfig")
 			return false, err
 		}
 	}
@@ -228,7 +228,7 @@ func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler() hand
 			FieldSelector: fields.OneTermEqualSelector(GatewayClass_GatewayClassConfigIndex, o.GetName()),
 		})
 		if err != nil {
-			r.Log.Error(err, "unable to list gateway classes")
+			r.Log.Error(err, "ocp: unable to list gateway classes")
 		}
 
 		// Create a reconcile request for each GatewayClass.
