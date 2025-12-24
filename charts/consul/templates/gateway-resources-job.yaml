@@ -48,6 +48,7 @@ spec:
             - -gateway-class-name=consul
             - -gateway-class-config-name=consul-api-gateway
             - -controller-name=consul.hashicorp.com/gateway-controller
+            - -ocp-controller-name=consul.hashicorp.com/ocp-gateway-controller
             - -app={{template "consul.name" .}}
             - -chart={{template "consul.chart" .}}
             - -heritage={{ .Release.Service }}

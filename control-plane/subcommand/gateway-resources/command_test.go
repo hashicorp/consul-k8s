@@ -94,6 +94,19 @@ func TestRun_flagValidation(t *testing.T) {
 			},
 			expectedErr: "-controller-name must be set",
 		},
+		"required ocp controller name": {
+			cmd: &Command{
+				flagGatewayClassConfigName: "test",
+				flagGatewayClassName:       "test",
+				flagHeritage:               "test",
+				flagChart:                  "test",
+				flagApp:                    "test",
+				flagRelease:                "test",
+				flagComponent:              "test",
+				flagControllerName:         "test",
+			},
+			expectedErr: "-ocp-controller-name must be set",
+		},
 		"required valid tolerations": {
 			cmd: &Command{
 				flagGatewayClassConfigName: "test",
@@ -104,6 +117,7 @@ func TestRun_flagValidation(t *testing.T) {
 				flagRelease:                "test",
 				flagComponent:              "test",
 				flagControllerName:         "test",
+				flagOCPControllerName:      "test",
 				flagTolerations:            "foo",
 			},
 			expectedErr: "error decoding tolerations: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into []gatewayresources.toleration",
@@ -118,6 +132,7 @@ func TestRun_flagValidation(t *testing.T) {
 				flagRelease:                "test",
 				flagComponent:              "test",
 				flagControllerName:         "test",
+				flagOCPControllerName:      "test",
 				flagNodeSelector:           "foo",
 			},
 			expectedErr: "error decoding node selector: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into map[string]string",
@@ -132,6 +147,7 @@ func TestRun_flagValidation(t *testing.T) {
 				flagRelease:                "test",
 				flagComponent:              "test",
 				flagControllerName:         "test",
+				flagOCPControllerName:      "test",
 				flagServiceAnnotations:     "foo",
 			},
 			expectedErr: "error decoding service annotations: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into []string",
@@ -146,6 +162,7 @@ func TestRun_flagValidation(t *testing.T) {
 				flagRelease:                "test",
 				flagComponent:              "test",
 				flagControllerName:         "test",
+				flagOCPControllerName:      "test",
 			},
 		},
 		"valid with optional flags": {
@@ -158,6 +175,7 @@ func TestRun_flagValidation(t *testing.T) {
 				flagRelease:                "test",
 				flagComponent:              "test",
 				flagControllerName:         "test",
+				flagOCPControllerName:      "test",
 				flagNodeSelector: `
 foo: 1
 bar: 2`,

@@ -72,6 +72,7 @@ type Command struct {
 	flagRelease                string
 	flagComponent              string
 	flagControllerName         string
+	flagOCPControllerName      string
 	flagGatewayClassName       string
 	flagGatewayClassConfigName string
 
@@ -127,6 +128,8 @@ func (c *Command) init() {
 		"Helm chart component for created objects.")
 	c.flags.StringVar(&c.flagControllerName, "controller-name", "",
 		"The controller name value to use in the GatewayClass.")
+	c.flags.StringVar(&c.flagOCPControllerName, "ocp-controller-name", "",
+		"The OCP controller name value to use in the OCP GatewayClass.")
 	c.flags.StringVar(&c.flagServiceType, "service-type", "",
 		"The service type to use for a gateway deployment.",
 	)
@@ -281,7 +284,7 @@ func (c *Command) Run(args []string) int {
 	customClass := &customgwv1beta1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
 		Spec: customgwv1beta1.GatewayClassSpec{
-			ControllerName: customgwv1beta1.GatewayController(c.flagControllerName),
+			ControllerName: customgwv1beta1.GatewayController(c.flagOCPControllerName),
 			ParametersRef: &customgwv1beta1.ParametersReference{
 				Group: customgwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
 				Kind:  customgwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
@@ -330,6 +333,9 @@ func (c *Command) validateFlags() error {
 	}
 	if c.flagControllerName == "" {
 		return errors.New("-controller-name must be set")
+	}
+	if c.flagOCPControllerName == "" {
+		return errors.New("-ocp-controller-name must be set")
 	}
 	if c.flagTolerations != "" {
 		var tolerations []toleration
@@ -460,6 +466,7 @@ func forceClass(ctx context.Context, k8sClient client.Client, o *gwv1beta1.Gatew
 	}, exponentialBackoffWithMaxIntervalAndTime())
 }
 
+// Update of the gateway class crd happens here
 func forceCustomClass(ctx context.Context, k8sClient client.Client, o *customgwv1beta1.GatewayClass) error {
 	return backoff.Retry(func() error {
 		var existing customgwv1beta1.GatewayClass
