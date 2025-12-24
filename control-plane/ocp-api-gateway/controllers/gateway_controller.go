@@ -77,7 +77,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var gateway gwv1beta1.Gateway
 
-	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
+	log := r.Log.V(1).WithValues("ocpgateway", req.NamespacedName)
 	log.Info("OCP Reconciling Gateway")
 
 	// get the gateway

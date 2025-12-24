@@ -194,7 +194,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	// Need to check if its required to have separate instance of GatewayClassController for OCP API Gateway
 	// Register GatewayClassController again for OCP API Gateway
 	if err := (&ocpgatewaycontrollers.GatewayClassController{
-		ControllerName: gatewaycommon.GatewayClassControllerName,
+		ControllerName: ocpgatewaycommon.GatewayClassControllerName,
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("ocpcontrollers").WithName("OCPGatewayClass"),
 	}).SetupWithManager(ctx, mgr); err != nil {
