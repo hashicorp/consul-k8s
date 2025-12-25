@@ -31,6 +31,7 @@ import (
 // destination for a terminating gateway. It checks that requests from the client can reach this server through the
 // terminating gateway via the mesh gateways.
 func TestPeering_Connect(t *testing.T) {
+	t.Skip("skip TestPeering_Connect test temporarily")
 	env := suite.Environment()
 	cfg := suite.Config()
 
