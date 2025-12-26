@@ -3,12 +3,12 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1923
-    gateway.networking.k8s.io/bundle-version: v0.7.1
-    gateway.networking.k8s.io/channel: standard
+    consul.networking.io/bundle-version: v0.7.1
+    consul.networking.io/channel: standard
   creationTimestamp: null
-  name: httproutes.gateway.networking.k8s.io
+  name: httproutes.consul.networking.io
 spec:
-  group: gateway.networking.k8s.io
+  group: consul.networking.io
   names:
     categories:
     - gateway-api
@@ -138,9 +138,9 @@ spec:
                     be registered in the cluster for this reference to be valid."
                   properties:
                     group:
-                      default: gateway.networking.k8s.io
+                      default: consul.networking.io
                       description: "Group is the group of the referent. When unspecified,
-                        \"gateway.networking.k8s.io\" is inferred. To set the core
+                        \"consul.networking.io\" is inferred. To set the core
                         API group (such as for a \"Service\" kind referent), Group
                         must be explicitly set to \"\" (empty string). \n Support:
                         Core"
@@ -265,7 +265,7 @@ spec:
                                   properties:
                                     group:
                                       description: Group is the group of the referent.
-                                        For example, "gateway.networking.k8s.io".
+                                        For example, "consul.networking.io".
                                         When unspecified or empty string, core API
                                         group is inferred.
                                       maxLength: 253
@@ -426,7 +426,7 @@ spec:
                                         group:
                                           default: ""
                                           description: Group is the group of the referent.
-                                            For example, "gateway.networking.k8s.io".
+                                            For example, "consul.networking.io".
                                             When unspecified or empty string, core
                                             API group is inferred.
                                           maxLength: 253
@@ -828,7 +828,7 @@ spec:
                           group:
                             default: ""
                             description: Group is the group of the referent. For example,
-                              "gateway.networking.k8s.io". When unspecified or empty
+                              "consul.networking.io". When unspecified or empty
                               string, core API group is inferred.
                             maxLength: 253
                             pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -939,7 +939,7 @@ spec:
                             properties:
                               group:
                                 description: Group is the group of the referent. For
-                                  example, "gateway.networking.k8s.io". When unspecified
+                                  example, "consul.networking.io". When unspecified
                                   or empty string, core API group is inferred.
                                 maxLength: 253
                                 pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -1090,7 +1090,7 @@ spec:
                                   group:
                                     default: ""
                                     description: Group is the group of the referent.
-                                      For example, "gateway.networking.k8s.io". When
+                                      For example, "consul.networking.io". When
                                       unspecified or empty string, core API group
                                       is inferred.
                                     maxLength: 253
@@ -1808,9 +1808,9 @@ spec:
                         that this RouteParentStatus struct describes the status of.
                       properties:
                         group:
-                          default: gateway.networking.k8s.io
+                          default: consul.networking.io
                           description: "Group is the group of the referent. When unspecified,
-                            \"gateway.networking.k8s.io\" is inferred. To set the
+                            \"consul.networking.io\" is inferred. To set the
                             core API group (such as for a \"Service\" kind referent),
                             Group must be explicitly set to \"\" (empty string). \n
                             Support: Core"
@@ -2006,9 +2006,9 @@ spec:
                     be registered in the cluster for this reference to be valid."
                   properties:
                     group:
-                      default: gateway.networking.k8s.io
+                      default: consul.networking.io
                       description: "Group is the group of the referent. When unspecified,
-                        \"gateway.networking.k8s.io\" is inferred. To set the core
+                        \"consul.networking.io\" is inferred. To set the core
                         API group (such as for a \"Service\" kind referent), Group
                         must be explicitly set to \"\" (empty string). \n Support:
                         Core"
@@ -2133,7 +2133,7 @@ spec:
                                   properties:
                                     group:
                                       description: Group is the group of the referent.
-                                        For example, "gateway.networking.k8s.io".
+                                        For example, "consul.networking.io".
                                         When unspecified or empty string, core API
                                         group is inferred.
                                       maxLength: 253
@@ -2294,7 +2294,7 @@ spec:
                                         group:
                                           default: ""
                                           description: Group is the group of the referent.
-                                            For example, "gateway.networking.k8s.io".
+                                            For example, "consul.networking.io".
                                             When unspecified or empty string, core
                                             API group is inferred.
                                           maxLength: 253
@@ -2696,7 +2696,7 @@ spec:
                           group:
                             default: ""
                             description: Group is the group of the referent. For example,
-                              "gateway.networking.k8s.io". When unspecified or empty
+                              "consul.networking.io". When unspecified or empty
                               string, core API group is inferred.
                             maxLength: 253
                             pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -2807,7 +2807,7 @@ spec:
                             properties:
                               group:
                                 description: Group is the group of the referent. For
-                                  example, "gateway.networking.k8s.io". When unspecified
+                                  example, "consul.networking.io". When unspecified
                                   or empty string, core API group is inferred.
                                 maxLength: 253
                                 pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -2958,7 +2958,7 @@ spec:
                                   group:
                                     default: ""
                                     description: Group is the group of the referent.
-                                      For example, "gateway.networking.k8s.io". When
+                                      For example, "consul.networking.io". When
                                       unspecified or empty string, core API group
                                       is inferred.
                                     maxLength: 253
@@ -3676,9 +3676,9 @@ spec:
                         that this RouteParentStatus struct describes the status of.
                       properties:
                         group:
-                          default: gateway.networking.k8s.io
+                          default: consul.networking.io
                           description: "Group is the group of the referent. When unspecified,
-                            \"gateway.networking.k8s.io\" is inferred. To set the
+                            \"consul.networking.io\" is inferred. To set the
                             core API group (such as for a \"Service\" kind referent),
                             Group must be explicitly set to \"\" (empty string). \n
                             Support: Core"

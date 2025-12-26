@@ -442,7 +442,7 @@ type RouteGroupKind struct {
 	// Group is the group of the Route.
 	//
 	// +optional
-	// +kubebuilder:default=gateway.networking.k8s.io
+	// +kubebuilder:default=consul.networking.io
 	Group *Group `json:"group,omitempty"`
 
 	// Kind is the kind of the Route.

@@ -113,7 +113,7 @@ more nuance here, so for the full details, refer to the GEP. (#1843, @robscott)
 - Updated spec to clarify that Exact matches have precedence over Prefix matches
   and RegularExpression matches have implementation specific precedence. (#1855,
   @Xunzhuo)
-- The `gateway-exists-finalizer.gateway.networking.k8s.io` finalizer is no
+- The `gateway-exists-finalizer.consul.networking.io` finalizer is no
   longer required and is now just recommended. (#1917, @howardjohn)
 
 ### Validation Fixes
@@ -236,7 +236,7 @@ The changelog below represents the changes since v0.7.0-rc1.
 - Updated spec to clarify that Exact matches have precedence over Prefix matches
   and RegularExpression matches have implementation specific precedence. (#1855,
   @Xunzhuo)
-- The `gateway-exists-finalizer.gateway.networking.k8s.io` finalizer is no
+- The `gateway-exists-finalizer.consul.networking.io` finalizer is no
   longer required and is now just recommended. (#1917, @howardjohn)
 
 ### Validation Fixes
@@ -733,8 +733,8 @@ The following APIs have been promoted to a `v1beta1` maturity:
 - Routes can now select `Gateway` listeners by port number
   [#1002](https://github.com/kubernetes-sigs/gateway-api/pull/1002)
 - Gateway API now includes "Experimental" release channel. Consequently, CRDs now
-  include `gateway.networking.k8s.io/bundle-version` and
-  `gateway.networking.k8s.io/channel` annotations.
+  include `consul.networking.io/bundle-version` and
+  `consul.networking.io/channel` annotations.
   [#945](https://github.com/kubernetes-sigs/gateway-api/pull/945)
 - URL Rewrites and Path redirects have been added as new "Experimental" features
   [#945](https://github.com/kubernetes-sigs/gateway-api/pull/945)
@@ -918,8 +918,8 @@ The following APIs have been promoted to a `v1beta1` maturity:
 - Routes can now select `Gateway` listeners by port number
   [#1002](https://github.com/kubernetes-sigs/gateway-api/pull/1002)
 - Gateway API now includes "Experimental" release channel. Consequently, CRDs now
-  include `gateway.networking.k8s.io/bundle-version` and
-  `gateway.networking.k8s.io/channel` annotations.
+  include `consul.networking.io/bundle-version` and
+  `consul.networking.io/channel` annotations.
   [#945](https://github.com/kubernetes-sigs/gateway-api/pull/945)
 - URL Rewrites and Path redirects have been added as new "Experimental" features
   [#945](https://github.com/kubernetes-sigs/gateway-api/pull/945)
@@ -1067,7 +1067,7 @@ The following changes have been made since v0.3.0:
 ### Major Changes
 
 * The Gateway API APIGroup has moved from `networking.x-k8s.io` to
-  `gateway.networking.k8s.io`. This means that, as far as the apiserver is
+  `consul.networking.io`. This means that, as far as the apiserver is
   concerned, this version is wholly distinct from v1alpha1, and automatic
   conversion is not possible. As part of this process, Gateway API is now
   subject to Kubernetes API review, the same as changes made to core API
@@ -1410,7 +1410,7 @@ possibility of incompatible changes prior to the final release.
 ### Major Changes
 
 * The Gateway API APIGroup has moved from `networking.x-k8s.io` to
-`gateway.networking.k8s.io`. This means that, as far as the apiserver is
+`consul.networking.io`. This means that, as far as the apiserver is
 concerned, this version is wholly distinct from v1alpha1, and automatic conversion
 is not possible. As part of this process, Gateway API is now subject to Kubernetes
 API review, the same as changes made to core API resources. More details in

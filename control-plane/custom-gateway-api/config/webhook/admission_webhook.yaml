@@ -3,11 +3,11 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: gateway-api-admission
 webhooks:
-- name: validate.gateway.networking.k8s.io
+- name: validate.consul.networking.io
   matchPolicy: Equivalent
   rules:
   - operations: [ "CREATE" , "UPDATE" ]
-    apiGroups: [ "gateway.networking.k8s.io" ]
+    apiGroups: [ "consul.networking.io" ]
     apiVersions: [ "v1alpha2", "v1beta1" ]
     resources: [ "gateways", "gatewayclasses", "httproutes" ]
   failurePolicy: Fail

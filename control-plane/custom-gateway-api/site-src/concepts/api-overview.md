@@ -18,7 +18,7 @@ section in the Security model for details.
 ## Resource model
 
 !!! note
-    Gateway API resources are in the `gateway.networking.k8s.io` API group as
+    Gateway API resources are in the `consul.networking.io` API group as
     Custom Resource Definitions (CRDs). Unqualified resource names below will
     implicitly be in this API group.
 

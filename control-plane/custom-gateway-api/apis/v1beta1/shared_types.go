@@ -29,13 +29,13 @@ import (
 // be registered in the cluster for this reference to be valid.
 type ParentReference struct {
 	// Group is the group of the referent.
-	// When unspecified, "gateway.networking.k8s.io" is inferred.
+	// When unspecified, "consul.networking.io" is inferred.
 	// To set the core API group (such as for a "Service" kind referent),
 	// Group must be explicitly set to "" (empty string).
 	//
 	// Support: Core
 	//
-	// +kubebuilder:default=gateway.networking.k8s.io
+	// +kubebuilder:default=consul.networking.io
 	// +optional
 	Group *Group `json:"group,omitempty"`
 
@@ -403,7 +403,7 @@ type PreciseHostname string
 // Valid values include:
 //
 // * "" - empty string implies core Kubernetes API group
-// * "gateway.networking.k8s.io"
+// * "consul.networking.io"
 // * "foo.example.com"
 //
 // Invalid values include:

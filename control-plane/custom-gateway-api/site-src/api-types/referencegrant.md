@@ -57,7 +57,7 @@ metadata:
   namespace: bar
 spec:
   from:
-  - group: gateway.networking.k8s.io
+  - group: consul.networking.io
     kind: HTTPRoute
     namespace: foo
   to:
@@ -82,7 +82,7 @@ While the API is simplistic in nature, it comes with a few notable decisions:
    other. This makes it impossible for them to conflict with each other.
 
 Please see the [API
-Specification](/references/spec#gateway.networking.k8s.io/v1alpha2.ReferenceGrant)
+Specification](/references/spec#consul.networking.io/v1alpha2.ReferenceGrant)
 for more details on how specific ReferenceGrant fields are interpreted.
 
 ## Implementation Guidelines
@@ -148,5 +148,5 @@ for cross-namespace references, except as noted in the Exceptions section above.
 ReferenceGrant is starting to gain interest outside of Gateway API and SIG
 Network use cases. It is possible that this resource may move to a more neutral
 home. Users of the ReferenceGrant API may be required to transition to a
-different API Group (instead of `gateway.networking.k8s.io`) at some point in
+different API Group (instead of `consul.networking.io`) at some point in
 the future.

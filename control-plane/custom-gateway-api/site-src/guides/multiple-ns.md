@@ -93,7 +93,7 @@ or which apps can use this Gateway by allowlisting a set of Namespaces.
 
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: Gateway
 spec:
   listeners:
@@ -155,7 +155,7 @@ Gateway that these Routes want to attach to.
 
 After these three Routes are deployed, they will all be attached to the
 `shared-gateway` Gateway. The Gateway merges these Routes into a single flat
-list of routing rules. [Routing precedence](/references/spec/#gateway.networking.k8s.io/v1beta1.HTTPRouteRule)
+list of routing rules. [Routing precedence](/references/spec/#consul.networking.io/v1beta1.HTTPRouteRule)
 between these routing rules is determined by most specific match and
 conflicts are handled according to [conflict
 resolution](/concepts/guidelines#conflicts). This provides predictable and

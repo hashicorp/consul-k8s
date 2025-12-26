@@ -27,7 +27,7 @@ here for implementations to support other types of parent resources.
 
 The following example shows how a Route would attach to the `acme-lb` Gateway:
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: HTTPRoute
 metadata:
   name: httproute-example
@@ -56,7 +56,7 @@ rules and filters (optional).
 
 The following example defines hostname "my.example.com":
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: HTTPRoute
 metadata:
   name: httproute-example
@@ -78,7 +78,7 @@ independent, i.e. this rule will be matched if any single match is satisfied.
 
 Take the following matches configuration as an example:
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: HTTPRoute
 ...
 matches:
@@ -177,7 +177,7 @@ appropriate when the route is modified.
 The following example indicates HTTPRoute "http-example" has been accepted by
 Gateway "gw-example" in namespace "gw-example-ns":
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: HTTPRoute
 metadata:
   name: http-example
@@ -198,12 +198,12 @@ only one Route rule may match each request. For more information on how conflict
 resolution applies to merging, refer to the [API specification][httprouterule].
 
 
-[httproute]: /references/spec/#gateway.networking.k8s.io/v1beta1.HTTPRoute
-[httprouterule]: /references/spec/#gateway.networking.k8s.io/v1beta1.HTTPRouteRule
-[hostname]: /references/spec/#gateway.networking.k8s.io/v1beta1.Hostname
+[httproute]: /references/spec/#consul.networking.io/v1beta1.HTTPRoute
+[httprouterule]: /references/spec/#consul.networking.io/v1beta1.HTTPRouteRule
+[hostname]: /references/spec/#consul.networking.io/v1beta1.Hostname
 [rfc-3986]: https://tools.ietf.org/html/rfc3986
-[matches]: /references/spec/#gateway.networking.k8s.io/v1beta1.HTTPRouteMatch
-[filters]: /references/spec/#gateway.networking.k8s.io/v1beta1.HTTPRouteFilter
-[backendRef]: /references/spec/#gateway.networking.k8s.io/v1beta1.HTTPBackendRef
-[parentRef]: /references/spec/#gateway.networking.k8s.io/v1beta1.ParentRef
+[matches]: /references/spec/#consul.networking.io/v1beta1.HTTPRouteMatch
+[filters]: /references/spec/#consul.networking.io/v1beta1.HTTPRouteFilter
+[backendRef]: /references/spec/#consul.networking.io/v1beta1.HTTPBackendRef
+[parentRef]: /references/spec/#consul.networking.io/v1beta1.ParentRef
 

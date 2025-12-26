@@ -1,6 +1,6 @@
 #$ Used in:
 #$ - site-src/guides/grpc-routing.md
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: GRPCRoute
 metadata:
   name: foo-route

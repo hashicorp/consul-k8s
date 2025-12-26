@@ -61,8 +61,8 @@ Each CRD will be published with annotations that indicate their bundle version
 and channel:
 
 ```
-gateway.networking.k8s.io/bundle-version: v0.4.0
-gateway.networking.k8s.io/channel: standard|experimental
+consul.networking.io/bundle-version: v0.4.0
+consul.networking.io/channel: standard|experimental
 ```
 
 ## What can Change

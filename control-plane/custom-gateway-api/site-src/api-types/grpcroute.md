@@ -82,7 +82,7 @@ here for implementations to support other types of parent resources.
 The following example shows how a Route would attach to the `acme-lb` Gateway:
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: GRPCRoute
 metadata:
   name: grpcroute-example
@@ -111,7 +111,7 @@ rules and filters (optional).
 
 The following example defines hostname "my.example.com":
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: GRPCRoute
 metadata:
   name: grpcroute-example
@@ -133,7 +133,7 @@ independent, i.e. this rule will be matched if any single match is satisfied.
 
 Take the following matches configuration as an example:
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: GRPCRoute
 ...
 matches:
@@ -237,7 +237,7 @@ appropriate when the route is modified.
 The following example indicates GRPCRoute "grpc-example" has been accepted by
 Gateway "gw-example" in namespace "gw-example-ns":
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: GRPCRoute
 metadata:
   name: grpc-example
@@ -258,12 +258,12 @@ only one Route rule may match each request. For more information on how conflict
 resolution applies to merging, refer to the [API specification][grpcrouterule].
 
 
-[grpcroute]: /references/spec/#gateway.networking.k8s.io/v1alpha2.GRPCPRoute
-[grpcrouterule]: /references/spec/#gateway.networking.k8s.io/v1alpha2.GRPCRouteRule
-[hostname]: /references/spec/#gateway.networking.k8s.io/v1beta1.Hostname
+[grpcroute]: /references/spec/#consul.networking.io/v1alpha2.GRPCPRoute
+[grpcrouterule]: /references/spec/#consul.networking.io/v1alpha2.GRPCRouteRule
+[hostname]: /references/spec/#consul.networking.io/v1beta1.Hostname
 [rfc-3986]: https://tools.ietf.org/html/rfc3986
-[matches]: /references/spec/#gateway.networking.k8s.io/v1alpha2.GRPCRouteMatch
-[filters]: /references/spec/#gateway.networking.k8s.io/v1alpha2.GRPCRouteFilter
-[backendRef]: /references/spec/#gateway.networking.k8s.io/v1alpha2.GRPCBackendRef
-[parentRef]: /references/spec/#gateway.networking.k8s.io/v1beta1.ParentRef
+[matches]: /references/spec/#consul.networking.io/v1alpha2.GRPCRouteMatch
+[filters]: /references/spec/#consul.networking.io/v1alpha2.GRPCRouteFilter
+[backendRef]: /references/spec/#consul.networking.io/v1alpha2.GRPCBackendRef
+[parentRef]: /references/spec/#consul.networking.io/v1beta1.ParentRef
 

@@ -21,7 +21,7 @@ the highlights.
 ### New API Group
 To recognize our status as an official Kubernetes API, we've transitioned from
 an experimental API group (`networking.x-k8s.io`) to the new
-`gateway.networking.k8s.io` API group. This means that, as far as the apiserver
+`consul.networking.io` API group. This means that, as far as the apiserver
 is concerned, this version is wholly distinct from v1alpha1, and automatic
 conversion is not possible.
 
@@ -42,7 +42,7 @@ For example, the following HTTPRoute uses the `parentRefs` field to attach
 itself to the `prod-web-gw` Gateway.
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: HTTPRoute
 metadata:
   name: foo
@@ -83,13 +83,13 @@ namespace to forward traffic to Services wherever this ReferenceGrant was
 installed:
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: ReferenceGrant
 metadata:
   name: allow-prod-traffic
 spec:
   from:
-  - group: gateway.networking.k8s.io
+  - group: consul.networking.io
     kind: HTTPRoute
     namespace: prod
   to:

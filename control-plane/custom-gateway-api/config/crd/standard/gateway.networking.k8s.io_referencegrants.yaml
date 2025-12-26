@@ -3,12 +3,12 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1923
-    gateway.networking.k8s.io/bundle-version: v0.7.1
-    gateway.networking.k8s.io/channel: standard
+    consul.networking.io/bundle-version: v0.7.1
+    consul.networking.io/channel: standard
   creationTimestamp: null
-  name: referencegrants.gateway.networking.k8s.io
+  name: referencegrants.consul.networking.io
 spec:
-  group: gateway.networking.k8s.io
+  group: consul.networking.io
   names:
     categories:
     - gateway-api

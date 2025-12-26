@@ -45,7 +45,7 @@ import (
 // Gateways, that MUST be clearly documented by the implementation.
 //
 // Whenever one or more Gateways are using a GatewayClass, implementations SHOULD
-// add the `gateway-exists-finalizer.gateway.networking.k8s.io` finalizer on the
+// add the `gateway-exists-finalizer.consul.networking.io` finalizer on the
 // associated GatewayClass. This ensures that a GatewayClass associated with a
 // Gateway is not deleted while in use.
 //

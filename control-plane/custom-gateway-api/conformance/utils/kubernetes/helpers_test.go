@@ -236,7 +236,7 @@ func Test_listenersMatch(t *testing.T) {
 				{
 					SupportedKinds: []v1beta1.RouteGroupKind{
 						{
-							Group: (*v1beta1.Group)(pointer.String("gateway.networking.k8s.io")),
+							Group: (*v1beta1.Group)(pointer.String("consul.networking.io")),
 							Kind:  v1beta1.Kind("HTTPRoute"),
 						},
 					},

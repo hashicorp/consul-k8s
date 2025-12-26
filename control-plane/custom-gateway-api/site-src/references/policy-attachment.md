@@ -50,7 +50,7 @@ example to illustrate Direct Policy Attachment.)
 The TLSConnectionPolicy would look something like this:
 
 ```yaml
-apiVersion: gateway.networking.k8s.io/v1alpha2
+apiVersion: consul.networking.io/v1alpha2
 kind: TLSConnectionPolicy
 metadata:
   name: tlsport8443
@@ -527,7 +527,7 @@ spec:
   minimumTLSVersion: 1.2
   targetRef:
     name: internet
-    group: gateway.networking.k8s.io
+    group: consul.networking.io
     kind: Gateway
 ```
 
@@ -616,7 +616,7 @@ spec:
       - "503"
   targetRef:
     kind: Gateway
-    group: gateway.networking.k8s.io
+    group: consul.networking.io
     name: we-love-retries
 ```
 
@@ -643,7 +643,7 @@ spec:
       - "503"
   targetRef:
     kind: Gateway
-    group: gateway.networking.k8s.io
+    group: consul.networking.io
     name: you-must-retry
 ```
 

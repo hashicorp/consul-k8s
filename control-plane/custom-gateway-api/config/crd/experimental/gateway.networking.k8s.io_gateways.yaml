@@ -3,12 +3,12 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1923
-    gateway.networking.k8s.io/bundle-version: v0.7.1
-    gateway.networking.k8s.io/channel: experimental
+    consul.networking.io/bundle-version: v0.7.1
+    consul.networking.io/channel: experimental
   creationTimestamp: null
-  name: gateways.gateway.networking.k8s.io
+  name: gateways.consul.networking.io
 spec:
-  group: gateway.networking.k8s.io
+  group: consul.networking.io
   names:
     categories:
     - gateway-api
@@ -174,7 +174,7 @@ spec:
                               of a Route resource.
                             properties:
                               group:
-                                default: gateway.networking.k8s.io
+                                default: consul.networking.io
                                 description: Group is the group of the Route.
                                 maxLength: 253
                                 pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -358,7 +358,7 @@ spec:
                               group:
                                 default: ""
                                 description: Group is the group of the referent. For
-                                  example, "gateway.networking.k8s.io". When unspecified
+                                  example, "consul.networking.io". When unspecified
                                   or empty string, core API group is inferred.
                                 maxLength: 253
                                 pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -691,7 +691,7 @@ spec:
                           a Route resource.
                         properties:
                           group:
-                            default: gateway.networking.k8s.io
+                            default: consul.networking.io
                             description: Group is the group of the Route.
                             maxLength: 253
                             pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -877,7 +877,7 @@ spec:
                               of a Route resource.
                             properties:
                               group:
-                                default: gateway.networking.k8s.io
+                                default: consul.networking.io
                                 description: Group is the group of the Route.
                                 maxLength: 253
                                 pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -1061,7 +1061,7 @@ spec:
                               group:
                                 default: ""
                                 description: Group is the group of the referent. For
-                                  example, "gateway.networking.k8s.io". When unspecified
+                                  example, "consul.networking.io". When unspecified
                                   or empty string, core API group is inferred.
                                 maxLength: 253
                                 pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -1394,7 +1394,7 @@ spec:
                           a Route resource.
                         properties:
                           group:
-                            default: gateway.networking.k8s.io
+                            default: consul.networking.io
                             description: Group is the group of the Route.
                             maxLength: 253
                             pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$

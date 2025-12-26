@@ -3,12 +3,12 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1923
-    gateway.networking.k8s.io/bundle-version: v0.7.1
-    gateway.networking.k8s.io/channel: experimental
+    consul.networking.io/bundle-version: v0.7.1
+    consul.networking.io/channel: experimental
   creationTimestamp: null
-  name: gatewayclasses.gateway.networking.k8s.io
+  name: gatewayclasses.consul.networking.io
 spec:
-  group: gateway.networking.k8s.io
+  group: consul.networking.io
   names:
     categories:
     - gateway-api
@@ -49,7 +49,7 @@ spec:
           to GatewayClass or associated parameters. If implementations choose to propagate
           GatewayClass changes to existing Gateways, that MUST be clearly documented
           by the implementation. \n Whenever one or more Gateways are using a GatewayClass,
-          implementations SHOULD add the `gateway-exists-finalizer.gateway.networking.k8s.io`
+          implementations SHOULD add the `gateway-exists-finalizer.consul.networking.io`
           finalizer on the associated GatewayClass. This ensures that a GatewayClass
           associated with a Gateway is not deleted while in use. \n GatewayClass is
           a Cluster level resource."
@@ -249,7 +249,7 @@ spec:
           to GatewayClass or associated parameters. If implementations choose to propagate
           GatewayClass changes to existing Gateways, that MUST be clearly documented
           by the implementation. \n Whenever one or more Gateways are using a GatewayClass,
-          implementations SHOULD add the `gateway-exists-finalizer.gateway.networking.k8s.io`
+          implementations SHOULD add the `gateway-exists-finalizer.consul.networking.io`
           finalizer on the associated GatewayClass. This ensures that a GatewayClass
           associated with a Gateway is not deleted while in use. \n GatewayClass is
           a Cluster level resource."

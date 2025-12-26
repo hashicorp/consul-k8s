@@ -1,4 +1,4 @@
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: Gateway
 metadata:
   name: gateway-certificate-nonexistent-secret
@@ -18,7 +18,7 @@ spec:
             kind: Secret
             name: nonexistent-certificate
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: Gateway
 metadata:
   name: gateway-certificate-unsupported-group
@@ -38,7 +38,7 @@ spec:
             kind: Secret
             name: tls-validity-checks-certificate
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: Gateway
 metadata:
   name: gateway-certificate-unsupported-kind
@@ -58,7 +58,7 @@ spec:
             kind: WrongKind
             name: tls-validity-checks-certificate
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: consul.networking.io/v1beta1
 kind: Gateway
 metadata:
   name: gateway-certificate-malformed-secret

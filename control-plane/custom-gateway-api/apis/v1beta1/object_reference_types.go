@@ -25,7 +25,7 @@ package v1beta1
 // be rejected by the implementation, with appropriate Conditions set
 // on the containing object.
 type LocalObjectReference struct {
-	// Group is the group of the referent. For example, "gateway.networking.k8s.io".
+	// Group is the group of the referent. For example, "consul.networking.io".
 	// When unspecified or empty string, core API group is inferred.
 	Group Group `json:"group"`
 
@@ -46,7 +46,7 @@ type LocalObjectReference struct {
 // be rejected by the implementation, with appropriate Conditions set
 // on the containing object.
 type SecretObjectReference struct {
-	// Group is the group of the referent. For example, "gateway.networking.k8s.io".
+	// Group is the group of the referent. For example, "consul.networking.io".
 	// When unspecified or empty string, core API group is inferred.
 	//
 	// +optional
@@ -92,7 +92,7 @@ type SecretObjectReference struct {
 // be rejected by the implementation, with appropriate Conditions set
 // on the containing object.
 type BackendObjectReference struct {
-	// Group is the group of the referent. For example, "gateway.networking.k8s.io".
+	// Group is the group of the referent. For example, "consul.networking.io".
 	// When unspecified or empty string, core API group is inferred.
 	//
 	// +optional
