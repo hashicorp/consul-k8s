@@ -32,6 +32,7 @@ rules:
   - routetimeoutfilters
   - routeauthfilters
   - gatewaypolicies
+  - ocpgatewaypolicies
   - registrations
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
@@ -70,6 +71,7 @@ rules:
   - jwtproviders/status
   - routeauthfilters/status
   - gatewaypolicies/status
+  - ocpgatewaypolicies/status
   verbs:
   - get
   - patch
