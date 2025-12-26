@@ -20,7 +20,7 @@ rules:
     - create
   - apiGroups:
     - gateway.networking.k8s.io
-    - dinesh.networking.io
+    - consul.networking.io
     resources:
     - gatewayclasses
     verbs:

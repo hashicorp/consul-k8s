@@ -4,8 +4,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
-    dinesh.networking.io/bundle-version: v0.6.2
-    dinesh.networking.io/channel: experimental
+    consul.networking.io/bundle-version: v0.6.2
+    consul.networking.io/channel: experimental
   creationTimestamp: null
   labels:
     app: {{ template "consul.name" . }}
@@ -13,9 +13,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-  name: gateways.dinesh.networking.io
+  name: gateways.consul.networking.io
 spec:
-  group: dinesh.networking.io
+  group: consul.networking.io
   names:
     categories:
       - gateway-api
@@ -102,7 +102,7 @@ spec:
                               description: RouteGroupKind indicates the group and kind of a Route resource.
                               properties:
                                 group:
-                                  default: dinesh.networking.io
+                                  default: consul.networking.io
                                   description: Group is the group of the Route.
                                   maxLength: 253
                                   pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -197,7 +197,7 @@ spec:
                               properties:
                                 group:
                                   default: ""
-                                  description: Group is the group of the referent. For example, "dinesh.networking.io". When unspecified or empty string, core API group is inferred.
+                                  description: Group is the group of the referent. For example, "consul.networking.io". When unspecified or empty string, core API group is inferred.
                                   maxLength: 253
                                   pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                                   type: string
@@ -416,7 +416,7 @@ spec:
                           description: RouteGroupKind indicates the group and kind of a Route resource.
                           properties:
                             group:
-                              default: dinesh.networking.io
+                              default: consul.networking.io
                               description: Group is the group of the Route.
                               maxLength: 253
                               pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -524,7 +524,7 @@ spec:
                               description: RouteGroupKind indicates the group and kind of a Route resource.
                               properties:
                                 group:
-                                  default: dinesh.networking.io
+                                  default: consul.networking.io
                                   description: Group is the group of the Route.
                                   maxLength: 253
                                   pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -619,7 +619,7 @@ spec:
                               properties:
                                 group:
                                   default: ""
-                                  description: Group is the group of the referent. For example, "dinesh.networking.io". When unspecified or empty string, core API group is inferred.
+                                  description: Group is the group of the referent. For example, "consul.networking.io". When unspecified or empty string, core API group is inferred.
                                   maxLength: 253
                                   pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                                   type: string
@@ -838,7 +838,7 @@ spec:
                           description: RouteGroupKind indicates the group and kind of a Route resource.
                           properties:
                             group:
-                              default: dinesh.networking.io
+                              default: consul.networking.io
                               description: Group is the group of the Route.
                               maxLength: 253
                               pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
