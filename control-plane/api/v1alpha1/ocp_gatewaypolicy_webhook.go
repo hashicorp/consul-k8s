@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
-const OCPGatewayPolicy_GatewayIndex = "__OCPGatewayPolicy_referencing_gateway"
+const OCPGatewayPolicy_GatewayIndex = "__ocpgatewaypolicy_referencing_gateway"
 
 // +kubebuilder:object:generate=false
 
@@ -32,7 +32,7 @@ type OCPGatewayPolicyWebhook struct {
 	client.Client
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-OCPGatewayPolicy,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=gatewaypolicies,versions=v1alpha1,name=validate-OCPGatewayPolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-ocpgatewaypolicy,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=ocpgatewaypolicies,versions=v1alpha1,name=validate-ocpgatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *OCPGatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var resource OCPGatewayPolicy
@@ -72,7 +72,7 @@ func differentOCPPolicySameTarget(resource, policy OCPGatewayPolicy) bool {
 
 func (v *OCPGatewayPolicyWebhook) SetupWithManager(mgr ctrl.Manager) {
 	v.decoder = admission.NewDecoder(mgr.GetScheme())
-	mgr.GetWebhookServer().Register("/validate-v1alpha1-OCPGatewayPolicy", &admission.Webhook{Handler: v})
+	mgr.GetWebhookServer().Register("/validate-v1alpha1-ocpgatewaypolicy", &admission.Webhook{Handler: v})
 }
 
 func OCPDerefStringOr[T ~string, U ~string](v *T, val U) string {
