@@ -43,44 +43,64 @@ func RunKubectlAndGetOutputE(t testutil.TestingTB, options *k8s.KubectlOptions, 
 // it also allows you to provide a custom logger. This is useful if the command output
 // contains sensitive information, for example, when you can pass logger.Discard.
 func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.KubectlOptions, logger *terratestLogger.Logger, args ...string) (string, error) {
-	var cmdArgs []string
-	if options.ContextName != "" {
-		cmdArgs = append(cmdArgs, "--context", options.ContextName)
-	}
-	if options.ConfigPath != "" {
-		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
-	}
-	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") {
-		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
-	}
-	cmdArgs = append(cmdArgs, args...)
-	command := helpers.Command{
-		Command: "kubectl",
-		Args:    cmdArgs,
-		Env:     options.Env,
-		Logger:  logger,
-	}
+    var cmdArgs []string
+    
+    // 1. Handle Context
+    if options.ContextName != "" {
+        cmdArgs = append(cmdArgs, "--context", options.ContextName)
+    }
+    
+    // 2. Handle Kubeconfig
+    if options.ConfigPath != "" {
+        cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
+    }
+    
+    // 3. Robust Namespace Check
+    // We check for both short (-n) and long (--namespace) versions
+    hasNamespace := sliceContains(args, "-n") || sliceContains(args, "--namespace")
+    if options.Namespace != "" && !hasNamespace {
+        cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
+    }
+    
+    cmdArgs = append(cmdArgs, args...)
+    
+    command := helpers.Command{
+        Command: "kubectl",
+        Args:    cmdArgs,
+        Env:     options.Env,
+        Logger:  logger,
+    }
 
-	counter := &retry.Counter{
-		Count: 10,
-		Wait:  1 * time.Second,
-	}
-	var output string
-	var err error
-	retry.RunWith(counter, t, func(r *retry.R) {
-		output, err = helpers.RunCommand(r, options, command)
-		if err != nil {
-			// Want to retry on errors connecting to actual Kube API because
-			// these are intermittent.
-			for _, connectionErr := range kubeAPIConnectErrs {
-				if strings.Contains(err.Error(), connectionErr) {
-					r.Errorf(err.Error())
-					return
-				}
-			}
-		}
-	})
-	return output, err
+    // Debugging: Log the full command being run
+    logger.Logf(t, "Running: kubectl %s", strings.Join(cmdArgs, " "))
+
+    counter := &retry.Counter{
+        Count: 10,
+        Wait:  1 * time.Second,
+    }
+    
+    var output string
+    var err error
+    
+    retry.RunWith(counter, t, func(r *retry.R) {
+        output, err = helpers.RunCommand(r, options, command)
+        if err != nil {
+            // CRITICAL: Log the output here. 'exit status 1' usually puts 
+            // the real error (like "not found") in the output string.
+            logger.Logf(t, "Command failed! Output: %s\nError: %v", output, err)
+
+            for _, connectionErr := range kubeAPIConnectErrs {
+                if strings.Contains(err.Error(), connectionErr) {
+                    r.Errorf("Retrying due to connection error: %v", err)
+                    return
+                }
+            }
+            // If it's a structural error (like a syntax error), don't hide it
+            r.Errorf("Kubectl execution failed: %v", err)
+        }
+    })
+    
+    return output, err
 }
 
 // KubectlApply takes a path to a Kubernetes YAML file and
@@ -135,15 +155,18 @@ func KubectlLabel(t *testing.T, options *k8s.KubectlOptions, objectType string, 
 // If there's an error running the command, fail the test.
 func RunKubectl(t *testing.T, options *k8s.KubectlOptions, args ...string) {
 	_, err := RunKubectlAndGetOutputE(t, options, args...)
+	t.Log("error in kubectl", err)
 	require.NoError(t, err)
 }
 
 // sliceContains returns true if s contains target.
-func sliceContains(s []string, target string) bool {
-	for _, elem := range s {
-		if elem == target {
-			return true
-		}
-	}
-	return false
+func sliceContains(args []string, flag string) bool {
+    for _, arg := range args {
+        // Checks for exact match (e.g., "-n") 
+        // OR if the argument starts with the flag and an equals (e.g., "-n=")
+        if arg == flag || strings.HasPrefix(arg, flag+"=") {
+            return true
+        }
+    }
+    return false
 }
