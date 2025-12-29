@@ -4,10 +4,18 @@
 terraform {
   required_providers {
     google = {
+      source  = "hashicorp/google"
       version = "~> 5.3.0"
+    }
+    random = {
+      source = "hashicorp/random"
+    }
+    null = {
+      source = "hashicorp/null"
     }
   }
 }
+
 
 provider "google" {
   project = var.project
@@ -51,20 +59,21 @@ resource "google_container_cluster" "cluster" {
   provider = google
   count    = var.cluster_count
 
-  name               = "consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"
-  project            = var.project
-  initial_node_count = 3
-  location           = var.zone
-  min_master_version = data.google_container_engine_versions.main.latest_master_version
-  node_version       = data.google_container_engine_versions.main.latest_master_version
-  network            = google_compute_network.custom_network.name
+  name                     = "consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"
+  remove_default_node_pool = false
+  initial_node_count       = 3
+  location                 = var.zone
+  min_master_version       = data.google_container_engine_versions.main.latest_master_version
+  node_version             = data.google_container_engine_versions.main.latest_master_version
+  network                  = google_compute_network.custom_network.name
+  networking_mode          = "VPC_NATIVE"
   node_config {
     tags         = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
     machine_type = "e2-standard-8"
   }
   subnetwork = google_compute_subnetwork.subnet[count.index].self_link
   ip_allocation_policy {
-    cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/14", 2, count.index)
+    cluster_ipv4_cidr_block = cidrsubnet("10.100.0.0/12", 4, count.index)
   }
   resource_labels     = var.labels
   deletion_protection = false
@@ -83,10 +92,10 @@ resource "google_compute_firewall" "firewall-rules" {
     protocol = "all"
   }
 
-  source_ranges = [
-    google_container_cluster.cluster[count.index == 0 ? 1 : 0].cluster_ipv4_cidr,
-    google_compute_subnetwork.subnet[count.index == 0 ? 1 : 0].ip_cidr_range
-  ]
+  source_ranges = concat(
+    google_container_cluster.cluster[*].cluster_ipv4_cidr,
+    google_compute_subnetwork.subnet[*].ip_cidr_range
+  )
   target_tags = ["consul-k8s-${random_string.cluster_prefix.result}-${random_id.suffix[count.index].dec}"]
 }
 
