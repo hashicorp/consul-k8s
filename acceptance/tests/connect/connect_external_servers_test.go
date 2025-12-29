@@ -54,6 +54,9 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"global.tls.enabled": strconv.FormatBool(secure),
 
 				"connectInject.enabled": "true",
+				// FIX: Increase startup failure threshold to allow Envoy to initialize
+               // This gives Envoy (300 * 1s) = 5 minutes to reach the external server
+               "connectInject.sidecarProxy.startupFailureSeconds": "300",
 
 				"externalServers.enabled":   "true",
 				"externalServers.hosts[0]":  fmt.Sprintf("%s-consul-server", serverReleaseName),

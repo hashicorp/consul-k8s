@@ -82,23 +82,26 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
     var output string
     var err error
     
-    retry.RunWith(counter, t, func(r *retry.R) {
-        output, err = helpers.RunCommand(r, options, command)
-        if err != nil {
-            // CRITICAL: Log the output here. 'exit status 1' usually puts 
-            // the real error (like "not found") in the output string.
-            logger.Logf(t, "Command failed! Output: %s\nError: %v", output, err)
-
-            for _, connectionErr := range kubeAPIConnectErrs {
-                if strings.Contains(err.Error(), connectionErr) {
-                    r.Errorf("Retrying due to connection error: %v", err)
-                    return
-                }
-            }
-            // If it's a structural error (like a syntax error), don't hide it
-            r.Errorf("Kubectl execution failed: %v", err)
+retry.RunWith(counter, t, func(r *retry.R) {
+    output, err = helpers.RunCommand(r, options, command)
+    if err != nil {
+        // If it's a condition timeout, fail immediately to save time
+        if strings.Contains(output, "timed out waiting for the condition") {
+            r.Errorf("Resource failed to become ready in time: %s", output)
+            counter.Count = 0 // Stop the retry loop
+            return
         }
-    })
+        
+        // Only retry for known network/connectivity issues
+        for _, connectionErr := range kubeAPIConnectErrs {
+            if strings.Contains(err.Error(), connectionErr) {
+                r.Errorf("Retrying due to connection error: %v", err)
+                return
+            }
+        }
+        r.Errorf("Kubectl execution failed: %v", err)
+    }
+})
     
     return output, err
 }
