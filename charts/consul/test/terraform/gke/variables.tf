@@ -43,3 +43,9 @@ variable "subnet" {
   default     = "default"
   description = "Subnet to create the cluster in. Currently all clusters use the default subnet and we are running out of IPs"
 }
+
+variable "kubernetes_version_prefix" {
+  type        = string
+  default     = "1.34."
+  description = "The Kubernetes version prefix to use for the GKE cluster."
+}

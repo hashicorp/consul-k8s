@@ -44,16 +44,26 @@ func RunKubectlAndGetOutputE(t testutil.TestingTB, options *k8s.KubectlOptions, 
 // contains sensitive information, for example, when you can pass logger.Discard.
 func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.KubectlOptions, logger *terratestLogger.Logger, args ...string) (string, error) {
 	var cmdArgs []string
+
+	// 1. Handle Context
 	if options.ContextName != "" {
 		cmdArgs = append(cmdArgs, "--context", options.ContextName)
 	}
+
+	// 2. Handle Kubeconfig
 	if options.ConfigPath != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
 	}
-	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") {
+
+	// 3. Robust Namespace Check
+	// We check for both short (-n) and long (--namespace) versions
+	hasNamespace := sliceContains(args, "-n") || sliceContains(args, "--namespace") || sliceContains(args, "ns")
+	if options.Namespace != "" && !hasNamespace {
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
+
 	cmdArgs = append(cmdArgs, args...)
+
 	command := helpers.Command{
 		Command: "kubectl",
 		Args:    cmdArgs,
@@ -61,25 +71,38 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 		Logger:  logger,
 	}
 
+	// Debugging: Log the full command being run
+	logger.Logf(t, "Running: kubectl %s", strings.Join(cmdArgs, " "))
+
 	counter := &retry.Counter{
-		Count: 10,
+		Count: 2,
 		Wait:  1 * time.Second,
 	}
+
 	var output string
 	var err error
+
 	retry.RunWith(counter, t, func(r *retry.R) {
 		output, err = helpers.RunCommand(r, options, command)
 		if err != nil {
-			// Want to retry on errors connecting to actual Kube API because
-			// these are intermittent.
+			// If it's a condition timeout, fail immediately to save time
+			if strings.Contains(output, "timed out waiting for the condition") {
+				r.Errorf("Resource failed to become ready in time: %s", output)
+				counter.Count = 0 // Stop the retry loop
+				return
+			}
+
+			// Only retry for known network/connectivity issues
 			for _, connectionErr := range kubeAPIConnectErrs {
 				if strings.Contains(err.Error(), connectionErr) {
-					r.Errorf(err.Error())
+					r.Errorf("Retrying due to connection error: %v", err)
 					return
 				}
 			}
+			r.Errorf("Kubectl execution failed: %v", err)
 		}
 	})
+
 	return output, err
 }
 
@@ -135,13 +158,16 @@ func KubectlLabel(t *testing.T, options *k8s.KubectlOptions, objectType string, 
 // If there's an error running the command, fail the test.
 func RunKubectl(t *testing.T, options *k8s.KubectlOptions, args ...string) {
 	_, err := RunKubectlAndGetOutputE(t, options, args...)
+	t.Log("error in kubectl", err)
 	require.NoError(t, err)
 }
 
 // sliceContains returns true if s contains target.
-func sliceContains(s []string, target string) bool {
-	for _, elem := range s {
-		if elem == target {
+func sliceContains(args []string, flag string) bool {
+	for _, arg := range args {
+		// Checks for exact match (e.g., "-n")
+		// OR if the argument starts with the flag and an equals (e.g., "-n=")
+		if arg == flag || strings.HasPrefix(arg, flag+"=") || strings.HasPrefix(arg, flag) {
 			return true
 		}
 	}
