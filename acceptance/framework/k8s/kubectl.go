@@ -43,67 +43,67 @@ func RunKubectlAndGetOutputE(t testutil.TestingTB, options *k8s.KubectlOptions, 
 // it also allows you to provide a custom logger. This is useful if the command output
 // contains sensitive information, for example, when you can pass logger.Discard.
 func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.KubectlOptions, logger *terratestLogger.Logger, args ...string) (string, error) {
-    var cmdArgs []string
-    
-    // 1. Handle Context
-    if options.ContextName != "" {
-        cmdArgs = append(cmdArgs, "--context", options.ContextName)
-    }
-    
-    // 2. Handle Kubeconfig
-    if options.ConfigPath != "" {
-        cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
-    }
-    
-    // 3. Robust Namespace Check
-    // We check for both short (-n) and long (--namespace) versions
-    hasNamespace := sliceContains(args, "-n") || sliceContains(args, "--namespace")
-    if options.Namespace != "" && !hasNamespace {
-        cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
-    }
-    
-    cmdArgs = append(cmdArgs, args...)
-    
-    command := helpers.Command{
-        Command: "kubectl",
-        Args:    cmdArgs,
-        Env:     options.Env,
-        Logger:  logger,
-    }
+	var cmdArgs []string
 
-    // Debugging: Log the full command being run
-    logger.Logf(t, "Running: kubectl %s", strings.Join(cmdArgs, " "))
+	// 1. Handle Context
+	if options.ContextName != "" {
+		cmdArgs = append(cmdArgs, "--context", options.ContextName)
+	}
 
-    counter := &retry.Counter{
-        Count: 2,
-        Wait:  1 * time.Second,
-    }
-    
-    var output string
-    var err error
-    
-retry.RunWith(counter, t, func(r *retry.R) {
-    output, err = helpers.RunCommand(r, options, command)
-    if err != nil {
-        // If it's a condition timeout, fail immediately to save time
-        if strings.Contains(output, "timed out waiting for the condition") {
-            r.Errorf("Resource failed to become ready in time: %s", output)
-            counter.Count = 0 // Stop the retry loop
-            return
-        }
-        
-        // Only retry for known network/connectivity issues
-        for _, connectionErr := range kubeAPIConnectErrs {
-            if strings.Contains(err.Error(), connectionErr) {
-                r.Errorf("Retrying due to connection error: %v", err)
-                return
-            }
-        }
-        r.Errorf("Kubectl execution failed: %v", err)
-    }
-})
-    
-    return output, err
+	// 2. Handle Kubeconfig
+	if options.ConfigPath != "" {
+		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
+	}
+
+	// 3. Robust Namespace Check
+	// We check for both short (-n) and long (--namespace) versions
+	hasNamespace := sliceContains(args, "-n") || sliceContains(args, "--namespace") || sliceContains(args, "ns")
+	if options.Namespace != "" && !hasNamespace {
+		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
+	}
+
+	cmdArgs = append(cmdArgs, args...)
+
+	command := helpers.Command{
+		Command: "kubectl",
+		Args:    cmdArgs,
+		Env:     options.Env,
+		Logger:  logger,
+	}
+
+	// Debugging: Log the full command being run
+	logger.Logf(t, "Running: kubectl %s", strings.Join(cmdArgs, " "))
+
+	counter := &retry.Counter{
+		Count: 2,
+		Wait:  1 * time.Second,
+	}
+
+	var output string
+	var err error
+
+	retry.RunWith(counter, t, func(r *retry.R) {
+		output, err = helpers.RunCommand(r, options, command)
+		if err != nil {
+			// If it's a condition timeout, fail immediately to save time
+			if strings.Contains(output, "timed out waiting for the condition") {
+				r.Errorf("Resource failed to become ready in time: %s", output)
+				counter.Count = 0 // Stop the retry loop
+				return
+			}
+
+			// Only retry for known network/connectivity issues
+			for _, connectionErr := range kubeAPIConnectErrs {
+				if strings.Contains(err.Error(), connectionErr) {
+					r.Errorf("Retrying due to connection error: %v", err)
+					return
+				}
+			}
+			r.Errorf("Kubectl execution failed: %v", err)
+		}
+	})
+
+	return output, err
 }
 
 // KubectlApply takes a path to a Kubernetes YAML file and
@@ -164,12 +164,12 @@ func RunKubectl(t *testing.T, options *k8s.KubectlOptions, args ...string) {
 
 // sliceContains returns true if s contains target.
 func sliceContains(args []string, flag string) bool {
-    for _, arg := range args {
-        // Checks for exact match (e.g., "-n") 
-        // OR if the argument starts with the flag and an equals (e.g., "-n=")
-        if arg == flag || strings.HasPrefix(arg, flag+"=") {
-            return true
-        }
-    }
-    return false
+	for _, arg := range args {
+		// Checks for exact match (e.g., "-n")
+		// OR if the argument starts with the flag and an equals (e.g., "-n=")
+		if arg == flag || strings.HasPrefix(arg, flag+"=") || strings.HasPrefix(arg, flag) {
+			return true
+		}
+	}
+	return false
 }

@@ -47,21 +47,19 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 
 			consulServerCluster.Create(t)
 
-			helmValues := map[string]string{
-				"server.enabled":               "false",
-				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
+helmValues := map[string]string{
+    "server.enabled":        "false",
+    "connectInject.enabled": "true",
+    
+    // CORRECT HELM KEYS:
+    // This ensures the sidecar-injector allows Envoy enough time to reach the server.
+    "connectInject.sidecarProxy.startupFailureSeconds": "300", 
+    "connectInject.sidecarProxy.livenessFailureSeconds": "300",
 
-				"global.tls.enabled": strconv.FormatBool(secure),
-
-				"connectInject.enabled": "true",
-				// FIX: Increase startup failure threshold to allow Envoy to initialize
-               // This gives Envoy (300 * 1s) = 5 minutes to reach the external server
-                "connectInject.sidecarProxy.defaultStartupFailureSeconds": "300",
-				"externalServers.enabled":   "true",
-                "externalServers.hosts[0]": fmt.Sprintf("%s-consul-server.default.svc.cluster.local", serverReleaseName),
-				"externalServers.httpsPort": "8500",
-				"consul.hashicorp.com/transparent-proxy-overwrite-probes": "false",
-			}
+    "externalServers.enabled":  "true",
+    "externalServers.hosts[0]": fmt.Sprintf("%s-consul-server.default.svc.cluster.local", serverReleaseName),
+    "externalServers.httpsPort": "8500",
+}
 
 			if secure {
 				helmValues["global.tls.caCert.secretName"] = fmt.Sprintf("%s-consul-ca-cert", serverReleaseName)
