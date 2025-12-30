@@ -75,7 +75,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
     logger.Logf(t, "Running: kubectl %s", strings.Join(cmdArgs, " "))
 
     counter := &retry.Counter{
-        Count: 10,
+        Count: 2,
         Wait:  1 * time.Second,
     }
     
