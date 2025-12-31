@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -274,19 +276,60 @@ func main() {
 	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, cniv.All, bv.BuildString("consul-cni"))
 }
 
+func resolveKubeconfigPath(dir, base string) (string, error) {
+	// 1. Prefer stable path (symlink or file)
+	stable := filepath.Join(dir, base)
+	if fi, err := os.Stat(stable); err == nil && !fi.IsDir() {
+		return stable, nil
+	}
+
+	// 2. Best-effort fallback: versioned files
+	pattern := stable + "-*"
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", fmt.Errorf("glob failed for %s: %w", pattern, err)
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no kubeconfig found at %s or %s-*", stable, stable)
+	}
+
+	// Pick newest by mtime (bounded + deterministic)
+	sort.Slice(matches, func(i, j int) bool {
+		fi, _ := os.Stat(matches[i])
+		fj, _ := os.Stat(matches[j])
+		return fi.ModTime().After(fj.ModTime())
+	})
+
+	return matches[0], nil
+}
+
 // createK8sClient configures the command's Kubernetes API client if it doesn't
 // already exist.
 // TODO: remove logger for auth provider details
 func (c *Command) createK8sClient(cfg *PluginConf, logger hclog.Logger) error {
-	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
+	dir := cfg.CNINetDir
+	base := cfg.Kubeconfig
+
+	path, err := resolveKubeconfigPath(dir, base)
+	if err != nil {
+		return err
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", path)
+	if err != nil {
+		return fmt.Errorf("failed to load kubeconfig %q: %w", path, err)
+	}
+	if restConfig == nil {
+		return fmt.Errorf("restConfig is nil for kubeconfig %q", path)
+	}
 	logger.Info("tokenFile used  - ", restConfig.BearerTokenFile)
+
+	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+		return fmt.Errorf("error initializing Kubernetes client: %w", err)
 	}
-	c.client, err = kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return fmt.Errorf("error initializing Kubernetes client: %s", err)
-	}
+
+	c.client = client
 	return nil
 }
 
