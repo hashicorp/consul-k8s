@@ -109,7 +109,7 @@ resource "aws_ebs_encryption_by_default" "enable" {
 
 # K8s Provider for the FIRST cluster (cluster 0)
 provider "kubernetes" {
-  alias = "cluster0"
+  alias                  = "cluster0"
   host                   = module.eks[0].cluster_endpoint
   cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
   token                  = data.aws_eks_cluster_auth.cluster[0].token
@@ -185,7 +185,7 @@ data "aws_eks_cluster_auth" "cluster" {
 
 # StorageClass for the FIRST cluster
 resource "kubernetes_storage_class" "ebs_gp3_cluster0" {
-  provider = kubernetes.cluster0
+  provider   = kubernetes.cluster0
   depends_on = [module.eks, aws_eks_addon.csi-driver[0]]
 
   metadata {
@@ -196,7 +196,7 @@ resource "kubernetes_storage_class" "ebs_gp3_cluster0" {
   }
   storage_provisioner = "ebs.csi.aws.com"
   parameters = {
-    type = "gp3"
+    type      = "gp3"
     encrypted = "true"
   }
   reclaim_policy      = "Delete"
@@ -207,7 +207,7 @@ resource "kubernetes_storage_class" "ebs_gp3_cluster0" {
 resource "kubernetes_storage_class" "ebs_gp3_cluster1" {
   count = var.cluster_count > 1 ? 1 : 0
 
-  provider = kubernetes.cluster1 
+  provider   = kubernetes.cluster1
   depends_on = [module.eks, aws_eks_addon.csi-driver[1]]
   metadata {
     name = "gp3"
@@ -217,7 +217,7 @@ resource "kubernetes_storage_class" "ebs_gp3_cluster1" {
   }
   storage_provisioner = "ebs.csi.aws.com"
   parameters = {
-    type = "gp3"
+    type      = "gp3"
     encrypted = "true"
   }
   reclaim_policy      = "Delete"
