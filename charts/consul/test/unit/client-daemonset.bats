@@ -164,6 +164,28 @@ load _helpers
   [ "${actual}" = "false" ]
 }
 
+@test "client/DaemonSet: port 8502 is not exposed when gRPC is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'client.grpc=false' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].ports[] | select (.containerPort == 8502)' | tee /dev/stderr)
+  [ "${actual}" == "" ]
+}
+
+@test "client/DaemonSet: port 8502 is exposed when gRPC is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/client-daemonset.yaml  \
+      --set 'client.enabled=true' \
+      --set 'client.grpc=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].ports[] | select (.containerPort == 8502)' | tee /dev/stderr)
+  [ "${actual}" != "" ]
+}
+
 #--------------------------------------------------------------------
 # nodeMeta
 
