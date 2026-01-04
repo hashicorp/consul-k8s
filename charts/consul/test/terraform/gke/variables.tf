@@ -23,9 +23,6 @@ variable "cluster_count" {
   default     = 1
   description = "The number of Kubernetes clusters to create."
 
-  // We currently cannot support more than 2 cluster
-  // because setting up peering is more complicated if cluster count is
-  // more than two.
   validation {
     condition     = var.cluster_count < 3 && var.cluster_count > 0
     error_message = "The cluster_count value must be 1 or 2."
@@ -38,13 +35,13 @@ variable "labels" {
   description = "Labels to attach to the created resources."
 }
 
-variable "subnet" {
-  type        = string
-  default     = "default"
-  description = "Subnet to create the cluster in. Currently all clusters use the default subnet and we are running out of IPs"
-}
-
 variable "kubernetes_version_prefix" {
   default     = "1.32."
   description = "Kubernetes version supported on EKS"
+}
+
+variable "subnet" {
+  type        = string
+  default     = "default"
+  description = "Legacy variable (unused) to maintain backward compatibility."
 }
