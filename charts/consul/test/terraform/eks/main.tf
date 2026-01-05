@@ -4,7 +4,11 @@
 terraform {
   required_providers {
     aws = {
-      version = ">= 4.0.0"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.27.0"
     }
   }
 }
@@ -12,9 +16,12 @@ terraform {
 provider "aws" {
   region = var.region
 
-  assume_role {
-    role_arn = var.role_arn
-    duration = "2700s"
+  dynamic "assume_role" {
+    for_each = var.role_arn != "" ? [1] : []
+    content {
+      role_arn = var.role_arn
+      duration = "2700s"
+    }
   }
 }
 
@@ -35,7 +42,7 @@ resource "random_string" "suffix" {
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
-  version = "4.0.0"
+  version = "5.0.0"
 
   name = "consul-k8s-${random_id.suffix[count.index].dec}"
   # The cidr range needs to be unique in each VPC to allow setting up a peering connection.
@@ -46,6 +53,11 @@ module "vpc" {
   enable_nat_gateway   = true
   single_nat_gateway   = true
   enable_dns_hostnames = true
+
+  # Enable dual-stack (IPv4 + IPv6) support for acceptance tests
+  # enable_ipv6                  = true
+  # public_subnet_ipv6_prefixes  = [0, 1, 2]
+  # private_subnet_ipv6_prefixes = [3, 4, 5]
 
   public_subnet_tags = {
     "kubernetes.io/cluster/consul-k8s-${random_id.suffix[count.index].dec}" = "shared"
@@ -90,6 +102,30 @@ module "eks" {
 
   tags = var.tags
 }
+
+resource "aws_ebs_encryption_by_default" "enable" {
+  enabled = true
+}
+
+# K8s Provider for the FIRST cluster (cluster 0)
+provider "kubernetes" {
+  alias                  = "cluster0"
+  host                   = module.eks[0].cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster[0].token
+}
+
+# Provider for the SECOND cluster (cluster 1)
+provider "kubernetes" {
+  alias = "cluster1"
+
+  # Use null to disable the provider configuration if cluster_count is not > 1
+  # This avoids errors from empty string credentials.
+  host                   = var.cluster_count > 1 ? module.eks[1].cluster_endpoint : null
+  cluster_ca_certificate = var.cluster_count > 1 ? base64decode(module.eks[1].cluster_certificate_authority_data) : null
+  token                  = var.cluster_count > 1 ? data.aws_eks_cluster_auth.cluster[1].token : null
+}
+
 
 resource "aws_iam_role" "csi-driver-role" {
   count = var.cluster_count
@@ -143,28 +179,75 @@ data "aws_eks_cluster_auth" "cluster" {
   name  = module.eks[count.index].cluster_id
 }
 
+# Add a default StorageClass for dynamic volume provisioning
+# This is the primary fix for the "unbound PersistentVolumeClaims" issue 
+# as we do not specify storage class in default helm values.yaml.
+
+# StorageClass for the FIRST cluster
+resource "kubernetes_storage_class" "ebs_gp3_cluster0" {
+  provider   = kubernetes.cluster0
+  depends_on = [module.eks, aws_eks_addon.csi-driver[0]]
+
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  parameters = {
+    type      = "gp3"
+    encrypted = "true"
+  }
+  reclaim_policy      = "Delete"
+  volume_binding_mode = "WaitForFirstConsumer"
+}
+
+# StorageClass for the SECOND cluster
+resource "kubernetes_storage_class" "ebs_gp3_cluster1" {
+  count = var.cluster_count > 1 ? 1 : 0
+
+  provider   = kubernetes.cluster1
+  depends_on = [module.eks, aws_eks_addon.csi-driver[1]]
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  parameters = {
+    type      = "gp3"
+    encrypted = "true"
+  }
+  reclaim_policy      = "Delete"
+  volume_binding_mode = "WaitForFirstConsumer"
+}
+
 # The following resources are only applied when cluster_count=2 to set up vpc peering and the appropriate routes and
 # security groups so traffic between VPCs is allowed. There is validation to ensure cluster_count can be 1 or 2.
 
 # Each EKS cluster needs to allow ingress traffic from the other VPC.
 resource "aws_security_group_rule" "allowingressfrom1-0" {
-  count             = var.cluster_count > 1 ? 1 : 0
+  count             = var.cluster_count > 1 ? length(module.vpc[1].private_subnets_cidr_blocks) : 0
   type              = "ingress"
   from_port         = 0
-  to_port           = 65535
-  protocol          = "tcp"
-  cidr_blocks       = [module.vpc[1].vpc_cidr_block]
-  security_group_id = module.eks[0].cluster_primary_security_group_id
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = [module.vpc[1].private_subnets_cidr_blocks[count.index]]
+  security_group_id = module.eks[0].worker_security_group_id
+  description       = "Allow node traffic from cluster 1 private subnet ${count.index}"
 }
 
 resource "aws_security_group_rule" "allowingressfrom0-1" {
-  count             = var.cluster_count > 1 ? 1 : 0
+  count             = var.cluster_count > 1 ? length(module.vpc[0].private_subnets_cidr_blocks) : 0
   type              = "ingress"
   from_port         = 0
-  to_port           = 65535
-  protocol          = "tcp"
-  cidr_blocks       = [module.vpc[0].vpc_cidr_block]
-  security_group_id = module.eks[1].cluster_primary_security_group_id
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = [module.vpc[0].private_subnets_cidr_blocks[count.index]]
+  security_group_id = module.eks[1].worker_security_group_id
+  description       = "Allow node traffic from cluster 0 private subnet ${count.index}"
 }
 
 # Create a peering connection. This is the requester's side of the connection.
@@ -193,19 +276,49 @@ resource "aws_vpc_peering_connection_accepter" "peer" {
 }
 
 # Add routes that so traffic going from VPC 0 to VPC 1 is routed through the peering connection.
-resource "aws_route" "peering0" {
-  # We have 2 route tables to add a route to, the public and private route tables.
-  count                     = var.cluster_count > 1 ? 2 : 0
-  route_table_id            = [module.vpc[0].public_route_table_ids[0], module.vpc[0].private_route_table_ids[0]][count.index]
+#resource "aws_route" "peering0" {
+#  # We have 2 route tables to add a route to, the public and private route tables.
+#  count                     = var.cluster_count > 1 ? 2 : 0
+#  route_table_id            = [module.vpc[0].public_route_table_ids[0], module.vpc[0].private_route_table_ids[0]][count.index]
+#  destination_cidr_block    = module.vpc[1].vpc_cidr_block
+#  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+#}
+
+# Add routes that so traffic going from VPC 1 to VPC 0 is routed through the peering connection.
+#resource "aws_route" "peering1" {
+#  # We have 2 route tables to add a route to, the public and private route tables.
+#  count                     = var.cluster_count > 1 ? 2 : 0
+#  route_table_id            = [module.vpc[1].public_route_table_ids[0], module.vpc[1].private_route_table_ids[0]][count.index]
+#  destination_cidr_block    = module.vpc[0].vpc_cidr_block
+#  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+#}
+
+# Add routes to all route tables in VPC 0 to route traffic to VPC 1 through the peering connection.
+resource "aws_route" "peering_private_0" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[0].private_route_table_ids) : 0
+  route_table_id            = module.vpc[0].private_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[1].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
 }
 
-# Add routes that so traffic going from VPC 1 to VPC 0 is routed through the peering connection.
-resource "aws_route" "peering1" {
-  # We have 2 route tables to add a route to, the public and private route tables.
-  count                     = var.cluster_count > 1 ? 2 : 0
-  route_table_id            = [module.vpc[1].public_route_table_ids[0], module.vpc[1].private_route_table_ids[0]][count.index]
+resource "aws_route" "peering_public_0" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[0].public_route_table_ids) : 0
+  route_table_id            = module.vpc[0].public_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[1].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Add routes to all route tables in VPC 1 to route traffic to VPC 0 through the peering connection.
+resource "aws_route" "peering_private_1" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[1].private_route_table_ids) : 0
+  route_table_id            = module.vpc[1].private_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[0].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+resource "aws_route" "peering_public_1" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[1].public_route_table_ids) : 0
+  route_table_id            = module.vpc[1].public_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[0].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
 }
