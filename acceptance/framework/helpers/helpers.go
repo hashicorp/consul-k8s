@@ -413,32 +413,44 @@ func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions,
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		logger.Logf(t, "httproute existence check attempt %d/%d", attempt, maxAttempts)
 
+		// // Check for httproute existence using simple loop
+		// for i := range checksPerAttempt {
+		// 	// _, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
+		// 	// if err == nil {
+		// 	// 	found = true
+		// 	// 	logger.Logf(t, "httproute %s found successfully", routeName)
+		// 	// 	break
+		// 	// }
+		// 	status, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions,
+		// 		"get", "httproute", routeName,
+		// 		"-o", "jsonpath={.status.parents[0].conditions[?(@.type==\"Accepted\")].status}",
+		// 	)
+		// 	// Normalize (in case of stray quotes or whitespace)
+		// 	status = strings.TrimSpace(strings.Trim(status, "'\""))
+		// 	if status == "True" {
+		// 		found = true
+		// 		logger.Logf(t, "httproute %s found successfully", routeName)
+		// 		// httproute, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions,
+		// 		// 	"get", "httproute", routeName,
+		// 		// 	"-o", "yaml",
+		// 		// )
+		// 		// if err != nil {
+		// 		// 	logger.Logf(t, "error getting httproute %s details: %v", routeName, err)
+		// 		// } else {
+		// 		// 	logger.Logf(t, "httproute %s details:\n%s", routeName, httproute)
+		// 		// }
+		// 		break
+		// 	}
+		// 	logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
+		// 	time.Sleep(2 * time.Second)
+		// }
+
 		// Check for httproute existence using simple loop
 		for i := range checksPerAttempt {
-			// _, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
-			// if err == nil {
-			// 	found = true
-			// 	logger.Logf(t, "httproute %s found successfully", routeName)
-			// 	break
-			// }
-			status, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions,
-				"get", "httproute", routeName,
-				"-o", "jsonpath={.status.parents[0].conditions[?(@.type==\"Accepted\")].status}",
-			)
-			// Normalize (in case of stray quotes or whitespace)
-			status = strings.TrimSpace(strings.Trim(status, "'\""))
-			if status == "True" {
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "httproute", routeName)
+			if err == nil {
 				found = true
 				logger.Logf(t, "httproute %s found successfully", routeName)
-				// httproute, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions,
-				// 	"get", "httproute", routeName,
-				// 	"-o", "yaml",
-				// )
-				// if err != nil {
-				// 	logger.Logf(t, "error getting httproute %s details: %v", routeName, err)
-				// } else {
-				// 	logger.Logf(t, "httproute %s details:\n%s", routeName, httproute)
-				// }
 				break
 			}
 			logger.Logf(t, "httproute check %d/%d: %v", i+1, checksPerAttempt, err)
