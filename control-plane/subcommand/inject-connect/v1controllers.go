@@ -131,7 +131,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}
 
 	// Setup Gateway Controller
-	cache, gatewayCache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
+	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: gatewaycommon.HelmConfig{
 			ConsulConfig: gatewaycommon.ConsulConfig{
 				Address:    c.consul.Addresses,
@@ -175,6 +175,14 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 
+	go cache.Run(ctx)
+	go cleaner.Run(ctx)
+
+	// wait for the cache to fill
+	setupLog.Info("waiting for Consul cache sync")
+	cache.WaitSynced(ctx)
+	setupLog.Info("Consul cache synced")
+
 	// New OCP API Gateway Controllers
 	if err := ocpgatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
 		setupLog.Error(err, "ocp: unable to register field indexes")
@@ -203,7 +211,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}
 
 	// Setup OCP Gateway Controller
-	err = ocpgatewaycontrollers.SetupGatewayControllerWithManager(ctx, cache, gatewayCache, mgr, ocpgatewaycontrollers.GatewayControllerConfig{
+	ocpcache, ocpcleaner, err := ocpgatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, ocpgatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: ocpgatewaycommon.HelmConfig{
 			ConsulConfig: ocpgatewaycommon.ConsulConfig{
 				Address:    c.consul.Addresses,
@@ -247,14 +255,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 	// Start the consul cache and cleaner for API Gateway
-
-	go cache.Run(ctx)
-	go cleaner.Run(ctx)
+	go ocpcache.Run(ctx)
+	go ocpcleaner.Run(ctx)
 
 	// wait for the cache to fill
-	setupLog.Info("waiting for Consul cache sync")
-	cache.WaitSynced(ctx)
-	setupLog.Info("Consul cache synced")
+	setupLog.Info("ocp: waiting for Consul cache sync")
+	ocpcache.WaitSynced(ctx)
+	setupLog.Info("ocp: Consul cache synced")
 
 	configEntryReconciler := &controllers.ConfigEntryController{
 		ConsulClientConfig:         consulConfig,
