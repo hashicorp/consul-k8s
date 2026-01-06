@@ -277,13 +277,11 @@ func main() {
 }
 
 func resolveKubeconfigPath(dir, base string) (string, error) {
-	// 1. Prefer stable path (symlink or file)
 	stable := filepath.Join(dir, base)
 	if fi, err := os.Stat(stable); err == nil && !fi.IsDir() {
 		return stable, nil
 	}
 
-	// 2. Best-effort fallback: versioned files
 	pattern := stable + "-*"
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
