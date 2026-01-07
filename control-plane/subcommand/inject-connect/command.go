@@ -398,8 +398,12 @@ func (c *Command) Run(args []string) int {
 
 	healthProbeBindAddress := constants.Getv4orv6Str("0.0.0.0:9445", "[::]:9445")
 	metricsServiceBindAddress := constants.Getv4orv6Str("0.0.0.0:9444", "[::]:9444")
+	cfg := ctrl.GetConfigOrDie()
+	cfg.Timeout = 90 * time.Second
+	cfg.QPS = 50
+	cfg.Burst = 100
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:                  scheme,
 		LeaderElection:          true,
 		LeaderElectionID:        "consul-controller-lock",
