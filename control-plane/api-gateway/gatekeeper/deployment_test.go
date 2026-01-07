@@ -408,9 +408,8 @@ func TestAdditionalAccessLogVolumeMount(t *testing.T) {
 			}
 
 			g := &Gatekeeper{
-				Log:          logr.Discard(),
-				Client:       fakeClient,
-				ConsulConfig: nil,
+				Log:    logr.Discard(),
+				Client: fakeClient,
 			}
 
 			initialvolume := []corev1.Volume{}
