@@ -242,6 +242,7 @@ clusters:
 	return path
 }
 
+// TestResolveKubeconfigPath tests the resolveKubeconfigPath function
 func TestResolveKubeconfigPath(t *testing.T) {
 	tests := []struct {
 		name                  string
@@ -384,7 +385,7 @@ func TestCreateK8sClient(t *testing.T) {
 					Kubeconfig: "",
 				}
 			},
-			expectedErrorContains: fmt.Errorf("no kubeconfig found"),
+			expectedErrorContains: fmt.Errorf("failed to load kubeconfig"),
 			expectedError:         true,
 			expectClient:          false,
 		},

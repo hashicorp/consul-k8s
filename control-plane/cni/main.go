@@ -10,7 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"sort"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -277,11 +277,13 @@ func main() {
 }
 
 func resolveKubeconfigPath(dir, base string) (string, error) {
+	// we  will return the actual kubeconfig path if present
 	stable := filepath.Join(dir, base)
 	if fi, err := os.Stat(stable); err == nil && !fi.IsDir() {
 		return stable, nil
 	}
-
+	// this will be a fallback to find the most recently modified kubeconfig file with the given base name pattern
+	// example file names: kubeconfig-<time.Now().UnixNano()>.
 	pattern := stable + "-*"
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
@@ -291,14 +293,26 @@ func resolveKubeconfigPath(dir, base string) (string, error) {
 		return "", fmt.Errorf("no kubeconfig found at %s or %s-*", stable, stable)
 	}
 
-	// Pick newest by mtime (bounded + deterministic)
-	sort.Slice(matches, func(i, j int) bool {
-		fi, _ := os.Stat(matches[i])
-		fj, _ := os.Stat(matches[j])
-		return fi.ModTime().After(fj.ModTime())
-	})
+	var newest string
+	var newestTime time.Time
 
-	return matches[0], nil
+	// we are looping over the matched files to find the most recently modified kubeconfig file, with O(n) complexity
+	for _, fp := range matches {
+		fi, err := os.Stat(fp)
+		if err != nil || fi.IsDir() {
+			continue
+		}
+		if fi.ModTime().After(newestTime) {
+			newestTime = fi.ModTime()
+			newest = fp
+		}
+	}
+	// checking if a file was found
+	if newest == "" {
+		return "", fmt.Errorf("no valid kubeconfig found at %s or %s-*", stable, stable)
+	}
+
+	return newest, nil
 }
 
 // createK8sClient configures the command's Kubernetes API client if it doesn't
@@ -310,7 +324,13 @@ func (c *Command) createK8sClient(cfg *PluginConf, logger hclog.Logger) error {
 
 	path, err := resolveKubeconfigPath(dir, base)
 	if err != nil {
-		return err
+		logger.Warn(
+			"kubeconfig not found, falling back to default client-go behavior",
+			"dir", dir,
+			"base", base,
+			"err", err,
+		)
+		path = ""
 	}
 
 	restConfig, err := clientcmd.BuildConfigFromFlags("", path)
