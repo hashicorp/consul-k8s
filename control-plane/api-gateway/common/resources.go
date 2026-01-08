@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -63,7 +64,7 @@ func (k *KubernetesUpdates) Operations() []client.Object {
 
 type ReferenceValidator interface {
 	GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
-	HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool
+	HTTPRouteCanReferenceBackend(httproute any, backendRef any) bool
 	TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool
 }
 
@@ -73,7 +74,7 @@ type certificate struct {
 }
 
 type httpRoute struct {
-	route    gwv1beta1.HTTPRoute
+	route    any
 	gateways mapset.Set
 }
 
@@ -210,10 +211,26 @@ func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	}
 }
 
-func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
-	key := client.ObjectKeyFromObject(&gateway)
-	consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
+func (s *ResourceMap) ReferenceCountGateway(gateway any) {
 
+	var (
+		key types.NamespacedName
+	)
+	var namespace string
+	var listeners any
+	switch g := gateway.(type) {
+	case *gwv1beta1.Gateway:
+		key = client.ObjectKeyFromObject(g)
+		namespace = g.Namespace
+		listeners = g.Spec.Listeners
+	case *gwv1beta1exp.Gateway:
+		key = client.ObjectKeyFromObject(g)
+		namespace = g.Namespace
+		listeners = g.Spec.Listeners
+	default:
+		panic("error in the reference count grant, gateway received")
+	}
+	consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
 	set := &resourceSet{
 		httpRoutes:    mapset.NewSet(),
 		tcpRoutes:     mapset.NewSet(),
@@ -221,27 +238,30 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 		consulObjects: NewReferenceSet(),
 	}
 
-	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
-			continue
-		}
-		for _, cert := range listener.TLS.CertificateRefs {
-			if NilOrEqual(cert.Group, "") && NilOrEqual(cert.Kind, "Secret") {
-				certificateKey := IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)
+	switch ls := listeners.(type) {
 
-				set.certificates.Add(certificateKey)
+	case []gwv1beta1.Listener:
+		for _, listener := range ls {
+			if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
+				continue
+			}
+			for _, cert := range listener.TLS.CertificateRefs {
+				if NilOrEqual(cert.Group, "") && NilOrEqual(cert.Kind, "Secret") {
+					certificateKey := IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, namespace)
+					set.certificates.Add(certificateKey)
+					consulCertificateKey := s.toConsulReference(api.FileSystemCertificate, certificateKey)
+					if certificate, ok := s.certificateGateways[NormalizeMeta(consulCertificateKey)]; ok {
+						certificate.gateways.Add(key)
+						set.consulObjects.Mark(consulCertificateKey)
+					}
 
-				consulCertificateKey := s.toConsulReference(api.FileSystemCertificate, certificateKey)
-				certificate, ok := s.certificateGateways[NormalizeMeta(consulCertificateKey)]
-				if ok {
-					certificate.gateways.Add(key)
-					set.consulObjects.Mark(consulCertificateKey)
 				}
 			}
 		}
-	}
 
+	}
 	s.gatewayResources[consulKey] = set
+
 }
 
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
@@ -351,26 +371,90 @@ func (s *ResourceMap) consulGatewaysForRoute(namespace string, refs []api.Resour
 	return gateways
 }
 
-func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1beta1.HTTPRoute) {
-	key := client.ObjectKeyFromObject(&route)
+func (s *ResourceMap) ReferenceCountHTTPRoute(route any) {
+
+	var (
+		key        types.NamespacedName
+		namespace  string
+		parentRefs any
+	)
+
+	switch r := route.(type) {
+	case *gwv1beta1.HTTPRoute:
+		key = client.ObjectKeyFromObject(r)
+		namespace = r.Namespace
+		parentRefs = r.Spec.ParentRefs
+	case *gwv1beta1exp.HTTPRoute:
+		key = client.ObjectKeyFromObject(r)
+		namespace = r.Namespace
+		parentRefs = r.Spec.ParentRefs
+	default:
+		return
+	}
+
 	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
 	set := &httpRoute{
 		route:    route,
 		gateways: mapset.NewSet(),
 	}
+	switch refs := parentRefs.(type) {
+	case []gwv1beta1.ParentReference:
+		for gatewayKey := range s.gatewaysForRoute(namespace, refs).Iter() {
+			ref := gatewayKey.(api.ResourceReference)
+			set.gateways.Add(ref)
+			/*
+				if gw, ok := s.gatewayResources[ref]; ok {
+					gw.httpRoutes.Add(consulKey)
+				}*/
+			gw := s.gatewayResources[ref]
+			gw.httpRoutes.Add(consulKey)
+		}
+	case []gwv1beta1exp.ParentReference:
+		for gatewayKey := range s.gatewaysForRoute(namespace, refs).Iter() {
+			ref := gatewayKey.(api.ResourceReference)
+			set.gateways.Add(ref)
+			/*
+				if gw, ok := s.gatewayResources[ref]; ok {
+					gw.httpRoutes.Add(consulKey)
+				}*/
+			gw := s.gatewayResources[ref]
+			gw.httpRoutes.Add(consulKey)
+		}
 
-	for gatewayKey := range s.gatewaysForRoute(route.Namespace, route.Spec.ParentRefs).Iter() {
-		set.gateways.Add(gatewayKey.(api.ResourceReference))
-
-		gateway := s.gatewayResources[gatewayKey.(api.ResourceReference)]
-		gateway.httpRoutes.Add(consulKey)
 	}
 
 	s.httpRouteGateways[consulKey] = set
 }
 
+// func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1beta1.HTTPRoute) {
+// 	key := client.ObjectKeyFromObject(&route)
+// 	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
+
+// 	set := &httpRoute{
+// 		route:    route,
+// 		gateways: mapset.NewSet(),
+// 	}
+
+// 	for gatewayKey := range s.gatewaysForRoute(route.Namespace, route.Spec.ParentRefs).Iter() {
+// 		set.gateways.Add(gatewayKey.(api.ResourceReference))
+
+// 		gateway := s.gatewayResources[gatewayKey.(api.ResourceReference)]
+// 		gateway.httpRoutes.Add(consulKey)
+// 	}
+
+// 	s.httpRouteGateways[consulKey] = set
+// }
+
 func localObjectReferenceToObjectReference(filterRef gwv1beta1.LocalObjectReference, namespace string) corev1.ObjectReference {
+	return corev1.ObjectReference{
+		Kind:      string(filterRef.Kind),
+		Name:      string(filterRef.Name),
+		Namespace: namespace,
+	}
+}
+
+func localObjectReferenceToObjectReferenceExp(filterRef gwv1beta1exp.LocalObjectReference, namespace string) corev1.ObjectReference {
 	return corev1.ObjectReference{
 		Kind:      string(filterRef.Kind),
 		Name:      string(filterRef.Name),
@@ -395,11 +479,35 @@ func (s *ResourceMap) AddExternalFilter(filter client.Object) {
 	s.externalFilters[key] = filter
 }
 
-func (s *ResourceMap) GetExternalFilter(filterRef gwv1beta1.LocalObjectReference, namespace string) (client.Object, bool) {
-	key := localObjectReferenceToObjectReference(filterRef, namespace)
-	filter, ok := s.externalFilters[key]
-	return filter, ok
+func (s *ResourceMap) GetExternalFilter(filterRef any, namespace string) (client.Object, bool) {
+	switch ref := filterRef.(type) {
+	case gwv1beta1.LocalObjectReference:
+		key := localObjectReferenceToObjectReference(ref, namespace)
+		filter, ok := s.externalFilters[key]
+		return filter, ok
+
+	case *gwv1beta1.LocalObjectReference:
+		key := localObjectReferenceToObjectReference(*ref, namespace)
+		filter, ok := s.externalFilters[key]
+		return filter, ok
+	case gwv1beta1exp.LocalObjectReference:
+		key := localObjectReferenceToObjectReferenceExp(ref, namespace)
+		filter, ok := s.externalFilters[key]
+		return filter, ok
+
+	case *gwv1beta1exp.LocalObjectReference:
+		key := localObjectReferenceToObjectReferenceExp(*ref, namespace)
+		filter, ok := s.externalFilters[key]
+		return filter, ok
+	}
+	return nil, false
 }
+
+// func (s *ResourceMap) GetExternalFilter(filterRef gwv1beta1.LocalObjectReference, namespace string) (client.Object, bool) {
+// 	key := localObjectReferenceToObjectReference(filterRef, namespace)
+// 	filter, ok := s.externalFilters[key]
+// 	return filter, ok
+// }
 
 func (s *ResourceMap) ExternalFilterExists(filterRef gwv1beta1.LocalObjectReference, namespace string) bool {
 	_, ok := s.GetExternalFilter(filterRef, namespace)
@@ -493,22 +601,65 @@ func (s *ResourceMap) ReferenceCountTCPRoute(route gwv1alpha2.TCPRoute) {
 	s.tcpRouteGateways[consulKey] = set
 }
 
-func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference) mapset.Set {
+// []gwv1beta1.ParentReference
+func (s *ResourceMap) gatewaysForRoute(namespace string, refs any) mapset.Set {
+
 	gateways := mapset.NewSet()
 
-	for _, parent := range refs {
-		if NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && NilOrEqual(parent.Kind, "Gateway") {
-			key := IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace)
-			consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
-
-			if _, ok := s.gatewayResources[consulKey]; ok {
-				gateways.Add(consulKey)
+	switch parents := refs.(type) {
+	case []gwv1beta1.ParentReference:
+		for _, parent := range parents {
+			if NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && NilOrEqual(parent.Kind, "Gateway") {
+				key := IndexedNamespacedNameWithDefault(
+					parent.Name,
+					parent.Namespace,
+					namespace,
+				)
+				consulKey := NormalizeMeta(s.toConsulReference(
+					api.APIGateway,
+					key))
+				if _, ok := s.gatewayResources[consulKey]; ok {
+					gateways.Add(consulKey)
+				}
+			}
+		}
+	case []gwv1beta1exp.ParentReference:
+		for _, parent := range parents {
+			if NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && NilOrEqual(parent.Kind, "Gateway") {
+				key := IndexedNamespacedNameWithDefault(
+					parent.Name,
+					parent.Namespace,
+					namespace,
+				)
+				consulKey := NormalizeMeta(s.toConsulReference(
+					api.APIGateway,
+					key))
+				if _, ok := s.gatewayResources[consulKey]; ok {
+					gateways.Add(consulKey)
+				}
 			}
 		}
 	}
 
 	return gateways
 }
+
+// func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference) mapset.Set {
+// 	gateways := mapset.NewSet()
+
+// 	for _, parent := range refs {
+// 		if NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && NilOrEqual(parent.Kind, "Gateway") {
+// 			key := IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace)
+// 			consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
+
+// 			if _, ok := s.gatewayResources[consulKey]; ok {
+// 				gateways.Add(consulKey)
+// 			}
+// 		}
+// 	}
+
+// 	return gateways
+// }
 
 func (s *ResourceMap) TranslateAndMutateHTTPRoute(key types.NamespacedName, onUpdate func(error, api.ConfigEntryStatus), mutateFn func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry) {
 	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
@@ -704,10 +855,30 @@ func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, ref g
 	return s.referenceValidator.GatewayCanReferenceSecret(gateway, ref)
 }
 
-func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1beta1.HTTPRoute, ref gwv1beta1.BackendRef) bool {
-	return s.referenceValidator.HTTPRouteCanReferenceBackend(route, ref)
+func (s *ResourceMap) HTTPRouteCanReferenceBackend(route any, ref any) bool {
+	switch r := route.(type) {
+	case *gwv1beta1.HTTPRoute:
+		backendRef, ok := ref.(gwv1beta1.BackendRef)
+		if !ok {
+			return false
+		}
+		return s.referenceValidator.
+			HTTPRouteCanReferenceBackend(r, backendRef)
+	case *gwv1beta1exp.HTTPRoute:
+		backendRef, ok := ref.(gwv1beta1exp.BackendRef)
+		if !ok {
+			return false
+		}
+		return s.referenceValidator.
+			HTTPRouteCanReferenceBackend(r, backendRef)
+	}
+	return false
+
 }
 
+//	func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1beta1.HTTPRoute, ref gwv1beta1.BackendRef) bool {
+//		return s.referenceValidator.HTTPRouteCanReferenceBackend(route, ref)
+//	}
 func (s *ResourceMap) TCPRouteCanReferenceBackend(route gwv1alpha2.TCPRoute, ref gwv1beta1.BackendRef) bool {
 	return s.referenceValidator.TCPRouteCanReferenceBackend(route, ref)
 }

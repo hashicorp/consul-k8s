@@ -12,6 +12,7 @@ import (
 	"time"
 
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwexp1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2/experimental"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"

@@ -16,257 +16,408 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-const (
-	gatewayClassFinalizer = "gateway-exists-finalizer.consul.hashicorp.com"
+//
+// ─────────────────────────────────────────────────────────────
+//  Constants & types
+// ─────────────────────────────────────────────────────────────
+//
 
-	// GatewayClass status fields.
-	accepted          = "Accepted"
-	invalidParameters = "InvalidParameters"
+type MigrationMode string
+
+const (
+	PreferBeta MigrationMode = "PreferBeta"
+	PreferExp  MigrationMode = "PreferExp"
+
+	ConditionAccepted = "Accepted"
+	ReasonInvalid     = "InvalidParameters"
+	ReasonSuperseded  = "Superseded"
 )
 
-// GatewayClassController reconciles a GatewayClass object.
-// The GatewayClass is responsible for defining the behavior of API gateways
-// which reference the given class.
+//
+// ─────────────────────────────────────────────────────────────
+//  Controller-owned model
+// ─────────────────────────────────────────────────────────────
+//
+
+type GatewayClassParametersRef struct {
+	Group string
+	Kind  string
+	Name  string
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+//  Adapter interface
+// ─────────────────────────────────────────────────────────────
+//
+
+type GatewayClassAdapter interface {
+	GetName() string
+	GetControllerName() string
+	GetGeneration() int64
+	GetParametersRef() *GatewayClassParametersRef
+	SetCondition(cond metav1.Condition) bool
+	GetObject() client.Object
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+//  v1beta1 adapter
+// ─────────────────────────────────────────────────────────────
+//
+
+type GatewayClassV1Beta1Adapter struct {
+	*gwv1beta1.GatewayClass
+}
+
+func (a *GatewayClassV1Beta1Adapter) GetName() string {
+	return a.Name
+}
+func (a *GatewayClassV1Beta1Adapter) GetControllerName() string {
+	return string(a.Spec.ControllerName)
+}
+func (a *GatewayClassV1Beta1Adapter) GetGeneration() int64 {
+	return a.Generation
+}
+func (a *GatewayClassV1Beta1Adapter) GetParametersRef() *GatewayClassParametersRef {
+	ref := a.Spec.ParametersRef
+	if ref == nil {
+		return nil
+	}
+	return &GatewayClassParametersRef{
+		Group: string(ref.Group),
+		Kind:  string(ref.Kind),
+		Name:  string(ref.Name),
+	}
+}
+func (a *GatewayClassV1Beta1Adapter) GetObject() client.Object {
+	return a.GatewayClass
+}
+func (a *GatewayClassV1Beta1Adapter) SetCondition(cond metav1.Condition) bool {
+	cond.ObservedGeneration = a.Generation
+	return setOrUpdateCondition(&a.Status.Conditions, cond)
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+//  v1beta1exp adapter
+// ─────────────────────────────────────────────────────────────
+//
+
+type GatewayClassV1Beta1ExpAdapter struct {
+	*gwv1beta1exp.GatewayClass
+}
+
+func (a *GatewayClassV1Beta1ExpAdapter) GetName() string {
+	return a.Name
+}
+func (a *GatewayClassV1Beta1ExpAdapter) GetControllerName() string {
+	return string(a.Spec.ControllerName)
+}
+func (a *GatewayClassV1Beta1ExpAdapter) GetGeneration() int64 {
+	return a.Generation
+}
+func (a *GatewayClassV1Beta1ExpAdapter) GetParametersRef() *GatewayClassParametersRef {
+	ref := a.Spec.ParametersRef
+	if ref == nil {
+		return nil
+	}
+	return &GatewayClassParametersRef{
+		Group: string(ref.Group),
+		Kind:  string(ref.Kind),
+		Name:  string(ref.Name),
+	}
+}
+func (a *GatewayClassV1Beta1ExpAdapter) GetObject() client.Object {
+	return a.GatewayClass
+}
+func (a *GatewayClassV1Beta1ExpAdapter) SetCondition(cond metav1.Condition) bool {
+	cond.ObservedGeneration = a.Generation
+	return setOrUpdateCondition(&a.Status.Conditions, cond)
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+//  Authority resolution
+// ─────────────────────────────────────────────────────────────
+//
+
+func ResolveAuthoritativeGatewayClass(
+	beta *gwv1beta1.GatewayClass,
+	exp *gwv1beta1exp.GatewayClass,
+	mode MigrationMode,
+) GatewayClassAdapter {
+
+	if mode == PreferExp && exp != nil {
+		return &GatewayClassV1Beta1ExpAdapter{exp}
+	}
+	if beta != nil {
+		return &GatewayClassV1Beta1Adapter{beta}
+	}
+	if exp != nil {
+		return &GatewayClassV1Beta1ExpAdapter{exp}
+	}
+	return nil
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+//  Validation (replaces validateParametersRef)
+// ─────────────────────────────────────────────────────────────
+//
+
+func ValidateGatewayClass(
+	ctx context.Context,
+	c client.Client,
+	adapter GatewayClassAdapter,
+	controllerName string,
+) (bool, string, error) {
+
+	if adapter.GetControllerName() != controllerName {
+		return false, "Not owned by this controller", nil
+	}
+
+	ref := adapter.GetParametersRef()
+	if ref == nil {
+		return true, "Accepted", nil
+	}
+
+	if ref.Kind != v1alpha1.GatewayClassConfigKind {
+		return false, "Invalid ParametersRef kind", nil
+	}
+
+	if ref.Group != v1alpha1.GroupVersion.Group {
+		return false, "Invalid ParametersRef group", nil
+	}
+
+	err := c.Get(ctx, types.NamespacedName{Name: ref.Name}, &v1alpha1.GatewayClassConfig{})
+	if k8serrors.IsNotFound(err) {
+		return false, "GatewayClassConfig not found", nil
+	}
+
+	return true, "Accepted", err
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+//  Condition helper (replaces setCondition + equalConditions)
+// ─────────────────────────────────────────────────────────────
+//
+
+func setOrUpdateCondition(conds *[]metav1.Condition, cond metav1.Condition) bool {
+	cond.LastTransitionTime = metav1.Now()
+
+	for i, existing := range *conds {
+		if existing.Type != cond.Type {
+			continue
+		}
+		if existing.Status == cond.Status &&
+			existing.Reason == cond.Reason &&
+			existing.Message == cond.Message &&
+			existing.ObservedGeneration == cond.ObservedGeneration {
+			return false
+		}
+		(*conds)[i] = cond
+		return true
+	}
+
+	*conds = append(*conds, cond)
+	return true
+}
+
+//
+// ─────────────────────────────────────────────────────────────
+//  Controller
+// ─────────────────────────────────────────────────────────────
+//
+
 type GatewayClassController struct {
-	ControllerName string
-	Log            logr.Logger
-
 	client.Client
+	Log            logr.Logger
+	ControllerName string
+	MigrationMode  MigrationMode
 }
 
-// Reconcile handles the reconciliation loop for GatewayClass objects.
-func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("gatewayClass", req.NamespacedName.Name)
-	log.V(1).Info("Reconciling GatewayClass")
+//
+// ─────────────────────────────────────────────────────────────
+//  Lifecycle helper (FROM OLD CODE – REQUIRED)
+// ─────────────────────────────────────────────────────────────
+//
 
-	gc := &gwv1beta1.GatewayClass{}
+// isGatewayClassInUse returns true if any Gateway references this GatewayClass
+func (r *GatewayClassController) isGatewayClassInUse(
+	ctx context.Context,
+	gcName string,
+) (bool, error) {
 
-	err := r.Client.Get(ctx, req.NamespacedName, gc)
-	if err != nil {
-		if k8serrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		log.Error(err, "unable to get GatewayClass")
-		return ctrl.Result{}, err
-	}
-
-	if string(gc.Spec.ControllerName) != r.ControllerName {
-		// This GatewayClass is not for this controller.
-		_, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
-		if err != nil {
-			log.Error(err, "unable to remove finalizer")
-		}
-
-		return ctrl.Result{}, err
-	}
-
-	if !gc.ObjectMeta.DeletionTimestamp.IsZero() {
-		// We have a deletion request. Ensure we are not in use.
-		used, err := r.isGatewayClassInUse(ctx, gc)
-		if err != nil {
-			log.Error(err, "unable to check if GatewayClass is in use")
-			return ctrl.Result{}, err
-		}
-		if used {
-			log.Info("GatewayClass is in use, cannot delete")
-			return ctrl.Result{}, nil
-		}
-		// Remove our finalizer.
-		if _, err := RemoveFinalizer(ctx, r.Client, gc, gatewayClassFinalizer); err != nil {
-			if k8serrors.IsConflict(err) {
-				log.V(1).Info("error removing finalizer for gatewayClass, will try to re-reconcile")
-
-				return ctrl.Result{Requeue: true}, nil
-			}
-			log.Error(err, "unable to remove finalizer")
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
-	}
-
-	// We are creating or updating the GatewayClass.
-	didUpdate, err := EnsureFinalizer(ctx, r.Client, gc, gatewayClassFinalizer)
-	if err != nil {
-		if k8serrors.IsConflict(err) {
-			log.V(1).Info("error adding finalizer for gatewayClass, will try to re-reconcile")
-
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "unable to add finalizer")
-		return ctrl.Result{}, err
-	}
-	if didUpdate {
-		// We updated the GatewayClass, requeue to avoid another update.
-		return ctrl.Result{}, nil
-	}
-
-	didUpdate, err = r.validateParametersRef(ctx, gc, log)
-	if didUpdate {
-		if err := r.Client.Status().Update(ctx, gc); err != nil {
-			if k8serrors.IsConflict(err) {
-				log.V(1).Info("error updating status for gatewayClass, will try to re-reconcile")
-
-				return ctrl.Result{Requeue: true}, nil
-			}
-			log.Error(err, "unable to update status for GatewayClass")
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
-	}
-	if err != nil {
-		log.Error(err, "unable to validate ParametersRef")
-	}
-
-	return ctrl.Result{}, err
-}
-
-// SetupWithManager registers the controller with the given manager.
-func (r *GatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&gwv1beta1.GatewayClass{}).
-		// Watch for changes to GatewayClassConfig objects.
-		Watches(&v1alpha1.GatewayClassConfig{}, r.gatewayClassConfigFieldIndexEventHandler()).
-		// Watch for changes to Gateway objects that reference this GatewayClass.
-		Watches(&gwv1beta1.Gateway{}, r.gatewayFieldIndexEventHandler()).
-		Complete(r)
-}
-
-// isGatewayClassInUse returns true if the given GatewayClass is referenced by any Gateway objects.
-func (r *GatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.GatewayClass) (bool, error) {
-	list := &gwv1beta1.GatewayList{}
-	if err := r.Client.List(ctx, list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gc.Name),
+	var gateways gwv1beta1.GatewayList
+	if err := r.List(ctx, &gateways, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector(
+			Gateway_GatewayClassIndex,
+			gcName,
+		),
 	}); err != nil {
 		return false, err
 	}
 
-	return len(list.Items) != 0, nil
+	return len(gateways.Items) > 0, nil
 }
 
-// validateParametersRef validates the ParametersRef field of the given GatewayClass
-// if it is set, ensuring that the referenced object is a GatewayClassConfig that exists.
-func (r *GatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.GatewayClass, log logr.Logger) (didUpdate bool, err error) {
-	parametersRef := gc.Spec.ParametersRef
-	if parametersRef != nil {
-		if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
-			didUpdate = r.setCondition(gc, metav1.Condition{
-				Type:    accepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  invalidParameters,
-				Message: fmt.Sprintf("Incorrect type for parametersRef. Expected GatewayClassConfig, got %q.", parametersRef.Kind),
-			})
-			return didUpdate, nil
-		}
+//
+// ─────────────────────────────────────────────────────────────
+//  Reconcile
+// ─────────────────────────────────────────────────────────────
+//
 
-		err = r.Client.Get(ctx, types.NamespacedName{Name: parametersRef.Name}, &v1alpha1.GatewayClassConfig{})
-		if k8serrors.IsNotFound(err) {
-			didUpdate := r.setCondition(gc, metav1.Condition{
-				Type:    accepted,
-				Status:  metav1.ConditionFalse,
-				Reason:  invalidParameters,
-				Message: fmt.Sprintf("GatewayClassConfig not found %q.", parametersRef.Name),
-			})
-			return didUpdate, nil
-		}
+func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
+	log := r.Log.WithValues("gatewayClass", req.Name)
+
+	var beta *gwv1beta1.GatewayClass
+	var exp *gwv1beta1exp.GatewayClass
+
+	// Fetch beta
+	b := &gwv1beta1.GatewayClass{}
+	if err := r.Get(ctx, req.NamespacedName, b); err == nil {
+		beta = b
+	} else if !k8serrors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
+
+	// Fetch exp
+	e := &gwv1beta1exp.GatewayClass{}
+	if err := r.Get(ctx, req.NamespacedName, e); err == nil {
+		exp = e
+	} else if !k8serrors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
+
+	adapter := ResolveAuthoritativeGatewayClass(beta, exp, r.MigrationMode)
+	if adapter == nil {
+		return ctrl.Result{}, nil
+	}
+
+	if !adapter.GetObject().GetDeletionTimestamp().IsZero() {
+		inUse, err := r.isGatewayClassInUse(ctx, adapter.GetName())
 		if err != nil {
-			log.Error(err, "unable to fetch GatewayClassConfig")
-			return false, err
+			return ctrl.Result{}, err
+		}
+		if inUse {
+			log.Info("GatewayClass is in use, blocking deletion")
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if beta != nil && exp != nil && r.MigrationMode == PreferExp {
+		legacy := &GatewayClassV1Beta1Adapter{beta}
+		legacyCond := metav1.Condition{
+			Type:    ConditionAccepted,
+			Status:  metav1.ConditionFalse,
+			Reason:  ReasonSuperseded,
+			Message: "Superseded by v1beta1exp GatewayClass",
+		}
+		if legacy.SetCondition(legacyCond) {
+			_ = r.Status().Update(ctx, legacy.GetObject())
 		}
 	}
 
-	didUpdate = r.setCondition(gc, metav1.Condition{
-		Type:    accepted,
-		Status:  metav1.ConditionTrue,
-		Reason:  accepted,
-		Message: "GatewayClass Accepted",
-	})
+	// ── Validation ──
+	accepted, msg, err := ValidateGatewayClass(ctx, r.Client, adapter, r.ControllerName)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	return didUpdate, err
-}
+	cond := metav1.Condition{
+		Type:               ConditionAccepted,
+		Status:             metav1.ConditionFalse,
+		Reason:             ReasonInvalid,
+		Message:            msg,
+		ObservedGeneration: adapter.GetGeneration(),
+	}
+	if accepted {
+		cond.Status = metav1.ConditionTrue
+		cond.Reason = ConditionAccepted
+	}
 
-// setCondition sets the given condition on the given GatewayClass.
-func (r *GatewayClassController) setCondition(gc *gwv1beta1.GatewayClass, condition metav1.Condition) (didUpdate bool) {
-	condition.LastTransitionTime = metav1.Now()
-	condition.ObservedGeneration = gc.GetGeneration()
-
-	// Set the condition if it already exists.
-	for i, c := range gc.Status.Conditions {
-		if c.Type == condition.Type {
-			// The condition already exists and is up to date.
-			if equalConditions(condition, c) {
-				return false
-			}
-
-			gc.Status.Conditions[i] = condition
-
-			return true
+	if adapter.SetCondition(cond) {
+		if err := r.Status().Update(ctx, adapter.GetObject()); err != nil {
+			return ctrl.Result{}, err
 		}
 	}
 
-	// Append the condition if it does not exist.
-	gc.Status.Conditions = append(gc.Status.Conditions, condition)
+	log.Info(
+		"Reconciled GatewayClass",
+		"accepted", accepted,
+		"api", fmt.Sprintf("%T", adapter),
+	)
 
-	return true
+	return ctrl.Result{}, nil
 }
 
-// gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
-// reconcile.Requests for GatewayClass objects that reference the GatewayClassConfig
-// object that triggered the event.
+//
+// ─────────────────────────────────────────────────────────────
+//  Watches (FROM OLD CODE – REQUIRED)
+
 func (r *GatewayClassController) gatewayClassConfigFieldIndexEventHandler() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-		requests := []reconcile.Request{}
 
-		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
-		var gcList gwv1beta1.GatewayClassList
-		err := r.Client.List(ctx, &gcList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(GatewayClass_GatewayClassConfigIndex, o.GetName()),
-		})
-		if err != nil {
-			r.Log.Error(err, "unable to list gateway classes")
+		var gcs gwv1beta1.GatewayClassList
+		if err := r.List(ctx, &gcs, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(
+				GatewayClass_GatewayClassConfigIndex,
+				o.GetName(),
+			),
+		}); err != nil {
+			r.Log.Error(err, "unable to list GatewayClasses")
+			return nil
 		}
 
-		// Create a reconcile request for each GatewayClass.
-		for _, gc := range gcList.Items {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name: gc.Name,
-				},
+		var reqs []reconcile.Request
+		for _, gc := range gcs.Items {
+			reqs = append(reqs, reconcile.Request{
+				NamespacedName: types.NamespacedName{Name: gc.Name},
 			})
 		}
-
-		return requests
+		return reqs
 	})
 }
 
-// gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
-// reconcile.Requests for GatewayClass objects from Gateways which reference the GatewayClass
-// when those Gateways are updated.
 func (r *GatewayClassController) gatewayFieldIndexEventHandler() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-		// Get the Gateway object that triggered the event.
-		g := o.(*gwv1beta1.Gateway)
-
-		// Return a slice with the single reconcile.Request for the GatewayClass
-		// that the Gateway references.
-		return []reconcile.Request{
-			{
-				NamespacedName: types.NamespacedName{
-					Name: string(g.Spec.GatewayClassName),
-				},
+		gw := o.(*gwv1beta1.Gateway)
+		return []reconcile.Request{{
+			NamespacedName: types.NamespacedName{
+				Name: string(gw.Spec.GatewayClassName),
 			},
-		}
+		}}
 	})
 }
 
-func equalConditions(a, b metav1.Condition) bool {
-	return a.Type == b.Type &&
-		a.Status == b.Status &&
-		a.Reason == b.Reason &&
-		a.Message == b.Message &&
-		a.ObservedGeneration == b.ObservedGeneration
+//
+// ─────────────────────────────────────────────────────────────
+//  Setup
+// ─────────────────────────────────────────────────────────────
+//
+
+func (r *GatewayClassController) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&gwv1beta1.GatewayClass{}).
+		Watches(&gwv1beta1exp.GatewayClass{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				return []reconcile.Request{{
+					NamespacedName: types.NamespacedName{Name: o.GetName()},
+				}}
+			}),
+		).
+		Watches(&v1alpha1.GatewayClassConfig{}, r.gatewayClassConfigFieldIndexEventHandler()).
+		Watches(&gwv1beta1.Gateway{}, r.gatewayFieldIndexEventHandler()).
+		Complete(r)
 }

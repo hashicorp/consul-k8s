@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -236,26 +237,48 @@ func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWT
 	return &verifyClaim
 }
 
-func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
-	namespace := t.Namespace(route.Namespace)
+func (t ResourceTranslator) ToHTTPRoute(route any, resources *ResourceMap) *api.HTTPRouteConfigEntry {
+	var (
+		name      string
+		namespace string
+		hostnames []string
+		rules     []api.HTTPRouteRule
+	)
 
-	// We don't translate parent refs.
+	switch r := route.(type) {
+	case *gwv1beta1.HTTPRoute:
+		namespace = t.Namespace(r.Namespace)
+		name = r.Name
 
-	hostnames := StringLikeSlice(route.Spec.Hostnames)
-	rules := ConvertSliceFuncIf(
-		route.Spec.Rules,
-		func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
-			return t.translateHTTPRouteRule(route, rule, resources)
-		})
+		hostnames = StringLikeSlice(r.Spec.Hostnames)
+		rules = ConvertSliceFuncIf(
+			r.Spec.Rules,
+			func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
+				return t.translateHTTPRouteRule(r, rule, resources)
+			})
+	case *gwv1beta1exp.HTTPRoute:
+		namespace = t.Namespace(r.Namespace)
+		name = r.Name
+
+		hostnames = StringLikeSlice(r.Spec.Hostnames)
+		rules = ConvertSliceFuncIf(
+			r.Spec.Rules,
+			func(rule gwv1beta1exp.HTTPRouteRule) (api.HTTPRouteRule, bool) {
+				return t.translateHTTPRouteRule(r, rule, resources)
+			})
+	default:
+		return nil
+
+	}
 
 	configEntry := api.HTTPRouteConfigEntry{
 		Kind:      api.HTTPRoute,
-		Name:      route.Name,
+		Name:      name,
 		Namespace: namespace,
 		Partition: t.ConsulPartition,
 		Meta: t.addDatacenterToMeta(map[string]string{
-			constants.MetaKeyKubeNS:   route.Namespace,
-			constants.MetaKeyKubeName: route.Name,
+			constants.MetaKeyKubeNS:   namespace,
+			constants.MetaKeyKubeName: name,
 		}),
 		Hostnames: hostnames,
 		Rules:     rules,
@@ -264,66 +287,271 @@ func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *Re
 	return &configEntry
 }
 
-func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
-	services := ConvertSliceFuncIf(
-		rule.BackendRefs,
-		func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
-			return t.translateHTTPBackendRef(route, ref, resources)
-		})
+// func (t ResourceTranslator) ToHTTPRoute(route gwv1beta1.HTTPRoute, resources *ResourceMap) *api.HTTPRouteConfigEntry {
+// 	namespace := t.Namespace(route.Namespace)
 
-	if len(services) == 0 {
+// 	// We don't translate parent refs.
+
+// 	hostnames := StringLikeSlice(route.Spec.Hostnames)
+// 	rules := ConvertSliceFuncIf(
+// 		route.Spec.Rules,
+// 		func(rule gwv1beta1.HTTPRouteRule) (api.HTTPRouteRule, bool) {
+// 			return t.translateHTTPRouteRule(route, rule, resources)
+// 		})
+
+// 	configEntry := api.HTTPRouteConfigEntry{
+// 		Kind:      api.HTTPRoute,
+// 		Name:      route.Name,
+// 		Namespace: namespace,
+// 		Partition: t.ConsulPartition,
+// 		Meta: t.addDatacenterToMeta(map[string]string{
+// 			constants.MetaKeyKubeNS:   route.Namespace,
+// 			constants.MetaKeyKubeName: route.Name,
+// 		}),
+// 		Hostnames: hostnames,
+// 		Rules:     rules,
+// 	}
+
+// 	return &configEntry
+// }
+
+func (t ResourceTranslator) translateHTTPRouteRule(route any, rule any, resources *ResourceMap) (api.HTTPRouteRule, bool) {
+
+	var (
+		namespace   string
+		services    []api.HTTPService
+		matches     []api.HTTPMatch
+		filters     api.HTTPFilters
+		respFilters api.HTTPResponseFilters
+	)
+	switch r := route.(type) {
+	case *gwv1beta1.HTTPRoute:
+		namespace = r.Namespace
+		stableRule, ok := rule.(gwv1beta1.HTTPRouteRule)
+		if !ok {
+			return api.HTTPRouteRule{}, false
+		}
+		services = ConvertSliceFuncIf(
+			stableRule.BackendRefs,
+			func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
+				return t.translateHTTPBackendRef(r, ref, resources)
+			},
+		)
+		if len(services) == 0 {
+			return api.HTTPRouteRule{}, false
+		}
+		matches = ConvertSliceFunc(stableRule.Matches, t.translateHTTPMatch)
+		filters, respFilters = t.translateHTTPFilters(stableRule.Filters, resources, namespace)
+
+	case *gwv1beta1exp.HTTPRoute:
+		namespace = r.Namespace
+
+		expRule, ok := rule.(gwv1beta1exp.HTTPRouteRule)
+		if !ok {
+			return api.HTTPRouteRule{}, false
+		}
+
+		services = ConvertSliceFuncIf(
+			expRule.BackendRefs,
+			func(ref gwv1beta1exp.HTTPBackendRef) (api.HTTPService, bool) {
+				return t.translateHTTPBackendRef(r, ref, resources)
+			},
+		)
+
+		if len(services) == 0 {
+			return api.HTTPRouteRule{}, false
+		}
+
+		matches = ConvertSliceFunc(expRule.Matches, t.translateHTTPMatch)
+		filters, respFilters =
+			t.translateHTTPFilters(expRule.Filters, resources, namespace)
+
+	default:
 		return api.HTTPRouteRule{}, false
-	}
 
-	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
-	filters, responseFilters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+	}
 
 	return api.HTTPRouteRule{
 		Filters:         filters,
 		Matches:         matches,
-		ResponseFilters: responseFilters,
+		ResponseFilters: respFilters,
 		Services:        services,
 	}, true
 }
 
-func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
-	id := types.NamespacedName{
-		Name:      string(ref.Name),
-		Namespace: DerefStringOr(ref.Namespace, route.Namespace),
+// func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, rule gwv1beta1.HTTPRouteRule, resources *ResourceMap) (api.HTTPRouteRule, bool) {
+// 	services := ConvertSliceFuncIf(
+// 		rule.BackendRefs,
+// 		func(ref gwv1beta1.HTTPBackendRef) (api.HTTPService, bool) {
+// 			return t.translateHTTPBackendRef(route, ref, resources)
+// 		})
+
+// 	if len(services) == 0 {
+// 		return api.HTTPRouteRule{}, false
+// 	}
+
+// 	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
+// 	filters, responseFilters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+
+// 	return api.HTTPRouteRule{
+// 		Filters:         filters,
+// 		Matches:         matches,
+// 		ResponseFilters: responseFilters,
+// 		Services:        services,
+// 	}, true
+// }
+
+func (t ResourceTranslator) translateHTTPBackendRef(route any, ref any, resources *ResourceMap) (api.HTTPService, bool) {
+	switch r := route.(type) {
+	case *gwv1beta1.HTTPRoute:
+		backend, ok := ref.(gwv1beta1.HTTPBackendRef)
+		if !ok {
+			return api.HTTPService{}, false
+		}
+		id := types.NamespacedName{
+			Name:      string(backend.Name),
+			Namespace: DerefStringOr(backend.Namespace, r.Namespace),
+		}
+		isServiceRef := NilOrEqual(backend.Group, "") && NilOrEqual(backend.Kind, "Service")
+		if isServiceRef &&
+			resources.HasService(id) &&
+			resources.HTTPRouteCanReferenceBackend(r, backend.BackendRef) {
+
+			filters, responseFilters :=
+				t.translateHTTPFilters(backend.Filters, resources, r.Namespace)
+
+			service := resources.Service(id)
+
+			return api.HTTPService{
+				Name:            service.Name,
+				Namespace:       service.Namespace,
+				Partition:       t.ConsulPartition,
+				Filters:         filters,
+				ResponseFilters: responseFilters,
+				Weight:          DerefIntOr(backend.Weight, 1),
+			}, true
+		}
+		isMeshServiceRef :=
+			DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
+				DerefEqual(backend.Kind, v1alpha1.MeshServiceKind)
+
+		if isMeshServiceRef &&
+			resources.HasMeshService(id) &&
+			resources.HTTPRouteCanReferenceBackend(r, backend.BackendRef) {
+
+			filters, responseFilters :=
+				t.translateHTTPFilters(backend.Filters, resources, r.Namespace)
+
+			service := resources.MeshService(id)
+
+			return api.HTTPService{
+				Name:            service.Name,
+				Namespace:       service.Namespace,
+				Partition:       t.ConsulPartition,
+				Filters:         filters,
+				ResponseFilters: responseFilters,
+				Weight:          DerefIntOr(backend.Weight, 1),
+			}, true
+		}
+	case *gwv1beta1exp.HTTPRoute:
+		backend, ok := ref.(gwv1beta1exp.HTTPBackendRef)
+		if !ok {
+			return api.HTTPService{}, false
+		}
+
+		id := types.NamespacedName{
+			Name:      string(backend.Name),
+			Namespace: DerefStringOr(backend.Namespace, r.Namespace),
+		}
+
+		isServiceRef :=
+			NilOrEqual(backend.Group, "") &&
+				NilOrEqual(backend.Kind, "Service")
+
+		if isServiceRef &&
+			resources.HasService(id) &&
+			resources.HTTPRouteCanReferenceBackend(r, backend.BackendRef) {
+
+			filters, responseFilters :=
+				t.translateHTTPFilters(backend.Filters, resources, r.Namespace)
+
+			service := resources.Service(id)
+
+			return api.HTTPService{
+				Name:            service.Name,
+				Namespace:       service.Namespace,
+				Partition:       t.ConsulPartition,
+				Filters:         filters,
+				ResponseFilters: responseFilters,
+				Weight:          DerefIntOr(backend.Weight, 1),
+			}, true
+		}
+		isMeshServiceRef :=
+			DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
+				DerefEqual(backend.Kind, v1alpha1.MeshServiceKind)
+
+		if isMeshServiceRef &&
+			resources.HasMeshService(id) &&
+			resources.HTTPRouteCanReferenceBackend(r, backend.BackendRef) {
+
+			filters, responseFilters :=
+				t.translateHTTPFilters(backend.Filters, resources, r.Namespace)
+
+			service := resources.MeshService(id)
+
+			return api.HTTPService{
+				Name:            service.Name,
+				Namespace:       service.Namespace,
+				Partition:       t.ConsulPartition,
+				Filters:         filters,
+				ResponseFilters: responseFilters,
+				Weight:          DerefIntOr(backend.Weight, 1),
+			}, true
+		}
+
 	}
-
-	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
-
-	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
-		service := resources.Service(id)
-		return api.HTTPService{
-			Name:            service.Name,
-			Namespace:       service.Namespace,
-			Partition:       t.ConsulPartition,
-			Filters:         filters,
-			ResponseFilters: responseFilters,
-			Weight:          DerefIntOr(ref.Weight, 1),
-		}, true
-	}
-
-	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
-	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
-		service := resources.MeshService(id)
-
-		return api.HTTPService{
-			Name:            service.Name,
-			Namespace:       service.Namespace,
-			Partition:       t.ConsulPartition,
-			Filters:         filters,
-			ResponseFilters: responseFilters,
-			Weight:          DerefIntOr(ref.Weight, 1),
-		}, true
-	}
-
 	return api.HTTPService{}, false
+
 }
+
+// func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, ref gwv1beta1.HTTPBackendRef, resources *ResourceMap) (api.HTTPService, bool) {
+// 	id := types.NamespacedName{
+// 		Name:      string(ref.Name),
+// 		Namespace: DerefStringOr(ref.Namespace, route.Namespace),
+// 	}
+
+// 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
+
+// 	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
+// 		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+// 		service := resources.Service(id)
+// 		return api.HTTPService{
+// 			Name:            service.Name,
+// 			Namespace:       service.Namespace,
+// 			Partition:       t.ConsulPartition,
+// 			Filters:         filters,
+// 			ResponseFilters: responseFilters,
+// 			Weight:          DerefIntOr(ref.Weight, 1),
+// 		}, true
+// 	}
+
+// 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
+// 	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
+// 		filters, responseFilters := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+// 		service := resources.MeshService(id)
+
+// 		return api.HTTPService{
+// 			Name:            service.Name,
+// 			Namespace:       service.Namespace,
+// 			Partition:       t.ConsulPartition,
+// 			Filters:         filters,
+// 			ResponseFilters: responseFilters,
+// 			Weight:          DerefIntOr(ref.Weight, 1),
+// 		}, true
+// 	}
+
+// 	return api.HTTPService{}, false
+// }
 
 var headerMatchTypeTranslation = map[gwv1beta1.HeaderMatchType]api.HTTPHeaderMatchType{
 	gwv1beta1.HeaderMatchExact:             api.HTTPHeaderMatchExact,
@@ -376,7 +604,7 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
+func (t ResourceTranslator) translateHTTPFilters(filters any, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
 	var (
 		urlRewrite            *api.URLRewrite
 		retryFilter           *api.RetryFilter
@@ -386,76 +614,172 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		jwtFilter             *api.JWTFilter
 	)
 
-	// Convert Gateway API filters to portions of the Consul request and response filters.
-	// Multiple filters applying the same or conflicting operations are allowed but may
-	// result in unexpected behavior.
-	for _, filter := range filters {
-		if filter.RequestHeaderModifier != nil {
-			newFilter := api.HTTPHeaderFilter{}
+	switch fs := filters.(type) {
+	case []gwv1beta1.HTTPRouteFilter:
+		for _, filter := range fs {
+			if filter.RequestHeaderModifier != nil {
+				newFilter := api.HTTPHeaderFilter{}
+				newFilter.Remove = append(
+					newFilter.Remove,
+					filter.RequestHeaderModifier.Remove...)
 
-			newFilter.Remove = append(newFilter.Remove, filter.RequestHeaderModifier.Remove...)
+				if len(filter.RequestHeaderModifier.Add) > 0 {
+					newFilter.Add = map[string]string{}
 
-			if len(filter.RequestHeaderModifier.Add) > 0 {
-				newFilter.Add = map[string]string{}
-				for _, toAdd := range filter.RequestHeaderModifier.Add {
-					newFilter.Add[string(toAdd.Name)] = toAdd.Value
+					for _, toAdd := range filter.RequestHeaderModifier.Add {
+						newFilter.Add[string(toAdd.Name)] = toAdd.Value
+					}
+				}
+				if len(filter.RequestHeaderModifier.Set) > 0 {
+					newFilter.Set = map[string]string{}
+					for _, toSet := range filter.RequestHeaderModifier.Set {
+						newFilter.Set[string(toSet.Name)] = toSet.Value
+					}
+				}
+				requestHeaderFilters = append(requestHeaderFilters, newFilter)
+
+			}
+			if filter.ResponseHeaderModifier != nil {
+				newFilter := api.HTTPHeaderFilter{}
+
+				newFilter.Remove = append(
+					newFilter.Remove,
+					filter.ResponseHeaderModifier.Remove...,
+				)
+
+				if len(filter.ResponseHeaderModifier.Add) > 0 {
+					newFilter.Add = map[string]string{}
+					for _, toAdd := range filter.ResponseHeaderModifier.Add {
+						newFilter.Add[string(toAdd.Name)] = toAdd.Value
+					}
+				}
+
+				if len(filter.ResponseHeaderModifier.Set) > 0 {
+					newFilter.Set = map[string]string{}
+					for _, toSet := range filter.ResponseHeaderModifier.Set {
+						newFilter.Set[string(toSet.Name)] = toSet.Value
+					}
+				}
+
+				responseHeaderFilters = append(responseHeaderFilters, newFilter)
+			}
+			if filter.URLRewrite != nil &&
+				filter.URLRewrite.Path != nil &&
+				filter.URLRewrite.Path.Type ==
+					gwv1beta1.PrefixMatchHTTPPathModifier {
+
+				urlRewrite = &api.URLRewrite{
+					Path: DerefStringOr(
+						filter.URLRewrite.Path.ReplacePrefixMatch,
+						"",
+					),
 				}
 			}
+			if filter.ExtensionRef != nil {
+				crdFilter, exists := resourceMap.GetExternalFilter(*filter.ExtensionRef, namespace)
+				if !exists {
+					continue
+				}
 
-			if len(filter.RequestHeaderModifier.Set) > 0 {
-				newFilter.Set = map[string]string{}
-				for _, toSet := range filter.RequestHeaderModifier.Set {
-					newFilter.Set[string(toSet.Name)] = toSet.Value
+				switch filter.ExtensionRef.Kind {
+				case v1alpha1.RouteRetryFilterKind:
+					retryFilter = t.translateRouteRetryFilter(crdFilter.(*v1alpha1.RouteRetryFilter))
+				case v1alpha1.RouteTimeoutFilterKind:
+					timeoutFilter = t.translateRouteTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
+				case v1alpha1.RouteAuthFilterKind:
+					jwtFilter = t.translateRouteJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
 				}
 			}
-
-			requestHeaderFilters = append(requestHeaderFilters, newFilter)
 		}
+	case []gwv1beta1exp.HTTPRouteFilter:
+		for _, filter := range fs {
+			if filter.RequestHeaderModifier != nil {
+				newFilter := api.HTTPHeaderFilter{}
 
-		if filter.ResponseHeaderModifier != nil {
-			newFilter := api.HTTPHeaderFilter{}
+				newFilter.Remove = append(
+					newFilter.Remove,
+					filter.RequestHeaderModifier.Remove...,
+				)
 
-			newFilter.Remove = append(newFilter.Remove, filter.ResponseHeaderModifier.Remove...)
+				if len(filter.RequestHeaderModifier.Add) > 0 {
+					newFilter.Add = map[string]string{}
+					for _, toAdd := range filter.RequestHeaderModifier.Add {
+						newFilter.Add[string(toAdd.Name)] = toAdd.Value
+					}
+				}
 
-			if len(filter.ResponseHeaderModifier.Add) > 0 {
-				newFilter.Add = map[string]string{}
-				for _, toAdd := range filter.ResponseHeaderModifier.Add {
-					newFilter.Add[string(toAdd.Name)] = toAdd.Value
+				if len(filter.RequestHeaderModifier.Set) > 0 {
+					newFilter.Set = map[string]string{}
+					for _, toSet := range filter.RequestHeaderModifier.Set {
+						newFilter.Set[string(toSet.Name)] = toSet.Value
+					}
+				}
+
+				requestHeaderFilters = append(requestHeaderFilters, newFilter)
+			}
+
+			if filter.ResponseHeaderModifier != nil {
+				newFilter := api.HTTPHeaderFilter{}
+
+				newFilter.Remove = append(
+					newFilter.Remove,
+					filter.ResponseHeaderModifier.Remove...,
+				)
+
+				if len(filter.ResponseHeaderModifier.Add) > 0 {
+					newFilter.Add = map[string]string{}
+					for _, toAdd := range filter.ResponseHeaderModifier.Add {
+						newFilter.Add[string(toAdd.Name)] = toAdd.Value
+					}
+				}
+
+				if len(filter.ResponseHeaderModifier.Set) > 0 {
+					newFilter.Set = map[string]string{}
+					for _, toSet := range filter.ResponseHeaderModifier.Set {
+						newFilter.Set[string(toSet.Name)] = toSet.Value
+					}
+				}
+
+				responseHeaderFilters = append(responseHeaderFilters, newFilter)
+			}
+
+			if filter.URLRewrite != nil &&
+				filter.URLRewrite.Path != nil &&
+				filter.URLRewrite.Path.Type ==
+					gwv1beta1exp.PrefixMatchHTTPPathModifier {
+
+				urlRewrite = &api.URLRewrite{
+					Path: DerefStringOr(
+						filter.URLRewrite.Path.ReplacePrefixMatch,
+						"",
+					),
 				}
 			}
 
-			if len(filter.ResponseHeaderModifier.Set) > 0 {
-				newFilter.Set = map[string]string{}
-				for _, toSet := range filter.ResponseHeaderModifier.Set {
-					newFilter.Set[string(toSet.Name)] = toSet.Value
+			if filter.ExtensionRef != nil {
+				crdFilter, exists :=
+					resourceMap.GetExternalFilter(*filter.ExtensionRef, namespace)
+				if !exists {
+					continue
 				}
-			}
 
-			responseHeaderFilters = append(responseHeaderFilters, newFilter)
-		}
-
-		// we drop any path rewrites that are not prefix matches as we don't support those
-		if filter.URLRewrite != nil &&
-			filter.URLRewrite.Path != nil &&
-			filter.URLRewrite.Path.Type == gwv1beta1.PrefixMatchHTTPPathModifier {
-			urlRewrite = &api.URLRewrite{Path: DerefStringOr(filter.URLRewrite.Path.ReplacePrefixMatch, "")}
-		}
-
-		if filter.ExtensionRef != nil {
-			// get crd from resources map
-			crdFilter, exists := resourceMap.GetExternalFilter(*filter.ExtensionRef, namespace)
-			if !exists {
-				// this should never be the case because we only translate a route if it's actually valid, and if we're missing filters during the validation step, then we won't get here
-				continue
-			}
-
-			switch filter.ExtensionRef.Kind {
-			case v1alpha1.RouteRetryFilterKind:
-				retryFilter = t.translateRouteRetryFilter(crdFilter.(*v1alpha1.RouteRetryFilter))
-			case v1alpha1.RouteTimeoutFilterKind:
-				timeoutFilter = t.translateRouteTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
-			case v1alpha1.RouteAuthFilterKind:
-				jwtFilter = t.translateRouteJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
+				switch filter.ExtensionRef.Kind {
+				case v1alpha1.RouteRetryFilterKind:
+					retryFilter =
+						t.translateRouteRetryFilter(
+							crdFilter.(*v1alpha1.RouteRetryFilter),
+						)
+				case v1alpha1.RouteTimeoutFilterKind:
+					timeoutFilter =
+						t.translateRouteTimeoutFilter(
+							crdFilter.(*v1alpha1.RouteTimeoutFilter),
+						)
+				case v1alpha1.RouteAuthFilterKind:
+					jwtFilter =
+						t.translateRouteJWTFilter(
+							crdFilter.(*v1alpha1.RouteAuthFilter),
+						)
+				}
 			}
 		}
 	}
@@ -474,6 +798,105 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 
 	return requestFilter, responseFilter
 }
+
+// func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters) {
+// 	var (
+// 		urlRewrite            *api.URLRewrite
+// 		retryFilter           *api.RetryFilter
+// 		timeoutFilter         *api.TimeoutFilter
+// 		requestHeaderFilters  = []api.HTTPHeaderFilter{}
+// 		responseHeaderFilters = []api.HTTPHeaderFilter{}
+// 		jwtFilter             *api.JWTFilter
+// 	)
+
+// 	// Convert Gateway API filters to portions of the Consul request and response filters.
+// 	// Multiple filters applying the same or conflicting operations are allowed but may
+// 	// result in unexpected behavior.
+// 	for _, filter := range filters {
+// 		if filter.RequestHeaderModifier != nil {
+// 			newFilter := api.HTTPHeaderFilter{}
+
+// 			newFilter.Remove = append(newFilter.Remove, filter.RequestHeaderModifier.Remove...)
+
+// 			if len(filter.RequestHeaderModifier.Add) > 0 {
+// 				newFilter.Add = map[string]string{}
+// 				for _, toAdd := range filter.RequestHeaderModifier.Add {
+// 					newFilter.Add[string(toAdd.Name)] = toAdd.Value
+// 				}
+// 			}
+
+// 			if len(filter.RequestHeaderModifier.Set) > 0 {
+// 				newFilter.Set = map[string]string{}
+// 				for _, toSet := range filter.RequestHeaderModifier.Set {
+// 					newFilter.Set[string(toSet.Name)] = toSet.Value
+// 				}
+// 			}
+
+// 			requestHeaderFilters = append(requestHeaderFilters, newFilter)
+// 		}
+
+// 		if filter.ResponseHeaderModifier != nil {
+// 			newFilter := api.HTTPHeaderFilter{}
+
+// 			newFilter.Remove = append(newFilter.Remove, filter.ResponseHeaderModifier.Remove...)
+
+// 			if len(filter.ResponseHeaderModifier.Add) > 0 {
+// 				newFilter.Add = map[string]string{}
+// 				for _, toAdd := range filter.ResponseHeaderModifier.Add {
+// 					newFilter.Add[string(toAdd.Name)] = toAdd.Value
+// 				}
+// 			}
+
+// 			if len(filter.ResponseHeaderModifier.Set) > 0 {
+// 				newFilter.Set = map[string]string{}
+// 				for _, toSet := range filter.ResponseHeaderModifier.Set {
+// 					newFilter.Set[string(toSet.Name)] = toSet.Value
+// 				}
+// 			}
+
+// 			responseHeaderFilters = append(responseHeaderFilters, newFilter)
+// 		}
+
+// 		// we drop any path rewrites that are not prefix matches as we don't support those
+// 		if filter.URLRewrite != nil &&
+// 			filter.URLRewrite.Path != nil &&
+// 			filter.URLRewrite.Path.Type == gwv1beta1.PrefixMatchHTTPPathModifier {
+// 			urlRewrite = &api.URLRewrite{Path: DerefStringOr(filter.URLRewrite.Path.ReplacePrefixMatch, "")}
+// 		}
+
+// 		if filter.ExtensionRef != nil {
+// 			// get crd from resources map
+// 			crdFilter, exists := resourceMap.GetExternalFilter(*filter.ExtensionRef, namespace)
+// 			if !exists {
+// 				// this should never be the case because we only translate a route if it's actually valid, and if we're missing filters during the validation step, then we won't get here
+// 				continue
+// 			}
+
+// 			switch filter.ExtensionRef.Kind {
+// 			case v1alpha1.RouteRetryFilterKind:
+// 				retryFilter = t.translateRouteRetryFilter(crdFilter.(*v1alpha1.RouteRetryFilter))
+// 			case v1alpha1.RouteTimeoutFilterKind:
+// 				timeoutFilter = t.translateRouteTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
+// 			case v1alpha1.RouteAuthFilterKind:
+// 				jwtFilter = t.translateRouteJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
+// 			}
+// 		}
+// 	}
+
+// 	requestFilter := api.HTTPFilters{
+// 		Headers:       requestHeaderFilters,
+// 		URLRewrite:    urlRewrite,
+// 		RetryFilter:   retryFilter,
+// 		TimeoutFilter: timeoutFilter,
+// 		JWT:           jwtFilter,
+// 	}
+
+// 	responseFilter := api.HTTPResponseFilters{
+// 		Headers: responseHeaderFilters,
+// 	}
+
+// 	return requestFilter, responseFilter
+// }
 
 func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)

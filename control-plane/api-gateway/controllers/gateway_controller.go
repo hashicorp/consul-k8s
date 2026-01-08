@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package controllers
 
 import (
@@ -30,6 +27,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -69,72 +68,110 @@ type GatewayController struct {
 	ConsulConfig *consul.Config
 }
 
+func gatewayClassName(gw any) string {
+	switch g := gw.(type) {
+	case *gwv1beta1.Gateway:
+		return string(g.Spec.GatewayClassName)
+	case *gwv1beta1exp.Gateway:
+		return string(g.Spec.GatewayClassName)
+	default:
+		panic("unsupported gateway type")
+	}
+}
+
+func gatewayNameNamespace(gw any) (string, string) {
+	switch g := gw.(type) {
+	case *gwv1beta1.Gateway:
+		return g.Name, g.Namespace
+	case *gwv1beta1exp.Gateway:
+		return g.Name, g.Namespace
+	default:
+		panic("unsupported gateway type")
+	}
+}
+
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	consulKey := r.Translator.ConfigEntryReference(api.APIGateway, req.NamespacedName)
-	nonNormalizedConsulKey := r.Translator.NonNormalizedConfigEntryReference(api.APIGateway, req.NamespacedName)
-
-	var gateway gwv1beta1.Gateway
 
 	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
 	log.Info("Reconciling Gateway")
+	consulKey := r.Translator.ConfigEntryReference(api.APIGateway, req.NamespacedName)
+	nonNormalizedConsulKey := r.Translator.NonNormalizedConfigEntryReference(api.APIGateway, req.NamespacedName)
 
-	// get the gateway
-	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
-		if !k8serrors.IsNotFound(err) {
-			log.Error(err, "unable to get Gateway")
+	var (
+		gatewayStable gwv1beta1.Gateway
+		gatewayExp    gwv1beta1exp.Gateway
+	)
+
+	stableErr := r.Client.Get(ctx, req.NamespacedName, &gatewayStable)
+	expErr := r.Client.Get(ctx, req.NamespacedName, &gatewayExp)
+
+	var gateway any
+	var old bool
+	switch {
+	case expErr == nil:
+		log.Info("Reconciling EXP Gateway")
+		gateway = &gatewayExp
+		old = true
+
+	case stableErr == nil:
+		log.Info("Reconciling STABLE Gateway")
+		gateway = &gatewayStable
+		old = false
+
+	case k8serrors.IsNotFound(expErr) && k8serrors.IsNotFound(stableErr):
+		log.Info("No Gateway found, skipping reconciliation")
+		return ctrl.Result{}, nil
+
+	default:
+		if expErr != nil && !k8serrors.IsNotFound(expErr) {
+			return ctrl.Result{}, expErr
 		}
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		if stableErr != nil && !k8serrors.IsNotFound(stableErr) {
+			return ctrl.Result{}, stableErr
+		}
 	}
 
-	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
 	if err != nil {
 		log.Error(err, "unable to get GatewayClass")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
-	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
 	if err != nil {
-		log.Error(err, "error fetching the gateway class config")
-		return ctrl.Result{}, err
+		log.Error(err, "unable to get GatewayClassConfig")
+		return ctrl.Result{}, nil
 	}
 
-	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
 	if err != nil {
 		log.Error(err, "unable to list Namespaces")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
-
-	// get all reference grants
-	grants, err := r.getReferenceGrants(ctx)
+	grants, err := r.getReferenceGrants(ctx, old)
 	if err != nil {
 		log.Error(err, "unable to list ReferenceGrants")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
-	// get related gateway service
 	service, err := r.getDeployedGatewayService(ctx, req.NamespacedName)
 	if err != nil {
-		log.Error(err, "unable to fetch service for Gateway")
+		log.Error(err, "unable to fetch Gateway Service")
+		return ctrl.Result{}, nil
 	}
-
-	// get related gateway pods
+	///
 	pods, err := r.getDeployedGatewayPods(ctx, gateway)
 	if err != nil {
-		log.Error(err, "unable to list Pods for Gateway")
-		return ctrl.Result{}, err
+		log.Error(err, "unable to list Gateway Pods")
+		return ctrl.Result{}, nil
 	}
-
-	// construct our resource map
-	referenceValidator := binding.NewReferenceValidator(grants)
+	referenceValidator := binding.NewReferenceValidator(grants, old)
 	resources := common.NewResourceMap(r.Translator, referenceValidator, log)
 
 	if err := r.fetchCertificatesForGateway(ctx, resources, gateway); err != nil {
-		log.Error(err, "unable to fetch certificates for gateway")
-		return ctrl.Result{}, err
+		log.Error(err, "unable to fetch certificates")
+		return ctrl.Result{}, nil
 	}
 
 	// fetch our file-system-certificates from cache, this needs to happen
@@ -146,41 +183,37 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// can garbage collect any resources for it.
 	resources.ReferenceCountGateway(gateway)
 
-	if err := r.fetchControlledGateways(ctx, resources); err != nil {
+	if err := r.fetchControlledGateways(ctx, resources, old); err != nil {
 		log.Error(err, "unable to fetch controlled gateways")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
-	// get all http routes referencing this gateway
-	httpRoutes, err := r.getRelatedHTTPRoutes(ctx, req.NamespacedName, resources)
+	httpRoutes, err := r.getRelatedHTTPRoutes(ctx, req.NamespacedName, resources, old)
 	if err != nil {
 		log.Error(err, "unable to list HTTPRoutes")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
-	// get all tcp routes referencing this gateway
 	tcpRoutes, err := r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
 	if err != nil {
 		log.Error(err, "unable to list TCPRoutes")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	if err := r.fetchServicesForRoutes(ctx, resources, tcpRoutes, httpRoutes); err != nil {
 		log.Error(err, "unable to fetch services for routes")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
-	// get all gatewaypolicies referencing this gateway
 	policies, err := r.getRelatedGatewayPolicies(ctx, req.NamespacedName, resources)
 	if err != nil {
-		log.Error(err, "unable to list gateway policies")
-		return ctrl.Result{}, err
+		log.Error(err, "unable to list Gateway policies")
+		return ctrl.Result{}, nil
 	}
 
-	_, err = r.getJWTProviders(ctx, resources)
-	if err != nil {
+	if _, err := r.getJWTProviders(ctx, resources); err != nil {
 		log.Error(err, "unable to list JWT providers")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	// fetch the rest of the consul objects from cache
@@ -839,14 +872,29 @@ func (c *GatewayController) getNamespaces(ctx context.Context) (map[string]corev
 	return namespaces, nil
 }
 
-func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1beta1.ReferenceGrant, error) {
-	var list gwv1beta1.ReferenceGrantList
-
+func (c *GatewayController) getReferenceGrants(ctx context.Context, old bool) ([]any, error) {
+	if old {
+		var list gwv1beta1.ReferenceGrantList
+		if err := c.Client.List(ctx, &list); err != nil {
+			return nil, err
+		}
+		result := make([]any, 0, len(list.Items))
+		for i := range list.Items {
+			result = append(result, &list.Items[i])
+		}
+		return result, nil
+	}
+	var list gwv1beta1exp.ReferenceGrantList
 	if err := c.Client.List(ctx, &list); err != nil {
 		return nil, err
 	}
 
-	return list.Items, nil
+	result := make([]any, 0, len(list.Items))
+	for i := range list.Items {
+		result = append(result, &list.Items[i])
+	}
+	return result, nil
+
 }
 
 func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gateway types.NamespacedName) (*corev1.Service, error) {
@@ -860,8 +908,18 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 	return service, nil
 }
 
-func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1beta1.Gateway) ([]corev1.Pod, error) {
-	labels := common.LabelsForGateway(&gateway)
+func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway any) ([]corev1.Pod, error) {
+	var labels map[string]string
+	switch rg := gateway.(type) {
+	case *gwv1beta1.Gateway:
+		labels = common.LabelsForGateway(rg)
+
+	case *gwv1beta1exp.Gateway:
+		labels = common.LabelsForGateway(rg)
+
+	default:
+		return nil, fmt.Errorf("unsupported gateway type %T", gateway)
+	}
 
 	var list corev1.PodList
 
@@ -872,29 +930,76 @@ func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway 
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
-	var list gwv1beta1.HTTPRouteList
+func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap, old bool) ([]any, error) {
+	if old {
+		var list gwv1beta1.HTTPRouteList
 
+		if err := c.Client.List(ctx, &list, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, gateway.String()),
+		}); err != nil {
+			return nil, err
+		}
+		result := make([]any, 0, len(list.Items))
+		for i := range list.Items {
+			route := &list.Items[i]
+			resources.ReferenceCountHTTPRoute(route) // update fn
+
+			_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources) // update fn
+			if err != nil {
+				c.Log.Error(err, "unable to list HTTPRoute ExternalFilters")
+				return nil, err
+			}
+			result = append(result, route)
+		}
+
+		return result, nil
+	}
+	var list gwv1beta1exp.HTTPRouteList
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, gateway.String()),
 	}); err != nil {
 		return nil, err
 	}
+	result := make([]any, 0, len(list.Items))
+	for i := range list.Items {
+		route := &list.Items[i]
+		resources.ReferenceCountHTTPRoute(route) // update fn
 
-	for _, route := range list.Items {
-		resources.ReferenceCountHTTPRoute(route)
-
-		_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources)
+		_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources) // update fn
 		if err != nil {
 			c.Log.Error(err, "unable to list HTTPRoute ExternalFilters")
 			return nil, err
 		}
+		result = append(result, route)
 	}
 
-	return list.Items, nil
+	return result, nil
+
 }
 
-func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1beta1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
+// func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
+// 	var list gwv1beta1.HTTPRouteList
+
+// 	if err := c.Client.List(ctx, &list, &client.ListOptions{
+// 		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, gateway.String()),
+// 	}); err != nil {
+// 		return nil, err
+// 	}
+
+// 	for _, route := range list.Items {
+// 		resources.ReferenceCountHTTPRoute(route)
+
+// 		_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources)
+// 		if err != nil {
+// 			c.Log.Error(err, "unable to list HTTPRoute ExternalFilters")
+// 			return nil, err
+// 		}
+// 	}
+
+// 	return list.Items, nil
+// }
+
+func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route any, resources *common.ResourceMap) ([]interface{}, error) {
 	var externalFilters []interface{}
 	for _, rule := range route.Spec.Rules {
 		ruleFilters, err := c.filterFiltersForExternalRefs(ctx, route, rule.Filters, resources)
@@ -1007,21 +1112,39 @@ func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway typ
 	return list.Items, nil
 }
 
-func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1beta1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
-	if gatewayClassConfig == nil {
+func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClass any) (*v1alpha1.GatewayClassConfig, error) {
+	if gatewayClass == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
 	}
-
 	config := &v1alpha1.GatewayClassConfig{}
-	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
+	switch gc := gatewayClass.(type) {
+	case *gwv1beta1.GatewayClass:
+		ref := gc.Spec.ParametersRef
+		if ref == nil {
+			return nil, nil
+		}
 		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
 			ref.Kind != v1alpha1.GatewayClassConfigKind ||
-			gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
+			gc.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}
+		if err := c.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, config); err != nil {
+			return nil, client.IgnoreNotFound(err)
+		}
 
+	case *gwv1beta1exp.GatewayClass:
+		ref := gc.Spec.ParametersRef
+		if ref == nil {
+			return nil, nil
+		}
+		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
+			ref.Kind != v1alpha1.GatewayClassConfigKind ||
+			gc.Spec.ControllerName != common.GatewayClassControllerName {
+			// we don't have supported params, so return nil
+			return nil, nil
+		}
 		if err := c.Client.Get(ctx, types.NamespacedName{Name: ref.Name}, config); err != nil {
 			return nil, client.IgnoreNotFound(err)
 		}
@@ -1029,34 +1152,64 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	return config, nil
 }
 
-func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.GatewayClass, error) {
-	var gatewayClass gwv1beta1.GatewayClass
-	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
-		return nil, client.IgnoreNotFound(err)
+func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway any) (any, error) {
+	switch g := gateway.(type) {
+	case *gwv1beta1.Gateway:
+		var gc gwv1beta1.GatewayClass
+		if err := c.Client.Get(ctx, types.NamespacedName{Name: string(g.Spec.GatewayClassName)}, &gc); err != nil {
+			return nil, client.IgnoreNotFound(err)
+		}
+		return &gc, nil
+	case *gwv1beta1exp.Gateway:
+		var gc gwv1beta1exp.GatewayClass
+		if err := c.Client.Get(ctx, types.NamespacedName{Name: string(g.Spec.GatewayClassName)}, &gc); err != nil {
+			return nil, client.IgnoreNotFound(err)
+		}
+		return &gc, nil
+	default:
+		return nil, fmt.Errorf("unsupported gateway type %T", gateway)
 	}
-	return &gatewayClass, nil
 }
 
 // resource map construction routines
 
-func (c *GatewayController) fetchControlledGateways(ctx context.Context, resources *common.ResourceMap) error {
+func (c *GatewayController) fetchControlledGateways(ctx context.Context, resources *common.ResourceMap, old bool) error {
 	set := mapset.NewSet()
+	if old {
+		list := gwv1beta1.GatewayClassList{}
+		if err := c.Client.List(ctx, &list, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
+		}); err != nil {
+			return err
+		}
+		for _, gatewayClass := range list.Items {
+			set.Add(gatewayClass.Name)
+		}
 
-	list := gwv1beta1.GatewayClassList{}
+		gateways := &gwv1beta1.GatewayList{}
+		if err := c.Client.List(ctx, gateways); err != nil {
+			return err
+		}
+
+		for _, gateway := range gateways.Items {
+			if set.Contains(string(gateway.Spec.GatewayClassName)) {
+				resources.ReferenceCountGateway(gateway)
+			}
+		}
+		return nil
+	}
+	list := gwv1beta1exp.GatewayClassList{}
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
-	}); err != nil {
+		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName)}); err != nil {
 		return err
 	}
 	for _, gatewayClass := range list.Items {
 		set.Add(gatewayClass.Name)
 	}
-
-	gateways := &gwv1beta1.GatewayList{}
+	gateways := &gwv1beta1exp.GatewayList{}
 	if err := c.Client.List(ctx, gateways); err != nil {
 		return err
 	}
-
 	for _, gateway := range gateways.Items {
 		if set.Contains(string(gateway.Spec.GatewayClassName)) {
 			resources.ReferenceCountGateway(gateway)
@@ -1065,14 +1218,28 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 	return nil
 }
 
-func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1beta1.Gateway) error {
+func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway any) error {
 	certificates := mapset.NewSet()
 
-	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS != nil {
-			for _, cert := range listener.TLS.CertificateRefs {
-				if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, common.KindSecret) {
-					certificates.Add(common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace))
+	switch g := gateway.(type) {
+
+	case *gwv1beta1.Gateway:
+		for _, listener := range g.Spec.Listeners {
+			if listener.TLS != nil {
+				for _, cert := range listener.TLS.CertificateRefs {
+					if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, common.KindSecret) {
+						certificates.Add(common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, g.Namespace))
+					}
+				}
+			}
+		}
+	case *gwv1beta1exp.Gateway:
+		for _, listener := range g.Spec.Listeners {
+			if listener.TLS != nil {
+				for _, cert := range listener.TLS.CertificateRefs {
+					if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, common.KindSecret) {
+						certificates.Add(common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, g.Namespace))
+					}
 				}
 			}
 		}

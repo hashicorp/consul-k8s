@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -87,28 +88,57 @@ func (r *GatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.R
 // gatewayClassUsesConfig determines whether a given GatewayClass references a
 // given GatewayClassConfig. Since these resources are scoped to the cluster,
 // namespace is not considered.
-func gatewayClassUsesConfig(gc gwv1beta1.GatewayClass, gcc *v1alpha1.GatewayClassConfig) bool {
-	parameterRef := gc.Spec.ParametersRef
-	return parameterRef != nil &&
-		string(parameterRef.Group) == v1alpha1.ConsulHashicorpGroup &&
-		parameterRef.Kind == v1alpha1.GatewayClassConfigKind &&
-		parameterRef.Name == gcc.Name
+func gatewayClassUsesConfig(gc any, gcc *v1alpha1.GatewayClassConfig) bool {
+
+	switch g := gc.(type) {
+	case gwv1beta1exp.GatewayClass:
+
+		parameterRef := g.Spec.ParametersRef
+		return parameterRef != nil &&
+			string(parameterRef.Group) == v1alpha1.ConsulHashicorpGroup &&
+			parameterRef.Kind == v1alpha1.GatewayClassConfigKind &&
+			parameterRef.Name == gcc.Name
+	case gwv1beta1.GatewayClass:
+		parameterRef := g.Spec.ParametersRef
+		return parameterRef != nil &&
+			string(parameterRef.Group) == v1alpha1.ConsulHashicorpGroup &&
+			parameterRef.Kind == v1alpha1.GatewayClassConfigKind &&
+			parameterRef.Name == gcc.Name
+
+	}
+	return false
 }
+
+// here it will look for either one gwc -- gateway.* or dinesh.*
 
 // GatewayClassConfigInUse determines whether any GatewayClass in the cluster
 // references the provided GatewayClassConfig.
 func gatewayClassConfigInUse(ctx context.Context, k8sClient client.Client, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
-	list := &gwv1beta1.GatewayClassList{}
-	if err := k8sClient.List(ctx, list); err != nil {
+	list_v1 := &gwv1beta1.GatewayClassList{}
+	if err := k8sClient.List(ctx, list_v1); err != nil {
 		return false, err
 	}
-
-	for _, gc := range list.Items {
+	var gwlist_v1_bool bool
+	for _, gc := range list_v1.Items {
 		if gatewayClassUsesConfig(gc, gcc) {
-			return true, nil
+			gwlist_v1_bool = true
+			break
 		}
 	}
-
+	list_exp := &gwv1beta1exp.GatewayClassList{}
+	if err := k8sClient.List(ctx, list_exp); err != nil {
+		return false, err
+	}
+	var gwlist_exp_bool bool
+	for _, gc := range list_exp.Items {
+		if gatewayClassUsesConfig(gc, gcc) {
+			gwlist_exp_bool = true
+			break
+		}
+	}
+	if gwlist_exp_bool || gwlist_v1_bool {
+		return true, nil
+	}
 	return false, nil
 }
 
@@ -117,7 +147,24 @@ func (r *GatewayClassConfigController) SetupWithManager(ctx context.Context, mgr
 		For(&v1alpha1.GatewayClassConfig{}).
 		// Watch for changes to GatewayClass objects associated with this config for purposes of finalizer removal.
 		Watches(&gwv1beta1.GatewayClass{}, r.transformGatewayClassToGatewayClassConfig()).
+		Watches(&gwv1beta1exp.GatewayClass{}, r.transformGatewayClassToGatewayClassConfigExp()).
 		Complete(r)
+}
+
+func (r *GatewayClassConfigController) transformGatewayClassToGatewayClassConfigExp() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+		gc := o.(*gwv1beta1exp.GatewayClass)
+
+		pr := gc.Spec.ParametersRef
+		if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Name: pr.Name,
+				},
+			}}
+		}
+		return nil
+	})
 }
 
 func (r *GatewayClassConfigController) transformGatewayClassToGatewayClassConfig() handler.EventHandler {

@@ -8,6 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -20,14 +21,28 @@ const (
 )
 
 // LabelsForGateway formats the default labels that appear on objects managed by the controllers.
-func LabelsForGateway(gateway *gwv1beta1.Gateway) map[string]string {
-	return map[string]string{
-		componentLabel: "api-gateway",
-		nameLabel:      gateway.Name,
-		namespaceLabel: gateway.Namespace,
-		createdAtLabel: fmt.Sprintf("%d", gateway.CreationTimestamp.Unix()),
-		ManagedLabel:   "true",
+
+func LabelsForGateway(gateway any) map[string]string {
+	data := make(map[string]string)
+	switch g := gateway.(type) {
+	case *gwv1beta1.Gateway:
+		data = map[string]string{
+			componentLabel: "api-gateway",
+			nameLabel:      g.Name,
+			namespaceLabel: g.Namespace,
+			createdAtLabel: fmt.Sprintf("%d", g.CreationTimestamp.Unix()),
+			ManagedLabel:   "true",
+		}
+	case *gwv1beta1exp.Gateway:
+		data = map[string]string{
+			componentLabel: "api-gateway",
+			nameLabel:      g.Name,
+			namespaceLabel: g.Namespace,
+			createdAtLabel: fmt.Sprintf("%d", g.CreationTimestamp.Unix()),
+			ManagedLabel:   "true",
+		}
 	}
+	return data
 }
 
 func GatewayFromPod(pod *corev1.Pod) (types.NamespacedName, bool) {

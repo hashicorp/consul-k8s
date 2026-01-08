@@ -6,7 +6,7 @@ package binding
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -14,22 +14,48 @@ import (
 )
 
 type referenceValidator struct {
-	grants map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant
+	oldgrants map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant
+	expgrants map[string]map[types.NamespacedName]gwv1beta1exp.ReferenceGrant
 }
 
-func NewReferenceValidator(grants []gwv1beta1.ReferenceGrant) common.ReferenceValidator {
-	byNamespace := make(map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant)
-	for _, grant := range grants {
-		grantsForNamespace, ok := byNamespace[grant.Namespace]
-		if !ok {
-			grantsForNamespace = make(map[types.NamespacedName]gwv1beta1.ReferenceGrant)
+func NewReferenceValidator(grants []any, old bool) common.ReferenceValidator {
+	v := &referenceValidator{
+		oldgrants: make(map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant),
+		expgrants: make(map[string]map[types.NamespacedName]gwv1beta1exp.ReferenceGrant),
+	}
+
+	for _, g := range grants {
+		switch rg := g.(type) {
+		case *gwv1beta1.ReferenceGrant:
+			if !old {
+				continue
+			}
+			ns := rg.Namespace
+			key := types.NamespacedName{
+				Namespace: rg.Namespace,
+				Name:      rg.Name,
+			}
+			if _, ok := v.oldgrants[ns]; !ok {
+				v.oldgrants[ns] = make(map[types.NamespacedName]gwv1beta1.ReferenceGrant)
+			}
+			v.oldgrants[ns][key] = *rg
+		case *gwv1beta1exp.ReferenceGrant:
+			if old {
+				continue
+			}
+			ns := rg.Namespace
+			key := types.NamespacedName{
+				Namespace: rg.Namespace,
+				Name:      rg.Name,
+			}
+			if _, ok := v.expgrants[ns]; !ok {
+				v.expgrants[ns] = make(map[types.NamespacedName]gwv1beta1exp.ReferenceGrant)
+			}
+			v.expgrants[ns][key] = *rg
 		}
-		grantsForNamespace[client.ObjectKeyFromObject(&grant)] = grant
-		byNamespace[grant.Namespace] = grantsForNamespace
+
 	}
-	return &referenceValidator{
-		grants: byNamespace,
-	}
+	return v
 }
 
 func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
