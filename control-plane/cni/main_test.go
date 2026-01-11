@@ -7,11 +7,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,6 +128,7 @@ func Test_cmdAdd(t *testing.T) {
 				iptablesConfigJson, err := json.Marshal(&cfg)
 				require.NoError(t, err)
 				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
 
@@ -150,6 +155,7 @@ func Test_cmdAdd(t *testing.T) {
 				iptablesConfigJson, err := json.Marshal(&cfg)
 				require.NoError(t, err)
 				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
 
@@ -194,6 +200,226 @@ func Test_cmdAdd(t *testing.T) {
 	}
 }
 
+func writeKubeconfig(t *testing.T, dir string, valid bool) string {
+	t.Helper()
+
+	var data string
+	if valid {
+		data = `
+apiVersion: v1
+kind: Config
+clusters:
+- name: test
+  cluster:
+    server: https://127.0.0.1:6443
+contexts:
+- name: test
+  context:
+    cluster: test
+    user: test
+current-context: test
+users:
+- name: test
+  user:
+    token: fake-token
+`
+	} else {
+		data = `
+apiVersion: v1
+kind: Config
+clusters:
+- name: test
+  cluster: {}
+`
+	}
+
+	path := filepath.Join(dir, "kubeconfig")
+
+	if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+		t.Fatalf("failed to write kubeconfig: %v", err)
+	}
+
+	return path
+}
+
+// TestResolveKubeconfigPath tests the resolveKubeconfigPath function
+func TestResolveKubeconfigPath(t *testing.T) {
+	tests := []struct {
+		name                  string
+		setup                 func(t *testing.T, dir string)
+		wantSuffix            string
+		expectError           bool
+		expectedErrorContains error
+	}{
+		{
+			name: "stable kubeconfig exists",
+			setup: func(t *testing.T, dir string) {
+				path := filepath.Join(dir, "kubeconfig")
+				if err := os.WriteFile(path, []byte("stable"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantSuffix:  "kubeconfig",
+			expectError: false,
+		},
+		{
+			name: "stable path is directory, fallback to versioned",
+			setup: func(t *testing.T, dir string) {
+				if err := os.Mkdir(filepath.Join(dir, "kubeconfig"), 0755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(
+					filepath.Join(dir, "kubeconfig-1"),
+					[]byte("v1"),
+					0644,
+				); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantSuffix:  "kubeconfig-1",
+			expectError: false,
+		},
+		{
+			name: "single versioned kubeconfig",
+			setup: func(t *testing.T, dir string) {
+				if err := os.WriteFile(
+					filepath.Join(dir, "kubeconfig-123"),
+					[]byte("v123"),
+					0644,
+				); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantSuffix:  "kubeconfig-123",
+			expectError: false,
+		},
+		{
+			name: "multiple versioned kubeconfigs, newest chosen",
+			setup: func(t *testing.T, dir string) {
+				old := filepath.Join(dir, "kubeconfig-old")
+				newer := filepath.Join(dir, "kubeconfig-new")
+
+				if err := os.WriteFile(old, []byte("old"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				time.Sleep(10 * time.Millisecond) // ensure mtime difference
+				if err := os.WriteFile(newer, []byte("new"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			},
+			wantSuffix:  "kubeconfig-new",
+			expectError: false,
+		},
+		{
+			name: "no kubeconfig files",
+			setup: func(t *testing.T, dir string) {
+				// nothing created
+			},
+			expectError:           true,
+			expectedErrorContains: fmt.Errorf("no kubeconfig found"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tc.setup(t, dir)
+
+			got, err := resolveKubeconfigPath(dir, "kubeconfig")
+
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("expected error, got nil (path=%s)", got)
+					return
+				}
+				require.Contains(t, err.Error(), tc.expectedErrorContains.Error())
+				return
+
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if !filepath.IsAbs(got) {
+				t.Fatalf("expected absolute path, got %s", got)
+			}
+
+			if !strings.HasSuffix(got, tc.wantSuffix) {
+				t.Fatalf("expected suffix %q, got %q", tc.wantSuffix, got)
+			}
+		})
+	}
+}
+
+func TestCreateK8sClient(t *testing.T) {
+	t.Parallel()
+	logger := hclog.NewNullLogger()
+
+	tests := []struct {
+		setup                 func(t *testing.T) *PluginConf
+		expectedErrorContains error
+		expectedError         bool
+		expectClient          bool
+		name                  string
+	}{
+		{
+			name: "Client success",
+			setup: func(t *testing.T) *PluginConf {
+				dir := t.TempDir()
+				writeKubeconfig(t, dir, true)
+				return &PluginConf{
+					CNINetDir:  dir,
+					Kubeconfig: "kubeconfig",
+				}
+			},
+			expectedError: false,
+			expectClient:  true,
+		},
+		{
+			name: "No Kubeconfig found",
+			setup: func(t *testing.T) *PluginConf {
+				dir := t.TempDir()
+				return &PluginConf{
+					CNINetDir:  dir,
+					Kubeconfig: "",
+				}
+			},
+			expectedErrorContains: fmt.Errorf("failed to load kubeconfig"),
+			expectedError:         true,
+			expectClient:          false,
+		},
+		{
+			name: "error from BuildConfigFromFlags",
+			setup: func(t *testing.T) *PluginConf {
+				dir := t.TempDir()
+				writeKubeconfig(t, dir, false) // invalid content
+				return &PluginConf{
+					CNINetDir:  dir,
+					Kubeconfig: "kubeconfig", // ALWAYS this
+				}
+			},
+			expectedErrorContains: fmt.Errorf("failed to load kubeconfig"),
+			expectedError:         true,
+			expectClient:          false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.setup(t)
+			cmd := &Command{}
+			err := cmd.createK8sClient(cfg, logger)
+			if tt.expectedError {
+				require.Contains(t, err.Error(), tt.expectedErrorContains.Error())
+				t.Logf("✅ expected error occurred: %v", err)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, cmd.client)
+				t.Log("✅ client created successfully")
+			}
+		})
+	}
+}
 func TestSkipTrafficRedirection(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
