@@ -16,6 +16,7 @@ import (
 	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
 	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
 	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
+	cmdGatewayResourcesOcp "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources-ocp"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
@@ -58,6 +59,10 @@ func init() {
 
 		"gateway-resources": func() (cli.Command, error) {
 			return &cmdGatewayResources.Command{UI: ui}, nil
+		},
+
+		"gateway-resources-ocp": func() (cli.Command, error) {
+			return &cmdGatewayResourcesOcp.Command{UI: ui}, nil
 		},
 
 		"server-acl-init": func() (cli.Command, error) {

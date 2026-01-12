@@ -43,7 +43,8 @@ type RouteAuthFilterList struct {
 type RouteAuthFilterSpec struct {
 	// This re-uses the JWT requirement type from Gateway Policy Types.
 	//+kubebuilder:validation:Optional
-	JWT *GatewayJWTRequirement `json:"jwt,omitempty"`
+	JWT    *GatewayJWTRequirement    `json:"jwt,omitempty"`
+	JWTOCP *OcpGatewayJWTRequirement `json:"jwtOCP,omitempty"`
 }
 
 // RouteAuthFilterStatus defines the observed state of the gateway.

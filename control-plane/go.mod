@@ -20,6 +20,8 @@ replace sigs.k8s.io/gateway-api/apis/v1alpha3 => ./gateway07/gateway-api-0.7.1/a
 
 replace sigs.k8s.io/gateway-api => ./gateway07/gateway-api-0.7.1
 
+replace sigs.k8s.io/gateway-api-exp => ./gateway07/gateway-api-0.7.1-exp
+
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -69,6 +71,7 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	sigs.k8s.io/controller-runtime v0.16.5
 	sigs.k8s.io/gateway-api v0.7.1
+	sigs.k8s.io/gateway-api-exp v0.0.0-00010101000000-000000000000
 )
 
 require (

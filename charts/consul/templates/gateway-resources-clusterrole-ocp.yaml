@@ -1,0 +1,37 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-gateway-resources-ocp
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gateway-resources-ocp
+rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    resources:
+    - gatewayclassconfigs
+    verbs:
+    - get
+    - update
+    - create
+  - apiGroups:
+    - dinesh.networking.io
+    resources:
+    - gatewayclasses
+    verbs:
+    - get
+    - update
+    - create
+{{- if .Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-gateway-resources-ocp
+    verbs:
+      - use
+{{- end }}
+{{- end }}

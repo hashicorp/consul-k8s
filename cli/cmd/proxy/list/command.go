@@ -230,6 +230,8 @@ func (c *ListCommand) fetchPods() ([]v1.Pod, error) {
 	}{
 		{Target: apiGateways, Selector: "component=api-gateway, gateway.consul.hashicorp.com/managed=true"},
 		{Target: apiGateways, Selector: "api-gateway.consul.hashicorp.com/managed=true"}, // Legacy API gateways
+		{Target: apiGateways, Selector: "component=api-gateway-ocp, gateway.consul.hashicorp.com/managed=true"},
+		{Target: apiGateways, Selector: "api-gateway-ocp.consul.hashicorp.com/managed=true"},
 		{Target: ingressGateways, Selector: "component=ingress-gateway, chart=consul-helm"},
 		{Target: meshGateways, Selector: "component=mesh-gateway, chart=consul-helm"},
 		{Target: terminatingGateways, Selector: "component=terminating-gateway, chart=consul-helm"},
@@ -297,6 +299,8 @@ func (c *ListCommand) output(pods []v1.Pod) {
 		// Get the type for api, ingress, mesh, and terminating gateways + sidecars.
 		switch pod.Labels["component"] {
 		case "api-gateway":
+			proxyType = "API Gateway"
+		case "api-gateway-ocp":
 			proxyType = "API Gateway"
 		case "ingress-gateway":
 			proxyType = "Ingress Gateway"
