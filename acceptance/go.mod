@@ -15,7 +15,6 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/go-version v1.6.0
-	github.com/hashicorp/hcp-sdk-go v0.50.0
 	github.com/hashicorp/serf v0.10.1
 	github.com/hashicorp/vault/api v1.12.2
 	github.com/stretchr/testify v1.8.4

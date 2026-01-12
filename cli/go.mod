@@ -17,7 +17,6 @@ require (
 	github.com/hashicorp/consul/troubleshoot v0.7.5
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/hcp-sdk-go v0.62.1-0.20230913154003-cf69c0370c54
 	github.com/kr/text v0.2.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/cli v1.1.5
