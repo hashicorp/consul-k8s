@@ -6,11 +6,11 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20251014172147-72a358cd0253
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.33.2
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20251014172147-72a358cd0253
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17.1
 
-replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20251014172147-72a358cd0253
+replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260112121053-7ee7c79b61f0
 
 require (
 	github.com/armon/go-metrics v0.4.1
@@ -129,7 +129,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.13.0 // indirect
 	github.com/gophercloud/gophercloud v0.3.0 // indirect
-	github.com/hashicorp/consul/proto-public v0.7.0-rc1 // indirect
+	github.com/hashicorp/consul/proto-public v0.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-discover/provider/gce v0.0.0-20241120163552-5eb1507d16b4 // indirect
