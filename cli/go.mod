@@ -2,7 +2,10 @@ module github.com/hashicorp/consul-k8s/cli
 
 go 1.25.5
 
-replace github.com/hashicorp/consul-k8s/version => ../version
+replace (
+	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.13.4
+	github.com/hashicorp/consul-k8s/version => ../version
+)
 
 require (
 	github.com/bgentry/speakeasy v0.1.0
@@ -11,7 +14,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/consul-k8s/charts v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/consul-k8s/version v0.0.0
-	github.com/hashicorp/consul/troubleshoot v0.8.0
+	github.com/hashicorp/consul/troubleshoot v0.8.3
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/hcp-sdk-go v0.62.1-0.20230913154003-cf69c0370c54
@@ -94,8 +97,8 @@ require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
-	github.com/hashicorp/consul/api v1.33.0 // indirect
-	github.com/hashicorp/consul/envoyextensions v0.9.0 // indirect
+	github.com/hashicorp/consul/api v1.33.2 // indirect
+	github.com/hashicorp/consul/envoyextensions v0.9.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
@@ -151,7 +154,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	go.mongodb.org/mongo-driver v1.11.1 // indirect
+	go.mongodb.org/mongo-driver v1.11.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.33.0 // indirect
 	go.opentelemetry.io/otel/metric v1.33.0 // indirect
