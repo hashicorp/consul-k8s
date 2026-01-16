@@ -5,7 +5,7 @@ go 1.25.1
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.12.0
 	github.com/hashicorp/consul-k8s/version => ../version
-	sigs.k8s.io/gateway-api => ../control-plane/gatewaytest/gateway-api
+	sigs.k8s.io/gateway-api => ../control-plane/gateway07/gateway-api-0.7.1
 )
 
 require (
@@ -156,7 +156,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
-	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
