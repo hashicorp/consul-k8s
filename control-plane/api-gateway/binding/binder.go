@@ -10,8 +10,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
+
+	// gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -42,13 +43,12 @@ type BinderConfig struct {
 	// state that we may have set on the Gateway, its corresponding Routes or in
 	// Consul, because we should no longer be managing the Gateway (its association
 	// to our controller is through a parameter on the GatewayClass).
-	GatewayClass *gwv1beta1.GatewayClass
+	GatewayClass *gwv1alpha2.GatewayClass
 	// Gateway is the Gateway being reconciled that we want to bind routes to.
-	Gateway gwv1beta1.Gateway
+	Gateway gwv1alpha2.Gateway
 	// HTTPRoutes is a list of HTTPRoute objects that ought to be bound to the Gateway.
-	HTTPRoutes []gwv1beta1.HTTPRoute
+	HTTPRoutes []gwv1alpha2.HTTPRoute
 	// TCPRoutes is a list of TCPRoute objects that ought to be bound to the Gateway.
-	TCPRoutes []gwv1alpha2.TCPRoute
 	// Pods are any pods that are part of the Gateway deployment.
 	Pods []corev1.Pod
 	// Service is the deployed service associated with the Gateway deployment.
@@ -152,7 +152,7 @@ func (b *Binder) Snapshot() *Snapshot {
 	// used for tracking how many routes have successfully bound to which listeners
 	// on a gateway for reporting the number of bound routes in a gateway listener's
 	// status
-	boundCounts := make(map[gwv1beta1.SectionName]int)
+	boundCounts := make(map[gwv1alpha2.SectionName]int)
 
 	// attempt to bind all routes
 
@@ -160,9 +160,9 @@ func (b *Binder) Snapshot() *Snapshot {
 		b.bindRoute(common.PointerTo(r), boundCounts, snapshot)
 	}
 
-	for _, r := range b.config.TCPRoutes {
-		b.bindRoute(common.PointerTo(r), boundCounts, snapshot)
-	}
+	// for _, r := range b.config.TCPRoutes {
+	// 	b.bindRoute(common.PointerTo(r), boundCounts, snapshot)
+	// }
 
 	// process secrets
 	gatewaySecrets := secretsForGateway(b.config.Gateway, b.config.Resources)
@@ -223,9 +223,9 @@ func (b *Binder) Snapshot() *Snapshot {
 		}
 
 		// calculate the status for the gateway
-		var status gwv1beta1.GatewayStatus
+		var status gwv1alpha2.GatewayStatus
 		for i, listener := range b.config.Gateway.Spec.Listeners {
-			status.Listeners = append(status.Listeners, gwv1beta1.ListenerStatus{
+			status.Listeners = append(status.Listeners, gwv1alpha2.ListenerStatus{
 				Name:           listener.Name,
 				SupportedKinds: supportedKinds(listener),
 				AttachedRoutes: int32(boundCounts[listener.Name]),
@@ -302,7 +302,7 @@ func (b *Binder) Snapshot() *Snapshot {
 	return snapshot
 }
 
-func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap) mapset.Set {
+func secretsForGateway(gateway gwv1alpha2.Gateway, resources *common.ResourceMap) mapset.Set {
 	set := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -323,7 +323,7 @@ func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap)
 	return set
 }
 
-func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1beta1.GatewayAddress {
+func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1alpha2.GatewayAddress {
 	if service == nil {
 		return addressesFromPods(pods)
 	}
@@ -344,22 +344,22 @@ func addressesForGateway(service *corev1.Service, pods []corev1.Pod) []gwv1beta1
 		return addressesFromPodHosts(pods)
 	}
 
-	return []gwv1beta1.GatewayAddress{}
+	return []gwv1alpha2.GatewayAddress{}
 }
 
-func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromLoadBalancer(service *corev1.Service) []gwv1alpha2.GatewayAddress {
+	addresses := []gwv1alpha2.GatewayAddress{}
 
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
 		if ingress.IP != "" {
-			addresses = append(addresses, gwv1beta1.GatewayAddress{
-				Type:  common.PointerTo(gwv1beta1.IPAddressType),
+			addresses = append(addresses, gwv1alpha2.GatewayAddress{
+				Type:  common.PointerTo(gwv1alpha2.IPAddressType),
 				Value: ingress.IP,
 			})
 		}
 		if ingress.Hostname != "" {
-			addresses = append(addresses, gwv1beta1.GatewayAddress{
-				Type:  common.PointerTo(gwv1beta1.HostnameAddressType),
+			addresses = append(addresses, gwv1alpha2.GatewayAddress{
+				Type:  common.PointerTo(gwv1alpha2.HostnameAddressType),
 				Value: ingress.Hostname,
 			})
 		}
@@ -368,12 +368,12 @@ func addressesFromLoadBalancer(service *corev1.Service) []gwv1beta1.GatewayAddre
 	return addresses
 }
 
-func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromClusterIP(service *corev1.Service) []gwv1alpha2.GatewayAddress {
+	addresses := []gwv1alpha2.GatewayAddress{}
 
 	if service.Spec.ClusterIP != "" {
-		addresses = append(addresses, gwv1beta1.GatewayAddress{
-			Type:  common.PointerTo(gwv1beta1.IPAddressType),
+		addresses = append(addresses, gwv1alpha2.GatewayAddress{
+			Type:  common.PointerTo(gwv1alpha2.IPAddressType),
 			Value: service.Spec.ClusterIP,
 		})
 	}
@@ -381,15 +381,15 @@ func addressesFromClusterIP(service *corev1.Service) []gwv1beta1.GatewayAddress 
 	return addresses
 }
 
-func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromPods(pods []corev1.Pod) []gwv1alpha2.GatewayAddress {
+	addresses := []gwv1alpha2.GatewayAddress{}
 	seenIPs := make(map[string]struct{})
 
 	for _, pod := range pods {
 		if pod.Status.PodIP != "" {
 			if _, found := seenIPs[pod.Status.PodIP]; !found {
-				addresses = append(addresses, gwv1beta1.GatewayAddress{
-					Type:  common.PointerTo(gwv1beta1.IPAddressType),
+				addresses = append(addresses, gwv1alpha2.GatewayAddress{
+					Type:  common.PointerTo(gwv1alpha2.IPAddressType),
 					Value: pod.Status.PodIP,
 				})
 				seenIPs[pod.Status.PodIP] = struct{}{}
@@ -400,15 +400,15 @@ func addressesFromPods(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
 	return addresses
 }
 
-func addressesFromPodHosts(pods []corev1.Pod) []gwv1beta1.GatewayAddress {
-	addresses := []gwv1beta1.GatewayAddress{}
+func addressesFromPodHosts(pods []corev1.Pod) []gwv1alpha2.GatewayAddress {
+	addresses := []gwv1alpha2.GatewayAddress{}
 	seenIPs := make(map[string]struct{})
 
 	for _, pod := range pods {
 		if pod.Status.HostIP != "" {
 			if _, found := seenIPs[pod.Status.HostIP]; !found {
-				addresses = append(addresses, gwv1beta1.GatewayAddress{
-					Type:  common.PointerTo(gwv1beta1.IPAddressType),
+				addresses = append(addresses, gwv1alpha2.GatewayAddress{
+					Type:  common.PointerTo(gwv1alpha2.IPAddressType),
 					Value: pod.Status.HostIP,
 				})
 				seenIPs[pod.Status.HostIP] = struct{}{}
@@ -424,13 +424,13 @@ func isDeleted(object client.Object) bool {
 	return !object.GetDeletionTimestamp().IsZero()
 }
 
-func supportedKinds(listener gwv1beta1.Listener) []gwv1beta1.RouteGroupKind {
+func supportedKinds(listener gwv1alpha2.Listener) []gwv1alpha2.RouteGroupKind {
 	if listener.AllowedRoutes != nil && listener.AllowedRoutes.Kinds != nil {
-		return common.Filter(listener.AllowedRoutes.Kinds, func(kind gwv1beta1.RouteGroupKind) bool {
+		return common.Filter(listener.AllowedRoutes.Kinds, func(kind gwv1alpha2.RouteGroupKind) bool {
 			if _, ok := allSupportedRouteKinds[kind.Kind]; !ok {
 				return true
 			}
-			return !common.NilOrEqual(kind.Group, gwv1beta1.GroupVersion.Group)
+			return !common.NilOrEqual(kind.Group, gwv1alpha2.GroupVersion.Group)
 		})
 	}
 	return supportedKindsForProtocol[listener.Protocol]

@@ -11,8 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -20,13 +19,13 @@ import (
 )
 
 // bindRoute contains the main logic for binding a route to a given gateway.
-func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.SectionName]int, snapshot *Snapshot) {
+func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1alpha2.SectionName]int, snapshot *Snapshot) {
 	// use the non-normalized key since we can't write back enterprise metadata
 	// on non-enterprise installations
 	routeConsulKey := r.config.Translator.NonNormalizedConfigEntryReference(entryKind(route), client.ObjectKeyFromObject(route))
 	filteredParents := filterParentRefs(r.key, route.GetNamespace(), getRouteParents(route))
 	filteredParentStatuses := filterParentRefs(r.key, route.GetNamespace(),
-		common.ConvertSliceFunc(getRouteParentsStatus(route), func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+		common.ConvertSliceFunc(getRouteParentsStatus(route), func(parentStatus gwv1alpha2.RouteParentStatus) gwv1alpha2.ParentReference {
 			return parentStatus.ParentRef
 		}),
 	)
@@ -112,7 +111,7 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 
 		// If there are no matching listeners, then we failed to find the parent
 		if len(listeners) == 0 {
-			var sectionName gwv1beta1.SectionName
+			var sectionName gwv1alpha2.SectionName
 			if ref.SectionName != nil {
 				sectionName = *ref.SectionName
 			}
@@ -168,7 +167,7 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 			results: result,
 		})
 
-		httproute, ok := route.(*gwv1beta1.HTTPRoute)
+		httproute, ok := route.(*gwv1alpha2.HTTPRoute)
 		if ok {
 			if !externalRefsOnRouteAllExist(httproute, r.config.Resources) {
 				results = append(results, parentBindResult{
@@ -220,8 +219,8 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1beta1.Section
 }
 
 // filterParentRefs returns the subset of parent references on a route that point to the given gateway.
-func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1beta1.ParentReference) []gwv1beta1.ParentReference {
-	references := []gwv1beta1.ParentReference{}
+func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv1alpha2.ParentReference) []gwv1alpha2.ParentReference {
+	references := []gwv1alpha2.ParentReference{}
 	for _, ref := range refs {
 		if common.NilOrEqual(ref.Group, common.BetaGroup) &&
 			common.NilOrEqual(ref.Kind, common.KindGateway) &&
@@ -237,8 +236,8 @@ func filterParentRefs(gateway types.NamespacedName, namespace string, refs []gwv
 // listenersFor returns the listeners corresponding to the given section name. If the section
 // name is actually specified, the returned set will only contain the named listener. If it is
 // unspecified, then all gateway listeners will be returned.
-func listenersFor(gateway *gwv1beta1.Gateway, name *gwv1beta1.SectionName) []gwv1beta1.Listener {
-	listeners := []gwv1beta1.Listener{}
+func listenersFor(gateway *gwv1alpha2.Gateway, name *gwv1alpha2.SectionName) []gwv1alpha2.Listener {
+	listeners := []gwv1alpha2.Listener{}
 	for _, listener := range gateway.Spec.Listeners {
 		if name == nil {
 			listeners = append(listeners, listener)
@@ -271,20 +270,14 @@ func consulParentMatches(namespace string, gatewayKey api.ResourceReference, par
 
 func (r *Binder) dropConsulRouteParent(snapshot *Snapshot, object client.Object, gateway api.ResourceReference, resources *common.ResourceMap) {
 	switch object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		resources.MutateHTTPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry {
 			entry.Parents = common.Filter(entry.Parents, func(parent api.ResourceReference) bool {
 				return consulParentMatches(entry.Namespace, gateway, parent)
 			})
 			return entry
 		})
-	case *gwv1alpha2.TCPRoute:
-		resources.MutateTCPRoute(client.ObjectKeyFromObject(object), r.handleRouteSyncStatus(snapshot, object), func(entry api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
-			entry.Parents = common.Filter(entry.Parents, func(parent api.ResourceReference) bool {
-				return consulParentMatches(entry.Namespace, gateway, parent)
-			})
-			return entry
-		})
+
 	}
 }
 
@@ -313,7 +306,7 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 	}
 
 	switch object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		resources.TranslateAndMutateHTTPRoute(key, r.handleRouteSyncStatus(snapshot, object), func(old *api.HTTPRouteConfigEntry, new api.HTTPRouteConfigEntry) api.HTTPRouteConfigEntry {
 			if old != nil {
 				for _, parent := range old.Parents {
@@ -337,35 +330,35 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 
 			return new
 		})
-	case *gwv1alpha2.TCPRoute:
-		resources.TranslateAndMutateTCPRoute(key, r.handleRouteSyncStatus(snapshot, object), func(old *api.TCPRouteConfigEntry, new api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
-			if old != nil {
-				for _, parent := range old.Parents {
-					// drop any references that already exist
-					if parents.Contains(parent) {
-						parents.Remove(parent)
-					}
-				}
+		// case *gwv1alpha2.TCPRoute:
+		// 	resources.TranslateAndMutateTCPRoute(key, r.handleRouteSyncStatus(snapshot, object), func(old *api.TCPRouteConfigEntry, new api.TCPRouteConfigEntry) api.TCPRouteConfigEntry {
+		// 		if old != nil {
+		// 			for _, parent := range old.Parents {
+		// 				// drop any references that already exist
+		// 				if parents.Contains(parent) {
+		// 					parents.Remove(parent)
+		// 				}
+		// 			}
 
-				// set the old parent states
-				new.Parents = old.Parents
-				new.Status = old.Status
-			}
-			// and now add what is left
-			for parent := range parents.Iter() {
-				new.Parents = append(new.Parents, parent.(api.ResourceReference))
-			}
-			return new
-		})
+		// 			// set the old parent states
+		// 			new.Parents = old.Parents
+		// 			new.Status = old.Status
+		// 		}
+		// 		// and now add what is left
+		// 		for parent := range parents.Iter() {
+		// 			new.Parents = append(new.Parents, parent.(api.ResourceReference))
+		// 		}
+		// 		return new
+		// 	})
 	}
 }
 
 func entryKind(object client.Object) string {
 	switch object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		return api.HTTPRoute
-	case *gwv1alpha2.TCPRoute:
-		return api.TCPRoute
+		// case *gwv1alpha2.TCPRoute:
+		// 	return api.TCPRoute
 	}
 	return ""
 }
@@ -374,71 +367,71 @@ func canGCOnUnbind(id api.ResourceReference, resources *common.ResourceMap) bool
 	switch id.Kind {
 	case api.HTTPRoute:
 		return resources.CanGCHTTPRouteOnUnbind(id)
-	case api.TCPRoute:
-		return resources.CanGCTCPRouteOnUnbind(id)
+		// case api.TCPRoute:
+		// 	return resources.CanGCTCPRouteOnUnbind(id)
 	}
 	return true
 }
 
-func getRouteHostnames(object client.Object) []gwv1beta1.Hostname {
+func getRouteHostnames(object client.Object) []gwv1alpha2.Hostname {
 	switch v := object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		return v.Spec.Hostnames
 	}
 	return nil
 }
 
-func getRouteParents(object client.Object) []gwv1beta1.ParentReference {
+func getRouteParents(object client.Object) []gwv1alpha2.ParentReference {
 	switch v := object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		return v.Spec.ParentRefs
-	case *gwv1alpha2.TCPRoute:
-		return v.Spec.ParentRefs
+		// case *gwv1alpha2.TCPRoute:
+		// 	return v.Spec.ParentRefs
 	}
 	return nil
 }
 
-func getRouteParentsStatus(object client.Object) []gwv1beta1.RouteParentStatus {
+func getRouteParentsStatus(object client.Object) []gwv1alpha2.RouteParentStatus {
 	switch v := object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		return v.Status.RouteStatus.Parents
-	case *gwv1alpha2.TCPRoute:
-		return v.Status.RouteStatus.Parents
+		// case *gwv1alpha2.TCPRoute:
+		// 	return v.Status.RouteStatus.Parents
 	}
 	return nil
 }
 
-func setRouteParentsStatus(object client.Object, parents []gwv1beta1.RouteParentStatus) {
+func setRouteParentsStatus(object client.Object, parents []gwv1alpha2.RouteParentStatus) {
 	switch v := object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		v.Status.RouteStatus.Parents = parents
-	case *gwv1alpha2.TCPRoute:
-		v.Status.RouteStatus.Parents = parents
+		// case *gwv1alpha2.TCPRoute:
+		// 	v.Status.RouteStatus.Parents = parents
 	}
 }
 
-func getRouteBackends(object client.Object) []gwv1beta1.BackendRef {
+func getRouteBackends(object client.Object) []gwv1alpha2.BackendRef {
 	switch v := object.(type) {
-	case *gwv1beta1.HTTPRoute:
-		return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1beta1.HTTPRouteRule) []gwv1beta1.BackendRef {
-			return common.ConvertSliceFunc(rule.BackendRefs, func(rule gwv1beta1.HTTPBackendRef) gwv1beta1.BackendRef {
+	case *gwv1alpha2.HTTPRoute:
+		return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1alpha2.HTTPRouteRule) []gwv1alpha2.BackendRef {
+			return common.ConvertSliceFunc(rule.BackendRefs, func(rule gwv1alpha2.HTTPBackendRef) gwv1alpha2.BackendRef {
 				return rule.BackendRef
 			})
 		}))
-	case *gwv1alpha2.TCPRoute:
-		return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1beta1.BackendRef {
-			return rule.BackendRefs
-		}))
+		// case *gwv1alpha2.TCPRoute:
+		// 	return common.Flatten(common.ConvertSliceFunc(v.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1alpha2.BackendRef {
+		// 		return rule.BackendRefs
+		// 	}))
 	}
 	return nil
 }
 
-func canReferenceBackend(object client.Object, ref gwv1beta1.BackendRef, resources *common.ResourceMap) bool {
+func canReferenceBackend(object client.Object, ref gwv1alpha2.BackendRef, resources *common.ResourceMap) bool {
 	switch v := object.(type) {
-	case *gwv1beta1.HTTPRoute:
+	case *gwv1alpha2.HTTPRoute:
 		return resources.HTTPRouteCanReferenceBackend(*v, ref)
-	case *gwv1alpha2.TCPRoute:
-		return resources.TCPRouteCanReferenceBackend(*v, ref)
+		// case *gwv1alpha2.TCPRoute:
+		// 	return resources.TCPRouteCanReferenceBackend(*v, ref)
 	}
 	return false
 }
@@ -474,7 +467,7 @@ func (r *Binder) handleRouteSyncStatus(snapshot *Snapshot, object client.Object)
 	}
 }
 
-func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1beta1.Gateway, status api.ConfigEntryStatus) func(error) {
+func (r *Binder) handleGatewaySyncStatus(snapshot *Snapshot, gateway *gwv1alpha2.Gateway, status api.ConfigEntryStatus) func(error) {
 	return func(err error) {
 		condition := metav1.Condition{
 			Type:               "Synced",
