@@ -1,0 +1,3 @@
+```release-note:feature
+Allow to define extra Init Containers for Client DaemonSet and Server Statefulset
+```
