@@ -104,159 +104,153 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}
 
 	// API Gateway Controllers
-	err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr)
-	//  err != nil {
-	// 	setupLog.Error(err, "unable to register field indexes for gateway.net controllers")
-	// 	return err
-	// }
-	if err == nil {
-
-		if err := (&gatewaycontrollers.GatewayClassConfigController{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("gateways"),
-		}).SetupWithManager(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
-			return err
-		}
-
-		if err := (&gatewaycontrollers.GatewayClassController{
-			ControllerName: gatewaycommon.GatewayClassControllerName,
-			Client:         mgr.GetClient(),
-			Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
-		}).SetupWithManager(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
-			return err
-		}
-
-		cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
-			HelmConfig: gatewaycommon.HelmConfig{
-				ConsulConfig: gatewaycommon.ConsulConfig{
-					Address:    c.consul.Addresses,
-					GRPCPort:   consulConfig.GRPCPort,
-					HTTPPort:   consulConfig.HTTPPort,
-					APITimeout: consulConfig.APITimeout,
-				},
-				ImageDataplane:              c.flagConsulDataplaneImage,
-				ImageConsulK8S:              c.flagConsulK8sImage,
-				ImagePullSecrets:            cfgFile.ImagePullSecrets,
-				GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
-				ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
-				NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
-				EnableNamespaces:            c.flagEnableNamespaces,
-				PeeringEnabled:              c.flagEnablePeering,
-				EnableOpenShift:             c.flagEnableOpenShift,
-				EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
-				AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
-				LogLevel:                    c.flagLogLevel,
-				LogJSON:                     c.flagLogJSON,
-				TLSEnabled:                  c.consul.UseTLS,
-				ConsulTLSServerName:         c.consul.TLSServerName,
-				ConsulPartition:             c.consul.Partition,
-				ConsulCACert:                string(c.caCertPem),
-				EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
-				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-				InitContainerResources:      &c.initContainerResources,
-			},
-			AllowK8sNamespacesSet:   allowK8sNamespaces,
-			DenyK8sNamespacesSet:    denyK8sNamespaces,
-			ConsulClientConfig:      consulConfig,
-			ConsulServerConnMgr:     watcher,
-			NamespacesEnabled:       c.flagEnableNamespaces,
-			CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
-			Partition:               c.consul.Partition,
-			Datacenter:              c.consul.Datacenter,
-		})
-		if err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Gateway")
-			return err
-		}
-
-		go cache.Run(ctx)
-		go cleaner.Run(ctx)
-
-		// wait for the cache to fill
-		setupLog.Info("waiting for Consul cache sync")
-		cache.WaitSynced(ctx)
-		setupLog.Info("Consul cache synced")
+	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to register field indexes for gateway.net controllers")
+		return err
+	}
+	if err := gatewaycontrollersocp.RegisterFieldIndexes(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to register field indexes dinesh.networking controllers")
+		return err
 	}
 
-	// ocp controllers
-	err = gatewaycontrollersocp.RegisterFieldIndexes(ctx, mgr)
-	// if err == nil {
-	// 	setupLog.Error(err, "unable to register field indexes dinesh.networking controllers")
-	// 	return err
-	// }
-	if err == nil {
-		if err := (&gatewaycontrollersocp.OcpGatewayClassConfigController{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("ocp-gateways"),
-		}).SetupWithManager(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollersocp.OcpGatewayClassConfigController{})
-			return err
-		}
-
-		if err := (&gatewaycontrollersocp.OcpGatewayClassController{
-			ControllerName: gatewaycommonocp.GatewayClassControllerName,
-			Client:         mgr.GetClient(),
-			Log:            ctrl.Log.WithName("controllers").WithName("OcpGatewayClass"),
-		}).SetupWithManager(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "OcpGatewayClass")
-			return err
-		}
-
-		ocpcache, ocpcleaner, err := gatewaycontrollersocp.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollersocp.OcpGatewayControllerConfig{
-			HelmConfig: gatewaycommonocp.HelmConfig{
-				ConsulConfig: gatewaycommonocp.ConsulConfig{
-					Address:    c.consul.Addresses,
-					GRPCPort:   consulConfig.GRPCPort,
-					HTTPPort:   consulConfig.HTTPPort,
-					APITimeout: consulConfig.APITimeout,
-				},
-				ImageDataplane:              c.flagConsulDataplaneImage,
-				ImageConsulK8S:              c.flagConsulK8sImage,
-				ImagePullSecrets:            cfgFile.ImagePullSecrets,
-				GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
-				ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
-				NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
-				EnableNamespaces:            c.flagEnableNamespaces,
-				PeeringEnabled:              c.flagEnablePeering,
-				EnableOpenShift:             c.flagEnableOpenShift,
-				EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
-				AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
-				LogLevel:                    c.flagLogLevel,
-				LogJSON:                     c.flagLogJSON,
-				TLSEnabled:                  c.consul.UseTLS,
-				ConsulTLSServerName:         c.consul.TLSServerName,
-				ConsulPartition:             c.consul.Partition,
-				ConsulCACert:                string(c.caCertPem),
-				EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
-				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-				InitContainerResources:      &c.initContainerResources,
-			},
-			AllowK8sNamespacesSet:   allowK8sNamespaces,
-			DenyK8sNamespacesSet:    denyK8sNamespaces,
-			ConsulClientConfig:      consulConfig,
-			ConsulServerConnMgr:     watcher,
-			NamespacesEnabled:       c.flagEnableNamespaces,
-			CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
-			Partition:               c.consul.Partition,
-			Datacenter:              c.consul.Datacenter,
-		})
-		if err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Gateway")
-			return err
-		}
-
-		go ocpcache.Run(ctx)
-		go ocpcleaner.Run(ctx)
-
-		// wait for the cache to fill
-		setupLog.Info("waiting for Consul ocp cache sync")
-		ocpcache.WaitSynced(ctx)
-		setupLog.Info("Consul ocp cache synced")
+	if err := (&gatewaycontrollers.GatewayClassConfigController{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controller").WithName("gateways"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
+		return err
 	}
+
+	if err := (&gatewaycontrollersocp.OcpGatewayClassConfigController{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controller").WithName("ocp-gateways"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollersocp.OcpGatewayClassConfigController{})
+		return err
+	}
+
+	if err := (&gatewaycontrollers.GatewayClassController{
+		ControllerName: gatewaycommon.GatewayClassControllerName,
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("GatewayClass"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
+		return err
+	}
+
+	if err := (&gatewaycontrollersocp.OcpGatewayClassController{
+		ControllerName: gatewaycommonocp.GatewayClassControllerName,
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("OcpGatewayClass"),
+	}).SetupWithManager(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OcpGatewayClass")
+		return err
+	}
+
+	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
+		HelmConfig: gatewaycommon.HelmConfig{
+			ConsulConfig: gatewaycommon.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:              c.flagConsulDataplaneImage,
+			ImageConsulK8S:              c.flagConsulK8sImage,
+			ImagePullSecrets:            cfgFile.ImagePullSecrets,
+			GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
+			ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
+			NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
+			EnableNamespaces:            c.flagEnableNamespaces,
+			PeeringEnabled:              c.flagEnablePeering,
+			EnableOpenShift:             c.flagEnableOpenShift,
+			EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
+			AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
+			LogLevel:                    c.flagLogLevel,
+			LogJSON:                     c.flagLogJSON,
+			TLSEnabled:                  c.consul.UseTLS,
+			ConsulTLSServerName:         c.consul.TLSServerName,
+			ConsulPartition:             c.consul.Partition,
+			ConsulCACert:                string(c.caCertPem),
+			EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+			InitContainerResources:      &c.initContainerResources,
+		},
+		AllowK8sNamespacesSet:   allowK8sNamespaces,
+		DenyK8sNamespacesSet:    denyK8sNamespaces,
+		ConsulClientConfig:      consulConfig,
+		ConsulServerConnMgr:     watcher,
+		NamespacesEnabled:       c.flagEnableNamespaces,
+		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
+		Partition:               c.consul.Partition,
+		Datacenter:              c.consul.Datacenter,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
+		return err
+	}
+
+	go cache.Run(ctx)
+	go cleaner.Run(ctx)
+
+	// wait for the cache to fill
+	setupLog.Info("waiting for Consul cache sync")
+	cache.WaitSynced(ctx)
+	setupLog.Info("Consul cache synced")
+
+	ocpcache, ocpcleaner, err := gatewaycontrollersocp.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollersocp.OcpGatewayControllerConfig{
+		HelmConfig: gatewaycommonocp.HelmConfig{
+			ConsulConfig: gatewaycommonocp.ConsulConfig{
+				Address:    c.consul.Addresses,
+				GRPCPort:   consulConfig.GRPCPort,
+				HTTPPort:   consulConfig.HTTPPort,
+				APITimeout: consulConfig.APITimeout,
+			},
+			ImageDataplane:              c.flagConsulDataplaneImage,
+			ImageConsulK8S:              c.flagConsulK8sImage,
+			ImagePullSecrets:            cfgFile.ImagePullSecrets,
+			GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
+			ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
+			NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
+			EnableNamespaces:            c.flagEnableNamespaces,
+			PeeringEnabled:              c.flagEnablePeering,
+			EnableOpenShift:             c.flagEnableOpenShift,
+			EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
+			AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
+			LogLevel:                    c.flagLogLevel,
+			LogJSON:                     c.flagLogJSON,
+			TLSEnabled:                  c.consul.UseTLS,
+			ConsulTLSServerName:         c.consul.TLSServerName,
+			ConsulPartition:             c.consul.Partition,
+			ConsulCACert:                string(c.caCertPem),
+			EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+			InitContainerResources:      &c.initContainerResources,
+		},
+		AllowK8sNamespacesSet:   allowK8sNamespaces,
+		DenyK8sNamespacesSet:    denyK8sNamespaces,
+		ConsulClientConfig:      consulConfig,
+		ConsulServerConnMgr:     watcher,
+		NamespacesEnabled:       c.flagEnableNamespaces,
+		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
+		Partition:               c.consul.Partition,
+		Datacenter:              c.consul.Datacenter,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
+		return err
+	}
+
+	go ocpcache.Run(ctx)
+	go ocpcleaner.Run(ctx)
+
+	// wait for the cache to fill
+	setupLog.Info("waiting for Consul ocp cache sync")
+	ocpcache.WaitSynced(ctx)
+	setupLog.Info("Consul ocp cache synced")
+
 	configEntryReconciler := &controllers.ConfigEntryController{
 		ConsulClientConfig:         consulConfig,
 		ConsulServerConnMgr:        watcher,
