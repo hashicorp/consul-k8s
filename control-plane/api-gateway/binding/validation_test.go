@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -213,15 +214,15 @@ func TestValidateGateway(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		object   gwv1beta1.Gateway
+		object   gwv1.Gateway
 		expected error
 	}{
 		"valid": {
-			object:   gwv1beta1.Gateway{},
+			object:   gwv1.Gateway{},
 			expected: nil,
 		},
 		"invalid": {
-			object: gwv1beta1.Gateway{Spec: gwv1beta1.GatewaySpec{Addresses: []gwv1beta1.GatewayAddress{
+			object: gwv1.Gateway{Spec: gwv1.GatewaySpec{Addresses: []gwv1.GatewaySpecAddress{
 				{Value: "1"},
 			}}},
 			expected: errGatewayUnsupportedAddress,
@@ -242,36 +243,36 @@ func TestMergedListeners_ValidateProtocol(t *testing.T) {
 	}{
 		"valid": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
 			},
 			expected: nil,
 		},
 		"invalid": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.TCPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.TCPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
 			},
 			expected: errListenerProtocolConflict,
 		},
 		"big list": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPSProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPSProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
 			},
 			expected: errListenerProtocolConflict,
 		},
@@ -291,11 +292,11 @@ func TestMergedListeners_ValidateHostname(t *testing.T) {
 	}{
 		"valid": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("2")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("3")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("4")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("5")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("2")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("3")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("4")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("5")}},
 				{},
 			},
 			expected: nil,
@@ -303,24 +304,24 @@ func TestMergedListeners_ValidateHostname(t *testing.T) {
 		"invalid nil": {
 			mergedListeners: []mergedListener{
 				{},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("2")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("3")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("4")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("5")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("2")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("3")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("4")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("5")}},
 				{},
 			},
 			expected: errListenerHostnameConflict,
 		},
 		"invalid set": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("2")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("3")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("4")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("5")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("2")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("3")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("4")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("5")}},
 				{},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
 			},
 			expected: errListenerHostnameConflict,
 		},
@@ -342,15 +343,15 @@ func TestValidateTLS(t *testing.T) {
 	_, secret := generateTestCertificate(t, "", "")
 
 	for name, tt := range map[string]struct {
-		gateway                 gwv1beta1.Gateway
+		gateway                 gwv1.Gateway
 		grants                  []gwv1beta1.ReferenceGrant
-		tls                     *gwv1beta1.GatewayTLSConfig
+		tls                     *gwv1.GatewayTLSConfig
 		certificates            []corev1.Secret
 		expectedResolvedRefsErr error
 		expectedAcceptedErr     error
 	}{
 		"no tls": {
-			gateway:                 gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:                 gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			tls:                     nil,
 			certificates:            nil,
 			expectedResolvedRefsErr: nil,

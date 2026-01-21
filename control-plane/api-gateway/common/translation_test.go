@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	logrtest "github.com/go-logr/logr/testing"
@@ -37,15 +37,11 @@ import (
 
 type fakeReferenceValidator struct{}
 
-func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
+func (v fakeReferenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
 	return true
 }
 
-func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
-	return true
-}
-
-func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
 	return true
 }
 
@@ -208,7 +204,7 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			input := gwv1beta1.Gateway{
+			input := gwv1.Gateway{
 				TypeMeta: metav1.TypeMeta{
 					Kind: "Gateway",
 				},
@@ -217,14 +213,15 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 					Namespace:   k8sNamespace,
 					Annotations: tc.annotations,
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name:     gwv1beta1.SectionName(listenerOneName),
 							Hostname: PointerTo(gwv1beta1.Hostname(listenerOneHostname)),
 							Port:     gwv1beta1.PortNumber(listenerOnePort),
 							Protocol: gwv1beta1.ProtocolType(listenerOneProtocol),
-							TLS: &gwv1beta1.GatewayTLSConfig{
+							TLS: &gwv1.GatewayTLSConfig{
+								Backend: ,
 								CertificateRefs: tc.listenerOneK8sCertRefs,
 								Options:         tc.listenerOneTLSOptions,
 							},
@@ -1532,119 +1529,6 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 			got := tr.ToHTTPRoute(tc.args.k8sHTTPRoute, resources)
 			if diff := cmp.Diff(&tc.want, got); diff != "" {
 				t.Errorf("Translator.ToHTTPRoute() mismatch (-want +got):\n%s", diff)
-			}
-		})
-	}
-}
-
-func TestTranslator_ToTCPRoute(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		k8sRoute     gwv1alpha2.TCPRoute
-		services     []types.NamespacedName
-		meshServices []v1alpha1.MeshService
-	}
-	tests := map[string]struct {
-		args args
-		want api.TCPRouteConfigEntry
-	}{
-		"base test": {
-			args: args{
-				k8sRoute: gwv1alpha2.TCPRoute{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "tcp-route",
-						Namespace: "k8s-ns",
-					},
-					Spec: gwv1alpha2.TCPRouteSpec{
-						Rules: []gwv1alpha2.TCPRouteRule{
-							{
-								BackendRefs: []gwv1beta1.BackendRef{
-									{
-										BackendObjectReference: gwv1beta1.BackendObjectReference{
-											Name:      "some-service",
-											Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
-										},
-										Weight: new(int32),
-									},
-								},
-							},
-							{
-								BackendRefs: []gwv1beta1.BackendRef{
-									{
-										BackendObjectReference: gwv1beta1.BackendObjectReference{
-											Name:      "some-service-part-two",
-											Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
-										},
-										Weight: new(int32),
-									},
-									{
-										BackendObjectReference: gwv1beta1.BackendObjectReference{
-											Group:     PointerTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
-											Kind:      PointerTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
-											Name:      "some-service-part-three",
-											Namespace: PointerTo(gwv1beta1.Namespace("svc-ns")),
-										},
-										Weight: new(int32),
-									},
-								},
-							},
-						},
-					},
-				},
-				services: []types.NamespacedName{
-					{Name: "some-service", Namespace: "svc-ns"},
-					{Name: "some-service-part-two", Namespace: "svc-ns"},
-				},
-				meshServices: []v1alpha1.MeshService{
-					{ObjectMeta: metav1.ObjectMeta{Name: "some-service-part-three", Namespace: "svc-ns"}, Spec: v1alpha1.MeshServiceSpec{Name: "some-override"}},
-				},
-			},
-			want: api.TCPRouteConfigEntry{
-				Kind:      api.TCPRoute,
-				Name:      "tcp-route",
-				Namespace: "k8s-ns",
-				Services: []api.TCPService{
-					{
-						Name:      "some-service",
-						Partition: "",
-						Namespace: "svc-ns",
-					},
-					{
-						Name:      "some-service-part-two",
-						Partition: "",
-						Namespace: "svc-ns",
-					},
-					{
-						Name:      "some-override",
-						Partition: "",
-						Namespace: "svc-ns",
-					},
-				},
-				Meta: map[string]string{
-					constants.MetaKeyKubeNS:   "k8s-ns",
-					constants.MetaKeyKubeName: "tcp-route",
-				},
-			},
-		},
-	}
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			tr := ResourceTranslator{
-				EnableConsulNamespaces: true,
-				EnableK8sMirroring:     true,
-			}
-
-			resources := NewResourceMap(tr, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
-			for _, service := range tt.args.services {
-				resources.AddService(service, service.Name)
-			}
-			for _, service := range tt.args.meshServices {
-				resources.AddMeshService(service)
-			}
-
-			got := tr.ToTCPRoute(tt.args.k8sRoute, resources)
-			if diff := cmp.Diff(&tt.want, got); diff != "" {
-				t.Errorf("Translator.TCPRouteToTCPRoute() mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

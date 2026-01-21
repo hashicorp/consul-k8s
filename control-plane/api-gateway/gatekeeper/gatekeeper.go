@@ -10,7 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -35,7 +35,7 @@ func New(log logr.Logger, client client.Client, consulConfig *consul.Config) *Ga
 
 // Upsert creates or updates the resources for handling routing of network traffic.
 // This is done in order based on dependencies between resources.
-func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
+func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	g.Log.V(1).Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
 
 	if err := g.upsertRole(ctx, gateway, gcc, config); err != nil {
@@ -67,7 +67,7 @@ func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1beta1.Gateway, gcc 
 
 // Delete removes the resources for handling routing of network traffic.
 // This is done in the reverse order of Upsert due to dependencies between resources.
-func (g *Gatekeeper) Delete(ctx context.Context, gateway gwv1beta1.Gateway) error {
+func (g *Gatekeeper) Delete(ctx context.Context, gateway gwv1.Gateway) error {
 	gatewayName := g.namespacedName(gateway)
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
 
@@ -101,14 +101,14 @@ func (g *Gatekeeper) Delete(ctx context.Context, gateway gwv1beta1.Gateway) erro
 // resourceMutator is passed to create or update functions to mutate Kubernetes resources.
 type resourceMutator = func() error
 
-func (g *Gatekeeper) namespacedName(gateway gwv1beta1.Gateway) types.NamespacedName {
+func (g *Gatekeeper) namespacedName(gateway gwv1.Gateway) types.NamespacedName {
 	return types.NamespacedName{
 		Namespace: gateway.Namespace,
 		Name:      gateway.Name,
 	}
 }
 
-func (g *Gatekeeper) serviceAccountName(gateway gwv1beta1.Gateway, config common.HelmConfig) string {
+func (g *Gatekeeper) serviceAccountName(gateway gwv1.Gateway, config common.HelmConfig) string {
 	// We only create a ServiceAccount if it's needed for RBAC or image pull secrets;
 	// otherwise, we clean up if one was previously created.
 	if config.AuthMethod == "" && !config.EnableOpenShift && len(config.ImagePullSecrets) == 0 {

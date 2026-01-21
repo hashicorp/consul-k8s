@@ -114,6 +114,7 @@ func gatewayClassConfigInUse(ctx context.Context, k8sClient client.Client, gcc *
 
 func (r *OcpGatewayClassConfigController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("gatewayclassconfig-custom").
 		For(&v1alpha1.GatewayClassConfig{}).
 		// Watch for changes to GatewayClass objects associated with this config for purposes of finalizer removal.
 		Watches(&gwv1beta1.OcpGatewayClass{}, r.transformGatewayClassToGatewayClassConfig()).

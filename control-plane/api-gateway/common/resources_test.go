@@ -9,8 +9,7 @@ import (
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -44,14 +43,10 @@ func TestResourceMap_JWTProvider(t *testing.T) {
 
 type mockReferenceValidator struct{}
 
-func (m mockReferenceValidator) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool {
+func (m mockReferenceValidator) GatewayCanReferenceSecret(gateway gwv1alpha2.Gateway, secretRef gwv1alpha2.SecretObjectReference) bool {
 	return true
 }
 
-func (m mockReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool {
-	return true
-}
-
-func (m mockReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (m mockReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1alpha2.HTTPRoute, backendRef gwv1alpha2.BackendRef) bool {
 	return true
 }

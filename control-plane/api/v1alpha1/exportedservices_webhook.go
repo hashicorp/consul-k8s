@@ -22,7 +22,7 @@ import (
 type ExportedServicesWebhook struct {
 	client.Client
 	Logger     logr.Logger
-	decoder    *admission.Decoder
+	decoder    admission.Decoder
 	ConsulMeta common.ConsulMeta
 }
 

@@ -216,7 +216,7 @@ type MeshWebhook struct {
 	LogLevel string
 	LogJSON  bool
 
-	decoder *admission.Decoder
+	decoder admission.Decoder
 	// etcResolvFile is only used in tests to stub out /etc/resolv.conf file.
 	etcResolvFile                               string
 	DefaultSidecarProbeCheckInitialDelaySeconds int

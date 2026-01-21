@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
@@ -2941,18 +2941,18 @@ func compareUpdates(t *testing.T, expected []client.Object, actual []client.Obje
 	require.ElementsMatch(t, expected, filtered, "statuses don't match", cmp.Diff(expected, filtered))
 }
 
-func addClassConfig(g gwv1beta1.Gateway) *gwv1beta1.Gateway {
+func addClassConfig(g gwv1alpha2.Gateway) *gwv1alpha2.Gateway {
 	serializeGatewayClassConfig(&g, &v1alpha1.GatewayClassConfig{})
 	return &g
 }
 
-func gatewayWithFinalizer(spec gwv1beta1.GatewaySpec) gwv1beta1.Gateway {
+func gatewayWithFinalizer(spec gwv1alpha2.GatewaySpec) gwv1alpha2.Gateway {
 	spec.GatewayClassName = testGatewayClassObjectName
 
 	typeMeta := metav1.TypeMeta{}
 	typeMeta.SetGroupVersionKind(gwv1beta1.SchemeGroupVersion.WithKind("Gateway"))
 
-	return gwv1beta1.Gateway{
+	return gwv1alpha2.Gateway{
 		TypeMeta: typeMeta,
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "gateway",

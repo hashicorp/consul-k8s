@@ -5,7 +5,7 @@ package common
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -21,7 +21,7 @@ var (
 	KindGateway = "Gateway"
 	KindSecret  = "Secret"
 	KindService = "Service"
-	BetaGroup   = gwv1beta1.GroupVersion.Group
+	BetaGroup   = gwv1.GroupVersion.Group
 )
 
 // EnsureFinalizer ensures that our finalizer is set on an object

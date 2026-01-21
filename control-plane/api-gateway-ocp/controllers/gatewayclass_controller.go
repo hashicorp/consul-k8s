@@ -128,6 +128,7 @@ func (r *OcpGatewayClassController) Reconcile(ctx context.Context, req ctrl.Requ
 // SetupWithManager registers the controller with the given manager.
 func (r *OcpGatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("gatewayclass-custom").
 		For(&gwv1beta1.OcpGatewayClass{}).
 		// Watch for changes to GatewayClassConfig objects.
 		Watches(&v1alpha1.GatewayClassConfig{}, r.gatewayClassConfigFieldIndexEventHandler()).

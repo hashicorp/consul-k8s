@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
@@ -74,7 +74,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	consulKey := r.Translator.ConfigEntryReference(api.APIGateway, req.NamespacedName)
 	nonNormalizedConsulKey := r.Translator.NonNormalizedConfigEntryReference(api.APIGateway, req.NamespacedName)
 
-	var gateway gwv1beta1.Gateway
+	var gateway gwv1.Gateway
 
 	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
 	log.Info("Reconciling Gateway")
@@ -158,14 +158,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// get all tcp routes referencing this gateway
-	tcpRoutes, err := r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
-	if err != nil {
-		log.Error(err, "unable to list TCPRoutes")
-		return ctrl.Result{}, err
-	}
-
-	if err := r.fetchServicesForRoutes(ctx, resources, tcpRoutes, httpRoutes); err != nil {
+	if err := r.fetchServicesForRoutes(ctx, resources, httpRoutes); err != nil {
 		log.Error(err, "unable to fetch services for routes")
 		return ctrl.Result{}, err
 	}
@@ -200,7 +193,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		Pods:                  pods,
 		Service:               service,
 		HTTPRoutes:            httpRoutes,
-		TCPRoutes:             tcpRoutes,
 		Resources:             resources,
 		ConsulGateway:         consulGateway,
 		ConsulGatewayServices: consulServices,
@@ -364,7 +356,7 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 	return es
 }
 
-func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
+func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway) error {
 	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
 	err := gk.Delete(ctx, *gw)
 	if err != nil {
@@ -374,7 +366,7 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
-func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
+func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
 	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
 	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
 	if err != nil {
@@ -430,7 +422,8 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	}
 
 	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
-		For(&gwv1beta1.Gateway{}).
+		Named("gateway-v1").
+		For(&gwv1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
@@ -439,16 +432,13 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
 		).
 		Watches(
-			&gwv1beta1.GatewayClass{},
+			&gwv1.GatewayClass{},
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass),
 		).
 		Watches(
-			&gwv1beta1.HTTPRoute{},
+			&gwv1.HTTPRoute{},
+
 			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute),
-		).
-		Watches(
-			&gwv1alpha2.TCPRoute{},
-			handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute),
 		).
 		Watches(
 			&corev1.Secret{},
@@ -468,28 +458,28 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			builder.WithPredicates(predicate),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for APIGateways
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for HTTPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for TCPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.TCPRoute, r.transformConsulTCPRoute(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for FileSystemCertificates
-			&source.Channel{Source: c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
-		).
-		WatchesRawSource(
-			&source.Channel{Source: c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		Watches(
 			&v1alpha1.GatewayPolicy{},
@@ -514,8 +504,8 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 // transformGatewayClass will check the list of GatewayClass objects for a matching
 // class, then return a list of reconcile Requests for it.
 func (r *GatewayController) transformGatewayClass(ctx context.Context, o client.Object) []reconcile.Request {
-	gatewayClass := o.(*gwv1beta1.GatewayClass)
-	gatewayList := &gwv1beta1.GatewayList{}
+	gatewayClass := o.(*gwv1.GatewayClass)
+	gatewayList := &gwv1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gatewayClass.Name),
 	}); err != nil {
@@ -527,22 +517,10 @@ func (r *GatewayController) transformGatewayClass(ctx context.Context, o client.
 // transformHTTPRoute will check the HTTPRoute object for a matching
 // class, then return a list of reconcile Requests for Gateways referring to it.
 func (r *GatewayController) transformHTTPRoute(ctx context.Context, o client.Object) []reconcile.Request {
-	route := o.(*gwv1beta1.HTTPRoute)
+	route := o.(*gwv1.HTTPRoute)
 
 	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
-	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
-		return parentStatus.ParentRef
-	})))
-	return append(refs, statusRefs...)
-}
-
-// transformTCPRoute will check the TCPRoute object for a matching
-// class, then return a list of reconcile Requests for Gateways referring to it.
-func (r *GatewayController) transformTCPRoute(ctx context.Context, o client.Object) []reconcile.Request {
-	route := o.(*gwv1alpha2.TCPRoute)
-
-	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
-	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1.RouteParentStatus) gwv1.ParentReference {
 		return parentStatus.ParentRef
 	})))
 	return append(refs, statusRefs...)
@@ -552,7 +530,7 @@ func (r *GatewayController) transformTCPRoute(ctx context.Context, o client.Obje
 // class, then return a list of reconcile Requests for Gateways referring to it.
 func (r *GatewayController) transformSecret(ctx context.Context, o client.Object) []reconcile.Request {
 	secret := o.(*corev1.Secret)
-	gatewayList := &gwv1beta1.GatewayList{}
+	gatewayList := &gwv1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, client.ObjectKeyFromObject(secret).String()),
 	}); err != nil {
@@ -567,7 +545,7 @@ func (r *GatewayController) transformReferenceGrant(ctx context.Context, o clien
 	// just re-reconcile all gateways for now ideally this will filter down to gateways
 	// affected, but technically the blast radius is gateways in the namespace + referencing
 	// the namespace + the routes that bind to them.
-	gatewayList := &gwv1beta1.GatewayList{}
+	gatewayList := &gwv1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList); err != nil {
 		return nil
 	}
@@ -764,21 +742,7 @@ func (r *GatewayController) transformEndpoints(ctx context.Context, o client.Obj
 func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tcpIndex, httpIndex, key string) []reconcile.Request {
 	requestSet := make(map[types.NamespacedName]struct{})
 
-	if tcpIndex != "" {
-		tcpRouteList := &gwv1alpha2.TCPRouteList{}
-		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
-			FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
-		}); err != nil {
-			r.Log.Error(err, "unable to list TCPRoutes")
-		}
-		for _, route := range tcpRouteList.Items {
-			for _, ref := range common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs) {
-				requestSet[ref] = struct{}{}
-			}
-		}
-	}
-
-	httpRouteList := &gwv1beta1.HTTPRouteList{}
+	httpRouteList := &gwv1.HTTPRouteList{}
 	if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(httpIndex, key),
 	}); err != nil {
@@ -860,7 +824,7 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 	return service, nil
 }
 
-func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1beta1.Gateway) ([]corev1.Pod, error) {
+func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1.Gateway) ([]corev1.Pod, error) {
 	labels := common.LabelsForGateway(&gateway)
 
 	var list corev1.PodList
@@ -872,8 +836,8 @@ func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway 
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
-	var list gwv1beta1.HTTPRouteList
+func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1.HTTPRoute, error) {
+	var list gwv1.HTTPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, gateway.String()),
@@ -894,7 +858,7 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 	return list.Items, nil
 }
 
-func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1beta1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
+func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
 	var externalFilters []interface{}
 	for _, rule := range route.Spec.Rules {
 		ruleFilters, err := c.filterFiltersForExternalRefs(ctx, route, rule.Filters, resources)
@@ -916,7 +880,7 @@ func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, 
 	return externalFilters, nil
 }
 
-func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, route gwv1beta1.HTTPRoute, filters []gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
+func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, route gwv1.HTTPRoute, filters []gwv1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
 	var externalFilters []interface{}
 
 	for _, filter := range filters {
@@ -991,23 +955,7 @@ func (c *GatewayController) getJWTProviders(ctx context.Context, resources *comm
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
-	var list gwv1alpha2.TCPRouteList
-
-	if err := c.Client.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(TCPRoute_GatewayIndex, gateway.String()),
-	}); err != nil {
-		return nil, err
-	}
-
-	for _, route := range list.Items {
-		resources.ReferenceCountTCPRoute(route)
-	}
-
-	return list.Items, nil
-}
-
-func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1beta1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
+func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
 	if gatewayClassConfig == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
@@ -1029,8 +977,8 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	return config, nil
 }
 
-func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.GatewayClass, error) {
-	var gatewayClass gwv1beta1.GatewayClass
+func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1.Gateway) (*gwv1.GatewayClass, error) {
+	var gatewayClass gwv1.GatewayClass
 	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
@@ -1042,7 +990,7 @@ func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gatew
 func (c *GatewayController) fetchControlledGateways(ctx context.Context, resources *common.ResourceMap) error {
 	set := mapset.NewSet()
 
-	list := gwv1beta1.GatewayClassList{}
+	list := gwv1.GatewayClassList{}
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
 	}); err != nil {
@@ -1052,7 +1000,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 		set.Add(gatewayClass.Name)
 	}
 
-	gateways := &gwv1beta1.GatewayList{}
+	gateways := &gwv1.GatewayList{}
 	if err := c.Client.List(ctx, gateways); err != nil {
 		return err
 	}
@@ -1065,7 +1013,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 	return nil
 }
 
-func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1beta1.Gateway) error {
+func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1.Gateway) error {
 	certificates := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -1098,24 +1046,11 @@ func (c *GatewayController) fetchSecret(ctx context.Context, resources *common.R
 	return nil
 }
 
-func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1beta1.HTTPRoute) error {
+func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, httpRoutes []gwv1.HTTPRoute) error {
 	serviceBackends := mapset.NewSet()
 	meshServiceBackends := mapset.NewSet()
 
 	for _, route := range httpRoutes {
-		for _, rule := range route.Spec.Rules {
-			for _, backend := range rule.BackendRefs {
-				if common.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&
-					common.DerefEqual(backend.Kind, v1alpha1.MeshServiceKind) {
-					meshServiceBackends.Add(common.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
-				} else if common.NilOrEqual(backend.Group, "") && common.NilOrEqual(backend.Kind, "Service") {
-					serviceBackends.Add(common.IndexedNamespacedNameWithDefault(backend.Name, backend.Namespace, route.Namespace))
-				}
-			}
-		}
-	}
-
-	for _, route := range tcpRoutes {
 		for _, rule := range route.Spec.Rules {
 			for _, backend := range rule.BackendRefs {
 				if common.DerefEqual(backend.Group, v1alpha1.ConsulHashicorpGroup) &&

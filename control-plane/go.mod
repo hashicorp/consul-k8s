@@ -12,6 +12,12 @@ replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17
 
 replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.22.0-rc1
 
+// replace sigs.k8s.io/gateway-api/apis/v1alpha2 => ./gateway07/gateway-api-0.7.1/apis/v1alpha2
+
+// replace sigs.k8s.io/gateway-api/apis/v1beta1 => ./gateway07/gateway-api-0.7.1/apis/v1beta1
+
+// replace sigs.k8s.io/gateway-api/apis/v1alpha3 => ./gateway07/gateway-api-0.7.1/apis/v1alpha3
+
 // replace sigs.k8s.io/gateway-api => ./gateway07/gateway-api-0.7.1
 
 replace sigs.k8s.io/gateway-api-exp => ./gateway07/gateway-api-0.7.1-exp

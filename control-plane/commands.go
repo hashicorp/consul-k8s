@@ -15,6 +15,7 @@ import (
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
 	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
+	cmdGatewayCleanupOcp "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup-ocp"
 	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
 	cmdGatewayResourcesOcp "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources-ocp"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
@@ -55,6 +56,9 @@ func init() {
 
 		"gateway-cleanup": func() (cli.Command, error) {
 			return &cmdGatewayCleanup.Command{UI: ui}, nil
+		},
+		"gateway-cleanup-ocp": func() (cli.Command, error) {
+			return &cmdGatewayCleanupOcp.Command{UI: ui}, nil
 		},
 
 		"gateway-resources": func() (cli.Command, error) {

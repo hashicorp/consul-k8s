@@ -439,6 +439,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	}
 
 	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
+		Named("gateway-custom").
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
@@ -477,28 +478,34 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			builder.WithPredicates(predicate),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for APIGateways
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for HTTPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for TCPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.TCPRoute, r.transformConsulTCPRoute(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for FileSystemCertificates
-			&source.Channel{Source: c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			&source.Channel{Source: c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.TCPRoute, r.transformConsulTCPRoute(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		Watches(
 			&v1alpha1.GatewayPolicy{},

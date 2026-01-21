@@ -23,7 +23,7 @@ type TerminatingGatewayWebhook struct {
 	// ConsulMeta contains metadata specific to the Consul installation.
 	ConsulMeta common.ConsulMeta
 
-	decoder *admission.Decoder
+	decoder admission.Decoder
 	client.Client
 }
 
