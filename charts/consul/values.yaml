@@ -806,9 +806,6 @@ global:
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
-  # Enables installing an HCP Consul Central self-managed cluster.
-  # Requires Consul v1.14+.
-
   # Extra labels to attach to all pods, deployments, daemonsets, statefulsets, and jobs. This should be a YAML map.
   #
   # Example:
