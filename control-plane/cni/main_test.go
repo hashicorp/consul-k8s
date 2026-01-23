@@ -124,7 +124,6 @@ func Test_cmdAdd(t *testing.T) {
 				iptablesConfigJson, err := json.Marshal(&cfg)
 				require.NoError(t, err)
 				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
-				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
 
@@ -151,7 +150,6 @@ func Test_cmdAdd(t *testing.T) {
 				iptablesConfigJson, err := json.Marshal(&cfg)
 				require.NoError(t, err)
 				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
-				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
 
