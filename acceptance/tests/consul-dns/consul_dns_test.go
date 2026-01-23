@@ -300,10 +300,6 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
         logger.Log(t, "Patching config file to target coredns instead of kube-dns")
         strContent = strings.ReplaceAll(strContent, "name: kube-dns", "name: coredns")
         fileChanged = true
-    } else if actualName == "rke2-coredns" && !strings.Contains(strContent, "name: rke2-coredns") {
-         logger.Log(t, "Patching config file to target rke2-coredns")
-         strContent = strings.ReplaceAll(strContent, "name: coredns", "name: rke2-coredns")
-         fileChanged = true
     }
 
     if fileChanged {
@@ -338,8 +334,6 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
     deploymentName := "deployment/coredns"
     if strings.Contains(actualName, "kube-dns") {
         deploymentName = "deployment/kube-dns"
-    } else if strings.Contains(actualName, "rke2") {
-        deploymentName = "deployment/rke2-coredns"
     }
 
     logger.Log(t, "Restarting DNS deployment", "name", deploymentName)
@@ -377,7 +371,7 @@ func getCoreDNSConfigMapName(t *testing.T, ctx environment.TestContext) string {
     }
 
     // 2. Check Known Names (Fallback for GKE)
-    knownNames := []string{"coredns", "kube-dns", "rke2-coredns"}
+    knownNames := []string{"coredns", "kube-dns"}
     for _, name := range knownNames {
         cm, err := client.Get(ctxBg, name, metav1.GetOptions{})
         if err == nil {
