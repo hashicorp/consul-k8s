@@ -28,7 +28,7 @@ import (
 func TestOpenshift_Basic(t *testing.T) {
 	cfg := suite.Config()
 
-	//its install helm chart
+	//its install helm chart use
 	logger.Log(t, "use openshift", cfg.UseOpenshift)
 	newOpenshiftCluster(t, cfg, true, false)
 
