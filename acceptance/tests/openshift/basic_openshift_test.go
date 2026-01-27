@@ -27,6 +27,8 @@ import (
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestOpenshift_Basic(t *testing.T) {
 	cfg := suite.Config()
+
+	//its install helm chart
 	newOpenshiftCluster(t, cfg, true, false)
 
 	// this is normally called by the environment, but because we have to bypass we have to call it explicitly
