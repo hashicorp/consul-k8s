@@ -1,4 +1,4 @@
-## 1.8.8 (January 27, 2025)
+## 1.8.8 (January 27, 2026)
 
 SECURITY:
 
