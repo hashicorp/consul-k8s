@@ -29,6 +29,13 @@ container {
         "CVE-2025-46394",  # busybox@1.37.0-r19 - Alpine Linux security issue
         "CVE-2025-47268",  # iputils@20240905-r0 - Alpine Linux security issue
         "CVE-2025-48964"   # iputils@20240905-r0 - Alpine Linux security issue
+        "GHSA-f6x5-jh6r-wrfv",
+        "GHSA-4f99-4q7p-p3gh",
+        "GO-2025-4135",
+        "GHSA-j5w8-q4qc-rx2x",
+        "GO-2025-4188",
+        "GO-2025-4134",
+        "GO-2025-4116"
       ]
     }
   }
