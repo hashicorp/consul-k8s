@@ -1,3 +1,12 @@
+## 1.9.3 (January 27, 2026)
+
+SECURITY:
+
+* Update the Consul Build Go base image to `alpine3.23` [[GH-5065](https://github.com/hashicorp/consul-k8s/issues/5065)]
+
+BUG FIXES:
+* cni: Updates code logic in CNI during application pod creation. [[GH-5062](https://github.com/hashicorp/consul-k8s/issues/5062)]
+
 ## 1.9.1 (2 December, 2025)
 
 SECURITY:
