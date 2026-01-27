@@ -1,3 +1,9 @@
+## 1.7.10 (January 27, 2026)
+
+SECURITY:
+
+* Update the Consul Build Go base image to `alpine3.23` [[GH-5065](https://github.com/hashicorp/consul-k8s/issues/5065)]
+
 ## 1.7.8 (2 December, 2025)
 
 SECURITY:
