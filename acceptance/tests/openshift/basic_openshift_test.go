@@ -29,6 +29,7 @@ func TestOpenshift_Basic(t *testing.T) {
 	cfg := suite.Config()
 
 	//its install helm chart
+	logger.Log(t, "use openshift", cfg.UseOpenshift)
 	newOpenshiftCluster(t, cfg, true, false)
 
 	// this is normally called by the environment, but because we have to bypass we have to call it explicitly
