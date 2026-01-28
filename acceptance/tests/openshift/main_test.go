@@ -15,6 +15,7 @@ func TestMain(m *testing.M) {
 
 	cfg := suite.Config()
 	if cfg.UseOpenshift {
+		fmt.Println("Running openshift tests because use-openshift is set")
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println("Skipping openshift tests because use-openshift not set")
