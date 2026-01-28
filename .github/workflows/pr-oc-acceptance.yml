@@ -3,11 +3,11 @@ name: pr-oc-acceptance
 on:
   push:
     branches:
-      - "anilvpatel/test-oc-acceptance"
+      - "test/anilvpatel/openshift-acceptance"
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: "anilvpatel/test-oc-acceptance"
+  BRANCH: "test/anilvpatel/openshift-acceptance"
   CONTEXT: "push"
 
 jobs:
