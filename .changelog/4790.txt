@@ -1,0 +1,3 @@
+```release-note:feature
+cli: Updated the status command to output the consul client & deployments status as well along with existing ones.
+```

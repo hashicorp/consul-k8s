@@ -1,0 +1,3 @@
+```release-note:feature
+Added boolean annotation "consul.hashicorp.com/enable-consul-dataplane-as-sidecar" for registering consul-dataplane as init container so that consul-dataplane container is initialised and started before application container. Default value is "false" i.e the feature is disabled by default. Also made the probe properties configurable through annotations.
+```

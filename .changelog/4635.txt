@@ -1,0 +1,5 @@
+```release-note:security
+cve: upgraded helmv3 packages to address following CVEs:
+- [CVE-2025-32386](https://nvd.nist.gov/vuln/detail/CVE-2025-32386)
+- [CVE-2025-32387](https://nvd.nist.gov/vuln/detail/cve-2025-32387)
+```

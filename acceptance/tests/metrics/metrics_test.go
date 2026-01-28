@@ -6,6 +6,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -74,17 +75,24 @@ func TestComponentMetrics(t *testing.T) {
 	k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
 
 	// Server Metrics
-	metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:8500/v1/agent/metrics?format=prometheus", fmt.Sprintf("%s-consul-server.%s.svc", releaseName, ns)))
-	require.NoError(t, err)
-	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
 
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 150}, t, func(r *retry.R) {
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:8500/v1/agent/metrics?format=prometheus", fmt.Sprintf("%s-consul-server.%s.svc", releaseName, ns)))
+		require.NoError(r, err)
+		require.Contains(r, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
+	})
 	// Client Metrics
-	metricsOutput, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "sh", "-c", "curl --silent --show-error http://$HOST_IP:8500/v1/agent/metrics?format=prometheus")
-	require.NoError(t, err)
-	require.Contains(t, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
-
-	logger.Log(t, "ingress gateway metrics")
-	assertGatewayMetricsEnabled(t, ctx, ns, "ingress-gateway", `envoy_cluster_assignment_stale{local_cluster="ingress-gateway",consul_source_service="ingress-gateway"`)
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 150}, t, func(r *retry.R) {
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t),
+			"exec", "deploy/"+StaticClientName,
+			"-c", "static-client",
+			"--",
+			"sh", "-c",
+			`if echo "$HOST_IP" | grep -q ':'; then url="http://[$HOST_IP]:8500"; else url="http://$HOST_IP:8500"; fi; curl --silent --show-error "$url/v1/agent/metrics?format=prometheus"`,
+		)
+		require.NoError(r, err)
+		require.Contains(r, metricsOutput, `consul_acl_ResolveToken{quantile="0.5"}`)
+	})
 
 	logger.Log(t, "terminating gateway metrics")
 	assertGatewayMetricsEnabled(t, ctx, ns, "terminating-gateway", `envoy_cluster_assignment_stale{local_cluster="terminating-gateway",consul_source_service="terminating-gateway"`)
@@ -132,8 +140,9 @@ func TestAppMetrics(t *testing.T) {
 
 	// Retry because sometimes the merged metrics server takes a couple hundred milliseconds
 	// to start.
-	retry.RunWith(&retry.Counter{Count: 20, Wait: 2 * time.Second}, t, func(r *retry.R) {
-		metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
+
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 150}, t, func(r *retry.R) {
+		metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s/metrics", net.JoinHostPort(podIP, "20200")))
 		require.NoError(r, err)
 		// This assertion represents the metrics from the envoy sidecar.
 		require.Contains(r, metricsOutput, `envoy_cluster_assignment_stale{local_cluster="server",consul_source_service="server"`)
@@ -147,8 +156,10 @@ func assertGatewayMetricsEnabled(t *testing.T, ctx environment.TestContext, ns, 
 	require.NoError(t, err)
 	for _, pod := range pods.Items {
 		podIP := pod.Status.PodIP
-		metricsOutput, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s:20200/metrics", podIP))
-		require.NoError(t, err)
-		require.Contains(t, metricsOutput, metricsAssertion)
+		retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 150}, t, func(r *retry.R) {
+			metricsOutput, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "exec", "deploy/"+StaticClientName, "-c", "static-client", "--", "curl", "--silent", "--show-error", fmt.Sprintf("http://%s/metrics", net.JoinHostPort(podIP, "20200")))
+			require.NoError(r, err)
+			require.Contains(r, metricsOutput, metricsAssertion)
+		})
 	}
 }

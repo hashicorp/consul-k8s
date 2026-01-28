@@ -271,7 +271,7 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 		tunnel.Close()
 	})
 
-	config.Address = fmt.Sprintf("127.0.0.1:%d", localPort)
+	config.Address = fmt.Sprintf("localhost:%d", localPort)
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 

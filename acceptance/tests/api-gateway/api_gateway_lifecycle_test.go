@@ -376,12 +376,13 @@ func checkRouteBound(t *testing.T, client client.Client, name, namespace, parent
 
 func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o T, fn func(o T)) {
 	t.Helper()
-
-	err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(o), o)
-	require.NoError(t, err)
-	fn(o)
-	err = k8sClient.Update(context.Background(), o)
-	require.NoError(t, err)
+	retryCheck(t, 200, func(r *retry.R) {
+		err := k8sClient.Get(context.Background(), client.ObjectKeyFromObject(o), o)
+		require.NoError(r, err)
+		fn(o)
+		err = k8sClient.Update(context.Background(), o)
+		require.NoError(r, err)
+	})
 }
 
 func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1beta1.HTTPRoute {

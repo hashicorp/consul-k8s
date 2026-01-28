@@ -12,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -158,7 +159,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(err.Error())
 			return 1
 		}
-		firstServerAddr := fmt.Sprintf("%s:%d", ipAddrs[0].IP.String(), c.consul.HTTPPort)
+		firstServerAddr := net.JoinHostPort(ipAddrs[0].IP.String(), strconv.Itoa(c.consul.HTTPPort))
 
 		config := c.consul.ConsulClientConfig().APIClientConfig
 		config.Address = firstServerAddr

@@ -103,6 +103,69 @@ Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
 [Consul website](https://www.consul.io/docs/platform/k8s/helm.html).
 
+## API Gateway Probe Configuration
+
+You can configure Kubernetes health probes (liveness, readiness, and startup) for individual API Gateways using annotations. This allows you to customize probe behavior per-Gateway rather than using a class-wide configuration.
+
+### Example Gateway with Custom Probes
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: example-gateway
+  namespace: consul
+  annotations:
+    # Configure liveness probe (JSON format)
+    consul.hashicorp.com/liveness-probe: |
+      {
+        "httpGet": {
+          "path": "/ready",
+          "port": 20000
+        },
+        "initialDelaySeconds": 10,
+        "periodSeconds": 10,
+        "timeoutSeconds": 1,
+        "successThreshold": 1,
+        "failureThreshold": 3
+      }
+    # Configure readiness probe (JSON format)
+    consul.hashicorp.com/readiness-probe: |
+      {
+        "httpGet": {
+          "path": "/ready",
+          "port": 20000
+        },
+        "initialDelaySeconds": 5,
+        "periodSeconds": 10
+      }
+    # Configure startup probe (JSON format)
+    consul.hashicorp.com/startup-probe: |
+      {
+        "tcpSocket": {
+          "port": 20000
+        },
+        "periodSeconds": 2,
+        "failureThreshold": 30
+      }
+spec:
+  gatewayClassName: consul
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 8080
+```
+
+### Supported Probe Annotations
+
+- `consul.hashicorp.com/liveness-probe`: Liveness probe configuration (JSON)
+- `consul.hashicorp.com/readiness-probe`: Readiness probe configuration (JSON)
+- `consul.hashicorp.com/startup-probe`: Startup probe configuration (JSON)
+
+Each annotation accepts a JSON object following the Kubernetes [Probe](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#probe-v1-core) specification. Supported probe handlers: `httpGet`, `tcpSocket`, `exec`, `grpc`.
+
+**Note**: Liveness and startup probes must have `successThreshold: 1` per Kubernetes requirements. The controller will automatically normalize this value if a different value is provided.
+
 ## Tutorials
 
 You can find examples and complete tutorials on how to deploy Consul on 

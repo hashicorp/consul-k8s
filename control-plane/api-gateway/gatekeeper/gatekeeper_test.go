@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const (
@@ -1153,8 +1154,8 @@ func TestUpsert(t *testing.T) {
 
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
-
-			gatekeeper := New(log, client)
+			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+			gatekeeper := New(log, client, nil)
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
@@ -1406,8 +1407,8 @@ func TestDelete(t *testing.T) {
 
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
-
-			gatekeeper := New(log, client)
+			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+			gatekeeper := New(log, client, nil)
 
 			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)
@@ -1506,8 +1507,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		}
 		assert.True(t, hasInitContainer)
 
-		// Ensure there is a consul-dataplane container dropping ALL capabilities, adding
-		// back the NET_BIND_SERVICE capability, and establishing a read-only root filesystem
+		// Ensure there is a consul-dataplane container dropping ALL capabilities and establishing a read-only root filesystem
 		hasDataplaneContainer := false
 		for _, container := range actual.Spec.Template.Spec.Containers {
 			if container.Image == dataplaneImage {
@@ -1516,7 +1516,6 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 				require.NotNil(t, container.SecurityContext.Capabilities)
 				require.NotNil(t, container.SecurityContext.ReadOnlyRootFilesystem)
 				assert.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)
-				assert.Equal(t, []corev1.Capability{netBindCapability}, container.SecurityContext.Capabilities.Add)
 				assert.Equal(t, []corev1.Capability{allCapabilities}, container.SecurityContext.Capabilities.Drop)
 			}
 		}

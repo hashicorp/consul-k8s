@@ -468,3 +468,77 @@ func minimal() *corev1.Pod {
 		},
 	}
 }
+
+func TestLifecycleConfig_EnableConsulDataplaneAsSidecar(t *testing.T) {
+	cases := []struct {
+		Name            string
+		Pod             func(*corev1.Pod) *corev1.Pod
+		LifecycleConfig Config
+		Expected        bool
+		Err             string
+	}{
+		{
+			Name: "Enabled via meshWebhook default",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultEnableConsulDataplaneAsSidecar: true,
+			},
+			Expected: true,
+			Err:      "",
+		},
+		{
+			Name: "Enabled via annotation",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationEnableConsulDataplaneAsSidecar] = "true"
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultEnableConsulDataplaneAsSidecar: false,
+			},
+			Expected: true,
+			Err:      "",
+		},
+		{
+			Name: "Disabled via annotation",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationEnableConsulDataplaneAsSidecar] = "false"
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultEnableConsulDataplaneAsSidecar: true,
+			},
+			Expected: false,
+			Err:      "",
+		},
+		{
+			Name: "Invalid annotation value",
+			Pod: func(pod *corev1.Pod) *corev1.Pod {
+				pod.Annotations[constants.AnnotationEnableConsulDataplaneAsSidecar] = "not-a-bool"
+				return pod
+			},
+			LifecycleConfig: Config{
+				DefaultEnableConsulDataplaneAsSidecar: false,
+			},
+			Expected: false,
+			Err:      "consul.hashicorp.com/enable-consul-dataplane-as-sidecar annotation value of not-a-bool was invalid: strconv.ParseBool: parsing \"not-a-bool\": invalid syntax",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			require := require.New(t)
+			lc := tt.LifecycleConfig
+
+			actual, err := lc.EnableConsulDataplaneAsSidecar(*tt.Pod(minimal()))
+
+			if tt.Err == "" {
+				require.Equal(tt.Expected, actual)
+				require.NoError(err)
+			} else {
+				require.EqualError(err, tt.Err)
+			}
+		})
+	}
+}

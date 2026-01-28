@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -99,6 +101,13 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 			connHelper.Setup(t)
 			connHelper.Install(t)
+
+			retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				peers, err := connHelper.ConsulClient.Status().Peers()
+				require.NoError(r, err)
+				require.Len(r, peers, 1)
+			})
+
 			connHelper.DeployClientAndServer(t)
 
 			// TODO: should this move into connhelper.DeployClientAndServer?
@@ -126,17 +135,21 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			}
 
 			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
-
-			// Get static-client pod name
-			ns := ctx.KubectlOptions(t).Namespace
-			pods, err := ctx.KubernetesClient(t).CoreV1().Pods(ns).List(
-				context.Background(),
-				metav1.ListOptions{
-					LabelSelector: "app=static-client",
-				},
-			)
-			require.NoError(t, err)
-			require.Len(t, pods.Items, 1)
+			var pods *corev1.PodList
+			var ns string
+			var err error
+			retry.Run(t, func(r *retry.R) {
+				// Get static-client pod name
+				ns = ctx.KubectlOptions(r).Namespace
+				pods, err = ctx.KubernetesClient(r).CoreV1().Pods(ns).List(
+					context.Background(),
+					metav1.ListOptions{
+						LabelSelector: "app=static-client",
+					},
+				)
+				require.NoError(r, err)
+				require.Len(r, pods.Items, 1)
+			})
 			clientPodName := pods.Items[0].Name
 
 			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
@@ -165,9 +178,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					default:
 						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
 						retry.RunWith(retrier, t, func(r *retry.R) {
+							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
-								r.Errorf(err.Error())
+								r.Errorf("%v", err.Error())
 								return
 							}
 							require.Condition(r, func() bool {
@@ -200,6 +214,26 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					})
 				})
 			}
+
+			// Checks are done, now ensure the pod is fully removed from k8s and Consul.
+			logger.Logf(t, "scaling down the static-client deployment to 0 replicas to clean up the terminating pod %q", clientPodName)
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
+
+			// Wait for the pod to be fully deleted
+			// This ensures that the ACL token associated with pod had also been cleaned up
+			retrier := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+			retry.RunWith(retrier, t, func(r *retry.R) {
+				err = ctx.KubernetesClient(r).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{})
+				if err != nil {
+					if strings.Contains(err.Error(), "not found") {
+						logger.Logf(r, "pod %q successfully deleted", clientPodName)
+						return
+					}
+					r.Errorf("error deleting pod %q: %v", clientPodName, err)
+				} else {
+					r.Errorf("pod %q still exists", clientPodName)
+				}
+			})
 
 			logger.Log(t, "ensuring pod is deregistered after termination")
 			// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
@@ -311,8 +345,8 @@ func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
 		jobName := pods.Items[0].Name
 
 		// Exec into job and send shutdown request to running proxy.
-		// curl --max-time 2 -s -f -XPOST http://127.0.0.1:20600/graceful_shutdown
-		sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://127.0.0.1:20600/graceful_shutdown"}
+		// curl --max-time 2 -s -f -XPOST http://localhost:20600/graceful_shutdown
+		sendProxyShutdownArgs := []string{"exec", jobName, "-c", connhelper.JobName, "--", "curl", "--max-time", "2", "-s", "-f", "-XPOST", "http://localhost:20600/graceful_shutdown"}
 		_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), sendProxyShutdownArgs...)
 		require.NoError(t, err)
 

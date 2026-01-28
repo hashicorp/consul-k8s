@@ -1382,8 +1382,7 @@ load _helpers
   local expected=$(echo '{
     "allowPrivilegeEscalation": false,
     "capabilities": {
-      "drop": ["ALL"],
-      "add": ["NET_BIND_SERVICE"]
+      "drop": ["ALL"]
     },
     "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
@@ -1415,8 +1414,7 @@ load _helpers
   local expected=$(echo '{
     "allowPrivilegeEscalation": false,
     "capabilities": {
-      "drop": ["ALL"],
-      "add": ["NET_BIND_SERVICE"]
+      "drop": ["ALL"]
     },
     "readOnlyRootFilesystem": true,
     "runAsNonRoot": true,
@@ -2298,7 +2296,7 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- if .Data.ca_chain -}}\n{{- $lastintermediatecertindex := len .Data.ca_chain | subtract 1 -}}\n{{ range $index, $cacert := .Data.ca_chain }}\n{{ if (lt $index $lastintermediatecertindex) }}\n{{ $cacert }}\n{{ end }}\n{{ end }}\n{{- end -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,::1\" -}}\n{{- .Data.certificate -}}\n{{- if .Data.ca_chain -}}\n{{- $lastintermediatecertindex := len .Data.ca_chain | subtract 1 -}}\n{{ range $index, $cacert := .Data.ca_chain }}\n{{ if (lt $index $lastintermediatecertindex) }}\n{{ $cacert }}\n{{ end }}\n{{ end }}\n{{- end -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $object |
@@ -2307,7 +2305,7 @@ load _helpers
 
   local actual="$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul\" \"ip_sans=127.0.0.1,::1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
@@ -2354,12 +2352,12 @@ load _helpers
 
   local actual=$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.crt"]' | tee /dev/stderr)
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.certificate -}}\n{{- if .Data.ca_chain -}}\n{{- $lastintermediatecertindex := len .Data.ca_chain | subtract 1 -}}\n{{ range $index, $cacert := .Data.ca_chain }}\n{{ if (lt $index $lastintermediatecertindex) }}\n{{ $cacert }}\n{{ end }}\n{{ end }}\n{{- end -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1,::1\" -}}\n{{- .Data.certificate -}}\n{{- if .Data.ca_chain -}}\n{{- $lastintermediatecertindex := len .Data.ca_chain | subtract 1 -}}\n{{ range $index, $cacert := .Data.ca_chain }}\n{{ if (lt $index $lastintermediatecertindex) }}\n{{ $cacert }}\n{{ end }}\n{{ end }}\n{{- end -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 
   local actual="$(echo $object |
       yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-servercert.key"]' | tee /dev/stderr)"
-  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
+  local expected=$'{{- with secret \"pki_int/issue/test\" \"common_name=server.dc2.consul\"\n\"alt_names=localhost,release-name-consul-server,*.release-name-consul-server,*.release-name-consul-server.default,release-name-consul-server.default,*.release-name-consul-server.default.svc,release-name-consul-server.default.svc,*.server.dc2.consul,*.foo.com,*.bar.com\" \"ip_sans=127.0.0.1,::1\" -}}\n{{- .Data.private_key -}}\n{{- end -}}'
   [ "${actual}" = "${expected}" ]
 }
 
@@ -2559,417 +2557,6 @@ load _helpers
   # Check that path to Vault secret config is provided to the command.
   local actual="$(echo $object | yq -r '.spec.containers[] | select(.name=="consul").command | any(contains("-config-file=/vault/secrets/replication-token-config.hcl"))' | tee /dev/stderr)"
   [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# global.cloud
-
-@test "server/StatefulSet: cloud config is not set in command when global.cloud.enabled is not set" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      . | tee /dev/stderr)
-
-  # Test the flag is set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"cloud { resource_id = \\\"${HCP_RESOURCE_ID}\\\" }\""))' | tee /dev/stderr)
-  [ "${actual}" = "false" ]
-
-  # Test the HCP_RESOURCE_ID environment variable is set.
-  local envvar=$(echo "$object" |
-    yq -r -c '.spec.template.spec.containers[] | select(.name == "consul") | .env | select(.name == "HCP_RESOURCE_ID")' | tee /dev/stderr)
-  [ "${envvar}" = "" ]
-}
-
-@test "server/StatefulSet: does not create HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL, HCP_SCADA_ADDRESS, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is not set" {
-  cd `chart_dir`
-  local object=$(helm template \
-    -s templates/server-statefulset.yaml \
-    . | tee /dev/stderr )
-
-  local container=$(echo "$object" |
-    yq -r '.spec.template.spec.containers[] | select(.name == "consul")' | tee /dev/stderr)
-  
-
-  local envvar=$(echo "$container" |
-    yq -r '.env[] | select(.name == "HCP_CLIENT_ID")' | tee /dev/stderr)
-  [ "${envvar}" = "" ]
-
-  envvar=$(echo "$container" |
-    yq -r '.env[] | select(.name == "HCP_CLIENT_SECRET")' | tee /dev/stderr)
-  [ "${envvar}" = "" ]
-
-  envvar=$(echo "$container" |
-    yq -r '.env[] | select(.name == "HCP_RESOURCE_ID")' | tee /dev/stderr)
-  [ "${envvar}" = "" ]
-
-  envvar=$(echo "$container" |
-    yq -r '.env[] | select(.name == "HCP_AUTH_URL")' | tee /dev/stderr)
-  [ "${envvar}" = "" ]
-
-  envvar=$(echo "$container" |
-    yq -r '.env[] | select(.name == "HCP_API_HOSTNAME")' | tee /dev/stderr)
-  [ "${envvar}" = "" ]
-
-  envvar=$(echo "$container" |
-    yq -r '.env[] | select(.name == "HCP_SCADA_ADDRESS")' | tee /dev/stderr)
-  [ "${envvar}" = "" ]
-
-}
-
-@test "server/StatefulSet: cloud config is set in command when global.cloud.enabled and global.cloud.resourceId are set" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[] | select(.name == "consul") | .command | any(contains("-hcl=\"cloud { resource_id = \\\"${HCP_RESOURCE_ID}\\\" }\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-
-@test "server/StatefulSet: creates HCP_RESOURCE_ID, HCP_CLIENT_ID, HCP_CLIENT_SECRET envvars in consul container when global.cloud.enabled is true" {
-  cd `chart_dir`
-  local object=$(helm template \
-    -s templates/server-statefulset.yaml \
-    --set 'global.cloud.enabled=true' \
-    --set 'global.cloud.clientId.secretName=client-id-name' \
-    --set 'global.cloud.clientId.secretKey=client-id-key' \
-    --set 'global.cloud.clientSecret.secretName=client-secret-name' \
-    --set 'global.cloud.clientSecret.secretKey=client-secret-key' \
-    --set 'global.cloud.resourceId.secretName=resource-id-name' \
-    --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-    . | tee /dev/stderr )
-
-  local container=$(echo "$object" |
-    yq -r '.spec.template.spec.containers[] | select(.name == "consul")' | tee /dev/stderr)
-  
-  # HCP_CLIENT_ID
-  local envvar=$(echo "$container" |
-    yq -r '.env[] | select(.name == "HCP_CLIENT_ID")' | tee /dev/stderr)
-
-  local actual=$(echo "$envvar" |
-    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
-  [ "${actual}" = "client-id-name" ]
-
-  actual=$(echo "$envvar" |
-  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
-  [ "${actual}" = "client-id-key" ]
-
-  # HCP_CLIENT_SECRET
-  envvar=$(echo "$container" |
-  yq -r '.env[] | select(.name == "HCP_CLIENT_SECRET")' | tee /dev/stderr)
-
-  local actual=$(echo "$envvar" |
-    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
-  [ "${actual}" = "client-secret-name" ]
-
-  actual=$(echo "$envvar" |
-  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
-  [ "${actual}" = "client-secret-key" ]
-
-  # HCP_RESOURCE_ID
-  envvar=$(echo "$container" |
-  yq -r '.env[] | select(.name == "HCP_RESOURCE_ID")' | tee /dev/stderr)
-
-  local actual=$(echo "$envvar" |
-    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
-  [ "${actual}" = "resource-id-name" ]
-
-  actual=$(echo "$envvar" |
-  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
-  [ "${actual}" = "resource-id-key" ]
-}
-
-@test "server/StatefulSet: creates HCP_AUTH_URL, HCP_SCADA_ADDRESS, and HCP_API_HOSTNAME envvars in consul container when global.cloud.enabled is true and those cloud values are specified" {
-  cd `chart_dir`
-  local object=$(helm template \
-    -s templates/server-statefulset.yaml \
-    --set 'global.cloud.enabled=true' \
-    --set 'global.cloud.secretName=foo' \
-    --set 'global.cloud.clientId.secretName=client-id-name' \
-    --set 'global.cloud.clientId.secretKey=client-id-key' \
-    --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-    --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-    --set 'global.cloud.resourceId.secretName=resource-id-name' \
-    --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-    --set 'global.cloud.authUrl.secretName=auth-url-name' \
-    --set 'global.cloud.authUrl.secretKey=auth-url-key' \
-    --set 'global.cloud.apiHost.secretName=api-host-name' \
-    --set 'global.cloud.apiHost.secretKey=api-host-key' \
-    --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
-    --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
-    . | tee /dev/stderr )
-
-  local container=$(echo "$object" |
-    yq -r '.spec.template.spec.containers[] | select(.name == "consul")' | tee /dev/stderr)
-
-  # HCP_AUTH_URL
-  envvar=$(echo "$container" |
-  yq -r '.env[] | select(.name == "HCP_AUTH_URL")' | tee /dev/stderr)
-
-  local actual=$(echo "$envvar" |
-    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
-  echo "actual: $actual"
-  
-  [ "${actual}" = "auth-url-name" ]
-
-  actual=$(echo "$envvar" |
-  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
-  [ "${actual}" = "auth-url-key" ]
-
-  # HCP_API_HOST
-  envvar=$(echo "$container" |
-  yq -r '.env[] | select(.name == "HCP_API_HOST")' | tee /dev/stderr)
-
-  local actual=$(echo "$envvar" |
-    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
-  [ "${actual}" = "api-host-name" ]
-
-  actual=$(echo "$envvar" |
-  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
-  [ "${actual}" = "api-host-key" ]
-
-  # HCP_SCADA_ADDRESS
-  envvar=$(echo "$container" |
-  yq -r '.env[] | select(.name == "HCP_SCADA_ADDRESS")' | tee /dev/stderr)
-
-  local actual=$(echo "$envvar" |
-    yq -r '.valueFrom.secretKeyRef.name' | tee /dev/stderr)
-  [ "${actual}" = "scada-address-name" ]
-
-  actual=$(echo "$envvar" |
-  yq -r '.valueFrom.secretKeyRef.key' | tee /dev/stderr)
-  [ "${actual}" = "scada-address-key" ]
-}
-
-@test "server/StatefulSet: cloud config is set in command global.cloud.enabled is not set" {
-  cd `chart_dir`
-  local object=$(helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'global.acls.enabled=true' \
-      --set 'global.acls.bootstrapToken.secretName=name' \
-      --set 'global.acls.bootstrapToken.secretKey=key' \
-      . | tee /dev/stderr)
-
-  # Test the flag is set.
-  local actual=$(echo "$object" |
-    yq '.spec.template.spec.containers[0].command | any(contains("-hcl=\"acl { tokens { initial_management = \\\"${ACL_BOOTSTRAP_TOKEN}\\\" } }\""))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-
-  # Test the ACL_BOOTSTRAP_TOKEN environment variable is set.
-  local actual=$(echo "$object" |
-    yq -r -c '.spec.template.spec.containers[0].env | map(select(.name == "ACL_BOOTSTRAP_TOKEN"))' | tee /dev/stderr)
-  [ "${actual}" = '[{"name":"ACL_BOOTSTRAP_TOKEN","valueFrom":{"secretKeyRef":{"name":"name","key":"key"}}}]' ]
-}
-
-@test "server/StatefulSet: fails when global.cloud.enabled is true and global.cloud.clientId.secretName is not set but global.cloud.clientSecret.secretName and global.cloud.resourceId.secretName is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientSecret.secretName=client-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-id-key' \
-      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.enabled is true and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.enabled is true and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.authUrl.secretName=auth-url-name' \
-      .
-  [ "$status" -eq 1 ]
-  
-  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.authUrl.secretKey=auth-url-key' \
-      .
-  [ "$status" -eq 1 ]
-  
-  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.apiHost.secretName=auth-url-name' \
-      .
-  [ "$status" -eq 1 ]
-  
-  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.apiHost.secretKey=auth-url-key' \
-      .
-  [ "$status" -eq 1 ]
-  
-  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
-      .
-  [ "$status" -eq 1 ]
-  
-  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
-}
-
-@test "server/StatefulSet: fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/server-statefulset.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'meshGateway.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
-      .
-  [ "$status" -eq 1 ]
-  
-  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
 }
 
 #--------------------------------------------------------------------

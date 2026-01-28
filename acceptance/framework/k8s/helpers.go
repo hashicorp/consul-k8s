@@ -6,6 +6,8 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +46,7 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	// Wait up to 20m.
 	// On Azure, volume provisioning can sometimes take close to 5 min,
 	// so we need to give a bit more time for pods to become healthy.
-	counter := &retry.Counter{Count: 10 * 60, Wait: 2 * time.Second}
+	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
 	logger.Logf(t, "Waiting %s for pods with label %q to be ready.", time.Duration(counter.Count*int(counter.Wait)), podLabelSelector)
 
 	retry.RunWith(counter, t, func(r *retry.R) {
@@ -94,7 +96,7 @@ func KubernetesAPIServerHost(t *testing.T, cfg *config.TestConfig, ctx environme
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 		kubernetesEndpoint, err := ctx.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
 		require.NoError(t, err)
-		k8sAPIHost = fmt.Sprintf("https://%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+		k8sAPIHost = fmt.Sprintf("https://%s", net.JoinHostPort(kubernetesEndpoint.Subsets[0].Addresses[0].IP, strconv.Itoa(int(kubernetesEndpoint.Subsets[0].Ports[0].Port))))
 	} else {
 		k8sAPIHost = KubernetesAPIServerHostFromOptions(t, ctx.KubectlOptions(t))
 	}

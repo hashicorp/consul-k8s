@@ -6,6 +6,9 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,9 +32,19 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul-k8s/version"
+	capi "github.com/hashicorp/consul/api"
 )
+
+type consulServerRespCfg struct {
+	hasProxyDefaults   bool
+	errOnProxyDefaults bool
+	accessLogEnabled   bool
+	fileLogSinkType    bool
+	fileLogPath        string
+}
 
 func TestHandlerHandle(t *testing.T) {
 	t.Parallel()
@@ -269,6 +282,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/spec/containers/0/env",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 
@@ -354,6 +371,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 
@@ -412,6 +433,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -491,6 +516,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 		{
@@ -554,6 +583,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -643,6 +676,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -789,131 +826,9 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "replace",
 					Path:      "/spec/containers/0/readinessProbe/httpGet/port",
 				},
-			},
-		},
-		{
-			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref",
-			MeshWebhook{
-				Log:                   logrtest.New(t),
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				Clientset:             testClientWithServiceAccountAndSecretRefs(),
-				AuthMethod:            "k8s",
-			},
-			admission.Request{
-				AdmissionRequest: admissionv1.AdmissionRequest{
-					Namespace: namespaces.DefaultNamespace,
-					Object: encodeRaw(t, &corev1.Pod{
-						Spec: basicSpec,
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								constants.AnnotationService: "web,web-admin",
-							},
-						},
-					}),
-				},
-			},
-			"",
-			[]jsonpatch.Operation{
 				{
 					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/1",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/2",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
-				},
-			},
-		},
-		{
-			"multiport pod kube 1.24 with AuthMethod, serviceaccount does not have secret ref",
-			MeshWebhook{
-				Log:                   logrtest.New(t),
-				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
-				DenyK8sNamespacesSet:  mapset.NewSet(),
-				decoder:               decoder,
-				Clientset:             testClientWithServiceAccountAndSecrets(),
-				AuthMethod:            "k8s",
-			},
-			admission.Request{
-				AdmissionRequest: admissionv1.AdmissionRequest{
-					Namespace: namespaces.DefaultNamespace,
-					Object: encodeRaw(t, &corev1.Pod{
-						Spec: basicSpec,
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								constants.AnnotationService: "web,web-admin",
-							},
-						},
-					}),
-				},
-			},
-			"",
-			[]jsonpatch.Operation{
-				{
-					Operation: "add",
-					Path:      "/spec/volumes",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/initContainers",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/1",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/2",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/labels",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -1004,6 +919,170 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
+			},
+		},
+		{
+			"multiport pod kube 1.24 with AuthMethod, serviceaccount does not have secret ref",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             testClientWithServiceAccountAndSecrets(),
+				AuthMethod:            "k8s",
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationService: "web,web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
+			},
+		},
+		{
+			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref, lifecycle enabled",
+			MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             testClientWithServiceAccountAndSecretRefs(),
+				AuthMethod:            "k8s",
+				LifecycleConfig:       lifecycle.Config{DefaultEnableProxyLifecycle: true},
+			},
+			admission.Request{
+				AdmissionRequest: admissionv1.AdmissionRequest{
+					Namespace: namespaces.DefaultNamespace,
+					Object: encodeRaw(t, &corev1.Pod{
+						Spec: basicSpec,
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationService: "web,web-admin",
+							},
+						},
+					}),
+				},
+			},
+			"",
+			[]jsonpatch.Operation{
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/env",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/volumeMounts",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/readinessProbe",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/securityContext",
+				},
+				{
+					Operation: "replace",
+					Path:      "/spec/containers/0/name",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/0/args",
+				},
+
+				{
+					Operation: "add",
+					Path:      "/spec/volumes",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/initContainers",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/1",
+				},
+				{
+					Operation: "add",
+					Path:      "/spec/containers/2",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyInjectStatus),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.LegacyAnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/labels",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 		{
@@ -1061,7 +1140,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyTransparentProxyStatus),
 				},
-
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
@@ -1081,6 +1159,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/dnsConfig",
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -1149,6 +1231,10 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
+				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 				// Note: no DNS policy/config additions.
 			},
@@ -1329,6 +1415,10 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
+				{
+					Operation: "add",
+					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
+				},
 			},
 		},
 	}
@@ -1358,7 +1448,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 						value := actual[i].Value.([]any)
 						valueMap := value[0].(map[string]any)
 						envs := valueMap["env"].([]any)
-						redirectEnv := envs[8].(map[string]any)
+						redirectEnv := envs[9].(map[string]any)
 						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
 						iptablesJson := redirectEnv["value"].(string)
 
@@ -2345,6 +2435,89 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 	}
 }
 
+func TestHandler_mountAdditionalAccessLogVolumeMount(t *testing.T) {
+	cases := []struct {
+		Name              string
+		Webhook           MeshWebhook
+		srvResponseConfig consulServerRespCfg
+		WantErr           bool
+	}{
+		{
+			Name: "no proxy-defaults configured",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: false,
+			},
+		},
+		{
+			Name: "error fetching proxy-defaults",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults:   true,
+				errOnProxyDefaults: true,
+			},
+			WantErr: true,
+		},
+		{
+			Name: "access-logs enabled but sink is not file type",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  false,
+				fileLogPath:      "/var/log/access-log.txt",
+			},
+		},
+		{
+			Name: "file-type access-log enabled with path",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  true,
+				fileLogPath:      "/var/log/access-log.txt",
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			server, testClient := fakeConsulServer(t, tt.srvResponseConfig)
+			defer server.Close()
+
+			tt.Webhook.ConsulConfig = testClient.Cfg
+			tt.Webhook.ConsulServerConnMgr = testClient.Watcher
+
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-pod",
+					Annotations: map[string]string{},
+				},
+			}
+
+			err := tt.Webhook.mountAdditionalAccessLogVolume(pod)
+			if tt.WantErr {
+				require.Error(t, err)
+				require.Equal(t, 0, len(pod.Spec.Volumes))
+				require.Equal(t, 0, len(pod.Annotations))
+				return
+			}
+			require.NoError(t, err)
+			if tt.srvResponseConfig.fileLogSinkType {
+				require.Equal(t, 1, len(pod.Spec.Volumes))
+				require.Equal(t, accessLogVolumeName, pod.Spec.Volumes[0].Name)
+				require.Equal(t, 2, len(pod.Annotations))
+				require.Equal(t, "true", pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled])
+				require.Equal(t, tt.srvResponseConfig.fileLogPath, pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath])
+
+			} else if tt.srvResponseConfig.accessLogEnabled {
+				require.Equal(t, 0, len(pod.Spec.Volumes))
+				require.Equal(t, 1, len(pod.Annotations))
+				require.Equal(t, "true", pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled])
+			} else {
+				require.Equal(t, 0, len(pod.Spec.Volumes))
+				require.Equal(t, 0, len(pod.Annotations))
+			}
+		})
+	}
+}
+
 // encodeRaw is a helper to encode some data into a RawExtension.
 func encodeRaw(t *testing.T, input interface{}) runtime.RawExtension {
 	data, err := json.Marshal(input)
@@ -2438,4 +2611,62 @@ func clientWithNamespace(name string) kubernetes.Interface {
 		},
 	}
 	return fake.NewSimpleClientset(&ns)
+}
+
+func fakeConsulServer(t *testing.T, srvResponseConfig consulServerRespCfg) (*httptest.Server, *test.TestServerClient) {
+	t.Helper()
+	mux := buildMux(t, srvResponseConfig)
+	consulServer := httptest.NewServer(mux)
+
+	parsedURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+	host := strings.Split(parsedURL.Host, ":")[0]
+
+	port, err := strconv.Atoi(parsedURL.Port())
+	require.NoError(t, err)
+
+	cfg := &consul.Config{APIClientConfig: &capi.Config{Address: host}, HTTPPort: port}
+	cfg.APIClientConfig.Address = consulServer.URL
+
+	testClient := &test.TestServerClient{
+		Cfg:     cfg,
+		Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
+	}
+
+	return consulServer, testClient
+}
+
+func buildMux(t *testing.T, cfg consulServerRespCfg) http.Handler {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/config/proxy-defaults/"+capi.ProxyConfigGlobal, func(w http.ResponseWriter, r *http.Request) {
+		if cfg.errOnProxyDefaults {
+			w.WriteHeader(500)
+			return
+		}
+		if !cfg.hasProxyDefaults {
+			w.WriteHeader(404)
+			return
+		}
+		w.WriteHeader(200)
+		accessLogType := capi.DefaultLogSinkType
+		if cfg.fileLogSinkType {
+			accessLogType = capi.FileLogSinkType
+		}
+		proxyDefaults := capi.ProxyConfigEntry{
+			AccessLogs: &capi.AccessLogsConfig{
+				Enabled: cfg.accessLogEnabled,
+				Type:    accessLogType,
+				Path:    cfg.fileLogPath,
+			},
+		}
+		val, err := json.Marshal(proxyDefaults)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		w.Write(val)
+	})
+
+	return mux
 }

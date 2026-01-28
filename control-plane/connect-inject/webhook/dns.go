@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/miekg/dns"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
@@ -41,8 +42,11 @@ func (w *MeshWebhook) configureDNS(pod *corev1.Pod, k8sNS string) error {
 	// We want to do that so that when consul cannot resolve the record, we will fall back to the nameservers
 	// configured in our /etc/resolv.conf. It's important to add Consul DNS as the first nameserver because
 	// if we put kube DNS first, it will return NXDOMAIN response and a DNS client will not fall back to other nameservers.
+
+	nameserver := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
+
 	if pod.Spec.DNSConfig == nil {
-		nameservers := []string{consulDataplaneDNSBindHost}
+		nameservers := []string{nameserver}
 		nameservers = append(nameservers, cfg.Servers...)
 		var options []corev1.PodDNSConfigOption
 		if cfg.Ndots != defaultDNSOptionNdots {

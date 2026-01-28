@@ -95,18 +95,7 @@ load _helpers
 #--------------------------------------------------------------------
 # updateStrategy
 
-@test "cni/DaemonSet: no updateStrategy by default" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/cni-daemonset.yaml  \
-      --set 'connectInject.cni.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r '.spec.updateStrategy' | tee /dev/stderr)
-  [ "${actual}" = "null" ]
-}
-
-@test "cni/DaemonSet: updateStrategy can be set" {
+@test "cni/DaemonSet: updateStrategy is fixed to rollingUpdate with maxSurge and maxUnavailable be set" {
   cd `chart_dir`
   local updateStrategy="type: RollingUpdate
 rollingUpdate:
@@ -116,9 +105,8 @@ rollingUpdate:
       -s templates/cni-daemonset.yaml  \
       --set 'connectInject.cni.enabled=true' \
       --set 'connectInject.enabled=true' \
-      --set "connectInject.cni.updateStrategy=${updateStrategy}" \
       . | tee /dev/stderr | \
-      yq -c '.spec.updateStrategy == {"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":5}}' | tee /dev/stderr)
+      yq -c '.spec.updateStrategy == {"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":0, "maxSurge":1}}' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

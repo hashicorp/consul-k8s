@@ -5,6 +5,8 @@ package binding
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
 	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
@@ -31,6 +33,10 @@ const (
 func registrationsForPods(metrics gatewaycommon.MetricsConfig, namespace string, gateway gwv1beta1.Gateway, pods []corev1.Pod) []api.CatalogRegistration {
 	registrations := []api.CatalogRegistration{}
 	for _, pod := range pods {
+		// Skip registration if pod doesn't have complete node information yet
+		if pod.Spec.NodeName == "" || pod.Status.PodIP == "" || pod.Status.HostIP == "" {
+			continue
+		}
 		registrations = append(registrations, registrationForPod(metrics, namespace, gateway, pod))
 	}
 	return registrations
@@ -46,13 +52,14 @@ func registrationForPod(metrics gatewaycommon.MetricsConfig, namespace string, g
 	if metrics.Enabled {
 		proxyConfigOverrides = &api.AgentServiceConnectProxyConfig{
 			Config: map[string]interface{}{
-				metricsConfiguration: fmt.Sprintf("%s:%d", pod.Status.PodIP, metrics.Port),
+				metricsConfiguration: net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(metrics.Port)),
 			},
 		}
 	}
+	nodeName := common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName)
 
 	return api.CatalogRegistration{
-		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
+		Node:    nodeName,
 		Address: pod.Status.HostIP,
 		NodeMeta: map[string]string{
 			metaKeySyntheticNode: "true",

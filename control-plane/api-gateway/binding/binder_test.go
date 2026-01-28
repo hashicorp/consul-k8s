@@ -1615,22 +1615,31 @@ func TestBinder_Registrations(t *testing.T) {
 				Pods: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "pod1"},
+						Spec:       corev1.PodSpec{NodeName: "test-node"},
 						Status: corev1.PodStatus{
 							Phase:      corev1.PodRunning,
+							PodIP:      "10.0.0.1",
+							HostIP:     "192.168.1.1",
 							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "pod2"},
+						Spec:       corev1.PodSpec{NodeName: "test-node"},
 						Status: corev1.PodStatus{
 							Phase:      corev1.PodRunning,
+							PodIP:      "10.0.0.2",
+							HostIP:     "192.168.1.1",
 							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "pod3"},
+						Spec:       corev1.PodSpec{NodeName: "test-node"},
 						Status: corev1.PodStatus{
 							Phase:      corev1.PodRunning,
+							PodIP:      "10.0.0.3",
+							HostIP:     "192.168.1.1",
 							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
 						},
 					},
@@ -1648,21 +1657,30 @@ func TestBinder_Registrations(t *testing.T) {
 				Pods: []corev1.Pod{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: "namespace1"},
+						Spec:       corev1.PodSpec{NodeName: "test-node"},
 						Status: corev1.PodStatus{
 							Phase:      corev1.PodRunning,
+							PodIP:      "10.0.0.1",
+							HostIP:     "192.168.1.1",
 							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: "namespace1"},
+						Spec:       corev1.PodSpec{NodeName: "test-node"},
 						Status: corev1.PodStatus{
-							Phase: corev1.PodFailed,
+							Phase:  corev1.PodFailed,
+							PodIP:  "10.0.0.3",
+							HostIP: "192.168.1.1",
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "pod4", Namespace: "namespace1"},
+						Spec:       corev1.PodSpec{NodeName: "test-node"},
 						Status: corev1.PodStatus{
 							Phase:      corev1.PodRunning,
+							PodIP:      "10.0.0.4",
+							HostIP:     "192.168.1.1",
 							Conditions: []corev1.PodCondition{{Type: corev1.PodReady, Status: corev1.ConditionTrue}},
 						},
 					},

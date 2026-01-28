@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 // Otherwise, bootstrap ACLs and write the bootstrap token to the secrets backend.
 func (c *Command) bootstrapServers(serverAddresses []net.IPAddr, backend SecretsBackend) (string, error) {
 	// Pick the first server address to connect to for bootstrapping and set up connection.
-	firstServerAddr := fmt.Sprintf("%s:%d", serverAddresses[0].IP.String(), c.consulFlags.HTTPPort)
+	firstServerAddr := net.JoinHostPort(serverAddresses[0].IP.String(), strconv.Itoa(c.consulFlags.HTTPPort))
 
 	bootstrapToken, err := backend.BootstrapToken()
 	if err != nil {
@@ -118,7 +119,7 @@ func (c *Command) bootstrapACLs(firstServerAddr string, backend SecretsBackend) 
 func (c *Command) setServerTokens(serverAddresses []net.IPAddr, bootstrapToken string) error {
 	// server specifically.
 	clientConfig := c.consulFlags.ConsulClientConfig().APIClientConfig
-	clientConfig.Address = fmt.Sprintf("%s:%d", serverAddresses[0].IP.String(), c.consulFlags.HTTPPort)
+	clientConfig.Address = net.JoinHostPort(serverAddresses[0].IP.String(), strconv.Itoa(c.consulFlags.HTTPPort))
 	clientConfig.Token = bootstrapToken
 	client, err := consul.NewDynamicClientWithTimeout(clientConfig,
 		c.consulFlags.APITimeout)
@@ -142,7 +143,7 @@ func (c *Command) setServerTokens(serverAddresses []net.IPAddr, bootstrapToken s
 		// We create a new client for each server because we need to call each
 		// server specifically.
 		clientConfig := c.consulFlags.ConsulClientConfig().APIClientConfig
-		clientConfig.Address = fmt.Sprintf("%s:%d", host.IP.String(), c.consulFlags.HTTPPort)
+		clientConfig.Address = net.JoinHostPort(host.IP.String(), strconv.Itoa(c.consulFlags.HTTPPort))
 		clientConfig.Token = bootstrapToken
 		serverClient, err := consul.NewClient(clientConfig,
 			c.consulFlags.APITimeout)

@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
+
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 )
 
 const k8sNamespace = "k8snamespace"
@@ -91,6 +92,10 @@ func TestHandlerContainerInit(t *testing.T) {
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
 				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
+				},
 			},
 		},
 
@@ -139,6 +144,10 @@ func TestHandlerContainerInit(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -295,6 +304,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			var expectedSecurityContext *corev1.SecurityContext
 			if c.cniEnabled && !c.openShiftEnabled {
 				expectedSecurityContext = &corev1.SecurityContext{
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
 					RunAsUser:    ptr.To(int64(initContainersUserAndGroupID)),
 					RunAsGroup:   ptr.To(int64(initContainersUserAndGroupID)),
 					RunAsNonRoot: ptr.To(true),
@@ -318,6 +330,9 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 			} else if c.cniEnabled && c.openShiftEnabled {
 				// When cni + openShift
 				expectedSecurityContext = &corev1.SecurityContext{
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
 					RunAsUser:    ptr.To(int64(1000799999)),
 					RunAsGroup:   ptr.To(int64(1000799999)),
 					RunAsNonRoot: ptr.To(true),
@@ -327,6 +342,20 @@ func TestHandlerContainerInit_transparentProxy(t *testing.T) {
 					},
 					ReadOnlyRootFilesystem:   ptr.To(true),
 					AllowPrivilegeEscalation: ptr.To(false),
+				}
+			} else {
+				// When tproxy disabled
+				expectedSecurityContext = &corev1.SecurityContext{
+					AllowPrivilegeEscalation: ptr.To(false),
+					Capabilities: &corev1.Capabilities{
+						Add:  []corev1.Capability{},
+						Drop: []corev1.Capability{"ALL"},
+					},
+					ReadOnlyRootFilesystem: ptr.To(true),
+					RunAsNonRoot:           ptr.To(true),
+					SeccompProfile: &corev1.SeccompProfile{
+						Type: corev1.SeccompProfileTypeRuntimeDefault,
+					},
 				}
 			}
 			ns := corev1.Namespace{
@@ -438,6 +467,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 					Value: "$(NODE_NAME)-virtual",
 				},
 				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
+				},
+				{
 					Name:  "CONSUL_NAMESPACE",
 					Value: "default",
 				},
@@ -479,6 +512,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -528,6 +565,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 					Value: "$(NODE_NAME)-virtual",
 				},
 				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
+				},
+				{
 					Name:  "CONSUL_NAMESPACE",
 					Value: "non-default",
 				},
@@ -569,6 +610,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_NAMESPACE",
@@ -619,6 +664,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -690,6 +739,10 @@ func TestHandlerContainerInit_namespacesAndPartitionsEnabled(t *testing.T) {
 				{
 					Name:  "CONSUL_NODE_NAME",
 					Value: "$(NODE_NAME)-virtual",
+				},
+				{
+					Name:  "CONSUL_DUAL_STACK",
+					Value: "false",
 				},
 				{
 					Name:  "CONSUL_LOGIN_AUTH_METHOD",
@@ -937,11 +990,11 @@ func TestHandlerContainerInit_WithTLSAndCustomPorts(t *testing.T) {
 			require.Equal(t, "CONSUL_HTTP_PORT", container.Env[5].Name)
 			require.Equal(t, fmt.Sprintf("%d", w.ConsulConfig.HTTPPort), container.Env[5].Value)
 			if w.TLSEnabled {
-				require.Equal(t, "CONSUL_USE_TLS", container.Env[8].Name)
-				require.Equal(t, "true", container.Env[8].Value)
+				require.Equal(t, "CONSUL_USE_TLS", container.Env[9].Name)
+				require.Equal(t, "true", container.Env[9].Value)
 				if caProvided {
-					require.Equal(t, "CONSUL_CACERT_PEM", container.Env[9].Name)
-					require.Equal(t, "consul-ca-cert", container.Env[9].Value)
+					require.Equal(t, "CONSUL_CACERT_PEM", container.Env[10].Name)
+					require.Equal(t, "consul-ca-cert", container.Env[10].Value)
 				} else {
 					for _, ev := range container.Env {
 						if ev.Name == "CONSUL_CACERT_PEM" {

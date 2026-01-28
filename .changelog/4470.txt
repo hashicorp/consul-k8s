@@ -1,0 +1,3 @@
+```release-note:feature
+control-plane: Add available Zone Kubernetes Topology Metadata for NodePort Service when Syncing Kubernetes Services.
+```

@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -53,6 +55,9 @@ const (
 	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
+
+	// annotationDualStack stores if pod need to run in dualstack mode
+	annotationDualStack = "consul.hashicorp.com/dual-stack"
 )
 
 type Command struct {
@@ -79,7 +84,7 @@ type CNIArgs struct {
 	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
 
-// PluginConf is is the configuration used by the plugin.
+// PluginConf is the configuration used by the plugin.
 type PluginConf struct {
 	// NetConf is the CNI Specification configuration for standard fields like Name, Type,
 	// CNIVersion and PrevResult.
@@ -174,7 +179,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	var iptablesCfg iptables.Config
-
+	dualStack := false
 	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
 	if cniArgsIPTablesCfg != "" {
 		var err error
@@ -184,7 +189,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		}
 	} else {
 		if c.client == nil {
-			if err := c.createK8sClient(cfg); err != nil {
+			if err := c.createK8sClient(cfg, logger); err != nil {
 				return err
 			}
 		}
@@ -215,6 +220,10 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		if err != nil {
 			return err
 		}
+		dualStack, err = parseDualStackAnnotation(*pod, annotationDualStack)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Set NetNS passed through the CNI.
@@ -227,13 +236,12 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Apply the iptables rules.
-	err = iptables.Setup(iptablesCfg)
+	err = iptables.Setup(iptablesCfg, dualStack)
 	if err != nil {
 		return fmt.Errorf("could not apply iptables setup: %v", err)
 	}
 
 	if cniArgsIPTablesCfg == "" {
-
 		// We do not throw an error here because kubernetes will often throw a
 		// benign error where the pod has been updated in between the get and update
 		// of the annotation. Eventually kubernetes will update the annotation
@@ -268,18 +276,78 @@ func main() {
 	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, cniv.All, bv.BuildString("consul-cni"))
 }
 
-// createK8sClient configures the command's Kubernetes API client if it doesn't
-// already exist.
-func (c *Command) createK8sClient(cfg *PluginConf) error {
-	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
+func resolveKubeconfigPath(dir, base string) (string, error) {
+	// we  will return the actual kubeconfig path if present
+	stable := filepath.Join(dir, base)
+	if fi, err := os.Stat(stable); err == nil && !fi.IsDir() {
+		return stable, nil
+	}
+	// this will be a fallback to find the most recently modified kubeconfig file with the given base name pattern
+	// example file names: kubeconfig-<time.Now().UnixNano()>.
+	pattern := stable + "-*"
+	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+		return "", fmt.Errorf("glob failed for %s: %w", pattern, err)
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no kubeconfig found at %s or %s-*", stable, stable)
 	}
 
-	c.client, err = kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return fmt.Errorf("error initializing Kubernetes client: %s", err)
+	var newest string
+	var newestTime time.Time
+
+	// we are looping over the matched files to find the most recently modified kubeconfig file, with O(n) complexity
+	for _, fp := range matches {
+		fi, err := os.Stat(fp)
+		if err != nil || fi.IsDir() {
+			continue
+		}
+		if fi.ModTime().After(newestTime) {
+			newestTime = fi.ModTime()
+			newest = fp
+		}
 	}
+	// checking if a file was found
+	if newest == "" {
+		return "", fmt.Errorf("no valid kubeconfig found at %s or %s-*", stable, stable)
+	}
+
+	return newest, nil
+}
+
+// createK8sClient configures the command's Kubernetes API client if it doesn't
+// already exist.
+// TODO: remove logger for auth provider details
+func (c *Command) createK8sClient(cfg *PluginConf, logger hclog.Logger) error {
+	dir := cfg.CNINetDir
+	base := cfg.Kubeconfig
+
+	path, err := resolveKubeconfigPath(dir, base)
+	if err != nil {
+		logger.Warn(
+			"kubeconfig not found, falling back to default client-go behavior",
+			"dir", dir,
+			"base", base,
+			"err", err,
+		)
+		path = ""
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", path)
+	if err != nil {
+		return fmt.Errorf("failed to load kubeconfig %q: %w", path, err)
+	}
+	if restConfig == nil {
+		return fmt.Errorf("restConfig is nil for kubeconfig %q", path)
+	}
+	logger.Info("tokenFile used  - ", restConfig.BearerTokenFile)
+
+	client, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return fmt.Errorf("error initializing Kubernetes client: %w", err)
+	}
+
+	c.client = client
 	return nil
 }
 
@@ -322,6 +390,18 @@ func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error)
 		return iptables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
 	}
 	return cfg, nil
+}
+
+// parseDualStackAnnotation parses if pod dualstack annotation.
+func parseDualStackAnnotation(pod corev1.Pod, annotation string) (bool, error) {
+	anno, ok := pod.Annotations[annotation]
+	if !ok {
+		return false, fmt.Errorf("could not find %s annotation for %s pod", annotation, pod.Name)
+	}
+	if anno == "true" {
+		return true, nil
+	}
+	return false, nil
 }
 
 // updateTransparentProxyStatusAnnotation updates the transparent-proxy-status annotation. We use it as a simple inicator of

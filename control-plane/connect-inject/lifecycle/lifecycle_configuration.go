@@ -14,13 +14,14 @@ import (
 
 // Config represents configuration common to connect-inject components related to proxy lifecycle management.
 type Config struct {
-	DefaultEnableProxyLifecycle         bool
-	DefaultEnableShutdownDrainListeners bool
-	DefaultShutdownGracePeriodSeconds   int
-	DefaultStartupGracePeriodSeconds    int
-	DefaultGracefulPort                 string
-	DefaultGracefulShutdownPath         string
-	DefaultGracefulStartupPath          string
+	DefaultEnableProxyLifecycle           bool
+	DefaultEnableShutdownDrainListeners   bool
+	DefaultShutdownGracePeriodSeconds     int
+	DefaultStartupGracePeriodSeconds      int
+	DefaultGracefulPort                   string
+	DefaultGracefulShutdownPath           string
+	DefaultGracefulStartupPath            string
+	DefaultEnableConsulDataplaneAsSidecar bool
 }
 
 // EnableProxyLifecycle returns whether proxy lifecycle management is enabled either via the default value in the meshWebhook, or if it's been
@@ -122,4 +123,18 @@ func (lc Config) GracefulStartupPath(pod corev1.Pod) string {
 	}
 
 	return lc.DefaultGracefulStartupPath
+}
+
+// EnableConsulDataplaneAsSidecar returns whether register consul-dataplane as sidecar in kubernetes is enabled either via the default value in the meshWebhook, or if it's been
+// overridden via the annotation.
+func (lc Config) EnableConsulDataplaneAsSidecar(pod corev1.Pod) (bool, error) {
+	enabled := lc.DefaultEnableConsulDataplaneAsSidecar
+	if raw, ok := pod.Annotations[constants.AnnotationEnableConsulDataplaneAsSidecar]; ok && raw != "" {
+		enableConsulDataplaneAsSidecar, err := strconv.ParseBool(raw)
+		if err != nil {
+			return false, fmt.Errorf("%s annotation value of %s was invalid: %s", constants.AnnotationEnableConsulDataplaneAsSidecar, raw, err)
+		}
+		enabled = enableConsulDataplaneAsSidecar
+	}
+	return enabled, nil
 }

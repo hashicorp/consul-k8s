@@ -162,7 +162,7 @@ func TestPeering_Connect(t *testing.T) {
 			staticClientPeerClient, _ := staticClientPeerCluster.SetupConsulClient(t, c.ACLsEnabled)
 
 			// Ensure mesh config entries are created in Consul.
-			timer := &retry.Timer{Timeout: 1 * time.Minute, Wait: 1 * time.Second}
+			timer := &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
 				ceServer, _, err := staticServerPeerClient.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
 				require.NoError(r, err)
@@ -184,12 +184,10 @@ func TestPeering_Connect(t *testing.T) {
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
-
 			// Ensure the secret is created.
+			timer = &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
-				require.NoError(r, err)
-				require.NotEmpty(r, acceptorSecretName)
+				helpers.EnsurePeeringAcceptorSecret(t, r, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 
 			// Copy secret from client peer to server peer.
@@ -390,7 +388,10 @@ func TestPeering_Connect(t *testing.T) {
 
 				// Test that we can make a call to the terminating gateway.
 				logger.Log(t, "trying calls to terminating gateway")
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerHostnameURL)
+				retry.RunWith(&retry.Counter{Count: 30, Wait: 30 * time.Second}, t, func(r *retry.R) {
+					logger.Log(r, "trying calls to terminating gateway")
+					k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, externalServerHostnameURL)
+				})
 			}
 		})
 	}

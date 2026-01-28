@@ -21,6 +21,17 @@ spec:
           # Using alpine vs latest as there is a build issue with M1s. Also other tests in multiport-app reference
           # alpine so standardizing this.
           image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              add:
+                - "NET_BIND_SERVICE"
+              drop:
+                - ALL
           args:
             - -text="hello world"
             - -listen=:8080

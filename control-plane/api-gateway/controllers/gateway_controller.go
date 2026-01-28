@@ -66,6 +66,7 @@ type GatewayController struct {
 	allowK8sNamespacesSet mapset.Set
 	denyK8sNamespacesSet  mapset.Set
 	client.Client
+	ConsulConfig *consul.Config
 }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
@@ -364,7 +365,7 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 }
 
 func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
-	gk := gatekeeper.New(log, r.Client)
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
 	err := gk.Delete(ctx, *gw)
 	if err != nil {
 		return err
@@ -374,7 +375,7 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 }
 
 func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
-	gk := gatekeeper.New(log, r.Client)
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
 	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
 	if err != nil {
 		return err
@@ -418,6 +419,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		allowK8sNamespacesSet: config.AllowK8sNamespacesSet,
 		cache:                 c,
 		gatewayCache:          gwc,
+		ConsulConfig:          config.ConsulClientConfig,
 	}
 
 	cleaner := binding.Cleaner{

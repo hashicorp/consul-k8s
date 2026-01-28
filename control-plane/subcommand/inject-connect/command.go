@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
@@ -26,6 +27,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -154,6 +156,12 @@ type Command struct {
 
 	once sync.Once
 	help string
+
+	flagDefaultEnableConsulDataplaneAsSidecar       bool
+	flagDefaultSidecarProbeCheckInitialDelaySeconds int
+	flagDefaultSidecarProbePeriodSeconds            int
+	flagDefaultSidecarProbeFailureThreshold         int
+	flagDefaultSidecarProbeCheckTimeoutSeconds      int
 }
 
 var (
@@ -273,6 +281,12 @@ func (c *Command) init() {
 
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
 
+	c.flagSet.BoolVar(&c.flagDefaultEnableConsulDataplaneAsSidecar, "default-enable-consul-dataplane-as-sidecar", false, "Default for enabling consul-dataplane as a sidecar container in the pod. ")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckInitialDelaySeconds, "default-sidecar-probe-check-initial-delay-seconds", 1, "Default number of seconds for the k8s initial delay before the readiness & liveness probe starts checking the consul-dataplane sidecar container.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbePeriodSeconds, "default-sidecar-probe-period-seconds", 1, "Default number of seconds for the k8s period between startup probe checks.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
+	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
+
 	c.consul = &flags.ConsulFlags{}
 
 	flags.Merge(c.flagSet, c.consul.Flags())
@@ -382,15 +396,26 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:           scheme,
-		LeaderElection:   true,
-		LeaderElectionID: "consul-controller-lock",
-		Logger:           zapLogger,
+	healthProbeBindAddress := constants.Getv4orv6Str("0.0.0.0:9445", "[::]:9445")
+	metricsServiceBindAddress := constants.Getv4orv6Str("0.0.0.0:9444", "[::]:9444")
+	cfg := ctrl.GetConfigOrDie()
+	cfg.Timeout = 90 * time.Second
+	cfg.QPS = 50
+	cfg.Burst = 100
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:                  scheme,
+		LeaderElection:          true,
+		LeaderElectionID:        "consul-controller-lock",
+		Logger:                  zapLogger,
+		LeaderElectionNamespace: c.flagReleaseNamespace,
+		LeaseDuration:           ptr.To(90 * time.Second),
+		RenewDeadline:           ptr.To(60 * time.Second),
+		RetryPeriod:             ptr.To(15 * time.Second),
 		Metrics: metricsserver.Options{
-			BindAddress: "0.0.0.0:9444",
+			BindAddress: metricsServiceBindAddress,
 		},
-		HealthProbeBindAddress: "0.0.0.0:9445",
+		HealthProbeBindAddress: healthProbeBindAddress,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			CertDir: c.flagCertDir,
 			Host:    listenSplits[0],

@@ -405,6 +405,12 @@ type RemoteJWKS struct {
 	// Default value is false.
 	FetchAsynchronously bool `json:"fetchAsynchronously,omitempty"`
 
+	// UseSNI determines whether the hostname should be set in SNI
+	// header for TLS connection.
+	//
+	// Default value is false.
+	UseSNI bool `json:",omitempty" alias:"use_sni"`
+
 	// RetryPolicy defines a retry policy for fetching JWKS.
 	//
 	// There is no retry by default.
@@ -423,6 +429,7 @@ func (r *RemoteJWKS) toConsul() *capi.RemoteJWKS {
 		RequestTimeoutMs:    r.RequestTimeoutMs,
 		CacheDuration:       r.CacheDuration.Duration,
 		FetchAsynchronously: r.FetchAsynchronously,
+		UseSNI:              r.UseSNI,
 		RetryPolicy:         r.RetryPolicy.toConsul(),
 		JWKSCluster:         r.JWKSCluster.toConsul(),
 	}

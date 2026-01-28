@@ -7,12 +7,16 @@ import (
 	"os"
 	"testing"
 
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
+
+	"github.com/hashicorp/consul/agent/netutil"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 )
 
 func TestMeshWebhook_configureDNS(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		etcResolv    string
 		expDNSConfig *corev1.PodDNSConfig
@@ -84,6 +88,7 @@ options ndots:5`,
 			w := MeshWebhook{
 				etcResolvFile:    etcResolvFile.Name(),
 				ReleaseNamespace: "consul",
+				ConsulConfig:     &consul.Config{APIClientConfig: nil},
 			}
 
 			pod := minimal()
@@ -96,7 +101,10 @@ options ndots:5`,
 }
 
 func TestMeshWebhook_configureDNS_error(t *testing.T) {
-	w := MeshWebhook{}
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+	w := MeshWebhook{
+		ConsulConfig: &consul.Config{APIClientConfig: nil},
+	}
 
 	pod := minimal()
 	pod.Spec.DNSConfig = &corev1.PodDNSConfig{Nameservers: []string{"1.1.1.1"}}

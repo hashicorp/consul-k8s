@@ -10,6 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -18,16 +19,17 @@ import (
 )
 
 const (
-	allCapabilities              = "ALL"
-	netBindCapability            = "NET_BIND_SERVICE"
-	consulDataplaneDNSBindHost   = "127.0.0.1"
-	consulDataplaneDNSBindPort   = 8600
-	defaultEnvoyProxyConcurrency = 1
-	volumeNameForConnectInject   = "consul-connect-inject-data"
-	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
+	allCapabilities                = "ALL"
+	netBindCapability              = "NET_BIND_SERVICE"
+	consulDataplaneDNSBindHost     = "127.0.0.1"
+	ipv6ConsulDataplaneDNSBindHost = "::1"
+	consulDataplaneDNSBindPort     = 8600
+	defaultEnvoyProxyConcurrency   = 1
+	volumeNameForConnectInject     = "consul-connect-inject-data"
+	volumeNameForTLSCerts          = "consul-gateway-tls-certificates"
 )
 
-func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, name, namespace string, mounts []corev1.VolumeMount) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -38,7 +40,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(metrics, namespace, config, bearerTokenFile, name)
+	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -54,7 +56,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	}
 
 	container := corev1.Container{
-		Name:            name,
+		Name:            gateway.Name,
 		Image:           config.ImageDataplane,
 		ImagePullPolicy: corev1.PullPolicy(config.GlobalImagePullPolicy),
 
@@ -110,19 +112,41 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		container.Resources = *gcc.Spec.DeploymentSpec.Resources
 	}
 
-	// If running in vanilla K8s, run as root to allow binding to privileged ports;
-	// otherwise, allow the user to be assigned by OpenShift.
-	container.SecurityContext = &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: ptr.To(true),
-		// Drop any Linux capabilities you'd get as root other than NET_BIND_SERVICE.
+	// For backwards-compatibility, we allow privilege escalation if port mapping
+	// is disabled and the Gateway utilizes a privileged port (< 1024).
+	usingPrivilegedPorts := false
+	if gcc.Spec.MapPrivilegedContainerPorts == 0 {
+		for _, listener := range gateway.Spec.Listeners {
+			if listener.Port < 1024 {
+				usingPrivilegedPorts = true
+				break
+			}
+		}
+	}
+
+	// Set up security context with least privilege by default
+	securityContext := &corev1.SecurityContext{
+		ReadOnlyRootFilesystem:   ptr.To(true),
+		RunAsNonRoot:             ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(false),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
 		Capabilities: &corev1.Capabilities{
-			Add:  []corev1.Capability{netBindCapability},
 			Drop: []corev1.Capability{allCapabilities},
 		},
 	}
-	if !config.EnableOpenShift {
-		container.SecurityContext.RunAsUser = ptr.To(int64(0))
+
+	if usingPrivilegedPorts {
+		securityContext.AllowPrivilegeEscalation = ptr.To(true)
+		securityContext.RunAsNonRoot = ptr.To(false)
+		securityContext.Capabilities.Add = []corev1.Capability{netBindCapability}
+		container.Command = []string{"privileged-consul-dataplane"}
+		// Add the envoy executable path argument
+		container.Args = append(container.Args, "-envoy-executable-path=/usr/local/bin/privileged-envoy")
 	}
+
+	container.SecurityContext = securityContext
 
 	return container, nil
 }
@@ -131,16 +155,30 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
+	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
+	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
+
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
+		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
+		"-consul-dns-bind-addr=" + consulDNSBindAddress,
+		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
+		"-graceful-addr=" + consulDPBindAddress,
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(
+		namespace, config.EnableNamespaces,
+		config.ConsulDestinationNamespace,
+		config.EnableNamespaceMirroring,
+		config.NamespaceMirroringPrefix,
+	)
 
 	if config.AuthMethod != "" {
 		args = append(args,

@@ -23,8 +23,33 @@ securityContext:
   capabilities:
     drop:
     - ALL
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+{{- if not .Values.global.openshift.enabled -}}
+{{/*
+We must set runAsUser or else the root user will be used in some cases and
+containers will fail to start due to runAsNonRoot above (e.g.
+tls-init-cleanup). On OpenShift, runAsUser is automatically. We pick user 100
+because it is a non-root user id that exists in the consul, consul-dataplane,
+and consul-k8s-control-plane images.
+*/}}
+  runAsUser: 100
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+
+{{- define "consul.restrictedSecurityContextWithNetBindService" -}}
+{{- if not .Values.global.enablePodSecurityPolicies -}}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
     add:
     - NET_BIND_SERVICE
+    drop:
+    - ALL
   runAsNonRoot: true
   seccompProfile:
     type: RuntimeDefault
@@ -254,9 +279,6 @@ This template is for an init container.
       consul-k8s-control-plane get-consul-client-ca \
         -output-file=/consul/tls/client/ca/tls.crt \
         -consul-api-timeout={{ .Values.global.consulAPITimeout }} \
-        {{- if .Values.global.cloud.enabled }}
-        -tls-server-name=server.{{.Values.global.datacenter}}.{{.Values.global.domain}} \
-        {{- end}}
         {{- if .Values.externalServers.enabled }}
         {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
         -server-addr={{ quote (first .Values.externalServers.hosts) }} \
@@ -381,9 +403,6 @@ Consul server environment variables for consul-k8s commands.
 {{- if and .Values.externalServers.enabled .Values.externalServers.tlsServerName }}
 - name: CONSUL_TLS_SERVER_NAME
   value: {{ .Values.externalServers.tlsServerName }}
-{{- else if .Values.global.cloud.enabled }}
-- name: CONSUL_TLS_SERVER_NAME
-  value: server.{{ .Values.global.datacenter}}.{{ .Values.global.domain}}
 {{- end }}
 {{- end }}
 {{- if and .Values.externalServers.enabled .Values.externalServers.skipServerWatch }}
@@ -402,9 +421,6 @@ Usage: {{ template "consul.validateRequiredCloudSecretsExist" . }}
 
 */}}
 {{- define "consul.validateRequiredCloudSecretsExist" -}}
-{{- if (and .Values.global.cloud.enabled (or (not .Values.global.cloud.resourceId.secretName) (not .Values.global.cloud.clientId.secretName) (not .Values.global.cloud.clientSecret.secretName))) }}
-{{fail "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set."}}
-{{- end }}
 {{- end -}}
 
 {{/*
@@ -419,28 +435,7 @@ Usage: {{ template "consul.validateCloudSecretKeys" . }}
 
 */}}
 {{- define "consul.validateCloudSecretKeys" -}}
-{{- if and .Values.global.cloud.enabled }}
-{{- if or (and .Values.global.cloud.resourceId.secretName (not .Values.global.cloud.resourceId.secretKey)) (and .Values.global.cloud.resourceId.secretKey (not .Values.global.cloud.resourceId.secretName)) }}
-{{fail "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.global.cloud.clientId.secretName (not .Values.global.cloud.clientId.secretKey)) (and .Values.global.cloud.clientId.secretKey (not .Values.global.cloud.clientId.secretName)) }}
-{{fail "When either global.cloud.clientId.secretName or global.cloud.clientId.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.global.cloud.clientSecret.secretName (not .Values.global.cloud.clientSecret.secretKey)) (and .Values.global.cloud.clientSecret.secretKey (not .Values.global.cloud.clientSecret.secretName)) }}
-{{fail "When either global.cloud.clientSecret.secretName or global.cloud.clientSecret.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.global.cloud.authUrl.secretName (not .Values.global.cloud.authUrl.secretKey)) (and .Values.global.cloud.authUrl.secretKey (not .Values.global.cloud.authUrl.secretName)) }}
-{{fail "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.global.cloud.apiHost.secretName (not .Values.global.cloud.apiHost.secretKey)) (and .Values.global.cloud.apiHost.secretKey (not .Values.global.cloud.apiHost.secretName)) }}
-{{fail "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.global.cloud.scadaAddress.secretName (not .Values.global.cloud.scadaAddress.secretKey)) (and .Values.global.cloud.scadaAddress.secretKey (not .Values.global.cloud.scadaAddress.secretName)) }}
-{{fail "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set."}}
-{{- end }}
-{{- end }}
 {{- end -}}
-
 
 {{/*
 Fails if telemetryCollector.clientId or telemetryCollector.clientSecret exist and one of other secrets is nil or empty.
@@ -452,29 +447,6 @@ Usage: {{ template "consul.validateTelemetryCollectorCloud" . }}
 
 */}}
 {{- define "consul.validateTelemetryCollectorCloud" -}}
-{{- if (and .Values.telemetryCollector.cloud.clientId.secretName (and (not .Values.global.cloud.clientSecret.secretName) (not .Values.telemetryCollector.cloud.clientSecret.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientId.secretName is set, telemetryCollector.cloud.clientSecret.secretName must also be set." }}
-{{- end }}
-{{- if (and .Values.telemetryCollector.cloud.clientSecret.secretName (and (not .Values.global.cloud.clientId.secretName) (not .Values.telemetryCollector.cloud.clientId.secretName))) }}
-{{fail "When telemetryCollector.cloud.clientSecret.secretName is set, telemetryCollector.cloud.clientId.secretName must also be set." }}
-{{- end }}
-{{- end }}
-
-{{/**/}}
-
-{{- define "consul.validateTelemetryCollectorCloudSecretKeys" -}}
-{{- if or (and .Values.telemetryCollector.cloud.clientId.secretName (not .Values.telemetryCollector.cloud.clientId.secretKey)) (and .Values.telemetryCollector.cloud.clientId.secretKey (not .Values.telemetryCollector.cloud.clientId.secretName)) }}
-{{fail "When either telemetryCollector.cloud.clientId.secretName or telemetryCollector.cloud.clientId.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName (not .Values.telemetryCollector.cloud.clientSecret.secretKey)) (and .Values.telemetryCollector.cloud.clientSecret.secretKey (not .Values.telemetryCollector.cloud.clientSecret.secretName)) }}
-{{fail "When either telemetryCollector.cloud.clientSecret.secretName or telemetryCollector.cloud.clientSecret.secretKey is defined, both must be set."}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName))) }}
-{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretName or global.cloud.resourceId.secretName must be set"}}
-{{- end }}
-{{- if or (and .Values.telemetryCollector.cloud.clientSecret.secretName .Values.telemetryCollector.cloud.clientSecret.secretKey .Values.telemetryCollector.cloud.clientId.secretName .Values.telemetryCollector.cloud.clientId.secretKey (not (or .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey))) }}
-{{fail "When telemetryCollector has clientId and clientSecret, telemetryCollector.cloud.resourceId.secretKey or global.cloud.resourceId.secretKey must be set"}}
-{{- end }}
 {{- end -}}
 
 {{/*
@@ -486,15 +458,10 @@ Usage: {{ template "consul.validateTelemetryCollectorResourceId" . }}
 
 */}}
 {{- define "consul.validateTelemetryCollectorResourceId" -}}
-{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName) (not (eq .Values.telemetryCollector.cloud.resourceId.secretName .Values.global.cloud.resourceId.secretName)) }}
-{{fail "When both global.cloud.resourceId.secretName and telemetryCollector.cloud.resourceId.secretName are set, they should be the same."}}
-{{- end }}
-{{- if and (and .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey) (not (eq .Values.telemetryCollector.cloud.resourceId.secretKey .Values.global.cloud.resourceId.secretKey)) }}
-{{fail "When both global.cloud.resourceId.secretKey and telemetryCollector.cloud.resourceId.secretKey are set, they should be the same."}}
-{{- end }}
-{{- end }}
+{{- end -}}
 
-{{/**/}}
+{{- define "consul.validateTelemetryCollectorCloudSecretKeys" -}}
+{{- end -}}
 
 {{/*
 Validation for Consul Metrics configuration:
@@ -656,4 +623,24 @@ Usage: {{ template "consul.imagePullPolicy" . }} TODO: melisa should we name thi
 {{ else }}
 {{fail "imagePullPolicy can only be IfNotPresent, Always, Never, or empty" }}
 {{ end }}
+{{- end -}}
+
+{{/*
+Checks if any of the ingress gateway ports are privileged (< 1024).
+This helper takes the ingress gateway configuration and checks both specific
+service ports and default service ports to determine if privileged ports are needed.
+
+Usage: {{ template "consul.ingressGatewayHasPrivilegedPorts" (dict "service" .service "defaults" $defaults) }}
+*/}}
+{{- define "consul.ingressGatewayHasPrivilegedPorts" -}}
+{{- $service := .service -}}
+{{- $defaults := .defaults -}}
+{{- $ports := (default $defaults.service.ports $service.ports) -}}
+{{- $hasPrivilegedPorts := false -}}
+{{- range $port := $ports -}}
+  {{- if lt (int $port.port) 1024 -}}
+    {{- $hasPrivilegedPorts = true -}}
+  {{- end -}}
+{{- end -}}
+{{- $hasPrivilegedPorts -}}
 {{- end -}}

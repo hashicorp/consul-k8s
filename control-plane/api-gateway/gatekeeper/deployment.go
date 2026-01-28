@@ -5,8 +5,10 @@ package gatekeeper
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,7 +48,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		currentReplicas = existingDeployment.Spec.Replicas
 	}
 
-	deployment, err := g.deployment(gateway, gcc, config, currentReplicas)
+	deployment, err := g.deployment(ctx, gateway, gcc, config, currentReplicas)
 	if err != nil {
 		return err
 	}
@@ -59,7 +61,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	}
 
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, gcc, gateway, g.Client.Scheme())
+	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme(), g.Log)
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -87,7 +89,7 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.Namespac
 	return err
 }
 
-func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
+func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
 	initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
@@ -109,7 +111,13 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 
 	volumes, mounts := volumesAndMounts(gateway)
 
-	container, err := consulDataplaneContainer(metrics, config, gcc, gateway.Name, gateway.Namespace, mounts)
+	volumes, mounts, err = g.additionalAccessLogVolumeMount(ctx, volumes, mounts)
+	if err != nil {
+		g.Log.Error(err, "error fetching proxy defaults for access logs")
+		return nil, err
+	}
+
+	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, mounts)
 	if err != nil {
 		return nil, err
 	}
@@ -162,10 +170,33 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}, nil
 }
 
-func mergeDeployments(gcc v1alpha1.GatewayClassConfig, a, b *appsv1.Deployment) *appsv1.Deployment {
+func mergeDeployments(log logr.Logger, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
+		// Replace template
 		b.Spec.Template = a.Spec.Template
 		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
+	}
+
+	// Apply probes from Gateway annotations if present
+	probes, err := ProbesFromGateway(&gateway)
+	if err != nil {
+		log.Error(err, "failed to parse probe annotations, skipping probe configuration")
+	} else if probes != nil {
+		for i, c := range b.Spec.Template.Spec.Containers {
+			if i > 0 { // only primary container gets managed probes
+				continue
+			}
+			if probes.Liveness != nil {
+				c.LivenessProbe = probes.Liveness.DeepCopy()
+			}
+			if probes.Readiness != nil {
+				c.ReadinessProbe = probes.Readiness.DeepCopy()
+			}
+			if probes.Startup != nil {
+				c.StartupProbe = probes.Startup.DeepCopy()
+			}
+			b.Spec.Template.Spec.Containers[i] = c
+		}
 	}
 
 	return b
@@ -209,6 +240,27 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 				return false
 			}
 		}
+
+		// Compare probe initialDelaySeconds for rollout restart functionality
+		otherContainer := b.Spec.Template.Spec.Containers[i]
+
+		// Compare readiness probe initialDelaySeconds
+		if container.ReadinessProbe != nil && otherContainer.ReadinessProbe != nil {
+			if container.ReadinessProbe.InitialDelaySeconds != otherContainer.ReadinessProbe.InitialDelaySeconds {
+				return false
+			}
+		} else if (container.ReadinessProbe == nil) != (otherContainer.ReadinessProbe == nil) {
+			return false
+		}
+
+		// Compare startup probe initialDelaySeconds
+		if container.StartupProbe != nil && otherContainer.StartupProbe != nil {
+			if container.StartupProbe.InitialDelaySeconds != otherContainer.StartupProbe.InitialDelaySeconds {
+				return false
+			}
+		} else if (container.StartupProbe == nil) != (otherContainer.StartupProbe == nil) {
+			return false
+		}
 	}
 
 	if b.Spec.Replicas == nil && a.Spec.Replicas == nil {
@@ -222,9 +274,24 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	return *b.Spec.Replicas == *a.Spec.Replicas
 }
 
-func newDeploymentMutator(deployment, mutated *appsv1.Deployment, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
+	if b.Spec.Template.Annotations == nil {
+		b.Spec.Template.Annotations = make(map[string]string)
+	}
+	for k, v := range annotations {
+		if _, ok := b.Spec.Template.Annotations[k]; !ok {
+			b.Spec.Template.Annotations[k] = v
+		}
+	}
+
+}
+
+func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(gcc, deployment, mutated)
+		mutated = mergeDeployments(log, gcc, gateway, deployment, mutated)
+		if deploymentExists {
+			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
+		}
 		return ctrl.SetControllerReference(&gateway, mutated, scheme)
 	}
 }
@@ -257,4 +324,37 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 
 	}
 	return &instanceValue
+}
+
+// Checking whether an additional volume is required for access logs defined in the proxy-defaults.
+// fetch the proxy-defaults resource and check if access logs are enabled and of type file.
+func (g *Gatekeeper) additionalAccessLogVolumeMount(ctx context.Context, volumes []corev1.Volume, mounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount, error) {
+
+	var proxyDefaultsList v1alpha1.ProxyDefaultsList
+	err := g.Client.List(ctx, &proxyDefaultsList)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return volumes, mounts, fmt.Errorf("error fetching proxy-defaults: %s", err.Error())
+	} else if k8serrors.IsNotFound(err) {
+		return volumes, mounts, nil
+	}
+
+	// If there are no proxy-defaults, return.
+	if len(proxyDefaultsList.Items) == 0 {
+		return volumes, mounts, nil
+	}
+
+	// Will always have only one proxy-defaults resource.
+	proxyDefaults := &proxyDefaultsList.Items[0]
+	if proxyDefaults.Spec.AccessLogs != nil {
+		if proxyDefaults.Spec.AccessLogs.Enabled {
+			if proxyDefaults.Spec.AccessLogs.Type == v1alpha1.FileLogSinkType {
+				accessPath := proxyDefaults.Spec.AccessLogs.Path
+				volumes = append(volumes, accessLogVolume())
+				mounts = append(mounts, accessLogVolumeMount(accessPath))
+				return volumes, mounts, nil
+			}
+		}
+	}
+
+	return volumes, mounts, nil
 }

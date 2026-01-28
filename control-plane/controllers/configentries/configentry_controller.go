@@ -90,6 +90,15 @@ type ConfigEntryController struct {
 	// `k8s-default` namespace.
 	NSMirroringPrefix string
 
+	// EnableConsulAdminPartitions indicates that the cluster is running an
+	// Enterprise binary with Admin Partitions turned on.
+	EnableConsulAdminPartitions bool
+
+	// ConsulPartition is the name of the admin partition this controller writes
+	// to. It’s used by reconcile-time helpers to set Query/Write options and to
+	// stamp metadata on the config-entry.
+	ConsulPartition string
+
 	// CrossNSACLPolicy is the name of the ACL policy to attach to
 	// any created Consul namespaces to allow cross namespace service discovery.
 	// Only necessary if ACLs are enabled.
@@ -147,9 +156,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		if containsString(configEntry.GetFinalizers(), FinalizerName) {
 			logger.Info("deletion event")
 			// Check to see if consul has config entry with the same name
-			entry, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
-				Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
-			})
+			entry, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), r.queryOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 
 			// Ignore the error where the config entry isn't found in Consul.
 			// It is indicative of desired state.
@@ -158,9 +165,11 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			} else if err == nil {
 				// Only delete the resource from Consul if it is owned by our datacenter.
 				if entry.GetMeta()[common.DatacenterKey] == r.DatacenterName {
-					_, err := consulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.WriteOptions{
-						Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
-					})
+					//_, err := consulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.WriteOptions{
+					//	Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
+					//})
+					_, err = consulClient.ConfigEntries().Delete(configEntry.ConsulKind(), configEntry.ConsulName(),
+						r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 					if err != nil {
 						return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 							fmt.Errorf("deleting config entry from consul: %w", err))
@@ -183,9 +192,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	}
 
 	// Check to see if consul has config entry with the same name
-	entryFromConsul, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), &capi.QueryOptions{
-		Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
-	})
+	entryFromConsul, _, err := consulClient.ConfigEntries().Get(configEntry.ConsulKind(), configEntry.ConsulName(), r.queryOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 	// If a config entry with this name does not exist
 	if isNotFoundErr(err) {
 		logger.Info("config entry not found in consul")
@@ -205,9 +212,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		}
 
 		// Create the config entry
-		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
-			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
-		})
+		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 		if err != nil {
 			return r.syncFailed(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("writing config entry to consul: %w", err))
@@ -248,9 +253,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			r.nonMatchingMigrationError(configEntry, entryFromConsul))
 	case !matchesConsul:
 		logger.Info("config entry does not match consul", "modify-index", entryFromConsul.GetModifyIndex())
-		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
-			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
-		})
+		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 		if err != nil {
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("updating config entry in consul: %w", err))
@@ -262,9 +265,7 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 		// matches the entry in Kubernetes. We just need to update the metadata
 		// of the entry in Consul to say that it's now managed by Kubernetes.
 		logger.Info("migrating config entry to be managed by Kubernetes")
-		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, &capi.WriteOptions{
-			Namespace: r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource()),
-		})
+		_, writeMeta, err := consulClient.ConfigEntries().Set(consulEntry, r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
 		if err != nil {
 			return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError,
 				fmt.Errorf("updating config entry in consul: %w", err))
@@ -494,4 +495,28 @@ func sourceDatacenterMismatchErr(sourceDatacenter string) error {
 		return fmt.Errorf("config entry already exists in Consul")
 	}
 	return fmt.Errorf("config entry managed in different datacenter: %q", sourceDatacenter)
+}
+
+// queryOpts builds a *capi.QueryOptions that always includes Namespace +
+// (optionally) Partition.
+func (r *ConfigEntryController) queryOpts(ns string) *capi.QueryOptions {
+	opts := &capi.QueryOptions{
+		Namespace: ns,
+	}
+	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
+		// Only add ?partition=… for Enterprise clusters
+		opts.Partition = r.ConsulPartition
+	}
+	return opts
+}
+
+// writeOpts mirrors queryOpts for writes.
+func (r *ConfigEntryController) writeOpts(ns string) *capi.WriteOptions {
+	opts := &capi.WriteOptions{
+		Namespace: ns,
+	}
+	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
+		opts.Partition = r.ConsulPartition
+	}
+	return opts
 }

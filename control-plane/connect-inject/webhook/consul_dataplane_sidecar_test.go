@@ -20,11 +20,13 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const nodeName = "test-node"
 
 func TestHandlerConsulDataplaneSidecar(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		webhookSetupFunc     func(w *MeshWebhook)
 		additionalExpCmdArgs string
@@ -186,9 +188,9 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 
 			container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
-			expCmd := "-addresses 1.1.1.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
+			expCmd := "-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 				" -proxy-service-id-path=/consul/connect-inject/proxyid " +
-				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs
+				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + " -graceful-addr=127.0.0.1" + c.additionalExpCmdArgs
 			require.Equal(t, expCmd, strings.Join(container.Args, " "))
 
 			if w.AuthMethod != "" {
@@ -241,6 +243,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		annotations map[string]string
 		expFlags    string
@@ -305,6 +308,7 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 
 // Test that we pass the dns proxy flag to dataplane correctly.
 func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	// We only want the flag passed when DNS and tproxy are both enabled. DNS/tproxy can
 	// both be enabled/disabled with annotations/labels on the pod and namespace and then globally
 	// through the helm chart. To test this we use an outer loop with the possible DNS settings and then
@@ -418,6 +422,7 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	tests := map[string]struct {
 		changeHook        func(*MeshWebhook)
 		changePod         func(*corev1.Pod)
@@ -558,6 +563,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	h := MeshWebhook{
 		ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 		ConsulAddress: "1.1.1.1",
@@ -665,6 +671,7 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) 
 }
 
 func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	for _, aclsEnabled := range []bool{false, true} {
 		name := fmt.Sprintf("acls enabled: %t", aclsEnabled)
 		t.Run(name, func(t *testing.T) {
@@ -727,18 +734,18 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				},
 			}
 			expArgs := []string{
-				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
-					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
-				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
+				"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
+					"-log-level=info -log-json=false -envoy-concurrency=0 -graceful-addr=127.0.0.1 -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
+				"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
+					"-log-level=info -log-json=false -envoy-concurrency=0 -graceful-addr=127.0.0.1 -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 			}
 			if aclsEnabled {
 				expArgs = []string{
-					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
-						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+					"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
+						"-log-level=info -log-json=false -envoy-concurrency=0 -graceful-addr=127.0.0.1 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
-					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
-						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
+					"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
+						"-log-level=info -log-json=false -envoy-concurrency=0 -graceful-addr=127.0.0.1 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 				}
 			}
@@ -793,6 +800,7 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		tproxyEnabled      bool
 		openShiftEnabled   bool
@@ -808,7 +816,10 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+					Drop: []corev1.Capability{"ALL"},
+				},
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
 			},
 		},
@@ -822,7 +833,10 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+					Drop: []corev1.Capability{"ALL"},
+				},
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
 			},
 		},
@@ -836,7 +850,10 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+					Drop: []corev1.Capability{"ALL"},
+				},
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
 			},
 		},
@@ -850,7 +867,10 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 				ReadOnlyRootFilesystem:   ptr.To(true),
 				AllowPrivilegeEscalation: ptr.To(false),
 				Capabilities: &corev1.Capabilities{
-					Add: []corev1.Capability{"NET_BIND_SERVICE"},
+					Drop: []corev1.Capability{"ALL"},
+				},
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
 			},
 		},
@@ -901,6 +921,7 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 // Test that if the user specifies a pod security context with the same uid as `sidecarUserAndGroupID` that we return
 // an error to the meshWebhook.
 func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	require := require.New(t)
 	w := MeshWebhook{
 		ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
@@ -928,6 +949,7 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t
 // return an error to the meshWebhook. If a container using the consul-dataplane image has the same uid, we don't return an error
 // because in multiport pod there can be multiple consul-dataplane sidecars.
 func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name          string
 		pod           corev1.Pod
@@ -1012,6 +1034,7 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 // or via pod annotations. When arguments are passed in both ways, the
 // arguments set via pod annotations are used.
 func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name              string
 		envoyExtraArgs    string
@@ -1079,6 +1102,7 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name                          string
 		pod                           corev1.Pod
@@ -1143,6 +1167,7 @@ func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	mem1 := resource.MustParse("100Mi")
 	mem2 := resource.MustParse("200Mi")
 	cpu1 := resource.MustParse("100m")
@@ -1323,6 +1348,7 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name       string
 		pod        corev1.Pod
@@ -1499,6 +1525,7 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	gracefulShutdownSeconds := 10
 	gracefulStartupSeconds := 10
 	gracefulPort := "20307"
@@ -1665,4 +1692,150 @@ func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
 // boolPtr returns pointer to b.
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func TestHandlerConsulDataplaneSidecar_LifecycleConfig(t *testing.T) {
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+	cases := map[string]struct {
+		pod                          corev1.Pod
+		defaultProbeTimeout          int
+		defaultProbeFailureThreshold int
+		lifecycleConfig              lifecycle.Config
+		expectedRestartPolicy        *corev1.ContainerRestartPolicy
+		expectedStartupProbe         *corev1.Probe
+		expectedError                string
+	}{
+		"when lifecycle enabled": {
+			lifecycleConfig: lifecycle.Config{
+				DefaultEnableConsulDataplaneAsSidecar: true,
+			},
+			defaultProbeTimeout:          5,
+			defaultProbeFailureThreshold: 3,
+			expectedRestartPolicy:        ptr.To(corev1.ContainerRestartPolicyAlways),
+			expectedStartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					Exec: &corev1.ExecAction{
+						Command: []string{
+							"/usr/local/bin/consul-dataplane",
+							"-check-proxy-health",
+						},
+					},
+				},
+				TimeoutSeconds:   5,
+				FailureThreshold: 3,
+			},
+		},
+		"when lifecycle disabled": {
+			lifecycleConfig: lifecycle.Config{
+				DefaultEnableConsulDataplaneAsSidecar: false,
+			},
+			expectedRestartPolicy: nil,
+			expectedStartupProbe:  nil,
+		},
+		"with custom probe settings from annotations": {
+			lifecycleConfig: lifecycle.Config{
+				DefaultEnableConsulDataplaneAsSidecar: true,
+			},
+			defaultProbeTimeout:          5,
+			defaultProbeFailureThreshold: 3,
+			pod: corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"consul.hashicorp.com/sidecar-probe-check-timeout-seconds": "10",
+						"consul.hashicorp.com/sidecar-probe-failure-threshold":     "6",
+					},
+				},
+			},
+			expectedRestartPolicy: ptr.To(corev1.ContainerRestartPolicyAlways),
+			expectedStartupProbe: &corev1.Probe{
+				ProbeHandler: corev1.ProbeHandler{
+					Exec: &corev1.ExecAction{
+						Command: []string{
+							"/usr/local/bin/consul-dataplane",
+							"-check-proxy-health",
+						},
+					},
+				},
+				TimeoutSeconds:   10,
+				FailureThreshold: 6,
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			w := MeshWebhook{
+				ImageConsulDataplane:                   "consul-dataplane:latest",
+				DefaultSidecarProbeCheckTimeoutSeconds: tc.defaultProbeTimeout,
+				DefaultSidecarProbeFailureThreshold:    tc.defaultProbeFailureThreshold,
+				LifecycleConfig:                        tc.lifecycleConfig,
+			}
+			w.ConsulConfig = &consul.Config{HTTPPort: 8500, GRPCPort: 8502}
+			container, err := w.consulDataplaneSidecar(testNS, tc.pod, multiPortInfo{})
+			if tc.expectedError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedRestartPolicy, container.RestartPolicy)
+			if tc.expectedStartupProbe == nil {
+				require.Nil(t, container.StartupProbe)
+			} else {
+				require.NotNil(t, container.StartupProbe)
+				require.Equal(t, tc.expectedStartupProbe.ProbeHandler, container.StartupProbe.ProbeHandler)
+				require.Equal(t, tc.expectedStartupProbe.TimeoutSeconds, container.StartupProbe.TimeoutSeconds)
+				require.Equal(t, tc.expectedStartupProbe.FailureThreshold, container.StartupProbe.FailureThreshold)
+			}
+		})
+	}
+}
+
+func TestMeshWebhook_getSidecarProbePeriodSeconds(t *testing.T) {
+	w := &MeshWebhook{DefaultSidecarProbePeriodSeconds: 5}
+	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+
+	require.Equal(t, int32(5), w.getSidecarProbePeriodSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbePeriodSeconds] = "10"
+	require.Equal(t, int32(10), w.getSidecarProbePeriodSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbePeriodSeconds] = "0"
+	require.Equal(t, int32(0), w.getSidecarProbePeriodSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbePeriodSeconds] = "invalid"
+	require.Equal(t, int32(0), w.getSidecarProbePeriodSeconds(pod))
+}
+
+func TestMeshWebhook_getSidecarProbeFailureThreshold(t *testing.T) {
+	w := &MeshWebhook{DefaultSidecarProbeFailureThreshold: 3}
+	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+
+	require.Equal(t, int32(3), w.getSidecarProbeFailureThreshold(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeFailureThreshold] = "8"
+	require.Equal(t, int32(8), w.getSidecarProbeFailureThreshold(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeFailureThreshold] = "0"
+	require.Equal(t, int32(0), w.getSidecarProbeFailureThreshold(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeFailureThreshold] = "invalid"
+	require.Equal(t, int32(0), w.getSidecarProbeFailureThreshold(pod))
+}
+
+func TestMeshWebhook_getSidecarProbeTimeoutSeconds(t *testing.T) {
+	w := &MeshWebhook{DefaultSidecarProbeCheckTimeoutSeconds: 7}
+	pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}}
+
+	require.Equal(t, int32(7), w.getSidecarProbeTimeoutSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeCheckTimeoutSeconds] = "12"
+	require.Equal(t, int32(12), w.getSidecarProbeTimeoutSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeCheckTimeoutSeconds] = "0"
+	require.Equal(t, int32(0), w.getSidecarProbeTimeoutSeconds(pod))
+
+	pod.Annotations[constants.AnnotationSidecarProbeCheckTimeoutSeconds] = "invalid"
+	require.Equal(t, int32(0), w.getSidecarProbeTimeoutSeconds(pod))
 }

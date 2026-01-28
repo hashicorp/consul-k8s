@@ -1,0 +1,3 @@
+```release-note:improvement
+Consul-dataplane now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used.
+```
