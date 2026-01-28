@@ -269,6 +269,19 @@ load _helpers
   [ "${actual}" = "http://foo.bar" ]
 }
 
+@test "server/ConfigMap: updates ui config with .ui.metrics.pathAllowlist" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'ui.enabled=true' \
+      --set 'ui.metrics.enabled=true' \
+      --set 'ui.metrics.pathAllowlist[0]=/consul/api/v1/query_range' \
+      --set 'ui.metrics.pathAllowlist[1]=/consul/api/v1/query' \
+      . | tee /dev/stderr |
+      yq -r '.data["ui-config.json"]' | yq -r '.ui_config.metrics_proxy.path_allowlist' | tee /dev/stderr)
+  [ "${actual}" = '["/consul/api/v1/query_range","/consul/api/v1/query"]' ]
+}
+
 #--------------------------------------------------------------------
 # ui.dashboardURLTemplates.service
 
@@ -1256,7 +1269,7 @@ load _helpers
 
   local actual=$(echo $object |  jq -r .audit.sink.MySink1.path | tee /dev/stderr)
   [ "${actual}" = "/tmp/audit.json" ]
-  
+
   local actual=$(echo $object |  jq -r .audit.sink.MySink3.path | tee /dev/stderr)
   [ "${actual}" = "/tmp/audit-3.json" ]
 
