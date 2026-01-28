@@ -443,7 +443,15 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	// If the name is explicitly annotated, adopt that name
 	if v, ok := svc.Annotations[annotationServiceName]; ok {
-		baseService.Service = strings.TrimSpace(v)
+		trimmedName := strings.TrimSpace(v)
+		if len(trimmedName) < 1 || len(trimmedName) > 64 {
+			t.Log.Warn("invalid service name length in annotation -- must be 1-64 characters",
+				"service", svc.Name,
+				"namespace", svc.Namespace,
+				"length", len(trimmedName))
+		} else {
+			baseService.Service = trimmedName
+		}
 	}
 
 	// Update the Consul namespace based on namespace settings
