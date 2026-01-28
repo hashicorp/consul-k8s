@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/control-plane/cni
 
-go 1.24.5
+go 1.25.1
 
 replace github.com/hashicorp/consul-k8s/version => ../../version
 
