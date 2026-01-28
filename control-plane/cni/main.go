@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
@@ -267,19 +269,78 @@ func main() {
 	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, cniv.All, bv.BuildString("consul-cni"))
 }
 
+func resolveKubeconfigPath(dir, base string) (string, error) {
+	// we  will return the actual kubeconfig path if present
+	stable := filepath.Join(dir, base)
+	if fi, err := os.Stat(stable); err == nil && !fi.IsDir() {
+		return stable, nil
+	}
+	// this will be a fallback to find the most recently modified kubeconfig file with the given base name pattern
+	// example file names: kubeconfig-<time.Now().UnixNano()>.
+	pattern := stable + "-*"
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", fmt.Errorf("glob failed for %s: %w", pattern, err)
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no kubeconfig found at %s or %s-*", stable, stable)
+	}
+
+	var newest string
+	var newestTime time.Time
+
+	// we are looping over the matched files to find the most recently modified kubeconfig file, with O(n) complexity
+	for _, fp := range matches {
+		fi, err := os.Stat(fp)
+		if err != nil || fi.IsDir() {
+			continue
+		}
+		if fi.ModTime().After(newestTime) {
+			newestTime = fi.ModTime()
+			newest = fp
+		}
+	}
+	// checking if a file was found
+	if newest == "" {
+		return "", fmt.Errorf("no valid kubeconfig found at %s or %s-*", stable, stable)
+	}
+
+	return newest, nil
+}
+
 // createK8sClient configures the command's Kubernetes API client if it doesn't
 // already exist.
 // TODO: remove logger for auth provider details
 func (c *Command) createK8sClient(cfg *PluginConf, logger hclog.Logger) error {
-	restConfig, err := clientcmd.BuildConfigFromFlags("", filepath.Join(cfg.CNINetDir, cfg.Kubeconfig))
+	dir := cfg.CNINetDir
+	base := cfg.Kubeconfig
+
+	path, err := resolveKubeconfigPath(dir, base)
+	if err != nil {
+		logger.Warn(
+			"kubeconfig not found, falling back to default client-go behavior",
+			"dir", dir,
+			"base", base,
+			"err", err,
+		)
+		path = ""
+	}
+
+	restConfig, err := clientcmd.BuildConfigFromFlags("", path)
+	if err != nil {
+		return fmt.Errorf("failed to load kubeconfig %q: %w", path, err)
+	}
+	if restConfig == nil {
+		return fmt.Errorf("restConfig is nil for kubeconfig %q", path)
+	}
 	logger.Info("tokenFile used  - ", restConfig.BearerTokenFile)
+
+	client, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
-		return fmt.Errorf("could not get rest config from kubernetes api: %s", err)
+		return fmt.Errorf("error initializing Kubernetes client: %w", err)
 	}
-	c.client, err = kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return fmt.Errorf("error initializing Kubernetes client: %s", err)
-	}
+
+	c.client = client
 	return nil
 }
 
