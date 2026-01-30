@@ -409,17 +409,9 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	t.Log.Debug("[generateRegistrations] generating registration", "key", key)
 
-	annotationServiceNameValue := ""
-	if v, ok := svc.Annotations[annotationServiceName]; ok {
-		trimmed := strings.TrimSpace(v)
-		if len(trimmed) < 1 || len(trimmed) > 255 {
-			t.Log.Error("invalid service name length in annotation -- must be 1-255 characters",
-				"service", svc.Name,
-				"namespace", svc.Namespace,
-				"length", len(trimmed))
-			return
-		}
-		annotationServiceNameValue = trimmed
+	annotationServiceNameValue, valid := getAnnotationServiceName(svc.Annotations, t.Log, svc.Name, svc.Namespace)
+	if !valid {
+		return
 	}
 
 	// Initialize our consul service map here if it isn't already.
@@ -1183,4 +1175,24 @@ func getPortName(name string, idx int) string {
 	}
 
 	return name
+}
+
+// getAnnotationServiceName extracts and validates the service name from annotations.
+// Returns the trimmed service name and true if valid, or empty string and false if invalid.
+func getAnnotationServiceName(annotations map[string]string, log hclog.Logger, svcName, namespace string) (string, bool) {
+	v, ok := annotations[annotationServiceName]
+	if !ok {
+		return "", true
+	}
+	trimmed := strings.TrimSpace(v)
+	if len(trimmed) < 1 || len(trimmed) > 255 {
+		if log != nil {
+			log.Error("invalid service name length in annotation -- must be 1-255 characters",
+				"service", svcName,
+				"namespace", namespace,
+				"length", len(trimmed))
+		}
+		return "", false
+	}
+	return trimmed, true
 }
