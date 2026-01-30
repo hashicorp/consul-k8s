@@ -409,6 +409,19 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	t.Log.Debug("[generateRegistrations] generating registration", "key", key)
 
+	annotationServiceNameValue := ""
+	if v, ok := svc.Annotations[annotationServiceName]; ok {
+		trimmed := strings.TrimSpace(v)
+		if len(trimmed) < 1 || len(trimmed) > 255 {
+			t.Log.Error("invalid service name length in annotation -- must be 1-255 characters",
+				"service", svc.Name,
+				"namespace", svc.Namespace,
+				"length", len(trimmed))
+			return
+		}
+		annotationServiceNameValue = trimmed
+	}
+
 	// Initialize our consul service map here if it isn't already.
 	if t.consulMap == nil {
 		t.consulMap = make(map[string][]*consulapi.CatalogRegistration)
@@ -441,17 +454,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		},
 	}
 
-	// If the name is explicitly annotated, adopt that name
-	if v, ok := svc.Annotations[annotationServiceName]; ok {
-		trimmedName := strings.TrimSpace(v)
-		if len(trimmedName) < 1 || len(trimmedName) > 64 {
-			t.Log.Warn("invalid service name length in annotation -- must be 1-64 characters",
-				"service", svc.Name,
-				"namespace", svc.Namespace,
-				"length", len(trimmedName))
-		} else {
-			baseService.Service = trimmedName
-		}
+	if annotationServiceNameValue != "" {
+		baseService.Service = annotationServiceNameValue
 	}
 
 	// Update the Consul namespace based on namespace settings
