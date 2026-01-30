@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/cli"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
+	cmdApplyManifests "github.com/hashicorp/consul-k8s/control-plane/subcommand/apply-manifests"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
@@ -18,6 +19,7 @@ import (
 	cmdGatewayCleanupOcp "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup-ocp"
 	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
 	cmdGatewayResourcesOcp "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources-ocp"
+	cmdGenerateManifests "github.com/hashicorp/consul-k8s/control-plane/subcommand/generate-manifests"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
@@ -68,7 +70,12 @@ func init() {
 		"gateway-resources-ocp": func() (cli.Command, error) {
 			return &cmdGatewayResourcesOcp.Command{UI: ui}, nil
 		},
-
+		"generate-manifests": func() (cli.Command, error) {
+			return &cmdGenerateManifests.Command{UI: ui}, nil
+		},
+		"applymanifests": func() (cli.Command, error) {
+			return &cmdApplyManifests.Command{UI: ui}, nil
+		},
 		"server-acl-init": func() (cli.Command, error) {
 			return &cmdServerACLInit.Command{UI: ui}, nil
 		},

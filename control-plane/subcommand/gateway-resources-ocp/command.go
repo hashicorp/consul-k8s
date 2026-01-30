@@ -379,7 +379,7 @@ func (c *Command) Help() string {
 const (
 	synopsis = "Create managed gateway resources after installation/upgrade."
 	help     = `
-Usage: consul-k8s-control-plane gateway-resources [options]
+Usage: consul-k8s-control-plane gateway-resources-ocp [options]
 
   Installs managed gateway class and configuration resources
 	after a helm installation or upgrade in order to avoid the

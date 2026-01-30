@@ -1,0 +1,60 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-generate-manifests
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: generate-manifests
+  metadata:
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/hook-delete-policy": before-hook-creation
+
+rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    resources:
+    - gatewayclassconfigs
+    verbs:
+    - get
+    - update
+    - create
+  - apiGroups:
+    - gateway.networking.k8s.io
+    resources:
+    - gatewayclasses
+    - gateways
+    - httproutes
+    - tcproutes
+    - tlsroutes
+    - referencegrants
+    - grpcroutes
+    - udproutes
+    verbs:
+    - get
+    - list
+    - watch
+    - delete
+  - apiGroups:
+    - apiextensions.k8s.io
+    resources:
+    - customresourcedefinitions
+    verbs:
+    - get
+    - list
+    - watch
+    - delete
+{{- if .Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-generate-manifests
+    verbs:
+      - use
+{{- end }}
+{{- end }}
