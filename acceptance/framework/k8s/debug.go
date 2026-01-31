@@ -44,6 +44,30 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 		testDebugDirectory := filepath.Join(debugDirectory, tn, contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
 
+		logger.Log(t, "collecting api gateway logs")
+		// collect logs and describe for gateway resources
+		apiGwPods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "gateway.consul.hashicorp.com/name=gateway"})
+		if err != nil {
+			logger.Log(t, "unable to list API Gateway pods", "err", err)
+		} else {
+			logger.Logf(t, "found %d api gateway pods to collect logs from", len(apiGwPods.Items))
+			for _, pod := range apiGwPods.Items {
+				logger.Log(t, "api-gw: ", pod.Name)
+				// Describe pod and write it to a file.
+				writeResourceInfoToFile(t, pod.Name, "pod", testDebugDirectory, kubectlOptions)
+
+				// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
+				logs, err := RunKubectlAndGetOutputWithLoggerE(t, kubectlOptions, terratestLogger.Discard, "logs", "--all-containers=true", pod.Name)
+				if err != nil {
+					logs = fmt.Sprintf("Error getting logs for pod %s: %s\n%s", pod.Name, err.Error(), logs)
+					logger.Log(t, "unable to fetch log from api gw pod: ", pod.Name, "\n err: ", err)
+				}
+				// Write logs or err to file name <pod.Name>.log
+				logFilename := filepath.Join(testDebugDirectory, fmt.Sprintf("%s.log", pod.Name))
+				require.NoError(t, os.WriteFile(logFilename, []byte(logs), 0600))
+			}
+		}
+
 		logger.Logf(t, "dumping logs, pod info, and envoy config for %s to %s", labelSelector, testDebugDirectory)
 
 		// Describe and get logs for any pods.
@@ -86,7 +110,7 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			if isServiceMeshPod || isGatewayPod {
 				localPort := portforward.CreateTunnelToResourcePort(t, pod.Name, 19000, kubectlOptions, terratestLogger.Discard)
 
-				configDumpResp, err := http.DefaultClient.Get(fmt.Sprintf("http://%s/config_dump?format=json", localPort))
+				configDumpResp, err := http.DefaultClient.Get(fmt.Sprintf("http://%s/config_dump?format=json&include_eds", localPort))
 				var configDump string
 				if err != nil {
 					configDump = fmt.Sprintf("Error getting config_dump: %s: %s", err, configDump)
@@ -166,6 +190,19 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			for _, service := range services.Items {
 				// Describe service and write it to a file.
 				writeResourceInfoToFile(t, service.Name, "service", testDebugDirectory, kubectlOptions)
+			}
+		}
+
+		// Describe any persistent volume claims in the namespace.
+		// for consul server/storage debugging
+		// This is useful for debugging storage issues, as the describe output includes events.
+		pvcs, err := client.CoreV1().PersistentVolumeClaims(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
+		if err != nil {
+			logger.Log(t, "unable to get persistentvolumeclaims", "err", err)
+		} else {
+			for _, pvc := range pvcs.Items {
+				// Describe pvc and write it to a file.
+				writeResourceInfoToFile(t, pvc.Name, "pvc", testDebugDirectory, kubectlOptions)
 			}
 		}
 
