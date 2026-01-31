@@ -1981,6 +1981,72 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# extraInitContainers
+
+@test "server/statefulset: extraInitContainers adds extra Init container" {
+  cd `chart_dir`
+
+  # Test that it defines the extra Init container
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.extraInitContainers[0].image=test-image' \
+      --set 'server.extraInitContainers[0].name=test-init-container' \
+      --set 'server.extraInitContainers[0].ports[0].name=test-port' \
+      --set 'server.extraInitContainers[0].ports[0].containerPort=9410' \
+      --set 'server.extraInitContainers[0].ports[0].protocol=TCP' \
+      --set 'server.extraInitContainers[0].env[0].name=TEST_ENV' \
+      --set 'server.extraInitContainers[0].env[0].value=test_env_value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers[] | select(.name == "test-init-container")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+      yq -r '.name' | tee /dev/stderr)
+  [ "${actual}" = "test-init-container" ]
+  local actual=$(echo $object |
+      yq -r '.image' | tee /dev/stderr)
+  [ "${actual}" = "test-image" ]
+
+  local actual=$(echo $object |
+      yq -r '.ports[0].name' | tee /dev/stderr)
+  [ "${actual}" = "test-port" ]
+
+  local actual=$(echo $object |
+      yq -r '.ports[0].containerPort' | tee /dev/stderr)
+  [ "${actual}" = "9410" ]
+
+  local actual=$(echo $object |
+      yq -r '.ports[0].protocol' | tee /dev/stderr)
+  [ "${actual}" = "TCP" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[0].name' | tee /dev/stderr)
+  [ "${actual}" = "TEST_ENV" ]
+
+  local actual=$(echo $object |
+      yq -r '.env[0].value' | tee /dev/stderr)
+  [ "${actual}" = "test_env_value" ]
+
+}
+
+@test "server/statefulset: extraInitContainers supports adding two containers" {
+  cd `chart_dir`
+
+  local object=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.enabled=true' \
+      --set 'server.extraInitContainers[0].image=test-image' \
+      --set 'server.extraInitContainers[0].name=test-init-container' \
+      --set 'server.extraInitContainers[1].image=test-image' \
+      --set 'server.extraInitContainers[1].name=test-init-container-2' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.initContainers | length' | tee /dev/stderr)
+
+  [ "${object}" = 3 ]
+
+}
+
+#--------------------------------------------------------------------
 # vault integration
 
 @test "server/StatefulSet: fail when vault is enabled but the consulServerRole is not provided" {
