@@ -719,6 +719,17 @@ global:
         # @type: string
         protocol: "http"
 
+      tags: 
+        # Override the datadog env tag set in "tags.datadoghq.com/env"
+        # @default: "", set to "{{ template consul.name }}" in server.statefulset.yaml 
+        # @type: string
+        env: ""
+        # Override the datadog version tag set in "tags.datadoghq.com/service"
+        # @default: "consul-server"
+        # @type: string
+        service: "consul-server"
+
+
       # Configuration settings for DogStatsD metrics aggregation service
       # that is bundled with the Datadog Agent.
       # DogStatsD implements the StatsD protocol and adds a few Datadog-specific extensions:
