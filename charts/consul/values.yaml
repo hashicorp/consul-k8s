@@ -28,7 +28,7 @@ global:
   name: null
 
   # The domain Consul will answer DNS queries for
-  # (Refer to [`-domain`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_domain)) and the domain services synced from
+  # (Refer to [`-domain`](https://developer.hashicorp.com/consul/commands/agent#_domain)) and the domain services synced from
   # Consul into Kubernetes will have, e.g. `service-name.service.consul`.
   domain: consul
 
@@ -106,7 +106,7 @@ global:
   # secretsBackend is used to configure Vault as the secrets backend for the Consul on Kubernetes installation.
   # The Vault cluster needs to have the Kubernetes Auth Method, KV2 and PKI secrets engines enabled
   # and have necessary secrets, policies and roles created prior to installing Consul.
-  # Refer to [Vault as the Secrets Backend](https://developer.hashicorp.com/consul/docs/k8s/deployment-configurations/vault)
+  # Refer to [Vault as the Secrets Backend](https://developer.hashicorp.com/consul/docs/deploy/server/k8s/vault)
   # documentation for full instructions.
   #
   # The Vault cluster _must_ not have the Consul cluster installed by this Helm chart as its storage backend
@@ -120,7 +120,7 @@ global:
   secretsBackend:
     vault:
       # Vault namespace (optional). This sets the Vault namespace for the `vault.hashicorp.com/namespace`
-      # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/connect/ca/vault#namespace).
+      # agent annotation and [Vault Connect CA namespace](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#namespace).
       # To override one of these values individually, see `agentAnnotations` and `connectCA.additionalConfig`.
       vaultNamespace: ""
 
@@ -212,7 +212,7 @@ global:
       # The provider will be configured to use the Vault Kubernetes auth method
       # and therefore requires the role provided by `global.secretsBackend.vault.consulServerRole`
       # to have permissions to the root and intermediate PKI paths.
-      # Please refer to [Vault ACL policies](https://developer.hashicorp.com/consul/docs/connect/ca/vault#vault-acl-policies)
+      # Please refer to [Vault ACL policies](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#vault-acl-policies)
       # documentation for information on how to configure the Vault policies.
       connectCA:
         # The address of the Vault server.
@@ -222,15 +222,15 @@ global:
         authMethodPath: "kubernetes"
 
         # The path to a PKI secrets engine for the root certificate.
-        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#rootpkipath).
+        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#rootpkipath).
         rootPKIPath: ""
 
         # The path to a PKI secrets engine for the generated intermediate certificate.
-        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#intermediatepkipath).
+        # For more details, please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#intermediatepkipath).
         intermediatePKIPath: ""
 
         # Additional Connect CA configuration in JSON format.
-        # Please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/connect/ca/vault#configuration)
+        # Please refer to [Vault Connect CA configuration](https://developer.hashicorp.com/consul/docs/secure-mesh/certificate/vault#configuration)
         # for all configuration options available for that provider.
         #
         # Example:
@@ -268,7 +268,7 @@ global:
           secretName: null
 
   # Configures Consul's gossip encryption key.
-  # (Refer to [`-encrypt`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_encrypt)).
+  # (Refer to [`-encrypt`](https://developer.hashicorp.com/consul/commands/agent#_encrypt)).
   # By default, gossip encryption is not enabled. The gossip encryption key may be set automatically or manually.
   # The recommended method is to automatically generate the key.
   # To automatically generate and set a gossip encryption key, set autoGenerate to true.
@@ -304,19 +304,19 @@ global:
 
   # A list of addresses of upstream DNS servers that are used to recursively resolve DNS queries.
   # These values are given as `-recursor` flags to Consul servers and clients.
-  # Refer to [`-recursor`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_recursor) for more details.
+  # Refer to [`-recursor`](https://developer.hashicorp.com/consul/commands/agent#_recursor) for more details.
   # If this is an empty array (the default), then Consul DNS will only resolve queries for the Consul top level domain (by default `.consul`).
   # @type: array<string>
   recursors: []
 
-  # Enables [TLS](https://developer.hashicorp.com/consul/tutorials/security/tls-encryption-secure)
+  # Enables [TLS](https://developer.hashicorp.com/consul/docs/secure/encryption/tls/mtls)
   # across the cluster to verify authenticity of the Consul servers and clients.
   # Requires Consul v1.4.1+.
   tls:
     # If true, the Helm chart will enable TLS for Consul
     # servers and clients and all consul-k8s-control-plane components, as well as generate certificate
     # authority (optional) and server and client certificates.
-    # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
+    # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/east-west/cluster-peering/tech-specs/k8s).
     enabled: false
 
     # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
@@ -343,7 +343,7 @@ global:
     # If true, `verify_outgoing`, `verify_server_hostname`,
     # and `verify_incoming` for internal RPC communication will be set to `true` for Consul servers and clients.
     # Set this to false to incrementally roll out TLS on an existing Consul cluster.
-    # Please refer to [TLS on existing clusters](https://developer.hashicorp.com/consul/docs/k8s/operations/tls-on-existing-cluster)
+    # Please refer to [TLS on existing clusters](https://developer.hashicorp.com/consul/docs/secure/encryption/tls/rotate/k8s)
     # for more details.
     verify: true
 
@@ -591,7 +591,7 @@ global:
     # This address must be reachable from the Consul servers in the primary datacenter.
     # This auth method will be used to provision ACL tokens for Consul components and is different
     # from the one used by the Consul Service Mesh.
-    # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+    # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method/k8s).
     #
     # If `externalServers.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
     # `externalServers.k8sAuthMethodHost` should be set to the same value.
@@ -806,9 +806,6 @@ global:
   # the API before cancelling the request.
   consulAPITimeout: 5s
 
-  # Enables installing an HCP Consul Central self-managed cluster.
-  # Requires Consul v1.14+.
-
   # Extra labels to attach to all pods, deployments, daemonsets, statefulsets, and jobs. This should be a YAML map.
   #
   # Example:
@@ -876,7 +873,7 @@ server:
   image: null
 
   # The number of server agents to run. This determines the fault tolerance of
-  # the cluster. Please refer to the [deployment table](https://developer.hashicorp.com/consul/docs/architecture/consensus#deployment-table)
+  # the cluster. Please refer to the [deployment table](https://developer.hashicorp.com/consul/docs/concept/consensus#deployment-table)
   # for more information.
   replicas: 1
 
@@ -918,7 +915,7 @@ server:
   # Vault Secrets backend:
   # If you are using Vault as a secrets backend, a Vault Policy must be created which allows `["create", "update"]`
   # capabilities on the PKI issuing endpoint, which is usually of the form `pki/issue/consul-server`.
-  # Complete [this tutorial](https://developer.hashicorp.com/consul/tutorials/vault-secure/vault-pki-consul-secure-tls)
+  # Refer to [Generate mTLS Certificates for Consul with Vault and Consul Template](https://developer.hashicorp.com/consul/docs/automate/consul-template/vault/mtls)
   # to learn how to generate a compatible certificate.
   # Note: when using TLS, both the `server.serverCert` and `global.tls.caCert` which points to the CA endpoint of this PKI engine
   # must be provided.
@@ -962,7 +959,7 @@ server:
   # storage classes, the PersistentVolumeClaims would need to be manually created.
   # A `null` value will use the Kubernetes cluster's default StorageClass. If a default
   # StorageClass does not exist, you will need to create one.
-  # Refer to the [Read/Write Tuning](https://developer.hashicorp.com/consul/docs/install/performance#read-write-tuning)
+  # Refer to the [Read/Write Tuning](https://developer.hashicorp.com/consul/docs/reference/architecture/server#read-write-tuning)
   # section of the Server Performance Requirements documentation for considerations
   # around choosing a performant storage class.
   #
@@ -987,11 +984,11 @@ server:
   # @type: map
   persistentVolumeClaimRetentionPolicy: null
 
-  # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect). Setting this to true
+  # This will enable/disable [service mesh](https://developer.hashicorp.com/consul/docs/connect/enable). Setting this to true
   # _will not_ automatically secure pod communication, this
   # setting will only enable usage of the feature. Consul will automatically initialize
   # a new CA and set of certificates. Additional service mesh settings can be configured
-  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/connect/config-entries).
+  # by setting the `server.extraConfig` value or by applying [configuration entries](https://developer.hashicorp.com/consul/docs/fundamentals/config-entry).
   connect: true
 
   # When set to true, enables Consul to report additional debugging information, including runtime profiling (pprof) data.
@@ -1078,7 +1075,7 @@ server:
   # control a rolling update of Consul server agents. This value specifies the
   # [partition](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#partitions)
   # for performing a rolling update. Please read the linked Kubernetes
-  # and [Upgrade Consul](https://developer.hashicorp.com/consul/docs/k8s/upgrade#upgrading-consul-servers)
+  # and [Upgrade Consul](https://developer.hashicorp.com/consul/docs/upgrade/k8s#upgrading-consul-servers)
   # documentation for more information.
   updatePartition: 0
 
@@ -1104,7 +1101,7 @@ server:
     # @type: integer
     maxUnavailable: null
 
-  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
+  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/general) for Consul
   # servers. This will be saved as-is into a ConfigMap that is read by the Consul
   # server agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -1404,7 +1401,7 @@ server:
 
   # [Enterprise Only] Added in Consul 1.8, the audit object allow users to enable auditing
   # and configure a sink and filters for their audit logs. Please refer to
-  # [audit logs](https://developer.hashicorp.com/consul/docs/enterprise/audit-logging) documentation
+  # [audit logs](https://developer.hashicorp.com/consul/docs/monitor/log/audit) documentation
   # for further information.
   auditLogs:
     # Controls whether Consul logs out each time a user performs an operation.
@@ -1463,7 +1460,7 @@ server:
     # This object specifies configurations that limit the rate of RPC and gRPC
     # requests on the Consul server. Limiting the rate of gRPC and RPC requests
     # also limits HTTP requests to the Consul server.
-    # https://developer.hashicorp.com/consul/docs/agent/config/config-files#request_limits
+    # https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/general#request_limits
     requestLimits:
       # Setting for disabling or enabling rate limiting.  If not disabled, it
       # enforces the action that will occur when RequestLimitsReadRate
@@ -1536,7 +1533,7 @@ externalServers:
   # If you are setting `global.acls.manageSystemACLs` and
   # `connectInject.enabled` to true, set `k8sAuthMethodHost` to the address of the Kubernetes API server.
   # This address must be reachable from the Consul servers.
-  # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes).
+  # Please refer to the [Kubernetes Auth Method documentation](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method/k8s).
   #
   # If `global.federation.enabled` is set to true, `global.federation.k8sAuthMethodHost` and
   # `externalServers.k8sAuthMethodHost` should be set to the same value.
@@ -1572,7 +1569,7 @@ client:
   # @type: string
   image: null
 
-  # A list of valid [`-retry-join` values](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_retry_join).
+  # A list of valid [`-retry-join` values](https://developer.hashicorp.com/consul/commands/agent#_retry_join).
   # If this is `null` (default), then the clients will attempt to automatically
   # join the server cluster running within Kubernetes.
   # This means that with `server.enabled` set to true, clients will automatically
@@ -1598,7 +1595,7 @@ client:
   grpc: true
 
   # nodeMeta specifies an arbitrary metadata key/value pair to associate with the node
-  # (refer to [`-node-meta`](https://developer.hashicorp.com/consul/docs/agent/config/cli-flags#_node_meta))
+  # (refer to [`-node-meta`](https://developer.hashicorp.com/consul/commands/agent#_node_meta))
   nodeMeta:
     pod-name: ${HOSTNAME}
     host-ip: ${HOST_IP}
@@ -1679,7 +1676,7 @@ client:
       # Maximum seconds to sleep before attempting the ACL login.
       maxSeconds: 0
 
-  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/agent/config/config-files) for Consul
+  # A raw string of extra [JSON configuration](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file) for Consul
   # clients. This will be saved as-is into a ConfigMap that is read by the Consul
   # client agents. This can be used to add additional configuration that
   # isn't directly exposed by the chart.
@@ -2055,7 +2052,7 @@ ui:
     # @default: global.metrics.enabled
     enabled: "-"
     # Provider for metrics. Refer to
-    # [`metrics_provider`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_metrics_provider)
+    # [`metrics_provider`](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/ui#ui_config_metrics_provider)
     # This value is only used if `ui.enabled` is set to true.
     # @type: string
     provider: "prometheus"
@@ -2065,10 +2062,10 @@ ui:
     # @type: string
     baseURL: http://prometheus-server
 
-  # Corresponds to [`dashboard_url_templates`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates)
+  # Corresponds to [`dashboard_url_templates`](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/ui#ui_config_dashboard_url_templates)
   # configuration.
   dashboardURLTemplates:
-    # Sets [`dashboardURLTemplates.service`](https://developer.hashicorp.com/consul/docs/agent/config/config-files#ui_config_dashboard_url_templates_service).
+    # Sets [`dashboardURLTemplates.service`](https://developer.hashicorp.com/consul/docs/reference/agent/configuration-file/ui#ui_config_dashboard_url_templates_service).
     service: ""
 
 # Configure the catalog sync process to sync K8S with Consul
@@ -2094,7 +2091,7 @@ syncCatalog:
   image: null
 
   # If true, all valid services in K8S are
-  # synced by default. If false, the service must be [annotated](https://developer.hashicorp.com/consul/docs/k8s/service-sync#enable-and-disable-sync)
+  # synced by default. If false, the service must be [annotated](https://developer.hashicorp.com/consul/docs/register/service/k8s/service-sync#enable-and-disable-sync)
   # properly to sync.
   # In either case an annotation can override the default.
   default: true
@@ -2362,7 +2359,7 @@ connectInject:
 
   # If true, the injector will inject the
   # Connect sidecar into all pods by default. Otherwise, pods must specify the
-  # [injection annotation](https://developer.hashicorp.com/consul/docs/k8s/connect#consul-hashicorp-com-connect-inject)
+  # [injection annotation](https://developer.hashicorp.com/consul/docs/connect/k8s#consul-hashicorp-com-connect-inject)
   # to opt-in to Connect injection. If this is true, pods can use the same annotation
   # to explicitly opt-out of injection.
   default: false
@@ -2864,8 +2861,8 @@ connectInject:
   # If set to an empty string all service accounts can log in.
   # This only has effect if ACLs are enabled.
   #
-  # Refer to Auth methods [Binding rules](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods#binding-rules)
-  # and [Trusted identiy attributes](https://developer.hashicorp.com/consul/docs/security/acl/auth-methods/kubernetes#trusted-identity-attributes)
+  # Refer to Auth methods [Binding rules](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method#binding-rules)
+  # and [Trusted identiy attributes](https://developer.hashicorp.com/consul/docs/secure/acl/auth-method/k8s#trusted-identity-attributes)
   # for more details.
   # Requires Consul >= v1.5.
   aclBindingRuleSelector: "serviceaccount.name!=default"
@@ -3006,11 +3003,11 @@ connectInject:
         # @type: string
         cpu: null
 
-# [Mesh Gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) enable Consul Connect to work across Consul datacenters.
+# [Mesh Gateways](https://developer.hashicorp.com/consul/docs/east-west/mesh-gateway) enable Consul to work across Consul datacenters.
 meshGateway:
-  # If [mesh gateways](https://developer.hashicorp.com/consul/docs/connect/gateways/mesh-gateway) are enabled, a Deployment will be created that runs
+  # If [mesh gateways](https://developer.hashicorp.com/consul/docs/east-west/mesh-gateway) are enabled, a Deployment will be created that runs
   # gateways and Consul service mesh will be configured to use gateways.
-  # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/connect/cluster-peering/k8s).
+  # This setting is required for [Cluster Peering](https://developer.hashicorp.com/consul/docs/east-west/cluster-peering/tech-specs/k8s).
   # Requirements: consul 1.6.0+ if using `global.acls.manageSystemACLs``.
   enabled: false
 
