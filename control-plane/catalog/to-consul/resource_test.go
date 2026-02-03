@@ -2328,20 +2328,6 @@ func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceR
 	}
 }
 
-func validateEndpointSliceServicePorts(r *retry.R, service *consulapi.AgentService) {
-	require.Equal(r, 0, service.Port)
-
-	require.Len(r, service.Ports, 2)
-	require.Equal(r, 8080, service.Ports[0].Port)
-	require.Equal(r, "http", service.Ports[0].Name)
-	require.True(r, service.Ports[0].Default)
-
-	require.Equal(r, 2000, service.Ports[1].Port)
-	require.Equal(r, "rpc", service.Ports[1].Name)
-	require.False(r, service.Ports[1].Default)
-
-}
-
 func TestGetAnnotationServiceName(t *testing.T) {
 	tests := []struct {
 		name          string
