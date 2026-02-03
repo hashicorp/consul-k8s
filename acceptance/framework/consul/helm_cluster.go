@@ -86,6 +86,10 @@ func NewHelmCluster(
 		createOrUpdateLicenseSecret(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
+	if cfg.UseOpenshift {
+		helmValues["global.openshift.enabled"] = "true"
+	}
+
 	// Deploy with the following defaults unless helmValues overwrites it.
 	values := defaultValues()
 	valuesFromConfig, err := cfg.HelmValuesFromConfig()
@@ -169,7 +173,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
-
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be

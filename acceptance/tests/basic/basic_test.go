@@ -56,15 +56,6 @@ func TestBasicInstallation(t *testing.T) {
 				"client.enabled":                       "true",
 			}
 
-			if cfg.EnableOpenshift {
-				helmValues["global.openshift.enabled"] = "true"
-			}
-
-			if cfg.EnterpriseLicense != "" {
-				helmValues["global.enterpriseLicense.secretName"] = "consul-ent-license"
-				helmValues["global.enterpriseLicense.secretKey"] = "key"
-			}
-
 			consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 
 			consulCluster.Create(t)
