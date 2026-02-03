@@ -1121,14 +1121,6 @@ func updateServiceMeta(baseServiceMeta map[string]string, endpoint discoveryv1.E
 	return serviceMeta
 }
 
-func getPortName(name string, idx int) string {
-	if strings.TrimSpace(name) == "" {
-		return fmt.Sprintf("port%d", idx)
-	}
-
-	return name
-}
-
 // getAnnotationServiceName extracts and validates the service name from annotations.
 // Returns the trimmed service name and true if valid, or empty string and false if invalid.
 func getAnnotationServiceName(annotations map[string]string, log hclog.Logger, svcName, namespace string) (string, bool) {
