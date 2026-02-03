@@ -5,7 +5,6 @@ package catalog
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 
