@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
@@ -2324,5 +2325,75 @@ func defaultServiceResource(client kubernetes.Interface, syncer Syncer) ServiceR
 		AllowK8sNamespacesSet: mapset.NewSet("*"),
 		DenyK8sNamespacesSet:  mapset.NewSet(),
 		ConsulNodeName:        ConsulSyncNodeName,
+	}
+}
+
+func TestGetAnnotationServiceName(t *testing.T) {
+	tests := []struct {
+		name          string
+		annotations   map[string]string
+		expectedValue string
+		expectedValid bool
+	}{
+		{
+			name:          "no annotation present",
+			annotations:   map[string]string{},
+			expectedValue: "",
+			expectedValid: true,
+		},
+		{
+			name:          "valid annotation",
+			annotations:   map[string]string{annotationServiceName: "my-service"},
+			expectedValue: "my-service",
+			expectedValid: true,
+		},
+		{
+			name:          "valid annotation with whitespace",
+			annotations:   map[string]string{annotationServiceName: "  my-service  "},
+			expectedValue: "my-service",
+			expectedValid: true,
+		},
+		{
+			name:          "empty annotation",
+			annotations:   map[string]string{annotationServiceName: ""},
+			expectedValue: "",
+			expectedValid: false,
+		},
+		{
+			name:          "whitespace only annotation",
+			annotations:   map[string]string{annotationServiceName: "   "},
+			expectedValue: "",
+			expectedValid: false,
+		},
+		{
+			name:          "annotation exceeds 255 characters",
+			annotations:   map[string]string{annotationServiceName: strings.Repeat("a", 256)},
+			expectedValue: "",
+			expectedValid: false,
+		},
+		{
+			name:          "annotation exactly 255 characters",
+			annotations:   map[string]string{annotationServiceName: strings.Repeat("a", 255)},
+			expectedValue: strings.Repeat("a", 255),
+			expectedValid: true,
+		},
+		{
+			name:          "annotation exactly 1 character",
+			annotations:   map[string]string{annotationServiceName: "a"},
+			expectedValue: "a",
+			expectedValid: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			value, valid := getAnnotationServiceName(tt.annotations, nil, "test-svc", "default")
+			if value != tt.expectedValue {
+				t.Errorf("expected value %q, got %q", tt.expectedValue, value)
+			}
+			if valid != tt.expectedValid {
+				t.Errorf("expected valid %v, got %v", tt.expectedValid, valid)
+			}
+		})
 	}
 }
