@@ -64,22 +64,22 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 
 	cases := []dnsWithPartitionsTestCase{
 		{
-			name:   "not secure - ACLs and auto-encrypt not enabled",
+			name:   "not secure - ACLs and auto-encrypt not enabled privileged port",
 			secure: false,
 			port:   privilegedPort,
 		},
 		{
-			name:   "secure - ACLs and auto-encrypt enabled",
+			name:   "secure - ACLs and auto-encrypt enabled privileged port",
 			secure: true,
 			port:   privilegedPort,
 		},
 		{
-			name:   "not secure - ACLs and auto-encrypt not enabled",
+			name:   "not secure - ACLs and auto-encrypt not enabled non-privileged port",
 			secure: false,
 			port:   nonPrivilegedPort,
 		},
 		{
-			name:   "secure - ACLs and auto-encrypt enabled",
+			name:   "secure - ACLs and auto-encrypt enabled non-privileged port",
 			secure: true,
 			port:   nonPrivilegedPort,
 		},
