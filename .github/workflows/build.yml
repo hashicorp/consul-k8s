@@ -12,13 +12,22 @@ on:
       - "release/**"
       # Build on releng branches for testing build pipelines
       - "releng/**"
+      # Build sujay/bofa/1.8.3-debug for generating debug builds for testing
+      - "sujay/bofa/1.8.3-debug"
 
 env:
   PKG_NAME: "consul-k8s"
 
 jobs:
   conditional-skip:
-    uses: ./.github/workflows/reusable-conditional-skip.yml
+    runs-on: ubuntu-latest
+    outputs:
+      skip-ci: ${{ steps.set-skip.outputs.skip-ci }}
+    steps:
+      - name: Set skip-ci output
+        id: set-skip
+        run: |
+          echo "skip-ci=false" >> "$GITHUB_OUTPUT"
 
   get-go-version:
     # Cascades down to test jobs
