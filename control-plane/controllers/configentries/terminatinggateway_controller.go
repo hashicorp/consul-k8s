@@ -237,7 +237,7 @@ func (r *TerminatingGatewayController) adminPartition() string {
 	if r.ConfigEntryController == nil {
 		return common.DefaultConsulPartition
 	}
-	return defaultIfEmpty(r.ConfigEntryController.ConsulPartition, "default")
+	return defaultIfEmpty(r.ConfigEntryController.ConsulPartition)
 }
 
 func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consulv1alpha1.TerminatingGateway) error {
@@ -316,7 +316,7 @@ func (r *TerminatingGatewayController) updateACls(log logr.Logger, termGW *consu
 func handleDeletionForPolicies(services []v1alpha1.LinkedService) ([]*capi.ACLRolePolicyLink, []*capi.ACLRolePolicyLink) {
 	var termGWPoliciesToRemove []*capi.ACLRolePolicyLink
 	for _, service := range services {
-		termGWPoliciesToRemove = append(termGWPoliciesToRemove, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace, "default"))})
+		termGWPoliciesToRemove = append(termGWPoliciesToRemove, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace))})
 	}
 	return nil, termGWPoliciesToRemove
 }
@@ -328,17 +328,17 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 
 	termGWPoliciesToKeepNames := mapset.NewSet[string]()
 	for _, service := range services {
-		log.Info("Checking for existing policies", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace, "default")))
-		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace, "default")), &capi.QueryOptions{})
+		log.Info("Checking for existing policies", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
+		existingPolicy, _, err := client.ACL().PolicyReadByName(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)), &capi.QueryOptions{})
 		if err != nil {
 			log.Error(err, "error reading policy")
 			return nil, nil, err
 		}
 
 		if existingPolicy == nil {
-			log.Info("No existing ACL Policies Found", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace, "default")))
+			log.Info("No existing ACL Policies Found", "policy", servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
 			policyTemplate := getPolicyTemplateFor(service.Name)
-			policyNamespace := defaultIfEmpty(service.Namespace, "default")
+			policyNamespace := defaultIfEmpty(service.Namespace)
 			policyAdminPartition := r.adminPartition()
 			log.Info("Templating new ACL Policy", "Service", service.Name, "Namespace", policyNamespace, "Partition", policyAdminPartition)
 			var data bytes.Buffer
@@ -355,7 +355,7 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 			}
 
 			_, _, err = client.ACL().PolicyCreate(&capi.ACLPolicy{
-				Name:  servicePolicyName(service.Name, defaultIfEmpty(service.Namespace, "default")),
+				Name:  servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)),
 				Rules: data.String(),
 			}, nil)
 			if err != nil {
@@ -368,8 +368,8 @@ func (r *TerminatingGatewayController) handleModificationForPolicies(log logr.Lo
 			log.Info("Found for existing policies", "policy", existingPolicy.Name, "ID", existingPolicy.ID)
 		}
 
-		termGWPoliciesToKeep = append(termGWPoliciesToKeep, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace, "default"))})
-		termGWPoliciesToKeepNames.Add(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace, "default")))
+		termGWPoliciesToKeep = append(termGWPoliciesToKeep, &capi.ACLRolePolicyLink{Name: servicePolicyName(service.Name, defaultIfEmpty(service.Namespace))})
+		termGWPoliciesToKeepNames.Add(servicePolicyName(service.Name, defaultIfEmpty(service.Namespace)))
 	}
 
 	for _, policy := range existingTermGWPolicies.Difference(termGWPoliciesToKeepNames).ToSlice() {
@@ -426,11 +426,14 @@ func getPolicyTemplateFor(service string) *template.Template {
 	return servicePolicyTpl
 }
 
-func defaultIfEmpty(s string, defaultVal string) string {
-	if s == "" {
-		return defaultVal
+func defaultIfEmpty(s string, defaultVal ...string) string {
+	if s != "" {
+		return s
 	}
-	return s
+	if len(defaultVal) > 0 {
+		return defaultVal[0]
+	}
+	return "default"
 }
 
 func servicePolicyName(name, namespace string) string {
