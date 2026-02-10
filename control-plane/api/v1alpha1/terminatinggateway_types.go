@@ -62,6 +62,93 @@ type TerminatingGatewayList struct {
 type TerminatingGatewaySpec struct {
 	// Services is a list of service names represented by the terminating gateway.
 	Services []LinkedService `json:"services,omitempty"`
+
+	// === DEPLOYMENT FIELDS ===
+
+	// GatewayName is the name of the gateway service in Consul
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=terminating-gateway
+	GatewayName string `json:"gatewayName,omitempty"`
+
+	// Replicas is the number of pod instances to deploy
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Optional
+	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Resources define CPU and memory requests/limits for the pod
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default:={requests: {memory: "100Mi", cpu: "100m"}, limits: {memory: "100Mi", cpu: "100m"}}
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// Affinity defines pod scheduling affinity rules
+	// +kubebuilder:validation:Optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
+
+	// Tolerations define pod tolerations for node taints
+	// +kubebuilder:validation:Optional
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// TopologySpreadConstraints define pod topology spread constraints
+	// +kubebuilder:validation:Optional
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+
+	// NodeSelector defines labels for node selection
+	// +kubebuilder:validation:Optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+	// PriorityClassName is the priority class for pod scheduling
+	// +kubebuilder:validation:Optional
+	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// Annotations are custom annotations applied to the pod
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// ExtraVolumes are additional volumes to mount in the pod
+	// +kubebuilder:validation:Optional
+	ExtraVolumes []ExtraVolume `json:"extraVolumes,omitempty"`
+
+	// ServiceAccount defines service account configuration
+	// +kubebuilder:validation:Optional
+	ServiceAccount ServiceAccountConfig `json:"serviceAccount,omitempty"`
+
+	// ConsulNamespace is the Consul namespace where the gateway is registered
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="default"
+	ConsulNamespace string `json:"consulNamespace,omitempty"`
+
+	// +kubebuilder:default=info
+	LogLevel string `json:"logLevel,omitempty"`
+	// +kubebuilder:default=false
+	LogJSON *bool `json:"logJSON,omitempty"`
+}
+
+// ExtraVolume defines a volume to be mounted in the pod
+type ExtraVolume struct {
+	// Name is the name of the volume
+	Name string `json:"name"`
+
+	// Type is the volume type (configMap or secret)
+	// +kubebuilder:validation:Enum=configMap;secret
+	Type string `json:"type"`
+
+	// Load indicates if the volume should be loaded
+	// +kubebuilder:validation:Optional
+	Load bool `json:"load,omitempty"`
+
+	Items []KeyToPath `json:"items,omitempty"`
+}
+
+// ServiceAccountConfig defines service account configuration
+type ServiceAccountConfig struct {
+	// Annotations are annotations for the service account
+	// +kubebuilder:validation:Optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type KeyToPath struct {
+	Key  string `json:"key"`
+	Path string `json:"path"`
 }
 
 // A LinkedService is a service represented by a terminating gateway.
@@ -167,7 +254,7 @@ func (in *TerminatingGateway) SetSyncedCondition(status corev1.ConditionStatus, 
 	in.Status.Conditions = append(in.Status.Conditions, cond)
 }
 
-func (in *TerminatingGateway) SetACLStatusConditon(status corev1.ConditionStatus, reason, message string) {
+func (in *TerminatingGateway) SetACLStatusCondition(status corev1.ConditionStatus, reason, message string) {
 	cond := Condition{
 		Type:               ConsulACLStatus,
 		Status:             status,

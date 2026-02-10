@@ -1,0 +1,81 @@
+{{- if .Values.terminatingGateways.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-helm-values
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+data:
+  values.json: |
+    {
+      "fullnameOverride": {{ .Values.fullnameOverride | default "" | quote }},
+      "nameOverride": {{ .Values.nameOverride | default "" | quote }},
+      "release": {
+        "name": {{ .Release.Name | quote }},
+        "namespace": {{ .Release.Namespace | quote }},
+        "service": {{ .Release.Service | quote }}
+      },
+      "global": {
+        "name": {{ .Values.global.name | default "" | quote }},
+        "enabled": {{ .Values.global.enabled | default true }},
+        "logLevel": {{ .Values.global.logLevel | default "info" | quote }},
+        "logJSON": {{ .Values.global.logJSON | default false }},
+        "datacenter": {{ .Values.global.datacenter | default "dc1" | quote }},
+        "enableConsulNamespaces": {{ .Values.global.enableConsulNamespaces | default false }},
+        "adminPartitions": {
+          "enabled": {{ .Values.global.adminPartitions.enabled | default false }},
+          "name": {{ .Values.global.adminPartitions.name | default "default" | quote }}
+        },
+        "tls": {
+          "enabled": {{ .Values.global.tls.enabled | default false }}
+        },
+        "acls": {
+          "manageSystemACLs": {{ .Values.global.acls.manageSystemACLs | default false }}
+        },
+        "metrics": {
+          "enabled": {{ .Values.global.metrics.enabled | default false }},
+          "enableGatewayMetrics": {{ .Values.global.metrics.enableGatewayMetrics | default false }}
+        },
+        "imageK8S": {{ .Values.global.imageK8S | quote }},
+        "imageConsulDataplane": {{ .Values.global.imageConsulDataplane | quote }},
+        "extraLabels": {{ .Values.global.extraLabels | default dict | toJson }},
+        "consulAPITimeout": {{ .Values.global.consulAPITimeout | default "10s" | quote }},
+        "imagePullPolicy": {{ .Values.global.imagePullPolicy | default "IfNotPresent" | quote }},
+        "enablePodSecurityPolicies": {{ .Values.global.enablePodSecurityPolicies | default false }},
+        "openShiftEnabled": {{ .Values.global.openShift.enabled | default false }}
+      },
+      "terminatingGateways": {
+        "enabled": {{ .Values.terminatingGateways.enabled }},
+        "logLevel": {{ .Values.terminatingGateways.logLevel | default "" | quote }},
+        "defaults": {
+          "replicas": {{ .Values.terminatingGateways.defaults.replicas | default 1 }},
+          "consulNamespace": {{ .Values.terminatingGateways.defaults.consulNamespace | default "default" | quote }},
+          "annotations": {{ .Values.terminatingGateways.defaults.annotations | default "" | quote }},
+          "affinity": {{ .Values.terminatingGateways.defaults.affinity | default "" | quote }},
+          "tolerations": {{ .Values.terminatingGateways.defaults.tolerations | default "" | quote }},
+          "topologySpreadConstraints": {{ .Values.terminatingGateways.defaults.topologySpreadConstraints | default "" | quote }},
+          "nodeSelector": {{ .Values.terminatingGateways.defaults.nodeSelector | default "" | quote }},
+          "priorityClassName": {{ .Values.terminatingGateways.defaults.priorityClassName | default "" | quote }},
+          "resources": {{ .Values.terminatingGateways.defaults.resources | default dict | toJson }},
+          "extraVolumes": {{ .Values.terminatingGateways.defaults.extraVolumes | default list | toJson }}
+        },
+        "gateways": {{ .Values.terminatingGateways.gateways | default list | toJson }}
+      },
+      "connectInject": {
+        "enabled": {{ .Values.connectInject.enabled | default false }}
+      },
+      "externalServers": {
+        "enabled": {{ .Values.externalServers.enabled | default false }},
+        "hosts": {{ .Values.externalServers.hosts | default list | toJson }},
+        "httpsPort": {{ .Values.externalServers.httpsPort | default 443 }},
+        "grpcPort": {{ .Values.externalServers.grpcPort | default 8502 }},
+        "tlsServerName": {{ .Values.externalServers.tlsServerName | default "" | quote }},
+        "useSystemRoots": {{ .Values.externalServers.useSystemRoots | default false }},
+        "skipServerWatch": {{ .Values.externalServers.skipServerWatch | default false }}
+      }
+    }
+{{- end }}
