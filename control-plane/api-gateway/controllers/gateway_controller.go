@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
+	"github.com/google/uuid"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 
@@ -70,13 +71,16 @@ type GatewayController struct {
 
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	correlationID := uuid.NewString()
+	ctx = context.WithValue(ctx, gatewayCorrelationContextKey{}, correlationID)
+
 	consulKey := r.Translator.ConfigEntryReference(api.APIGateway, req.NamespacedName)
 	nonNormalizedConsulKey := r.Translator.NonNormalizedConfigEntryReference(api.APIGateway, req.NamespacedName)
 
 	var gateway gwv1beta1.Gateway
 
-	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling Gateway")
+	log := gatewayLoggerWithCorrelation(ctx, r.Log).WithValues("gateway", req.NamespacedName)
+	log.Info("reconciling Gateway")
 
 	// get the gateway
 	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
@@ -99,6 +103,23 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
+
+	gatewayClassController := ""
+	if gatewayClass != nil {
+		gatewayClassController = string(gatewayClass.Spec.ControllerName)
+	}
+	gatewayMarkedDeleted := !gateway.GetDeletionTimestamp().IsZero()
+	gatewayClassMissing := gatewayClass == nil
+	gatewayClassMismatch := gatewayClassMissing || gatewayClassController != common.GatewayClassControllerName
+	gatewayClassConfigMissing := gatewayClassConfig == nil
+	log.Info(
+		"evaluated gateway lifecycle state",
+		"gatewayMarkedDeleted", gatewayMarkedDeleted,
+		"gatewayClassMissing", gatewayClassMissing,
+		"gatewayClassController", gatewayClassController,
+		"gatewayClassMismatch", gatewayClassMismatch,
+		"gatewayClassConfigMissing", gatewayClassConfigMissing,
+	)
 
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
@@ -208,13 +229,26 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	})
 
 	updates := binder.Snapshot()
+	log.Info(
+		"calculated gateway snapshot",
+		"upsertGatewayDeployment", updates.UpsertGatewayDeployment,
+		"consulUpdates", len(updates.Consul.Updates),
+		"consulDeletions", len(updates.Consul.Deletions),
+		"consulRegistrations", len(updates.Consul.Registrations),
+		"consulDeregistrations", len(updates.Consul.Deregistrations),
+		"kubernetesUpdates", len(updates.Kubernetes.Updates.Operations()),
+		"kubernetesStatusUpdates", len(updates.Kubernetes.StatusUpdates.Operations()),
+	)
 
 	if updates.UpsertGatewayDeployment {
-		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
+		log.Info("ensuring gateway ACL resources")
+		if err := r.cache.EnsureRoleBindingWithLogger(log, r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
 			return ctrl.Result{}, err
 		}
+		log.Info("finished ensuring gateway ACL resources")
 
+		log.Info("upserting gatekeeper resources")
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
@@ -225,8 +259,17 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Error(err, "unable to update gateway resources")
 			return ctrl.Result{}, err
 		}
+		log.Info("finished upserting gatekeeper resources")
 		r.gatewayCache.EnsureSubscribed(nonNormalizedConsulKey, req.NamespacedName)
 	} else {
+		log.Info(
+			"gateway deployment marked for cleanup",
+			"gatewayMarkedDeleted", gatewayMarkedDeleted,
+			"gatewayClassMismatch", gatewayClassMismatch,
+			"gatewayClassConfigMissing", gatewayClassConfigMissing,
+		)
+
+		log.Info("deleting gatekeeper resources")
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
@@ -237,6 +280,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Error(err, "unable to delete gateway resources")
 			return ctrl.Result{}, err
 		}
+		log.Info("finished deleting gatekeeper resources")
 		r.gatewayCache.RemoveSubscription(nonNormalizedConsulKey)
 		// make sure we have deregistered all services even if they haven't
 		// hit cache yet
@@ -245,11 +289,13 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
-		err = r.cache.RemoveRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace)
+		log.Info("removing gateway ACL resources")
+		err = r.cache.RemoveRoleBindingWithLogger(log, r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace)
 		if err != nil {
 			log.Error(err, "error removing acl role bindings")
 			return ctrl.Result{}, err
 		}
+		log.Info("finished removing gateway ACL resources")
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
@@ -323,6 +369,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	log.Info("finished reconciling Gateway")
 	return ctrl.Result{}, nil
 }
 
@@ -871,20 +918,24 @@ func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway 
 }
 
 func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
+	logger := gatewayLoggerWithCorrelation(ctx, c.Log).WithValues("gateway", gateway.String())
+
 	var list gwv1beta1.HTTPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, gateway.String()),
 	}); err != nil {
+		logger.Error(err, "unable to list HTTPRoutes")
 		return nil, err
 	}
 
 	for _, route := range list.Items {
 		resources.ReferenceCountHTTPRoute(route)
 
-		_, err := c.getExternalFiltersForHTTPRoute(ctx, route, resources)
+		routeLogger := logger.WithValues("httpRoute", client.ObjectKeyFromObject(&route))
+		_, err := c.getExternalFiltersForHTTPRoute(ctx, routeLogger, route, resources)
 		if err != nil {
-			c.Log.Error(err, "unable to list HTTPRoute ExternalFilters")
+			routeLogger.Error(err, "unable to list HTTPRoute ExternalFilters")
 			return nil, err
 		}
 	}
@@ -892,17 +943,19 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 	return list.Items, nil
 }
 
-func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1beta1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
+func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, baseLogger logr.Logger, route gwv1beta1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
 	var externalFilters []interface{}
-	for _, rule := range route.Spec.Rules {
-		ruleFilters, err := c.filterFiltersForExternalRefs(ctx, route, rule.Filters, resources)
+	for idx, rule := range route.Spec.Rules {
+		ruleLogger := baseLogger.WithValues("ruleIndex", idx)
+		ruleFilters, err := c.filterFiltersForExternalRefs(ctx, ruleLogger, route, rule.Filters, resources)
 		if err != nil {
 			return nil, err
 		}
 		externalFilters = append(externalFilters, ruleFilters...)
 
-		for _, backendRef := range rule.BackendRefs {
-			backendRefFilter, err := c.filterFiltersForExternalRefs(ctx, route, backendRef.Filters, resources)
+		for backendIdx, backendRef := range rule.BackendRefs {
+			backendLogger := ruleLogger.WithValues("backendRefIndex", backendIdx, "backendRefName", backendRef.Name)
+			backendRefFilter, err := c.filterFiltersForExternalRefs(ctx, backendLogger, route, backendRef.Filters, resources)
 			if err != nil {
 				return nil, err
 			}
@@ -914,7 +967,7 @@ func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, 
 	return externalFilters, nil
 }
 
-func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, route gwv1beta1.HTTPRoute, filters []gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
+func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, logger logr.Logger, route gwv1beta1.HTTPRoute, filters []gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
 	var externalFilters []interface{}
 
 	for _, filter := range filters {
@@ -942,7 +995,12 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 		}, externalFilter)
 		if err != nil {
 			if k8serrors.IsNotFound(err) {
-				c.Log.Info(fmt.Sprintf("externalref %s:%s not found: %v", filter.ExtensionRef.Kind, filter.ExtensionRef.Name, err))
+				logger.Info(
+					"external reference not found",
+					"kind", filter.ExtensionRef.Kind,
+					"name", filter.ExtensionRef.Name,
+					"error", err,
+				)
 				// ignore, the validation call should mark this route as error
 				continue
 			} else {
@@ -1274,4 +1332,13 @@ func shouldIgnore(namespace string, denySet, allowSet mapset.Set) bool {
 	}
 
 	return false
+}
+
+type gatewayCorrelationContextKey struct{}
+
+func gatewayLoggerWithCorrelation(ctx context.Context, base logr.Logger) logr.Logger {
+	if id, ok := ctx.Value(gatewayCorrelationContextKey{}).(string); ok && id != "" {
+		return base.WithValues("correlationID", id)
+	}
+	return base
 }

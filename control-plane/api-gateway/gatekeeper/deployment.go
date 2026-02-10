@@ -5,6 +5,9 @@ package gatekeeper
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"strconv"
 
 	"github.com/google/go-cmp/cmp"
@@ -58,6 +61,35 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		deployment.Spec.Replicas = existingDeployment.Spec.Replicas
 	}
 
+	desiredTemplateHash := deploymentTemplateHash(deployment)
+	desiredImage := primaryContainerImage(deployment)
+	existingTemplateHash := ""
+	existingImage := ""
+	managedFieldsEqual := false
+	if exists {
+		managedFieldsEqual = compareDeployments(deployment, existingDeployment)
+		existingTemplateHash = deploymentTemplateHash(existingDeployment)
+		existingImage = primaryContainerImage(existingDeployment)
+
+		g.Log.Info(
+			"evaluated gateway deployment drift",
+			"managedFieldsEqual", managedFieldsEqual,
+			"desiredTemplateHash", desiredTemplateHash,
+			"existingTemplateHash", existingTemplateHash,
+			"desiredImage", desiredImage,
+			"existingImage", existingImage,
+			"desiredTemplateAnnotationCount", len(deployment.Spec.Template.Annotations),
+			"existingTemplateAnnotationCount", len(existingDeployment.Spec.Template.Annotations),
+		)
+		if managedFieldsEqual && desiredImage != existingImage {
+			g.Log.Info(
+				"detected dataplane image drift not covered by managed deployment equality check",
+				"desiredImage", desiredImage,
+				"existingImage", existingImage,
+			)
+		}
+	}
+
 	mutated := deployment.DeepCopy()
 	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme())
 
@@ -68,11 +100,26 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 
 	switch result {
 	case controllerutil.OperationResultCreated:
-		g.Log.V(1).Info("Created Deployment")
+		g.Log.Info("created gateway deployment", "templateHash", deploymentTemplateHash(mutated), "image", primaryContainerImage(mutated))
 	case controllerutil.OperationResultUpdated:
-		g.Log.V(1).Info("Updated Deployment")
+		g.Log.Info(
+			"updated gateway deployment",
+			"desiredTemplateHash", desiredTemplateHash,
+			"existingTemplateHash", existingTemplateHash,
+			"resultTemplateHash", deploymentTemplateHash(mutated),
+			"desiredImage", desiredImage,
+			"existingImage", existingImage,
+			"resultImage", primaryContainerImage(mutated),
+		)
 	case controllerutil.OperationResultNone:
-		g.Log.V(1).Info("No change to deployment")
+		g.Log.Info(
+			"no deployment update emitted by gateway reconciliation",
+			"managedFieldsEqual", managedFieldsEqual,
+			"desiredTemplateHash", desiredTemplateHash,
+			"existingTemplateHash", existingTemplateHash,
+			"desiredImage", desiredImage,
+			"existingImage", existingImage,
+		)
 	}
 
 	return nil
@@ -272,4 +319,24 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 
 	}
 	return &instanceValue
+}
+func deploymentTemplateHash(d *appsv1.Deployment) string {
+	if d == nil {
+		return ""
+	}
+
+	payload, err := json.Marshal(d.Spec.Template)
+	if err != nil {
+		return "unavailable"
+	}
+
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:8])
+}
+
+func primaryContainerImage(d *appsv1.Deployment) string {
+	if d == nil || len(d.Spec.Template.Spec.Containers) == 0 {
+		return ""
+	}
+	return d.Spec.Template.Spec.Containers[0].Image
 }
