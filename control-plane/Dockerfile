@@ -17,13 +17,13 @@
 # go-discover builds the discover binary (which we don't currently publish
 # either).
 ARG GOLANG_VERSION
-FROM golang:${GOLANG_VERSION}-alpine3.22 AS go-discover
+FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
 RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@40c38fd658f0fd07ce74f2ee51b8abd3bfed01b3
 
 # dev copies the binary from a local build
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
-FROM alpine:3.22 AS dev
+FROM alpine:3.23 AS dev
 
 # NAME and VERSION are the name of the software in releases.hashicorp.com
 # and the version to download. Example: NAME=consul VERSION=1.2.3.
@@ -49,7 +49,8 @@ COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
-RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+# Add --upgrade to ensure the latest security patches for iputils are applied
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat iptables
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -79,7 +80,7 @@ CMD /bin/${BIN_NAME}
 # We don't rebuild the software because we want the exact checksums and
 # binary signatures to match the software and our builds aren't fully
 # reproducible currently.
-FROM alpine:3.22 AS release-default
+FROM alpine:3.23 AS release-default
 
 ARG BIN_NAME=consul-k8s-control-plane
 ARG CNI_BIN_NAME=consul-cni
@@ -101,7 +102,8 @@ COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
-RUN apk add --no-cache ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+# Add --upgrade to ensure the latest security patches for iputils are applied
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
 
 # for FIPS CGO glibc compatibility in alpine
 # see https://github.com/golang/go/issues/59305

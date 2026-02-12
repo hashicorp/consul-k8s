@@ -192,7 +192,15 @@ func (c Cleaner) cleanupInlineCerts(client *api.Client) (bool, error) {
 		deletedCerts++
 	}
 
-	return certSet.Cardinality() == deletedCerts, mErr
+	c.Logger.Info(
+		"Inline-certificate cleanup complete",
+		"total-certs", certSet.Cardinality(),
+		"certs-to-keep", certsToKeep.Cardinality(),
+		"certs-to-delete", certsToDelete.Cardinality(),
+		"deleted", deletedCerts,
+	)
+
+	return certsToDelete.Cardinality() == deletedCerts, mErr
 }
 
 func ignoreNotFoundError(err error) error {
