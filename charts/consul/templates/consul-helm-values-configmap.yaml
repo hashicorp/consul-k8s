@@ -36,6 +36,16 @@ data:
         "acls": {
           "manageSystemACLs": {{ .Values.global.acls.manageSystemACLs | default false }}
         },
+        "secretsBackend": {
+          "vault": {
+            "enabled": {{ .Values.global.secretsBackend.vault.enabled | default false }},
+            "consulCARole": {{ .Values.global.secretsBackend.vault.consulCARole | default "" | quote }},
+            "ca": {
+              "secretName": {{ .Values.global.secretsBackend.vault.ca.secretName | default "" | quote }},
+              "secretKey": {{ .Values.global.secretsBackend.vault.ca.secretKey | default "" | quote }}
+            }
+          }
+        },
         "metrics": {
           "enabled": {{ .Values.global.metrics.enabled | default false }},
           "enableGatewayMetrics": {{ .Values.global.metrics.enableGatewayMetrics | default false }}

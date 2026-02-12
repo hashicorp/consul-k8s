@@ -527,8 +527,9 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(ctx context.Co
 
 	// Init container for gateway registration
 	initContainer := corev1.Container{
-		Name:  "terminating-gateway-init",
-		Image: helmConfigValues.Global.ImageK8S,
+		Name:            "terminating-gateway-init",
+		Image:           helmConfigValues.Global.ImageK8S,
+		SecurityContext: restrictedSecurityContext(helmConfigValues),
 		// In constructDeploymentFromCRD, for the init container Env field:
 		Env: append([]corev1.EnvVar{
 			{
@@ -1053,10 +1054,10 @@ func getImagePullPolicy(policy string) corev1.PullPolicy {
 }
 
 // restrictedSecurityContext matches charts/consul/templates/_helpers.tpl:consul.restrictedSecurityContext
-func restrictedSecurityContext(helmConfigValues helmvalues.HelmValues) *corev1.SecurityContext {
+func restrictedSecurityContext(helmConfigValues *helmvalues.HelmValues) *corev1.SecurityContext {
 	// Helm: {{- if not .Values.global.enablePodSecurityPolicies -}}
 	// If PSPs are enabled, the helper emits nothing.
-	if !helmConfigValues.Global.EnablePodSecurityPolicies {
+	if helmConfigValues.Global.EnablePodSecurityPolicies {
 		return nil
 	}
 
