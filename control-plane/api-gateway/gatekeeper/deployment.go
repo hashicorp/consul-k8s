@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -47,7 +48,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		currentReplicas = existingDeployment.Spec.Replicas
 	}
 
-	deployment, err := g.deployment(gateway, gcc, config, currentReplicas)
+	deployment, err := g.deployment(ctx, gateway, gcc, config, currentReplicas)
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.Namespac
 	return err
 }
 
-func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
+func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
 	initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
@@ -109,6 +110,12 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	}
 
 	volumes, mounts := volumesAndMounts(gateway)
+
+	volumes, mounts, err = g.additionalAccessLogVolumeMount(ctx, volumes, mounts)
+	if err != nil {
+		g.Log.Error(err, "error fetching proxy defaults for access logs")
+		return nil, err
+	}
 
 	container, err := consulDataplaneContainer(metrics, config, gcc, gateway, mounts)
 	if err != nil {
@@ -317,4 +324,37 @@ func deploymentReplicas(gcc v1alpha1.GatewayClassConfig, currentReplicas *int32)
 
 	}
 	return &instanceValue
+}
+
+// Checking whether an additional volume is required for access logs defined in the proxy-defaults.
+// fetch the proxy-defaults resource and check if access logs are enabled and of type file.
+func (g *Gatekeeper) additionalAccessLogVolumeMount(ctx context.Context, volumes []corev1.Volume, mounts []corev1.VolumeMount) ([]corev1.Volume, []corev1.VolumeMount, error) {
+
+	var proxyDefaultsList v1alpha1.ProxyDefaultsList
+	err := g.Client.List(ctx, &proxyDefaultsList)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		return volumes, mounts, fmt.Errorf("error fetching proxy-defaults: %s", err.Error())
+	} else if k8serrors.IsNotFound(err) {
+		return volumes, mounts, nil
+	}
+
+	// If there are no proxy-defaults, return.
+	if len(proxyDefaultsList.Items) == 0 {
+		return volumes, mounts, nil
+	}
+
+	// Will always have only one proxy-defaults resource.
+	proxyDefaults := &proxyDefaultsList.Items[0]
+	if proxyDefaults.Spec.AccessLogs != nil {
+		if proxyDefaults.Spec.AccessLogs.Enabled {
+			if proxyDefaults.Spec.AccessLogs.Type == v1alpha1.FileLogSinkType {
+				accessPath := proxyDefaults.Spec.AccessLogs.Path
+				volumes = append(volumes, accessLogVolume())
+				mounts = append(mounts, accessLogVolumeMount(accessPath))
+				return volumes, mounts, nil
+			}
+		}
+	}
+
+	return volumes, mounts, nil
 }
