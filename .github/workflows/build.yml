@@ -226,19 +226,21 @@ jobs:
 
       - name: Test consul-k8s CLI rpm package on platforms on UBI
         if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
-        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
-        with:
-          image: registry.access.redhat.com/ubi9/ubi:latest
-          options: -v ${{ github.workspace }}:/work --platform linux/${{matrix.goarch}}
-          run: |
-            dnf install -y /work/out/${{ env.RPM_PACKAGE }}
-            CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
-            VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
-            if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
-              echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
-              exit 1
-            fi
-            echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+        run: |
+          docker run --rm \
+            --platform linux/${{ matrix.goarch }} \
+            -v "${{ github.workspace }}:/work" \
+            registry.access.redhat.com/ubi9/ubi:latest \
+            /bin/bash -lc '
+              dnf install -y /work/out/${{ env.RPM_PACKAGE }}
+              CONSUL_K8S_VERSION="$(consul-k8s version | awk '"'"'{print $2}'"'"')"
+              VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
+              if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
+                echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+                exit 1
+              fi
+              echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+            '
 
       - name: Upload rpm packages
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
@@ -248,21 +250,23 @@ jobs:
           path: out/${{ env.RPM_PACKAGE }}
 
       - name: Test consul-k8s CLI debian package
-        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true' 
-        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
-        with:
-          image: ubuntu:latest
-          options: -v ${{ github.workspace }}:/work --platform linux/${{matrix.goarch}}
-          run: |
-            apt-get update -qq
-            apt-get install -y /work/out/${{ env.DEB_PACKAGE }}
-            CONSUL_K8S_VERSION="$(consul-k8s version | awk '{print $2}')"
-            VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
-            if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
-              echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
-              exit 1
-            fi
-            echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+        if: matrix.goos == 'linux' && matrix.component == 'cli' && matrix.skip_packaging != 'true'
+        run: |
+          docker run --rm \
+            --platform linux/${{ matrix.goarch }} \
+            -v "${{ github.workspace }}:/work" \
+            ubuntu:latest \
+            /bin/bash -lc '
+              apt-get update -qq
+              apt-get install -y /work/out/${{ env.DEB_PACKAGE }}
+              CONSUL_K8S_VERSION="$(consul-k8s version | awk '"'"'{print $2}'"'"')"
+              VERSION="v${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}"
+              if [ "${VERSION}" != "${CONSUL_K8S_VERSION}" ]; then
+                echo "Test FAILED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+                exit 1
+              fi
+              echo "Test PASSED, expected: ${VERSION}, got: ${CONSUL_K8S_VERSION}"
+            '
 
       - name: Upload debian packages 
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
