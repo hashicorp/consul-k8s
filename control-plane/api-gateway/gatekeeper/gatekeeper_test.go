@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/version"
 	"github.com/hashicorp/consul/agent/netutil"
 )
 
@@ -1720,6 +1721,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 					Labels: labels,
 					Annotations: map[string]string{
 						constants.AnnotationInject:                   "false",
+						constants.AnnotationConsulK8sVersion:         version.GetHumanVersion(),
 						constants.AnnotationGatewayConsulServiceName: name,
 						constants.AnnotationGatewayKind:              "api-gateway",
 					},

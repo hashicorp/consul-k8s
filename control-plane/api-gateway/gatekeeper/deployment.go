@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
+	"github.com/hashicorp/consul-k8s/version"
 )
 
 const (
@@ -97,6 +98,7 @@ func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1beta1.Gateway, 
 
 	annotations := map[string]string{
 		"consul.hashicorp.com/connect-inject":        "false",
+		constants.AnnotationConsulK8sVersion:         version.GetHumanVersion(),
 		constants.AnnotationGatewayConsulServiceName: gateway.Name,
 		constants.AnnotationGatewayKind:              "api-gateway",
 	}
@@ -263,6 +265,12 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 		}
 	}
 
+	// Compare managed rollout annotation so upgrades to the gateway controller
+	// deterministically trigger Deployment rollout.
+	if !comparePodTemplateAnnotation(a, b, constants.AnnotationConsulK8sVersion) {
+		return false
+	}
+
 	if b.Spec.Replicas == nil && a.Spec.Replicas == nil {
 		return true
 	} else if b.Spec.Replicas == nil {
@@ -272,6 +280,30 @@ func compareDeployments(a, b *appsv1.Deployment) bool {
 	}
 
 	return *b.Spec.Replicas == *a.Spec.Replicas
+}
+
+func comparePodTemplateAnnotation(a, b *appsv1.Deployment, key string) bool {
+	var (
+		aVal string
+		bVal string
+		aOk  bool
+		bOk  bool
+	)
+
+	if a.Spec.Template.Annotations != nil {
+		aVal, aOk = a.Spec.Template.Annotations[key]
+	}
+	if b.Spec.Template.Annotations != nil {
+		bVal, bOk = b.Spec.Template.Annotations[key]
+	}
+
+	if aOk != bOk {
+		return false
+	}
+	if !aOk {
+		return true
+	}
+	return aVal == bVal
 }
 
 func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
