@@ -11,6 +11,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 )
 
 func Test_compareDeployments(t *testing.T) {
@@ -204,6 +206,32 @@ func Test_compareDeployments(t *testing.T) {
 				},
 			},
 			shouldBeEqual: true,
+		},
+		{
+			name: "different consul-k8s version annotation",
+			a: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationConsulK8sVersion: "v1",
+							},
+						},
+					},
+				},
+			},
+			b: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Annotations: map[string]string{
+								constants.AnnotationConsulK8sVersion: "v2",
+							},
+						},
+					},
+				},
+			},
+			shouldBeEqual: false,
 		},
 	}
 
