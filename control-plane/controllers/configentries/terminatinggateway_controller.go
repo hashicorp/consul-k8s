@@ -452,7 +452,7 @@ func serviceNameFromPolicy(policyName string) string {
 	return strings.TrimSuffix(n, "-write-policy")
 }
 
-func (r *TerminatingGatewayController) constructDeploymentFromCRD(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, helmConfigValues *helmvalues.HelmValues) *appsv1.Deployment {
+func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consulv1alpha1.TerminatingGateway, helmConfigValues *helmvalues.HelmValues) *appsv1.Deployment {
 
 	fullName := consulFullName(helmConfigValues)
 	terminatingGatewayServiceAccountName := fmt.Sprintf("%s-%s", fullName, termGW.Spec.GatewayName)
@@ -604,19 +604,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(ctx context.Co
 		Image:           helmConfigValues.Global.ImageConsulDataplane,
 		Resources:       termGW.Spec.Resources,
 		ImagePullPolicy: getImagePullPolicy(helmConfigValues.Global.ImagePullPolicy),
-		//SecurityContext: restrictedSecurityContext(helmConfigValues),
-		SecurityContext: &corev1.SecurityContext{
-			AllowPrivilegeEscalation: ptr.To(false),
-			ReadOnlyRootFilesystem:   ptr.To(true),
-			Capabilities: &corev1.Capabilities{
-				Drop: []corev1.Capability{"ALL"},
-			},
-			RunAsNonRoot: ptr.To(true),
-			SeccompProfile: &corev1.SeccompProfile{
-				Type: corev1.SeccompProfileTypeRuntimeDefault,
-			},
-			RunAsUser: ptr.To(int64(100)),
-		},
+		SecurityContext: restrictedSecurityContext(helmConfigValues),
 		Ports: []corev1.ContainerPort{
 			{Name: "gateway", ContainerPort: 8443},
 		},
@@ -636,7 +624,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(ctx context.Co
 		},
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(8443)},
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(8443)},
 			},
 			InitialDelaySeconds: 30,
 			PeriodSeconds:       10,
@@ -645,7 +633,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(ctx context.Co
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
-				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt(8443)},
+				TCPSocket: &corev1.TCPSocketAction{Port: intstr.FromInt32(8443)},
 			},
 			InitialDelaySeconds: 10,
 			PeriodSeconds:       10,
@@ -735,7 +723,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(ctx context.Co
 }
 
 func (r *TerminatingGatewayController) deployTerminatingGatewayDeployment(ctx context.Context, log logr.Logger, termGW *consulv1alpha1.TerminatingGateway, helmValues *helmvalues.HelmValues) error {
-	deployment := r.constructDeploymentFromCRD(ctx, termGW, helmValues)
+	deployment := r.constructDeploymentFromCRD(termGW, helmValues)
 	if deployment == nil {
 		return fmt.Errorf("failed to construct deployment for terminating gateway")
 	}
