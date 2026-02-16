@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/acceptance
 
-go 1.25.5
+go 1.25.7
 
 require (
 	github.com/go-logr/logr v1.3.0
