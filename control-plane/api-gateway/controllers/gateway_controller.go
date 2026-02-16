@@ -76,8 +76,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var gateway gwv1.Gateway
 
-	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling Gateway")
+	log := r.Log.WithValues("gateway-stable", req.NamespacedName)
+	log.Info("Reconciling Gateway -  starting forstable API version")
 
 	// get the gateway
 	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
@@ -100,6 +100,10 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
+	log.Info("gatewayclassconfig fetched from the system: " + fmt.Sprintf("%+v", gatewayClassConfig))
+	log.Info("gatewayclassconfig fetched from the system - max instances: " + fmt.Sprintf("%+v", *gatewayClassConfig.Spec.DeploymentSpec.MaxInstances))
+	log.Info("gatewayclassconfig fetched from the system - min instances: " + fmt.Sprintf("%+v", *gatewayClassConfig.Spec.DeploymentSpec.MinInstances))
+	log.Info("gatewayclassconfig fetched from the system - default instances: " + fmt.Sprintf("%+v", *gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances))
 
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
@@ -201,12 +205,16 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	})
 
 	updates := binder.Snapshot()
-
+	log.Info("updates binder: " + fmt.Sprintf("%+v", updates))
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
 			return ctrl.Result{}, err
 		}
+		log.Info("gatewayclassconfig in updates fetched from the system: " + fmt.Sprintf("%+v", updates.GatewayClassConfig))
+		log.Info("gatewayclassconfig in updates fetched from the system - max instances: " + fmt.Sprintf("%+v", *updates.GatewayClassConfig.Spec.DeploymentSpec.MaxInstances))
+		log.Info("gatewayclassconfig in updates fetched from the system - min instances: " + fmt.Sprintf("%+v", *updates.GatewayClassConfig.Spec.DeploymentSpec.MinInstances))
+		log.Info("gatewayclassconfig in updates fetched from the system - default instances: " + fmt.Sprintf("%+v", *updates.GatewayClassConfig.Spec.DeploymentSpec.DefaultInstances))
 
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
@@ -955,17 +963,17 @@ func (c *GatewayController) getJWTProviders(ctx context.Context, resources *comm
 	return list.Items, nil
 }
 
-func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
-	if gatewayClassConfig == nil {
+func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClass *gwv1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
+	if gatewayClass == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
 	}
 
 	config := &v1alpha1.GatewayClassConfig{}
-	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
+	if ref := gatewayClass.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
 			ref.Kind != v1alpha1.GatewayClassConfigKind ||
-			gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
+			gatewayClass.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}

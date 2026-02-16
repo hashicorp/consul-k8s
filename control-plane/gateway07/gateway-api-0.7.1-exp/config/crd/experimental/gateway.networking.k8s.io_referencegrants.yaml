@@ -3,12 +3,12 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1923
-    dinesh.networking.io/bundle-version: v0.7.1
-    dinesh.networking.io/channel: experimental
+    consul.networking.io/bundle-version: v0.7.1
+    consul.networking.io/channel: experimental
   creationTimestamp: null
-  name: referencegrants.dinesh.networking.io
+  name: referencegrants.consul.networking.io
 spec:
-  group: dinesh.networking.io
+  group: consul.networking.io
   names:
     categories:
     - gateway-api

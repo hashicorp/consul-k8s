@@ -19,7 +19,7 @@ rules:
     - update
     - create
   - apiGroups:
-    - dinesh.networking.io
+    - consul.networking.io
     resources:
     - gatewayclasses
     verbs:

@@ -76,17 +76,18 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var gateway gwv1beta1.Gateway
 
-	log := r.Log.WithValues("gateway-ocp", req.NamespacedName)
-	log.Info("Reconciling Gateway")
+	log := r.Log.WithValues("gateway-custom", req.NamespacedName)
+	log.Info("Reconciling Gateway -  starting for custom consul networking API version")
 
 	// get the gateway
 	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
 		if !k8serrors.IsNotFound(err) {
 			log.Error(err, "unable to get Gateway")
 		}
+		log.Info("gateway(custom) not found for: " + fmt.Sprintf("%+v", gateway))
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+
 	}
-	log.Info("gateway of ocp %+vs found", gateway)
 
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
@@ -94,7 +95,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
-	log.Info("gateway class of ocp %+v found", gatewayClass)
 
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
@@ -102,28 +102,26 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
-	log.Info("gateway class config of ocp %+v found", gatewayClassConfig)
+
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
 	if err != nil {
 		log.Error(err, "unable to list Namespaces")
 		return ctrl.Result{}, err
 	}
-	log.Info("namespaces found: " + strconv.Itoa(len(namespaces)))
+
 	// get all reference grants
 	grants, err := r.getReferenceGrants(ctx)
 	if err != nil {
 		log.Error(err, "unable to list ReferenceGrants")
 		return ctrl.Result{}, err
 	}
-	log.Info("reference grants found: " + strconv.Itoa(len(grants)))
 
 	// get related gateway service
 	service, err := r.getDeployedGatewayService(ctx, req.NamespacedName)
 	if err != nil {
 		log.Error(err, "unable to fetch service for Gateway")
 	}
-	log.Info("service for gateway found: " + fmt.Sprintf("%+v", service))
 
 	// get related gateway pods
 	pods, err := r.getDeployedGatewayPods(ctx, gateway)
@@ -131,7 +129,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to list Pods for Gateway")
 		return ctrl.Result{}, err
 	}
-	log.Info("pods for gateway found: +%v", pods)
 
 	// construct our resource map
 	referenceValidator := binding.NewReferenceValidator(grants)
@@ -174,10 +171,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to fetch services for routes")
 		return ctrl.Result{}, err
 	}
-	log.Info("Httproutes: %+v", httpRoutes)
-	log.Info("Tcproutes: %+v", tcpRoutes)
-	// print resources
-	log.Info("Resources: %+v", resources)
 
 	// get all gatewaypolicies referencing this gateway
 	policies, err := r.getRelatedGatewayPolicies(ctx, req.NamespacedName, resources)
@@ -393,6 +386,23 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
+func mapToCustomGateway(obj client.Object) []reconcile.Request {
+	for _, owner := range obj.GetOwnerReferences() {
+		if owner.Controller != nil && *owner.Controller &&
+			owner.Kind == "Gateway" &&
+			owner.APIVersion == "consul.networking.io/v1beta1" {
+
+			return []reconcile.Request{{
+				NamespacedName: types.NamespacedName{
+					Name:      owner.Name,
+					Namespace: obj.GetNamespace(),
+				},
+			}}
+		}
+	}
+	return nil
+}
+
 // SetupWithGatewayControllerManager registers the controller with the given manager.
 func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config OcpGatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
 	cacheConfig := cache.Config{
@@ -408,7 +418,8 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 
 	predicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
-			common.ManagedLabel: "true",
+			common.ManagedLabel:  "true",
+			common.NameLabelTest: "api-gateway-ocp",
 		}),
 	)
 
@@ -437,13 +448,40 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ServerMgr:    config.ConsulServerConnMgr,
 		AuthMethod:   config.HelmConfig.AuthMethod,
 	}
+	/*
+	   ctrl.NewControllerManagedBy(mgr).
+	   	Named("gateway-custom").
+	   	For(
+	   		&gwv1beta1.Gateway{},
+	   		builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+	   	).
+	   	Watches(...).
+	   	Complete(r)
 
+	*/
 	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-custom").
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
+		// Watches(
+		// 	&appsv1.Deployment{},
+		// 	handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		// 		return mapToCustomGateway(obj)
+		// 	}), builder.WithPredicates(predicate),
+		// ).
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(r.transformPods),
+			builder.WithPredicates(predicate),
+		).
+		// Watches(
+		// 	&corev1.Service{},
+		// 	handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+		// 		return mapToCustomGateway(obj)
+		// 	}),
+		// ).
 		Watches(
 			&gwv1beta1.ReferenceGrant{},
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
@@ -472,11 +510,11 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&corev1.Endpoints{},
 			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints),
 		).
-		Watches(
-			&corev1.Pod{},
-			handler.EnqueueRequestsFromMapFunc(r.transformPods),
-			builder.WithPredicates(predicate),
-		).
+		// Watches(
+		// 	&corev1.Pod{},
+		// 	handler.EnqueueRequestsFromMapFunc(r.transformPods),
+		// 	builder.WithPredicates(predicate),
+		// ).
 		WatchesRawSource(
 			source.Channel(
 				c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events(),
@@ -508,7 +546,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			),
 		).
 		Watches(
-			&v1alpha1.GatewayPolicy{},
+			&v1alpha1.OcpGatewayPolicy{},
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayPolicy),
 		).
 		Watches(

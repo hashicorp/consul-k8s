@@ -42,7 +42,7 @@ type GatewayClassController struct {
 // Reconcile handles the reconciliation loop for GatewayClass objects.
 func (r *GatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("gatewayClass", req.NamespacedName.Name)
-	log.V(1).Info("Reconciling GatewayClass")
+	log.Info("Reconciling GatewayClass")
 
 	gc := &gwv1.GatewayClass{}
 

@@ -36,7 +36,7 @@ func New(log logr.Logger, client client.Client, consulConfig *consul.Config) *Ga
 // Upsert creates or updates the resources for handling routing of network traffic.
 // This is done in order based on dependencies between resources.
 func (g *Gatekeeper) Upsert(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
-	g.Log.V(1).Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
+	g.Log.Info(fmt.Sprintf("Upsert Gateway Deployment %s/%s", gateway.Namespace, gateway.Name))
 
 	if err := g.upsertRole(ctx, gateway, gcc, config); err != nil {
 		return err

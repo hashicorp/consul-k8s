@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/google/go-cmp/cmp"
@@ -41,6 +42,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1.Gateway,
 		exists = true
 	}
 
+	g.Log.Info("existing deployment: " + fmt.Sprintf("%+v", existingDeployment))
 	var currentReplicas *int32
 	if exists {
 		currentReplicas = existingDeployment.Spec.Replicas
@@ -50,9 +52,10 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1.Gateway,
 	if err != nil {
 		return err
 	}
+	g.Log.Info("desired deployment: " + fmt.Sprintf("%+v", deployment))
 
 	if exists {
-		g.Log.V(1).Info("Existing Gateway Deployment found.")
+		g.Log.Info("Existing Gateway Deployment found.")
 
 		// If the user has set the number of replicas, let's respect that.
 		deployment.Spec.Replicas = existingDeployment.Spec.Replicas
@@ -235,8 +238,10 @@ func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
 }
 
 func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1.Gateway, scheme *runtime.Scheme) resourceMutator {
+
 	return func() error {
 		mutated = mergeDeployments(gcc, deployment, mutated)
+
 		if deploymentExists {
 			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
 		}

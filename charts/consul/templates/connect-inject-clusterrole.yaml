@@ -146,7 +146,7 @@ rules:
   - use
 - apiGroups:
   - gateway.networking.k8s.io
-  - dinesh.networking.io
+  - consul.networking.io
   resources:
   - gatewayclasses
   - ocpgatewayclasses
@@ -164,7 +164,7 @@ rules:
   - watch
 - apiGroups:
   - gateway.networking.k8s.io
-  - dinesh.networking.io
+  - consul.networking.io
   resources:
   - gatewayclasses/finalizers
   - ocpgatewayclasses/finalizers
@@ -175,7 +175,7 @@ rules:
   - update
 - apiGroups:
   - gateway.networking.k8s.io
-  - dinesh.networking.io
+  - consul.networking.io
   resources:
   - gatewayclasses/status
   - ocpgatewayclasses/status

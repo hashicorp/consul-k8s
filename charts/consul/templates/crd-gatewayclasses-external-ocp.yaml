@@ -4,8 +4,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
-    dinesh.networking.io/bundle-version: v0.6.2
-    dinesh.networking.io/channel: experimental
+    consul.networking.io/bundle-version: v0.6.2
+    consul.networking.io/channel: experimental
   creationTimestamp: null
   labels:
     app: {{ template "consul.name" . }}
@@ -13,9 +13,9 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-  name: ocpgatewayclasses.dinesh.networking.io
+  name: ocpgatewayclasses.consul.networking.io
 spec:
-  group: dinesh.networking.io
+  group: consul.networking.io
   names:
     categories:
       - gateway-api

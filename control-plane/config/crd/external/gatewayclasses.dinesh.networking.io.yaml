@@ -3,12 +3,12 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
-    dinesh.networking.io/bundle-version: v0.6.2
-    dinesh.networking.io/channel: experimental
+    consul.networking.io/bundle-version: v0.6.2
+    consul.networking.io/channel: experimental
   creationTimestamp: null
-  name: ocpgatewayclasses.dinesh.networking.io
+  name: ocpgatewayclasses.consul.networking.io
 spec:
-  group: dinesh.networking.io
+  group: consul.networking.io
   names:
     categories:
       - gateway-api
@@ -39,7 +39,7 @@ spec:
       name: v1alpha2
       schema:
         openAPIV3Schema:
-          description: "GatewayClass describes a class of Gateways available to the user for creating Gateway resources. \n It is recommended that this resource be used as a template for Gateways. This means that a Gateway is based on the state of the GatewayClass at the time it was created and changes to the GatewayClass or associated parameters are not propagated down to existing Gateways. This recommendation is intended to limit the blast radius of changes to GatewayClass or associated parameters. If implementations choose to propagate GatewayClass changes to existing Gateways, that MUST be clearly documented by the implementation. \n Whenever one or more Gateways are using a GatewayClass, implementations MUST add the `gateway-exists-finalizer.dinesh.networking.io` finalizer on the associated GatewayClass. This ensures that a GatewayClass associated with a Gateway is not deleted while in use. \n GatewayClass is a Cluster level resource."
+          description: "GatewayClass describes a class of Gateways available to the user for creating Gateway resources. \n It is recommended that this resource be used as a template for Gateways. This means that a Gateway is based on the state of the GatewayClass at the time it was created and changes to the GatewayClass or associated parameters are not propagated down to existing Gateways. This recommendation is intended to limit the blast radius of changes to GatewayClass or associated parameters. If implementations choose to propagate GatewayClass changes to existing Gateways, that MUST be clearly documented by the implementation. \n Whenever one or more Gateways are using a GatewayClass, implementations MUST add the `gateway-exists-finalizer.consul.networking.io` finalizer on the associated GatewayClass. This ensures that a GatewayClass associated with a Gateway is not deleted while in use. \n GatewayClass is a Cluster level resource."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -184,7 +184,7 @@ spec:
       name: v1beta1
       schema:
         openAPIV3Schema:
-          description: "GatewayClass describes a class of Gateways available to the user for creating Gateway resources. \n It is recommended that this resource be used as a template for Gateways. This means that a Gateway is based on the state of the GatewayClass at the time it was created and changes to the GatewayClass or associated parameters are not propagated down to existing Gateways. This recommendation is intended to limit the blast radius of changes to GatewayClass or associated parameters. If implementations choose to propagate GatewayClass changes to existing Gateways, that MUST be clearly documented by the implementation. \n Whenever one or more Gateways are using a GatewayClass, implementations MUST add the `gateway-exists-finalizer.dinesh.networking.io` finalizer on the associated GatewayClass. This ensures that a GatewayClass associated with a Gateway is not deleted while in use. \n GatewayClass is a Cluster level resource."
+          description: "GatewayClass describes a class of Gateways available to the user for creating Gateway resources. \n It is recommended that this resource be used as a template for Gateways. This means that a Gateway is based on the state of the GatewayClass at the time it was created and changes to the GatewayClass or associated parameters are not propagated down to existing Gateways. This recommendation is intended to limit the blast radius of changes to GatewayClass or associated parameters. If implementations choose to propagate GatewayClass changes to existing Gateways, that MUST be clearly documented by the implementation. \n Whenever one or more Gateways are using a GatewayClass, implementations MUST add the `gateway-exists-finalizer.consul.networking.io` finalizer on the associated GatewayClass. This ensures that a GatewayClass associated with a Gateway is not deleted while in use. \n GatewayClass is a Cluster level resource."
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'

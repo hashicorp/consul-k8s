@@ -41,8 +41,8 @@ type OcpGatewayClassController struct {
 
 // Reconcile handles the reconciliation loop for GatewayClass objects.
 func (r *OcpGatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("gatewayClass", req.NamespacedName.Name)
-	log.V(1).Info("Reconciling GatewayClass")
+	log := r.Log.WithValues("ocp gatewayClass", req.NamespacedName.Name)
+	log.Info("Reconciling GatewayClass")
 
 	gc := &gwv1beta1.OcpGatewayClass{}
 

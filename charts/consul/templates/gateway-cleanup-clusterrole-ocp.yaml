@@ -18,7 +18,7 @@ rules:
     - get
     - delete
   - apiGroups:
-    - dinesh.networking.io
+    - consul.networking.io
     resources:
     - ocpgatewayclasses
     verbs:

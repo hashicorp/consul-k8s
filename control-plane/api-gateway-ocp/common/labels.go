@@ -17,6 +17,7 @@ const (
 	namespaceLabel = "gateway.consul.hashicorp.com/namespace"
 	createdAtLabel = "gateway.consul.hashicorp.com/created"
 	ManagedLabel   = "gateway.consul.hashicorp.com/managed"
+	NameLabelTest  = "gateway.consul.hashicorp.com/name"
 )
 
 // LabelsForGateway formats the default labels that appear on objects managed by the controllers.
