@@ -1,0 +1,69 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-generate-manifests
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: generate-manifests
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-generate-manifests
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: generate-manifests
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-generate-manifests
+      containers:
+        - name: generate-manifests
+          image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - generate-manifests
+            - -app={{template "consul.name" .}}
+            - -chart={{template "consul.chart" .}}
+            - -release-name={{ .Release.Name }}
+            - -manifests-gatewayapi-dir=/consul/config/gatewayapi
+            {{- if .Values.global.openshift.enabled  }}
+            - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+            {{- end }}
+          {{- with .Values.connectInject.apiGateway.managedGatewayClass.resourceJob.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: gatewayapi-pvc
+              mountPath: /consul/config/gatewayapi
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+      volumes:
+        - name: gatewayapi-pvc
+          persistentVolumeClaim:
+            claimName: {{ template "consul.fullname" . }}-gatewayapi-pvc
+{{- end }}
