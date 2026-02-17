@@ -1,0 +1,58 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-delete-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: generate-manifests-pvc-cleaner
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-pvc-cleaner
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: generate-manifests-pvc-cleaner
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        "openshift.io/scc": "restricted-v2"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-pvc-cleaner-sa
+      containers:
+        - name: pvc-cleaner
+          image: bitnami/kubectl:latest
+          command: ["/bin/sh","-c"]
+          args:
+          - |
+            echo "Apply manifests in the PVC"
+            kubectl apply -R -f /consul/config/gatewayapi/
+            
+            echo "Done"
+          volumeMounts:
+            - name: gatewayapi-pvc
+              mountPath: /consul/config/gatewayapi
+      volumes:
+        - name: gatewayapi-pvc
+          persistentVolumeClaim:
+            claimName: {{ template "consul.fullname" . }}-gatewayapi-pvc
+{{- end }}
+# echo "Deleting PVC: {{ template "consul.fullname" . }}-gatewayapi-pvc in namespace {{ .Release.Namespace }}"
+# kubectl delete pvc {{ template "consul.fullname" . }}-gatewayapi-pvc -n {{ .Release.Namespace }} --ignore-not-found=true
