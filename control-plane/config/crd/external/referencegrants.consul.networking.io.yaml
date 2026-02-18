@@ -5,7 +5,7 @@ metadata:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
     consul.networking.io/bundle-version: v0.6.2
     consul.networking.io/channel: experimental
-  creationTimestamp: null
+  
   name: referencegrants.consul.networking.io
 spec:
   group: consul.networking.io
