@@ -28,7 +28,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/version"
-	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const (

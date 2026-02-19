@@ -12,8 +12,8 @@ on:
       - "release/**"
       # Build on releng branches for testing build pipelines
       - "releng/**"
-      # Build sujay/bofa/1.8.3-debug for generating debug builds for testing
-      - "sujay/bofa/1.8.3-debug"
+      # Build sujay/fix/bofa-acl-removal for generating debug builds for testing
+      - "sujay/fix/bofa-acl-removal"
 
 env:
   PKG_NAME: "consul-k8s"

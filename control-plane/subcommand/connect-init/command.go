@@ -419,8 +419,9 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService) error {
 		c.iptablesConfig.ExcludeInboundPorts = append(c.iptablesConfig.ExcludeInboundPorts, port)
 	}
 
-	// Configure any relevant information from the proxy service
-	err = iptables.Setup(c.iptablesConfig)
+	// Configure any relevant information from the proxy service.
+	// connect-init currently configures IPv4-only redirection rules.
+	err = iptables.Setup(c.iptablesConfig, false)
 	if err != nil {
 		return err
 	}

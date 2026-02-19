@@ -2229,15 +2229,109 @@ func TestCache_RemoveRoleBinding(t *testing.T) {
 			authMethod := "k8s-auth-method"
 			gatewayName := "my-api-gateway"
 			namespace := "ns"
+			aclCacheKey := gatewayACLCacheKey(gatewayName, namespace)
 			// file the acl binding rule, acl policy, and acl role maps with the necessary data
-			c.gatewayNameToACLBindingRule[gatewayName] = tt.bindingRule
-			c.gatewayNameToACLRole[gatewayName] = tt.role
-			c.gatewayNameToACLPolicy[gatewayName] = tt.policy
+			c.gatewayNameToACLBindingRule[aclCacheKey] = tt.bindingRule
+			c.gatewayNameToACLRole[aclCacheKey] = tt.role
+			c.gatewayNameToACLPolicy[aclCacheKey] = tt.policy
 
 			err = c.RemoveRoleBinding(authMethod, gatewayName, namespace)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
+}
+
+func TestGatewayACLObjectNamesAreNamespaceScoped(t *testing.T) {
+	t.Parallel()
+
+	gatewayName := "my-api-gateway"
+	namespaceOne := "consul"
+	namespaceTwo := "test"
+
+	roleOne := getACLRoleName(gatewayName, namespaceOne)
+	roleTwo := getACLRoleName(gatewayName, namespaceTwo)
+	require.NotEqual(t, roleOne, roleTwo)
+
+	policyOne := getACLPolicyName(gatewayName, namespaceOne)
+	policyTwo := getACLPolicyName(gatewayName, namespaceTwo)
+	require.NotEqual(t, policyOne, policyTwo)
+
+	require.NotEqual(t, gatewayACLCacheKey(gatewayName, namespaceOne), gatewayACLCacheKey(gatewayName, namespaceTwo))
+}
+
+func TestCache_RemoveRoleBinding_NamespaceScopedCache(t *testing.T) {
+	t.Parallel()
+
+	gatewayName := "api-gateway-test"
+	namespaceOne := "consul"
+	namespaceTwo := "test"
+	authMethod := "k8s-auth-method"
+
+	keyOne := gatewayACLCacheKey(gatewayName, namespaceOne)
+	keyTwo := gatewayACLCacheKey(gatewayName, namespaceTwo)
+
+	ruleOne := &api.ACLBindingRule{ID: "binding-rule-id-1"}
+	roleOne := &api.ACLRole{ID: "role-id-1"}
+	policyOne := &api.ACLPolicy{ID: "policy-id-1"}
+
+	ruleTwo := &api.ACLBindingRule{ID: "binding-rule-id-2"}
+	roleTwo := &api.ACLRole{ID: "role-id-2"}
+	policyTwo := &api.ACLPolicy{ID: "policy-id-2"}
+
+	consulServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case fmt.Sprintf("/v1/acl/binding-rule/%s", ruleOne.ID):
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintln(w, `{deleted: true}`)
+		case fmt.Sprintf("/v1/acl/role/%s", roleOne.ID):
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintln(w, `{deleted: true}`)
+		case fmt.Sprintf("/v1/acl/policy/%s", policyOne.ID):
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintln(w, `{deleted: true}`)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintln(w, "Mock Server not configured for this route: "+r.URL.Path)
+		}
+	}))
+	defer consulServer.Close()
+
+	serverURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(serverURL.Port())
+	require.NoError(t, err)
+
+	c := New(Config{
+		ConsulClientConfig: &consul.Config{
+			APIClientConfig: &api.Config{},
+			HTTPPort:        port,
+			GRPCPort:        port,
+			APITimeout:      0,
+		},
+		ConsulServerConnMgr: test.MockConnMgrForIPAndPort(t, serverURL.Hostname(), port, false),
+		NamespacesEnabled:   false,
+		Logger:              logrtest.NewTestLogger(t),
+	})
+
+	c.gatewayNameToACLBindingRule[keyOne] = ruleOne
+	c.gatewayNameToACLRole[keyOne] = roleOne
+	c.gatewayNameToACLPolicy[keyOne] = policyOne
+
+	c.gatewayNameToACLBindingRule[keyTwo] = ruleTwo
+	c.gatewayNameToACLRole[keyTwo] = roleTwo
+	c.gatewayNameToACLPolicy[keyTwo] = policyTwo
+
+	err = c.RemoveRoleBinding(authMethod, gatewayName, namespaceOne)
+	require.NoError(t, err)
+
+	require.NotContains(t, c.gatewayNameToACLBindingRule, keyOne)
+	require.NotContains(t, c.gatewayNameToACLRole, keyOne)
+	require.NotContains(t, c.gatewayNameToACLPolicy, keyOne)
+
+	require.Contains(t, c.gatewayNameToACLBindingRule, keyTwo)
+	require.Contains(t, c.gatewayNameToACLRole, keyTwo)
+	require.Contains(t, c.gatewayNameToACLPolicy, keyTwo)
 }
 
 func loadedReferenceMaps(entries []api.ConfigEntry) map[string]*common.ReferenceMap {

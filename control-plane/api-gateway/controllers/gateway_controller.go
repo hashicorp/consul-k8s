@@ -69,6 +69,10 @@ type GatewayController struct {
 	client.Client
 }
 
+func shouldCleanupGatewayResources(gatewayMarkedDeleted, gatewayClassMismatch, gatewayClassConfigMissing bool) bool {
+	return gatewayMarkedDeleted || gatewayClassMismatch || gatewayClassConfigMissing
+}
+
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	correlationID := uuid.NewString()
@@ -112,6 +116,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	gatewayClassMissing := gatewayClass == nil
 	gatewayClassMismatch := gatewayClassMissing || gatewayClassController != common.GatewayClassControllerName
 	gatewayClassConfigMissing := gatewayClassConfig == nil
+	shouldCleanupResources := shouldCleanupGatewayResources(gatewayMarkedDeleted, gatewayClassMismatch, gatewayClassConfigMissing)
 	log.Info(
 		"evaluated gateway lifecycle state",
 		"gatewayMarkedDeleted", gatewayMarkedDeleted,
@@ -119,6 +124,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		"gatewayClassController", gatewayClassController,
 		"gatewayClassMismatch", gatewayClassMismatch,
 		"gatewayClassConfigMissing", gatewayClassConfigMissing,
+		"shouldCleanupResources", shouldCleanupResources,
 	)
 
 	// get all namespaces
@@ -261,7 +267,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		log.Info("finished upserting gatekeeper resources")
 		r.gatewayCache.EnsureSubscribed(nonNormalizedConsulKey, req.NamespacedName)
-	} else {
+	} else if shouldCleanupResources {
 		log.Info(
 			"gateway deployment marked for cleanup",
 			"gatewayMarkedDeleted", gatewayMarkedDeleted,
@@ -296,6 +302,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		log.Info("finished removing gateway ACL resources")
+	} else {
+		log.Info("skipping gateway deployment cleanup for reconcile that only updates metadata or status")
 	}
 
 	for _, deletion := range updates.Consul.Deletions {
