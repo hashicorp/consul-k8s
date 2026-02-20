@@ -1,3 +1,13 @@
+## 1.9.4 (February 22, 2025)
+
+SECURITY:
+
+* Added input length validation on "consul.hashicorp.com/service-name" annotation [[GH-5107](https://github.com/hashicorp/consul-k8s/issues/5107)]
+* go: upgrade go version to 1.25.7 [[GH-5113](https://github.com/hashicorp/consul-k8s/issues/5113)]
+* docker: upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
+
+
+
 ## 1.9.3 (January 27, 2026)
 
 SECURITY:
