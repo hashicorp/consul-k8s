@@ -7,7 +7,6 @@ SECURITY:
 * docker: upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
 
 
-
 ## 1.9.3 (January 27, 2026)
 
 SECURITY:
