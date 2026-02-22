@@ -6,7 +6,7 @@ schema = "1"
 project "consul-k8s" {
   team = "consul-k8s"
   slack {
-    notification_channel = "C0421KHNAV9" # feed-consul-k8s-ci
+    notification_channel = "C09L0379QMQ" # feed-consul-k8s-ci
   }
   github {
     organization = "hashicorp"
