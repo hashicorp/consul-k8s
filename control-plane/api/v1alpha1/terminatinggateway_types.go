@@ -68,7 +68,7 @@ type TerminatingGatewaySpec struct {
 	Deployment TerminatingGatewayDeploymentSpec `json:"deployment,omitempty"`
 }
 
-// DeploymentSpec contains all deployment-related configuration for the terminating gateway
+// TerminatingGatewayDeploymentSpec contains all deployment-related configuration for the terminating gateway.
 type TerminatingGatewayDeploymentSpec struct {
 
 	// Enabled controls whether to create a Deployment for this gateway
@@ -137,7 +137,7 @@ type TerminatingGatewayDeploymentSpec struct {
 	LogJSON *bool `json:"logJSON,omitempty"`
 }
 
-// ExtraVolume defines a volume to be mounted in the pod
+// ExtraVolume defines a volume to be mounted in the pod.
 type ExtraVolume struct {
 	// Name is the name of the volume
 	Name string `json:"name"`
@@ -153,7 +153,7 @@ type ExtraVolume struct {
 	Items []KeyToPath `json:"items,omitempty"`
 }
 
-// ServiceAccountConfig defines service account configuration
+// ServiceAccountConfig defines service account configuration.
 type ServiceAccountConfig struct {
 	// Annotations are annotations for the service account
 	// +kubebuilder:validation:Optional
