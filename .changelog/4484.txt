@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: Allow for Downward API based extra environment variables
+```
