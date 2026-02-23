@@ -1,0 +1,3 @@
+```release-note:feature
+helm: add server.usePersistentVolume variable for determine whether to use a persistent volume.
+```
