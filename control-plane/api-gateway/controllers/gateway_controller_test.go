@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set"
+	logrtest "github.com/go-logr/logr/testr"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -634,6 +635,166 @@ func TestTransformSecret(t *testing.T) {
 			}
 
 			require.ElementsMatch(t, tt.expected, controller.transformSecret(context.Background(), tt.secret))
+		})
+	}
+}
+
+// TestGatewayControllerReconcile validates the Gateway controller's early return logic
+// based on the GatewayClass controller name. This test ensures that:
+//
+// 1. Gateways with non-consul GatewayClasses return early without processing
+// 2. Gateways with missing GatewayClasses return early without processing
+// 3. Gateways with consul GatewayClasses continue past the early return check
+//
+// The "continues past early return check" test case verifies that consul-controlled
+// gateways are NOT rejected by the early return logic. Since the test doesn't initialize
+// the full controller dependencies (cache, translator, etc.), it expects a panic when
+// the reconciliation continues beyond the early return and tries to access these nil
+// dependencies. This panic is the proof that the gateway passed the early return check
+// and proceeded into the reconciliation logic, which is the desired behavior.
+func TestGatewayControllerReconcile(t *testing.T) {
+	t.Parallel()
+
+	namespace := "default"
+	name := "test-gateway"
+	differentGatewayClassName := "different-controller"
+
+	consulGatewayClassName := "consul"
+
+	cases := map[string]struct {
+		gateway               *gwv1beta1.Gateway
+		gatewayClass          *gwv1beta1.GatewayClass
+		k8sObjects            []runtime.Object
+		expectedResult        reconcile.Result
+		expectedError         error
+		expectsEarlyReturn    bool
+		expectsContinuesPast  bool
+	}{
+		"gateway with non-consul gateway class returns early": {
+			gateway: &gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					GatewayClassName: gwv1beta1.ObjectName(differentGatewayClassName),
+				},
+			},
+			gatewayClass: &gwv1beta1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: differentGatewayClassName,
+				},
+				Spec: gwv1beta1.GatewayClassSpec{
+					ControllerName: "different.controller.name",
+				},
+			},
+			expectedResult:     reconcile.Result{},
+			expectedError:      nil,
+			expectsEarlyReturn: true,
+		},
+		"gateway with missing gateway class returns early": {
+			gateway: &gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					GatewayClassName: gwv1beta1.ObjectName("nonexistent"),
+				},
+			},
+			expectedResult:     reconcile.Result{},
+			expectedError:      nil,
+			expectsEarlyReturn: true,
+		},
+		"gateway with consul gateway class continues past early return check": {
+			gateway: &gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					GatewayClassName: gwv1beta1.ObjectName(consulGatewayClassName),
+				},
+			},
+			gatewayClass: &gwv1beta1.GatewayClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: consulGatewayClassName,
+				},
+				Spec: gwv1beta1.GatewayClassSpec{
+					ControllerName: common.GatewayClassControllerName,
+				},
+			},
+			expectedResult:        reconcile.Result{},
+			expectedError:         nil, // Will fail later due to missing dependencies, but NOT at early return
+			expectsContinuesPast:  true,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := runtime.NewScheme()
+			require.NoError(t, clientgoscheme.AddToScheme(s))
+			require.NoError(t, gwv1alpha2.Install(s))
+			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
+
+			objs := tc.k8sObjects
+			if tc.gateway != nil {
+				objs = append(objs, tc.gateway)
+			}
+			if tc.gatewayClass != nil {
+				objs = append(objs, tc.gatewayClass)
+			}
+
+			fakeClient := registerFieldIndexersForTest(
+				fake.NewClientBuilder().WithScheme(s).
+					WithRuntimeObjects(objs...).
+					WithStatusSubresource(&gwv1beta1.Gateway{})).Build()
+
+			controller := &GatewayController{
+				Client: fakeClient,
+				Log:    logrtest.New(t),
+			}
+
+			req := reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: tc.gateway.Namespace,
+					Name:      tc.gateway.Name,
+				},
+			}
+
+			if tc.expectsContinuesPast {
+				// This case should get past the early return check and fail later
+				// We expect a panic or error due to missing dependencies (cache, translator, etc.)
+				require.Panics(t, func() {
+					controller.Reconcile(context.Background(), req)
+				}, "Expected panic from missing dependencies, proving it got past early return")
+				return
+			}
+
+			result, err := controller.Reconcile(context.Background(), req)
+
+			if tc.expectsEarlyReturn {
+				// Early return cases should always succeed with empty result
+				require.Equal(t, tc.expectedResult, result)
+				require.NoError(t, err)
+			} else if tc.expectsContinuesPast {
+				// This case should get past the early return check and fail later
+				// due to missing dependencies (cache, translator, etc.)
+				// The key is that it does NOT return early - it fails at a later step
+				require.Error(t, err, "Expected error from missing dependencies, not early return")
+				// The error should NOT be nil (which would indicate early return success)
+				// Instead it should be an actual error from later in the reconciliation
+			} else {
+				// Standard test cases
+				require.Equal(t, tc.expectedResult, result)
+				if tc.expectedError != nil {
+					require.Error(t, err)
+					require.Equal(t, tc.expectedError.Error(), err.Error())
+				} else {
+					require.NoError(t, err)
+				}
+			}
 		})
 	}
 }
