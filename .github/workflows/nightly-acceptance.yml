@@ -5,11 +5,23 @@ on:
     # * is a special character in YAML so you have to quote this string
     # Run nightly at 12AM UTC/8PM EST/5PM PST
     - cron:  '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to test'
+        required: false
+        default: 'main'
+        type: string
+      context:
+        description: 'Context for the test run'
+        required: false
+        default: 'manual-dispatch'
+        type: string
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: ${{ github.ref_name }}
-  CONTEXT: "nightly"
+  BRANCH: ${{ github.event.inputs.branch || github.ref_name }}
+  CONTEXT: ${{ github.event.inputs.context || 'nightly' }}
 
 jobs:
   cloud:
