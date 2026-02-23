@@ -90,6 +90,28 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	hasGatewayFinalizer := false
+	for _, f := range gateway.GetFinalizers() {
+		if f == common.GatewayFinalizer {
+			hasGatewayFinalizer = true
+			break
+		}
+	}
+	hasSerializedGatewayClassConfig := false
+	if gateway.Annotations != nil {
+		_, hasSerializedGatewayClassConfig = gateway.Annotations[common.AnnotationGatewayClassConfig]
+	}
+	log.Info(
+		"gateway object state at reconcile start",
+		"generation", gateway.Generation,
+		"resourceVersion", gateway.ResourceVersion,
+		"gatewayClassName", gateway.Spec.GatewayClassName,
+		"finalizerCount", len(gateway.GetFinalizers()),
+		"hasManagedFinalizer", hasGatewayFinalizer,
+		"hasSerializedGatewayClassConfig", hasSerializedGatewayClassConfig,
+		"deletionTimestampSet", !gateway.GetDeletionTimestamp().IsZero(),
+	)
+
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
 	if err != nil {
@@ -229,9 +251,17 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	})
 
 	updates := binder.Snapshot()
+	selectedBranch := "metadata-only/noop"
+	if updates.UpsertGatewayDeployment {
+		selectedBranch = "upsert"
+	} else if shouldCleanupResources {
+		selectedBranch = "cleanup"
+	}
 	log.Info(
 		"calculated gateway snapshot",
+		"selectedBranch", selectedBranch,
 		"upsertGatewayDeployment", updates.UpsertGatewayDeployment,
+		"shouldCleanupResources", shouldCleanupResources,
 		"consulUpdates", len(updates.Consul.Updates),
 		"consulDeletions", len(updates.Consul.Deletions),
 		"consulRegistrations", len(updates.Consul.Registrations),
@@ -344,7 +374,34 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, update := range updates.Kubernetes.Updates.Operations() {
-		log.Info("update in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
+		kind := update.GetObjectKind().GroupVersionKind().Kind
+		logValues := []interface{}{
+			"kind", kind,
+			"namespace", update.GetNamespace(),
+			"name", update.GetName(),
+		}
+		if gw, ok := update.(*gwv1beta1.Gateway); ok {
+			hasManagedFinalizer := false
+			for _, f := range gw.GetFinalizers() {
+				if f == common.GatewayFinalizer {
+					hasManagedFinalizer = true
+					break
+				}
+			}
+			hasSerializedClassConfig := false
+			if gw.Annotations != nil {
+				_, hasSerializedClassConfig = gw.Annotations[common.AnnotationGatewayClassConfig]
+			}
+			logValues = append(logValues,
+				"generation", gw.Generation,
+				"resourceVersion", gw.ResourceVersion,
+				"finalizerCount", len(gw.GetFinalizers()),
+				"hasManagedFinalizer", hasManagedFinalizer,
+				"hasSerializedGatewayClassConfig", hasSerializedClassConfig,
+				"deletionTimestampSet", !gw.GetDeletionTimestamp().IsZero(),
+			)
+		}
+		log.Info("update in Kubernetes", logValues...)
 		if err := r.updateAndResetStatus(ctx, update); err != nil {
 			if k8serrors.IsConflict(err) {
 				log.Info("error updating object for gateway, will try to re-reconcile")
@@ -357,7 +414,21 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	for _, update := range updates.Kubernetes.StatusUpdates.Operations() {
-		log.Info("update status in Kubernetes", "kind", update.GetObjectKind().GroupVersionKind().Kind, "namespace", update.GetNamespace(), "name", update.GetName())
+		logValues := []interface{}{
+			"kind", update.GetObjectKind().GroupVersionKind().Kind,
+			"namespace", update.GetNamespace(),
+			"name", update.GetName(),
+		}
+		if gw, ok := update.(*gwv1beta1.Gateway); ok {
+			logValues = append(logValues,
+				"generation", gw.Generation,
+				"resourceVersion", gw.ResourceVersion,
+				"listenerStatusCount", len(gw.Status.Listeners),
+				"gatewayConditionCount", len(gw.Status.Conditions),
+				"gatewayAddressCount", len(gw.Status.Addresses),
+			)
+		}
+		log.Info("update status in Kubernetes", logValues...)
 		if err := r.Client.Status().Update(ctx, update); err != nil {
 			if k8serrors.IsConflict(err) {
 				log.Info("error updating status for gateway, will try to re-reconcile")

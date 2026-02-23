@@ -107,6 +107,33 @@ func (b *Binder) isGatewayDeleted() bool {
 // Snapshot generates a snapshot of operations that need to occur in Kubernetes and Consul
 // in order for a Gateway to be reconciled.
 func (b *Binder) Snapshot() *Snapshot {
+	logger := b.config.Logger.WithValues("gateway", b.key)
+	hasGatewayFinalizerBefore := false
+	for _, f := range b.config.Gateway.GetFinalizers() {
+		if f == common.GatewayFinalizer {
+			hasGatewayFinalizerBefore = true
+			break
+		}
+	}
+	hasSerializedClassConfigBefore := false
+	if b.config.Gateway.Annotations != nil {
+		_, hasSerializedClassConfigBefore = b.config.Gateway.Annotations[common.AnnotationGatewayClassConfig]
+	}
+
+	logger.Info(
+		"binder snapshot input state",
+		"gatewayGeneration", b.config.Gateway.Generation,
+		"gatewayResourceVersion", b.config.Gateway.ResourceVersion,
+		"gatewayFinalizerCount", len(b.config.Gateway.GetFinalizers()),
+		"gatewayHasManagedFinalizer", hasGatewayFinalizerBefore,
+		"gatewayHasSerializedGatewayClassConfig", hasSerializedClassConfigBefore,
+		"httpRouteCount", len(b.config.HTTPRoutes),
+		"tcpRouteCount", len(b.config.TCPRoutes),
+		"policyCount", len(b.config.Policies),
+		"podCount", len(b.config.Pods),
+		"consulGatewayServiceCount", len(b.config.ConsulGatewayServices),
+	)
+
 	// at this point we assume all tcp routes and http routes
 	// actually reference this gateway
 	snapshot := NewSnapshot()
@@ -118,10 +145,27 @@ func (b *Binder) Snapshot() *Snapshot {
 			registrationPods = append(registrationPods, pod)
 		}
 	}
+	logger.Info(
+		"binder pod eligibility summary",
+		"registrationPodCount", len(registrationPods),
+		"deletedPodCount", len(b.config.Pods)-len(registrationPods),
+	)
 
 	gatewayClassConfig := b.config.GatewayClassConfig
 
-	isGatewayDeleted := b.isGatewayDeleted()
+	gatewayMarkedDeleted := isDeleted(&b.config.Gateway)
+	gatewayClassMissing := b.config.GatewayClass == nil
+	gatewayClassMismatch := gatewayClassMissing || b.config.ControllerName != string(b.config.GatewayClass.Spec.ControllerName)
+	gatewayClassConfigMissing := b.config.GatewayClassConfig == nil
+	isGatewayDeleted := gatewayMarkedDeleted || gatewayClassMismatch || gatewayClassConfigMissing
+	logger.Info(
+		"binder lifecycle flags",
+		"gatewayMarkedDeleted", gatewayMarkedDeleted,
+		"gatewayClassMissing", gatewayClassMissing,
+		"gatewayClassMismatch", gatewayClassMismatch,
+		"gatewayClassConfigMissing", gatewayClassConfigMissing,
+		"isGatewayDeleted", isGatewayDeleted,
+	)
 
 	var gatewayValidation gatewayValidationResult
 	var listenerValidation listenerValidationResults
@@ -129,6 +173,7 @@ func (b *Binder) Snapshot() *Snapshot {
 	var authFilterValidation authFilterValidationResults
 
 	authFilters := b.config.Resources.GetExternalAuthFilters()
+	logger.Info("binder route/filter inventory", "authFilterCount", len(authFilters))
 	if !isGatewayDeleted {
 		var updated bool
 
@@ -136,9 +181,23 @@ func (b *Binder) Snapshot() *Snapshot {
 
 		// we don't have a deletion but if we add a finalizer for the gateway, then just add it and return
 		// otherwise try and resolve as much as possible
-		if common.EnsureFinalizer(&b.config.Gateway) || updated {
+		finalizerAdded := common.EnsureFinalizer(&b.config.Gateway)
+		if finalizerAdded || updated {
+			hasSerializedClassConfigAfter := false
+			if b.config.Gateway.Annotations != nil {
+				_, hasSerializedClassConfigAfter = b.config.Gateway.Annotations[common.AnnotationGatewayClassConfig]
+			}
 			// if we've added the finalizer or serialized the class config, then update
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
+			logger.Info(
+				"binder returning metadata-only snapshot",
+				"finalizerAdded", finalizerAdded,
+				"gatewayClassConfigSerialized", updated,
+				"gatewayFinalizerCountBefore", len(b.config.Gateway.GetFinalizers())-boolToInt(finalizerAdded),
+				"gatewayFinalizerCountAfter", len(b.config.Gateway.GetFinalizers()),
+				"gatewayHasSerializedGatewayClassConfigAfter", hasSerializedClassConfigAfter,
+				"kubernetesUpdates", len(snapshot.Kubernetes.Updates.Operations()),
+			)
 			return snapshot
 		}
 
@@ -180,6 +239,12 @@ func (b *Binder) Snapshot() *Snapshot {
 
 	snapshot.Consul.Deletions = b.config.Resources.ResourcesToGC(b.key)
 	snapshot.Consul.Updates = b.config.Resources.Mutations()
+	logger.Info(
+		"binder resource mutation summary prior to gateway operation",
+		"resourceMutations", len(snapshot.Consul.Updates),
+		"resourceGarbageCollections", len(snapshot.Consul.Deletions),
+		"gatewaySecretRefCount", gatewaySecrets.Cardinality(),
+	)
 
 	// finally, handle the gateway itself
 
@@ -188,6 +253,7 @@ func (b *Binder) Snapshot() *Snapshot {
 	if !isGatewayDeleted {
 		snapshot.GatewayClassConfig = gatewayClassConfig
 		snapshot.UpsertGatewayDeployment = true
+		logger.Info("binder selected upsert path for gateway")
 
 		var consulStatus api.ConfigEntryStatus
 		if b.config.ConsulGateway != nil {
@@ -221,6 +287,14 @@ func (b *Binder) Snapshot() *Snapshot {
 				})
 			}
 		}
+		logger.Info(
+			"binder upsert operation details",
+			"gatewayConsulNamespace", entry.Namespace,
+			"registrationPodCount", len(registrationPods),
+			"consulRegistrationsPlanned", len(snapshot.Consul.Registrations),
+			"consulDeregistrationsPlanned", len(snapshot.Consul.Deregistrations),
+			"consulGatewayServiceCount", len(b.config.ConsulGatewayServices),
+		)
 
 		// calculate the status for the gateway
 		var status gwv1beta1.GatewayStatus
@@ -243,11 +317,20 @@ func (b *Binder) Snapshot() *Snapshot {
 
 		// only mark the gateway as needing a status update if there's a diff with its old
 		// status, this keeps the controller from infinitely reconciling
-		if !common.GatewayStatusesEqual(status, b.config.Gateway.Status) {
+		gatewayStatusChanged := !common.GatewayStatusesEqual(status, b.config.Gateway.Status)
+		if gatewayStatusChanged {
 			b.config.Gateway.Status = status
 			snapshot.Kubernetes.StatusUpdates.Add(&b.config.Gateway)
 		}
+		logger.Info(
+			"binder gateway status evaluation",
+			"gatewayStatusChanged", gatewayStatusChanged,
+			"listenerStatusCount", len(status.Listeners),
+			"gatewayConditionCount", len(status.Conditions),
+			"gatewayAddressCount", len(status.Addresses),
+		)
 
+		policyStatusUpdates := 0
 		for idx, policy := range b.config.Policies {
 			policy := policy
 
@@ -258,9 +341,11 @@ func (b *Binder) Snapshot() *Snapshot {
 			if !common.GatewayPolicyStatusesEqual(policyStatus, policy.Status) {
 				b.config.Policies[idx].Status = policyStatus
 				snapshot.Kubernetes.StatusUpdates.Add(&b.config.Policies[idx])
+				policyStatusUpdates++
 			}
 		}
 
+		authFilterStatusUpdates := 0
 		for idx, authFilter := range authFilters {
 			if authFilter == nil {
 				continue
@@ -275,9 +360,16 @@ func (b *Binder) Snapshot() *Snapshot {
 			if !common.RouteAuthFilterStatusesEqual(filterStatus, authFilter.Status) {
 				authFilter.Status = filterStatus
 				snapshot.Kubernetes.StatusUpdates.Add(authFilter)
+				authFilterStatusUpdates++
 			}
 		}
+		logger.Info(
+			"binder policy/filter status evaluation",
+			"policyStatusUpdates", policyStatusUpdates,
+			"authFilterStatusUpdates", authFilterStatusUpdates,
+		)
 	} else {
+		logger.Info("binder selected cleanup path for gateway")
 		// if the gateway has been deleted, unset whatever we've set on it
 		snapshot.Consul.Deletions = append(snapshot.Consul.Deletions, b.nonNormalizedConsulKey)
 		for _, service := range b.config.ConsulGatewayServices {
@@ -289,17 +381,44 @@ func (b *Binder) Snapshot() *Snapshot {
 			})
 		}
 
-		if common.RemoveFinalizer(&b.config.Gateway) {
+		finalizerRemoved := common.RemoveFinalizer(&b.config.Gateway)
+		policyStatusResets := 0
+		if finalizerRemoved {
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
 			for _, policy := range b.config.Policies {
 				policy := policy
 				policy.Status = v1alpha1.GatewayPolicyStatus{}
 				snapshot.Kubernetes.StatusUpdates.Add(&policy)
+				policyStatusResets++
 			}
 		}
+		logger.Info(
+			"binder cleanup operation details",
+			"finalizerRemoved", finalizerRemoved,
+			"consulDeregistrationsPlanned", len(snapshot.Consul.Deregistrations),
+			"policyStatusResets", policyStatusResets,
+		)
 	}
 
+	logger.Info(
+		"binder snapshot summary",
+		"upsertGatewayDeployment", snapshot.UpsertGatewayDeployment,
+		"consulUpdates", len(snapshot.Consul.Updates),
+		"consulDeletions", len(snapshot.Consul.Deletions),
+		"consulRegistrations", len(snapshot.Consul.Registrations),
+		"consulDeregistrations", len(snapshot.Consul.Deregistrations),
+		"kubernetesUpdates", len(snapshot.Kubernetes.Updates.Operations()),
+		"kubernetesStatusUpdates", len(snapshot.Kubernetes.StatusUpdates.Operations()),
+	)
+
 	return snapshot
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func secretsForGateway(gateway gwv1beta1.Gateway, resources *common.ResourceMap) mapset.Set {
