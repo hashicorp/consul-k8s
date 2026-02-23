@@ -763,7 +763,7 @@ func (r *TerminatingGatewayController) deployTerminatingGatewayDeployment(ctx co
 	return nil
 }
 
-// int64Ptr returns a pointer to an int64 value
+// int64Ptr returns a pointer to an int64 value.
 func int64Ptr(v int64) *int64 {
 	return &v
 }
@@ -803,7 +803,7 @@ func parseAnnotationsString(annotationsStr string) map[string]string {
 }
 
 // consulK8sConsulServerEnvVars returns the environment variables for Consul server connection
-// matching the consul.consulK8sConsulServerEnvVars Helm template helper
+// matching the consul.consulK8sConsulServerEnvVars Helm template helper.
 func (r *TerminatingGatewayController) consulK8sConsulServerEnvVars(helmConfigValues *helmvalues.HelmValues) []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
@@ -935,7 +935,7 @@ func (r *TerminatingGatewayController) consulK8sConsulServerEnvVars(helmConfigVa
 }
 
 // getImagePullPolicy converts the helm imagePullPolicy string to corev1.PullPolicy
-// Valid values are: IfNotPresent, Always, Never, or empty
+// Valid values are: IfNotPresent, Always, Never, or empty.
 func getImagePullPolicy(policy string) corev1.PullPolicy {
 	switch policy {
 	case "IfNotPresent":
