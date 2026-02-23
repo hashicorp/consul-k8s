@@ -1,0 +1,4 @@
+```release-note:improvements
+Updated terraform provider version for eks acceptance test.
+
+```
