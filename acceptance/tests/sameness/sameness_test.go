@@ -349,6 +349,23 @@ func TestFailover_Connect(t *testing.T) {
 				}
 			}
 
+			// Ensure mesh config entries are created in Consul before proceeding with peering.
+			// This is critical for mesh gateways to be properly configured for TLS.
+			logger.Log(t, "waiting for mesh config entries to be created in Consul")
+			timer := &retry.Timer{Timeout: retryTimeout, Wait: 5 * time.Second}
+			for _, v := range testClusters {
+				if v.hasServer {
+					retry.RunWith(timer, t, func(r *retry.R) {
+						ce, _, err := v.client.ConfigEntries().Get(api.MeshConfig, "mesh", &api.QueryOptions{})
+						require.NoError(r, err)
+						configEntry, ok := ce.(*api.MeshConfigEntry)
+						require.True(r, ok)
+						require.Equal(r, configEntry.GetName(), "mesh")
+						logger.Logf(t, "mesh config entry verified on cluster %s", v.name)
+					})
+				}
+			}
+
 			// Apply locality to clusters
 			for _, v := range testClusters {
 				setK8sNodeLocality(t, v.context, v)
