@@ -17,20 +17,21 @@ jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
 
-  test:
-    name: test
-    needs: [ conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci != 'true'
-    runs-on: ubuntu-latest
-    steps:
-    - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
-      name: test
-      with:
-        workflow: test.yml
-        repo: hashicorp/consul-k8s-workflows
-        ref: main
-        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
+  # TODO: enable tests once eks issues are resolved
+  # test:
+  #   name: test
+  #   needs: [ conditional-skip ]
+  #   if: needs.conditional-skip.outputs.skip-ci != 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+  #     name: test
+  #     with:
+  #       workflow: test.yml
+  #       repo: hashicorp/consul-k8s-workflows
+  #       ref: main
+  #       token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+  #       inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
 
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
@@ -61,3 +62,18 @@ jobs:
         INPUT_SHA: ${{ env.SHA }}
         INPUT_DETAILS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         INPUT_OWNER: "hashicorp"
+
+  # cloud-acceptance:
+  #   name: cloud-acceptance
+  #   runs-on: ubuntu-24.04
+  #   steps:
+  #     - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+  #       name: cloud
+  #       with:
+  #         workflow: cloud.yml
+  #         repo: hashicorp/consul-k8s-workflows
+  #         # ref: main
+  #         # TODO: change ref to main after testing
+  #         ref: abhishek/test-eks-cni
+  #         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+  #         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
