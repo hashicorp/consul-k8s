@@ -252,7 +252,7 @@ func TestPeering_Gateway(t *testing.T) {
 		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
 		require.NoError(r, err, out)
 	})
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+	helpers.Cleanup(t, true, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
 		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-k", "../fixtures/bases/api-gateway")
@@ -319,4 +319,7 @@ func TestPeering_Gateway(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
+
+	// Add this line to force a failure and skip cleanup
+	t.Fatal("Forcing failure to inspect resources")
 }

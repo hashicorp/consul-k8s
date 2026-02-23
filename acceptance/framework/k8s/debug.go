@@ -86,7 +86,7 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 			if isServiceMeshPod || isGatewayPod {
 				localPort := portforward.CreateTunnelToResourcePort(t, pod.Name, 19000, kubectlOptions, terratestLogger.Discard)
 
-				configDumpResp, err := http.DefaultClient.Get(fmt.Sprintf("http://%s/config_dump?format=json", localPort))
+				configDumpResp, err := http.DefaultClient.Get(fmt.Sprintf("http://%s/config_dump?format=json&include_eds", localPort))
 				var configDump string
 				if err != nil {
 					configDump = fmt.Sprintf("Error getting config_dump: %s: %s", err, configDump)
