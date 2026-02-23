@@ -213,6 +213,25 @@ func TestPartitions_Gateway(t *testing.T) {
 		k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), kustomizeDir)
 	})
 
+	// Ensure proxy-defaults config entries are created in Consul before proceeding.
+	// This is critical for mesh gateways to be properly configured for TLS.
+	logger.Log(t, "waiting for proxy-defaults config entries to be created in Consul")
+	retry.Run(t, func(r *retry.R) {
+		ceDefault, _, err := consulClient.ConfigEntries().Get(api.ProxyDefaults, api.ProxyConfigGlobal, serverQueryServerOpts)
+		require.NoError(r, err)
+		configEntryDefault, ok := ceDefault.(*api.ProxyConfigEntry)
+		require.True(r, ok)
+		require.Equal(r, configEntryDefault.GetName(), api.ProxyConfigGlobal)
+		logger.Log(t, "proxy-defaults config entry verified on default partition")
+
+		ceSecondary, _, err := consulClient.ConfigEntries().Get(api.ProxyDefaults, api.ProxyConfigGlobal, serverQueryClientOpts)
+		require.NoError(r, err)
+		configEntrySecondary, ok := ceSecondary.(*api.ProxyConfigEntry)
+		require.True(r, ok)
+		require.Equal(r, configEntrySecondary.GetName(), api.ProxyConfigGlobal)
+		logger.Log(t, "proxy-defaults config entry verified on secondary partition")
+	})
+
 	// We use the static-client pod so that we can make calls to the api gateway
 	// via kubectl exec without needing a route into the cluster from the test machine.
 	// Since we're deploying the gateway in the secondary cluster, we create the static client
