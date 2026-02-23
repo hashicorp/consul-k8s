@@ -118,7 +118,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	log.Info("Reconciling TerminatingGateway")
 
 	// Get Helm values from ConfigMap
-	helmValues, err := r.getHelmValues(ctx)
+	helmValues, err := helmvalues.GetHelmValues(ctx, r.Client, r.ReleaseName, r.ReleaseNamespace)
 	if err != nil {
 		log.Error(err, "failed to get Helm values")
 		return ctrl.Result{}, err
@@ -454,11 +454,11 @@ func serviceNameFromPolicy(policyName string) string {
 
 func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consulv1alpha1.TerminatingGateway, helmConfigValues *helmvalues.HelmValues) *appsv1.Deployment {
 
-	fullName := consulFullName(helmConfigValues)
-	terminatingGatewayServiceAccountName := fmt.Sprintf("%s-%s", fullName, termGW.Spec.GatewayName)
+	fullName := helmvalues.ConsulFullName(helmConfigValues)
+	terminatingGatewayServiceAccountName := fmt.Sprintf("%s-%s", fullName, termGW.Spec.Deployment.GatewayName)
 	baseLabels := map[string]string{
-		"app":                      consulName(helmConfigValues),
-		"chart":                    consulChart(),
+		"app":                      helmvalues.ConsulName(helmConfigValues),
+		"chart":                    helmvalues.ConsulChart(),
 		"heritage":                 helmConfigValues.Release.Service,
 		"release":                  helmConfigValues.Release.Name,
 		"component":                "terminating-gateway",
@@ -474,22 +474,22 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consul
 	}
 
 	replicas := int32(helmConfigValues.TerminatingGateways.Defaults.Replicas)
-	if termGW.Spec.Replicas != nil {
-		replicas = *termGW.Spec.Replicas
+	if termGW.Spec.Deployment.Replicas != nil {
+		replicas = *termGW.Spec.Deployment.Replicas
 	}
 
 	podSpec := corev1.PodSpec{
 		TerminationGracePeriodSeconds: int64Ptr(10),
 		ServiceAccountName:            terminatingGatewayServiceAccountName,
-		Affinity:                      termGW.Spec.Affinity,
-		Tolerations:                   termGW.Spec.Tolerations,
-		TopologySpreadConstraints:     termGW.Spec.TopologySpreadConstraints,
-		NodeSelector:                  termGW.Spec.NodeSelector,
-		PriorityClassName:             termGW.Spec.PriorityClassName,
+		Affinity:                      termGW.Spec.Deployment.Affinity,
+		Tolerations:                   termGW.Spec.Deployment.Tolerations,
+		TopologySpreadConstraints:     termGW.Spec.Deployment.TopologySpreadConstraints,
+		NodeSelector:                  termGW.Spec.Deployment.NodeSelector,
+		PriorityClassName:             termGW.Spec.Deployment.PriorityClassName,
 	}
 
 	// Add volumes
-	for _, vol := range termGW.Spec.ExtraVolumes {
+	for _, vol := range termGW.Spec.Deployment.ExtraVolumes {
 		volume := corev1.Volume{
 			Name: vol.Name,
 		}
@@ -558,7 +558,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consul
     -proxy-id-file=/consul/service/proxy-id \
     -service-name=%s \
     -log-level=%s \
-    -log-json=%v`, termGW.Spec.GatewayName, termGW.Spec.LogLevel, *termGW.Spec.LogJSON),
+    -log-json=%v`, termGW.Spec.Deployment.GatewayName, termGW.Spec.Deployment.LogLevel, *termGW.Spec.Deployment.LogJSON),
 		},
 		VolumeMounts: func() []corev1.VolumeMount {
 			mounts := []corev1.VolumeMount{
@@ -602,7 +602,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consul
 	mainContainer := corev1.Container{
 		Name:            "terminating-gateway",
 		Image:           helmConfigValues.Global.ImageConsulDataplane,
-		Resources:       termGW.Spec.Resources,
+		Resources:       termGW.Spec.Deployment.Resources,
 		ImagePullPolicy: getImagePullPolicy(helmConfigValues.Global.ImagePullPolicy),
 		SecurityContext: restrictedSecurityContext(helmConfigValues),
 		Ports: []corev1.ContainerPort{
@@ -649,12 +649,12 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consul
 		"consul.hashicorp.com/connect-inject":              "false",
 		"consul.hashicorp.com/mesh-inject":                 "false",
 		"consul.hashicorp.com/gateway-kind":                "terminating-gateway",
-		"consul.hashicorp.com/gateway-consul-service-name": termGW.Spec.GatewayName,
+		"consul.hashicorp.com/gateway-consul-service-name": termGW.Spec.Deployment.GatewayName,
 	}
 
 	// Add gateway-namespace if namespaces are enabled
 	if helmConfigValues.Global.EnableConsulNamespaces {
-		ns := defaultIfEmpty(termGW.Spec.ConsulNamespace, helmConfigValues.TerminatingGateways.Defaults.ConsulNamespace)
+		ns := defaultIfEmpty(termGW.Spec.Deployment.ConsulNamespace, helmConfigValues.TerminatingGateways.Defaults.ConsulNamespace)
 		if ns != "" {
 			annotations["consul.hashicorp.com/gateway-namespace"] = ns
 		}
@@ -692,7 +692,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consul
 	}
 
 	// Add gateway-specific annotations (these override defaults)
-	for k, v := range termGW.Spec.Annotations {
+	for k, v := range termGW.Spec.Deployment.Annotations {
 		annotations[k] = v
 	}
 
@@ -723,9 +723,21 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(termGW *consul
 }
 
 func (r *TerminatingGatewayController) deployTerminatingGatewayDeployment(ctx context.Context, log logr.Logger, termGW *consulv1alpha1.TerminatingGateway, helmValues *helmvalues.HelmValues) error {
+	if termGW.Spec.Deployment.Enabled == nil || !*termGW.Spec.Deployment.Enabled {
+		return nil
+	}
+
 	deployment := r.constructDeploymentFromCRD(termGW, helmValues)
 	if deployment == nil {
 		return fmt.Errorf("failed to construct deployment for terminating gateway")
+	}
+
+	// printing deployment spec for debugging purposes
+	deploymentSpecBytes, printErr := json.MarshalIndent(deployment.Spec, "", "  ")
+	if printErr != nil {
+		log.Error(printErr, "failed to marshal deployment spec for logging")
+	} else {
+		log.Info("Constructed Deployment spec", "spec", string(deploymentSpecBytes))
 	}
 
 	existingDeployment := &appsv1.Deployment{}
@@ -754,110 +766,6 @@ func (r *TerminatingGatewayController) deployTerminatingGatewayDeployment(ctx co
 // int64Ptr returns a pointer to an int64 value
 func int64Ptr(v int64) *int64 {
 	return &v
-}
-
-func (r *TerminatingGatewayController) getInitContainerImage(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway) (string, error) {
-	podList := &corev1.PodList{}
-	if err := r.Client.List(ctx, podList, client.InNamespace(termGW.Namespace), client.MatchingLabels{"app": "terminating-gateway"}); err != nil {
-		return "", fmt.Errorf("failed to list terminating-gateway pods: %w", err)
-	}
-	if len(podList.Items) == 0 {
-		return "", fmt.Errorf("no terminating-gateway pods found in namespace %s", termGW.Namespace)
-	}
-	pod := podList.Items[0]
-	if len(pod.Spec.InitContainers) == 0 {
-		return "", fmt.Errorf("no containers found in terminating-gateway pod %s", pod.Name)
-	}
-	return pod.Spec.InitContainers[0].Image, nil
-}
-
-// getHelmValues retrieves the Helm values from the ConfigMap
-func (r *TerminatingGatewayController) getHelmValues(ctx context.Context) (*helmvalues.HelmValues, error) {
-	cm := &corev1.ConfigMap{}
-	configMapName := fmt.Sprintf("%s-consul-helm-values", r.ReleaseName)
-
-	err := r.Client.Get(ctx, types.NamespacedName{
-		Name:      configMapName,
-		Namespace: r.ReleaseNamespace,
-	}, cm)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get helm values ConfigMap %s: %w", configMapName, err)
-	}
-
-	data, ok := cm.Data["values.json"]
-	if !ok {
-		return nil, fmt.Errorf("values.json key not found in ConfigMap %s", configMapName)
-	}
-
-	var values helmvalues.HelmValues
-	if err := json.Unmarshal([]byte(data), &values); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal helm values: %w", err)
-	}
-
-	return &values, nil
-}
-
-func consulFullName(hv *helmvalues.HelmValues) string {
-	if hv == nil {
-		return ""
-	}
-
-	// 1) fullnameOverride (if your HelmValues struct does not yet have this, add it there)
-	if s := strings.TrimSpace(hv.FullNameOverride); s != "" {
-		return truncDNSLabel(s)
-	}
-
-	// 2) global.name
-	if s := strings.TrimSpace(hv.Global.Name); s != "" {
-		return truncDNSLabel(s)
-	}
-
-	// 3) releaseName + chart/nameOverride
-	// Chart name in this repo is consul; nameOverride optionally replaces it.
-	name := "consul"
-	if s := strings.TrimSpace(hv.NameOverride); s != "" {
-		name = s
-	}
-
-	release := strings.TrimSpace(hv.Release.Name)
-	if release == "" {
-		// Fallback to just the name if Release.Name is not available.
-		return truncDNSLabel(name)
-	}
-
-	return truncDNSLabel(fmt.Sprintf("%s-%s", release, name))
-}
-
-func truncDNSLabel(s string) string {
-	s = strings.TrimSpace(s)
-	if len(s) > 63 {
-		s = s[:63]
-	}
-	return strings.TrimSuffix(s, "-")
-}
-
-// consulChart mirrors Helm helper `consul.chart` (helpers.tpl ~203-206):
-//
-//	printf "%s-helm" .Chart.Name | replace "+" "_" | trunc 63 | trimSuffix "-"
-func consulChart() string {
-	chartName := "consul"
-	// If you later add Chart.Name to HelmValues, prefer it here.
-	out := fmt.Sprintf("%s-helm", chartName)
-	out = strings.ReplaceAll(out, "+", "_")
-	return truncDNSLabel(out)
-}
-
-// consulName mirrors Helm helper `consul.name` (helpers.tpl ~211-214):
-//
-//	default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-"
-func consulName(hv *helmvalues.HelmValues) string {
-	name := "consul"
-	if hv != nil {
-		if s := strings.TrimSpace(hv.NameOverride); s != "" {
-			name = s
-		}
-	}
-	return truncDNSLabel(name)
 }
 
 // consulServerTLSCATemplate mirrors Helm helper `consul.serverTLSCATemplate` (helpers.tpl):

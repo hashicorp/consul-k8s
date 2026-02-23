@@ -63,7 +63,18 @@ type TerminatingGatewaySpec struct {
 	// Services is a list of service names represented by the terminating gateway.
 	Services []LinkedService `json:"services,omitempty"`
 
-	// === DEPLOYMENT FIELDS ===
+	// Deployment contains all deployment-related configuration
+	// +kubebuilder:validation:Optional
+	Deployment TerminatingGatewayDeploymentSpec `json:"deployment,omitempty"`
+}
+
+// DeploymentSpec contains all deployment-related configuration for the terminating gateway
+type TerminatingGatewayDeploymentSpec struct {
+
+	// Enabled controls whether to create a Deployment for this gateway
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=false
+	Enabled *bool `json:"enabled,omitempty"`
 
 	// GatewayName is the name of the gateway service in Consul
 	// +kubebuilder:validation:Optional
@@ -117,8 +128,11 @@ type TerminatingGatewaySpec struct {
 	// +kubebuilder:default="default"
 	ConsulNamespace string `json:"consulNamespace,omitempty"`
 
+	// LogLevel sets the logging level for the gateway
 	// +kubebuilder:default=info
 	LogLevel string `json:"logLevel,omitempty"`
+
+	// LogJSON enables JSON formatted logging
 	// +kubebuilder:default=false
 	LogJSON *bool `json:"logJSON,omitempty"`
 }
