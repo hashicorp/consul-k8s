@@ -451,35 +451,13 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ServerMgr:    config.ConsulServerConnMgr,
 		AuthMethod:   config.HelmConfig.AuthMethod,
 	}
-	/*
-	   ctrl.NewControllerManagedBy(mgr).
-	   	Named("gateway-custom").
-	   	For(
-	   		&gwv1beta1.Gateway{},
-	   		builder.WithPredicates(predicate.GenerationChangedPredicate{}),
-	   	).
-	   	Watches(...).
-	   	Complete(r)
 
-	*/
 	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-custom").
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
-		// Watches(
-		// 	&appsv1.Deployment{},
-		// 	handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		// 		return mapToCustomGateway(obj)
-		// 	}), builder.WithPredicates(predicate),
-		// ).
-		// Watches(
-		// 	&corev1.Service{},
-		// 	handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		// 		return mapToCustomGateway(obj)
-		// 	}),
-		// ).
 		Watches(
 			&gwv1beta1.ReferenceGrant{},
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
