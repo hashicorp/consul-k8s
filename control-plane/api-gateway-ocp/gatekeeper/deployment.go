@@ -6,6 +6,7 @@ package gatekeeper
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,7 +37,14 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	} else if k8serrors.IsNotFound(err) {
-		exists = false
+		time.Sleep(5 * time.Second)
+		err = g.ApiReader.Get(ctx, g.namespacedName(gateway), existingDeployment)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return err
+		} else if k8serrors.IsNotFound(err) {
+			g.Log.Info("No existing deployment found.")
+			exists = false
+		}
 	} else {
 		exists = true
 	}

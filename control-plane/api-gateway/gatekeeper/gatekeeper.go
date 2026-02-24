@@ -22,14 +22,16 @@ type Gatekeeper struct {
 	Log          logr.Logger
 	Client       client.Client
 	ConsulConfig *consul.Config
+	ApiReader    client.Reader
 }
 
 // New creates a new Gatekeeper from the Config.
-func New(log logr.Logger, client client.Client, consulConfig *consul.Config) *Gatekeeper {
+func New(log logr.Logger, client client.Client, consulConfig *consul.Config, apiReader client.Reader) *Gatekeeper {
 	return &Gatekeeper{
 		Log:          log,
 		Client:       client,
 		ConsulConfig: consulConfig,
+		ApiReader:    apiReader,
 	}
 }
 

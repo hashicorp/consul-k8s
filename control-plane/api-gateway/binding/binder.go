@@ -128,21 +128,20 @@ func (b *Binder) Snapshot() *Snapshot {
 
 	authFilters := b.config.Resources.GetExternalAuthFilters()
 	if !isGatewayDeleted {
-		var updated bool
+		var updatedGwcc bool
 
-		gatewayClassConfig, updated = serializeGatewayClassConfig(&b.config.Gateway, gatewayClassConfig)
-
+		gatewayClassConfig, updatedGwcc = serializeGatewayClassConfig(&b.config.Gateway, gatewayClassConfig)
 		// we don't have a deletion but if we add a finalizer for the gateway, then just add it and return
 		// otherwise try and resolve as much as possible
-		if common.EnsureFinalizer(&b.config.Gateway) || updated {
+		if common.EnsureFinalizer(&b.config.Gateway) || updatedGwcc {
 			// if we've added the finalizer or serialized the class config, then update
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
-			return snapshot
+			// return snapshot
 		}
 
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
-		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, b.config.GatewayClassConfig)
+		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, gatewayClassConfig)
 		policyValidation = validateGatewayPolicies(b.config.Gateway, b.config.Policies, b.config.Resources)
 		authFilterValidation = validateAuthFilters(authFilters, b.config.Resources)
 	}
@@ -198,6 +197,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		})
 
 		metricsConfig := common.GatewayMetricsConfig(b.config.Gateway, *gatewayClassConfig, b.config.HelmConfig)
+		b.config.Logger.Info("registrationPods count", "count", len(registrationPods))
 		registrations := registrationsForPods(metricsConfig, entry.Namespace, b.config.Gateway, registrationPods)
 		snapshot.Consul.Registrations = registrations
 

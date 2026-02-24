@@ -67,6 +67,7 @@ type GatewayController struct {
 	denyK8sNamespacesSet  mapset.Set
 	client.Client
 	ConsulConfig *consul.Config
+	ApiReader    client.Reader
 }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
@@ -76,7 +77,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var gateway gwv1beta1.Gateway
 
-	log := r.Log.WithValues("gateway-custom", req.NamespacedName)
+	log := r.Log.V(1).WithValues("gateway-custom", req.NamespacedName)
 	log.Info("Reconciling Gateway -  starting for custom consul networking API version")
 
 	// get the gateway
@@ -88,6 +89,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 
 	}
+	log.Info("Gateway found: " + fmt.Sprintf("%+v", gateway))
 
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
@@ -211,7 +213,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	})
 
 	updates := binder.Snapshot()
-
+	r.Log.V(1).Info("updates binder: " + fmt.Sprintf("%+v", updates))
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
@@ -229,7 +231,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.EnsureSubscribed(nonNormalizedConsulKey, req.NamespacedName)
-	} else {
+	} else if gateway.DeletionTimestamp != nil && !gateway.GetDeletionTimestamp().IsZero() {
+		r.Log.Info("gateway delete detected, deleting gateway resources")
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
@@ -367,7 +370,7 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 }
 
 func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
-	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig, r.ApiReader)
 	err := gk.Delete(ctx, *gw)
 	if err != nil {
 		return err
@@ -377,7 +380,7 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 }
 
 func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
-	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig, r.ApiReader)
 	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
 	if err != nil {
 		return err
@@ -426,6 +429,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
+		ApiReader:  mgr.GetAPIReader(),
 		HelmConfig: config.HelmConfig.Normalize(),
 		Translator: common.ResourceTranslator{
 			EnableConsulNamespaces: config.HelmConfig.EnableNamespaces,
@@ -448,40 +452,13 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		ServerMgr:    config.ConsulServerConnMgr,
 		AuthMethod:   config.HelmConfig.AuthMethod,
 	}
-	/*
-	   ctrl.NewControllerManagedBy(mgr).
-	   	Named("gateway-custom").
-	   	For(
-	   		&gwv1beta1.Gateway{},
-	   		builder.WithPredicates(predicate.GenerationChangedPredicate{}),
-	   	).
-	   	Watches(...).
-	   	Complete(r)
 
-	*/
 	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-custom").
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
-		// Watches(
-		// 	&appsv1.Deployment{},
-		// 	handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		// 		return mapToCustomGateway(obj)
-		// 	}), builder.WithPredicates(predicate),
-		// ).
-		Watches(
-			&corev1.Pod{},
-			handler.EnqueueRequestsFromMapFunc(r.transformPods),
-			builder.WithPredicates(predicate),
-		).
-		// Watches(
-		// 	&corev1.Service{},
-		// 	handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-		// 		return mapToCustomGateway(obj)
-		// 	}),
-		// ).
 		Watches(
 			&gwv1beta1.ReferenceGrant{},
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
@@ -510,11 +487,11 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&corev1.Endpoints{},
 			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints),
 		).
-		// Watches(
-		// 	&corev1.Pod{},
-		// 	handler.EnqueueRequestsFromMapFunc(r.transformPods),
-		// 	builder.WithPredicates(predicate),
-		// ).
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestsFromMapFunc(r.transformPods),
+			builder.WithPredicates(predicate),
+		).
 		WatchesRawSource(
 			source.Channel(
 				c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events(),

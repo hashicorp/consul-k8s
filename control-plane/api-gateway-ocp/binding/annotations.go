@@ -5,12 +5,16 @@ package binding
 
 import (
 	"encoding/json"
+	"reflect"
 
 	gwv1beta1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-ocp/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+var log = ctrl.Log.WithName("serialize-gatewayclassconfig-custom")
 
 func serializeGatewayClassConfig(gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) (*v1alpha1.GatewayClassConfig, bool) {
 	if gwcc == nil {
@@ -20,18 +24,21 @@ func serializeGatewayClassConfig(gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayCl
 	if gw.Annotations == nil {
 		gw.Annotations = make(map[string]string)
 	}
+	key := common.AnnotationGatewayClassConfig
+	if annotatedConfig, ok := gw.Annotations[key]; ok {
+		var config v1alpha1.GatewayClassConfigSpec
+		if err := json.Unmarshal([]byte(annotatedConfig), &config); err == nil {
+			if reflect.DeepEqual(config, gwcc.Spec) {
+				return gwcc, false
+			}
 
-	if annotatedConfig, ok := gw.Annotations[common.AnnotationGatewayClassConfig]; ok {
-		var config v1alpha1.GatewayClassConfig
-		if err := json.Unmarshal([]byte(annotatedConfig), &config.Spec); err == nil {
-			// if we can unmarshal the gateway, return it
-			return &config, false
 		}
 	}
 
 	// otherwise if we failed to unmarshal or there was no annotation, marshal it onto
 	// the gateway
 	marshaled, _ := json.Marshal(gwcc.Spec)
-	gw.Annotations[common.AnnotationGatewayClassConfig] = string(marshaled)
+	gw.Annotations[key] = string(marshaled)
+	log.Info("gwcc to be used: " + string(marshaled) + "and generation: " + string(gwcc.Generation))
 	return gwcc, true
 }
