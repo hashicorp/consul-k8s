@@ -57,16 +57,16 @@ type GatewayControllerConfig struct {
 // GatewayController reconciles a Gateway object.
 // The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
-	HelmConfig common.HelmConfig
-	Log        logr.Logger
-	Translator common.ResourceTranslator
-
+	HelmConfig            common.HelmConfig
+	Log                   logr.Logger
+	Translator            common.ResourceTranslator
 	cache                 *cache.Cache
 	gatewayCache          *cache.GatewayCache
 	allowK8sNamespacesSet mapset.Set
 	denyK8sNamespacesSet  mapset.Set
 	client.Client
 	ConsulConfig *consul.Config
+	ApiReader    client.Reader
 }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
@@ -76,8 +76,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	var gateway gwv1.Gateway
 
-	log := r.Log.WithValues("gateway-stable", req.NamespacedName)
-	log.Info("Reconciling Gateway -  starting forstable API version")
+	log := r.Log.V(1).WithValues("gateway-stable", req.NamespacedName)
+	log.Info("Reconciling Gateway -  starting for stable API version")
 
 	// get the gateway
 	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
@@ -100,11 +100,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
-	log.Info("gatewayclassconfig fetched from the system: " + fmt.Sprintf("%+v", gatewayClassConfig))
-	log.Info("gatewayclassconfig fetched from the system - max instances: " + fmt.Sprintf("%+v", *gatewayClassConfig.Spec.DeploymentSpec.MaxInstances))
-	log.Info("gatewayclassconfig fetched from the system - min instances: " + fmt.Sprintf("%+v", *gatewayClassConfig.Spec.DeploymentSpec.MinInstances))
-	log.Info("gatewayclassconfig fetched from the system - default instances: " + fmt.Sprintf("%+v", *gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances))
-
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
 	if err != nil {
@@ -205,16 +200,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	})
 
 	updates := binder.Snapshot()
-	log.Info("updates binder: " + fmt.Sprintf("%+v", updates))
+	r.Log.V(1).Info("updates binder: " + fmt.Sprintf("%+v", updates))
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
 			return ctrl.Result{}, err
 		}
-		log.Info("gatewayclassconfig in updates fetched from the system: " + fmt.Sprintf("%+v", updates.GatewayClassConfig))
-		log.Info("gatewayclassconfig in updates fetched from the system - max instances: " + fmt.Sprintf("%+v", *updates.GatewayClassConfig.Spec.DeploymentSpec.MaxInstances))
-		log.Info("gatewayclassconfig in updates fetched from the system - min instances: " + fmt.Sprintf("%+v", *updates.GatewayClassConfig.Spec.DeploymentSpec.MinInstances))
-		log.Info("gatewayclassconfig in updates fetched from the system - default instances: " + fmt.Sprintf("%+v", *updates.GatewayClassConfig.Spec.DeploymentSpec.DefaultInstances))
 
 		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
 		if err != nil {
@@ -227,7 +218,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.EnsureSubscribed(nonNormalizedConsulKey, req.NamespacedName)
-	} else {
+	} else if gateway.DeletionTimestamp != nil && !gateway.GetDeletionTimestamp().IsZero() {
+		log.Info("gateway delete detected, deleting gateway resources")
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
@@ -365,7 +357,7 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 }
 
 func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway) error {
-	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig, r.ApiReader)
 	err := gk.Delete(ctx, *gw)
 	if err != nil {
 		return err
@@ -375,7 +367,7 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 }
 
 func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
-	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig, r.ApiReader)
 	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
 	if err != nil {
 		return err
@@ -406,6 +398,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
+		ApiReader:  mgr.GetAPIReader(),
 		HelmConfig: config.HelmConfig.Normalize(),
 		Translator: common.ResourceTranslator{
 			EnableConsulNamespaces: config.HelmConfig.EnableNamespaces,
@@ -832,6 +825,18 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 	return service, nil
 }
 
+// get deployment for gateway
+func (c *GatewayController) getDeployedGatewayDeployment(ctx context.Context, gateway types.NamespacedName) (*appsv1.Deployment, error) {
+	deployment := &appsv1.Deployment{}
+	// we use the implicit association of a deployment name/namespace with a corresponding gateway
+	if err := c.Client.Get(ctx, gateway, deployment); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+
+	return deployment, nil
+}
+
+// get pods for gateway
 func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1.Gateway) ([]corev1.Pod, error) {
 	labels := common.LabelsForGateway(&gateway)
 

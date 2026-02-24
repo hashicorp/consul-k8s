@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,6 +30,7 @@ const (
 )
 
 func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
+
 	// Get Deployment if it exists.
 	existingDeployment := &appsv1.Deployment{}
 	exists := false
@@ -37,12 +39,18 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1.Gateway,
 	if err != nil && !k8serrors.IsNotFound(err) {
 		return err
 	} else if k8serrors.IsNotFound(err) {
-		exists = false
+		time.Sleep(5 * time.Second)
+		err = g.ApiReader.Get(ctx, g.namespacedName(gateway), existingDeployment)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return err
+		} else if k8serrors.IsNotFound(err) {
+			g.Log.Info("No existing deployment found.")
+			exists = false
+		}
 	} else {
 		exists = true
 	}
 
-	g.Log.Info("existing deployment: " + fmt.Sprintf("%+v", existingDeployment))
 	var currentReplicas *int32
 	if exists {
 		currentReplicas = existingDeployment.Spec.Replicas
@@ -63,7 +71,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1.Gateway,
 
 	mutated := deployment.DeepCopy()
 	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme())
-
+	g.Log.Info("mutated deployment: " + fmt.Sprintf("%+v", mutated))
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
 		return err
