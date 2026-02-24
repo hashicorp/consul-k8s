@@ -89,6 +89,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 
 	}
+	log.Info("Gateway found: " + fmt.Sprintf("%+v", gateway))
 
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
