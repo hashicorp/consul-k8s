@@ -949,7 +949,7 @@ func getImagePullPolicy(policy string) corev1.PullPolicy {
 	}
 }
 
-// restrictedSecurityContext matches charts/consul/templates/_helpers.tpl:consul.restrictedSecurityContext
+// restrictedSecurityContext matches charts/consul/templates/_helpers.tpl:consul.restrictedSecurityContext.
 func restrictedSecurityContext(helmConfigValues *helmvalues.HelmValues) *corev1.SecurityContext {
 	// Helm: {{- if not .Values.global.enablePodSecurityPolicies -}}
 	// If PSPs are enabled, the helper emits nothing.
