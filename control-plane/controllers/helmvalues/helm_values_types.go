@@ -1,6 +1,6 @@
 package helmvalues
 
-// HelmValues represents the structure stored in the ConfigMap
+// HelmValues represents the structure stored in the ConfigMap.
 type HelmValues struct {
 	// These two fields mirror root chart values used by the Helm helper template
 	// "consul.fullname".
