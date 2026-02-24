@@ -13,3 +13,4 @@ pkg/
 control-plane/cni/cni
 acceptance/tests/consul-dns/coredns-custom.yaml
 **vendor
+**bofa-repro**

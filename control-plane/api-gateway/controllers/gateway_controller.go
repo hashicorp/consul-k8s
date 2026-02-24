@@ -134,6 +134,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	gatewayClassMissing := gatewayClass == nil
 	gatewayClassMismatch := gatewayClassMissing || gatewayClassController != common.GatewayClassControllerName
 	gatewayClassConfigMissing := gatewayClassConfig == nil
+	shouldCleanupResources := gatewayMarkedDeleted || gatewayClassMismatch || gatewayClassConfigMissing
 	log.Info(
 		"evaluated gateway lifecycle state",
 		"gatewayMarkedDeleted", gatewayMarkedDeleted,
@@ -141,6 +142,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		"gatewayClassController", gatewayClassController,
 		"gatewayClassMismatch", gatewayClassMismatch,
 		"gatewayClassConfigMissing", gatewayClassConfigMissing,
+		"shouldCleanupResources", shouldCleanupResources,
 	)
 
 	// get all namespaces
