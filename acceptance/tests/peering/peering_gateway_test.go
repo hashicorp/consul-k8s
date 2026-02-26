@@ -319,4 +319,45 @@ func TestPeering_Gateway(t *testing.T) {
 
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
+
+	// Base case validated above: api_gateway reaches static-server across peers
+	// when both clusters use Local mesh_gateway mode via proxyDefaults.
+	//
+	// Additional cases:
+	// 1. All services in both clusters use Remote mesh_gateway mode.
+	// 2. Only api_gateway uses Local mesh_gateway mode.
+	// 3. Only api_gateway uses Remote mesh_gateway mode.
+
+	// Test 1: all services in both clusters use Remote mesh_gateway mode.
+	logger.Log(t, "patching all services to set mesh_gateway mode to remote in both clusters")
+	k8s.RunKubectl(t, staticClientOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"remote"}}}`, "--type=merge")
+	k8s.RunKubectl(t, staticServerOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"remote"}}}`, "--type=merge")
+	// Intentions are already in place from previous steps, so we can directly check connectivity.
+	logger.Log(t, "checking that connection is successful")
+	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
+
+	// Test 2: only api_gateway uses Local mesh_gateway mode.
+	// proxyDefaults are already Remote for all services; override api_gateway with service-defaults.
+	// service-defaults takes precedence over proxy-defaults.
+	logger.Log(t, "patching api_gateway to set mesh_gateway mode to local")
+	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-local.yaml")
+	require.NoError(t, err, out)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-local.yaml")
+	})
+	logger.Log(t, "checking that connection is successful")
+	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
+
+	// Test 3: only api_gateway uses Remote mesh_gateway mode.
+	// Set proxyDefaults to Local for both clusters, then override api_gateway with service-defaults.
+	logger.Log(t, "patching api_gateway to set mesh_gateway mode to remote")
+	k8s.RunKubectl(t, staticClientOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
+	k8s.RunKubectl(t, staticServerOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
+	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-remote.yaml")
+	require.NoError(t, err, out)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-remote.yaml")
+	})
+	logger.Log(t, "checking that connection is successful")
+	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
 }
