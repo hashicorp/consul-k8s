@@ -1,0 +1,3 @@
+```release-note:bug
+charts: fix terraform script where all eks acceptance test cases failed to provision infra on aws.
+```
