@@ -31,6 +31,7 @@ func init() {
 type templateArgs struct {
 	EnableNamespaces bool
 	APIGatewayName   string
+	APIGatewayNS     string
 }
 
 var (
@@ -38,7 +39,7 @@ var (
 	gatewayRulesTpl = `
 mesh = "read"
 {{- if .EnableNamespaces }}
-  namespace_prefix "" {
+  namespace "{{.APIGatewayNS}}" {
 {{- end }}
 		node_prefix "" {
 			policy = "read"
@@ -360,7 +361,7 @@ func (c *Cache) ensurePolicy(client *api.Client, gatewayName, namespace string) 
 	defer c.policyMutex.Unlock()
 
 	createPolicy := func() (string, error) {
-		policy := c.gatewayPolicy(gatewayCacheKey)
+		policy := c.gatewayPolicy(gatewayName, namespace)
 
 		created, _, err := client.ACL().PolicyCreate(&policy, &api.WriteOptions{})
 
@@ -471,11 +472,13 @@ func (c *Cache) ensureRole(client *api.Client, gatewayName string, namespace str
 	return createRole()
 }
 
-func (c *Cache) gatewayPolicy(gatewayCacheKey string) api.ACLPolicy {
+func (c *Cache) gatewayPolicy(gatewayServiceName, gatewayNamespace string) api.ACLPolicy {
+	gatewayCacheKey := fmt.Sprintf("%s-%s", gatewayServiceName, gatewayNamespace)
 	var data bytes.Buffer
 	if err := gatewayTpl.Execute(&data, templateArgs{
 		EnableNamespaces: c.namespacesEnabled,
-		APIGatewayName:   gatewayCacheKey,
+		APIGatewayName:   gatewayServiceName,
+		APIGatewayNS:     gatewayNamespace,
 	}); err != nil {
 		// just panic if we can't compile the simple template
 		// as it means something else is going severly wrong.
