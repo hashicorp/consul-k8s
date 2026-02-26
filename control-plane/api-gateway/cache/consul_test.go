@@ -2045,6 +2045,23 @@ func TestCache_Delete(t *testing.T) {
 	}
 }
 
+func TestCache_gatewayPolicyUsesGatewayServiceName(t *testing.T) {
+	t.Parallel()
+
+	c := &Cache{namespacesEnabled: true}
+	gatewayName := "api-gateway-test"
+	gatewayNamespace := "consul"
+	gatewayCacheKey := "api-gateway-test-consul"
+
+	policy := c.gatewayPolicy(gatewayName, gatewayNamespace)
+
+	require.Equal(t, "api-gateway-policy-for-"+gatewayCacheKey, policy.Name)
+	require.Contains(t, policy.Rules, `namespace "consul"`)
+	require.NotContains(t, policy.Rules, `namespace_prefix ""`)
+	require.Contains(t, policy.Rules, `service "api-gateway-test"`)
+	require.NotContains(t, policy.Rules, `service "api-gateway-test-consul"`)
+}
+
 func TestCache_RemoveRoleBinding(t *testing.T) {
 	t.Parallel()
 	successFn := func(w http.ResponseWriter) {
