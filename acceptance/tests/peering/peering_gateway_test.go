@@ -330,8 +330,8 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Test 1: all services in both clusters use Remote mesh_gateway mode.
 	logger.Log(t, "patching all services to set mesh_gateway mode to remote in both clusters")
-	k8s.RunKubectl(t, staticClientOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"remote"}}}`, "--type=merge")
-	k8s.RunKubectl(t, staticServerOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"remote"}}}`, "--type=merge")
+	k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"remote"}}}`, "--type=merge")
+	k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"remote"}}}`, "--type=merge")
 	// Intentions are already in place from previous steps, so we can directly check connectivity.
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
@@ -351,8 +351,8 @@ func TestPeering_Gateway(t *testing.T) {
 	// Test 3: only api_gateway uses Remote mesh_gateway mode.
 	// Set proxyDefaults to Local for both clusters, then override api_gateway with service-defaults.
 	logger.Log(t, "patching api_gateway to set mesh_gateway mode to remote")
-	k8s.RunKubectl(t, staticClientOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
-	k8s.RunKubectl(t, staticServerOpts, "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
+	k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
+	k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
 	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-remote.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
