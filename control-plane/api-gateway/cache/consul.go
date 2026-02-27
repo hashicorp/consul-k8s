@@ -31,7 +31,6 @@ func init() {
 type templateArgs struct {
 	EnableNamespaces bool
 	APIGatewayName   string
-	APIGatewayNS     string
 }
 
 var (
@@ -39,7 +38,7 @@ var (
 	gatewayRulesTpl = `
 mesh = "read"
 {{- if .EnableNamespaces }}
-  namespace "{{.APIGatewayNS}}" {
+  namespace_prefix "" {
 {{- end }}
 		node_prefix "" {
 			policy = "read"
@@ -478,7 +477,6 @@ func (c *Cache) gatewayPolicy(gatewayServiceName, gatewayNamespace string) api.A
 	if err := gatewayTpl.Execute(&data, templateArgs{
 		EnableNamespaces: c.namespacesEnabled,
 		APIGatewayName:   gatewayServiceName,
-		APIGatewayNS:     gatewayNamespace,
 	}); err != nil {
 		// just panic if we can't compile the simple template
 		// as it means something else is going severly wrong.
