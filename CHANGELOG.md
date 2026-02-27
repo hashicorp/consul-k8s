@@ -1,3 +1,14 @@
+## 1.7.12 (February 27, 2025)
+
+SECURITY:
+
+* Added input length validation on "consul.hashicorp.com/service-name" annotation [[GH-5097](https://github.com/hashicorp/consul-k8s/issues/5097)]
+* go: upgrade go version to 1.25.7 [[GH-5113](https://github.com/hashicorp/consul-k8s/issues/5113)]
+* upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
+
+BUG FIXES:
+* cni: Updates code logic in CNI during application pod creation. [[GH-5062](https://github.com/hashicorp/consul-k8s/issues/5062)]
+
 ## 1.7.10 (January 27, 2026)
 
 SECURITY:
