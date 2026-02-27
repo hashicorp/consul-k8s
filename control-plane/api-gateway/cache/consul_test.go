@@ -2229,10 +2229,11 @@ func TestCache_RemoveRoleBinding(t *testing.T) {
 			authMethod := "k8s-auth-method"
 			gatewayName := "my-api-gateway"
 			namespace := "ns"
+			cacheKey := fmt.Sprintf("%s-%s", gatewayName, namespace)
 			// file the acl binding rule, acl policy, and acl role maps with the necessary data
-			c.gatewayNameToACLBindingRule[gatewayName] = tt.bindingRule
-			c.gatewayNameToACLRole[gatewayName] = tt.role
-			c.gatewayNameToACLPolicy[gatewayName] = tt.policy
+			c.gatewayToACLBindingRule[cacheKey] = tt.bindingRule
+			c.gatewayToACLRole[cacheKey] = tt.role
+			c.gatewayToACLPolicy[cacheKey] = tt.policy
 
 			err = c.RemoveRoleBinding(authMethod, gatewayName, namespace)
 			require.ErrorIs(t, err, tt.expectedErr)
