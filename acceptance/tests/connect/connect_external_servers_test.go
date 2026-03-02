@@ -42,6 +42,16 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"connectInject.enabled":     "false",
 				"connectInject.cni.enabled": "false",
 			}
+
+			// OpenShift: Override container security context to allow OpenShift SCCs to manage permissions
+			// We need to disable runAsNonRoot since the Consul image runs as root by default
+			// OpenShift SCCs will manage the actual user/group assignments
+			if cfg.EnableOpenshift {
+				// Must provide full security context when overriding to avoid using restrictedSecurityContext helper
+				serverHelmValues["server.containerSecurityContext.server.allowPrivilegeEscalation"] = "false"
+				serverHelmValues["server.containerSecurityContext.server.runAsNonRoot"] = "false"
+			}
+
 			serverReleaseName := helpers.RandomName()
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
 
