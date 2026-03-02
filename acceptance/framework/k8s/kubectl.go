@@ -113,8 +113,20 @@ func KubectlDelete(t *testing.T, options *k8s.KubectlOptions, configPath string)
 func KubectlDeleteK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir string) {
 	// Ignore not found errors because Kubernetes automatically cleans up the kube secrets that we deployed
 	// referencing the ServiceAccount when it is deleted.
-	_, err := RunKubectlAndGetOutputE(t, options, "delete", kubectlTimeout, "--ignore-not-found", "-k", kustomizeDir)
-	require.NoError(t, err)
+	output, err := RunKubectlAndGetOutputE(t, options, "delete", kubectlTimeout, "--ignore-not-found", "-k", kustomizeDir)
+	if err != nil {
+		// OpenShift protects certain service accounts from deletion via admission webhooks.
+		// This is expected behavior and should not fail the test.
+		if strings.Contains(err.Error(), "serviceaccount-validation.managed.openshift.io") {
+			t.Logf("Ignoring OpenShift service account deletion error: %v", err)
+			return
+		}
+		// Log the output for debugging other errors
+		if output != "" {
+			t.Logf("kubectl delete output: %s", output)
+		}
+		require.NoError(t, err)
+	}
 }
 
 // KubectlScale takes a deployment and scales it to the provided number of replicas.
