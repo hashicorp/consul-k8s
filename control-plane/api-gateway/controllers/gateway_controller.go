@@ -391,6 +391,7 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
+// SetupWithGatewayControllerManager registers the controller with the given manager.
 func SetupGatewayControllerWithManager(ctx context.Context,
 	mgr ctrl.Manager,
 	config GatewayControllerConfig,
@@ -545,8 +546,6 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter),
 		)
 
-	// ---- COMPLETE ----
-
 	if err := builder.Complete(r); err != nil {
 		return nil, cleaner, err
 	}
@@ -554,7 +553,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 	return c, cleaner, nil
 }
 
-// SetupWithGatewayControllerManager registers the controller with the given manager.
+// temp setup manager, would be deleted once we are ready to move the gateway controller to the new structure.
 func SetupGatewayControllerWithManagerTemp(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
 	cacheConfig := cache.Config{
 		ConsulClientConfig:      config.ConsulClientConfig,
