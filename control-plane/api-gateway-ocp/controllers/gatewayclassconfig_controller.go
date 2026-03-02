@@ -71,6 +71,8 @@ func (r *OcpGatewayClassConfigController) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
+	// propagate the gatewayclassconfig
+	
 	if _, err := EnsureFinalizer(ctx, r.Client, gcc, gatewayClassConfigFinalizer); err != nil {
 		if k8serrors.IsConflict(err) {
 			log.V(1).Info("error adding gateway class config finalizer, will try to re-reconcile")

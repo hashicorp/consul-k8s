@@ -31,7 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	gwv1alpha2exp "sigs.k8s.io/gateway-api-exp/apis/v1alpha2"
 	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -176,9 +177,10 @@ func init() {
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
-	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
+	utilruntime.Must(gwv1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2exp.AddToScheme(scheme))
+	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
 	fmt.Printf("added to the scheme")
 	// +kubebuilder:scaffold:scheme
 }
