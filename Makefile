@@ -47,7 +47,7 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
-	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
+	@docker buildx build --debug --platform linux/$(GOARCH) -t '$(DEV_IMAGE)' \
 	   --no-cache \
        --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
