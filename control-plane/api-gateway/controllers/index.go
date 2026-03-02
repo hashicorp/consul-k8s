@@ -11,6 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	// gwv1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -45,8 +46,35 @@ const (
 // These indexes are similar to indexes used in databases to speed up queries.
 // They allow us to quickly find objects based on a field value.
 func RegisterFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
-	for _, index := range indexes {
-		if err := mgr.GetFieldIndexer().IndexField(ctx, index.target, index.name, index.indexerFunc); err != nil {
+	// for _, index := range indexes {
+	// 	if err := mgr.GetFieldIndexer().IndexField(ctx, index.target, index.name, index.indexerFunc); err != nil {
+	// 		return err
+	// 	}
+	// }
+	log := mgr.GetLogger()
+
+	for _, idx := range indexes {
+
+		// Get GVK for the target object
+		gvks, _, err := mgr.GetScheme().ObjectKinds(idx.target)
+		if err != nil || len(gvks) == 0 {
+			return err
+		}
+
+		gvk := gvks[0]
+
+		// Check if the GVK exists in the cluster
+		if _, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version); err != nil {
+			log.Info("Skipping field index registration - GVK not present",
+				"kind", gvk.Kind,
+				"version", gvk.GroupVersion().String(),
+				"index", idx.name,
+			)
+			continue
+		}
+
+		// Safe to register
+		if err := mgr.GetFieldIndexer().IndexField(ctx, idx.target, idx.name, idx.indexerFunc); err != nil {
 			return err
 		}
 	}
@@ -94,6 +122,21 @@ var indexes = []index{
 		name:        HTTPRoute_MeshServiceIndex,
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: meshServicesForHTTPRoute,
+	},
+	{
+		name:        TCPRoute_GatewayIndex,
+		target:      &gwv1alpha2.TCPRoute{},
+		indexerFunc: gatewaysForTCPRoute,
+	},
+	{
+		name:        TCPRoute_ServiceIndex,
+		target:      &gwv1alpha2.TCPRoute{},
+		indexerFunc: servicesForTCPRoute,
+	},
+	{
+		name:        TCPRoute_MeshServiceIndex,
+		target:      &gwv1alpha2.TCPRoute{},
+		indexerFunc: meshServicesForTCPRoute,
 	},
 	{
 		name:        MeshService_PeerIndex,
@@ -183,6 +226,14 @@ func gatewaysForHTTPRoute(o client.Object) []string {
 	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs, statusRefs)
 }
 
+func gatewaysForTCPRoute(o client.Object) []string {
+	route := o.(*gwv1alpha2.TCPRoute)
+	statusRefs := common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1alpha2.RouteParentStatus) gwv1alpha2.ParentReference {
+		return parentStatus.ParentRef
+	})
+	return gatewaysForRoute(route.Namespace, route.Spec.ParentRefs, statusRefs)
+}
+
 func servicesForHTTPRoute(o client.Object) []string {
 	route := o.(*gwv1.HTTPRoute)
 	refs := []string{}
@@ -205,6 +256,46 @@ func servicesForHTTPRoute(o client.Object) []string {
 
 func meshServicesForHTTPRoute(o client.Object) []string {
 	route := o.(*gwv1.HTTPRoute)
+	refs := []string{}
+	for _, rule := range route.Spec.Rules {
+	BACKEND_LOOP:
+		for _, ref := range rule.BackendRefs {
+			if common.DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && common.DerefEqual(ref.Kind, v1alpha1.MeshServiceKind) {
+				backendRef := common.IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+				for _, member := range refs {
+					if member == backendRef {
+						continue BACKEND_LOOP
+					}
+				}
+				refs = append(refs, backendRef)
+			}
+		}
+	}
+	return refs
+}
+
+func servicesForTCPRoute(o client.Object) []string {
+	route := o.(*gwv1alpha2.TCPRoute)
+	refs := []string{}
+	for _, rule := range route.Spec.Rules {
+	BACKEND_LOOP:
+		for _, ref := range rule.BackendRefs {
+			if common.NilOrEqual(ref.Group, "") && common.NilOrEqual(ref.Kind, common.KindService) {
+				backendRef := common.IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, route.Namespace).String()
+				for _, member := range refs {
+					if member == backendRef {
+						continue BACKEND_LOOP
+					}
+				}
+				refs = append(refs, backendRef)
+			}
+		}
+	}
+	return refs
+}
+
+func meshServicesForTCPRoute(o client.Object) []string {
+	route := o.(*gwv1alpha2.TCPRoute)
 	refs := []string{}
 	for _, rule := range route.Spec.Rules {
 	BACKEND_LOOP:

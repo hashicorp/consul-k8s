@@ -8,7 +8,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
@@ -31,7 +32,7 @@ func NewReferenceValidator(grants []gwv1beta1.ReferenceGrant) common.ReferenceVa
 	}
 }
 
-func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1alpha2.Gateway, secretRef gwv1alpha2.SecretObjectReference) bool {
+func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1.SecretObjectReference) bool {
 	fromNS := gateway.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: gateway.GroupVersionKind().Group,
@@ -45,7 +46,7 @@ func (rv *referenceValidator) GatewayCanReferenceSecret(gateway gwv1alpha2.Gatew
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(secretRef.Name))
 }
 
-func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1alpha2.HTTPRoute, backendRef gwv1alpha2.BackendRef) bool {
+func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1.BackendRef) bool {
 	fromNS := httproute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: httproute.GroupVersionKind().Group,
@@ -55,6 +56,20 @@ func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1alpha2.
 	// Kind should default to Service if not set
 	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#L106
 	toNS, toGK := createValuesFromRef(backendRef.Namespace, backendRef.Group, backendRef.Kind, "", common.KindService)
+
+	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
+}
+
+func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
+	fromNS := tcpRoute.GetNamespace()
+	fromGK := metav1.GroupKind{
+		Group: tcpRoute.GroupVersionKind().Group,
+		Kind:  tcpRoute.GroupVersionKind().Kind,
+	}
+
+	// Kind should default to Service if not set
+	// https://github.com/kubernetes-sigs/gateway-api/blob/v0.6.2/apis/v1beta1/object_reference_types.go#L106
+	toNS, toGK := createValuesFromRef(backendRef.Namespace, backendRef.Group, backendRef.Kind, common.BetaGroup, common.KindService)
 
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
 }
