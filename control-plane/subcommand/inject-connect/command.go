@@ -163,6 +163,9 @@ type Command struct {
 	flagDefaultSidecarProbePeriodSeconds            int
 	flagDefaultSidecarProbeFailureThreshold         int
 	flagDefaultSidecarProbeCheckTimeoutSeconds      int
+
+	// enable custom crds controller flags
+	flagEnableCustomGatewayCRDController bool
 }
 
 var (
@@ -252,6 +255,9 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
+	// custom controller flags
+	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")
+
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
@@ -291,6 +297,8 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbePeriodSeconds, "default-sidecar-probe-period-seconds", 1, "Default number of seconds for the k8s period between startup probe checks.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
+
+	// enable custom crds controller flags
 
 	c.consul = &flags.ConsulFlags{}
 
