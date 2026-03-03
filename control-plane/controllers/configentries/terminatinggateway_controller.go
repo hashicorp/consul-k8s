@@ -6,40 +6,44 @@ package configentries
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"text/template"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
 	capi "github.com/hashicorp/consul/api"
-	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"encoding/json"
-
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 var _ Controller = (*TerminatingGatewayController)(nil)
 
 const terminatingGatewayByLinkedServiceName = "linkedServiceName"
+
+const (
+	secretOwnerKey      = ".metadata.secretOwner"
+	secretTriggerPrefix = "__secret_rotation__"
+)
 
 // TerminatingGatewayController is the controller for TerminatingGateway resources.
 type TerminatingGatewayController struct {
@@ -114,12 +118,18 @@ partition "{{.Partition}}" {
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=terminatinggateways,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=terminatinggateways/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 
 func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.V(1).WithValues("terminating-gateway", req.NamespacedName)
 	log.Info("Reconciling TerminatingGateway")
+	isSecretChange := strings.HasPrefix(req.Name, secretTriggerPrefix)
+	realName := strings.TrimPrefix(req.Name, secretTriggerPrefix)
+	namespacedName := types.NamespacedName{Name: realName, Namespace: req.Namespace}
+	req.Name = realName
+	req.NamespacedName = namespacedName
 
 	// Get Helm values from ConfigMap
 	helmValues, err := helmvalues.GetHelmValues(ctx, r.Client, r.ReleaseName, r.ReleaseNamespace)
@@ -141,10 +151,9 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 	_ = defaults.Replicas
 	_ = defaults.Annotations
 	_ = defaults.ConsulNamespace
-
 	termGW := &consulv1alpha1.TerminatingGateway{}
 	// get the registration
-	if err := r.Client.Get(ctx, req.NamespacedName, termGW); err != nil {
+	if err := r.Client.Get(ctx, namespacedName, termGW); err != nil {
 		if !k8serrors.IsNotFound(err) {
 			log.Error(err, "unable to get terminating-gateway")
 		}
@@ -184,6 +193,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, err
 		}
 	}
+	ctx = context.WithValue(ctx, "isSecretChange", isSecretChange)
 
 	// Reconcile Consul config entry first.
 	result, err := r.ConfigEntryController.ReconcileEntry(ctx, r, req, termGW)
@@ -274,7 +284,46 @@ func (r *TerminatingGatewayController) SetupWithManager(ctx context.Context, mgr
 		return err
 	}
 
+	// 2. NEW Indexer: Lookup by Secret Name
+	// This allows the controller to find which TGW is using a specific Secret
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.TerminatingGateway{}, secretOwnerKey, func(rawObj client.Object) []string {
+		tgw := rawObj.(*v1alpha1.TerminatingGateway)
+		var secrets []string
+		for _, svc := range tgw.Spec.Services {
+			if svc.SecretRef != nil && svc.SecretRef.Name != "" {
+				secrets = append(secrets, svc.SecretRef.Name)
+			}
+		}
+		return secrets
+	}); err != nil {
+		return err
+	}
+
 	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
+}
+
+// MutateConsulEntry is the "Poke" logic.
+// It is called by the generic ReconcileEntry function.
+func (r *TerminatingGatewayController) MutateConsulEntry(obj common.ConfigEntryResource, entry capi.ConfigEntry, req ctrl.Request) error {
+	tgEntry, ok := entry.(*capi.TerminatingGatewayConfigEntry)
+	if !ok {
+		return fmt.Errorf("expected TerminatingGatewayConfigEntry, got %T", entry)
+	}
+
+	// Initialize Meta if it doesn't exist
+	if tgEntry.Meta == nil {
+		tgEntry.Meta = make(map[string]string)
+	}
+	// Adding a timestamp ensures that every time a Secret changes,
+	// the Consul Config Entry gets a new ModifyIndex.
+	// This triggers the SDS Push from Consul to Envoy.
+	for _, service := range obj.(*consulv1alpha1.TerminatingGateway).Spec.Services {
+		if service.SecretRef != nil && service.SecretRef.Name != "" {
+			tgEntry.Meta[fmt.Sprintf("consul.hashicorp.com/secret/%s/last-rotation", service.SecretRef.Name)] = time.Now().Format(time.RFC3339Nano)
+		}
+	}
+
+	return nil
 }
 
 func termGWLinkedServiceIndexer(o client.Object) []string {
@@ -492,6 +541,23 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 	}
 
 	return mErr
+}
+
+func (r *TerminatingGatewayController) transformSecret(ctx context.Context, obj client.Object) []reconcile.Request {
+	secret := obj.(*corev1.Secret)
+	var gateways v1alpha1.TerminatingGatewayList
+	_ = r.Client.List(ctx, &gateways,
+		client.InNamespace(secret.Namespace),
+		client.MatchingFields{secretOwnerKey: secret.Name},
+	)
+
+	var requests []reconcile.Request
+	for _, gw := range gateways.Items {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: types.NamespacedName{Name: secretTriggerPrefix + gw.Name, Namespace: gw.Namespace},
+		})
+	}
+	return requests
 }
 
 func getPolicyTemplateFor(service string) *template.Template {
