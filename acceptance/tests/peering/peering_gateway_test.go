@@ -340,10 +340,10 @@ func TestPeering_Gateway(t *testing.T) {
 	// proxyDefaults are already Remote for all services; override api_gateway with service-defaults.
 	// service-defaults takes precedence over proxy-defaults.
 	logger.Log(t, "patching api_gateway to set mesh_gateway mode to local")
-	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-local.yaml")
+	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-local.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-local.yaml")
+		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-local.yaml")
 	})
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
@@ -353,10 +353,10 @@ func TestPeering_Gateway(t *testing.T) {
 	logger.Log(t, "patching api_gateway to set mesh_gateway mode to remote")
 	k8s.RunKubectl(t, staticClientPeerClusterContext.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
 	k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", `{"spec":{"meshGateway":{"mode":"local"}}}`, "--type=merge")
-	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-remote.yaml")
+	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-remote.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways//service-defaults/gateway-remote.yaml")
+		k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-remote.yaml")
 	})
 	logger.Log(t, "checking that connection is successful")
 	k8s.CheckStaticServerConnectionSuccessful(t, staticClientOpts, staticClientName, targetAddress)
