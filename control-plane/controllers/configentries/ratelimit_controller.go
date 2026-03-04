@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// RateLimitController reconciles a RateLimit object
+// RateLimitController reconciles a RateLimit object.
 type RateLimitController struct {
 	client.Client
 	FinalizerPatcher
