@@ -393,7 +393,7 @@ func mapToCustomGateway(obj client.Object) []reconcile.Request {
 	for _, owner := range obj.GetOwnerReferences() {
 		if owner.Controller != nil && *owner.Controller &&
 			owner.Kind == "Gateway" &&
-			owner.APIVersion == "consul.networking.io/v1beta1" {
+			owner.APIVersion == "consul.hashicorp.com/v1beta1" {
 
 			return []reconcile.Request{{
 				NamespacedName: types.NamespacedName{
