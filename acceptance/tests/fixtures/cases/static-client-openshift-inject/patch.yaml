@@ -14,4 +14,3 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
-
