@@ -242,6 +242,17 @@ func TestController(t *testing.T) {
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)
 					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.WriteRate)
+
+					// rate-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
+					require.NoError(r, err)
+					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+					require.Equal(r, 100, rateLimitConfigEntry.Config.WriteRate)
+					require.Equal(r, 0, rateLimitConfigEntry.Config.ReadRate)
+					require.True(r, rateLimitConfigEntry.Config.Priority)
+					require.Equal(r, "Health.Check", rateLimitConfigEntry.Config.ExcludeEndpoints[0])
+					require.Equal(r, "ConfigEntry.Apply", rateLimitConfigEntry.Config.ExcludeEndpoints[1])
 				})
 			}
 
@@ -290,6 +301,9 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "patching control-plane-request-limit custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
+
+				logger.Log(t, "patching rate-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "ratelimit", "global", "-p", `{"spec": {"priority": "false"}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -379,6 +393,13 @@ func TestController(t *testing.T) {
 					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
 					require.Equal(r, rateLimitIPConfigEntry.Mode, "disabled")
+
+					// rate-limit
+					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
+					require.NoError(r, err)
+					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+					require.True(r, ok, "could not cast to RateLimitConfigEntry")
+					require.Equal(r, rateLimitConfigEntry.Config.Priority, false)
 				})
 			}
 
@@ -419,6 +440,9 @@ func TestController(t *testing.T) {
 
 				logger.Log(t, "deleting control-plane-request-limit custom resource")
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "controlplanerequestlimit", "controlplanerequestlimit")
+
+				logger.Log(t, "deleting rate-limit custom resource")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "ratelimit", "global")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -479,6 +503,11 @@ func TestController(t *testing.T) {
 
 					// control-plane-request-limit
 					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
+					require.Error(r, err)
+					require.Contains(r, err.Error(), "404 (Config entry not found")
+
+					// rate-limit
+					_, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
 					require.Error(r, err)
 					require.Contains(r, err.Error(), "404 (Config entry not found")
 				})
