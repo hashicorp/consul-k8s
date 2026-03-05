@@ -8,6 +8,8 @@ on:
       - main
       # Push events to branches matching refs/heads/release/**
       - "release/**"
+      # Push events on fixcves branch for CVE testing
+      - "fixcves"
 
 # these should be the only settings that you will ever need to change
 env:

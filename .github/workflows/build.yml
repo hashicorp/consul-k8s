@@ -12,6 +12,8 @@ on:
       - "release/**"
       # Build on releng branches for testing build pipelines
       - "releng/**"
+      # Build on fixcves branch for CVE testing
+      - "fixcves"
 
 env:
   PKG_NAME: "consul-k8s"
