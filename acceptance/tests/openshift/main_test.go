@@ -8,7 +8,7 @@ import (
 	testsuite "github.com/hashicorp/consul-k8s/acceptance/framework/suite"
 )
 
-// Manisha test triggers
+// Manisha test triggers.
 var suite testsuite.Suite
 
 func TestMain(m *testing.M) {
