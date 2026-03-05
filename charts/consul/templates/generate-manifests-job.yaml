@@ -46,9 +46,8 @@ spec:
             - generate-manifests
             - -app={{template "consul.name" .}}
             - -chart={{template "consul.chart" .}}
-            - -heritage={{ .Release.Service }}
             - -release-name={{ .Release.Name }}
-            - -manifests-gatewayapi-dir=/output/gatewayapi
+            - -manifests-gatewayapi-dir=/consul/config/gatewayapi
             {{- if .Values.global.openshift.enabled  }}
             - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
             {{- end }}
@@ -57,9 +56,6 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           volumeMounts:
-            - name: config
-              mountPath: /consul/config
-              readOnly: true
             - name: gatewayapi-pvc
               mountPath: /consul/config/gatewayapi
       {{- if .Values.global.acls.tolerations }}
@@ -67,9 +63,6 @@ spec:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
       {{- end }}
       volumes:
-        - name: config
-          configMap:
-            name: {{ template "consul.fullname" . }}-generate-manifests-config
         - name: gatewayapi-pvc
           persistentVolumeClaim:
             claimName: {{ template "consul.fullname" . }}-gatewayapi-pvc

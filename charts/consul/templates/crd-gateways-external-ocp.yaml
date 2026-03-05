@@ -1,21 +1,39 @@
-{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}
+{{- if and
+    .Values.connectInject.enabled 
+    (or 
+        .Values.connectInject.apiGateway.manageExternalCRDs 
+        .Values.connectInject.apiGateway.manageNonStandardCRDs
+    )
+    (or 
+        (and 
+            .Values.global.crds.consulapi.enabled 
+            (not (default false .Values.global.openshift.enabled))
+        )
+        (and
+            (default false .Values.global.openshift.enabled)
+            
+            (default false .Values.global.openshift.crds.enableTcpRoute)
+        )
+    )
+}}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
-    consul.networking.io/bundle-version: v0.6.2
-    consul.networking.io/channel: experimental
+    consul.hashicorp.com/bundle-version: v0.6.2
+    consul.hashicorp.com/channel: experimental
   creationTimestamp: null
   labels:
-    app: {{ template "consul.name" . }}
-    chart: {{ template "consul.chart" . }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+    # app: {{ template "consul.name" . }}
+    # chart: {{ template "consul.chart" . }}
+    # heritage: {{ .Release.Service }}
+    # release: {{ .Release.Name }}
+    name: consul-custom-gateways
     component: crd
-  name: gateways.consul.networking.io
+  name: gateways.consul.hashicorp.com
 spec:
-  group: consul.networking.io
+  group: consul.hashicorp.com
   names:
     categories:
       - gateway-api
@@ -23,7 +41,7 @@ spec:
     listKind: GatewayList
     plural: gateways
     shortNames:
-      - gtw
+      - ocgtw
     singular: gateway
   scope: Namespaced
   versions:
@@ -102,7 +120,7 @@ spec:
                               description: RouteGroupKind indicates the group and kind of a Route resource.
                               properties:
                                 group:
-                                  default: consul.networking.io
+                                  default: consul.hashicorp.com
                                   description: Group is the group of the Route.
                                   maxLength: 253
                                   pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -416,7 +434,7 @@ spec:
                           description: RouteGroupKind indicates the group and kind of a Route resource.
                           properties:
                             group:
-                              default: consul.networking.io
+                              default: consul.hashicorp.com
                               description: Group is the group of the Route.
                               maxLength: 253
                               pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -524,7 +542,7 @@ spec:
                               description: RouteGroupKind indicates the group and kind of a Route resource.
                               properties:
                                 group:
-                                  default: consul.networking.io
+                                  default: consul.hashicorp.com
                                   description: Group is the group of the Route.
                                   maxLength: 253
                                   pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
@@ -838,7 +856,7 @@ spec:
                           description: RouteGroupKind indicates the group and kind of a Route resource.
                           properties:
                             group:
-                              default: consul.networking.io
+                              default: consul.hashicorp.com
                               description: Group is the group of the Route.
                               maxLength: 253
                               pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$

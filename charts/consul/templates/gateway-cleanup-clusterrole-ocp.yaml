@@ -18,7 +18,7 @@ rules:
     - get
     - delete
   - apiGroups:
-    - consul.networking.io
+    - consul.hashicorp.com
     resources:
     - ocpgatewayclasses
     verbs:

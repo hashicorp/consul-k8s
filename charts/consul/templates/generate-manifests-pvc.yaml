@@ -10,9 +10,13 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: generate-manifests
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/resource-policy": keep
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi

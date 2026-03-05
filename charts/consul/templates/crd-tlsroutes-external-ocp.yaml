@@ -1,21 +1,39 @@
-{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}
+{{- if and
+    .Values.connectInject.enabled 
+    (or 
+        .Values.connectInject.apiGateway.manageExternalCRDs 
+        .Values.connectInject.apiGateway.manageNonStandardCRDs
+    )
+    (or 
+        (and 
+            .Values.global.crds.consulapi.enabled 
+            (not (default false .Values.global.openshift.enabled))
+        )
+        (and
+            (default false .Values.global.openshift.enabled)
+            
+            (default false .Values.global.openshift.crds.enableTcpRoute)
+        )
+    )
+}}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
-    consul.networking.io/bundle-version: v0.6.2
-    consul.networking.io/channel: experimental
+    consul.hashicorp.com/bundle-version: v0.6.2
+    consul.hashicorp.com/channel: experimental
   creationTimestamp: null
   labels:
-    app: {{ template "consul.name" . }}
-    chart: {{ template "consul.chart" . }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+    # app: {{ template "consul.name" . }}
+    # chart: {{ template "consul.chart" . }}
+    # heritage: {{ .Release.Service }}
+    # release: {{ .Release.Name }}
+    name: consul-custom-tlsroutes
     component: crd
-  name: tlsroutes.consul.networking.io
+  name: tlsroutes.consul.hashicorp.com
 spec:
-  group: consul.networking.io
+  group: consul.hashicorp.com
   names:
     categories:
       - gateway-api
@@ -61,8 +79,8 @@ spec:
                     description: "ParentReference identifies an API object (usually a Gateway) that can be considered a parent of this resource (usually a route). The only kind of parent resource with \"Core\" support is Gateway. This API may be extended in the future to support additional kinds of parent resources, such as HTTPRoute. \n The API object must be valid in the cluster; the Group and Kind must be registered in the cluster for this reference to be valid."
                     properties:
                       group:
-                        default: consul.networking.io
-                        description: "Group is the group of the referent. When unspecified, \"consul.networking.io\" is inferred. To set the core API group (such as for a \"Service\" kind referent), Group must be explicitly set to \"\" (empty string). \n Support: Core"
+                        default: consul.hashicorp.com
+                        description: "Group is the group of the referent. When unspecified, \"consul.hashicorp.com\" is inferred. To set the core API group (such as for a \"Service\" kind referent), Group must be explicitly set to \"\" (empty string). \n Support: Core"
                         maxLength: 253
                         pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
@@ -113,7 +131,7 @@ spec:
                           properties:
                             group:
                               default: ""
-                              description: Group is the group of the referent. For example, "consul.networking.io". When unspecified or empty string, core API group is inferred.
+                              description: Group is the group of the referent. For example, "consul.hashicorp.com". When unspecified or empty string, core API group is inferred.
                               maxLength: 253
                               pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                               type: string
@@ -228,8 +246,8 @@ spec:
                         description: ParentRef corresponds with a ParentRef in the spec that this RouteParentStatus struct describes the status of.
                         properties:
                           group:
-                            default: consul.networking.io
-                            description: "Group is the group of the referent. When unspecified, \"consul.networking.io\" is inferred. To set the core API group (such as for a \"Service\" kind referent), Group must be explicitly set to \"\" (empty string). \n Support: Core"
+                            default: consul.hashicorp.com
+                            description: "Group is the group of the referent. When unspecified, \"consul.hashicorp.com\" is inferred. To set the core API group (such as for a \"Service\" kind referent), Group must be explicitly set to \"\" (empty string). \n Support: Core"
                             maxLength: 253
                             pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                             type: string
