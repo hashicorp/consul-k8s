@@ -170,7 +170,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
-
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
 	// deleted at this point, in which case these operations will fail on non-existent
@@ -206,7 +205,10 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		require.NoError(r, err)
+		// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			require.NoError(r, err)
+		}
 	})
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
