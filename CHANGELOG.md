@@ -1,4 +1,4 @@
-## 1.8.10 (February 27, 2025)
+## 1.8.10 (February 27, 2026)
 
 SECURITY:
 
