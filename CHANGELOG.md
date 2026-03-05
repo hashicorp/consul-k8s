@@ -1,4 +1,4 @@
-## 1.7.12 (February 27, 2025)
+## 1.7.12 (February 27, 2026)
 
 SECURITY:
 
