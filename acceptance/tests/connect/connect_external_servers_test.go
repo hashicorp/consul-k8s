@@ -1,16 +1,5 @@
 // Copyright (c) HashiCorp, Inc.
-// SPDX			/			// Don't install injector, controller and cni on this cluster so that it's not installed twice.
-			"connectInject.enabled":     "false",
-			"connectInject.cni.enabled": "false",
-		}
-		// OpenShift: Override container security context to allow OpenShift SCCs to manage permissions
-		// We need to disable runAsNonRoot since the Consul image runs as root by default
-		// OpenShift SCCs will manage the actual user/group assignments
-		if cfg.EnableOpenshift {all injector, controller and cni on this cluster so that it's not installed twice.
-			"connectInject.enabled":     "false",
-			"connectInject.cni.enabled": "false",
-		}
-		// OpenShift: Override container security context to allow OpenShift SCCs to manage permissionsIdentifier: MPL-2.0
+// SPDX-License-Identifier: MPL-2.0
 
 package connect
 
