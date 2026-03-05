@@ -795,12 +795,30 @@ global:
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: hashicorp/consul-dataplane:1.9.0-rc1
 
+  # enableTcpRoute enables support for TCP routes in the consul under gateway.networking.k8s.io
+  # consulapi.enabled enables support for the consulapi controller which allows users to manage gateway resources under consul.hashicorp.com via Kubernetes CRDs.
+  crds:
+    enableTcpRoute: true
+    consulapi:
+      enabled: true
+
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:
     # If true, the Helm chart will create necessary configuration for running
     # its components on OpenShift.
     enabled: false
+    # enable this flas if you are planning to upgrade your ocp cluster from 4.18 to 4.19 only
+    upgradeTo419From418: false
+    # enable this flag if your ocp cluster version is greater than 4.18
+    isOcpGreaterthan4_18: false
+    # enableTcpRoute enables support for TCP routes in the consul under gateway.networking.k8s.io but when isOcpGreaterthan4_18 then this flag is void.
+    crds: 
+      enableTcpRoute: false  
+    # consulapi.enabled enables support for the consulapi controller which allows users to manage gateway resources under consul.hashicorp.com via Kubernetes CRDs.
+ 
+      consulapi:
+        enabled: false 
 
   # The time in seconds that the consul API client will wait for a response from
   # the API before cancelling the request.

@@ -10,6 +10,10 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: enerate-manifests
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   privileged: false
   allowPrivilegeEscalation: false

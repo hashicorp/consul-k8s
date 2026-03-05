@@ -19,9 +19,9 @@ rules:
     - update
     - create
   - apiGroups:
-    - consul.networking.io
+    - consul.hashicorp.com
     resources:
-    - gatewayclasses
+    - ocpgatewayclasses
     verbs:
     - get
     - update
