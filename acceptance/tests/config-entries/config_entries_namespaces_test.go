@@ -39,9 +39,9 @@ func TestControllerNamespaces(t *testing.T) {
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and controller is already tested with regular tproxy")
 	}
-	//if !cfg.EnableEnterprise {
-	//	t.Skipf("skipping this test because -enable-enterprise is not set")
-	//}
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
 
 	cases := []struct {
 		name                 string
