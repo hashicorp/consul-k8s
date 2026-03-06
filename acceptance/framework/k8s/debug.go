@@ -29,7 +29,7 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 	t.Helper()
 
 	if t.Failed() {
-		// Create k8s client from kubectl options.
+		// Create k8s client from the kubectl options.
 		client := environment.KubernetesClientFromOptions(t, kubectlOptions)
 
 		contextName := environment.KubernetesContextFromOptions(t, kubectlOptions)
