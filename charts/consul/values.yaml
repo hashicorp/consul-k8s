@@ -795,28 +795,59 @@ global:
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: hashicorp/consul-dataplane:1.9.0-rc1
 
-  # enableTcpRoute enables support for TCP routes in the consul under gateway.networking.k8s.io
-  # consulapi.enabled enables support for the consulapi controller which allows users to manage gateway resources under consul.hashicorp.com via Kubernetes CRDs.
+  # During the install:
+  # custom crds and gateway TCP crd enabling
+  # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.
+  # crds.consulapi.enabled install the CRDs under consul.hashicorp.com API group and enables the new custom gateway controller to watch for the resources.
+
+  # During the upgrade - manifests are generated.
+  # if consulapi.enabled is set to false; no manifests will be generated under consul.hashicorp.com API group
+  # if consulapi.enables is set to true; manifests will be generated and applied under consul.hashicorp.com API group
   crds:
-    enableTcpRoute: true
+    enableTcpRoute: false
     consulapi:
       enabled: true
-
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:
     # If true, the Helm chart will create necessary configuration for running
     # its components on OpenShift.
     enabled: false
-    # enable this flas if you are planning to upgrade your ocp cluster from 4.18 to 4.19 only
+
+    # During the install:
+    # in this case ideally customer deploys the consul directly on the 4.19+ and thus is void.
+
+    # During the upgrade:
+    # This should be enabled when the customer plans to upgrade the OCP from 4.18 to 4.19+ versions.
+    # This will generate the manifests inaccordance to 2 cases along with enableTcpRoute:
+    # case 1: when upgradeTo419From418 is true and enableTcpRoute is false:
+    # generate the manifests only for gateway.networking.k8s.io and ignores the TCP watch
+    # case 2: when upgradeTo419From418 is true and enableTcpRoute is true:
+    # generate the manifests for both consul.hashicorp.com and gateway.networking.k8s.io ( the deleteion of TCP GVK is manual )
     upgradeTo419From418: false
-    # enable this flag if your ocp cluster version is greater than 4.18
-    isOcpGreaterthan4_18: false
-    # enableTcpRoute enables support for TCP routes in the consul under gateway.networking.k8s.io but when isOcpGreaterthan4_18 then this flag is void.
-    crds: 
-      enableTcpRoute: false  
-    # consulapi.enabled enables support for the consulapi controller which allows users to manage gateway resources under consul.hashicorp.com via Kubernetes CRDs.
+
+    # During the install:
+    # for isOcpGreaterthan4_18: n this case ideally customer deploys the consul directly on the 4.19+ and thus is void.
+   
+    # for crds.enableTcpRoute set to true; controller watches for the TCP
+    # for crds.enableTcpRoute set to false; controller does not watch for the TCp.
+
+    # for crds.consulapi.enabled set to true; controller watches for resources under the API group - consul.hashicorp.com
  
+    # During the upgrade:
+    # If isOcpGreaterthan4_18 is false and enableTcpRoute is false:
+    # generate the manifests only for gateway.networking.k8s.io and ignores the TCP watch
+    # If isOcpGreaterthan4_18 is false and enableTcpRoute is true:
+    # generate the manifests only for gateway.networking.k8s.io and watches for the TCP
+    # If isOcpGreaterthan4_18 is true and enableTcpRoute is false:
+    # generate the manifests only for gateway.networking.k8s.io and ignores the TCP watch
+    # If isOcpGreaterthan4_18 is true and enableTcpRoute is true:
+    # generate the manifests for both consul.hashicorp.com ( all current GVK ) and gateway.networking.k8s.io ( no TCP )
+
+    # in any case, crds.consulapi.enabled install the CRDs under consul.hashicorp.com API group and enables the new custom gateway controller to watch for the resources.
+    isOcpGreaterthan4_18: false
+    crds: 
+      enableTcpRoute: false
       consulapi:
         enabled: false 
 
