@@ -30,7 +30,7 @@ jobs:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
         ref: test_wf_din
-        
+        token: ${{ secrets.TEST_13047 }}
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.TEST_13047 }}" }'
 
   pass-required-checks-on-skip:
