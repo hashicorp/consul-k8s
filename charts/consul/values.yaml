@@ -804,9 +804,9 @@ global:
   # if consulapi.enabled is set to false; no manifests will be generated under consul.hashicorp.com API group
   # if consulapi.enables is set to true; manifests will be generated and applied under consul.hashicorp.com API group
   crds:
-    enableTcpRoute: false
+    enableTcpRoute: true
     consulapi:
-      enabled: true
+      enabled: false
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:
