@@ -5,11 +5,14 @@
         .Values.connectInject.apiGateway.manageNonStandardCRDs
     )
     (or 
-        (not (default false .Values.global.openshift.enabled))
-              
+        (and (not (default false .Values.global.openshift.enabled))
+          (default false .Values.global.crds.enableTcpRoute)
+        )
+        
         (and
             (default false .Values.global.openshift.enabled)
             (not (default false .Values.global.openshift.isOcpGreaterthan4_18))
+            (default false .Values.global.openshift.crds.enableTcpRoute)
         )
     )
 }}

@@ -3,6 +3,45 @@
 
 package generatemanifests
 
+// currently we are generating manifests for all, better to look for helm release name in the future to only generate for specific releases.
+// There is a high chance that all the manifests generated might not have the helm release name, because the applications httproutes can be a
+// separate helm release and the gateway can be a separate helm release.
+// OR the httproutes or any obj is a direct install with kubectl and not managed by helm at all.
+
+// Thus the way to identify the relevant manifests it to look for the parentref of the obj, then get the gatewayclass of the gateway referred
+// then get the helm release name from the gatewayclass labels, and only dump the manifests for the objects which have the same helm release name as the flag provided by user.
+// labels to look for: release: <release-name-flag>
+
+/*
+#Sample:
+k get gc -A -o yaml
+apiVersion: v1
+items:
+- apiVersion: gateway.networking.k8s.io/v1
+  kind: GatewayClass
+  metadata:
+    creationTimestamp: "2026-03-08T17:10:10Z"
+    finalizers:
+    - gateway-exists-finalizer.consul.hashicorp.com
+    generation: 1
+    labels:
+      app: consul
+      chart: consul-helm
+      component: api-gateway
+      heritage: Helm
+      release: consul
+    name: consul
+    resourceVersion: "8051"
+    uid: e3250842-ed7c-49fc-b111-7bcf0153c1bc
+  spec:
+    controllerName: consul.hashicorp.com/gateway-controller
+    parametersRef:
+      group: consul.hashicorp.com
+      kind: GatewayClassConfig
+      name: consul-api-gateway
+
+*/
+
 import (
 	"context"
 	"errors"
@@ -46,6 +85,7 @@ type Command struct {
 	flagApp                    string
 	flagRelease                string
 	flagManifestsGatewayAPIDir string
+	flagManifestsConsulAPIDir  string
 
 	flagOpenshiftSCCName string
 
@@ -58,6 +98,7 @@ type Command struct {
 	tolerations        []corev1.Toleration
 	serviceAnnotations []string
 	resources          corev1.ResourceRequirements
+	consulApiEnabled   bool
 
 	ctx context.Context
 }
@@ -75,12 +116,22 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagOpenshiftSCCName, "openshift-scc-name", "",
 		"Name of security context constraint to use for gateways on Openshift.",
 	)
+	//for consul.hashicorp.com API group
+	c.flags.BoolVar(&c.consulApiEnabled, "consulapi-enabled", false,
+		"Whether to generate manifests for gateway resources under consul.hashicorp.com API group.")
 
 	c.flags.StringVar(
 		&c.flagManifestsGatewayAPIDir,
 		"manifests-gatewayapi-dir",
 		"/output/gatewayapi",
 		"Directory where Gateway API objects will be dumped.",
+	)
+
+	c.flags.StringVar(
+		&c.flagManifestsConsulAPIDir,
+		"manifests-consulapi-dir",
+		"/output/consulapi",
+		"Directory where Consul API objects will be dumped. This is only applicable if -consulapi-enabled is set to true.",
 	)
 
 	c.k8s = &flags.K8SFlags{}
@@ -263,8 +314,8 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	}
 
 	switch kind {
-
-	// you asked these to be gateway.networking.k8s.io/v1
+	// by default
+	// for gateway.networking.k8s.io/v1
 	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute":
 		raw["apiVersion"] = "gateway.networking.k8s.io/v1"
 
@@ -275,6 +326,98 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	// UDP/TLS/TCP -> v1alpha2
 	case "UDPRoute", "TLSRoute", "TCPRoute":
 		raw["apiVersion"] = "gateway.networking.k8s.io/v1alpha2"
+	}
+}
+
+func enforceConsulApiVersion(raw map[string]interface{}) {
+	kind, _ := raw["kind"].(string)
+	if kind == "" {
+		return
+	}
+
+	switch kind {
+
+	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute", "ReferenceGrant", "UDPRoute", "TLSRoute", "TCPRoute":
+		raw["apiVersion"] = "consul.hashicorp.com/v1beta1"
+
+	}
+
+	// route parentRef conversion
+	switch kind {
+	case "HTTPRoute", "GRPCRoute", "UDPRoute", "TLSRoute", "TCPRoute":
+		spec, ok := raw["spec"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		parentRefs, ok := spec["parentRefs"].([]interface{})
+		if !ok {
+			return
+		}
+		for _, pr := range parentRefs {
+			prMap, ok := pr.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			group, _ := prMap["group"].(string)
+			if group == "gateway.networking.k8s.io" {
+				prMap["group"] = "consul.hashicorp.com"
+				prMap["name"] = "api-gateway-ocp"
+			}
+
+		}
+	}
+	// update referenceGrant to point to consul.hashicorp.com
+	if kind == "ReferenceGrant" {
+		spec, ok := raw["spec"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		from, ok := spec["from"].([]interface{})
+		if !ok {
+			return
+		}
+		for _, f := range from {
+			fMap, ok := f.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			group, _ := fMap["group"].(string)
+			if group == "gateway.networking.k8s.io" {
+				fMap["group"] = "consul.hashicorp.com"
+			}
+		}
+	}
+
+	// update gatewayclass metadata.labels.component set to api-gateway-ocp
+	if kind == "GatewayClass" {
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		labels, ok := metadata["labels"].(map[string]interface{})
+		if !ok {
+			labels = make(map[string]interface{})
+			metadata["labels"] = labels
+		}
+		labels["component"] = "api-gateway-ocp"
+
+		// also set name --> metadata.name to "consul-ocp"
+		metadata["name"] = "consul-ocp"
+	}
+
+	// for gateway, update spec.gatewayClassName to "consul-ocp"
+	if kind == "Gateway" {
+		spec, ok := raw["spec"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		spec["gatewayClassName"] = "consul-ocp"
+		// update metadata.name to "api-gateway-ocp"
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		metadata["name"] = "api-gateway-ocp"
 	}
 }
 
@@ -361,9 +504,16 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 // }
 
 func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
-	dir := filepath.Join(c.flagManifestsGatewayAPIDir, kindDir)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	gatewayAPIDir := filepath.Join(c.flagManifestsGatewayAPIDir, kindDir)
+	if err := os.MkdirAll(gatewayAPIDir, 0755); err != nil {
 		return err
+	}
+	var consulDir string
+	if c.consulApiEnabled {
+		consulDir = filepath.Join(c.flagManifestsConsulAPIDir, kindDir)
+		if err := os.MkdirAll(consulDir, 0755); err != nil {
+			return err
+		}
 	}
 
 	for index, obj := range objs {
@@ -377,7 +527,7 @@ func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
 
 		filename = safeFileName(filename)
 
-		path := filepath.Join(dir, filename)
+		path := filepath.Join(gatewayAPIDir, filename)
 
 		// Convert to unstructured for sanitization
 		raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -386,20 +536,46 @@ func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
 		}
 
 		sanitizeUnstructured(raw)
-		enforceGatewayAPIVersion(raw)
 
-		yml, err := yaml.Marshal(raw)
+		// gateway API manifests
+
+		gatewayRaw := deepCopyMap(raw)
+
+		enforceGatewayAPIVersion(gatewayRaw)
+
+		yml, err := yaml.Marshal(gatewayRaw)
 		if err != nil {
 			return fmt.Errorf("yaml marshal failed (%s/%s): %w", ns, name, err)
 		}
-		// update the apiVersion to remove k8s.io specific versions
-
 		if err := os.WriteFile(path, yml, 0644); err != nil {
 			return fmt.Errorf("write failed (%s): %w", path, err)
 		}
+
+		// call this function only when consulApiEnabled is true; This generates another set of manifests for consul.hashicorp.com API group.
+		// make another copy of raw to update the apiVersion for consul.hashicorp.com CRDs without affecting the gateway.networking.k8s.io versions
+		if c.consulApiEnabled {
+			// this will update the apiVersion for consul.hashicorp.com CRDs to v1alpha1
+			consulRaw := deepCopyMap(raw)
+			enforceConsulApiVersion(consulRaw)
+			yml, err := yaml.Marshal(consulRaw)
+			if err != nil {
+				return fmt.Errorf("yaml marshal failed for consul api version (%s/%s): %w", ns, name, err)
+			}
+			path := filepath.Join(consulDir, filename)
+			if err := os.WriteFile(path, yml, 0644); err != nil {
+				return fmt.Errorf("write failed for consul api version (%s): %w", path, err)
+			}
+
+		}
+
+		// update the apiVersion to remove k8s.io specific versions
+
 	}
 
-	c.UI.Info(fmt.Sprintf("✅ dumped %d objects into %s", len(objs), dir))
+	c.UI.Info(fmt.Sprintf("✅ dumped %d objects into %s", len(objs), gatewayAPIDir))
+	if c.consulApiEnabled {
+		c.UI.Info(fmt.Sprintf("✅ dumped %d objects into %s", len(objs), consulDir))
+	}
 	return nil
 }
 
@@ -447,6 +623,50 @@ func (c *Command) validateFlags() error {
 	}
 
 	return nil
+}
+
+func deepCopyMap(in map[string]interface{}) map[string]interface{} {
+
+	out := make(map[string]interface{}, len(in))
+
+	for k, v := range in {
+
+		switch val := v.(type) {
+
+		case map[string]interface{}:
+			out[k] = deepCopyMap(val)
+
+		case []interface{}:
+			out[k] = deepCopySlice(val)
+
+		default:
+			out[k] = val
+		}
+	}
+
+	return out
+}
+
+func deepCopySlice(in []interface{}) []interface{} {
+
+	out := make([]interface{}, len(in))
+
+	for i, v := range in {
+
+		switch val := v.(type) {
+
+		case map[string]interface{}:
+			out[i] = deepCopyMap(val)
+
+		case []interface{}:
+			out[i] = deepCopySlice(val)
+
+		default:
+			out[i] = val
+		}
+	}
+
+	return out
 }
 
 func (c *Command) Synopsis() string { return synopsis }
