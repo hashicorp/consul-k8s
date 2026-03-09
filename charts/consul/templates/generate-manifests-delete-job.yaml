@@ -47,8 +47,8 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            echo "Apply manifests in the PVC using oc"
-            kubectl apply -R -f /consul/config/gatewayapi/
+            echo "Apply manifests in the PVC using kubectl"
+            kubectl apply -R -f /consul/config
             echo "Done"
         volumeMounts:
           - name: gatewayapi-pvc
@@ -62,11 +62,11 @@ spec:
         args:
           - |
             echo "Applying manifests using oc"
-            oc apply -R -f /consul/config/gatewayapi/
+            oc apply -R -f /consul/config
             echo "Done"
         volumeMounts:
           - name: gatewayapi-pvc
-            mountPath: /consul/config/gatewayapi
+            mountPath: /consul/config/
       {{- end }}
 
 

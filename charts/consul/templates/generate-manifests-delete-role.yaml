@@ -20,6 +20,7 @@ rules:
   verbs: ["get", "delete", "list", "watch"]
 - apiGroups:
     - gateway.networking.k8s.io
+    - consul.hashicorp.com
   resources:
     - gatewayclasses
     - gateways

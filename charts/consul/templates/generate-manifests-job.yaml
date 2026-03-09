@@ -47,7 +47,10 @@ spec:
             - -app={{template "consul.name" .}}
             - -chart={{template "consul.chart" .}}
             - -release-name={{ .Release.Name }}
-            - -manifests-gatewayapi-dir=/consul/config/gatewayapi
+            # - -manifests-gatewayapi-dir=/consul/config/gatewayapi
+            {{- if or .Values.global.crds.consulapi.enabled .Values.global.openshift.crds.consulapi.enabled }}
+            - -consulapi-enabled=true
+            {{- end }}
             {{- if .Values.global.openshift.enabled  }}
             - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
             {{- end }}
@@ -57,7 +60,8 @@ spec:
           {{- end }}
           volumeMounts:
             - name: gatewayapi-pvc
-              mountPath: /consul/config/gatewayapi
+              mountPath: /output/
+              
       {{- if .Values.global.acls.tolerations }}
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
