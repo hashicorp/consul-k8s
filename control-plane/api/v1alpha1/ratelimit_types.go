@@ -20,6 +20,9 @@ func init() {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Synced",type="string",JSONPath=".status.conditions[?(@.type==\"Synced\")].status",description="The sync status of the resource with Consul"
+// +kubebuilder:printcolumn:name="Last Synced",type="date",JSONPath=".status.lastSyncedTime",description="The last successful synced time of the resource with Consul"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="The age of the resource"
 
 // RateLimit is the Schema for the ratelimits API.
 type RateLimit struct {
@@ -30,15 +33,15 @@ type RateLimit struct {
 	Status `json:"status,omitempty"`
 }
 
-func (r RateLimit) GetObjectMeta() metav1.ObjectMeta {
+func (r *RateLimit) GetObjectMeta() metav1.ObjectMeta {
 	return r.ObjectMeta
 }
 
-func (r RateLimit) AddFinalizer(name string) {
+func (r *RateLimit) AddFinalizer(name string) {
 	r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers, name)
 }
 
-func (r RateLimit) RemoveFinalizer(name string) {
+func (r *RateLimit) RemoveFinalizer(name string) {
 	for i, n := range r.ObjectMeta.Finalizers {
 		if n == name {
 			r.ObjectMeta.Finalizers = append(r.ObjectMeta.Finalizers[:i], r.ObjectMeta.Finalizers[i+1:]...)
@@ -47,35 +50,35 @@ func (r RateLimit) RemoveFinalizer(name string) {
 	}
 }
 
-func (r RateLimit) Finalizers() []string {
+func (r *RateLimit) Finalizers() []string {
 	return r.ObjectMeta.Finalizers
 }
 
-func (r RateLimit) ConsulKind() string {
+func (r *RateLimit) ConsulKind() string {
 	return api.RateLimit
 }
 
-func (r RateLimit) ConsulGlobalResource() bool {
+func (r *RateLimit) ConsulGlobalResource() bool {
 	return true
 }
 
-func (r RateLimit) ConsulMirroringNS() string {
+func (r *RateLimit) ConsulMirroringNS() string {
 	return common.DefaultConsulNamespace
 }
 
-func (r RateLimit) KubeKind() string {
+func (r *RateLimit) KubeKind() string {
 	return RateLimitKubeKind
 }
 
-func (r RateLimit) ConsulName() string {
+func (r *RateLimit) ConsulName() string {
 	return r.ObjectMeta.Name
 }
 
-func (r RateLimit) KubernetesName() string {
+func (r *RateLimit) KubernetesName() string {
 	return r.ObjectMeta.Name
 }
 
-func (r RateLimit) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
+func (r *RateLimit) SetSyncedCondition(status corev1.ConditionStatus, reason, message string) {
 	r.Status.Conditions = Conditions{
 		{
 			Type:               ConditionSynced,
@@ -87,11 +90,11 @@ func (r RateLimit) SetSyncedCondition(status corev1.ConditionStatus, reason, mes
 	}
 }
 
-func (r RateLimit) SetLastSyncedTime(time *metav1.Time) {
+func (r *RateLimit) SetLastSyncedTime(time *metav1.Time) {
 	r.Status.LastSyncedTime = time
 }
 
-func (r RateLimit) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
+func (r *RateLimit) SyncedCondition() (status corev1.ConditionStatus, reason, message string) {
 	cond := r.Status.GetCondition(ConditionSynced)
 	if cond == nil {
 		return corev1.ConditionUnknown, "", ""
@@ -99,7 +102,7 @@ func (r RateLimit) SyncedCondition() (status corev1.ConditionStatus, reason, mes
 	return cond.Status, cond.Reason, cond.Message
 }
 
-func (r RateLimit) SyncedConditionStatus() corev1.ConditionStatus {
+func (r *RateLimit) SyncedConditionStatus() corev1.ConditionStatus {
 	condition := r.Status.GetCondition(ConditionSynced)
 	if condition == nil {
 		return corev1.ConditionUnknown
@@ -107,7 +110,7 @@ func (r RateLimit) SyncedConditionStatus() corev1.ConditionStatus {
 	return condition.Status
 }
 
-func (r RateLimit) ToConsul(datacenter string) api.ConfigEntry {
+func (r *RateLimit) ToConsul(datacenter string) api.ConfigEntry {
 	return &api.GlobalRateLimitConfigEntry{
 		Kind:   r.ConsulKind(),
 		Name:   "global",
@@ -116,7 +119,7 @@ func (r RateLimit) ToConsul(datacenter string) api.ConfigEntry {
 	}
 }
 
-func (r RateLimit) MatchesConsul(candidate api.ConfigEntry) bool {
+func (r *RateLimit) MatchesConsul(candidate api.ConfigEntry) bool {
 	configEntry, ok := candidate.(*api.GlobalRateLimitConfigEntry)
 	if !ok {
 		return false
@@ -125,7 +128,7 @@ func (r RateLimit) MatchesConsul(candidate api.ConfigEntry) bool {
 	return cmp.Equal(r.ToConsul(""), configEntry, cmpopts.IgnoreFields(api.GlobalRateLimitConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
 }
 
-func (r RateLimit) Validate(consulMeta common.ConsulMeta) error {
+func (r *RateLimit) Validate(consulMeta common.ConsulMeta) error {
 	path := field.NewPath("spec")
 	errs := r.Spec.Config.validate(path.Child("config"))
 	if len(errs) > 0 {
@@ -134,7 +137,7 @@ func (r RateLimit) Validate(consulMeta common.ConsulMeta) error {
 	return nil
 }
 
-func (r RateLimit) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
+func (r *RateLimit) DefaultNamespaceFields(consulMeta common.ConsulMeta) {
 }
 
 // +kubebuilder:object:root=true

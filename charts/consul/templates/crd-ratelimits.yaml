@@ -25,6 +25,10 @@ spec:
       jsonPath: .status.conditions[?(@.type=="Synced")].status
       name: Synced
       type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
     - description: The age of the resource
       jsonPath: .metadata.creationTimestamp
       name: Age
