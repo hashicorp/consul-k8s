@@ -17,8 +17,8 @@ limitations under the License.
 package validation
 
 import (
-	gatewayv1a2 "sigs.k8s.io/gateway-api-exp/apis/v1alpha2"
-	"sigs.k8s.io/gateway-api-exp/apis/v1beta1"
+	gatewayv1a2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 )
 
 type routeRule interface {

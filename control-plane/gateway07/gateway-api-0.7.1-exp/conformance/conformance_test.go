@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"sigs.k8s.io/gateway-api-exp/apis/v1alpha2"
-	"sigs.k8s.io/gateway-api-exp/apis/v1beta1"
-	"sigs.k8s.io/gateway-api-exp/conformance/tests"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/flags"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/suite"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/tests"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/flags"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/suite"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"

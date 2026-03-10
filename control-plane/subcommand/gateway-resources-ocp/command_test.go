@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -15,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gwv1beta1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )

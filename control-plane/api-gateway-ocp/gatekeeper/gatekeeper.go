@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-ocp/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"

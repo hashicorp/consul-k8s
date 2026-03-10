@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package validation has functions for validating the correctness of api
 // objects and explaining what's wrong with them when they're not valid.
-package validation // import "sigs.k8s.io/gateway-api-exp/apis/v1alpha2/validation"
+package validation // import "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2/validation"

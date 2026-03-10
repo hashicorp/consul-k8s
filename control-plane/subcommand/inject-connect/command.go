@@ -15,6 +15,8 @@ import (
 	"sync"
 	"syscall"
 
+	gwv1alpha2exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
+	gwv1beta1exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
@@ -29,8 +31,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-	gwv1alpha2exp "sigs.k8s.io/gateway-api-exp/apis/v1alpha2"
-	gwv1beta1exp "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"

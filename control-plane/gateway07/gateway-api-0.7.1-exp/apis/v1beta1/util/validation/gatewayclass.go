@@ -19,7 +19,7 @@ package validation
 import (
 	"regexp"
 
-	gatewayv1b1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
+	gatewayv1b1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 )
 
 var controllerNameRegex = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/[A-Za-z0-9\/\-._~%!$&'()*+,;=:]+$`)

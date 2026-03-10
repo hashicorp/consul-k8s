@@ -345,6 +345,13 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 	// route parentRef conversion
 	switch kind {
 	case "HTTPRoute", "GRPCRoute", "UDPRoute", "TLSRoute", "TCPRoute":
+		// change the name
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		metadata["name"] = metadata["name"].(string) + "-custom"
+
 		spec, ok := raw["spec"].(map[string]interface{})
 		if !ok {
 			return
@@ -362,12 +369,20 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 			if group == "gateway.networking.k8s.io" {
 				prMap["group"] = "consul.hashicorp.com"
 				prMap["name"] = "api-gateway-ocp"
+
 			}
 
 		}
 	}
 	// update referenceGrant to point to consul.hashicorp.com
 	if kind == "ReferenceGrant" {
+		// change the name
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		metadata["name"] = metadata["name"].(string) + "-custom"
+
 		spec, ok := raw["spec"].(map[string]interface{})
 		if !ok {
 			return
@@ -423,12 +438,12 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 
 func extractItems(list client.ObjectList) ([]client.Object, error) {
 	switch v := list.(type) {
-	case *gwv1beta1.GatewayClassList:
-		out := make([]client.Object, 0, len(v.Items))
-		for i := range v.Items {
-			out = append(out, &v.Items[i])
-		}
-		return out, nil
+	// case *gwv1beta1.GatewayClassList:
+	// 	out := make([]client.Object, 0, len(v.Items))
+	// 	for i := range v.Items {
+	// 		out = append(out, &v.Items[i])
+	// 	}
+	// 	return out, nil
 
 	case *gwv1beta1.GatewayList:
 		out := make([]client.Object, 0, len(v.Items))
