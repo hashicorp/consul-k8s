@@ -21,6 +21,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -55,6 +56,14 @@ type Controller interface {
 	// Logger returns a logger with values added for the specific controller
 	// and request name.
 	Logger(types.NamespacedName) logr.Logger
+}
+
+// Mutator is an optional interface that controllers can implement
+// if they need to modify the Consul entry before it's sent to the server.
+type Mutator interface {
+	// MutateConsulEntry allows specific controllers (like TerminatingGateway)
+	// to modify the Consul API object before it is sent to the Consul Server.
+	MutateConsulEntry(obj common.ConfigEntryResource, entry capi.ConfigEntry, req ctrl.Request) error
 }
 
 // ConfigEntryController is a generic controller that is used to reconcile
@@ -134,6 +143,38 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	}
 
 	consulEntry := configEntry.ToConsul(r.DatacenterName)
+
+	isSecretChange, _ := ctx.Value("isSecretChange").(bool)
+	if mutator, ok := crdCtrl.(Mutator); ok && isSecretChange {
+		if err := mutator.MutateConsulEntry(configEntry, consulEntry, req); err != nil {
+			logger.Error(err, "failed to mutate consul entry")
+			return ctrl.Result{}, err
+		}
+
+		// 1. Fetch current state from Consul first
+		entryFromConsul, _, err := consulClient.ConfigEntries().Get(
+			configEntry.ConsulKind(),
+			configEntry.ConsulName(),
+			r.queryOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())),
+		)
+
+		// If there's a real API error (not 404), return it.
+		if err != nil && !isNotFoundErr(err) {
+			return ctrl.Result{}, fmt.Errorf("getting config entry from consul: %w", err)
+		}
+		// We ONLY force update if:
+		// - It's a Terminating Gateway
+		// - The entry ALREADY exists in Consul (entryFromConsul != nil)
+		// - The metadata timestamp differs (Secret change detected)
+		if configEntry.ConsulKind() == capi.TerminatingGateway && entryFromConsul != nil {
+			logger.Info("secret change detected, forcing metadata sync")
+			_, _, err := consulClient.ConfigEntries().Set(consulEntry, r.writeOpts(r.consulNamespace(consulEntry, configEntry.ConsulMirroringNS(), configEntry.ConsulGlobalResource())))
+			if err != nil {
+				return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError, err)
+			}
+			return r.syncSuccessful(ctx, crdCtrl, configEntry)
+		}
+	}
 
 	if configEntry.GetDeletionTimestamp().IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
@@ -313,10 +354,22 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 		),
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	// 2. Initialize the Builder
+	builder := ctrl.NewControllerManagedBy(mgr).
 		For(resource).
-		WithOptions(options).
-		Complete(reconciler)
+		WithOptions(options)
+
+	// 3. Register the Secret Watch (Specifically for TGW)
+	if tgw, ok := reconciler.(*TerminatingGatewayController); ok {
+		builder.Watches(
+			&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(tgw.transformSecret),
+		)
+	}
+
+	// 4. THE FINAL STEP: Complete the builder.
+	// This tells the Manager: "I am done configuring this controller, please start it."
+	return builder.Complete(reconciler)
 }
 
 func (r *ConfigEntryController) consulNamespace(configEntry capi.ConfigEntry, namespace string, globalResource bool) string {
