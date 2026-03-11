@@ -337,8 +337,10 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 
 	switch kind {
 
-	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute", "ReferenceGrant", "UDPRoute", "TLSRoute", "TCPRoute":
+	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute", "ReferenceGrant":
 		raw["apiVersion"] = "consul.hashicorp.com/v1beta1"
+	case "UDPRoute", "TLSRoute", "TCPRoute":
+		raw["apiVersion"] = "consul.hashicorp.com/v1alpha2"
 
 	}
 
