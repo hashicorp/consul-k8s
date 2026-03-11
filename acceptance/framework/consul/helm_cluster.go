@@ -6,6 +6,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -154,6 +155,14 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
+	}
+	logger.Logf(t, "Helm Chart: %s", chartName)
+	logger.Logf(t, "Helm Value Files: %v", h.helmOptions.ValuesFiles)
+
+	for _, f := range h.helmOptions.ValuesFiles {
+		data, _ := os.ReadFile(f)
+
+		logger.Logf(t, "Values file %s:\n%s", f, string(data))
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
