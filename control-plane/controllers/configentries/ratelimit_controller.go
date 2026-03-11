@@ -1,0 +1,50 @@
+package configentries
+
+import (
+	"context"
+
+	"github.com/go-logr/logr"
+	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+// RateLimitController reconciles a RateLimit object.
+type RateLimitController struct {
+	client.Client
+	FinalizerPatcher
+	Log                   logr.Logger
+	Scheme                *runtime.Scheme
+	ConfigEntryController *ConfigEntryController
+}
+
+// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=ratelimits,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=ratelimits/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=consul.hashicorp.com,resources=ratelimits/finalizers,verbs=update
+
+// Reconcile is part of the main kubernetes reconciliation loop which aims to
+// move the current state of the cluster closer to the desired state.
+// TODO(user): Modify the Reconcile function to compare the state specified by
+// the RateLimit object against the actual cluster state, and then
+// perform operations to make the cluster state reflect the state specified by
+// the user.
+//
+// For more details, check Reconcile and its Result here:
+// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
+func (r *RateLimitController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, &consulv1alpha1.RateLimit{})
+}
+
+func (r *RateLimitController) Logger(name types.NamespacedName) logr.Logger {
+	return r.Log.WithValues("request", name)
+}
+
+func (r *RateLimitController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
+	return r.Status().Update(ctx, obj, opts...)
+}
+
+func (r *RateLimitController) SetupWithManager(mgr ctrl.Manager) error {
+	return setupWithManager(mgr, &consulv1alpha1.RateLimit{}, r)
+}

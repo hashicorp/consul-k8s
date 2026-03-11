@@ -1,0 +1,12 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RateLimit
+metadata:
+  name: global
+spec:
+  config:
+    readRate: 0
+    writeRate: 100
+    priority: true
+    excludeEndpoints:
+      - "Health.Check"
+      - "ConfigEntry.Apply"
