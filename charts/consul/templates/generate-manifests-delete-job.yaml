@@ -42,7 +42,7 @@ spec:
       {{- if not .Values.global.openshift.enabled }}
       containers:
       - name: pvc-cleaner
-        image: bitnami/kubectl:1.0
+        image: bitnami/kubectl
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c"]
         args:
