@@ -157,6 +157,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 	logger.Logf(t, "Helm Chart: %s", chartName)
+	logger.Logf(t, "Helm setValues: %s", h.helmOptions.SetValues)
 	logger.Logf(t, "Helm Value Files: %v", h.helmOptions.ValuesFiles)
 
 	for _, f := range h.helmOptions.ValuesFiles {
