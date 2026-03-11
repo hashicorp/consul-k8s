@@ -171,6 +171,14 @@ func (h *HelmCluster) Create(t *testing.T) {
 		require.NoError(r, err)
 	})
 
+	// get the helm values
+	// Attempt to fetch the rendered Helm values for the installed release and log them.
+	if vals, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "get", "values", h.releaseName, "--all", "--output", "yaml"); err != nil {
+		logger.Logf(t, "Unable to get helm values for release %s: %v", h.releaseName, err)
+	} else {
+		logger.Logf(t, "Helm release values for %s:\n%s", h.releaseName, vals)
+	}
+
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
