@@ -150,7 +150,8 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	// expect 3
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, ptr.To(int32(*maxInstances+1)))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
-
+	// at this stage replica count is equal to the maxInstances
+	replicas := maxInstances
 	// Scenario: Updating the GatewayClassConfig should not affect gateways that have already been created
 	logger.Log(t, "updating gatewayclassconfig values")
 	err = k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassConfigName, Namespace: namespace}, gatewayClassConfig)
@@ -162,7 +163,8 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	gatewayClassConfig.Spec.DeploymentSpec.MaxInstances = ptr.To(int32(5))
 	err = k8sClient.Update(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
-	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
+
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, replicas, gateway)
 
 	/*
 			Here we have updated the gatewayclass config with:
@@ -200,6 +202,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		2. scale down to 0, we expect 2.
 	*/
 	maxInstances = ptr.To(int32(5))
+	minInstances = ptr.To(int32(2))
 	// Scenario: gateways should be able to scale independently and not get overridden by the controller unless it's above the max
 	// expect 5
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, ptr.To(int32(*maxInstances+1)))
