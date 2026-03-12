@@ -9,6 +9,10 @@ SECURITY:
 BUG FIXES:
 * cni: Updates code logic in CNI during application pod creation. [[GH-5062](https://github.com/hashicorp/consul-k8s/issues/5062)]
 
+## 1.8.9
+
+**UNRELEASED**
+
 ## 1.8.6 (2 December, 2025)
 
 SECURITY:
