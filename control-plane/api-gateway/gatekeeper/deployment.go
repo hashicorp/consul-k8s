@@ -43,6 +43,13 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		exists = true
 	}
 
+	// Determine scaling configuration using new annotation-based approach
+	desiredReplicas, err := g.ReconcileScaling(ctx, gateway, gcc)
+	if err != nil {
+		g.Log.Error(err, "failed to reconcile scaling configuration")
+		return err
+	}
+
 	var currentReplicas *int32
 	if exists {
 		currentReplicas = existingDeployment.Spec.Replicas
@@ -56,8 +63,17 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 	if exists {
 		g.Log.V(1).Info("Existing Gateway Deployment found.")
 
-		// If the user has set the number of replicas, let's respect that.
-		deployment.Spec.Replicas = existingDeployment.Spec.Replicas
+		// If HPA is managing replicas (desiredReplicas is nil), preserve existing replicas
+		// Otherwise, use the desired replicas from scaling config
+		if desiredReplicas != nil {
+			deployment.Spec.Replicas = desiredReplicas
+		} else {
+			// HPA is managing, don't set replicas
+			deployment.Spec.Replicas = existingDeployment.Spec.Replicas
+		}
+	} else if desiredReplicas != nil {
+		// New deployment with static replicas
+		deployment.Spec.Replicas = desiredReplicas
 	}
 
 	mutated := deployment.DeepCopy()
