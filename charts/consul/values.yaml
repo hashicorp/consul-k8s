@@ -2478,10 +2478,21 @@ connectInject:
           memory: "100Mi"
           cpu: "100m"
 
-      # This value defines the number of pods to deploy for each Gateway as well as a min and max number of pods for all Gateways
+      # DEPRECATED: These values are deprecated and will be removed in a future release.
+      # Use Gateway annotations instead for per-gateway scaling configuration.
+      # See: https://developer.hashicorp.com/consul/docs/k8s/api-gateway/scaling
+      #
+      # For static replica count, use: consul.hashicorp.com/default-replicas: "<N>"
+      # For HPA, use: consul.hashicorp.com/hpa/enabled: "true" with min/max replicas annotations
       deployment:
+        # Default number of gateway instances
+        # DEPRECATED: Use consul.hashicorp.com/default-replicas annotation on Gateway resource
         defaultInstances: 1
+        # Maximum number of gateway instances
+        # DEPRECATED: No longer enforced. Use HPA maxReplicas via annotations instead
         maxInstances: 1
+        # Minimum number of gateway instances
+        # DEPRECATED: Use HPA minReplicas via annotations instead
         minInstances: 1
 
       # The name of the OpenShift SecurityContextConstraints resource to use for Gateways.

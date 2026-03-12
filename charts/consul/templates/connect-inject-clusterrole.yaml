@@ -190,6 +190,18 @@ rules:
     - watch
     - delete
 - apiGroups:
+    - autoscaling
+  resources:
+    - horizontalpodautoscalers
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
     - core
   resources:
     - services
