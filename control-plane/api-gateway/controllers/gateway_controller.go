@@ -483,7 +483,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 	// 	Version: "v1alpha2",
 	// 	Kind:    "TCPRoute",
 	// }
-
+	mgr.GetLogger().Info("config received %v", config.EnableTCP)
 	if config.EnableTCP {
 		//if _, err := mgr.GetRESTMapper().RESTMapping(tcpGVK.GroupKind(), tcpGVK.Version); err == nil {
 		r.supportsTCPRoute = true
