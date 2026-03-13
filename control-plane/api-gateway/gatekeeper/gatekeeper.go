@@ -71,6 +71,10 @@ func (g *Gatekeeper) Delete(ctx context.Context, gateway gwv1beta1.Gateway) erro
 	gatewayName := g.namespacedName(gateway)
 	g.Log.V(1).Info(fmt.Sprintf("Delete Gateway Deployment %s/%s", gatewayName.Namespace, gatewayName.Name))
 
+	if err := g.DeleteHPA(ctx, gateway); err != nil {
+		return err
+	}
+
 	if err := g.deleteDeployment(ctx, gatewayName); err != nil {
 		return err
 	}

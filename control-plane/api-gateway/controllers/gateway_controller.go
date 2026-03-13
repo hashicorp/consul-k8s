@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -463,6 +464,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints),
 		).
 		Watches(
+			&autoscalingv2.HorizontalPodAutoscaler{},
+			handler.EnqueueRequestsFromMapFunc(r.transformHPA),
+		).
+		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),
 			builder.WithPredicates(predicate),
@@ -732,6 +737,22 @@ func gatewayReferencesCertificate(certificateKey api.ResourceReference, gateway 
 		}
 	}
 	return false
+}
+
+func (r *GatewayController) transformHPA(_ context.Context, o client.Object) []reconcile.Request {
+	hpa := o.(*autoscalingv2.HorizontalPodAutoscaler)
+	if hpa.Spec.ScaleTargetRef.Kind != "Deployment" || hpa.Spec.ScaleTargetRef.Name == "" {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: hpa.Namespace,
+				Name:      hpa.Spec.ScaleTargetRef.Name,
+			},
+		},
+	}
 }
 
 func (r *GatewayController) transformPods(ctx context.Context, o client.Object) []reconcile.Request {

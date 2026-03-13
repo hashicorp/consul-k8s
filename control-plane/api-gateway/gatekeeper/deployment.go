@@ -43,8 +43,7 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		exists = true
 	}
 
-	// Determine scaling configuration using new annotation-based approach
-	desiredReplicas, err := g.ReconcileScaling(ctx, gateway, gcc)
+	scalingConfig, err := g.ReconcileScaling(ctx, gateway, gcc)
 	if err != nil {
 		g.Log.Error(err, "failed to reconcile scaling configuration")
 		return err
@@ -55,29 +54,13 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		currentReplicas = existingDeployment.Spec.Replicas
 	}
 
-	deployment, err := g.deployment(ctx, gateway, gcc, config, currentReplicas)
+	deployment, err := g.deployment(ctx, gateway, gcc, config, resolvedDeploymentReplicas(scalingConfig, gcc, currentReplicas))
 	if err != nil {
 		return err
 	}
 
-	if exists {
-		g.Log.V(1).Info("Existing Gateway Deployment found.")
-
-		// If HPA is managing replicas (desiredReplicas is nil), preserve existing replicas
-		// Otherwise, use the desired replicas from scaling config
-		if desiredReplicas != nil {
-			deployment.Spec.Replicas = desiredReplicas
-		} else {
-			// HPA is managing, don't set replicas
-			deployment.Spec.Replicas = existingDeployment.Spec.Replicas
-		}
-	} else if desiredReplicas != nil {
-		// New deployment with static replicas
-		deployment.Spec.Replicas = desiredReplicas
-	}
-
 	mutated := deployment.DeepCopy()
-	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gcc, gateway, g.Client.Scheme(), g.Log)
+	mutator := newDeploymentMutator(deployment, mutated, existingDeployment, exists, gateway, g.Client.Scheme(), g.Log)
 
 	result, err := controllerutil.CreateOrUpdate(ctx, g.Client, mutated, mutator)
 	if err != nil {
@@ -105,7 +88,7 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.Namespac
 	return err
 }
 
-func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, currentReplicas *int32) (*appsv1.Deployment, error) {
+func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, replicas *int32) (*appsv1.Deployment, error) {
 	initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
 	if err != nil {
 		return nil, err
@@ -145,7 +128,7 @@ func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1beta1.Gateway, 
 			Labels:    common.LabelsForGateway(&gateway),
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: deploymentReplicas(gcc, currentReplicas),
+			Replicas: replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: common.LabelsForGateway(&gateway),
 			},
@@ -186,11 +169,11 @@ func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1beta1.Gateway, 
 	}, nil
 }
 
-func mergeDeployments(log logr.Logger, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, a, b *appsv1.Deployment) *appsv1.Deployment {
+func mergeDeployments(log logr.Logger, gateway gwv1beta1.Gateway, a, b *appsv1.Deployment) *appsv1.Deployment {
 	if !compareDeployments(a, b) {
 		// Replace template
 		b.Spec.Template = a.Spec.Template
-		b.Spec.Replicas = deploymentReplicas(gcc, a.Spec.Replicas)
+		b.Spec.Replicas = a.Spec.Replicas
 	}
 
 	// Apply probes from Gateway annotations if present
@@ -302,9 +285,9 @@ func mergeAnnotation(b *appsv1.Deployment, annotations map[string]string) {
 
 }
 
-func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
+func newDeploymentMutator(deployment, mutated, existingDeployment *appsv1.Deployment, deploymentExists bool, gateway gwv1beta1.Gateway, scheme *runtime.Scheme, log logr.Logger) resourceMutator {
 	return func() error {
-		mutated = mergeDeployments(log, gcc, gateway, deployment, mutated)
+		mutated = mergeDeployments(log, gateway, deployment, mutated)
 		if deploymentExists {
 			mergeAnnotation(mutated, existingDeployment.Spec.Template.Annotations)
 		}
