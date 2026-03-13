@@ -11,7 +11,11 @@
         )
         (and
             (default false .Values.global.openshift.enabled)
-            
+            (default false .Values.global.openshift.crds.consulapi.enabled)
+        )
+        (and
+            (default false .Values.global.openshift.enabled)
+            (default false .Values.global.openshift.upgradeTo419From418)
             (default false .Values.global.openshift.crds.enableTcpRoute)
         )
     )

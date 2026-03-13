@@ -1,6 +1,7 @@
 {{- if .Values.apiGateway}}{{fail "[DEPRECATED and REMOVED] the apiGateway stanza is no longer supported as of Consul 1.19.0. Use connectInject.apiGateway instead."}}{{- end -}}
 {{- if and .Values.connectInject.enabled 
-      (default false .Values.global.crds.consulapi.enabled)
+      (or (default false .Values.global.crds.consulapi.enabled)
+      (default false .Values.global.openshift.crds.consulapi.enabled))
 }}
 apiVersion: batch/v1
 kind: Job

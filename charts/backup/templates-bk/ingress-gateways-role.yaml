@@ -1,0 +1,46 @@
+{{- if .Values.ingressGateways.enabled }}
+
+{{- $root := . }}
+{{- $defaults := .Values.ingressGateways.defaults }}
+
+{{- range .Values.ingressGateways.gateways }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "consul.fullname" $root }}-{{ .name }}
+  namespace: {{ $root.Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" $root }}
+    chart: {{ template "consul.chart" $root }}
+    heritage: {{ $root.Release.Service }}
+    release: {{ $root.Release.Name }}
+    component: ingress-gateway
+    ingress-gateway-name: {{ template "consul.fullname" $root }}-{{ .name }}
+rules:
+  - apiGroups: [""]
+    resources:
+      - services
+    resourceNames:
+      - {{ template "consul.fullname" $root }}-{{ .name }}
+    verbs:
+      - get
+{{- if $root.Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" $root }}-{{ .name }}
+    verbs:
+      - use
+{{- end }}
+{{- if $root.Values.global.acls.manageSystemACLs }}
+  - apiGroups: [""]
+    resources:
+      - secrets
+    resourceNames:
+      - {{ template "consul.fullname" $root }}-{{ .name }}-acl-token
+    verbs:
+      - get
+{{- end }}
+---
+{{- end }}
+{{- end }}

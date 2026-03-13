@@ -1,0 +1,31 @@
+{{- if (and .Values.connectInject.cni.enabled .Values.global.enablePodSecurityPolicies) }}
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ default .Release.Namespace .Values.connectInject.cni.namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: cni 
+spec:
+  privileged: true
+  # GKE requires that allowPrivilegeEscalation:true if privileged: true.
+  allowPrivilegeEscalation: true 
+  volumes:
+  - hostPath
+  - secret
+  - emptyDir
+  hostNetwork: false
+  readOnlyRootFilesystem: false
+  runAsUser:
+    rule: 'RunAsAny'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+{{- end }}

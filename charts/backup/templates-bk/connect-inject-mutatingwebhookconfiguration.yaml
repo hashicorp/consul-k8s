@@ -1,0 +1,358 @@
+{{- if (or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled)) }}
+# The MutatingWebhookConfiguration to enable the Connect injector.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ template "consul.fullname" . }}-connect-injector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: connect-injector
+webhooks:
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-proxydefaults
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-proxydefaults.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - proxydefaults
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-mesh
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-mesh.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - meshes
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-servicedefaults
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-servicedefaults.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - servicedefaults
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-serviceresolver
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-serviceresolver.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceresolvers
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-servicerouter
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-servicerouter.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - servicerouters
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-servicesplitter
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-servicesplitter.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - servicesplitters
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-serviceintentions
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-serviceintentions.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - serviceintentions
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-ingressgateway
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-ingressgateway.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ingressgateways
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-terminatinggateway
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-terminatinggateway.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - terminatinggateways
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-exportedservices
+  failurePolicy: Fail
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  name: mutate-exportedservices.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - exportedservices
+  sideEffects: None
+- clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-controlplanerequestlimits
+  failurePolicy: Fail
+  admissionReviewVersions:
+    - "v1beta1"
+    - "v1"
+  name: mutate-controlplanerequestlimit.consul.hashicorp.com
+  rules:
+    - apiGroups:
+        - consul.hashicorp.com
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - controlplanerequestlimits
+  sideEffects: None
+- name: {{ template "consul.fullname" . }}-connect-injector.consul.hashicorp.com
+  # The webhook will fail scheduling all pods that are not part of consul if all replicas of the webhook are unhealthy.
+  objectSelector:
+    matchExpressions:
+    - key: app
+      operator: NotIn
+      values: [ {{ template "consul.name" . }} ]
+  failurePolicy: {{ .Values.connectInject.failurePolicy }}
+  sideEffects: None
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: "/mutate"
+  rules:
+  - operations: [ "CREATE" ]
+    apiGroups: [ "" ]
+    apiVersions: [ "v1" ]
+    resources: [ "pods" ]
+{{- if .Values.connectInject.namespaceSelector }}
+  namespaceSelector:
+{{ tpl .Values.connectInject.namespaceSelector . | indent 6 }}
+{{- end }}
+{{- if .Values.global.peering.enabled }}
+- name: {{ template "consul.fullname" . }}-mutate-peeringacceptors.consul.hashicorp.com
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: "/mutate-v1alpha1-peeringacceptors"
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - peeringacceptors
+  failurePolicy: Fail
+  sideEffects: None
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+- name: {{ template "consul.fullname" . }}-mutate-peeringdialers.consul.hashicorp.com
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: "/mutate-v1alpha1-peeringdialers"
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - peeringdialers
+  failurePolicy: Fail
+  sideEffects: None
+  admissionReviewVersions:
+  - "v1beta1"
+  - "v1"
+- admissionReviewVersions:
+    - v1beta1
+    - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-samenessgroup
+  failurePolicy: Fail
+  name: mutate-samenessgroup.consul.hashicorp.com
+  rules:
+    - apiGroups:
+        - consul.hashicorp.com
+      apiVersions:
+        - v1alpha1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - samenessgroups
+  sideEffects: None
+{{- end }}
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "consul.fullname" . }}-connect-injector
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1alpha1-jwtprovider
+  failurePolicy: Fail
+  name: mutate-jwtprovider.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - jwtproviders
+  sideEffects: None
+{{- end }}

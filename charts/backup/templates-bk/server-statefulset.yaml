@@ -1,0 +1,787 @@
+{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if and .Values.global.federation.enabled .Values.global.adminPartitions.enabled }}{{ fail "If global.federation.enabled is true, global.adminPartitions.enabled must be false because they are mutually exclusive" }}{{ end }}
+{{- if and .Values.global.federation.enabled (not .Values.global.tls.enabled) }}{{ fail "If global.federation.enabled is true, global.tls.enabled must be true because federation is only supported with TLS enabled" }}{{ end }}
+{{- if and .Values.global.federation.enabled (not .Values.meshGateway.enabled) }}{{ fail "If global.federation.enabled is true, meshGateway.enabled must be true because mesh gateways are required for federation" }}{{ end }}
+{{- if and .Values.server.serverCert.secretName (not .Values.global.tls.caCert.secretName) }}{{ fail "If server.serverCert.secretName is provided, global.tls.caCert must also be provided" }}{{ end }}
+{{- if .Values.server.disableFsGroupSecurityContext }}{{ fail "server.disableFsGroupSecurityContext has been removed. Please use global.openshift.enabled instead." }}{{ end }}
+{{- if .Values.server.bootstrapExpect }}{{ if lt (int .Values.server.bootstrapExpect) (int .Values.server.replicas) }}{{ fail "server.bootstrapExpect cannot be less than server.replicas" }}{{ end }}{{ end }}
+{{- if (and .Values.global.gossipEncryption.secretName (not .Values.global.gossipEncryption.secretKey)) }}{{fail "gossipEncryption.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if (and (not .Values.global.gossipEncryption.secretName) .Values.global.gossipEncryption.secretKey) }}{{fail "gossipEncryption.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.secretsBackend.vault.consulServerRole)) }}{{ fail "global.secretsBackend.vault.consulServerRole must be provided if global.secretsBackend.vault.enabled=true." }}{{ end -}}
+{{- if (and .Values.server.serverCert.secretName (not .Values.global.tls.caCert.secretName)) }}{{ fail "If server.serverCert.secretName is provided, global.tls.caCert.secretName must also be provided" }}{{ end }}
+{{- if (and (and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled) (not .Values.global.tls.caCert.secretName)) }}{{ fail "global.tls.caCert.secretName must be provided if global.tls.enabled=true and global.secretsBackend.vault.enabled=true." }}{{ end -}}
+{{- if (and .Values.global.enterpriseLicense.secretName (not .Values.global.enterpriseLicense.secretKey)) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if (and (not .Values.global.enterpriseLicense.secretName) .Values.global.enterpriseLicense.secretKey) }}{{fail "enterpriseLicense.secretKey and secretName must both be specified." }}{{ end -}}
+{{- if (and .Values.global.acls.bootstrapToken.secretName (not .Values.global.acls.bootstrapToken.secretKey)) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
+{{- if (and (not .Values.global.acls.bootstrapToken.secretName) .Values.global.acls.bootstrapToken.secretKey) }}{{fail "both global.acls.bootstrapToken.secretKey and global.acls.bootstrapToken.secretName must be set if one of them is provided." }}{{ end -}}
+{{- if .Values.server.snapshotAgent.enabled -}}
+{{- if or (and .Values.server.snapshotAgent.configSecret.secretName (not .Values.server.snapshotAgent.configSecret.secretKey)) (and (not .Values.server.snapshotAgent.configSecret.secretName) .Values.server.snapshotAgent.configSecret.secretKey) }}{{fail "server.snapshotAgent.configSecret.secretKey and server.snapshotAgent.configSecret.secretName must both be specified." }}{{ end -}}
+{{- end -}}
+{{ template "consul.validateRequiredCloudSecretsExist" . }}
+{{ template "consul.validateCloudSecretKeys" . }}
+{{ template "consul.validateMetricsConfig" . }}
+{{ template "consul.validateDatadogConfiguration" . }}
+{{ template "consul.validateExtraConfig" . }}
+# StatefulSet to run the actual Consul server cluster.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "consul.fullname" . }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: server
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+spec:
+  serviceName: {{ template "consul.fullname" . }}-server
+  podManagementPolicy: Parallel
+  replicas: {{ .Values.server.replicas }}
+  {{- if (gt (int .Values.server.updatePartition) 0) }}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: {{ .Values.server.updatePartition }}
+  {{- end }}
+  {{- if and (semverCompare ">= 1.23-0" .Capabilities.KubeVersion.Version) (.Values.server.persistentVolumeClaimRetentionPolicy) }}
+  persistentVolumeClaimRetentionPolicy: {{ toYaml .Values.server.persistentVolumeClaimRetentionPolicy | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: server
+      hasDNS: "true"
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: server
+        hasDNS: "true"
+        {{- if .Values.global.metrics.datadog.enabled }}
+        "tags.datadoghq.com/version": {{ template "consul.versionInfo" . }}
+        "tags.datadoghq.com/env": {{ template "consul.name" . }}
+        "tags.datadoghq.com/service": "consul-server"
+        {{- end }}
+        {{- if .Values.server.extraLabels }}
+          {{- toYaml .Values.server.extraLabels | nindent 8 }}
+        {{- end }}
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.global.secretsBackend.vault.enabled }}
+        "vault.hashicorp.com/agent-inject": "true"
+        "vault.hashicorp.com/role": "{{ .Values.global.secretsBackend.vault.consulServerRole }}"
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        "vault.hashicorp.com/agent-extra-secret": {{ .Values.global.secretsBackend.vault.ca.secretName }}
+        "vault.hashicorp.com/ca-cert": /vault/custom/{{ .Values.global.secretsBackend.vault.ca.secretKey }}
+        {{- end }}
+        {{- if .Values.global.gossipEncryption.secretName }}
+        {{- with .Values.global.gossipEncryption }}
+        "vault.hashicorp.com/agent-inject-secret-gossip.txt": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-gossip.txt": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.server.serverCert.secretName }}
+        "vault.hashicorp.com/agent-inject-secret-servercert.crt": {{ .Values.server.serverCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-servercert.crt": {{ include "consul.serverTLSCertTemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-servercert.key": {{ .Values.server.serverCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-servercert.key": {{ include "consul.serverTLSKeyTemplate" . }}
+        "vault.hashicorp.com/agent-inject-secret-serverca.crt": {{ .Values.global.tls.caCert.secretName }}
+        "vault.hashicorp.com/agent-inject-template-serverca.crt": {{ include "consul.serverTLSCATemplate" . }}
+        {{- end }}
+        {{- if (and .Values.global.acls.replicationToken.secretName (not .Values.global.acls.createReplicationToken)) }}
+        "vault.hashicorp.com/agent-inject-secret-replication-token-config.hcl": "{{ .Values.global.acls.replicationToken.secretName }}"
+        "vault.hashicorp.com/agent-inject-template-replication-token-config.hcl":  {{ template "consul.vaultReplicationTokenConfigTemplate" . }}
+        {{- end }}
+        {{- if (and .Values.global.acls.manageSystemACLs .Values.global.acls.bootstrapToken.secretName) }}
+        "vault.hashicorp.com/agent-inject-secret-bootstrap-token-config.hcl": "{{ .Values.global.acls.bootstrapToken.secretName }}"
+        "vault.hashicorp.com/agent-inject-template-bootstrap-token-config.hcl":  {{ template "consul.vaultBootstrapTokenConfigTemplate" . }}
+        {{- end }}
+        {{- if .Values.global.secretsBackend.vault.agentAnnotations }}
+        {{ tpl .Values.global.secretsBackend.vault.agentAnnotations . | nindent 8 | trim }}
+        {{- end }}
+       {{- if (and (.Values.global.secretsBackend.vault.vaultNamespace) (not (hasKey (default "" .Values.global.secretsBackend.vault.agentAnnotations | fromYaml) "vault.hashicorp.com/namespace")))}}
+        "vault.hashicorp.com/namespace": "{{ .Values.global.secretsBackend.vault.vaultNamespace }}"
+        {{- end }}
+        {{- if .Values.global.enterpriseLicense.secretName }}
+        {{- with .Values.global.enterpriseLicense }}
+        "vault.hashicorp.com/agent-inject-secret-enterpriselicense.txt": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-enterpriselicense.txt": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.server.snapshotAgent.configSecret.secretName }}
+        {{- with .Values.server.snapshotAgent.configSecret }}
+        "vault.hashicorp.com/agent-inject-secret-snapshot-agent-config.json": "{{ .secretName }}"
+        "vault.hashicorp.com/agent-inject-template-snapshot-agent-config.json": {{ template "consul.vaultSecretTemplate" . }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        "consul.hashicorp.com/config-checksum": {{ print (include (print $.Template.BasePath "/server-config-configmap.yaml") .) (include (print $.Template.BasePath "/server-tmp-extra-config-configmap.yaml") .) | sha256sum }}
+        {{- if .Values.server.annotations }}
+          {{- tpl .Values.server.annotations . | nindent 8 }}
+        {{- end }}
+        {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+        {{- if (or (not .Values.global.metrics.datadog.enabled) (and .Values.global.metrics.datadog.enabled (.Values.global.metrics.datadog.dogstatsd.enabled))) }}
+        "prometheus.io/scrape": "true"
+        {{- if not (hasKey (default "" .Values.server.annotations | fromYaml) "prometheus.io/path")}}
+        "prometheus.io/path": "/v1/agent/metrics"
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        "prometheus.io/port": "8501"
+        "prometheus.io/scheme": "https"
+        {{- else }}
+        "prometheus.io/port": "8500"
+        "prometheus.io/scheme": "http"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.metrics.datadog.enabled }}
+        "ad.datadoghq.com/tolerate-unready": "true"
+        "ad.datadoghq.com/consul.logs": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson | replace "[" "[{" | replace "]" "}]" | replace ":" "\": \"" | join "\",\"" | squote }}
+        {{- if .Values.global.metrics.datadog.openMetricsPrometheus.enabled }}
+        "ad.datadoghq.com/consul.checks": |
+          {
+            "openmetrics": {
+              "init_config": {},
+              "instances": [
+                {
+        {{- if .Values.global.tls.enabled }}
+                  "openmetrics_endpoint": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501/v1/agent/metrics?format=prometheus",
+                  "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
+                  "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
+                  "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
+        {{- else }}
+                  "openmetrics_endpoint": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500/v1/agent/metrics?format=prometheus",
+        {{- end }}
+        {{- if ( .Values.global.acls.manageSystemACLs) }}
+                  "headers": {
+                    "X-Consul-Token": "ENC[k8s_secret@{{ .Release.Namespace }}/{{ .Release.Namespace }}-datadog-agent-metrics-acl-token/token]"
+                  },
+        {{- end }}
+                  "namespace": "{{ .Release.Namespace }}",
+                  "metrics": [ ".*" ]
+                }
+              ]
+            }
+          }
+        {{- else if (not .Values.global.metrics.datadog.dogstatsd.enabled) }}
+        "ad.datadoghq.com/consul.checks": |
+          {
+            "consul": {
+              "init_config": {},
+              "instances": [
+                {
+        {{- if .Values.global.tls.enabled }}
+                  "url": "https://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8501",
+                  "tls_cert": "/etc/datadog-agent/conf.d/consul.d/certs/tls.crt",
+                  "tls_private_key": "/etc/datadog-agent/conf.d/consul.d/certs/tls.key",
+                  "tls_ca_cert": "/etc/datadog-agent/conf.d/consul.d/ca/tls.crt",
+        {{- else }}
+                  "url": "http://{{ template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:8500",
+        {{- end }}
+                  "use_prometheus_endpoint": true,
+        {{- if ( .Values.global.acls.manageSystemACLs) }}
+                  "acl_token": "ENC[k8s_secret@{{ .Release.Namespace }}/{{ .Release.Namespace }}-datadog-agent-metrics-acl-token/token]",
+        {{- end }}
+                  "new_leader_checks": true,
+                  "network_latency_checks": true,
+                  "catalog_checks": true,
+                  "auth_type": "basic"
+                }
+              ]
+            }
+          }
+        {{- else }}
+        "ad.datadoghq.com/consul.metrics_exclude": "true"
+        {{- end }}
+        {{- end }}
+        {{- end }}
+    spec:
+    {{- if .Values.server.affinity }}
+      affinity:
+        {{ tpl .Values.server.affinity . | nindent 8 | trim }}
+    {{- end }}
+    {{- if .Values.server.tolerations }}
+      tolerations:
+        {{ tpl .Values.server.tolerations . | nindent 8 | trim }}
+    {{- end }}
+    {{- if .Values.server.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{ tpl .Values.server.topologySpreadConstraints . | nindent 8 | trim }}
+    {{- end }}
+      terminationGracePeriodSeconds: 30
+      serviceAccountName: {{ template "consul.fullname" . }}-server
+      {{- if not .Values.global.openshift.enabled }}
+      securityContext:
+        {{- toYaml .Values.server.securityContext | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ template "consul.fullname" . }}-server-config
+        - name: extra-config
+          emptyDir: {}
+        - name: tmp-extra-config
+          configMap:
+            name: {{ template "consul.fullname" . }}-server-tmp-extra-config
+        {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
+        - name: consul-ca-cert
+          secret:
+            {{- if .Values.global.tls.caCert.secretName }}
+            secretName: {{ .Values.global.tls.caCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-ca-cert
+            {{- end }}
+            items:
+            - key: {{ default "tls.crt" .Values.global.tls.caCert.secretKey }}
+              path: tls.crt
+        - name: consul-server-cert
+          secret:
+            {{- if .Values.server.serverCert.secretName }}
+            secretName: {{ .Values.server.serverCert.secretName }}
+            {{- else }}
+            secretName: {{ template "consul.fullname" . }}-server-cert
+            {{- end }}
+        {{- end }}
+        {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
+        - name: consul-license
+          secret:
+            secretName: {{ .Values.global.enterpriseLicense.secretName }}
+        {{- end }}
+        {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+        - name: vault-ca
+          secret:
+            secretName: {{ .Values.global.secretsBackend.vault.ca.secretName }}
+            items:
+              - key: {{ .Values.global.secretsBackend.vault.ca.secretKey }}
+                path: tls.crt
+        {{- end }}
+        {{- if .Values.server.snapshotAgent.enabled }}
+        {{- if .Values.global.acls.manageSystemACLs }}
+        - name: snapshot-agent-config
+          configMap:
+            name: {{ template "consul.fullname" . }}-snapshot-agent-config
+        {{- end }}
+        {{- if (and .Values.server.snapshotAgent.configSecret.secretName .Values.server.snapshotAgent.configSecret.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
+        - name: snapshot-agent-user-config
+          secret:
+            secretName: {{ .Values.server.snapshotAgent.configSecret.secretName }}
+            items:
+              - key: {{ .Values.server.snapshotAgent.configSecret.secretKey }}
+                path: snapshot-config.json
+        {{- end }}
+        {{- if .Values.server.snapshotAgent.caCert }}
+        - name: extra-ssl-certs
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
+        {{- end }}
+        {{- if .Values.global.trustedCAs }}
+        - name: trusted-cas
+          emptyDir:
+            medium: "Memory"
+        {{- end }}
+        {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
+        - name: dsdsocket
+          hostPath:
+            path: {{ dir .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}
+            type: DirectoryOrCreate
+        {{- end }}
+        {{- range .Values.server.extraVolumes }}
+        - name: userconfig-{{ .name }}
+          {{ .type }}:
+            {{- if (eq .type "configMap") }}
+            name: {{ .name }}
+            {{- else if (eq .type "secret") }}
+            secretName: {{ .name }}
+            {{- end }}
+            {{- with .items }}
+            items:
+            {{- range . }}
+            - key: {{.key}}
+              path: {{.path}}
+            {{- end }}
+            {{- end }}
+        {{- end }}
+        {{- range .Values.server.snapshotAgent.extraVolumes }}
+        - name: userconfig-snapshot-{{ .name }}
+          {{ .type }}:
+            {{- if (eq .type "configMap") }}
+            name: {{ .name }}
+            {{- else if (eq .type "secret") }}
+            secretName: {{ .name }}
+            {{- end }}
+            {{- with .items }}
+            items:
+            {{- range . }}
+            - key: {{.key}}
+              path: {{.path}}
+            {{- end }}
+            {{- end }}
+        {{- end }}
+      {{- if .Values.server.priorityClassName }}
+      priorityClassName: {{ .Values.server.priorityClassName | quote }}
+      {{- end }}
+      initContainers:
+      - name: locality-init
+        image: {{ .Values.global.imageK8S }}
+        {{ template "consul.imagePullPolicy" . }}
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            exec consul-k8s-control-plane fetch-server-region -node-name "$NODE_NAME" -output-file /consul/extra-config/locality.json
+        volumeMounts:
+          - name: extra-config
+            mountPath: /consul/extra-config
+        {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+      containers:
+        - name: consul
+          image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
+          {{ template "consul.imagePullPolicy" . }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - name: ADVERTISE_IP
+              valueFrom:
+                fieldRef:
+                  {{- if .Values.server.exposeGossipAndRPCPorts }}
+                  {{- /* Server gossip and RPC ports will be exposed as a hostPort
+                  on the hostIP, so they need to advertise their host ip
+                  instead of their pod ip. This is to support external client
+                  agents. */}}
+                  fieldPath: status.hostIP
+                  {{- else }}
+                  fieldPath: status.podIP
+                  {{- end }}
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: CONSUL_DISABLE_PERM_MGMT
+              value: "true"
+            {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
+            {{- if not .Values.global.secretsBackend.vault.enabled }}
+            - name: GOSSIP_KEY
+              valueFrom:
+                secretKeyRef:
+                {{- if .Values.global.gossipEncryption.autoGenerate }}
+                  name: {{ template "consul.fullname" . }}-gossip-encryption-key
+                  key: key
+                {{- else if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+                  name: {{ .Values.global.gossipEncryption.secretName }}
+                  key: {{ .Values.global.gossipEncryption.secretKey }}
+                {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              value: https://localhost:8501
+            - name: CONSUL_CACERT
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/serverca.crt
+              {{- else }}
+              value: /consul/tls/ca/tls.crt
+              {{- end }}
+            {{- end }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload) }}
+            - name: CONSUL_LICENSE_PATH
+              {{- if  .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
+              value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
+            {{- end }}
+            {{- if and (not .Values.global.secretsBackend.vault.enabled) .Values.global.acls.bootstrapToken.secretName }}
+            - name: ACL_BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.bootstrapToken.secretName | quote }}
+                  key: {{ .Values.global.acls.bootstrapToken.secretKey | quote }}
+            {{- end }}
+            {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
+            - name: ACL_REPLICATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.acls.replicationToken.secretName | quote }}
+                  key: {{ .Values.global.acls.replicationToken.secretKey | quote }}
+            {{- end }}
+            {{- if .Values.global.cloud.enabled}}
+            # These are mounted as secrets so that the consul server agent can use them.
+            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
+            #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
+            # - HCP_RESOURCE_ID is created for use in the
+            #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
+            {{- if .Values.global.cloud.clientId.secretName }}
+            - name: HCP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.clientId.secretName }}
+                  key: {{ .Values.global.cloud.clientId.secretKey }}
+            {{- end }}
+            {{- if .Values.global.cloud.clientSecret.secretName }}
+            - name: HCP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.clientSecret.secretName }}
+                  key: {{ .Values.global.cloud.clientSecret.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.resourceId.secretName }}
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.resourceId.secretName }}
+                  key: {{ .Values.global.cloud.resourceId.secretKey }}
+            {{- end }}
+            {{- if .Values.global.cloud.authUrl.secretName }}
+            - name: HCP_AUTH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.authUrl.secretName }}
+                  key: {{ .Values.global.cloud.authUrl.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.apiHost.secretName }}
+            - name: HCP_API_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.apiHost.secretName }}
+                  key: {{ .Values.global.cloud.apiHost.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.scadaAddress.secretName }}
+            - name: HCP_SCADA_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.scadaAddress.secretName }}
+                  key: {{ .Values.global.cloud.scadaAddress.secretKey }}
+            {{- end}}
+            {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: SSL_CERT_DIR
+              value: "/etc/ssl/certs:/trusted-cas"
+            {{- end }}
+            {{- include "consul.extraEnvironmentVars" .Values.server | nindent 12 }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              {{- if .Values.global.trustedCAs }}
+              {{- range $i, $cert := .Values.global.trustedCAs }}
+              cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
+              {{- $cert | nindent 14 }}
+              EOF
+              {{- end }}
+              {{- end }}
+
+              {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.gossipEncryption.secretName }}
+              GOSSIP_KEY=`cat /vault/secrets/gossip.txt`
+              {{- end }}
+
+              {{ template "consul.extraconfig" }}
+
+              exec /usr/local/bin/docker-entrypoint.sh consul agent \
+                -advertise="${ADVERTISE_IP}" \
+                -config-dir=/consul/config \
+                {{- if (or .Values.global.gossipEncryption.autoGenerate (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey)) }}
+                -encrypt="${GOSSIP_KEY}" \
+                {{- end }}
+                {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+                {{- if (and .Values.global.secretsBackend.vault.enabled (not .Values.global.acls.createReplicationToken)) }}
+                -config-file=/vault/secrets/replication-token-config.hcl \
+                {{- else }}
+                -hcl="acl { tokens { agent = \"${ACL_REPLICATION_TOKEN}\", replication = \"${ACL_REPLICATION_TOKEN}\" } }" \
+                {{- end }}
+                {{- end }}
+                {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.acls.bootstrapToken.secretName }}
+                -config-file=/vault/secrets/bootstrap-token-config.hcl \
+                {{- else if (and (not .Values.global.secretsBackend.vault.enabled) .Values.global.acls.bootstrapToken.secretName) }}
+                -hcl="acl { tokens { initial_management = \"${ACL_BOOTSTRAP_TOKEN}\" } }" \
+                {{- end }}
+                {{- /* Always include the extraVolumes at the end so that users can
+                      override other Consul settings. The last -config-dir takes
+                      precedence. */}}
+                {{- range .Values.server.extraVolumes }}
+                {{- if .load }}
+                -config-dir=/consul/userconfig/{{ .name }} \
+                {{- end }}
+                {{- end }}
+                -config-dir=/consul/extra-config \
+                {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
+                -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
+                {{- end }}
+                
+                {{- if .Values.global.experiments }}
+                {{- $commaSeparatedValues := "" }}
+                {{- range $index, $value := .Values.global.experiments }}
+                  {{- if ne $index 0 }}
+                    {{- $commaSeparatedValues = printf "%s,\\\"%s\\\"" $commaSeparatedValues $value }}
+                  {{- else }}
+                    {{- $commaSeparatedValues = printf "\\\"%s\\\"" $value }}
+                  {{- end }}
+                {{- end }}
+                -hcl="experiments=[{{ $commaSeparatedValues }}]"
+                {{- end }}
+          volumeMounts:
+            - name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
+              mountPath: /consul/data
+            - name: config
+              mountPath: /consul/config
+            - name: extra-config
+              mountPath: /consul/extra-config
+            - name: tmp-extra-config
+              mountPath: /consul/tmp/extra-config
+            {{- if (and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled)) }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca/
+              readOnly: true
+            - name: consul-server-cert
+              mountPath: /consul/tls/server
+              readOnly: true
+            {{- end }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled)) }}
+            - name: consul-license
+              mountPath: /consul/license
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.global.metrics.datadog.enabled .Values.global.metrics.datadog.dogstatsd.enabled (eq .Values.global.metrics.datadog.dogstatsd.socketTransportType "UDS" ) }}
+            - name: dsdsocket
+              mountPath: {{ dir .Values.global.metrics.datadog.dogstatsd.dogstatsdAddr | trimAll "\"" }}
+              readOnly: true
+            {{- end }}
+            {{- range .Values.server.extraVolumes }}
+            - name: userconfig-{{ .name }}
+              readOnly: true
+              mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+            {{- if and .Values.global.secretsBackend.vault.ca.secretName .Values.global.secretsBackend.vault.ca.secretKey }}
+            - name: vault-ca
+              mountPath: /consul/vault-ca/
+              readOnly: true
+            {{- end }}
+            {{- if .Values.global.trustedCAs }}
+            - name: trusted-cas
+              mountPath: /trusted-cas
+              readOnly: false
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+              readOnly: false
+          ports:
+            {{- if (or (not .Values.global.tls.enabled) (not .Values.global.tls.httpsOnly)) }}
+            - name: http
+              containerPort: 8500
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: https
+              containerPort: 8501
+            {{- end }}
+            - name: grpc
+              containerPort: 8502
+              {{- if .Values.server.exposeGossipAndRPCPorts }}
+              hostPort: 8502
+              {{- end }}
+              protocol: "TCP"
+            - name: serflan-tcp
+              containerPort: {{ .Values.server.ports.serflan.port }}
+              {{- if .Values.server.exposeGossipAndRPCPorts }}
+              hostPort: {{ .Values.server.ports.serflan.port }}
+              {{- end }}
+              protocol: "TCP"
+            - name: serflan-udp
+              containerPort: {{ .Values.server.ports.serflan.port }}
+              {{- if .Values.server.exposeGossipAndRPCPorts }}
+              hostPort: {{ .Values.server.ports.serflan.port }}
+              {{- end }}
+              protocol: "UDP"
+            - name: serfwan-tcp
+              containerPort: 8302
+              {{- if .Values.server.exposeGossipAndRPCPorts }}
+              hostPort: 8302
+              {{- end }}
+              protocol: "TCP"
+            - name: serfwan-udp
+              containerPort: 8302
+              {{- if .Values.server.exposeGossipAndRPCPorts }}
+              hostPort: 8302
+              {{- end }}
+              protocol: "UDP"
+            - name: server
+              containerPort: 8300
+              {{- if .Values.server.exposeGossipAndRPCPorts }}
+              hostPort: 8300
+              {{- end }}
+            - name: dns-tcp
+              containerPort: 8600
+              protocol: "TCP"
+            - name: dns-udp
+              containerPort: 8600
+              protocol: "UDP"
+          readinessProbe:
+            # NOTE(mitchellh): when our HTTP status endpoints support the
+            # proper status codes, we should switch to that. This is temporary.
+            exec:
+              command:
+                - "/bin/sh"
+                - "-ec"
+                - |
+                  {{- if .Values.global.tls.enabled }}
+                  curl -k \
+                    https://127.0.0.1:8501/v1/status/leader \
+                  {{- else }}
+                  curl http://127.0.0.1:8500/v1/status/leader \
+                  {{- end }}
+                  2>/dev/null | grep -E '".+"'
+            failureThreshold: 2
+            initialDelaySeconds: 5
+            periodSeconds: 3
+            successThreshold: 1
+            timeoutSeconds: 5
+          {{- if .Values.server.resources }}
+          resources:
+            {{- if eq (typeOf .Values.server.resources) "string" }}
+            {{ tpl .Values.server.resources . | nindent 12 | trim }}
+            {{- else }}
+            {{- toYaml .Values.server.resources | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.server.containerSecurityContext.server }}
+          securityContext:
+            {{- toYaml .Values.server.containerSecurityContext.server | nindent 12 }}
+          {{- else }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          {{- end }}
+          {{- if .Values.server.extraContainers }}
+          {{ toYaml .Values.server.extraContainers | nindent 8 }}
+          {{- end }}
+        {{- if .Values.server.snapshotAgent.enabled }}
+        - name: consul-snapshot-agent
+          image: "{{ default .Values.global.image .Values.server.image }}"
+          {{ template "consul.imagePullPolicy" . }}
+          env:
+            {{- if .Values.server.snapshotAgent.caCert }}
+            - name: SSL_CERT_DIR
+              value: "/etc/ssl/certs:/extra-ssl-certs"
+            {{- end }}
+            {{- if .Values.global.tls.enabled }}
+            - name: CONSUL_HTTP_ADDR
+              {{- if .Values.global.dualStack.defaultEnabled }}
+              value: https://[::1]:8501
+              {{- else }}
+              value: https://127.0.0.1:8501
+              {{- end }}
+            - name: CONSUL_CACERT
+              {{- if .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/serverca.crt
+              {{- else }}
+              value: /consul/tls/ca/tls.crt
+              {{- end }}
+            {{- else }}
+            - name: CONSUL_HTTP_ADDR
+              {{- if .Values.global.dualStack.defaultEnabled }}
+              value: http://[::1]:8500
+              {{- else }}
+              value: http://127.0.0.1:8500
+              {{- end }}
+            {{- end }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
+            - name: CONSUL_LICENSE_PATH
+              {{- if  .Values.global.secretsBackend.vault.enabled }}
+              value: /vault/secrets/enterpriselicense.txt
+              {{- else }}
+              value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
+              {{- end }}
+            {{- end }}
+            {{- include "consul.extraEnvironmentVars" .Values.server.snapshotAgent | nindent 12 }}
+          command:
+            - "/bin/sh"
+            - "-ec"
+            - |
+              {{- if .Values.server.snapshotAgent.caCert }}
+              cat <<EOF > /extra-ssl-certs/custom-ca.pem
+              {{- .Values.server.snapshotAgent.caCert | nindent 14 }}
+              EOF
+              {{- end }}
+              exec /bin/consul snapshot agent \
+                -interval={{ .Values.server.snapshotAgent.interval }} \
+                {{- if .Values.global.acls.manageSystemACLs }}
+                -config-file=/consul/config/snapshot-login.json \
+                {{- end }}
+                {{- if (and .Values.server.snapshotAgent.configSecret.secretName .Values.server.snapshotAgent.configSecret.secretKey) }}
+                {{- if  .Values.global.secretsBackend.vault.enabled }}
+                -config-file=/vault/secrets/snapshot-agent-config.json \
+                {{- else }}
+                -config-dir=/consul/user-config \
+                {{- end }}
+                {{- end }}
+          volumeMounts:
+            {{- if .Values.global.acls.manageSystemACLs }}
+            - name: snapshot-agent-config
+              mountPath: /consul/config
+              readOnly: true
+            {{- end }}
+            {{- if .Values.server.snapshotAgent.caCert }}
+            - name: extra-ssl-certs
+              mountPath: /extra-ssl-certs
+              readOnly: false
+            {{- end }}
+            {{- if (and .Values.server.snapshotAgent.configSecret.secretName .Values.server.snapshotAgent.configSecret.secretKey (not .Values.global.secretsBackend.vault.enabled)) }}
+            - name: snapshot-agent-user-config
+              mountPath: /consul/user-config
+              readOnly: true
+            {{- end }}
+            {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.secretsBackend.vault.enabled) (not .Values.global.acls.manageSystemACLs))}}
+            - name: consul-license
+              mountPath: /consul/license
+              readOnly: true
+            {{- end }}
+            {{- if and .Values.global.tls.enabled (not .Values.global.secretsBackend.vault.enabled) }}
+            - name: consul-ca-cert
+              mountPath: /consul/tls/ca
+              readOnly: true
+            {{- end }}
+            {{- range .Values.server.snapshotAgent.extraVolumes }}
+            - name: userconfig-snapshot-{{ .name }}
+              readOnly: true
+              mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+          {{- with .Values.server.snapshotAgent.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      {{- if .Values.server.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.server.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data-{{ .Release.Namespace | trunc 58 | trimSuffix "-" }}
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.server.storage }}
+        {{- if .Values.server.storageClass }}
+        storageClassName: {{ .Values.server.storageClass }}
+        {{- end }}
+{{- end }}

@@ -1,0 +1,18 @@
+{{- if (and .Values.telemetryCollector.enabled .Values.telemetryCollector.customExporterConfig) }}
+# Immutable ConfigMap which saves the partition name. Attempting to update this configmap
+# with a new Admin Partition name will cause the helm upgrade to fail
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-telemetry-collector
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: consul-telemetry-collector
+data:
+  config.json: |-
+  {{ tpl .Values.telemetryCollector.customExporterConfig . | trimAll "\"" | indent 4 }}
+{{- end }}

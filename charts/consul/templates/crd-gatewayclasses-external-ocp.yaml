@@ -12,7 +12,7 @@
         (and
             (default false .Values.global.openshift.enabled)
            
-            (default false .Values.global.openshift.crds.enableTcpRoute)
+            (default false .Values.global.openshift.crds.consulapi.enabled)
         )
     )
 }}

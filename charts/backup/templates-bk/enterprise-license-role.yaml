@@ -1,0 +1,37 @@
+{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey (not .Values.global.enterpriseLicense.enableLicenseAutoload)) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "consul.fullname" . }}-enterprise-license
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: license
+{{- if or .Values.global.acls.manageSystemACLs .Values.global.enablePodSecurityPolicies }}
+rules:
+{{- if .Values.global.acls.manageSystemACLs }}
+  - apiGroups: [""]
+    resources:
+      - secrets
+    resourceNames:
+      - {{ template "consul.fullname" . }}-enterprise-license-acl-token
+    verbs:
+      - get
+{{- end }}
+{{- if .Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-enterprise-license
+    verbs:
+      - use
+{{- end }}
+{{- else }}
+rules: []
+{{- end }}
+{{- end }}
+{{- end }}

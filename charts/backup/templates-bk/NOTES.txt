@@ -1,0 +1,21 @@
+
+Thank you for installing HashiCorp Consul!
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, run:
+
+  $ helm status {{ .Release.Name }} {{- if .Release.Namespace }} --namespace {{ .Release.Namespace }}{{ end }}
+  $ helm get all {{ .Release.Name }} {{- if .Release.Namespace }} --namespace {{ .Release.Namespace }}{{ end }}
+
+Consul on Kubernetes Documentation:
+https://www.consul.io/docs/platform/k8s
+
+Consul on Kubernetes CLI Reference:
+https://www.consul.io/docs/k8s/k8s-cli
+
+{{- if (and .Values.global.acls.manageSystemACLs (gt (len .Values.server.extraConfig) 3)) }}
+Warning: Defining server extraConfig potentially disrupts the automatic ACL
+         bootstrapping required settings. This may cause future issues if
+         there are conflicts.
+{{- end }}

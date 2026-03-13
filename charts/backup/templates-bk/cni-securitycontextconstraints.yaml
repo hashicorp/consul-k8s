@@ -1,0 +1,55 @@
+{{- if (and (.Values.connectInject.cni.enabled) (.Values.global.openshift.enabled)) }}
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ default .Release.Namespace .Values.connectInject.cni.namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: cni
+  annotations:
+    kubernetes.io/description: {{ template "consul.fullname" . }}-cni are the security context constraints required
+      to run consul-cni.
+# Iff. allowHostDirVolumePlugin is true, hostPath must be included in volumes (see below).
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: true
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: MustRunAs
+groups: []
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- KILL
+- MKNOD
+- SETUID
+- SETGID
+runAsUser:
+  type: MustRunAsRange
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+users: []
+volumes:
+# This list must be in alphabetical order to match the post-reconcile order enforced by OpenShift admission hooks.
+# Furthermore, hostPath must be included explicitly if allowHostDirVolumePlugin is true, as it will otherwise be
+# added by OpenShift. It must be excluded if allowHostDirVolumePlugin is false per OpenShift requirements.
+# This avoids false positives in change detection by third-party diff tools (e.g. ArgoCD) that respect list order.
+- configMap
+- downwardAPI
+- emptyDir
+- hostPath
+- persistentVolumeClaim
+- projected
+- secret
+{{- end }}

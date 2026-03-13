@@ -1,4 +1,4 @@
-{{- if .Values.connectInject.enabled }}
+{{- if (and .Values.connectInject.enabled .Values.global.generateManifests) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -54,6 +54,7 @@ spec:
             {{- if .Values.global.openshift.enabled  }}
             - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
             {{- end }}
+            
           {{- with .Values.connectInject.apiGateway.managedGatewayClass.resourceJob.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

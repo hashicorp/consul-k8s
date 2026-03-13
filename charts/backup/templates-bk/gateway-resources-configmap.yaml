@@ -1,0 +1,24 @@
+{{- if .Values.connectInject.enabled }}
+
+# Validation
+# For meshGateway.wanAddress, static must be set if source is "Static"
+{{if (and (eq .Values.meshGateway.wanAddress.source "Static") (eq .Values.meshGateway.wanAddress.static ""))}}{{fail ".meshGateway.wanAddress.static must be set to a value if .meshGateway.wanAddress.source is Static"}}{{ end }}
+
+# Configuration of Gateway Resources Job which creates managed Gateway configuration.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-gateway-resources-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gateway-resources
+data:
+  {{- if .Values.connectInject.apiGateway.managedGatewayClass.resources }}
+  resources.json: |
+    {{ toJson .Values.connectInject.apiGateway.managedGatewayClass.resources }}
+  {{- end }}
+{{- end }}

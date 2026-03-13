@@ -1,0 +1,40 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if (or $serverEnabled .Values.externalServers.enabled) }}
+{{- if .Values.global.acls.manageSystemACLs }}
+{{- if .Values.global.enablePodSecurityPolicies }}
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ template "consul.fullname" . }}-server-acl-init-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: server-acl-init-cleanup
+spec:
+  privileged: false
+  # Allow core volume types.
+  volumes:
+    - 'secret'
+  allowPrivilegeEscalation: false
+  # This is redundant with non-root + disallow privilege escalation,
+  # but we can provide it for defense in depth.
+  requiredDropCapabilities:
+    - ALL
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'RunAsAny'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: false
+  {{- end }}
+  {{- end }}
+  {{- end }}

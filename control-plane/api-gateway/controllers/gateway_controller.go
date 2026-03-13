@@ -20,7 +20,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -54,6 +53,7 @@ type GatewayControllerConfig struct {
 	Datacenter              string
 	AllowK8sNamespacesSet   mapset.Set
 	DenyK8sNamespacesSet    mapset.Set
+	EnableTCP               bool
 }
 
 // GatewayController reconciles a Gateway object.
@@ -478,13 +478,14 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			builder.WithPredicates(predicate),
 		)
 
-	tcpGVK := schema.GroupVersionKind{
-		Group:   "gateway.networking.k8s.io",
-		Version: "v1alpha2",
-		Kind:    "TCPRoute",
-	}
+	// tcpGVK := schema.GroupVersionKind{
+	// 	Group:   "gateway.networking.k8s.io",
+	// 	Version: "v1alpha2",
+	// 	Kind:    "TCPRoute",
+	// }
 
-	if _, err := mgr.GetRESTMapper().RESTMapping(tcpGVK.GroupKind(), tcpGVK.Version); err == nil {
+	if config.EnableTCP {
+		//if _, err := mgr.GetRESTMapper().RESTMapping(tcpGVK.GroupKind(), tcpGVK.Version); err == nil {
 		r.supportsTCPRoute = true
 		mgr.GetLogger().Info("TCPRoute CRD detected - enabling TCPRoute support")
 

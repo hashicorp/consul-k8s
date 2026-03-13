@@ -166,6 +166,8 @@ type Command struct {
 
 	// enable custom crds controller flags
 	flagEnableCustomGatewayCRDController bool
+	//enable tcp routes
+	flagEnableTCPRoute bool
 }
 
 var (
@@ -254,6 +256,9 @@ func (c *Command) init() {
 			"%q, %q, %q, and %q.", zapcore.DebugLevel.String(), zapcore.InfoLevel.String(), zapcore.WarnLevel.String(), zapcore.ErrorLevel.String()))
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
+
+	// enable TCP watch
+	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")

@@ -1,0 +1,61 @@
+{{- if (and .Values.global.openshift.enabled (or (and (ne (.Values.client.enabled | toString) "-") .Values.client.enabled) (and (eq (.Values.client.enabled | toString) "-") .Values.global.enabled))) }}
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ template "consul.fullname" . }}-client
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: client
+  annotations:
+    kubernetes.io/description: {{ template "consul.fullname" . }}-client are the security context constraints required
+      to run the consul client.
+# Iff. allowHostDirVolumePlugin is true, hostPath must be included in volumes (see below).
+{{- if .Values.client.dataDirectoryHostPath }}
+allowHostDirVolumePlugin: true
+{{- else }}
+allowHostDirVolumePlugin: false
+{{- end}}
+allowHostIPC: false
+allowHostNetwork: {{ .Values.client.hostNetwork }}
+allowHostPID: false
+allowHostPorts: true
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: false
+allowedCapabilities: null
+defaultAddCapabilities: null
+fsGroup:
+  type: MustRunAs
+groups: []
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities:
+- KILL
+- MKNOD
+- SETUID
+- SETGID
+runAsUser:
+  type: MustRunAsRange
+seLinuxContext:
+  type: MustRunAs
+supplementalGroups:
+  type: MustRunAs
+users: []
+volumes:
+# This list must be in alphabetical order to match the post-reconcile order enforced by OpenShift admission hooks.
+# Furthermore, hostPath must be included explicitly if allowHostDirVolumePlugin is true, as it will otherwise be
+# added by OpenShift. It must be excluded if allowHostDirVolumePlugin is false per OpenShift requirements.
+# This avoids false positives in change detection by third-party diff tools (e.g. ArgoCD) that respect list order.
+- configMap
+- downwardAPI
+- emptyDir
+{{- if .Values.client.dataDirectoryHostPath }}
+- hostPath
+{{- end }}
+- persistentVolumeClaim
+- projected
+- secret
+{{- end}}

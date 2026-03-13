@@ -1,0 +1,85 @@
+{{- if (and (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) (or (and (ne (.Values.ui.enabled | toString) "-") .Values.ui.enabled) (and (eq (.Values.ui.enabled | toString) "-") .Values.global.enabled)) (or (and (ne (.Values.ui.service.enabled | toString) "-") .Values.ui.service.enabled) (and (eq (.Values.ui.service.enabled | toString) "-") .Values.global.enabled))) }}
+{{- if (and (ne (.Values.ui.ingress.enabled | toString) "-") .Values.ui.ingress.enabled) }}
+{{- $serviceName := printf "%s-%s" (include "consul.fullname" .) "ui" -}}
+{{- /* We use the kube version to determine if the apiVersion of networking.k8s.io should be v1 or v1beta1.
+This is because while networks.k8s.io/v1 was introduced in Kubernetes v1.15+, the Ingress resource was
+promoted to v1 only in Kubernetes v1.19+. This ensures the correct API version is chosen that supports
+the Ingress resource. */}}
+{{- if or ( gt .Capabilities.KubeVersion.Major "1" ) ( ge .Capabilities.KubeVersion.Minor "19" ) }}
+apiVersion: networking.k8s.io/v1
+{{- else }}
+apiVersion: networking.k8s.io/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ template "consul.fullname" . }}-ui
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ui
+  {{- if .Values.ui.ingress.annotations }}
+  annotations:
+    {{ tpl .Values.ui.ingress.annotations . | nindent 4 | trim }}
+  {{- end }}
+spec:
+  {{- if ne .Values.ui.ingress.ingressClassName "" }}
+  ingressClassName: {{ .Values.ui.ingress.ingressClassName }}
+  {{- end }}
+  rules:
+  {{- $global := .Values.global }}
+  {{- if or ( gt .Capabilities.KubeVersion.Major "1" ) ( ge .Capabilities.KubeVersion.Minor "19" ) }}
+  {{- range .Values.ui.ingress.hosts }}
+  - host: {{ .host | quote }}
+    http:
+      paths:
+      {{- range (.paths | default (list "/")) }}
+      {{- if (or (not $global.tls.enabled) (not $global.tls.httpsOnly)) }}
+      - backend:
+          service:
+            name: {{ $serviceName }}
+            port:
+              number: 80
+        path: {{ . }}
+        pathType: {{ $.Values.ui.ingress.pathType }}
+      {{- end }}
+      {{- if $global.tls.enabled }}
+      - backend:
+          service:
+            name: {{ $serviceName }}
+            port:
+              number: 443
+        path: {{ . }}
+        pathType: {{ $.Values.ui.ingress.pathType }}
+      {{- end }}
+      {{- end }}
+  {{- end }}
+  {{- else }}
+  {{- range .Values.ui.ingress.hosts }}
+  - host: {{ .host | quote }}
+    http:
+      paths:
+      {{- range (.paths | default (list "/")) }}
+      {{- if (or (not $global.tls.enabled) (not $global.tls.httpsOnly)) }}
+      - backend:
+          serviceName: {{ $serviceName }}
+          servicePort: 80
+        path: {{ . }}
+      {{- end }}
+      {{- if $global.tls.enabled }}
+      - backend:
+          serviceName: {{ $serviceName }}
+          servicePort: 443
+        path: {{ . }}
+      {{- end }}
+      {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.ui.ingress.tls }}
+  tls:
+  {{- toYaml .Values.ui.ingress.tls | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

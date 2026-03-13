@@ -1,0 +1,21 @@
+{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+# ConfigMap that is used as a temporary landing spot so that the container command
+# in the server-stateful set where it needs to be transformed.  ConfigMaps create
+# read only volumes so it needs to be copied and transformed to the extra-config
+# emptyDir volume where all final extra cofngi lives for use in consul.  (locality-init
+# also writes to extra-config volume.)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-server-tmp-extra-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: server
+data:
+  extra-from-values.json: |-
+{{ tpl .Values.server.extraConfig . | trimAll "\"" | indent 4 }}
+{{- end }}

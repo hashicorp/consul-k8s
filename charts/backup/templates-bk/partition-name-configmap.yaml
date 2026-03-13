@@ -1,0 +1,19 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if (and .Values.global.adminPartitions.enabled (not $serverEnabled)) }}
+# Immutable ConfigMap which saves the partition name. Attempting to update this configmap
+# with a new Admin Partition name will cause the helm upgrade to fail
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-partition
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: partition-init
+immutable: true
+data:
+  partitionName: {{ .Values.global.adminPartitions.name }}
+{{- end }}

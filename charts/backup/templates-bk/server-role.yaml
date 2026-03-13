@@ -1,0 +1,34 @@
+{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "consul.fullname" . }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: server
+{{- if (or (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts) .Values.global.enablePodSecurityPolicies) }}
+rules:
+{{- if .Values.global.enablePodSecurityPolicies }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  resourceNames:
+  - {{ template "consul.fullname" . }}-server
+  verbs:
+  - use
+{{- end }}
+{{- if (and .Values.global.openshift.enabled .Values.server.exposeGossipAndRPCPorts ) }}
+- apiGroups: ["security.openshift.io"]
+  resources: ["securitycontextconstraints"]
+  resourceNames:
+  - {{ template "consul.fullname" . }}-server
+  verbs:
+  - use
+{{- end }}
+{{- else}}
+rules: []
+{{- end }}
+{{- end }}

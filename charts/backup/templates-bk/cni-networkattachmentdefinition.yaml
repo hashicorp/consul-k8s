@@ -1,0 +1,25 @@
+{{- if (and (.Values.connectInject.cni.enabled) (.Values.connectInject.cni.multus)) }}
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: {{ template "consul.fullname" . }}-cni
+  namespace: {{ default .Release.Namespace .Values.connectInject.cni.namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: cni 
+spec:
+  config: '{
+            "cniVersion": "0.3.1",
+            "type": "consul-cni",
+            "cni_bin_dir": "{{ .Values.connectInject.cni.cniBinDir }}",
+            "cni_net_dir": "{{ .Values.connectInject.cni.cniNetDir }}",
+            "kubeconfig": "ZZZ-consul-cni-kubeconfig",
+            "log_level": "{{ default .Values.global.logLevel .Values.connectInject.cni.logLevel }}",
+            "multus": true,
+            "name": "consul-cni",
+            "type": "consul-cni"
+        }'
+{{- end }}

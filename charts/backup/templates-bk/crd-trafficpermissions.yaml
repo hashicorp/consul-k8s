@@ -1,0 +1,265 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.12.1
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
+  name: trafficpermissions.auth.consul.hashicorp.com
+spec:
+  group: auth.consul.hashicorp.com
+  names:
+    kind: TrafficPermissions
+    listKind: TrafficPermissionsList
+    plural: trafficpermissions
+    shortNames:
+    - traffic-permissions
+    singular: trafficpermissions
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: The sync status of the resource with Consul
+      jsonPath: .status.conditions[?(@.type=="Synced")].status
+      name: Synced
+      type: string
+    - description: The last successful synced time of the resource with Consul
+      jsonPath: .status.lastSyncedTime
+      name: Last Synced
+      type: date
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v2beta1
+    schema:
+      openAPIV3Schema:
+        description: TrafficPermissions is the Schema for the traffic-permissions
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              action:
+                description: "Action can be either allow or deny for the entire object.
+                  It will default to allow. \n If action is allow, we will allow the
+                  connection if one of the rules in Rules matches, in other words,
+                  we will deny all requests except for the ones that match Rules.
+                  If Consul is in default allow mode, then allow actions have no effect
+                  without a deny permission as everything is allowed by default. \n
+                  If action is deny, we will deny the connection if one of the rules
+                  in Rules match, in other words, we will allow all requests except
+                  for the ones that match Rules. If Consul is default deny mode, then
+                  deny permissions have no effect without an allow permission as everything
+                  is denied by default. \n Action unspecified is reserved for compatibility
+                  with the addition of future actions."
+                enum:
+                - ACTION_ALLOW
+                - ACTION_DENY
+                - ACTION_UNKNOWN
+                format: int32
+                type: string
+              destination:
+                description: Destination is a configuration of the destination proxies
+                  where these traffic permissions should apply.
+                properties:
+                  identityName:
+                    type: string
+                type: object
+              permissions:
+                description: Permissions is a list of permissions to match on. They
+                  are applied using OR semantics.
+                items:
+                  description: Permissions is a list of permissions to match on.
+                  properties:
+                    destinationRules:
+                      description: DestinationRules is a list of rules to apply for
+                        matching sources in this Permission. These rules are specific
+                        to the request or connection that is going to the destination(s)
+                        selected by the TrafficPermissions resource.
+                      items:
+                        description: DestinationRule contains rules rules to apply
+                          to the incoming connection.
+                        properties:
+                          exclude:
+                            description: Exclude contains a list of rules to exclude
+                              when evaluating rules for the incoming connection.
+                            items:
+                              properties:
+                                headers:
+                                  items:
+                                    properties:
+                                      exact:
+                                        type: string
+                                      invert:
+                                        type: boolean
+                                      name:
+                                        type: string
+                                      prefix:
+                                        type: string
+                                      present:
+                                        type: boolean
+                                      regex:
+                                        type: string
+                                      suffix:
+                                        type: string
+                                    type: object
+                                  type: array
+                                methods:
+                                  description: Methods is the list of HTTP methods.
+                                  items:
+                                    type: string
+                                  type: array
+                                pathExact:
+                                  type: string
+                                pathPrefix:
+                                  type: string
+                                pathRegex:
+                                  type: string
+                                portNames:
+                                  description: PortNames is a list of workload ports
+                                    to apply this rule to. The ports specified here
+                                    must be the ports used in the connection.
+                                  items:
+                                    type: string
+                                  type: array
+                              type: object
+                            type: array
+                          headers:
+                            items:
+                              properties:
+                                exact:
+                                  type: string
+                                invert:
+                                  type: boolean
+                                name:
+                                  type: string
+                                prefix:
+                                  type: string
+                                present:
+                                  type: boolean
+                                regex:
+                                  type: string
+                                suffix:
+                                  type: string
+                              type: object
+                            type: array
+                          methods:
+                            description: Methods is the list of HTTP methods. If no
+                              methods are specified, this rule will apply to all methods.
+                            items:
+                              type: string
+                            type: array
+                          pathExact:
+                            type: string
+                          pathPrefix:
+                            type: string
+                          pathRegex:
+                            type: string
+                          portNames:
+                            items:
+                              type: string
+                            type: array
+                        type: object
+                      type: array
+                    sources:
+                      description: Sources is a list of sources in this traffic permission.
+                      items:
+                        description: Source represents the source identity. To specify
+                          any of the wildcard sources, the specific fields need to
+                          be omitted. For example, for a wildcard namespace, identity_name
+                          should be omitted.
+                        properties:
+                          exclude:
+                            description: Exclude is a list of sources to exclude from
+                              this source.
+                            items:
+                              description: ExcludeSource is almost the same as source
+                                but it prevents the addition of matching sources.
+                              properties:
+                                identityName:
+                                  type: string
+                                namespace:
+                                  type: string
+                                partition:
+                                  type: string
+                                peer:
+                                  type: string
+                                samenessGroup:
+                                  type: string
+                              type: object
+                            type: array
+                          identityName:
+                            type: string
+                          namespace:
+                            type: string
+                          partition:
+                            type: string
+                          peer:
+                            type: string
+                          samenessGroup:
+                            type: string
+                        type: object
+                      type: array
+                  type: object
+                type: array
+            type: object
+          status:
+            properties:
+              conditions:
+                description: Conditions indicate the latest available observations
+                  of a resource's current state.
+                items:
+                  description: 'Conditions define a readiness condition for a Consul
+                    resource. See: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#typical-status-properties'
+                  properties:
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the resource successfully
+                  synced with Consul.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+{{- end }}

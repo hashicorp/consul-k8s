@@ -794,7 +794,10 @@ global:
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: hashicorp/consul-dataplane:1.9.2
-
+  
+  # Enables or disables the generation of Manifests. 
+  # Recommended to disable this once the upgrade is successful.
+  generateManifests: true
   # During the install:
   # custom crds and gateway TCP crd enabling
   # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.

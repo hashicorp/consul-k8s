@@ -1,0 +1,228 @@
+{{- if (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) }}
+{{- if (not (or (eq .Values.server.limits.requestLimits.mode "disabled") (eq .Values.server.limits.requestLimits.mode "permissive") (eq .Values.server.limits.requestLimits.mode "enforce"))) }}{{fail "server.limits.requestLimits.mode must be one of the following values: disabled, permissive, and enforce." }}{{ end -}}
+{{- if and .Values.server.auditLogs.enabled (not .Values.global.acls.manageSystemACLs) }}{{fail "ACLs must be enabled inorder to configure audit logs"}}{{ end -}}
+# StatefulSet to run the actual Consul server cluster.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-server-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: server
+data:
+  server.json: |
+    {
+      {{- if and .Values.global.secretsBackend.vault.enabled }}
+      "auto_reload_config": true,
+      {{- end }}
+      {{- if .Values.global.dualStack.defaultEnabled }}
+      "bind_addr": "[::]",
+      {{- else }}
+      "bind_addr": "0.0.0.0",
+      {{- end }}
+      "bootstrap_expect": {{ if .Values.server.bootstrapExpect }}{{ .Values.server.bootstrapExpect }}{{ else }}{{ .Values.server.replicas }}{{ end }},
+      {{- if .Values.global.dualStack.defaultEnabled }}
+      "client_addr": "[::]",
+      {{- else }}
+      "client_addr": "0.0.0.0",
+      {{- end }}
+      "connect": {
+        "enabled": {{ .Values.server.connect }}
+      },
+      "datacenter": "{{ .Values.global.datacenter }}",
+      "data_dir": "/consul/data",
+      {{- if .Values.server.logLevel }}
+      "log_level": "{{ .Values.server.logLevel | upper }}",
+      {{- end }}
+      "enable_debug": {{ .Values.server.enableAgentDebug }},
+      "domain": "{{ .Values.global.domain }}",
+      "limits": {
+        "request_limits": {
+          "mode": "{{ .Values.server.limits.requestLimits.mode }}",
+          "read_rate": {{ .Values.server.limits.requestLimits.readRate }},
+          "write_rate": {{ .Values.server.limits.requestLimits.writeRate }}
+        }
+      },
+      "ports": {
+        {{- if not .Values.global.tls.enabled }}
+        "grpc": 8502,
+        "grpc_tls": -1,
+        {{- end }}
+        {{- if .Values.global.tls.enabled }}
+        "grpc": -1,
+        "grpc_tls": 8502,
+        {{- end }}
+        "serf_lan": {{ .Values.server.ports.serflan.port }}
+      },
+      "recursors": {{ .Values.global.recursors | toJson }},
+      "retry_join": ["{{template "consul.fullname" . }}-server.{{ .Release.Namespace }}.svc:{{ .Values.server.ports.serflan.port }}"],
+      {{- if .Values.global.peering.enabled }}
+      "peering": {
+        "enabled": true
+      },
+      {{- end }}
+      "server": true,
+      "leave_on_terminate": true,
+      "autopilot": {
+        "min_quorum": {{ template "consul.server.autopilotMinQuorum" . }},
+        "disable_upgrade_migration": true
+      }
+    }
+  {{- $vaultConnectCAEnabled := and .Values.global.secretsBackend.vault.connectCA.address .Values.global.secretsBackend.vault.connectCA.rootPKIPath .Values.global.secretsBackend.vault.connectCA.intermediatePKIPath -}}
+  {{- if and .Values.global.secretsBackend.vault.enabled $vaultConnectCAEnabled }}
+  {{- with .Values.global.secretsBackend.vault }}
+  connect-ca-config.json: |
+    {
+      "connect": [
+        {
+          "ca_config": [
+            {
+              "address": "{{ .connectCA.address }}",
+              {{- if and .ca.secretName .ca.secretKey }}
+              "ca_file": "/consul/vault-ca/tls.crt",
+              {{- end }}
+              "intermediate_pki_path": "{{ .connectCA.intermediatePKIPath }}",
+              {{- if (and (.vaultNamespace) (not (contains "namespace" (default "" .connectCA.additionalConfig)))) }}
+              "namespace": "{{ .vaultNamespace }}",
+              {{- end }}
+              "root_pki_path": "{{ .connectCA.rootPKIPath }}",
+              "auth_method": {
+                "type": "kubernetes",
+                "mount_path": "{{ .connectCA.authMethodPath }}",
+                "params": {
+                  "role": "{{ .consulServerRole }}"
+                }
+              }
+            }
+          ],
+          "ca_provider": "vault"
+        }
+      ]
+    }
+  {{- if .connectCA.additionalConfig }}
+  additional-connect-ca-config.json: |
+{{ tpl .connectCA.additionalConfig $ | trimAll "\"" | indent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.global.acls.manageSystemACLs }}
+  acl-config.json: |-
+    {
+      "acl": {
+        "enabled": true,
+        "default_policy": "deny",
+        "down_policy": "extend-cache",
+        {{- if (and .Values.global.acls.replicationToken.secretName .Values.global.acls.replicationToken.secretKey) }}
+        "enable_token_replication": true,
+        {{- end }}
+        "enable_token_persistence": true
+      }
+    }
+  {{- end }}
+  {{- if .Values.global.tls.enabled }}
+  tls-config.json: |-
+    {
+      "tls": {
+        {{- if .Values.global.tls.verify }}
+        "internal_rpc": {
+          "verify_incoming": true,
+          "verify_server_hostname": true
+        },
+        "grpc": {
+          "verify_incoming": false
+        },
+        {{- end }}
+        "defaults": {
+          {{- if .Values.global.tls.verify }}
+          "verify_outgoing": true,
+          {{- end }}
+          {{- if .Values.global.secretsBackend.vault.enabled }}
+          "ca_file": "/vault/secrets/serverca.crt",
+          "cert_file": "/vault/secrets/servercert.crt",
+          "key_file": "/vault/secrets/servercert.key"
+          {{- else }}
+          "ca_file": "/consul/tls/ca/tls.crt",
+          "cert_file": "/consul/tls/server/tls.crt",
+          "key_file": "/consul/tls/server/tls.key"
+          {{- end }}
+        }
+      },
+      {{- if .Values.global.tls.enableAutoEncrypt }}
+      "auto_encrypt": {
+        "allow_tls": true
+      },
+      {{- end }}
+      "ports": {
+        {{- if .Values.global.tls.httpsOnly }}
+        "http": -1,
+        {{- end }}
+        "https": 8501
+      }
+    }
+  {{- end }}
+  {{- if .Values.ui.enabled }}
+  ui-config.json: |-
+    {
+      "ui_config": {
+        {{- if (or (eq "true" (.Values.ui.metrics.enabled | toString) ) (and .Values.global.metrics.enabled (eq "-" (.Values.ui.metrics.enabled | toString)))) }}
+        "metrics_provider": "{{ .Values.ui.metrics.provider }}",
+        "metrics_proxy": {
+          "base_url": "{{ .Values.ui.metrics.baseURL }}"
+        },
+        {{- end }}
+        {{- if .Values.ui.dashboardURLTemplates.service }}
+        "dashboard_url_templates": {
+          "service": "{{ .Values.ui.dashboardURLTemplates.service }}"
+        },
+        {{- end }}
+        "enabled": true
+      }
+    }
+  {{- end }}
+  central-config.json: |-
+    {
+      "enable_central_service_config": true
+    }
+  {{- if .Values.global.federation.enabled }}
+  federation-config.json: |-
+    {
+      "primary_datacenter": "{{ .Values.global.federation.primaryDatacenter }}",
+      "primary_gateways": {{ .Values.global.federation.primaryGateways | toJson }},
+      "connect": {
+        "enable_mesh_gateway_wan_federation": true
+      }
+    }
+  {{- end }}
+  {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+  telemetry-config.json: |-
+    {
+      "telemetry": {
+        "prometheus_retention_time": "{{ .Values.global.metrics.agentMetricsRetentionTime }}",
+        "disable_hostname": {{ .Values.global.metrics.disableAgentHostName }},{{ template "consul.prefixFilter" . }}
+        "enable_host_metrics": {{ .Values.global.metrics.enableHostMetrics }}{{- if .Values.global.metrics.datadog.dogstatsd.enabled }},{{ template "consul.dogstatsdAaddressInfo" . }}
+        {{- if .Values.global.metrics.datadog.dogstatsd.enabled }}
+        "dogstatsd_tags": {{ .Values.global.metrics.datadog.dogstatsd.dogstatsdTags | toJson }}
+        {{- end }}
+        {{- end }}
+      }
+    }
+  {{- end }}
+  {{- if and .Values.server.auditLogs.enabled .Values.global.acls.manageSystemACLs }}
+  audit-logging.json: |-
+    {
+      "audit": {
+        "enabled": true,
+        "sink": {
+          {{- range $index, $element := .Values.server.auditLogs.sinks }}
+          {{- if ne $index 0 }},{{end}}
+          "{{ get $element "name" }}": {{ omit $element "name" | toJson }}
+          {{- end }}
+        }
+      }
+    }
+  {{- end }}
+{{- end }}

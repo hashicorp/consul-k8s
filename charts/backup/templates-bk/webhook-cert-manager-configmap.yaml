@@ -1,0 +1,29 @@
+{{ $hasConfiguredWebhookCertsUsingVault := (and .Values.global.secretsBackend.vault.enabled .Values.global.secretsBackend.vault.connectInjectRole .Values.global.secretsBackend.vault.connectInject.tlsCert.secretName .Values.global.secretsBackend.vault.connectInject.caCert.secretName) -}}
+{{- if (and .Values.connectInject.enabled (not $hasConfiguredWebhookCertsUsingVault)) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-webhook-cert-manager-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: webhook-cert-manager
+data:
+  webhook-config.json: |-
+    [
+      {
+        "name": "{{ template "consul.fullname" . }}-connect-injector",
+        "tlsAutoHosts": [
+          "{{ template "consul.fullname" . }}-connect-injector",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}.svc",
+          "{{ template "consul.fullname" . }}-connect-injector.{{ .Release.Namespace }}.svc.cluster.local"
+        ],
+        "secretName": "{{ template "consul.fullname" . }}-connect-inject-webhook-cert",
+        "secretNamespace": "{{ .Release.Namespace }}"
+      }
+    ]
+  {{- end }}
