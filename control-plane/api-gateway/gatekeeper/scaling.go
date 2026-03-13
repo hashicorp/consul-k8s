@@ -24,10 +24,13 @@ import (
 const (
 	// Annotation keys for scaling configuration
 	AnnotationDefaultReplicas = "consul.hashicorp.com/default-replicas"
-	AnnotationHPAEnabled      = "consul.hashicorp.com/hpa/enabled"
-	AnnotationHPAMinReplicas  = "consul.hashicorp.com/hpa/minimum-replicas"
-	AnnotationHPAMaxReplicas  = "consul.hashicorp.com/hpa/maximum-replicas"
-	AnnotationHPACPUTarget    = "consul.hashicorp.com/hpa/cpu-utilization-target"
+	AnnotationHPAEnabled      = "consul.hashicorp.com/hpa-enabled"
+	AnnotationHPAMinReplicas  = "consul.hashicorp.com/hpa-minimum-replicas"
+	AnnotationHPAMaxReplicas  = "consul.hashicorp.com/hpa-maximum-replicas"
+	AnnotationHPACPUTarget    = "consul.hashicorp.com/hpa-cpu-utilisation-target"
+
+	// Backward-compatible alias for the earlier hyphenated US spelling.
+	annotationHPACPUTargetUS = "consul.hashicorp.com/hpa-cpu-utilization-target"
 
 	// Default values
 	defaultHPAMinReplicas = 1
@@ -45,6 +48,10 @@ type ScalingConfig struct {
 
 	// HPAConfig holds HPA configuration (for hpa-controller mode)
 	HPAConfig *HPAConfig
+
+	// UseGatewayClassFallback indicates the deprecated GatewayClassConfig
+	// deployment fields are still the source of truth for replicas.
+	UseGatewayClassFallback bool
 }
 
 // HPAConfig holds HPA-specific configuration
@@ -62,7 +69,7 @@ func ParseScalingAnnotations(gateway gwv1beta1.Gateway, log logr.Logger) (*Scali
 	}
 
 	// Check for HPA enabled annotation
-	if hpaEnabled, ok := annotations[AnnotationHPAEnabled]; ok && hpaEnabled == "true" {
+	if hpaEnabled, ok := annotationValue(annotations, AnnotationHPAEnabled); ok && hpaEnabled == "true" {
 		hpaConfig, err := parseHPAAnnotations(annotations, log)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse HPA annotations: %w", err)
@@ -106,48 +113,57 @@ func parseHPAAnnotations(annotations map[string]string, log logr.Logger) (*HPACo
 	}
 
 	// Parse min replicas
-	if minStr, ok := annotations[AnnotationHPAMinReplicas]; ok {
+	if minStr, ok := annotationValue(annotations, AnnotationHPAMinReplicas); ok {
 		min, err := strconv.ParseInt(minStr, 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("invalid hpa/minimum-replicas: %w", err)
+			return nil, fmt.Errorf("invalid %s: %w", AnnotationHPAMinReplicas, err)
 		}
 		if min < 1 {
-			return nil, fmt.Errorf("hpa/minimum-replicas must be at least 1, got %d", min)
+			return nil, fmt.Errorf("%s must be at least 1, got %d", AnnotationHPAMinReplicas, min)
 		}
 		config.MinReplicas = int32(min)
 	}
 
 	// Parse max replicas
-	if maxStr, ok := annotations[AnnotationHPAMaxReplicas]; ok {
+	if maxStr, ok := annotationValue(annotations, AnnotationHPAMaxReplicas); ok {
 		max, err := strconv.ParseInt(maxStr, 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("invalid hpa/maximum-replicas: %w", err)
+			return nil, fmt.Errorf("invalid %s: %w", AnnotationHPAMaxReplicas, err)
 		}
 		if max < 1 {
-			return nil, fmt.Errorf("hpa/maximum-replicas must be at least 1, got %d", max)
+			return nil, fmt.Errorf("%s must be at least 1, got %d", AnnotationHPAMaxReplicas, max)
 		}
 		config.MaxReplicas = int32(max)
 	}
 
 	// Validate min <= max
 	if config.MinReplicas > config.MaxReplicas {
-		return nil, fmt.Errorf("hpa/minimum-replicas (%d) cannot be greater than hpa/maximum-replicas (%d)",
-			config.MinReplicas, config.MaxReplicas)
+		return nil, fmt.Errorf("%s (%d) cannot be greater than %s (%d)",
+			AnnotationHPAMinReplicas, config.MinReplicas, AnnotationHPAMaxReplicas, config.MaxReplicas)
 	}
 
 	// Parse CPU target
-	if cpuStr, ok := annotations[AnnotationHPACPUTarget]; ok {
+	if cpuStr, ok := annotationValue(annotations, AnnotationHPACPUTarget, annotationHPACPUTargetUS); ok {
 		cpu, err := strconv.ParseInt(cpuStr, 10, 32)
 		if err != nil {
-			return nil, fmt.Errorf("invalid hpa/cpu-utilization-target: %w", err)
+			return nil, fmt.Errorf("invalid %s: %w", AnnotationHPACPUTarget, err)
 		}
 		if cpu < 1 || cpu > 100 {
-			return nil, fmt.Errorf("hpa/cpu-utilization-target must be between 1 and 100, got %d", cpu)
+			return nil, fmt.Errorf("%s must be between 1 and 100, got %d", AnnotationHPACPUTarget, cpu)
 		}
 		config.CPUTargetValue = int32(cpu)
 	}
 
 	return config, nil
+}
+
+func annotationValue(annotations map[string]string, keys ...string) (string, bool) {
+	for _, key := range keys {
+		if value, ok := annotations[key]; ok {
+			return value, true
+		}
+	}
+	return "", false
 }
 
 // DetectUserManagedHPA checks if a user has created their own HPA for the gateway
@@ -259,7 +275,8 @@ func LogDeprecationWarnings(gcc v1alpha1.GatewayClassConfig, log logr.Logger) {
 		gcc.Spec.DeploymentSpec.MinInstances != nil {
 		log.Info("DEPRECATED: GatewayClassConfig deployment fields (defaultInstances, maxInstances, minInstances) are deprecated. "+
 			"Use Gateway annotations instead: consul.hashicorp.com/default-replicas for static replicas, "+
-			"or consul.hashicorp.com/hpa/* annotations for HPA configuration. "+
+			"or consul.hashicorp.com/hpa-enabled, consul.hashicorp.com/hpa-minimum-replicas, "+
+			"consul.hashicorp.com/hpa-maximum-replicas, and consul.hashicorp.com/hpa-cpu-utilisation-target for HPA configuration. "+
 			"See: https://developer.hashicorp.com/consul/docs/k8s/api-gateway/scaling",
 			"gatewayClassConfig", gcc.Name)
 	}
@@ -292,23 +309,24 @@ func (g *Gatekeeper) DetermineScalingMode(ctx context.Context, gateway gwv1beta1
 	}
 
 	// Priority 3: Fall back to GCC (deprecated)
-	if gcc.Spec.DeploymentSpec.DefaultInstances != nil {
+	if gcc.Spec.DeploymentSpec.DefaultInstances != nil ||
+		gcc.Spec.DeploymentSpec.MaxInstances != nil ||
+		gcc.Spec.DeploymentSpec.MinInstances != nil {
 		return &ScalingConfig{
-			Mode:           "static",
-			StaticReplicas: gcc.Spec.DeploymentSpec.DefaultInstances,
+			Mode:                    "static",
+			StaticReplicas:          gcc.Spec.DeploymentSpec.DefaultInstances,
+			UseGatewayClassFallback: true,
 		}, nil
 	}
 
-	// Default: static with 1 replica
-	defaultReplicas := int32(1)
-	return &ScalingConfig{
-		Mode:           "static",
-		StaticReplicas: &defaultReplicas,
-	}, nil
+	// Default: no controller-owned scaling. New deployments seed at 1 replica,
+	// and existing deployments keep their current scale to allow manual scaling.
+	return &ScalingConfig{Mode: "none"}, nil
 }
 
 // ReconcileScaling handles the complete scaling reconciliation for a gateway
-func (g *Gatekeeper) ReconcileScaling(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) (*int32, error) {
+// and returns the resolved scaling mode after HPA side effects are applied.
+func (g *Gatekeeper) ReconcileScaling(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) (*ScalingConfig, error) {
 	scalingConfig, err := g.DetermineScalingMode(ctx, gateway, gcc)
 	if err != nil {
 		return nil, err
@@ -320,28 +338,74 @@ func (g *Gatekeeper) ReconcileScaling(ctx context.Context, gateway gwv1beta1.Gat
 		if err := g.DeleteHPA(ctx, gateway); err != nil {
 			g.Log.Error(err, "failed to delete controller-managed HPA")
 		}
-		// Return nil to let HPA manage replicas
-		return nil, nil
+		return scalingConfig, nil
 
 	case "hpa-controller":
 		// Create/update controller-managed HPA
 		if err := g.UpsertHPA(ctx, gateway, scalingConfig.HPAConfig); err != nil {
 			return nil, err
 		}
-		// Return nil to let HPA manage replicas
-		return nil, nil
+		return scalingConfig, nil
 
 	case "static":
 		// Ensure no controller-managed HPA exists
 		if err := g.DeleteHPA(ctx, gateway); err != nil {
 			g.Log.Error(err, "failed to delete controller-managed HPA")
 		}
-		// Return static replica count
-		return scalingConfig.StaticReplicas, nil
+		return scalingConfig, nil
+
+	case "none":
+		// Scaling is unmanaged by the controller. Ensure any controller-managed
+		// HPA is removed and preserve the current Deployment scale.
+		if err := g.DeleteHPA(ctx, gateway); err != nil {
+			g.Log.Error(err, "failed to delete controller-managed HPA")
+		}
+		return scalingConfig, nil
 
 	default:
-		// Fallback to default
-		defaultReplicas := int32(1)
-		return &defaultReplicas, nil
+		return scalingConfig, nil
 	}
+}
+
+func resolvedDeploymentReplicas(scalingConfig *ScalingConfig, gcc v1alpha1.GatewayClassConfig, currentReplicas *int32) *int32 {
+	if scalingConfig == nil {
+		return deploymentReplicas(gcc, currentReplicas)
+	}
+
+	switch scalingConfig.Mode {
+	case "none":
+		if currentReplicas != nil {
+			replicas := *currentReplicas
+			return &replicas
+		}
+	case "hpa-controller":
+		if currentReplicas != nil {
+			replicas := *currentReplicas
+			return &replicas
+		}
+		if scalingConfig.HPAConfig != nil {
+			replicas := scalingConfig.HPAConfig.MinReplicas
+			return &replicas
+		}
+	case "hpa-user":
+		if currentReplicas != nil {
+			replicas := *currentReplicas
+			return &replicas
+		}
+	case "static":
+		if scalingConfig.UseGatewayClassFallback {
+			if currentReplicas != nil {
+				replicas := *currentReplicas
+				return &replicas
+			}
+			return deploymentReplicas(gcc, nil)
+		}
+		if scalingConfig.StaticReplicas != nil {
+			replicas := *scalingConfig.StaticReplicas
+			return &replicas
+		}
+	}
+
+	defaultReplicas := defaultInstances
+	return &defaultReplicas
 }
