@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func TestParseScalingAnnotations(t *testing.T) {
@@ -91,6 +93,24 @@ func TestParseScalingAnnotations(t *testing.T) {
 					MinReplicas:    2,
 					MaxReplicas:    50,
 					CPUTargetValue: 70,
+				},
+			},
+			expectError: false,
+		},
+		{
+			name: "legacy hyphenated CPU target spelling remains supported",
+			annotations: map[string]string{
+				AnnotationHPAEnabled:     "true",
+				AnnotationHPAMinReplicas: "3",
+				AnnotationHPAMaxReplicas: "25",
+				annotationHPACPUTargetUS: "65",
+			},
+			expected: &ScalingConfig{
+				Mode: "hpa-controller",
+				HPAConfig: &HPAConfig{
+					MinReplicas:    3,
+					MaxReplicas:    25,
+					CPUTargetValue: 65,
 				},
 			},
 			expectError: false,
@@ -242,6 +262,18 @@ func TestParseHPAAnnotations(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name: "legacy hyphenated CPU target spelling",
+			annotations: map[string]string{
+				annotationHPACPUTargetUS: "55",
+			},
+			expected: &HPAConfig{
+				MinReplicas:    defaultHPAMinReplicas,
+				MaxReplicas:    defaultHPAMaxReplicas,
+				CPUTargetValue: 55,
+			},
+			expectError: false,
+		},
+		{
 			name: "invalid min replicas - not a number",
 			annotations: map[string]string{
 				AnnotationHPAMinReplicas: "abc",
@@ -309,8 +341,99 @@ func TestParseHPAAnnotations(t *testing.T) {
 	}
 }
 
+func TestResolvedDeploymentReplicas(t *testing.T) {
+	max := int32(8)
+	min := int32(1)
+	defaultInstances := int32(15)
+	gcc := v1alpha1.GatewayClassConfig{
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			DeploymentSpec: v1alpha1.DeploymentSpec{
+				DefaultInstances: &defaultInstances,
+				MaxInstances:     &max,
+				MinInstances:     &min,
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		scalingConfig   *ScalingConfig
+		currentReplicas *int32
+		expected        int32
+	}{
+		{
+			name: "unmanaged scaling preserves current replicas",
+			scalingConfig: &ScalingConfig{
+				Mode: "none",
+			},
+			currentReplicas: int32Ptr(12),
+			expected:        12,
+		},
+		{
+			name: "unmanaged scaling seeds new deployment at default replica count",
+			scalingConfig: &ScalingConfig{
+				Mode: "none",
+			},
+			expected: 1,
+		},
+		{
+			name: "gateway class fallback seeds new deployment using deprecated bounds",
+			scalingConfig: &ScalingConfig{
+				Mode:                    "static",
+				UseGatewayClassFallback: true,
+			},
+			expected: 8,
+		},
+		{
+			name: "gateway class fallback preserves current replicas above deprecated max",
+			scalingConfig: &ScalingConfig{
+				Mode:                    "static",
+				UseGatewayClassFallback: true,
+			},
+			currentReplicas: int32Ptr(15),
+			expected:        15,
+		},
+		{
+			name: "controller HPA preserves current replicas above deprecated max",
+			scalingConfig: &ScalingConfig{
+				Mode: "hpa-controller",
+				HPAConfig: &HPAConfig{
+					MinReplicas: 2,
+				},
+			},
+			currentReplicas: int32Ptr(15),
+			expected:        15,
+		},
+		{
+			name: "controller HPA seeds new deployment from min replicas",
+			scalingConfig: &ScalingConfig{
+				Mode: "hpa-controller",
+				HPAConfig: &HPAConfig{
+					MinReplicas: 2,
+				},
+			},
+			expected: 2,
+		},
+		{
+			name: "gateway static annotation ignores deprecated max",
+			scalingConfig: &ScalingConfig{
+				Mode:           "static",
+				StaticReplicas: int32Ptr(20),
+			},
+			expected: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			replicas := resolvedDeploymentReplicas(tt.scalingConfig, gcc, tt.currentReplicas)
+			require.NotNil(t, replicas)
+			require.Equal(t, tt.expected, *replicas)
+		})
+	}
+}
+
 // Helper function to create int32 pointer
 func int32Ptr(i int32) *int32 {
 	return &i
 }
-
