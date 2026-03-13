@@ -16,6 +16,6 @@ limitations under the License.
 
 package tests
 
-import "sigs.k8s.io/gateway-api-exp/conformance/utils/suite"
+import "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/suite"
 
 var ConformanceTests []suite.ConformanceTest

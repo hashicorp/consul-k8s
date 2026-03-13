@@ -35,9 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"sigs.k8s.io/gateway-api-exp/apis/v1alpha2"
-	"sigs.k8s.io/gateway-api-exp/apis/v1beta1"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/config"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/config"
 )
 
 // GatewayRef is a tiny type for specifying an HTTP Route ParentRef without

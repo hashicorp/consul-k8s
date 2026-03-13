@@ -60,6 +60,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -181,6 +182,10 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Could not add api-gateway v1alpha2 schema: %s", err))
 			return 1
 		}
+		if err := gwv1.Install(s); err != nil {
+			c.UI.Error(fmt.Sprintf("Could not add api-gateway v1 schema: %s", err))
+			return 1
+		}
 		if err := v1alpha1.AddToScheme(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add consul-k8s schema: %s", err))
 			return 1
@@ -254,20 +259,25 @@ func (c *Command) dumpGatewayAPIObjects() error {
 	}
 
 	// Dump resources
-	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
+	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1.GatewayClassList{}); err != nil {
+		if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
+			c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
+		}
 	}
-
-	if err := c.dumpTypedList(ctx, "gateways", &gwv1beta1.GatewayList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping Gateway dump: %v", err))
+	if err := c.dumpTypedList(ctx, "gateways", &gwv1.GatewayList{}); err != nil {
+		if err := c.dumpTypedList(ctx, "gateways", &gwv1beta1.GatewayList{}); err != nil {
+			c.UI.Info(fmt.Sprintf("Skipping Gateway dump: %v", err))
+		}
 	}
-
-	if err := c.dumpTypedList(ctx, "httproutes", &gwv1beta1.HTTPRouteList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping HTTPRoute dump: %v", err))
+	if err := c.dumpTypedList(ctx, "httproutes", &gwv1.HTTPRouteList{}); err != nil {
+		if err := c.dumpTypedList(ctx, "httproutes", &gwv1beta1.HTTPRouteList{}); err != nil {
+			c.UI.Info(fmt.Sprintf("Skipping HTTPRoute dump: %v", err))
+		}
 	}
-
-	if err := c.dumpTypedList(ctx, "grpcroutes", &gwv1alpha2.GRPCRouteList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping GRPCRoute dump: %v", err))
+	if err := c.dumpTypedList(ctx, "grpcroutes", &gwv1.GRPCRouteList{}); err != nil {
+		if err := c.dumpTypedList(ctx, "grpcroutes", &gwv1alpha2.GRPCRouteList{}); err != nil {
+			c.UI.Info(fmt.Sprintf("Skipping GRPCRoute dump: %v", err))
+		}
 	}
 
 	// fetch referenceGrants from gwv1beta1
@@ -337,14 +347,23 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 
 	switch kind {
 
-	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute", "ReferenceGrant", "UDPRoute", "TLSRoute", "TCPRoute":
+	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute", "ReferenceGrant":
 		raw["apiVersion"] = "consul.hashicorp.com/v1beta1"
+	case "UDPRoute", "TLSRoute", "TCPRoute":
+		raw["apiVersion"] = "consul.hashicorp.com/v1alpha2"
 
 	}
 
 	// route parentRef conversion
 	switch kind {
 	case "HTTPRoute", "GRPCRoute", "UDPRoute", "TLSRoute", "TCPRoute":
+		// change the name
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		metadata["name"] = metadata["name"].(string) + "-custom"
+
 		spec, ok := raw["spec"].(map[string]interface{})
 		if !ok {
 			return
@@ -362,12 +381,20 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 			if group == "gateway.networking.k8s.io" {
 				prMap["group"] = "consul.hashicorp.com"
 				prMap["name"] = "api-gateway-ocp"
+
 			}
 
 		}
 	}
 	// update referenceGrant to point to consul.hashicorp.com
 	if kind == "ReferenceGrant" {
+		// change the name
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		metadata["name"] = metadata["name"].(string) + "-custom"
+
 		spec, ok := raw["spec"].(map[string]interface{})
 		if !ok {
 			return
@@ -423,7 +450,20 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 
 func extractItems(list client.ObjectList) ([]client.Object, error) {
 	switch v := list.(type) {
-	case *gwv1beta1.GatewayClassList:
+	// case *gwv1beta1.GatewayClassList:
+	// 	out := make([]client.Object, 0, len(v.Items))
+	// 	for i := range v.Items {
+	// 		out = append(out, &v.Items[i])
+	// 	}
+	// 	return out, nil
+	// case *gwv1.GatewayClassList:
+	// 	out := make([]client.Object, 0, len(v.Items))
+	// 	for i := range v.Items {
+	// 		out = append(out, &v.Items[i])
+	// 	}
+	// 	return out, nil
+
+	case *gwv1.GatewayList:
 		out := make([]client.Object, 0, len(v.Items))
 		for i := range v.Items {
 			out = append(out, &v.Items[i])
@@ -437,7 +477,21 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 		}
 		return out, nil
 
+	case *gwv1.HTTPRouteList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
+
 	case *gwv1beta1.HTTPRouteList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
+
+	case *gwv1.GRPCRouteList:
 		out := make([]client.Object, 0, len(v.Items))
 		for i := range v.Items {
 			out = append(out, &v.Items[i])

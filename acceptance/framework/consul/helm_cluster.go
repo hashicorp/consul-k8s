@@ -6,6 +6,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -155,11 +156,28 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
+	logger.Logf(t, "Helm Chart: %s", chartName)
+	logger.Logf(t, "Helm setValues: %s", h.helmOptions.SetValues)
+	logger.Logf(t, "Helm Value Files: %v", h.helmOptions.ValuesFiles)
+
+	for _, f := range h.helmOptions.ValuesFiles {
+		data, _ := os.ReadFile(f)
+
+		logger.Logf(t, "Values file %s:\n%s", f, string(data))
+	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
+
+	// get the helm values
+	// Attempt to fetch the rendered Helm values for the installed release and log them.
+	if vals, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "get", "values", h.releaseName, "--all", "--output", "yaml"); err != nil {
+		logger.Logf(t, "Unable to get helm values for release %s: %v", h.releaseName, err)
+	} else {
+		logger.Logf(t, "Helm release values for %s:\n%s", h.releaseName, vals)
+	}
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }

@@ -19,9 +19,9 @@ package tests
 import (
 	"testing"
 
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/echo"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/http"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/suite"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/echo"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/http"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/suite"
 )
 
 func init() {

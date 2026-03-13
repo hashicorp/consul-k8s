@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha2
 
 import (
-	"sigs.k8s.io/gateway-api-exp/apis/v1beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 )
 
 // ParentReference identifies an API object (usually a Gateway) that can be considered

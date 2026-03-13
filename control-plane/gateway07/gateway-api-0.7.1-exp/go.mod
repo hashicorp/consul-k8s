@@ -1,4 +1,4 @@
-module sigs.k8s.io/gateway-api-exp
+module github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp
 
 go 1.19
 

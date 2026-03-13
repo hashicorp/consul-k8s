@@ -19,8 +19,8 @@ package validation
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	gatewayv1a2 "sigs.k8s.io/gateway-api-exp/apis/v1alpha2"
-	gatewayv1b1validation "sigs.k8s.io/gateway-api-exp/apis/v1beta1/validation"
+	gatewayv1a2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
+	gatewayv1b1validation "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1/validation"
 )
 
 // ValidateHTTPRoute validates HTTPRoute according to the Gateway API specification.

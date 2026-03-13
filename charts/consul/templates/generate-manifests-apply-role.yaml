@@ -1,15 +1,15 @@
-{{- if .Values.connectInject.enabled }}
+{{- if (and .Values.connectInject.enabled .Values.global.generateManifests) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "consul.fullname" . }}-pvc-cleaner-role
+  name: {{ template "consul.fullname" . }}-apply-role
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: generate-manifests-pvc-cleaner
+    component: generate-manifests-apply
   annotations:
     "helm.sh/hook": post-upgrade,post-install
     "helm.sh/hook-weight": "-10"

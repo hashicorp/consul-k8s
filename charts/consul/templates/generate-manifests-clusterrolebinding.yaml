@@ -1,4 +1,4 @@
-{{- if .Values.connectInject.enabled }}
+{{- if (and .Values.connectInject.enabled .Values.global.generateManifests) }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

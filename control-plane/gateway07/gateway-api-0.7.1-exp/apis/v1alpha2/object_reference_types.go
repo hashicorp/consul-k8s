@@ -16,7 +16,7 @@ limitations under the License.
 
 package v1alpha2
 
-import "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
+import "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 
 // LocalObjectReference identifies an API object within the namespace of the
 // referrer.

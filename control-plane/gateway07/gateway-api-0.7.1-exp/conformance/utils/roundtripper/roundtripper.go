@@ -29,7 +29,7 @@ import (
 	"net/url"
 	"regexp"
 
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/config"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/config"
 )
 
 // RoundTripper is an interface used to make requests within conformance tests.

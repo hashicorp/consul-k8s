@@ -1,15 +1,15 @@
-{{- if .Values.connectInject.enabled }}
+{{- if (and .Values.connectInject.enabled .Values.global.generateManifests) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ template "consul.fullname" . }}-delete-pvc
+  name: {{ template "consul.fullname" . }}-apply-manifests-in-pvc
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: generate-manifests-pvc-cleaner
+    component: generate-manifests-apply
     {{- if .Values.global.extraLabels }}
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
@@ -20,12 +20,12 @@ metadata:
 spec:
   template:
     metadata:
-      name: {{ template "consul.fullname" . }}-pvc-cleaner
+      name: {{ template "consul.fullname" . }}-apply
       labels:
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
-        component: generate-manifests-pvc-cleaner
+        component: generate-manifests-apply
         {{- if .Values.global.extraLabels }}
           {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
@@ -38,10 +38,10 @@ spec:
         
     spec:
       restartPolicy: Never
-      serviceAccountName: {{ template "consul.fullname" . }}-pvc-cleaner-sa
+      serviceAccountName: {{ template "consul.fullname" . }}-apply-sa
       {{- if not .Values.global.openshift.enabled }}
       containers:
-      - name: pvc-cleaner
+      - name: apply
         image: bitnami/kubectl:1.0
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c"]
@@ -55,7 +55,7 @@ spec:
             mountPath: /consul/config/gatewayapi
       {{- else }}
       containers:
-      - name: pvc-cleaner
+      - name: apply
         image: registry.redhat.io/openshift4/ose-cli
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c"]

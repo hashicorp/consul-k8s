@@ -5,9 +5,9 @@ package binding
 
 import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-ocp/common"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 )
 
 // setter wraps the status setting logic for routes.

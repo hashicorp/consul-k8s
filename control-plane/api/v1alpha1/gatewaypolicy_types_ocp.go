@@ -4,8 +4,8 @@
 package v1alpha1
 
 import (
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 )
 
 func init() {
