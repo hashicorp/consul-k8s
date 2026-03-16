@@ -284,26 +284,26 @@ func (m mergedListeners) validateHostname(index int, listener gwv1.Listener) err
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-// func validateTLS(gateway gwv1.Gateway, tls *gwv1.GatewayTLSConfig, resources *common.ResourceMap) (error, error) {
-// 	// If there's no TLS, there's nothing to validate
-// 	if tls == nil {
-// 		return nil, nil
-// 	}
+func validateTLS(gateway gwv1.Gateway, tls *gwv1.ListenerTLSConfig, resources *common.ResourceMap) (error, error) {
+	// If there's no TLS, there's nothing to validate
+	if tls == nil {
+		return nil, nil
+	}
 
-// 	// Validate the certificate references and then return any error
-// 	// alongside any TLS configuration error that we find below.
-// 	// refsErr := validateCertificateRefs(gateway, tls.CertificateRefs, resources) // --> tls check
+	// Validate the certificate references and then return any error
+	// alongside any TLS configuration error that we find below.
+	refsErr := validateCertificateRefs(gateway, tls.CertificateRefs, resources)
 
-// 	if tls.Mode != nil && *tls.Mode == gwv1.TLSModePassthrough {
-// 		return errListenerNoTLSPassthrough, refsErr
-// 	}
+	if tls.Mode != nil && *tls.Mode == gwv1.TLSModePassthrough {
+		return errListenerNoTLSPassthrough, refsErr
+	}
 
-// 	if err := validateTLSOptions(tls.Options); err != nil {
-// 		return err, refsErr
-// 	}
+	if err := validateTLSOptions(tls.Options); err != nil {
+		return err, refsErr
+	}
 
-// 	return nil, refsErr
-// }
+	return nil, refsErr
+}
 
 func validateJWT(gateway gwv1.Gateway, listener gwv1.Listener, resources *common.ResourceMap) error {
 	policy, _ := resources.GetPolicyForGatewayListener(gateway, listener)
