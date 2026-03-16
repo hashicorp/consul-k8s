@@ -449,11 +449,11 @@ func validateListeners(gateway gwv1.Gateway, listeners []gwv1.Listener, resource
 	for i, listener := range listeners {
 		var result listenerValidationResult
 
-		// err, refErr := validateTLS(gateway, listener.TLS, resources)
-		// if refErr != nil {
-		// 	result.refErrs = append(result.refErrs, refErr)
-		// }
-		var err error
+		err, refErr := validateTLS(gateway, listener.TLS, resources)
+		if refErr != nil {
+			result.refErrs = append(result.refErrs, refErr)
+		}
+
 		jwtErr := validateJWT(gateway, listener, resources)
 		if jwtErr != nil {
 			result.refErrs = append(result.refErrs, jwtErr)
