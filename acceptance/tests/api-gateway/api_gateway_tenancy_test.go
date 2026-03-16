@@ -23,7 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -37,14 +38,14 @@ import (
 )
 
 var (
-	gatewayGroup    = gwv1beta1.Group(gwv1beta1.GroupVersion.Group)
-	consulGroup     = gwv1beta1.Group(v1alpha1.GroupVersion.Group)
-	gatewayKind     = gwv1beta1.Kind("Gateway")
-	serviceKind     = gwv1beta1.Kind("Service")
-	secretKind      = gwv1beta1.Kind("Secret")
-	meshServiceKind = gwv1beta1.Kind("MeshService")
-	httpRouteKind   = gwv1beta1.Kind("HTTPRoute")
-	tcpRouteKind    = gwv1beta1.Kind("TCPRoute")
+	gatewayGroup    = gwv1.Group(gwv1.GroupVersion.Group)
+	consulGroup     = gwv1.Group(v1alpha1.GroupVersion.Group)
+	gatewayKind     = gwv1.Kind("Gateway")
+	serviceKind     = gwv1.Kind("Service")
+	secretKind      = gwv1.Kind("Secret")
+	meshServiceKind = gwv1.Kind("MeshService")
+	httpRouteKind   = gwv1.Kind("HTTPRoute")
+	tcpRouteKind    = gwv1.Kind("TCPRoute")
 )
 
 func TestAPIGateway_Tenancy(t *testing.T) {
@@ -132,7 +133,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			retryCheck(t, 200, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
+				var gateway gwv1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
@@ -154,7 +155,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// route failure
 			retryCheck(t, 60, func(r *retry.R) {
-				var httproute gwv1beta1.HTTPRoute
+				var httproute gwv1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
@@ -176,7 +177,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// gateway updated with references allowed
 			retryCheck(t, 60, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
+				var gateway gwv1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
@@ -208,7 +209,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// route updated with gateway and services allowed
 			retryCheck(t, 30, func(r *retry.R) {
-				var httproute gwv1beta1.HTTPRoute
+				var httproute gwv1.HTTPRoute
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
@@ -362,26 +363,26 @@ func createReferenceGrant(t *testing.T, client client.Client, name, from, to str
 
 	// we just create a reference grant for all combinations in the given namespaces
 
-	require.NoError(t, client.Create(context.Background(), &gwv1beta1.ReferenceGrant{
+	require.NoError(t, client.Create(context.Background(), &gwv1beta.ReferenceGrant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: to,
 		},
-		Spec: gwv1beta1.ReferenceGrantSpec{
-			From: []gwv1beta1.ReferenceGrantFrom{{
+		Spec: gwv1beta.ReferenceGrantSpec{
+			From: []gwv1beta.ReferenceGrantFrom{{
 				Group:     gatewayGroup,
 				Kind:      gatewayKind,
-				Namespace: gwv1beta1.Namespace(from),
+				Namespace: gwv1.Namespace(from),
 			}, {
 				Group:     gatewayGroup,
 				Kind:      httpRouteKind,
-				Namespace: gwv1beta1.Namespace(from),
+				Namespace: gwv1.Namespace(from),
 			}, {
 				Group:     gatewayGroup,
 				Kind:      tcpRouteKind,
-				Namespace: gwv1beta1.Namespace(from),
+				Namespace: gwv1.Namespace(from),
 			}},
-			To: []gwv1beta1.ReferenceGrantTo{{
+			To: []gwv1beta.ReferenceGrantTo{{
 				Group: gatewayGroup,
 				Kind:  gatewayKind,
 			}, {

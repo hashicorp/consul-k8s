@@ -795,6 +795,10 @@ global:
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: hashicorp/consul-dataplane:1.9.0-rc1
 
+  # Disable this once the manifests are generated and subsequent helm upgrades
+  
+  generateManifests: true
+
   # During the install:
   # custom crds and gateway TCP crd enabling
   # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.

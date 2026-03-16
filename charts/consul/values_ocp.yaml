@@ -818,8 +818,8 @@ global:
     # If true, the Helm chart will create necessary configuration for running
     # its components on OpenShift.
     enabled: true
-    upgradeTo419From418: true
-    isOcpGreaterthan4_18: false
+    upgradeTo419From418: false
+    isOcpGreaterthan4_18: true
     crds: 
       enableTcpRoute: true
       consulapi:
