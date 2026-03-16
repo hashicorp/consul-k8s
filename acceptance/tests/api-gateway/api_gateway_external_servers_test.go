@@ -88,6 +88,13 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	})
 
+	// fetch the api-resources installed
+	logger.Log(t, "fetching api-resources")
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "api-resources")
+	// log the api-resources output to help with debugging if the test fails due to missing CRDs
+	logger.Log(t, "api-resources output:\n%s", out)
+	require.NoError(t, err)
+
 	logger.Log(t, "creating api-gateway resources")
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
 	require.NoError(t, err, out)
