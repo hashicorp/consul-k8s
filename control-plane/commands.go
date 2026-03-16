@@ -9,7 +9,6 @@ import (
 	"github.com/mitchellh/cli"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
-	cmdApplyManifests "github.com/hashicorp/consul-k8s/control-plane/subcommand/apply-manifests"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
@@ -73,9 +72,7 @@ func init() {
 		"generate-manifests": func() (cli.Command, error) {
 			return &cmdGenerateManifests.Command{UI: ui}, nil
 		},
-		"applymanifests": func() (cli.Command, error) {
-			return &cmdApplyManifests.Command{UI: ui}, nil
-		},
+
 		"server-acl-init": func() (cli.Command, error) {
 			return &cmdServerACLInit.Command{UI: ui}, nil
 		},

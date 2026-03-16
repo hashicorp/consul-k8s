@@ -1155,7 +1155,7 @@ func TestUpsert(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil)
+			gatekeeper := New(log, client, nil, nil)
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
@@ -1408,7 +1408,7 @@ func TestDelete(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil)
+			gatekeeper := New(log, client, nil, nil)
 
 			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)
