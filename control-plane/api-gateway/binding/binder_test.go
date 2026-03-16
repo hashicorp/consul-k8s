@@ -300,7 +300,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "HTTPRoute",
-							APIVersion: "gateway.networking.k8s.io/v1beta1",
+							APIVersion: "gateway.networking.k8s.io/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "route",
@@ -427,7 +427,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 					{
 						TypeMeta: metav1.TypeMeta{
 							Kind:       "TCPRoute",
-							APIVersion: "gateway.networking.k8s.io/v1beta1",
+							APIVersion: "gateway.networking.k8s.io/v1",
 						},
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "route",
@@ -690,7 +690,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 				&gwv1.HTTPRoute{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "HTTPRoute",
-						APIVersion: "gateway.networking.k8s.io/v1beta1",
+						APIVersion: "gateway.networking.k8s.io/v1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "http-route-one",
@@ -709,7 +709,7 @@ func TestBinder_Lifecycle(t *testing.T) {
 				&gwv1alpha2.TCPRoute{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "TCPRoute",
-						APIVersion: "gateway.networking.k8s.io/v1beta1",
+						APIVersion: "gateway.networking.k8s.io/v1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:       "tcp-route-one",
