@@ -1,9 +1,8 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
-# This fixture is for OpenShift WITHOUT CNI enabled and transparent proxy.
-# For OpenShift WITH CNI, use static-client-openshift-tproxy-cni instead.
-# Note: The previous version incorrectly included CNI annotations.
+# This fixture is for OpenShift WITH CNI enabled and transparent proxy.
+# It includes the k8s.v1.cni.cncf.io/networks annotation required by Multus.
 
 apiVersion: apps/v1
 kind: Deployment
@@ -14,5 +13,4 @@ spec:
     metadata:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-
-
+        "k8s.v1.cni.cncf.io/networks": '[{ "name":"consul-cni" }]'
