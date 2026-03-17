@@ -297,10 +297,13 @@ func getCRDsWithFinalizers(options *k8s.KubectlOptions) ([]string, error) {
 	}
 
 	output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error running kubectl command: %v, output: %s", err, string(output))
+	}
 
 	var crds CRD
 	if err := json.Unmarshal(output, &crds); err != nil {
-		return nil, fmt.Errorf("error parsing JSON: %v", err)
+		return nil, fmt.Errorf("error parsing JSON: %v, output: %s", err, string(output))
 	}
 
 	var crdNames []string
