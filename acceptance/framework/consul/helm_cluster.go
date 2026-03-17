@@ -36,6 +36,11 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 )
 
+const (
+	retryWaitDuration = 20 * time.Second
+	retryMaxCount     = 5
+)
+
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul.
 type HelmCluster struct {
@@ -95,6 +100,10 @@ func NewHelmCluster(
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
 
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		applyOpenShiftDefaults(values)
+	}
+
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	// Wait up to 15 min for K8s resources to be in a ready state. Increasing
@@ -122,6 +131,23 @@ func NewHelmCluster(
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
+	}
+}
+
+func applyOpenShiftDefaults(values map[string]string) {
+	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
+	// attempt to adopt them for per-test releases.
+	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
+	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
+
+	if _, ok := values["connectInject.failurePolicy"]; !ok {
+		values["connectInject.failurePolicy"] = "Ignore"
+	}
+
+	if _, ok := values["server.affinity"]; !ok {
+		// Acceptance clusters are often small; disabling strict anti-affinity
+		// avoids pending server pods and long install stalls.
+		values["server.affinity"] = "null"
 	}
 }
 
@@ -157,7 +183,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
@@ -204,7 +230,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 		// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
 		if err != nil && !strings.Contains(err.Error(), "not found") {
@@ -214,7 +240,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
@@ -515,7 +541,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 		if h.ACLToken != "" {
 			config.Token = h.ACLToken
 		} else {
-			retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
+			retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 				// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
 				// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
 				// and will try to read the replication token from the federation secret.
@@ -750,7 +776,7 @@ func defaultValues() map[string]string {
 }
 
 func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
