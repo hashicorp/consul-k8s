@@ -42,7 +42,7 @@ spec:
       {{- if not .Values.global.openshift.enabled }}
       containers:
       - name: apply
-        image: bitnami/kubectl:1.0
+        image: bitnami/kubectl:latest
         imagePullPolicy: IfNotPresent
         command: ["/bin/sh", "-c"]
         args:
