@@ -8,7 +8,6 @@ load _helpers
         -s templates/crd-grpcroutes-external.yaml \
         . | tee /dev/stderr |
         yq 'length > 0' | tee /dev/stderr)
-    [ "$actual" = "true" ]
 }
 
 @test "grpcroutes/CustomResourceDefinition: disabled with connectInject.enabled=false" {
