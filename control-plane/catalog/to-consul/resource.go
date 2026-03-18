@@ -12,6 +12,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/parsetags"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
@@ -408,6 +409,11 @@ func (t *ServiceResource) generateRegistrations(key string) {
 
 	t.Log.Debug("[generateRegistrations] generating registration", "key", key)
 
+	annotationServiceNameValue, valid := getAnnotationServiceName(svc.Annotations, t.Log, svc.Name, svc.Namespace)
+	if !valid {
+		return
+	}
+
 	// Initialize our consul service map here if it isn't already.
 	if t.consulMap == nil {
 		t.consulMap = make(map[string][]*consulapi.CatalogRegistration)
@@ -420,10 +426,12 @@ func (t *ServiceResource) generateRegistrations(key string) {
 	// baseNode and baseService are the base that should be modified with
 	// service-type specific changes. These are not pointers, they should be
 	// shallow copied for each instance.
+
+	addr := constants.Getv4orv6Str("127.0.0.1", "::1")
 	baseNode := consulapi.CatalogRegistration{
 		SkipNodeUpdate: true,
 		Node:           t.ConsulNodeName,
-		Address:        "127.0.0.1",
+		Address:        addr,
 		NodeMeta: map[string]string{
 			ConsulSourceKey: ConsulSourceValue,
 		},
@@ -438,9 +446,8 @@ func (t *ServiceResource) generateRegistrations(key string) {
 		},
 	}
 
-	// If the name is explicitly annotated, adopt that name
-	if v, ok := svc.Annotations[annotationServiceName]; ok {
-		baseService.Service = strings.TrimSpace(v)
+	if annotationServiceNameValue != "" {
+		baseService.Service = annotationServiceNameValue
 	}
 
 	// Update the Consul namespace based on namespace settings
@@ -550,6 +557,23 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			"namespace", baseService.Namespace,
 			"instances", len(t.consulMap[key]))
 	}()
+
+	// // if ingress
+	// if t.EnableIngress {
+	// 	if addr, ok := t.serviceHostnameMap[key]; ok && addr.hostName != "" {
+
+	// 		r := baseNode
+	// 		rs := baseService
+	// 		r.Service = &rs
+
+	// 		r.Service.ID = serviceID(r.Service.Service, addr.hostName)
+	// 		r.Service.Address = addr.hostName
+	// 		r.Service.Port = int(addr.port)
+
+	// 		t.consulMap[key] = []*consulapi.CatalogRegistration{&r}
+	// 		return
+	// 	}
+	// }
 
 	// If there are external IPs then those become the instance registrations
 	// for any type of service.
@@ -1168,4 +1192,24 @@ func getPortName(name string, idx int) string {
 	}
 
 	return name
+}
+
+// getAnnotationServiceName extracts and validates the service name from annotations.
+// Returns the trimmed service name and true if valid, or empty string and false if invalid.
+func getAnnotationServiceName(annotations map[string]string, log hclog.Logger, svcName, namespace string) (string, bool) {
+	v, ok := annotations[annotationServiceName]
+	if !ok {
+		return "", true
+	}
+	trimmed := strings.TrimSpace(v)
+	if len(trimmed) < 1 || len(trimmed) > 255 {
+		if log != nil {
+			log.Error("invalid service name length in annotation -- must be 1-255 characters",
+				"service", svcName,
+				"namespace", namespace,
+				"length", len(trimmed))
+		}
+		return "", false
+	}
+	return trimmed, true
 }

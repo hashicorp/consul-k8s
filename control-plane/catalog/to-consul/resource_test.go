@@ -564,7 +564,7 @@ func (t *testServiceResource) Informer() cache.SharedIndexInformer {
 }
 
 func getinformer() (*fake.Clientset, cache.SharedIndexInformer) {
-	client := fake.NewClientset()
+	client := fake.NewSimpleClientset()
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -2557,12 +2557,12 @@ func TestServiceResource_addIngress(t *testing.T) {
 				informer:        informer,
 			}
 
-			// Create the ingress
-			_, err := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
+			// Create the service
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), clusterIPService("test-service", metav1.NamespaceDefault), metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			// Create the service
-			_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), clusterIPService("test-service", metav1.NamespaceDefault), metav1.CreateOptions{})
+			// Create the ingress
+			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
 			require.NoError(t, err)
 
 			// Start the controller
