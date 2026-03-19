@@ -1,10 +1,8 @@
 module github.com/hashicorp/consul-k8s/control-plane/cni
 
-go 1.25.3
+go 1.25.7
 
 replace github.com/hashicorp/consul-k8s/version => ../../version
-
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.4.1-0.20251014172147-72a358cd0253
 
 require (
 	github.com/containernetworking/cni v1.1.2
@@ -17,7 +15,7 @@ require (
 	k8s.io/client-go v0.29.8
 )
 
-require github.com/hashicorp/consul/sdk v0.4.1-0.20250924061425-7e8f30184eaf
+require github.com/hashicorp/consul/sdk v0.17.2
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -45,13 +43,12 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
