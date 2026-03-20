@@ -143,8 +143,8 @@ func NewHelmCluster(
 func applyOpenShiftDefaults(values map[string]string) {
 	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
 	// attempt to adopt or create them for per-test releases.
-	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
-	values["connectInject.apiGateway.manageNonStandardCRDs"] = "false"
+	values["connectInject.apiGateway.manageExternalCRDs"] = "true"
+	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
 
 	if _, ok := values["connectInject.failurePolicy"]; !ok {
 		values["connectInject.failurePolicy"] = "Ignore"
@@ -201,6 +201,14 @@ func (h *HelmCluster) Create(t *testing.T) {
 			_ = h.uninstallReleaseNoHooks(t, h.releaseName)
 			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		}
+		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+			h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
+			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+		}
+		if err != nil && isGatewayResourcesAlreadyExistsError(err) {
+			h.deleteGatewayResourcesJobIfExistsForRelease(r, h.releaseName)
+			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+		}
 		require.NoError(r, err)
 	})
 
@@ -212,6 +220,7 @@ func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
 
 	logger.Logf(t, "Cleaning stale Consul resources before Helm install in OpenShift namespace %s", h.helmOptions.KubectlOptions.Namespace)
 
+	h.deleteGatewayHookJobsIfExistsForRelease(t, h.releaseName)
 	h.deleteStaleHelmReleases(t)
 	h.deleteStaleLabeledResources(t)
 }
@@ -237,6 +246,10 @@ func (h *HelmCluster) deleteStaleHelmReleases(t *testing.T) {
 		err := h.uninstallReleaseNoHooks(t, release.Name)
 		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
 			h.deleteGatewayCleanupJobIfExistsForRelease(t, release.Name)
+			err = h.uninstallReleaseNoHooks(t, release.Name)
+		}
+		if err != nil && isGatewayResourcesAlreadyExistsError(err) {
+			h.deleteGatewayResourcesJobIfExistsForRelease(t, release.Name)
 			err = h.uninstallReleaseNoHooks(t, release.Name)
 		}
 		if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
@@ -350,7 +363,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
-
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
@@ -656,12 +668,35 @@ func (h *HelmCluster) deleteGatewayCleanupJobIfExistsForRelease(t require.Testin
 	}
 }
 
+func (h *HelmCluster) deleteGatewayResourcesJobIfExistsForRelease(t require.TestingT, releaseName string) {
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	jobName := fmt.Sprintf("%s-consul-gateway-resources", releaseName)
+
+	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+}
+
+func (h *HelmCluster) deleteGatewayHookJobsIfExistsForRelease(t require.TestingT, releaseName string) {
+	h.deleteGatewayCleanupJobIfExistsForRelease(t, releaseName)
+	h.deleteGatewayResourcesJobIfExistsForRelease(t, releaseName)
+}
+
 func isGatewayCleanupAlreadyExistsError(err error) bool {
 	if err == nil {
 		return false
 	}
 	errText := err.Error()
 	return strings.Contains(errText, "gateway-cleanup") && strings.Contains(errText, "already exists")
+}
+
+func isGatewayResourcesAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "gateway-resources") && strings.Contains(errText, "already exists")
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
