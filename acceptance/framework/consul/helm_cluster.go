@@ -226,11 +226,24 @@ func (h *HelmCluster) deleteStaleHelmReleases(t *testing.T) {
 		}
 
 		logger.Logf(t, "Deleting stale Helm release %s in namespace %s before install", release.Name, h.helmOptions.KubectlOptions.Namespace)
-		err := helm.DeleteE(t, h.helmOptions, release.Name, false)
-		if err != nil && !strings.Contains(err.Error(), "not found") {
+		err := h.uninstallReleaseNoHooks(t, release.Name)
+		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+			h.deleteGatewayCleanupJobIfExistsForRelease(t, release.Name)
+			err = h.uninstallReleaseNoHooks(t, release.Name)
+		}
+		if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
 			require.NoError(t, err)
 		}
 	}
+}
+
+func (h *HelmCluster) uninstallReleaseNoHooks(t *testing.T, releaseName string) error {
+	_, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions,
+		"uninstall", releaseName,
+		"--no-hooks",
+		"--timeout", "30s",
+	)
+	return err
 }
 
 func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
@@ -342,12 +355,12 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		if err != nil && strings.Contains(err.Error(), "consul-gateway-cleanup\" already exists") {
-			h.deleteGatewayCleanupJobIfExists(r)
+		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+			h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
 			err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 		}
 		// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
-		if err != nil && !strings.Contains(err.Error(), "not found") {
+		if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
 			require.NoError(r, err)
 		}
 	})
@@ -601,14 +614,22 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	})
 }
 
-func (h *HelmCluster) deleteGatewayCleanupJobIfExists(t require.TestingT) {
+func (h *HelmCluster) deleteGatewayCleanupJobIfExistsForRelease(t require.TestingT, releaseName string) {
 	namespace := h.helmOptions.KubectlOptions.Namespace
-	jobName := fmt.Sprintf("%s-consul-gateway-cleanup", h.releaseName)
+	jobName := fmt.Sprintf("%s-consul-gateway-cleanup", releaseName)
 
 	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
+}
+
+func isGatewayCleanupAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "gateway-cleanup") && strings.Contains(errText, "already exists")
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
