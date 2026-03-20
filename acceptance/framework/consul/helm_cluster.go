@@ -5,6 +5,7 @@ package consul
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -37,8 +38,9 @@ import (
 )
 
 const (
-	retryWaitDuration = 20 * time.Second
-	retryMaxCount     = 5
+	retryWaitDuration        = 20 * time.Second
+	retryMaxCount            = 5
+	staleConsulLabelSelector = "chart=consul-helm"
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -62,6 +64,7 @@ type HelmCluster struct {
 	releaseName        string
 	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
+	isOpenShift        bool
 	noCleanupOnFailure bool
 	noCleanup          bool
 	debugDirectory     string
@@ -126,6 +129,7 @@ func NewHelmCluster(
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
+		isOpenShift:        cfg.UseOpenshift || cfg.EnableOpenshift,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
@@ -135,9 +139,9 @@ func NewHelmCluster(
 
 func applyOpenShiftDefaults(values map[string]string) {
 	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
-	// attempt to adopt them for per-test releases.
+	// attempt to adopt or create them for per-test releases.
 	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
-	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
+	values["connectInject.apiGateway.manageNonStandardCRDs"] = "false"
 
 	if _, ok := values["connectInject.failurePolicy"]; !ok {
 		values["connectInject.failurePolicy"] = "Ignore"
@@ -155,6 +159,10 @@ func (h *HelmCluster) Create(t *testing.T) {
 
 	// check and remove any CRDs with finalizers
 	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+
+	if h.isOpenShift {
+		h.cleanupOpenShiftBeforeInstall(t)
+	}
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
@@ -205,6 +213,108 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
+}
+
+func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
+	t.Helper()
+
+	logger.Logf(t, "Cleaning stale Consul resources before Helm install in OpenShift namespace %s", h.helmOptions.KubectlOptions.Namespace)
+
+	h.deleteStaleHelmReleases(t)
+	h.deleteStaleLabeledResources(t)
+}
+
+func (h *HelmCluster) deleteStaleHelmReleases(t *testing.T) {
+	t.Helper()
+
+	output, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--all", "--output", "json")
+	require.NoError(t, err)
+
+	var releases []struct {
+		Name  string `json:"name"`
+		Chart string `json:"chart"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(output), &releases))
+
+	for _, release := range releases {
+		if !strings.Contains(release.Chart, "consul") {
+			continue
+		}
+
+		logger.Logf(t, "Deleting stale Helm release %s in namespace %s before install", release.Name, h.helmOptions.KubectlOptions.Namespace)
+		err := helm.DeleteE(t, h.helmOptions, release.Name, false)
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			require.NoError(t, err)
+		}
+	}
+}
+
+func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
+	t.Helper()
+
+	deleteList := func(err error) {
+		if err != nil && !errors.IsNotFound(err) {
+			require.NoError(t, err)
+		}
+	}
+
+	listOptions := metav1.ListOptions{LabelSelector: staleConsulLabelSelector}
+	namespace := h.helmOptions.KubectlOptions.Namespace
+
+	var gracePeriod int64 = 0
+	deleteList(h.kubernetesClient.CoreV1().Pods(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod}, listOptions))
+	deleteList(h.kubernetesClient.AppsV1().Deployments(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.AppsV1().ReplicaSets(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.AppsV1().StatefulSets(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.AppsV1().DaemonSets(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.CoreV1().PersistentVolumeClaims(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.CoreV1().ServiceAccounts(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.RbacV1().Roles(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.RbacV1().RoleBindings(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.BatchV1().Jobs(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.CoreV1().ConfigMaps(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.CoreV1().Secrets(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.RbacV1().ClusterRoles().DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.RbacV1().ClusterRoleBindings().DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+
+	services, err := h.kubernetesClient.CoreV1().Services(namespace).List(context.Background(), listOptions)
+	require.NoError(t, err)
+	for _, service := range services.Items {
+		deleteList(h.kubernetesClient.CoreV1().Services(namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{}))
+	}
+
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.MatchingLabels{"chart": "consul-helm"})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.MatchingLabels{"chart": "consul-helm"})
+
+	mutatingWebhooks, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), listOptions)
+	require.NoError(t, err)
+	for _, webhook := range mutatingWebhooks.Items {
+		webhook.SetFinalizers(nil)
+		_, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Update(context.Background(), &webhook, metav1.UpdateOptions{})
+		deleteList(err)
+	}
+
+	validatingWebhooks, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.Background(), listOptions)
+	require.NoError(t, err)
+	for _, webhook := range validatingWebhooks.Items {
+		webhook.SetFinalizers(nil)
+		_, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.Background(), &webhook, metav1.UpdateOptions{})
+		deleteList(err)
+	}
+
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
+		pods, err := h.kubernetesClient.CoreV1().Pods(namespace).List(context.Background(), listOptions)
+		require.NoError(r, err)
+		if len(pods.Items) > 0 {
+			var podNames []string
+			for _, pod := range pods.Items {
+				podNames = append(podNames, pod.Name)
+			}
+			r.Errorf("stale Consul pods still present after cleanup: %s", strings.Join(podNames, ", "))
+		}
+	})
 }
 
 func (h *HelmCluster) Destroy(t *testing.T) {
