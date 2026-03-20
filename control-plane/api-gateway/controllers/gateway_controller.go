@@ -20,7 +20,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -54,6 +53,7 @@ type GatewayControllerConfig struct {
 	Datacenter              string
 	AllowK8sNamespacesSet   mapset.Set
 	DenyK8sNamespacesSet    mapset.Set
+	EnableTCP               bool
 }
 
 // GatewayController reconciles a Gateway object.
@@ -478,13 +478,14 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			builder.WithPredicates(predicate),
 		)
 
-	tcpGVK := schema.GroupVersionKind{
-		Group:   "gateway.networking.k8s.io",
-		Version: "v1alpha2",
-		Kind:    "TCPRoute",
-	}
-
-	if _, err := mgr.GetRESTMapper().RESTMapping(tcpGVK.GroupKind(), tcpGVK.Version); err == nil {
+	// tcpGVK := schema.GroupVersionKind{
+	// 	Group:   "gateway.networking.k8s.io",
+	// 	Version: "v1alpha2",
+	// 	Kind:    "TCPRoute",
+	// }
+	mgr.GetLogger().Info("config received %v", config.EnableTCP)
+	if config.EnableTCP {
+		//if _, err := mgr.GetRESTMapper().RESTMapping(tcpGVK.GroupKind(), tcpGVK.Version); err == nil {
 		r.supportsTCPRoute = true
 		mgr.GetLogger().Info("TCPRoute CRD detected - enabling TCPRoute support")
 
@@ -551,144 +552,6 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 	}
 
 	return c, cleaner, nil
-}
-
-// temp setup manager, would be deleted once we are ready to move the gateway controller to the new structure.
-func SetupGatewayControllerWithManagerTemp(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
-	cacheConfig := cache.Config{
-		ConsulClientConfig:      config.ConsulClientConfig,
-		ConsulServerConnMgr:     config.ConsulServerConnMgr,
-		NamespacesEnabled:       config.NamespacesEnabled,
-		Datacenter:              config.Datacenter,
-		CrossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
-		Logger:                  mgr.GetLogger(),
-	}
-	c := cache.New(cacheConfig)
-	gwc := cache.NewGatewayCache(ctx, cacheConfig)
-
-	predicate, _ := predicate.LabelSelectorPredicate(
-		*metav1.SetAsLabelSelector(map[string]string{
-			common.ManagedLabel: "true",
-		}),
-	)
-
-	r := &GatewayController{
-		Client:     mgr.GetClient(),
-		Log:        mgr.GetLogger(),
-		ApiReader:  mgr.GetAPIReader(),
-		HelmConfig: config.HelmConfig.Normalize(),
-		Translator: common.ResourceTranslator{
-			EnableConsulNamespaces: config.HelmConfig.EnableNamespaces,
-			ConsulDestNamespace:    config.HelmConfig.ConsulDestinationNamespace,
-			EnableK8sMirroring:     config.HelmConfig.EnableNamespaceMirroring,
-			MirroringPrefix:        config.HelmConfig.NamespaceMirroringPrefix,
-			ConsulPartition:        config.HelmConfig.ConsulPartition,
-			Datacenter:             config.Datacenter,
-		},
-		denyK8sNamespacesSet:  config.DenyK8sNamespacesSet,
-		allowK8sNamespacesSet: config.AllowK8sNamespacesSet,
-		cache:                 c,
-		gatewayCache:          gwc,
-		ConsulConfig:          config.ConsulClientConfig,
-	}
-
-	cleaner := binding.Cleaner{
-		Logger:       mgr.GetLogger(),
-		ConsulConfig: config.ConsulClientConfig,
-		ServerMgr:    config.ConsulServerConnMgr,
-		AuthMethod:   config.HelmConfig.AuthMethod,
-	}
-
-	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
-		Named("gateway-v1").
-		For(&gwv1.Gateway{}).
-		Owns(&appsv1.Deployment{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.Pod{}).
-		Watches(
-			&gwv1beta1.ReferenceGrant{},
-			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
-		).
-		Watches(
-			&gwv1.GatewayClass{},
-			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass),
-		).
-		Watches(
-			&gwv1.HTTPRoute{},
-			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute),
-		).
-		Watches(
-			&gwv1alpha2.TCPRoute{},
-			handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute),
-		).
-		Watches(
-			&corev1.Secret{},
-			handler.EnqueueRequestsFromMapFunc(r.transformSecret),
-		).
-		Watches(
-			&v1alpha1.MeshService{},
-			handler.EnqueueRequestsFromMapFunc(r.transformMeshService),
-		).
-		Watches(
-			&corev1.Endpoints{},
-			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints),
-		).
-		Watches(
-			&corev1.Pod{},
-			handler.EnqueueRequestsFromMapFunc(r.transformPods),
-			builder.WithPredicates(predicate),
-		).
-		WatchesRawSource(
-			// Subscribe to changes from Consul for APIGateways
-			source.Channel(
-				c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events(),
-				&handler.EnqueueRequestForObject{},
-			),
-		).
-		WatchesRawSource(
-			// Subscribe to changes from Consul for HTTPRoutes
-			source.Channel(
-				c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events(),
-				&handler.EnqueueRequestForObject{},
-			),
-		).
-		WatchesRawSource(
-			// Subscribe to changes from Consul for TCPRoutes
-			source.Channel(
-				c.Subscribe(ctx, api.TCPRoute, r.transformConsulTCPRoute(ctx)).Events(),
-				&handler.EnqueueRequestForObject{},
-			),
-		).
-		WatchesRawSource(
-			source.Channel(
-				c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events(),
-				&handler.EnqueueRequestForObject{},
-			),
-		).
-		WatchesRawSource(
-			source.Channel(
-				c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events(),
-				&handler.EnqueueRequestForObject{},
-			),
-		).
-		Watches(
-			&v1alpha1.GatewayPolicy{},
-			handler.EnqueueRequestsFromMapFunc(r.transformGatewayPolicy),
-		).
-		Watches(
-			&v1alpha1.RouteRetryFilter{},
-			handler.EnqueueRequestsFromMapFunc(r.transformRouteRetryFilter),
-		).
-		Watches(
-			&v1alpha1.RouteTimeoutFilter{},
-			handler.EnqueueRequestsFromMapFunc(r.transformRouteTimeoutFilter),
-		).
-		Watches(
-			// Subscribe to changes in RouteAuthFilter custom resources referenced by HTTPRoutes.
-			&v1alpha1.RouteAuthFilter{},
-			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter),
-		).
-		Complete(r)
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching

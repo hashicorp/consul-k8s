@@ -19,7 +19,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // Enabled everything possible, see if anything breaks.
@@ -139,7 +139,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	// the reconcile loop to run (hence the 2m timeout here).
 	var (
 		gatewayAddress string
-		httpRoute      gwv1beta1.HTTPRoute
+		httpRoute      gwv1.HTTPRoute
 	)
 
 	logger.Log(t, "waiting for gateway and httproute to be ready")
@@ -148,7 +148,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	gatewayCounter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
 	logger.Log(t, "waiting for gateway to be ready")
 	retry.RunWith(gatewayCounter, t, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 		require.NoError(r, err)
 

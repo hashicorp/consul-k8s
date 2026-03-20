@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/config"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/http"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/roundtripper"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/config"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/http"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/roundtripper"
 )
 
 // MakeTLSRequestAndExpectEventuallyConsistentResponse makes a request with the given parameters,

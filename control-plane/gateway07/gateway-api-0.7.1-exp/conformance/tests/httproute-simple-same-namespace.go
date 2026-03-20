@@ -21,10 +21,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	"sigs.k8s.io/gateway-api-exp/apis/v1beta1"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/http"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/kubernetes"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/suite"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/http"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/kubernetes"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/suite"
 )
 
 func init() {

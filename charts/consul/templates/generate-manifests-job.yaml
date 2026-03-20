@@ -1,4 +1,4 @@
-{{- if .Values.connectInject.enabled }}
+{{- if (and .Values.connectInject.enabled .Values.global.generateManifests) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -48,12 +48,25 @@ spec:
             - -chart={{template "consul.chart" .}}
             - -release-name={{ .Release.Name }}
             # - -manifests-gatewayapi-dir=/consul/config/gatewayapi
-            {{- if or .Values.global.crds.consulapi.enabled .Values.global.openshift.crds.consulapi.enabled }}
+            {{- if or .Values.global.crds.consulapi.enabled .Values.global.openshift.crds.consulapi.enabled 
+            (and
+            (default false .Values.global.openshift.enabled)
+            (default false .Values.global.openshift.upgradeTo419From418)
+            (default false .Values.global.openshift.crds.enableTcpRoute)
+            )
+            (and 
+            (default false .Values.global.openshift.enabled)
+            (default false .Values.global.openshift.isOcpGreaterthan4_18)
+            (default false .Values.global.openshift.crds.enableTcpRoute)
+
+            )
+            }}
             - -consulapi-enabled=true
             {{- end }}
             {{- if .Values.global.openshift.enabled  }}
             - -openshift-scc-name={{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
             {{- end }}
+            
           {{- with .Values.connectInject.apiGateway.managedGatewayClass.resourceJob.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

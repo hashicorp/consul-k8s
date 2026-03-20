@@ -31,9 +31,9 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/config"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/http"
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/suite"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/config"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/http"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/suite"
 )
 
 // MeshPod represents a connection to a specific pod running in the mesh.

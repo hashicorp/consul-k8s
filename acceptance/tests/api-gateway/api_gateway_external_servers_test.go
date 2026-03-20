@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -88,6 +88,13 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	})
 
+	// fetch the api-resources installed
+	logger.Log(t, "fetching api-resources")
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "api-resources")
+	// log the api-resources output to help with debugging if the test fails due to missing CRDs
+	logger.Log(t, "api-resources output:\n%s", out)
+	require.NoError(t, err)
+
 	logger.Log(t, "creating api-gateway resources")
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
 	require.NoError(t, err, out)
@@ -109,7 +116,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	// the reconcile loop to run (hence a ~1m timeout here).
 	var gatewayAddress string
 	retryCheck(t, 60, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 		require.NoError(r, err)
 

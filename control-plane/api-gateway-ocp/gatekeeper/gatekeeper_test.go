@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testr"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -22,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gwv1beta1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-ocp/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -1155,7 +1155,7 @@ func TestUpsert(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil)
+			gatekeeper := New(log, client, nil, nil)
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
@@ -1408,7 +1408,7 @@ func TestDelete(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil)
+			gatekeeper := New(log, client, nil, nil)
 
 			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)

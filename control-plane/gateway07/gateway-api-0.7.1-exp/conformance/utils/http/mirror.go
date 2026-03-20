@@ -26,7 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"sigs.k8s.io/gateway-api-exp/conformance/utils/kubernetes"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/conformance/utils/kubernetes"
 )
 
 func ExpectMirroredRequest(t *testing.T, client client.Client, clientset *clientset.Clientset, ns, mirrorPod, path string) {

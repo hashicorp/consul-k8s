@@ -56,10 +56,10 @@ import (
 	"github.com/mitchellh/cli"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -101,6 +101,9 @@ type Command struct {
 	consulApiEnabled   bool
 
 	ctx context.Context
+
+	// // For test injection
+	// AddToSchemeFunc func(*runtime.Scheme) error
 }
 
 func (c *Command) init() {
@@ -181,6 +184,10 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Could not add api-gateway v1alpha2 schema: %s", err))
 			return 1
 		}
+		if err := gwv1.Install(s); err != nil {
+			c.UI.Error(fmt.Sprintf("Could not add api-gateway v1 schema: %s", err))
+			return 1
+		}
 		if err := v1alpha1.AddToScheme(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add consul-k8s schema: %s", err))
 			return 1
@@ -208,36 +215,6 @@ func (c *Command) Run(args []string) int {
 
 }
 
-func (c *Command) deleteGatewayAPICRDs() error {
-	crds := []string{
-		"gatewayclasses.gateway.networking.k8s.io",
-		"gateways.gateway.networking.k8s.io",
-		"httproutes.gateway.networking.k8s.io",
-		"referencegrants.gateway.networking.k8s.io",
-		"grpcroutes.gateway.networking.k8s.io",
-		"tcproutes.gateway.networking.k8s.io",
-		"tlsroutes.gateway.networking.k8s.io",
-		"udproutes.gateway.networking.k8s.io",
-	}
-
-	for _, crd := range crds {
-		err := c.k8sClient.Delete(c.ctx, &apiextensions.CustomResourceDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: crd,
-			},
-		},
-		)
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Error deleting CRD %s: %s", crd, err))
-			continue
-		}
-
-		c.UI.Info(fmt.Sprintf("✅ Deleted CRD: %s", crd))
-	}
-	c.UI.Info("✅ Deleted all Gateway API CRDs")
-	return nil
-}
-
 func (c *Command) dumpGatewayAPIObjects() error {
 	if c.k8sClient == nil {
 		return fmt.Errorf("k8s client is nil")
@@ -247,27 +224,33 @@ func (c *Command) dumpGatewayAPIObjects() error {
 	if err := os.MkdirAll(c.flagManifestsGatewayAPIDir, 0755); err != nil {
 		return err
 	}
+	c.UI.Info(fmt.Sprintf("Dumping Gateway API objects... in %s", c.flagManifestsGatewayAPIDir))
 
 	ctx := c.ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
-	// Dump resources
-	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
+	// // Dump resources no gc is needed to set up
+	// if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1.GatewayClassList{}); err != nil {
+	// 	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
+	// 		c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
+	// 	}
+	// }
+	if err := c.dumpTypedList(ctx, "gateways", &gwv1.GatewayList{}); err != nil {
+		if err := c.dumpTypedList(ctx, "gateways", &gwv1beta1.GatewayList{}); err != nil {
+			c.UI.Info(fmt.Sprintf("Skipping Gateway dump: %v", err))
+		}
 	}
-
-	if err := c.dumpTypedList(ctx, "gateways", &gwv1beta1.GatewayList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping Gateway dump: %v", err))
+	if err := c.dumpTypedList(ctx, "httproutes", &gwv1.HTTPRouteList{}); err != nil {
+		if err := c.dumpTypedList(ctx, "httproutes", &gwv1beta1.HTTPRouteList{}); err != nil {
+			c.UI.Info(fmt.Sprintf("Skipping HTTPRoute dump: %v", err))
+		}
 	}
-
-	if err := c.dumpTypedList(ctx, "httproutes", &gwv1beta1.HTTPRouteList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping HTTPRoute dump: %v", err))
-	}
-
-	if err := c.dumpTypedList(ctx, "grpcroutes", &gwv1alpha2.GRPCRouteList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping GRPCRoute dump: %v", err))
+	if err := c.dumpTypedList(ctx, "grpcroutes", &gwv1.GRPCRouteList{}); err != nil {
+		if err := c.dumpTypedList(ctx, "grpcroutes", &gwv1alpha2.GRPCRouteList{}); err != nil {
+			c.UI.Info(fmt.Sprintf("Skipping GRPCRoute dump: %v", err))
+		}
 	}
 
 	// fetch referenceGrants from gwv1beta1
@@ -316,7 +299,7 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	switch kind {
 	// by default
 	// for gateway.networking.k8s.io/v1
-	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute":
+	case "Gateway", "HTTPRoute", "GRPCRoute":
 		raw["apiVersion"] = "gateway.networking.k8s.io/v1"
 
 	// ReferenceGrant -> v1beta1
@@ -337,14 +320,23 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 
 	switch kind {
 
-	case "GatewayClass", "Gateway", "HTTPRoute", "GRPCRoute", "ReferenceGrant", "UDPRoute", "TLSRoute", "TCPRoute":
+	case "Gateway", "HTTPRoute", "GRPCRoute", "ReferenceGrant":
 		raw["apiVersion"] = "consul.hashicorp.com/v1beta1"
+	case "UDPRoute", "TLSRoute", "TCPRoute":
+		raw["apiVersion"] = "consul.hashicorp.com/v1alpha2"
 
 	}
 
 	// route parentRef conversion
 	switch kind {
 	case "HTTPRoute", "GRPCRoute", "UDPRoute", "TLSRoute", "TCPRoute":
+		// change the name
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		metadata["name"] = metadata["name"].(string) + "-custom"
+
 		spec, ok := raw["spec"].(map[string]interface{})
 		if !ok {
 			return
@@ -362,12 +354,20 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 			if group == "gateway.networking.k8s.io" {
 				prMap["group"] = "consul.hashicorp.com"
 				prMap["name"] = "api-gateway-ocp"
+
 			}
 
 		}
 	}
 	// update referenceGrant to point to consul.hashicorp.com
 	if kind == "ReferenceGrant" {
+		// change the name
+		metadata, ok := raw["metadata"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		metadata["name"] = metadata["name"].(string) + "-custom"
+
 		spec, ok := raw["spec"].(map[string]interface{})
 		if !ok {
 			return
@@ -389,21 +389,21 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 	}
 
 	// update gatewayclass metadata.labels.component set to api-gateway-ocp
-	if kind == "GatewayClass" {
-		metadata, ok := raw["metadata"].(map[string]interface{})
-		if !ok {
-			return
-		}
-		labels, ok := metadata["labels"].(map[string]interface{})
-		if !ok {
-			labels = make(map[string]interface{})
-			metadata["labels"] = labels
-		}
-		labels["component"] = "api-gateway-ocp"
+	// if kind == "GatewayClass" {
+	// 	metadata, ok := raw["metadata"].(map[string]interface{})
+	// 	if !ok {
+	// 		return
+	// 	}
+	// 	labels, ok := metadata["labels"].(map[string]interface{})
+	// 	if !ok {
+	// 		labels = make(map[string]interface{})
+	// 		metadata["labels"] = labels
+	// 	}
+	// 	labels["component"] = "api-gateway-ocp"
 
-		// also set name --> metadata.name to "consul-ocp"
-		metadata["name"] = "consul-ocp"
-	}
+	// 	// also set name --> metadata.name to "consul-ocp"
+	// 	metadata["name"] = "consul-ocp"
+	// }
 
 	// for gateway, update spec.gatewayClassName to "consul-ocp"
 	if kind == "Gateway" {
@@ -423,7 +423,20 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 
 func extractItems(list client.ObjectList) ([]client.Object, error) {
 	switch v := list.(type) {
-	case *gwv1beta1.GatewayClassList:
+	// case *gwv1beta1.GatewayClassList:
+	// 	out := make([]client.Object, 0, len(v.Items))
+	// 	for i := range v.Items {
+	// 		out = append(out, &v.Items[i])
+	// 	}
+	// 	return out, nil
+	// case *gwv1.GatewayClassList:
+	// 	out := make([]client.Object, 0, len(v.Items))
+	// 	for i := range v.Items {
+	// 		out = append(out, &v.Items[i])
+	// 	}
+	// 	return out, nil
+
+	case *gwv1.GatewayList:
 		out := make([]client.Object, 0, len(v.Items))
 		for i := range v.Items {
 			out = append(out, &v.Items[i])
@@ -437,7 +450,21 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 		}
 		return out, nil
 
+	case *gwv1.HTTPRouteList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
+
 	case *gwv1beta1.HTTPRouteList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
+
+	case *gwv1.GRPCRouteList:
 		out := make([]client.Object, 0, len(v.Items))
 		for i := range v.Items {
 			out = append(out, &v.Items[i])

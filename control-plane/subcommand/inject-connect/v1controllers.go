@@ -266,6 +266,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
 		Datacenter:              c.consul.Datacenter,
+		EnableTCP:               c.flagEnableTCPRoute,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")

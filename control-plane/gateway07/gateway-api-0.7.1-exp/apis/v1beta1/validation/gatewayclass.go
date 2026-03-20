@@ -19,7 +19,7 @@ package validation
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
-	gatewayv1b1 "sigs.k8s.io/gateway-api-exp/apis/v1beta1"
+	gatewayv1b1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
 )
 
 // ValidateGatewayClassUpdate validates an update to oldClass according to the
