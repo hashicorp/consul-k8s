@@ -220,6 +220,7 @@ func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
 
 	logger.Logf(t, "Cleaning stale Consul resources before Helm install in OpenShift namespace %s", h.helmOptions.KubectlOptions.Namespace)
 
+	h.deleteStaleNamedSecretsForRelease(t, h.releaseName)
 	h.deleteGatewayHookJobsIfExistsForRelease(t, h.releaseName)
 	h.deleteStaleHelmReleases(t)
 	h.deleteStaleLabeledResources(t)
@@ -345,7 +346,6 @@ func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 		_, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Update(context.Background(), &webhook, metav1.UpdateOptions{})
 		deleteList(err)
 	}
-
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
 		pods, err := h.kubernetesClient.CoreV1().Pods(namespace).List(context.Background(), listOptions)
 		require.NoError(r, err)
@@ -357,6 +357,30 @@ func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 			r.Errorf("stale Consul pods still present after cleanup: %s", strings.Join(podNames, ", "))
 		}
 	})
+}
+
+func (h *HelmCluster) deleteStaleNamedSecretsForRelease(t require.TestingT, releaseName string) {
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	for _, secretName := range staleSecretNamesForRelease(releaseName) {
+		err := h.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			require.NoError(t, err)
+		}
+	}
+}
+
+func staleSecretNamesForRelease(releaseName string) []string {
+	if releaseName == "" {
+		return []string{
+			"consul-bootstrap-acl-token",
+			"consul-enterprise-license-acl-token",
+		}
+	}
+
+	return []string{
+		releaseName + "-consul-bootstrap-acl-token",
+		releaseName + "-consul-enterprise-license-acl-token",
+	}
 }
 
 func (h *HelmCluster) Destroy(t *testing.T) {
