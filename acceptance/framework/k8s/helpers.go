@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -138,10 +139,35 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 	var err error
 	retry.Run(t, func(r *retry.R) {
 		secret, err = sourceContext.KubernetesClient(r).CoreV1().Secrets(sourceContext.KubectlOptions(r).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
-		secret.ResourceVersion = ""
 		require.NoError(r, err)
 	})
-	secret.Namespace = destContext.KubectlOptions(t).Namespace
-	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destContext.KubectlOptions(t).Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	destNamespace := destContext.KubectlOptions(t).Namespace
+
+	secretToCopy := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        secret.Name,
+			Namespace:   destNamespace,
+			Labels:      secret.Labels,
+			Annotations: secret.Annotations,
+		},
+		Type:      secret.Type,
+		Data:      secret.Data,
+		Immutable: secret.Immutable,
+	}
+
+	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
+	if err != nil && apierrors.IsAlreadyExists(err) {
+		err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			require.NoError(t, err)
+		}
+
+		retry.Run(t, func(r *retry.R) {
+			_, createErr := destContext.KubernetesClient(r).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
+			require.NoError(r, createErr)
+		})
+		return
+	}
+
 	require.NoError(t, err)
 }
