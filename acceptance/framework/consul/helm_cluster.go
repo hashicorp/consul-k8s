@@ -363,6 +363,10 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		if err != nil && strings.Contains(err.Error(), "consul-gateway-cleanup\" already exists") {
+			h.deleteGatewayCleanupJobIfExists(r)
+			err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		}
 		// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
 		if err != nil && !strings.Contains(err.Error(), "not found") {
 			require.NoError(r, err)
@@ -616,6 +620,16 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	})
+}
+
+func (h *HelmCluster) deleteGatewayCleanupJobIfExists(t require.TestingT) {
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	jobName := fmt.Sprintf("%s-consul-gateway-cleanup", h.releaseName)
+
+	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, metav1.DeleteOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
