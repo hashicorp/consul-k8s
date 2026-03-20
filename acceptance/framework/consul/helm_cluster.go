@@ -41,6 +41,8 @@ const (
 	retryWaitDuration        = 20 * time.Second
 	retryMaxCount            = 5
 	staleConsulLabelSelector = "chart=consul-helm"
+	openShiftCleanupWait     = 5 * time.Second
+	openShiftCleanupCount    = 3
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -201,6 +203,12 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+		if err != nil && strings.Contains(err.Error(), "has no deployed releases") {
+			//TODO:: recheck this
+			// Helm can leave a release in history-only state; remove it so upgrade --install can succeed.
+			_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+		}
 		require.NoError(r, err)
 	})
 
@@ -262,6 +270,30 @@ func (h *HelmCluster) uninstallReleaseNoHooks(t *testing.T, releaseName string) 
 	return err
 }
 
+func fastDeleteOptions() metav1.DeleteOptions {
+	var gracePeriod int64 = 0
+	background := metav1.DeletePropagationBackground
+	return metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriod,
+		PropagationPolicy:  &background,
+	}
+}
+
+func (h *HelmCluster) cleanupDeleteOptions() metav1.DeleteOptions {
+	if h.isOpenShift {
+		return fastDeleteOptions()
+	}
+	return metav1.DeleteOptions{}
+}
+
+func (h *HelmCluster) cleanupRetryCounter() *retry.Counter {
+	if h.isOpenShift {
+		// OpenShift interrupt cleanup should be best-effort and quick.
+		return &retry.Counter{Wait: openShiftCleanupWait, Count: openShiftCleanupCount}
+	}
+	return &retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}
+}
+
 func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 	t.Helper()
 
@@ -284,7 +316,7 @@ func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 	deleteList(h.kubernetesClient.CoreV1().ServiceAccounts(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
 	deleteList(h.kubernetesClient.RbacV1().Roles(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
 	deleteList(h.kubernetesClient.RbacV1().RoleBindings(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
-	deleteList(h.kubernetesClient.BatchV1().Jobs(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
+	deleteList(h.kubernetesClient.BatchV1().Jobs(namespace).DeleteCollection(context.Background(), h.cleanupDeleteOptions(), listOptions))
 	deleteList(h.kubernetesClient.CoreV1().ConfigMaps(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
 	deleteList(h.kubernetesClient.CoreV1().Secrets(namespace).DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
 	deleteList(h.kubernetesClient.RbacV1().ClusterRoles().DeleteCollection(context.Background(), metav1.DeleteOptions{}, listOptions))
@@ -374,7 +406,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
 			h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
@@ -388,7 +420,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
-	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
 
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
@@ -522,7 +554,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, job := range jobs.Items {
 			if strings.Contains(job.Name, h.releaseName) {
-				err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
+				err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, h.cleanupDeleteOptions())
 				if !errors.IsNotFound(err) {
 					require.NoError(r, err)
 				}
@@ -639,7 +671,7 @@ func (h *HelmCluster) deleteGatewayCleanupJobIfExistsForRelease(t require.Testin
 	namespace := h.helmOptions.KubectlOptions.Namespace
 	jobName := fmt.Sprintf("%s-consul-gateway-cleanup", releaseName)
 
-	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, metav1.DeleteOptions{})
+	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
 	if err != nil && !errors.IsNotFound(err) {
 		require.NoError(t, err)
 	}
