@@ -103,10 +103,6 @@ module "eks" {
   tags = var.tags
 }
 
-resource "aws_ebs_encryption_by_default" "enable" {
-  enabled = true
-}
-
 # Multi cluster setup.
 # K8s Provider for the first cluster (cluster0)
 provider "kubernetes" {
