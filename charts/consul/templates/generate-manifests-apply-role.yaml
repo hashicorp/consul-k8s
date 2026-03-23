@@ -30,6 +30,7 @@ rules:
     - referencegrants
     - grpcroutes
     - udproutes
+    - serviceintentions
   verbs:
     - get
     - create
