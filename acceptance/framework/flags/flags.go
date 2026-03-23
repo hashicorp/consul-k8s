@@ -46,8 +46,6 @@ type TestFlags struct {
 	flagVaultHelmChartVersion  string
 	flagVaultServerVersion     string
 
-	flagHCPResourceID string
-
 	flagNoCleanupOnFailure bool
 	flagNoCleanup          bool
 
@@ -103,7 +101,6 @@ func (t *TestFlags) init() {
 	flag.Var(&t.flagKubecontexts, "kube-contexts", "The list of names of the Kubernetes contexts to use. If this is blank, "+
 		"the context set as the current context will be used by default.")
 	flag.Var(&t.flagKubeNamespaces, "kube-namespaces", "The list of Kubernetes namespaces to use for tests.")
-	flag.StringVar(&t.flagHCPResourceID, "hcp-resource-id", "", "The hcp resource id to use for all tests.")
 
 	flag.BoolVar(&t.flagEnableMultiCluster, "enable-multi-cluster", false,
 		"If true, the tests that require multiple Kubernetes clusters will be run. "+
@@ -244,8 +241,6 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		ConsulCollectorImage:   t.flagConsulCollectorImage,
 		VaultHelmChartVersion:  t.flagVaultHelmChartVersion,
 		VaultServerVersion:     t.flagVaultServerVersion,
-
-		HCPResourceID: t.flagHCPResourceID,
 
 		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
 		NoCleanup:          t.flagNoCleanup,

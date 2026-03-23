@@ -137,7 +137,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", "http://static-server")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80"}, "", "http://static-server")
 			} else {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}

@@ -189,6 +189,9 @@ const (
 	// iptables rules.
 	AnnotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
+	// AnnotationDualStack stores if pod need to run in dualstack mode.
+	AnnotationDualStack = "consul.hashicorp.com/dual-stack"
+
 	// AnnotationOriginalPod is the value of the pod before being overwritten by the consul
 	// webhook/meshWebhook.
 	AnnotationOriginalPod = "consul.hashicorp.com/original-pod"
@@ -232,6 +235,10 @@ const (
 	AnnotationSidecarProbePeriodSeconds            = "consul.hashicorp.com/sidecar-probe-period-seconds"
 	AnnotationSidecarProbeFailureThreshold         = "consul.hashicorp.com/sidecar-probe-failure-threshold"
 	AnnotationSidecarProbeCheckTimeoutSeconds      = "consul.hashicorp.com/sidecar-probe-check-timeout-seconds"
+
+	// annotations for sidecar access volumes.
+	AnnotationConsulSidecarAccessLogEnabled = "consul.hashicorp.com/consul-sidecar-access-log-enabled"
+	AnnotationConsulSidecarAccessLogPath    = "consul.hashicorp.com/consul-sidecar-access-log-path"
 )
 
 // Annotations used by Prometheus.

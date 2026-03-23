@@ -1,16 +1,16 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.25.1
+go 1.25.7
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20250930105947-1607d9a7ef5c
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.33.4
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17.0-rc1.0.20250930105947-1607d9a7ef5c
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17.2
 
-replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.22.0-rc1
+replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260112121053-7ee7c79b61f0
 
 // replace sigs.k8s.io/gateway-api/apis/v1alpha2 => ./gateway07/gateway-api-0.7.1/apis/v1alpha2
 
@@ -40,8 +40,8 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp v0.1.0
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.12
-	github.com/hashicorp/consul/api v1.33.0-rc1
-	github.com/hashicorp/consul/sdk v0.17.0-rc1
+	github.com/hashicorp/consul/api v1.33.2
+	github.com/hashicorp/consul/sdk v0.17.2
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v1.1.0
 	github.com/hashicorp/go-hclog v1.6.3
@@ -149,7 +149,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.13.0 // indirect
 	github.com/gophercloud/gophercloud v0.3.0 // indirect
-	github.com/hashicorp/consul/proto-public v0.7.0-rc1 // indirect
+	github.com/hashicorp/consul/proto-public v0.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-discover/provider/gce v0.0.0-20241120163552-5eb1507d16b4 // indirect
@@ -208,7 +208,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
