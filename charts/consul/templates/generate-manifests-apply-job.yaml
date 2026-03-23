@@ -48,11 +48,17 @@ spec:
         args:
           - |
             echo "Apply manifests in the PVC using kubectl"
-            kubectl apply -R -f /consul/config
+            kubectl apply -R -f /consul/config/gatewayapi
+            if [ -d "/consul/config/consulapi" ]; then
+              echo "Applying Consul API manifests"
+              kubectl apply -R -f /consul/config/consulapi
+              echo "Applying Consul service intentions"
+              kubectl replace -R -f /consul/config/serviceintentions 
+            fi
             echo "Done"
         volumeMounts:
           - name: gatewayapi-pvc
-            mountPath: /consul/config/gatewayapi
+            mountPath: /consul/config/
       {{- else }}
       containers:
       - name: apply
@@ -63,6 +69,12 @@ spec:
           - |
             echo "Applying manifests using oc"
             oc apply -R -f /consul/config
+            if [ -d "/consul/config/consulapi" ]; then
+              echo "Applying Consul API manifests"
+              oc apply -R -f /consul/config/consulapi
+              echo "Applying Consul service intentions"
+              oc replace -R -f /consul/config/serviceintentions 
+            fi
             echo "Done"
         volumeMounts:
           - name: gatewayapi-pvc

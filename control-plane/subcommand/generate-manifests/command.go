@@ -86,6 +86,7 @@ type Command struct {
 	flagRelease                string
 	flagManifestsGatewayAPIDir string
 	flagManifestsConsulAPIDir  string
+	consulServiceIntentionsDir string
 
 	flagOpenshiftSCCName string
 
@@ -136,6 +137,7 @@ func (c *Command) init() {
 		"/output/consulapi",
 		"Directory where Consul API objects will be dumped. This is only applicable if -consulapi-enabled is set to true.",
 	)
+	c.flags.StringVar(&c.consulServiceIntentionsDir, "consul-service-intentions-dir", "/output/serviceintentions", "Directory where Consul service intentions will be dumped.")
 
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
@@ -271,6 +273,11 @@ func (c *Command) dumpGatewayAPIObjects() error {
 	// fetch udproutes from gwv1alpha2
 	if err := c.dumpTypedList(ctx, "udproutes", &gwv1alpha2.UDPRouteList{}); err != nil {
 		c.UI.Info(fmt.Sprintf("Skipping UDPRoute dump: %v", err))
+	}
+
+	// fetch service intentions from consul.hashicorp.com/v1alpha1
+	if err := c.dumpTypedList(ctx, "serviceintentions", &v1alpha1.ServiceIntentionsList{}); err != nil {
+		c.UI.Info(fmt.Sprintf("Skipping ServiceIntention dump: %v", err))
 	}
 
 	return nil
@@ -419,6 +426,65 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 		}
 		metadata["name"] = "api-gateway-ocp"
 	}
+
+	// for service intentions, we will update the sources to have a new source with name <original-name>-ocp
+	if kind == "ServiceIntentions" {
+		spec, ok := raw["spec"].(map[string]interface{})
+		if !ok {
+			return
+		}
+		sources, ok := spec["sources"].([]interface{})
+		if !ok {
+			return
+		}
+		var newSources []interface{}
+
+		// check if api-gateway-ocp is present or not, if not and if api-gateway is present , then add. Can we use for in loop to find the source with name api-gateway and then add a new source with same details but name api-gateway-ocp?
+		if !containsSourceName(sources, "api-gateway-ocp") && containsSourceName(sources, "api-gateway") {
+			fmt.Println("Adding new source with name api-gateway-ocp to ServiceIntentions since api-gateway source is present and api-gateway-ocp is not present")
+			for _, s := range sources {
+				srcMap, ok := s.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				// deep copy the source
+				copied := deepCopyMap(srcMap)
+
+				name, _ := srcMap["name"].(string)
+				// if name is empty or not named after gateway: 'api-gateway', then skip it since it is not relevant.
+				if name == "" || name != "api-gateway" {
+					continue
+				}
+
+				// update name if it is named api-gateway
+
+				copied["name"] = name + "-ocp"
+
+				newSources = append(newSources, copied)
+			}
+		} else {
+			return
+		}
+
+		// append new sources
+		spec["sources"] = append(sources, newSources...)
+	}
+
+}
+
+func containsSourceName(sources []interface{}, targetName string) bool {
+	for _, s := range sources {
+		srcMap, ok := s.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := srcMap["name"].(string)
+		if name == targetName {
+			return true
+		}
+	}
+	return false
 }
 
 func extractItems(list client.ObjectList) ([]client.Object, error) {
@@ -506,6 +572,14 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 		}
 		return out, nil
 
+	// for service intentions
+	case *v1alpha1.ServiceIntentionsList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported list type: %T", list)
 	}
@@ -530,19 +604,7 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 // 	return c.writeObjects(kindDir, items)
 // }
 
-func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
-	gatewayAPIDir := filepath.Join(c.flagManifestsGatewayAPIDir, kindDir)
-	if err := os.MkdirAll(gatewayAPIDir, 0755); err != nil {
-		return err
-	}
-	var consulDir string
-	if c.consulApiEnabled {
-		consulDir = filepath.Join(c.flagManifestsConsulAPIDir, kindDir)
-		if err := os.MkdirAll(consulDir, 0755); err != nil {
-			return err
-		}
-	}
-
+func (c *Command) writeGatewayObjects(directory string, objs []client.Object) error {
 	for index, obj := range objs {
 		ns := obj.GetNamespace()
 		if ns == "" {
@@ -554,7 +616,7 @@ func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
 
 		filename = safeFileName(filename)
 
-		path := filepath.Join(gatewayAPIDir, filename)
+		path := filepath.Join(directory, filename)
 
 		// Convert to unstructured for sanitization
 		raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -564,46 +626,93 @@ func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
 
 		sanitizeUnstructured(raw)
 
-		// gateway API manifests
+		enforceGatewayAPIVersion(raw)
 
-		gatewayRaw := deepCopyMap(raw)
-
-		enforceGatewayAPIVersion(gatewayRaw)
-
-		yml, err := yaml.Marshal(gatewayRaw)
+		yml, err := yaml.Marshal(raw)
 		if err != nil {
-			return fmt.Errorf("yaml marshal failed (%s/%s): %w", ns, name, err)
+			return fmt.Errorf("yaml marshal failed for gateway api version(%s/%s): %w", ns, name, err)
 		}
 		if err := os.WriteFile(path, yml, 0644); err != nil {
-			return fmt.Errorf("write failed (%s): %w", path, err)
+			return fmt.Errorf("write failed for gateway api version(%s): %w", path, err)
+		}
+	}
+	fmt.Printf("✅ Gateway API objects dumped into: %s\n", directory)
+	return nil
+}
+
+func (c *Command) writeConsulObjects(directory string, objs []client.Object) error {
+	for index, obj := range objs {
+		ns := obj.GetNamespace()
+		if ns == "" {
+			ns = "cluster"
+		}
+		name := obj.GetName()
+
+		filename := fmt.Sprintf("%d-%s-%s.yaml", index, ns, name)
+
+		filename = safeFileName(filename)
+
+		path := filepath.Join(directory, filename)
+
+		// Convert to unstructured for sanitization
+		raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+		if err != nil {
+			return fmt.Errorf("convert to unstructured failed (%s/%s): %w", ns, name, err)
 		}
 
-		// call this function only when consulApiEnabled is true; This generates another set of manifests for consul.hashicorp.com API group.
-		// make another copy of raw to update the apiVersion for consul.hashicorp.com CRDs without affecting the gateway.networking.k8s.io versions
-		if c.consulApiEnabled {
-			// this will update the apiVersion for consul.hashicorp.com CRDs to v1alpha1
-			consulRaw := deepCopyMap(raw)
-			enforceConsulApiVersion(consulRaw)
-			yml, err := yaml.Marshal(consulRaw)
-			if err != nil {
-				return fmt.Errorf("yaml marshal failed for consul api version (%s/%s): %w", ns, name, err)
-			}
-			path := filepath.Join(consulDir, filename)
-			if err := os.WriteFile(path, yml, 0644); err != nil {
-				return fmt.Errorf("write failed for consul api version (%s): %w", path, err)
-			}
+		sanitizeUnstructured(raw)
 
+		enforceConsulApiVersion(raw)
+
+		yml, err := yaml.Marshal(raw)
+		if err != nil {
+			return fmt.Errorf("yaml marshal failed for consul api version(%s/%s): %w", ns, name, err)
 		}
-
-		// update the apiVersion to remove k8s.io specific versions
+		if err := os.WriteFile(path, yml, 0644); err != nil {
+			return fmt.Errorf("write failed for consul api version(%s): %w", path, err)
+		}
 
 	}
+	fmt.Printf("✅ Consul API objects dumped into: %s\n", directory)
+	return nil
+}
 
-	c.UI.Info(fmt.Sprintf("✅ dumped %d objects into %s", len(objs), gatewayAPIDir))
+func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
+	// if KindDir is serviceintentions and c.consulApiEnabled is false, then we should skip since service intentions are already set
+	if kindDir == "serviceintentions" && !c.consulApiEnabled {
+		return nil
+	}
+
+	gatewayAPIDir := filepath.Join(c.flagManifestsGatewayAPIDir, kindDir)
+	if err := os.MkdirAll(gatewayAPIDir, 0755); err != nil {
+		return err
+	}
+
+	if kindDir != "serviceintentions" {
+		if err := c.writeGatewayObjects(gatewayAPIDir, objs); err != nil {
+			return err
+		}
+	}
+	var consulDir string
+	// call this function only when consulApiEnabled is true; This generates another set of manifests for consul.hashicorp.com API group.
+	// make another copy of raw to update the apiVersion for consul.hashicorp.com CRDs without affecting the gateway.networking.k8s.io versions
+
 	if c.consulApiEnabled {
-		c.UI.Info(fmt.Sprintf("✅ dumped %d objects into %s", len(objs), consulDir))
+		if kindDir == "serviceintentions" {
+			consulDir = c.consulServiceIntentionsDir
+		} else {
+			consulDir = filepath.Join(c.flagManifestsConsulAPIDir, kindDir)
+		}
+
+		if err := os.MkdirAll(consulDir, 0755); err != nil {
+			return err
+		}
+		if err := c.writeConsulObjects(consulDir, objs); err != nil {
+			return err
+		}
 	}
 	return nil
+
 }
 
 func sanitizeUnstructured(obj map[string]interface{}) {
