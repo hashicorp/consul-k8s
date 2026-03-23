@@ -46,7 +46,7 @@ func trimSuffix(s, suffix string) string {
 // GetHelmValues retrieves the Helm values from the ConfigMap.
 func GetHelmValues(ctx context.Context, k8sClient client.Client, releaseName, namespace string) (*HelmValues, error) {
 	cm := &corev1.ConfigMap{}
-	configMapName := fmt.Sprintf("%s-consul-helm-values", releaseName)
+	configMapName := fmt.Sprintf("helm-values")
 
 	err := k8sClient.Get(ctx, types.NamespacedName{
 		Name:      configMapName,

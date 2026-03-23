@@ -72,13 +72,10 @@ type TerminatingGatewaySpec struct {
 type TerminatingGatewayDeploymentSpec struct {
 
 	// Enabled controls whether to create a Deployment for this gateway
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	Enabled *bool `json:"enabled,omitempty"`
+	EnableDeployment *bool `json:"enabledDeployment,omitempty"`
 
 	// GatewayName is the name of the gateway service in Consul
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=terminating-gateway
 	GatewayName string `json:"gatewayName,omitempty"`
 
 	// Replicas is the number of pod instances to deploy
@@ -88,7 +85,6 @@ type TerminatingGatewayDeploymentSpec struct {
 
 	// Resources define CPU and memory requests/limits for the pod
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default:={requests: {memory: "100Mi", cpu: "100m"}, limits: {memory: "100Mi", cpu: "100m"}}
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 
 	// Affinity defines pod scheduling affinity rules
@@ -125,15 +121,12 @@ type TerminatingGatewayDeploymentSpec struct {
 
 	// ConsulNamespace is the Consul namespace where the gateway is registered
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="default"
 	ConsulNamespace string `json:"consulNamespace,omitempty"`
 
 	// LogLevel sets the logging level for the gateway
-	// +kubebuilder:default=info
 	LogLevel string `json:"logLevel,omitempty"`
 
 	// LogJSON enables JSON formatted logging
-	// +kubebuilder:default=false
 	LogJSON *bool `json:"logJSON,omitempty"`
 }
 
@@ -234,6 +227,9 @@ func (in *TerminatingGateway) ConsulGlobalResource() bool {
 }
 
 func (in *TerminatingGateway) ConsulMirroringNS() string {
+	if in.Spec.Deployment.ConsulNamespace != "" {
+		return in.Spec.Deployment.ConsulNamespace
+	}
 	return in.Namespace
 }
 
@@ -242,6 +238,9 @@ func (in *TerminatingGateway) KubeKind() string {
 }
 
 func (in *TerminatingGateway) ConsulName() string {
+	if in.Spec.Deployment.GatewayName != "" {
+		return in.Spec.Deployment.GatewayName
+	}
 	return in.ObjectMeta.Name
 }
 

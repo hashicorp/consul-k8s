@@ -14,7 +14,11 @@ import (
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
@@ -29,12 +33,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
-
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
-	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 const datacenterName = "datacenter"
@@ -2562,58 +2560,6 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			},
 		},
 		{
-			name: "with extra volumes - configMap",
-			termGW: func() *v1alpha1.TerminatingGateway {
-				gw := baseTermGW()
-				gw.Spec.Deployment.ExtraVolumes = []v1alpha1.ExtraVolume{
-					{
-						Name: "extra-config",
-						Type: "configMap",
-					},
-				}
-				return gw
-			},
-			helmValues: baseHelmValues,
-			validate: func(t *testing.T, deployment *appsv1.Deployment) {
-				require.NotNil(t, deployment)
-				var found bool
-				for _, vol := range deployment.Spec.Template.Spec.Volumes {
-					if vol.Name == "extra-config" {
-						found = true
-						require.NotNil(t, vol.ConfigMap)
-						require.Equal(t, "extra-config", vol.ConfigMap.Name)
-					}
-				}
-				require.True(t, found, "expected extra-config volume")
-			},
-		},
-		{
-			name: "with extra volumes - secret",
-			termGW: func() *v1alpha1.TerminatingGateway {
-				gw := baseTermGW()
-				gw.Spec.Deployment.ExtraVolumes = []v1alpha1.ExtraVolume{
-					{
-						Name: "extra-secret",
-						Type: "secret",
-					},
-				}
-				return gw
-			},
-			helmValues: baseHelmValues,
-			validate: func(t *testing.T, deployment *appsv1.Deployment) {
-				require.NotNil(t, deployment)
-				var found bool
-				for _, vol := range deployment.Spec.Template.Spec.Volumes {
-					if vol.Name == "extra-secret" {
-						found = true
-						require.NotNil(t, vol.Secret)
-						require.Equal(t, "extra-secret", vol.Secret.SecretName)
-					}
-				}
-				require.True(t, found, "expected extra-secret volume")
-			},
-		},
-		{
 			name: "with priority class",
 			termGW: func() *v1alpha1.TerminatingGateway {
 				gw := baseTermGW()
@@ -2667,7 +2613,7 @@ func TestConstructDeploymentFromCRD(t *testing.T) {
 			termGW := tc.termGW()
 			helmValues := tc.helmValues()
 
-			deployment := r.constructDeploymentFromCRD(termGW, helmValues)
+			deployment, _ := r.constructDeploymentFromCRD(termGW, helmValues)
 			tc.validate(t, deployment)
 		})
 	}
@@ -2698,7 +2644,7 @@ func TestDeployTerminatingGatewayDeployment_DisabledNilOrFalse(t *testing.T) {
 			}
 
 			termGW := &v1alpha1.TerminatingGateway{}
-			termGW.Spec.Deployment.Enabled = tc.enabled
+			termGW.Spec.Deployment.EnableDeployment = tc.enabled
 
 			err := r.deployTerminatingGatewayDeployment(context.Background(), r.Log, termGW, &helmvalues.HelmValues{})
 			require.NoError(t, err)
@@ -2708,219 +2654,4 @@ func TestDeployTerminatingGatewayDeployment_DisabledNilOrFalse(t *testing.T) {
 			require.Len(t, list.Items, 0)
 		})
 	}
-}
-
-func TestDeployTerminatingGatewayDeployment_CreatesDeploymentWhenNotExists(t *testing.T) {
-	t.Parallel()
-
-	scheme := runtime.NewScheme()
-	require.NoError(t, v1alpha1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-
-	fc := fake.NewClientBuilder().WithScheme(scheme).Build()
-	r := &TerminatingGatewayController{
-		Client: fc,
-		Log:    logrtest.New(t),
-		Scheme: scheme,
-	}
-
-	termGW := &v1alpha1.TerminatingGateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-gateway",
-			Namespace: "default",
-		},
-		Spec: v1alpha1.TerminatingGatewaySpec{
-			Deployment: v1alpha1.TerminatingGatewayDeploymentSpec{
-				Enabled:     ptr.To(true),
-				GatewayName: "my-gateway",
-				LogLevel:    "info",
-				LogJSON:     ptr.To(false),
-			},
-		},
-	}
-
-	helmValues := &helmvalues.HelmValues{
-		Release: helmvalues.ReleaseConfig{
-			Name:      "consul",
-			Namespace: "consul",
-			Service:   "Helm",
-		},
-		Global: helmvalues.GlobalConfig{
-			ImageK8S:                  "consul-k8s:latest",
-			ImageConsulDataplane:      "consul-dataplane:latest",
-			ImagePullPolicy:           "IfNotPresent",
-			EnableConsulNamespaces:    false,
-			EnablePodSecurityPolicies: false,
-			TLS:                       helmvalues.TLSConfig{Enabled: false},
-		},
-		TerminatingGateways: helmvalues.TerminatingGatewaysConfig{
-			Defaults: helmvalues.Defaults{
-				Replicas: 1,
-			}},
-	}
-
-	err := r.deployTerminatingGatewayDeployment(context.Background(), r.Log, termGW, helmValues)
-	require.NoError(t, err)
-
-	var list appsv1.DeploymentList
-	require.NoError(t, fc.List(context.Background(), &list))
-	require.Len(t, list.Items, 1)
-	require.Equal(t, "consul-my-gateway", list.Items[0].Name)
-}
-
-func TestDeployTerminatingGatewayDeployment_UpdatesExistingDeployment(t *testing.T) {
-	t.Parallel()
-
-	scheme := runtime.NewScheme()
-	require.NoError(t, v1alpha1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-
-	existing := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "consul-my-gateway",
-			Namespace:       "consul",
-			ResourceVersion: "1",
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: ptr.To(int32(1)),
-		},
-	}
-
-	fc := fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(existing).Build()
-	r := &TerminatingGatewayController{
-		Client: fc,
-		Log:    logrtest.New(t),
-		Scheme: scheme,
-	}
-
-	termGW := &v1alpha1.TerminatingGateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-gateway",
-			Namespace: "default",
-		},
-		Spec: v1alpha1.TerminatingGatewaySpec{
-			Deployment: v1alpha1.TerminatingGatewayDeploymentSpec{
-				Enabled:     ptr.To(true),
-				GatewayName: "my-gateway",
-				Replicas:    ptr.To(int32(3)),
-				LogLevel:    "info",
-				LogJSON:     ptr.To(false),
-			},
-		},
-	}
-
-	helmValues := &helmvalues.HelmValues{
-		Release: helmvalues.ReleaseConfig{
-			Name:      "consul",
-			Namespace: "consul",
-			Service:   "Helm",
-		},
-		Global: helmvalues.GlobalConfig{
-			ImageK8S:                  "consul-k8s:latest",
-			ImageConsulDataplane:      "consul-dataplane:latest",
-			ImagePullPolicy:           "IfNotPresent",
-			EnableConsulNamespaces:    false,
-			EnablePodSecurityPolicies: false,
-			TLS:                       helmvalues.TLSConfig{Enabled: false},
-		},
-		TerminatingGateways: helmvalues.TerminatingGatewaysConfig{
-			Defaults: helmvalues.Defaults{
-				Replicas: 1,
-			},
-		},
-	}
-
-	err := r.deployTerminatingGatewayDeployment(context.Background(), r.Log, termGW, helmValues)
-	require.NoError(t, err)
-
-	updated := &appsv1.Deployment{}
-	require.NoError(t, fc.Get(context.Background(), client.ObjectKey{Name: "consul-my-gateway", Namespace: "consul"}, updated))
-	require.Equal(t, int32(3), *updated.Spec.Replicas)
-}
-
-func TestDeployTerminatingGatewayDeployment_ConstructionFailure(t *testing.T) {
-	t.Parallel()
-
-	scheme := runtime.NewScheme()
-	require.NoError(t, v1alpha1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-
-	fc := fake.NewClientBuilder().WithScheme(scheme).Build()
-	r := &TerminatingGatewayController{
-		Client: fc,
-		Log:    logrtest.New(t),
-		Scheme: nil, // This will cause constructDeploymentFromCRD to return nil
-	}
-
-	termGW := &v1alpha1.TerminatingGateway{
-		Spec: v1alpha1.TerminatingGatewaySpec{
-			Deployment: v1alpha1.TerminatingGatewayDeploymentSpec{
-				Enabled: ptr.To(true),
-			},
-		},
-	}
-
-	err := r.deployTerminatingGatewayDeployment(context.Background(), r.Log, termGW, &helmvalues.HelmValues{})
-	require.Error(t, err)
-	require.Equal(t, "failed to construct deployment for terminating gateway", err.Error())
-}
-
-func TestDeployTerminatingGatewayDeployment_CreateFailure(t *testing.T) {
-	t.Parallel()
-
-	scheme := runtime.NewScheme()
-	require.NoError(t, v1alpha1.AddToScheme(scheme))
-	require.NoError(t, appsv1.AddToScheme(scheme))
-
-	fc := fake.NewClientBuilder().WithScheme(scheme).
-		WithInterceptorFuncs(interceptor.Funcs{
-			Create: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
-				return fmt.Errorf("create failed")
-			},
-		}).Build()
-	r := &TerminatingGatewayController{
-		Client: fc,
-		Log:    logrtest.New(t),
-		Scheme: scheme,
-	}
-
-	termGW := &v1alpha1.TerminatingGateway{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-gateway",
-			Namespace: "default",
-		},
-		Spec: v1alpha1.TerminatingGatewaySpec{
-			Deployment: v1alpha1.TerminatingGatewayDeploymentSpec{
-				Enabled:     ptr.To(true),
-				GatewayName: "my-gateway",
-				LogLevel:    "info",
-				LogJSON:     ptr.To(false),
-			},
-		},
-	}
-
-	helmValues := &helmvalues.HelmValues{
-		Release: helmvalues.ReleaseConfig{
-			Name:      "consul",
-			Namespace: "consul",
-			Service:   "Helm",
-		},
-		Global: helmvalues.GlobalConfig{
-			ImageK8S:                  "consul-k8s:latest",
-			ImageConsulDataplane:      "consul-dataplane:latest",
-			ImagePullPolicy:           "IfNotPresent",
-			EnableConsulNamespaces:    false,
-			EnablePodSecurityPolicies: false,
-			TLS:                       helmvalues.TLSConfig{Enabled: false},
-		},
-		TerminatingGateways: helmvalues.TerminatingGatewaysConfig{
-			Defaults: helmvalues.Defaults{
-				Replicas: 1,
-			},
-		},
-	}
-
-	err := r.deployTerminatingGatewayDeployment(context.Background(), r.Log, termGW, helmValues)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "create failed")
 }

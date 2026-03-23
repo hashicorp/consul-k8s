@@ -75,7 +75,7 @@ type TerminatingGatewaysConfig struct {
 type Defaults struct {
 	Replicas                  int                    `json:"replicas"`
 	ConsulNamespace           string                 `json:"consulNamespace"`
-	Annotations               string                 `json:"annotations"`
+	Annotations               map[string]string      `json:"annotations"`
 	Affinity                  string                 `json:"affinity"`
 	Tolerations               string                 `json:"tolerations"`
 	TopologySpreadConstraints string                 `json:"topologySpreadConstraints"`
