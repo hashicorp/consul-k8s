@@ -25,6 +25,8 @@ container {
   triage {
     suppress {
       vulnerabilites = [
+        "ALPINE-CVE-2026-27171",
+        "ALPINE-CVE-2026-22184",
         // The OSV scanner will trip on several packages that are included in the
         // the UBI images. This is due to RHEL using the same base version in the
         // package name for the life of the distro regardless of whether or not
