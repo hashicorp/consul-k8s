@@ -18,9 +18,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
-	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -1044,7 +1044,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 		},
 		Spec: v1alpha1.GatewayClassConfigSpec{},
 	}
-	gwClass := &gwv1beta1.OcpGatewayClass{
+	gwClass := &gwv1beta1.CustomGatewayClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClass",
 			APIVersion: "gateway.networking.k8s.io/v1beta1",
@@ -1600,33 +1600,33 @@ func createJWTProvider(t *testing.T, ctx context.Context, k8sClient client.WithW
 }
 
 func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway, providerName string) {
-	policy := &v1alpha1.OcpGatewayPolicy{
+	policy := &v1alpha1.CustomGatewayPolicy{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "GatewayPolicy",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gw-policy",
 		},
-		Spec: v1alpha1.OcpGatewayPolicySpec{
-			TargetRef: v1alpha1.OcpPolicyTargetReference{
+		Spec: v1alpha1.CustomGatewayPolicySpec{
+			TargetRef: v1alpha1.CustomPolicyTargetReference{
 				Group:       gw.GroupVersionKind().Group,
 				Kind:        gw.GroupVersionKind().Kind,
 				Name:        gw.Name,
 				Namespace:   gw.Namespace,
 				SectionName: &gw.Spec.Listeners[0].Name,
 			},
-			Override: &v1alpha1.OcpGatewayPolicyConfig{
-				JWT: &v1alpha1.OcpGatewayJWTRequirement{
-					Providers: []*v1alpha1.OcpGatewayJWTProvider{
+			Override: &v1alpha1.CustomGatewayPolicyConfig{
+				JWT: &v1alpha1.CustomGatewayJWTRequirement{
+					Providers: []*v1alpha1.CustomGatewayJWTProvider{
 						{
 							Name: providerName,
 						},
 					},
 				},
 			},
-			Default: &v1alpha1.OcpGatewayPolicyConfig{
-				JWT: &v1alpha1.OcpGatewayJWTRequirement{
-					Providers: []*v1alpha1.OcpGatewayJWTProvider{
+			Default: &v1alpha1.CustomGatewayPolicyConfig{
+				JWT: &v1alpha1.CustomGatewayJWTRequirement{
+					Providers: []*v1alpha1.CustomGatewayJWTProvider{
 						{
 							Name: providerName,
 						},

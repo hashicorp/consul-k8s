@@ -6,7 +6,7 @@ package common
 import (
 	"strings"
 
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul/api"
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"

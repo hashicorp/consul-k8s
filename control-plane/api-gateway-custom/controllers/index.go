@@ -8,8 +8,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -19,25 +19,25 @@ import (
 
 const (
 	// Naming convention: TARGET_REFERENCE.
-	GatewayClass_GatewayClassConfigIndex = "__ocp_gatewayclass_referencing_gatewayclassconfig"
-	GatewayClass_ControllerNameIndex     = "__ocp_gatewayclass_controller_name"
+	GatewayClass_GatewayClassConfigIndex = "__custom_gatewayclass_referencing_gatewayclassconfig"
+	GatewayClass_ControllerNameIndex     = "__custom_gatewayclass_controller_name"
 
-	Gateway_GatewayClassIndex = "__ocp_gateway_referencing_gatewayclass"
+	Gateway_GatewayClassIndex = "__custom_gateway_referencing_gatewayclass"
 
-	HTTPRoute_GatewayIndex            = "__ocp_httproute_referencing_gateway"
-	HTTPRoute_ServiceIndex            = "__ocp_httproute_referencing_service"
-	HTTPRoute_MeshServiceIndex        = "__ocp_httproute_referencing_mesh_service"
-	HTTPRoute_RouteRetryFilterIndex   = "__ocp_httproute_referencing_retryfilter"
-	HTTPRoute_RouteTimeoutFilterIndex = "__ocp_httproute_referencing_timeoutfilter"
-	HTTPRoute_RouteAuthFilterIndex    = "__ocp_httproute_referencing_routeauthfilter"
+	HTTPRoute_GatewayIndex            = "__custom_httproute_referencing_gateway"
+	HTTPRoute_ServiceIndex            = "__custom_httproute_referencing_service"
+	HTTPRoute_MeshServiceIndex        = "__custom_httproute_referencing_mesh_service"
+	HTTPRoute_RouteRetryFilterIndex   = "__custom_httproute_referencing_retryfilter"
+	HTTPRoute_RouteTimeoutFilterIndex = "__custom_httproute_referencing_timeoutfilter"
+	HTTPRoute_RouteAuthFilterIndex    = "__custom_httproute_referencing_routeauthfilter"
 
-	TCPRoute_GatewayIndex     = "__ocp_tcproute_referencing_gateway"
-	TCPRoute_ServiceIndex     = "__ocp_tcproute_referencing_service"
-	TCPRoute_MeshServiceIndex = "__ocp_tcproute_referencing_mesh_service"
+	TCPRoute_GatewayIndex     = "__custom_tcproute_referencing_gateway"
+	TCPRoute_ServiceIndex     = "__custom_tcproute_referencing_service"
+	TCPRoute_MeshServiceIndex = "__custom_tcproute_referencing_mesh_service"
 
-	MeshService_PeerIndex      = "__ocp_meshservice_referencing_peer"
-	Secret_GatewayIndex        = "__ocp_secret_referencing_gateway"
-	Gatewaypolicy_GatewayIndex = "__ocp_gatewaypolicy_referencing_gateway"
+	MeshService_PeerIndex      = "__custom_meshservice_referencing_peer"
+	Secret_GatewayIndex        = "__custom_secret_referencing_gateway"
+	Gatewaypolicy_GatewayIndex = "__custom_gatewaypolicy_referencing_gateway"
 )
 
 // RegisterFieldIndexes registers all of the field indexes for the API gateway controllers.
@@ -61,12 +61,12 @@ type index struct {
 var indexes = []index{
 	{
 		name:        GatewayClass_GatewayClassConfigIndex,
-		target:      &gwv1beta1.OcpGatewayClass{},
+		target:      &gwv1beta1.CustomGatewayClass{},
 		indexerFunc: gatewayClassConfigForGatewayClass,
 	},
 	{
 		name:        GatewayClass_ControllerNameIndex,
-		target:      &gwv1beta1.OcpGatewayClass{},
+		target:      &gwv1beta1.CustomGatewayClass{},
 		indexerFunc: gatewayClassControllerName,
 	},
 	{
@@ -131,14 +131,14 @@ var indexes = []index{
 	},
 	{
 		name:        Gatewaypolicy_GatewayIndex,
-		target:      &v1alpha1.OcpGatewayPolicy{},
+		target:      &v1alpha1.CustomGatewayPolicy{},
 		indexerFunc: gatewayForGatewayPolicy,
 	},
 }
 
 // gatewayClassConfigForGatewayClass creates an index of every GatewayClassConfig referenced by a GatewayClass.
 func gatewayClassConfigForGatewayClass(o client.Object) []string {
-	gc := o.(*gwv1beta1.OcpGatewayClass)
+	gc := o.(*gwv1beta1.CustomGatewayClass)
 
 	pr := gc.Spec.ParametersRef
 	if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {
@@ -149,7 +149,7 @@ func gatewayClassConfigForGatewayClass(o client.Object) []string {
 }
 
 func gatewayClassControllerName(o client.Object) []string {
-	gc := o.(*gwv1beta1.OcpGatewayClass)
+	gc := o.(*gwv1beta1.CustomGatewayClass)
 
 	if gc.Spec.ControllerName != "" {
 		return []string{string(gc.Spec.ControllerName)}

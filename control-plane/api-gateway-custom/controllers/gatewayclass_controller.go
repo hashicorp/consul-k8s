@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -32,7 +32,7 @@ const (
 // GatewayClassController reconciles a GatewayClass object.
 // The GatewayClass is responsible for defining the behavior of API gateways
 // which reference the given class.
-type OcpGatewayClassController struct {
+type CustomGatewayClassController struct {
 	ControllerName string
 	Log            logr.Logger
 
@@ -40,11 +40,11 @@ type OcpGatewayClassController struct {
 }
 
 // Reconcile handles the reconciliation loop for GatewayClass objects.
-func (r *OcpGatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("ocp gatewayClass", req.NamespacedName.Name)
+func (r *CustomGatewayClassController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.Log.WithValues("custom gatewayClass", req.NamespacedName.Name)
 	log.Info("Reconciling GatewayClass")
 
-	gc := &gwv1beta1.OcpGatewayClass{}
+	gc := &gwv1beta1.CustomGatewayClass{}
 
 	err := r.Client.Get(ctx, req.NamespacedName, gc)
 	if err != nil {
@@ -126,10 +126,10 @@ func (r *OcpGatewayClassController) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // SetupWithManager registers the controller with the given manager.
-func (r *OcpGatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *CustomGatewayClassController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("gatewayclass-custom").
-		For(&gwv1beta1.OcpGatewayClass{}).
+		For(&gwv1beta1.CustomGatewayClass{}).
 		// Watch for changes to GatewayClassConfig objects.
 		Watches(&v1alpha1.GatewayClassConfig{}, r.gatewayClassConfigFieldIndexEventHandler()).
 		// Watch for changes to Gateway objects that reference this GatewayClass.
@@ -138,7 +138,7 @@ func (r *OcpGatewayClassController) SetupWithManager(ctx context.Context, mgr ct
 }
 
 // isGatewayClassInUse returns true if the given GatewayClass is referenced by any Gateway objects.
-func (r *OcpGatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.OcpGatewayClass) (bool, error) {
+func (r *CustomGatewayClassController) isGatewayClassInUse(ctx context.Context, gc *gwv1beta1.CustomGatewayClass) (bool, error) {
 	list := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gc.Name),
@@ -151,7 +151,7 @@ func (r *OcpGatewayClassController) isGatewayClassInUse(ctx context.Context, gc 
 
 // validateParametersRef validates the ParametersRef field of the given GatewayClass
 // if it is set, ensuring that the referenced object is a GatewayClassConfig that exists.
-func (r *OcpGatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.OcpGatewayClass, log logr.Logger) (didUpdate bool, err error) {
+func (r *CustomGatewayClassController) validateParametersRef(ctx context.Context, gc *gwv1beta1.CustomGatewayClass, log logr.Logger) (didUpdate bool, err error) {
 	parametersRef := gc.Spec.ParametersRef
 	if parametersRef != nil {
 		if parametersRef.Kind != v1alpha1.GatewayClassConfigKind {
@@ -191,7 +191,7 @@ func (r *OcpGatewayClassController) validateParametersRef(ctx context.Context, g
 }
 
 // setCondition sets the given condition on the given GatewayClass.
-func (r *OcpGatewayClassController) setCondition(gc *gwv1beta1.OcpGatewayClass, condition metav1.Condition) (didUpdate bool) {
+func (r *CustomGatewayClassController) setCondition(gc *gwv1beta1.CustomGatewayClass, condition metav1.Condition) (didUpdate bool) {
 	condition.LastTransitionTime = metav1.Now()
 	condition.ObservedGeneration = gc.GetGeneration()
 
@@ -218,12 +218,12 @@ func (r *OcpGatewayClassController) setCondition(gc *gwv1beta1.OcpGatewayClass, 
 // gatewayClassConfigFieldIndexEventHandler returns an EventHandler that will enqueue
 // reconcile.Requests for GatewayClass objects that reference the GatewayClassConfig
 // object that triggered the event.
-func (r *OcpGatewayClassController) gatewayClassConfigFieldIndexEventHandler() handler.EventHandler {
+func (r *CustomGatewayClassController) gatewayClassConfigFieldIndexEventHandler() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 		requests := []reconcile.Request{}
 
 		// Get all GatewayClass objects from the field index of the GatewayClassConfig which triggered the event.
-		var gcList gwv1beta1.OcpGatewayClassList
+		var gcList gwv1beta1.CustomGatewayClassList
 		err := r.Client.List(ctx, &gcList, &client.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(GatewayClass_GatewayClassConfigIndex, o.GetName()),
 		})
@@ -247,7 +247,7 @@ func (r *OcpGatewayClassController) gatewayClassConfigFieldIndexEventHandler() h
 // gatewayFieldIndexEventHandler returns an EventHandler that will enqueue
 // reconcile.Requests for GatewayClass objects from Gateways which reference the GatewayClass
 // when those Gateways are updated.
-func (r *OcpGatewayClassController) gatewayFieldIndexEventHandler() handler.EventHandler {
+func (r *CustomGatewayClassController) gatewayFieldIndexEventHandler() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 		// Get the Gateway object that triggered the event.
 		g := o.(*gwv1beta1.Gateway)

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -24,7 +24,7 @@ const (
 )
 
 // The GatewayClassConfigController manages the state of GatewayClassConfigs.
-type OcpGatewayClassConfigController struct {
+type CustomGatewayClassConfigController struct {
 	client.Client
 
 	Log logr.Logger
@@ -34,8 +34,8 @@ type OcpGatewayClassConfigController struct {
 // move the current state of the cluster closer to the desired state.
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.8.3/pkg/reconcile
-func (r *OcpGatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("ocp gatewayClassConfig", req.NamespacedName.Name)
+func (r *CustomGatewayClassConfigController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.Log.WithValues("custom gatewayClassConfig", req.NamespacedName.Name)
 	log.Info("Reconciling GatewayClassConfig ")
 
 	gcc := &v1alpha1.GatewayClassConfig{}
@@ -89,7 +89,7 @@ func (r *OcpGatewayClassConfigController) Reconcile(ctx context.Context, req ctr
 // gatewayClassUsesConfig determines whether a given GatewayClass references a
 // given GatewayClassConfig. Since these resources are scoped to the cluster,
 // namespace is not considered.
-func gatewayClassUsesConfig(gc gwv1beta1.OcpGatewayClass, gcc *v1alpha1.GatewayClassConfig) bool {
+func gatewayClassUsesConfig(gc gwv1beta1.CustomGatewayClass, gcc *v1alpha1.GatewayClassConfig) bool {
 	parameterRef := gc.Spec.ParametersRef
 	return parameterRef != nil &&
 		string(parameterRef.Group) == v1alpha1.ConsulHashicorpGroup &&
@@ -100,7 +100,7 @@ func gatewayClassUsesConfig(gc gwv1beta1.OcpGatewayClass, gcc *v1alpha1.GatewayC
 // GatewayClassConfigInUse determines whether any GatewayClass in the cluster
 // references the provided GatewayClassConfig.
 func gatewayClassConfigInUse(ctx context.Context, k8sClient client.Client, gcc *v1alpha1.GatewayClassConfig) (bool, error) {
-	list := &gwv1beta1.OcpGatewayClassList{}
+	list := &gwv1beta1.CustomGatewayClassList{}
 	if err := k8sClient.List(ctx, list); err != nil {
 		return false, err
 	}
@@ -114,18 +114,18 @@ func gatewayClassConfigInUse(ctx context.Context, k8sClient client.Client, gcc *
 	return false, nil
 }
 
-func (r *OcpGatewayClassConfigController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *CustomGatewayClassConfigController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("gatewayclassconfig-custom").
 		For(&v1alpha1.GatewayClassConfig{}).
 		// Watch for changes to GatewayClass objects associated with this config for purposes of finalizer removal.
-		Watches(&gwv1beta1.OcpGatewayClass{}, r.transformGatewayClassToGatewayClassConfig()).
+		Watches(&gwv1beta1.CustomGatewayClass{}, r.transformGatewayClassToGatewayClassConfig()).
 		Complete(r)
 }
 
-func (r *OcpGatewayClassConfigController) transformGatewayClassToGatewayClassConfig() handler.EventHandler {
+func (r *CustomGatewayClassConfigController) transformGatewayClassToGatewayClassConfig() handler.EventHandler {
 	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-		gc := o.(*gwv1beta1.OcpGatewayClass)
+		gc := o.(*gwv1beta1.CustomGatewayClass)
 
 		pr := gc.Spec.ParametersRef
 		if pr != nil && pr.Kind == v1alpha1.GatewayClassConfigKind {

@@ -1,13 +1,13 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package gatewayresourcesocp
+package gatewayresourcescustom
 
 import (
 	"os"
 	"testing"
 
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -222,7 +222,7 @@ func TestRun(t *testing.T) {
 			existingGatewayClassConfig := &v1alpha1.GatewayClassConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			}
-			existingGatewayClass := &gwv1beta1.OcpGatewayClass{
+			existingGatewayClass := &gwv1beta1.CustomGatewayClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			}
 

@@ -10,8 +10,8 @@ import (
 
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/stretchr/testify/require"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +72,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 						Finalizers:        []string{gatewayClassConfigFinalizer},
 					},
 				}
-				gatewayClass := gwv1beta1.OcpGatewayClass{
+				gatewayClass := gwv1beta1.CustomGatewayClass{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "consul-api-gateway-class",
@@ -106,7 +106,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 				Build()
 
 			// Create the gateway class config controller.
-			gcc := &OcpGatewayClassConfigController{
+			gcc := &CustomGatewayClassConfigController{
 				Client: fakeClient,
 				Log:    logrtest.New(t),
 			}

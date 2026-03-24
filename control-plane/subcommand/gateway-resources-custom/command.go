@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/mitchellh/cli"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -259,7 +259,7 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
-	class := &gwv1beta1.OcpGatewayClass{
+	class := &gwv1beta1.CustomGatewayClass{
 		ObjectMeta: metav1.ObjectMeta{Name: c.flagGatewayClassName, Labels: labels},
 		Spec: gwv1beta1.GatewayClassSpec{
 			ControllerName: gwv1beta1.GatewayController(c.flagControllerName),
@@ -418,9 +418,9 @@ func forceClassConfig(ctx context.Context, k8sClient client.Client, o *v1alpha1.
 	}, exponentialBackoffWithMaxIntervalAndTime())
 }
 
-func forceClass(ctx context.Context, k8sClient client.Client, o *gwv1beta1.OcpGatewayClass) error {
+func forceClass(ctx context.Context, k8sClient client.Client, o *gwv1beta1.CustomGatewayClass) error {
 	return backoff.Retry(func() error {
-		var existing gwv1beta1.OcpGatewayClass
+		var existing gwv1beta1.CustomGatewayClass
 		err := k8sClient.Get(ctx, client.ObjectKeyFromObject(o), &existing)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			return err

@@ -15,8 +15,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 
 	"github.com/go-logr/logr"
-	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
-	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +42,7 @@ import (
 )
 
 // GatewayControllerConfig holds the values necessary for configuring the GatewayController.
-type OcpGatewayControllerConfig struct {
+type CustomGatewayControllerConfig struct {
 	HelmConfig              common.HelmConfig
 	ConsulClientConfig      *consul.Config
 	ConsulServerConnMgr     consul.ServerConnectionManager
@@ -407,7 +407,7 @@ func mapToCustomGateway(obj client.Object) []reconcile.Request {
 }
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
-func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config OcpGatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
+func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config CustomGatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
 	cacheConfig := cache.Config{
 		ConsulClientConfig:      config.ConsulClientConfig,
 		ConsulServerConnMgr:     config.ConsulServerConnMgr,
@@ -464,7 +464,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
 		).
 		Watches(
-			&gwv1beta1.OcpGatewayClass{},
+			&gwv1beta1.CustomGatewayClass{},
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass),
 		).
 		Watches(
@@ -523,7 +523,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			),
 		).
 		Watches(
-			&v1alpha1.OcpGatewayPolicy{},
+			&v1alpha1.CustomGatewayPolicy{},
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayPolicy),
 		).
 		Watches(
@@ -545,7 +545,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 // transformGatewayClass will check the list of GatewayClass objects for a matching
 // class, then return a list of reconcile Requests for it.
 func (r *GatewayController) transformGatewayClass(ctx context.Context, o client.Object) []reconcile.Request {
-	gatewayClass := o.(*gwv1beta1.OcpGatewayClass)
+	gatewayClass := o.(*gwv1beta1.CustomGatewayClass)
 	gatewayList := &gwv1beta1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gatewayClass.Name),
@@ -989,8 +989,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 	return externalFilters, nil
 }
 
-func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]v1alpha1.OcpGatewayPolicy, error) {
-	var list v1alpha1.OcpGatewayPolicyList
+func (c *GatewayController) getRelatedGatewayPolicies(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]v1alpha1.CustomGatewayPolicy, error) {
+	var list v1alpha1.CustomGatewayPolicyList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Gatewaypolicy_GatewayIndex, gateway.String()),
@@ -1037,7 +1037,7 @@ func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway typ
 	return list.Items, nil
 }
 
-func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1beta1.OcpGatewayClass) (*v1alpha1.GatewayClassConfig, error) {
+func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1beta1.CustomGatewayClass) (*v1alpha1.GatewayClassConfig, error) {
 	if gatewayClassConfig == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
@@ -1059,8 +1059,8 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	return config, nil
 }
 
-func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.OcpGatewayClass, error) {
-	var gatewayClass gwv1beta1.OcpGatewayClass
+func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.CustomGatewayClass, error) {
+	var gatewayClass gwv1beta1.CustomGatewayClass
 	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
@@ -1072,7 +1072,7 @@ func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gatew
 func (c *GatewayController) fetchControlledGateways(ctx context.Context, resources *common.ResourceMap) error {
 	set := mapset.NewSet()
 
-	list := gwv1beta1.OcpGatewayClassList{}
+	list := gwv1beta1.CustomGatewayClassList{}
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
 	}); err != nil {
