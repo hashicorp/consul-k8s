@@ -18,11 +18,11 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 )
 
-const OcpGatewaypolicy_GatewayIndex = "__ocp_gatewaypolicy_referencing_gateway"
+const CustomGatewaypolicy_GatewayIndex = "__custom_gatewaypolicy_referencing_gateway"
 
 // +kubebuilder:object:generate=false
 
-type OcpGatewayPolicyWebhook struct {
+type CustomGatewayPolicyWebhook struct {
 	Logger logr.Logger
 
 	// ConsulMeta contains metadata specific to the Consul installation.
@@ -32,19 +32,19 @@ type OcpGatewayPolicyWebhook struct {
 	client.Client
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-ocpgatewaypolicy,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=ocpgatewaypolicies,versions=v1alpha1,name=validate-ocpgatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-customgatewaypolicy,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=customgatewaypolicies,versions=v1alpha1,name=validate-customgatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
-func (v *OcpGatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
-	var resource OcpGatewayPolicy
+func (v *CustomGatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
+	var resource CustomGatewayPolicy
 	err := v.decoder.Decode(req, &resource)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	var list OcpGatewayPolicyList
+	var list CustomGatewayPolicyList
 
 	gwNamespaceName := types.NamespacedName{Name: resource.Spec.TargetRef.Name, Namespace: resource.Namespace}
 	err = v.Client.List(ctx, &list, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector(OcpGatewaypolicy_GatewayIndex, gwNamespaceName.String()),
+		FieldSelector: fields.OneTermEqualSelector(CustomGatewaypolicy_GatewayIndex, gwNamespaceName.String()),
 	})
 
 	if err != nil {
@@ -53,7 +53,7 @@ func (v *OcpGatewayPolicyWebhook) Handle(ctx context.Context, req admission.Requ
 	}
 
 	for _, policy := range list.Items {
-		if differentOcpPolicySameTarget(resource, policy) {
+		if differentCustomPolicySameTarget(resource, policy) {
 			return admission.Denied(fmt.Sprintf("policy targets gateway listener %q that is already the target of an existing policy %q", DerefStringOr(resource.Spec.TargetRef.SectionName, ""), policy.Name))
 		}
 	}
@@ -61,7 +61,7 @@ func (v *OcpGatewayPolicyWebhook) Handle(ctx context.Context, req admission.Requ
 	return admission.Allowed("gateway policy is valid")
 }
 
-func differentOcpPolicySameTarget(resource, policy OcpGatewayPolicy) bool {
+func differentCustomPolicySameTarget(resource, policy CustomGatewayPolicy) bool {
 	return resource.Name != policy.Name &&
 		resource.Spec.TargetRef.Name == policy.Spec.TargetRef.Name &&
 		resource.Spec.TargetRef.Group == policy.Spec.TargetRef.Group &&
@@ -70,9 +70,9 @@ func differentOcpPolicySameTarget(resource, policy OcpGatewayPolicy) bool {
 		DerefStringOr(resource.Spec.TargetRef.SectionName, "") == DerefStringOr(policy.Spec.TargetRef.SectionName, "")
 }
 
-func (v *OcpGatewayPolicyWebhook) SetupWithManager(mgr ctrl.Manager) {
+func (v *CustomGatewayPolicyWebhook) SetupWithManager(mgr ctrl.Manager) {
 	v.decoder = admission.NewDecoder(mgr.GetScheme())
-	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy-ocp", &admission.Webhook{Handler: v})
+	mgr.GetWebhookServer().Register("/validate-v1alpha1-customgatewaypolicy", &admission.Webhook{Handler: v})
 }
 
 // func DerefStringOr[T ~string, U ~string](v *T, val U) string {

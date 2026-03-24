@@ -360,7 +360,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 			group, _ := prMap["group"].(string)
 			if group == "gateway.networking.k8s.io" {
 				prMap["group"] = "consul.hashicorp.com"
-				prMap["name"] = "api-gateway-ocp"
+				prMap["name"] = "api-gateway-custom"
 
 			}
 
@@ -395,7 +395,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 		}
 	}
 
-	// update gatewayclass metadata.labels.component set to api-gateway-ocp
+	// update gatewayclass metadata.labels.component set to api-gateway-custom
 	// if kind == "GatewayClass" {
 	// 	metadata, ok := raw["metadata"].(map[string]interface{})
 	// 	if !ok {
@@ -406,7 +406,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 	// 		labels = make(map[string]interface{})
 	// 		metadata["labels"] = labels
 	// 	}
-	// 	labels["component"] = "api-gateway-ocp"
+	// 	labels["component"] = "api-gateway-custom"
 
 	// 	// also set name --> metadata.name to "consul-ocp"
 	// 	metadata["name"] = "consul-ocp"
@@ -419,12 +419,12 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 			return
 		}
 		spec["gatewayClassName"] = "consul-ocp"
-		// update metadata.name to "api-gateway-ocp"
+		// update metadata.name to "api-gateway-custom"
 		metadata, ok := raw["metadata"].(map[string]interface{})
 		if !ok {
 			return
 		}
-		metadata["name"] = "api-gateway-ocp"
+		metadata["name"] = "api-gateway-custom"
 	}
 
 	// for service intentions, we will update the sources to have a new source with name <original-name>-ocp
@@ -439,9 +439,9 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 		}
 		var newSources []interface{}
 
-		// check if api-gateway-ocp is present or not, if not and if api-gateway is present , then add. Can we use for in loop to find the source with name api-gateway and then add a new source with same details but name api-gateway-ocp?
-		if !containsSourceName(sources, "api-gateway-ocp") && containsSourceName(sources, "api-gateway") {
-			fmt.Println("Adding new source with name api-gateway-ocp to ServiceIntentions since api-gateway source is present and api-gateway-ocp is not present")
+		// check if api-gateway-custom is present or not, if not and if api-gateway is present , then add. Can we use for in loop to find the source with name api-gateway and then add a new source with same details but name api-gateway-custom?
+		if !containsSourceName(sources, "api-gateway-custom") && containsSourceName(sources, "api-gateway") {
+			fmt.Println("Adding new source with name api-gateway-custom to ServiceIntentions since api-gateway source is present and api-gateway-custom is not present")
 			for _, s := range sources {
 				srcMap, ok := s.(map[string]interface{})
 				if !ok {
