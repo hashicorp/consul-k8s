@@ -6,7 +6,8 @@ BUG FIXES:
 
 SECURITY:
 
-* go: upgrade go version to 1.25.8 
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
 
 ## 1.8.10 (February 27, 2026)
 
