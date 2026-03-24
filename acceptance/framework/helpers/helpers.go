@@ -35,7 +35,25 @@ import (
 
 // RandomName generates a random string with a 'test-' prefix.
 func RandomName() string {
+	if isOpenShiftRun() {
+		// Keep a stable release name for OpenShift runs where cleanup and retries
+		// can benefit from deterministic resource names.
+		return "test-consul-1"
+	}
+
 	return fmt.Sprintf("test-%s", strings.ToLower(random.UniqueId()))
+}
+
+func isOpenShiftRun() bool {
+	for _, arg := range os.Args {
+		if arg == "-enable-openshift" || strings.HasPrefix(arg, "-enable-openshift=") {
+			return true
+		}
+		if arg == "-use-openshift" || strings.HasPrefix(arg, "-use-openshift=") {
+			return true
+		}
+	}
+	return false
 }
 
 // CheckForPriorInstallations checks if there is an existing Helm release
