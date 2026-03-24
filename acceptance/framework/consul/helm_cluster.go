@@ -142,7 +142,7 @@ func NewHelmCluster(
 func applyOpenShiftDefaults(values map[string]string) {
 	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
 	// attempt to adopt or create them for per-test releases.
-	values["connectInject.apiGateway.manageExternalCRDs"] = "true"
+	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
 	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
 
 	if _, ok := values["connectInject.failurePolicy"]; !ok {
@@ -239,7 +239,39 @@ func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
 	h.deleteStaleNamedSecretsForRelease(t, h.releaseName)
 	h.deleteGatewayHookJobsIfExistsForRelease(t, h.releaseName)
 	h.deleteStaleHelmReleases(t)
+	h.deleteStaleGatewayAPICRDs(t)
 	h.deleteStaleLabeledResources(t)
+}
+
+func (h *HelmCluster) deleteStaleGatewayAPICRDs(t *testing.T) {
+	t.Helper()
+
+	// These non-standard CRDs are cluster-scoped and can be left behind with
+	// stale Helm ownership annotations from prior acceptance releases.
+	crds := []string{
+		"gatewayclassconfigs.consul.hashicorp.com",
+		"meshservices.consul.hashicorp.com",
+		"tcproutes.gateway.networking.k8s.io",
+	}
+
+	for _, crd := range crds {
+		ownerRelease, err := k8s.RunKubectlAndGetOutputE(
+			t,
+			h.helmOptions.KubectlOptions,
+			"get", "crd", crd,
+			"--ignore-not-found=true",
+			"-o", "jsonpath={.metadata.annotations.meta\\.helm\\.sh/release-name}",
+		)
+		if err != nil {
+			require.NoError(t, err)
+		}
+
+		if ownerRelease != "" && ownerRelease != h.releaseName {
+			logger.Logf(t, "Deleting stale CRD %s owned by release %s before installing release %s", crd, ownerRelease, h.releaseName)
+			_, err = k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "delete", "crd", crd, "--ignore-not-found=true")
+			require.NoError(t, err)
+		}
+	}
 }
 
 func (h *HelmCluster) deleteStaleHelmReleases(t *testing.T) {
@@ -341,7 +373,7 @@ func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 	services, err := h.kubernetesClient.CoreV1().Services(namespace).List(context.Background(), listOptions)
 	require.NoError(t, err)
 	for _, service := range services.Items {
-		deleteList(h.kubernetesClient.CoreV1().Services(namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{}))
+		deleteList(h.deleteServiceWithFinalizerCleanup(context.Background(), namespace, &service, metav1.DeleteOptions{}))
 	}
 
 	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.MatchingLabels{"chart": "consul-helm"})
@@ -373,6 +405,26 @@ func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 			r.Errorf("stale Consul pods still present after cleanup: %s", strings.Join(podNames, ", "))
 		}
 	})
+}
+
+func (h *HelmCluster) deleteServiceWithFinalizerCleanup(ctx context.Context, namespace string, service *corev1.Service, deleteOpts metav1.DeleteOptions) error {
+	if service == nil {
+		return nil
+	}
+
+	if len(service.Finalizers) > 0 {
+		serviceCopy := service.DeepCopy()
+		serviceCopy.Finalizers = nil
+		if _, err := h.kubernetesClient.CoreV1().Services(namespace).Update(ctx, serviceCopy, metav1.UpdateOptions{}); err != nil && !errors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	err := h.kubernetesClient.CoreV1().Services(namespace).Delete(ctx, service.Name, deleteOpts)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 func (h *HelmCluster) deleteStaleNamedSecretsForRelease(t require.TestingT, releaseName string) {
@@ -449,6 +501,12 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
 			h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
 			err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		}
+		if err != nil && h.isOpenShift {
+			// In OpenShift acceptance runs, uninstall hooks can fail due to stale/missing
+			// cluster-scoped CRD state. Fall back to no-hooks uninstall so cleanup remains best-effort.
+			h.logger.Logf(r, "Helm delete failed for release %s in OpenShift, falling back to no-hooks uninstall: %v", h.releaseName, err)
+			err = h.uninstallReleaseNoHooks(t, h.releaseName)
 		}
 		// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
 		if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
@@ -528,9 +586,14 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, service := range services.Items {
 			if strings.Contains(service.Name, h.releaseName) {
-				err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
-				if !errors.IsNotFound(err) {
+				if h.isOpenShift {
+					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, metav1.DeleteOptions{})
 					require.NoError(r, err)
+				} else {
+					err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
 				}
 			}
 		}
