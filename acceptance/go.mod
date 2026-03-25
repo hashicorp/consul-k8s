@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gruntwork-io/terratest v0.46.7
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240821160356-557f7c37e108
-	github.com/hashicorp/consul/api v1.33.5
+	github.com/hashicorp/consul/api v1.33.7
 	github.com/hashicorp/consul/sdk v0.17.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-uuid v1.0.3
