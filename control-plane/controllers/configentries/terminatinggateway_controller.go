@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -195,20 +196,17 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		return result, err
 	}
 
-	// Deploy pod based on CRD spec
-	if err := r.deployTerminatingGatewayDeployment(ctx, log, termGW, helmValues); err != nil {
-		log.Error(err, "error deploying terminating gateway pod")
-		termGW.SetSyncedCondition(corev1.ConditionFalse, "FailedToDeployPod", err.Error())
-		err := r.UpdateStatus(ctx, termGW)
-		if err != nil {
-			return ctrl.Result{}, err
+	if deployErr := r.deployTerminatingGatewayDeployment(ctx, log, termGW, helmValues); deployErr != nil {
+		log.Error(deployErr, "error deploying terminating gateway pod")
+		termGW.SetSyncedCondition(corev1.ConditionFalse, "FailedToDeployPod", deployErr.Error())
+		if statusErr := r.UpdateStatus(ctx, termGW); statusErr != nil {
+			return ctrl.Result{}, statusErr
 		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, deployErr
 	}
 
 	termGW.SetSyncedCondition(corev1.ConditionTrue, "DeploymentReady", "Deployment ready")
-	err = r.UpdateStatus(ctx, termGW)
-	if err != nil {
+	if err := r.UpdateStatus(ctx, termGW); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -220,7 +218,47 @@ func (r *TerminatingGatewayController) Logger(name types.NamespacedName) logr.Lo
 }
 
 func (r *TerminatingGatewayController) UpdateStatus(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-	return r.Status().Update(ctx, obj, opts...)
+	desired, ok := obj.(*consulv1alpha1.TerminatingGateway)
+	if !ok {
+		return fmt.Errorf("expected *consulv1alpha1.TerminatingGateway, got %T", obj)
+	}
+
+	key := types.NamespacedName{
+		Name:      desired.Name,
+		Namespace: desired.Namespace,
+	}
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &consulv1alpha1.TerminatingGateway{}
+		if err := r.Client.Get(ctx, key, latest); err != nil {
+			return err
+		}
+
+		mergeTerminatingGatewayStatus(&latest.Status, desired.Status)
+
+		return r.Status().Update(ctx, latest, opts...)
+	})
+}
+
+func mergeTerminatingGatewayStatus(dst *consulv1alpha1.Status, src consulv1alpha1.Status) {
+	if src.LastSyncedTime != nil {
+		t := *src.LastSyncedTime
+		dst.LastSyncedTime = &t
+	}
+
+	for _, cond := range src.Conditions {
+		updated := false
+		for i := range dst.Conditions {
+			if dst.Conditions[i].Type == cond.Type {
+				dst.Conditions[i] = cond
+				updated = true
+				break
+			}
+		}
+		if !updated {
+			dst.Conditions = append(dst.Conditions, cond)
+		}
+	}
 }
 
 func (r *TerminatingGatewayController) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
