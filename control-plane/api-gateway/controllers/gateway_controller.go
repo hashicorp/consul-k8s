@@ -430,7 +430,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		AuthMethod:   config.HelmConfig.AuthMethod,
 	}
 
-	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(&gwv1beta1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
@@ -462,11 +462,16 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Watches(
 			&corev1.Endpoints{},
 			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints),
-		).
-		Watches(
+		)
+
+	if config.HelmConfig.EnableGatewayScaling {
+		controllerBuilder = controllerBuilder.Watches(
 			&autoscalingv2.HorizontalPodAutoscaler{},
 			handler.EnqueueRequestsFromMapFunc(r.transformHPA),
-		).
+		)
+	}
+
+	return c, cleaner, controllerBuilder.
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),

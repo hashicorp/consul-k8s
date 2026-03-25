@@ -166,6 +166,32 @@ func annotationValue(annotations map[string]string, keys ...string) (string, boo
 	return "", false
 }
 
+func scalingAnnotationsConfigured(gateway gwv1beta1.Gateway) bool {
+	annotations := gateway.Annotations
+	if annotations == nil {
+		return false
+	}
+
+	if _, ok := annotations[AnnotationDefaultReplicas]; ok {
+		return true
+	}
+	if _, ok := annotationValue(annotations, AnnotationHPAEnabled, AnnotationHPAMinReplicas, AnnotationHPAMaxReplicas, AnnotationHPACPUTarget, annotationHPACPUTargetUS); ok {
+		return true
+	}
+
+	return false
+}
+
+func logScalingFeatureDisabled(log logr.Logger, gateway gwv1beta1.Gateway) {
+	if !scalingAnnotationsConfigured(gateway) {
+		return
+	}
+
+	log.Info("Ignoring Gateway scaling annotations because Enterprise API Gateway scaling is disabled. "+
+		"Enable connectInject.apiGateway.managedGatewayClass.scaling.enabled to allow annotation-driven scaling and HPA reconciliation.",
+		"gateway", client.ObjectKeyFromObject(&gateway))
+}
+
 // DetectUserManagedHPA checks if a user has created their own HPA for the gateway
 func (g *Gatekeeper) DetectUserManagedHPA(ctx context.Context, gateway gwv1beta1.Gateway) (bool, error) {
 	hpaList := &autoscalingv2.HorizontalPodAutoscalerList{}

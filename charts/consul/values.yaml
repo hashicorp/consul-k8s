@@ -2478,12 +2478,19 @@ connectInject:
           memory: "100Mi"
           cpu: "100m"
 
+      # [Enterprise Only] These settings enable per-Gateway scaling behavior for
+      # the managed GatewayClass, including Gateway annotations for static
+      # replicas, controller-managed HPA resources, and preserving manual scale.
+      # Requires Consul Enterprise with a valid license.
+      scaling:
+        enabled: false
+
       # DEPRECATED: These values are deprecated and will be removed in a future release.
       # Use Gateway annotations instead for per-gateway scaling configuration.
       # See: https://developer.hashicorp.com/consul/docs/k8s/api-gateway/scaling
       #
       # For static replica count, use: consul.hashicorp.com/default-replicas: "<N>"
-      # For HPA, use: consul.hashicorp.com/hpa/enabled: "true" with min/max replicas annotations
+      # For HPA, use: consul.hashicorp.com/hpa-enabled: "true" with min/max replicas annotations
       deployment:
         # Default number of gateway instances
         # DEPRECATED: Use consul.hashicorp.com/default-replicas annotation on Gateway resource
