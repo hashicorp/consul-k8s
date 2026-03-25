@@ -27,6 +27,7 @@ const (
 	JWTProvider              string = "jwtprovider"
 	ControlPlaneRequestLimit string = "controlplanerequestlimit"
 	RouteAuthFilter          string = "routeauthfilter"
+	RouteTLSSDSFilter        string = "routetlssdsfilter"
 	GatewayPolicy            string = "gatewaypolicy"
 	Registration             string = "registration"
 

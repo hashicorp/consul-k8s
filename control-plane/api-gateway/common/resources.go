@@ -225,6 +225,9 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
 			continue
 		}
+		if ListenerUsesTLSSDS(gateway, listener.TLS) {
+			continue
+		}
 		for _, cert := range listener.TLS.CertificateRefs {
 			if NilOrEqual(cert.Group, "") && NilOrEqual(cert.Kind, "Secret") {
 				certificateKey := IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)

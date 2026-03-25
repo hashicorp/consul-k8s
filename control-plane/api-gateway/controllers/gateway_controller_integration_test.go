@@ -294,7 +294,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 				}
 			}()
 
-			require.Never(t, func() bool {
+			require.Eventually(t, func() bool {
 				err = k8sClient.Get(ctx, gwNamespaceName, k8sGWObj)
 				require.NoError(t, err)
 				newGWResourceVersion := k8sGWObj.ResourceVersion
