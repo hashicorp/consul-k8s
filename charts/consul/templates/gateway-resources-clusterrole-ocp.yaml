@@ -2,13 +2,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "consul.fullname" . }}-gateway-resources-ocp
+  name: {{ template "consul.fullname" . }}-gateway-resources-custom
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: gateway-resources-ocp
+    component: gateway-resources-custom
 rules:
   - apiGroups:
     - consul.hashicorp.com
@@ -21,7 +21,7 @@ rules:
   - apiGroups:
     - consul.hashicorp.com
     resources:
-    - ocpgatewayclasses
+    - customgatewayclasses
     verbs:
     - get
     - update
@@ -30,7 +30,7 @@ rules:
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
     resourceNames:
-      - {{ template "consul.fullname" . }}-gateway-resources-ocp
+      - {{ template "consul.fullname" . }}-gateway-resources-custom
     verbs:
       - use
 {{- end }}

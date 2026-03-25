@@ -41,18 +41,18 @@ metadata:
     # release: {{ .Release.Name }}
     name: consul-custom-gatewayclasses
     component: crd
-  name: ocpgatewayclasses.consul.hashicorp.com
+  name: customgatewayclasses.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
     categories:
       - gateway-api
-    kind: OcpGatewayClass
-    listKind: OcpGatewayClassList
-    plural: ocpgatewayclasses
+    kind: CustomGatewayClass
+    listKind: CustomGatewayClassList
+    plural: customgatewayclasses
     shortNames:
-      - ocgc
-    singular: gatewayclass
+      - cgc
+    singular: customgatewayclass
   scope: Cluster
   versions:
     - additionalPrinterColumns:

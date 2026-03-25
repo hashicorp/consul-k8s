@@ -86,7 +86,6 @@ type Command struct {
 	flagRelease                string
 	flagManifestsGatewayAPIDir string
 	flagManifestsConsulAPIDir  string
-	consulServiceIntentionsDir string
 
 	flagOpenshiftSCCName string
 
@@ -137,7 +136,6 @@ func (c *Command) init() {
 		"/output/consulapi",
 		"Directory where Consul API objects will be dumped. This is only applicable if -consulapi-enabled is set to true.",
 	)
-	c.flags.StringVar(&c.consulServiceIntentionsDir, "consul-service-intentions-dir", "/output/serviceintentions", "Directory where Consul service intentions will be dumped.")
 
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
@@ -275,11 +273,6 @@ func (c *Command) dumpGatewayAPIObjects() error {
 		c.UI.Info(fmt.Sprintf("Skipping UDPRoute dump: %v", err))
 	}
 
-	// fetch service intentions from consul.hashicorp.com/v1alpha1
-	if err := c.dumpTypedList(ctx, "serviceintentions", &v1alpha1.ServiceIntentionsList{}); err != nil {
-		c.UI.Info(fmt.Sprintf("Skipping ServiceIntention dump: %v", err))
-	}
-
 	return nil
 }
 
@@ -360,7 +353,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 			group, _ := prMap["group"].(string)
 			if group == "gateway.networking.k8s.io" {
 				prMap["group"] = "consul.hashicorp.com"
-				prMap["name"] = "api-gateway-custom"
+				prMap["name"] = prMap["name"].(string) + "-custom"
 
 			}
 
@@ -418,7 +411,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 		if !ok {
 			return
 		}
-		spec["gatewayClassName"] = "consul-ocp"
+		spec["gatewayClassName"] = "consul-custom"
 		// update metadata.name to "api-gateway-custom"
 		metadata, ok := raw["metadata"].(map[string]interface{})
 		if !ok {
@@ -427,65 +420,21 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 		metadata["name"] = "api-gateway-custom"
 	}
 
-	// for service intentions, we will update the sources to have a new source with name <original-name>-ocp
-	if kind == "ServiceIntentions" {
-		spec, ok := raw["spec"].(map[string]interface{})
-		if !ok {
-			return
-		}
-		sources, ok := spec["sources"].([]interface{})
-		if !ok {
-			return
-		}
-		var newSources []interface{}
-
-		// check if api-gateway-custom is present or not, if not and if api-gateway is present , then add. Can we use for in loop to find the source with name api-gateway and then add a new source with same details but name api-gateway-custom?
-		if !containsSourceName(sources, "api-gateway-custom") && containsSourceName(sources, "api-gateway") {
-			fmt.Println("Adding new source with name api-gateway-custom to ServiceIntentions since api-gateway source is present and api-gateway-custom is not present")
-			for _, s := range sources {
-				srcMap, ok := s.(map[string]interface{})
-				if !ok {
-					continue
-				}
-
-				// deep copy the source
-				copied := deepCopyMap(srcMap)
-
-				name, _ := srcMap["name"].(string)
-				// if name is empty or not named after gateway: 'api-gateway', then skip it since it is not relevant.
-				if name == "" || name != "api-gateway" {
-					continue
-				}
-
-				// update name if it is named api-gateway
-
-				copied["name"] = name + "-ocp"
-
-				newSources = append(newSources, copied)
-			}
-		} else {
-			return
-		}
-
-		// append new sources
-		spec["sources"] = append(sources, newSources...)
-	}
-
 }
 
-func containsSourceName(sources []interface{}, targetName string) bool {
-	for _, s := range sources {
-		srcMap, ok := s.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		name, _ := srcMap["name"].(string)
-		if name == targetName {
-			return true
-		}
-	}
-	return false
-}
+// func containsSourceName(sources []interface{}, targetName string) bool {
+// 	for _, s := range sources {
+// 		srcMap, ok := s.(map[string]interface{})
+// 		if !ok {
+// 			continue
+// 		}
+// 		name, _ := srcMap["name"].(string)
+// 		if name == targetName {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
 func extractItems(list client.ObjectList) ([]client.Object, error) {
 	switch v := list.(type) {
@@ -566,14 +515,6 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 		return out, nil
 
 	case *gwv1alpha2.UDPRouteList:
-		out := make([]client.Object, 0, len(v.Items))
-		for i := range v.Items {
-			out = append(out, &v.Items[i])
-		}
-		return out, nil
-
-	// for service intentions
-	case *v1alpha1.ServiceIntentionsList:
 		out := make([]client.Object, 0, len(v.Items))
 		for i := range v.Items {
 			out = append(out, &v.Items[i])
@@ -678,31 +619,23 @@ func (c *Command) writeConsulObjects(directory string, objs []client.Object) err
 }
 
 func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
-	// if KindDir is serviceintentions and c.consulApiEnabled is false, then we should skip since service intentions are already set
-	if kindDir == "serviceintentions" && !c.consulApiEnabled {
-		return nil
-	}
 
 	gatewayAPIDir := filepath.Join(c.flagManifestsGatewayAPIDir, kindDir)
 	if err := os.MkdirAll(gatewayAPIDir, 0755); err != nil {
 		return err
 	}
 
-	if kindDir != "serviceintentions" {
-		if err := c.writeGatewayObjects(gatewayAPIDir, objs); err != nil {
-			return err
-		}
+	if err := c.writeGatewayObjects(gatewayAPIDir, objs); err != nil {
+		return err
 	}
+
 	var consulDir string
 	// call this function only when consulApiEnabled is true; This generates another set of manifests for consul.hashicorp.com API group.
 	// make another copy of raw to update the apiVersion for consul.hashicorp.com CRDs without affecting the gateway.networking.k8s.io versions
 
 	if c.consulApiEnabled {
-		if kindDir == "serviceintentions" {
-			consulDir = c.consulServiceIntentionsDir
-		} else {
-			consulDir = filepath.Join(c.flagManifestsConsulAPIDir, kindDir)
-		}
+
+		consulDir = filepath.Join(c.flagManifestsConsulAPIDir, kindDir)
 
 		if err := os.MkdirAll(consulDir, 0755); err != nil {
 			return err

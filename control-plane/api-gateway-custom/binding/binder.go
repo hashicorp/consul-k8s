@@ -139,7 +139,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		if common.EnsureFinalizer(&b.config.Gateway) || updatedGcc {
 			// if we've added the finalizer or serialized the class config, then update
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
-			// return snapshot
+			return snapshot
 		}
 
 		// calculate the status for the gateway
