@@ -4,7 +4,6 @@
 package v1alpha1
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -180,12 +179,12 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
 							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Arguments: JSONRawObject(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
 					},
@@ -612,12 +611,12 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
 							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Arguments: JSONRawObject(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
 					},
@@ -923,12 +922,12 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
 							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Arguments: JSONRawObject(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
 					},
@@ -1345,7 +1344,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
@@ -1389,7 +1388,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"SOME_INVALID_JSON"}`),
+							Arguments: JSONRawObject(`{"SOME_INVALID_JSON"}`),
 							Required:  false,
 						},
 					},
