@@ -29,13 +29,13 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-v1alpha1-gatewaypolicy
 
-- name: validate-ocpgatewaypolicy.consul.hashicorp.com
+- name: validate-customgatewaypolicy.consul.hashicorp.com
   matchPolicy: Equivalent
   rules:
   - operations: [ "CREATE" , "UPDATE" ]
     apiGroups: [ "consul.hashicorp.com" ]
     apiVersions: [ "v1alpha1" ]
-    resources: [ "ocpgatewaypolicies" ]
+    resources: [ "customgatewaypolicies" ]
   failurePolicy: Fail
   sideEffects: None
   admissionReviewVersions:
@@ -44,7 +44,7 @@ webhooks:
     service:
       name: {{ template "consul.fullname" . }}-connect-injector
       namespace: {{ .Release.Namespace }}
-      path: /validate-v1alpha1-gatewaypolicy-ocp
+      path: /validate-v1alpha1-gatewaypolicy-custom
       
 - name: validate-registration.consul.hashicorp.com
   matchPolicy: Equivalent

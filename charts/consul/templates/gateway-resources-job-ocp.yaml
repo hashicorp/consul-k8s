@@ -18,14 +18,14 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ template "consul.fullname" . }}-gateway-resources-ocp
+  name: {{ template "consul.fullname" . }}-gateway-resources-custom
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: gateway-resources-ocp
+    component: gateway-resources-custom
     {{- if .Values.global.extraLabels }}
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
@@ -36,12 +36,12 @@ metadata:
 spec:
   template:
     metadata:
-      name: {{ template "consul.fullname" . }}-gateway-resources-ocp
+      name: {{ template "consul.fullname" . }}-gateway-resources-custom
       labels:
         app: {{ template "consul.name" . }}
         chart: {{ template "consul.chart" . }}
         release: {{ .Release.Name }}
-        component: gateway-resources-ocp
+        component: gateway-resources-custom
         {{- if .Values.global.extraLabels }}
           {{- toYaml .Values.global.extraLabels | nindent 8 }}
         {{- end }}
@@ -50,24 +50,24 @@ spec:
         "consul.hashicorp.com/mesh-inject": "false"
     spec:
       restartPolicy: Never
-      serviceAccountName: {{ template "consul.fullname" . }}-gateway-resources-ocp
+      serviceAccountName: {{ template "consul.fullname" . }}-gateway-resources-custom
       containers:
-        - name: gateway-resources-ocp
+        - name: gateway-resources-custom
           image: {{ .Values.global.imageK8S }}
           {{ template "consul.imagePullPolicy" . }}
           {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
           command:
             - consul-k8s-control-plane
           args:
-            - gateway-resources-ocp
-            - -gateway-class-name=consul-ocp
-            - -gateway-class-config-name=consul-api-gateway-ocp
-            - -controller-name=consul.hashicorp.com/gateway-controller-ocp
+            - gateway-resources-custom
+            - -gateway-class-name=consul-custom
+            - -gateway-class-config-name=consul-api-gateway-custom
+            - -controller-name=consul.hashicorp.com/gateway-controller-custom
             - -app={{template "consul.name" .}}
             - -chart={{template "consul.chart" .}}
             - -heritage={{ .Release.Service }}
             - -release-name={{ .Release.Name }}
-            - -component=api-gateway-ocp
+            - -component=api-gateway-custom
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment }}
             {{- if .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
             - -deployment-default-instances={{ .Values.connectInject.apiGateway.managedGatewayClass.deployment.defaultInstances }}
@@ -120,5 +120,5 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ template "consul.fullname" . }}-gateway-resources-config-ocp
+            name: {{ template "consul.fullname" . }}-gateway-resources-config-custom
 {{- end }}

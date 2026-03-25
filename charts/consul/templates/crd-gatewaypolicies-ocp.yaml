@@ -37,14 +37,14 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-  name: ocpgatewaypolicies.consul.hashicorp.com
+  name: customgatewaypolicies.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
-    kind: OcpGatewayPolicy
-    listKind: OcpGatewayPolicyList
-    plural: ocpgatewaypolicies
-    singular: ocpgatewaypolicy
+    kind: CustomGatewayPolicy
+    listKind: CustomGatewayPolicyList
+    plural: customgatewaypolicies
+    singular: customgatewaypolicy
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

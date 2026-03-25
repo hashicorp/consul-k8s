@@ -47,7 +47,7 @@ const (
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
 	apiGateway         = "api-gateway"
-	apiGatewayOCP      = "api-gateway-ocp"
+	apiGatewayOCP      = "api-gateway-custom"
 
 	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
 	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"

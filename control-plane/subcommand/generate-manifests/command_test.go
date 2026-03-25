@@ -378,7 +378,7 @@ func TestEnforceConsulApiVersion(t *testing.T) {
 				require.Equal(t, "consul.hashicorp.com/v1beta1", raw["apiVersion"])
 
 				md := raw["metadata"].(map[string]interface{})
-				require.Equal(t, "api-gateway-ocp", md["name"])
+				require.Equal(t, "api-gateway-custom", md["name"])
 
 				spec := raw["spec"].(map[string]interface{})
 				require.Equal(t, "consul-ocp", spec["gatewayClassName"])
@@ -402,7 +402,7 @@ func TestEnforceConsulApiVersion(t *testing.T) {
 
 				pr := parentRefs[0].(map[string]interface{})
 				require.Equal(t, "consul.hashicorp.com", pr["group"])
-				require.Equal(t, "api-gateway-ocp", pr["name"])
+				require.Equal(t, "api-gateway-custom", pr["name"])
 
 				// rules validation
 				rules := spec["rules"].([]interface{})
@@ -446,7 +446,7 @@ func TestEnforceConsulApiVersion(t *testing.T) {
 				require.Len(t, parentRefs, 1)
 				pr := parentRefs[0].(map[string]interface{})
 				require.Equal(t, "consul.hashicorp.com", pr["group"])
-				require.Equal(t, "api-gateway-ocp", pr["name"])
+				require.Equal(t, "api-gateway-custom", pr["name"])
 			},
 		},
 		{
@@ -463,7 +463,7 @@ func TestEnforceConsulApiVersion(t *testing.T) {
 				require.Len(t, parentRefs, 1)
 				pr := parentRefs[0].(map[string]interface{})
 				require.Equal(t, "consul.hashicorp.com", pr["group"])
-				require.Equal(t, "api-gateway-ocp", pr["name"])
+				require.Equal(t, "api-gateway-custom", pr["name"])
 			},
 		},
 		{
@@ -633,7 +633,7 @@ func TestWriteObjects(t *testing.T) {
 	require.Equal(t, "consul.hashicorp.com/v1beta1", consulObj["apiVersion"])
 
 	md := consulObj["metadata"].(map[string]interface{})
-	require.Equal(t, "api-gateway-ocp", md["name"])
+	require.Equal(t, "api-gateway-custom", md["name"])
 	spec := consulObj["spec"].(map[string]interface{})
 	listeners := spec["listeners"].([]interface{})
 	require.Len(t, listeners, 2)
@@ -693,7 +693,7 @@ func TestEnforceConsulApiVersion_ServiceIntentions(t *testing.T) {
 
 	// validate new source is added
 	require.Contains(t, sources, map[string]interface{}{
-		"name":   "api-gateway-ocp",
+		"name":   "api-gateway-custom",
 		"action": "allow",
 	})
 
@@ -813,7 +813,7 @@ func TestEnforceConsulApiVersion_ServiceIntentions(t *testing.T) {
 // 	require.Equal(t, "consul.hashicorp.com/v1beta1", consulObj["apiVersion"])
 
 // 	md := consulObj["metadata"].(map[string]interface{})
-// 	require.Equal(t, "api-gateway-ocp", md["name"])
+// 	require.Equal(t, "api-gateway-custom", md["name"])
 
 // 	spec := consulObj["spec"].(map[string]interface{})
 // 	require.Equal(t, "consul-ocp", spec["gatewayClassName"])

@@ -2,13 +2,13 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ template "consul.fullname" . }}-gateway-cleanup-ocp
+  name: {{ template "consul.fullname" . }}-gateway-cleanup-custom
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: gateway-cleanup-ocp
+    component: gateway-cleanup-custom
 rules:
   - apiGroups:
     - consul.hashicorp.com
@@ -20,7 +20,7 @@ rules:
   - apiGroups:
     - consul.hashicorp.com
     resources:
-    - ocpgatewayclasses
+    - customgatewayclasses
     verbs:
     - get
     - delete
@@ -28,7 +28,7 @@ rules:
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
     resourceNames:
-      - {{ template "consul.fullname" . }}-gateway-cleanup-ocp
+      - {{ template "consul.fullname" . }}-gateway-cleanup-custom
     verbs:
       - use
 {{- end }}

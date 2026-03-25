@@ -32,7 +32,7 @@ rules:
   - routetimeoutfilters
   - routeauthfilters
   - gatewaypolicies
-  - ocpgatewaypolicies
+  - customgatewaypolicies
   - registrations
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
@@ -71,7 +71,7 @@ rules:
   - jwtproviders/status
   - routeauthfilters/status
   - gatewaypolicies/status
-  - ocpgatewaypolicies/status
+  - customgatewaypolicies/status
   verbs:
   - get
   - patch
@@ -149,7 +149,7 @@ rules:
   - consul.hashicorp.com
   resources:
   - gatewayclasses
-  - ocpgatewayclasses
+  - customgatewayclasses
   - gateways
   - httproutes
   - tcproutes
@@ -167,7 +167,7 @@ rules:
   - consul.hashicorp.com
   resources:
   - gatewayclasses/finalizers
-  - ocpgatewayclasses/finalizers
+  - customgatewayclasses/finalizers
   - gateways/finalizers
   - httproutes/finalizers
   - tcproutes/finalizers
@@ -178,7 +178,7 @@ rules:
   - consul.hashicorp.com
   resources:
   - gatewayclasses/status
-  - ocpgatewayclasses/status
+  - customgatewayclasses/status
   - gateways/status
   - httproutes/status
   - tcproutes/status
