@@ -829,7 +829,7 @@ func TestUpsert(t *testing.T) {
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
 		},
-		"update a gateway deployment by scaling it lower than the min number of instances on the GatewayClassConfig and preserve the manual scale": {
+		"update a gateway deployment by scaling it lower than the min number of instances on the GatewayClassConfig": {
 			gateway: gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -863,7 +863,7 @@ func TestUpsert(t *testing.T) {
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 1, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 2, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
 				secrets:         []*corev1.Secret{},
@@ -871,7 +871,7 @@ func TestUpsert(t *testing.T) {
 				serviceAccounts: []*corev1.ServiceAccount{},
 			},
 		},
-		"update a gateway deployment by scaling it higher than the max number of instances on the GatewayClassConfig and preserve the manual scale": {
+		"update a gateway deployment by scaling it higher than the max number of instances on the GatewayClassConfig": {
 			gateway: gwv1beta1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -905,7 +905,7 @@ func TestUpsert(t *testing.T) {
 			},
 			finalResources: resources{
 				deployments: []*appsv1.Deployment{
-					configureDeployment(name, namespace, labels, 10, nil, nil, "", "1"),
+					configureDeployment(name, namespace, labels, 5, nil, nil, "", "1"),
 				},
 				roles:           []*rbac.Role{},
 				secrets:         []*corev1.Secret{},
@@ -1465,7 +1465,8 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 	}
 
 	helmConfig := common.HelmConfig{
-		ImageDataplane: dataplaneImage,
+		ImageDataplane:       dataplaneImage,
+		EnableGatewayScaling: true,
 	}
 
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
@@ -1511,6 +1512,70 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 	require.NotNil(t, hpa.Spec.Metrics[0].Resource)
 	require.NotNil(t, hpa.Spec.Metrics[0].Resource.Target.AverageUtilization)
 	require.Equal(t, int32(80), *hpa.Spec.Metrics[0].Resource.Target.AverageUtilization)
+}
+
+func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+	require.NoError(t, rbac.AddToScheme(s))
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, appsv1.AddToScheme(s))
+	require.NoError(t, autoscalingv2.AddToScheme(s))
+
+	gateway := gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				AnnotationHPAEnabled:     "true",
+				AnnotationHPAMinReplicas: "3",
+				AnnotationHPAMaxReplicas: "25",
+				AnnotationHPACPUTarget:   "70",
+			},
+		},
+		Spec: gwv1beta1.GatewaySpec{
+			Listeners: listeners,
+		},
+	}
+
+	gcc := v1alpha1.GatewayClassConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-gatewayclassconfig",
+		},
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			DeploymentSpec: v1alpha1.DeploymentSpec{
+				DefaultInstances: common.PointerTo(int32(3)),
+				MaxInstances:     common.PointerTo(int32(8)),
+				MinInstances:     common.PointerTo(int32(1)),
+			},
+			CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+			ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+		},
+	}
+
+	helmConfig := common.HelmConfig{
+		ImageDataplane: dataplaneImage,
+	}
+
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+
+	g := New(logrtest.New(t), client, nil)
+
+	require.NoError(t, g.Upsert(ctx, gateway, gcc, helmConfig))
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, deployment))
+	require.NotNil(t, deployment.Spec.Replicas)
+	require.Equal(t, int32(3), *deployment.Spec.Replicas)
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
+	err := client.Get(ctx, types.NamespacedName{Name: gateway.Name + "-hpa", Namespace: gateway.Namespace}, hpa)
+	require.True(t, k8serrors.IsNotFound(err))
 }
 
 func TestUpsertPreservesManualScaleWithoutScalingAnnotations(t *testing.T) {
@@ -1574,7 +1639,8 @@ func TestUpsertPreservesManualScaleWithoutScalingAnnotations(t *testing.T) {
 			}
 
 			helmConfig := common.HelmConfig{
-				ImageDataplane: dataplaneImage,
+				ImageDataplane:       dataplaneImage,
+				EnableGatewayScaling: true,
 			}
 
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &tc.gatewayClassConfig).Build()

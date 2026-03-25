@@ -43,18 +43,29 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1beta1.Gat
 		exists = true
 	}
 
-	scalingConfig, err := g.ReconcileScaling(ctx, gateway, gcc)
-	if err != nil {
-		g.Log.Error(err, "failed to reconcile scaling configuration")
-		return err
-	}
-
 	var currentReplicas *int32
 	if exists {
 		currentReplicas = existingDeployment.Spec.Replicas
 	}
 
-	deployment, err := g.deployment(ctx, gateway, gcc, config, resolvedDeploymentReplicas(scalingConfig, gcc, currentReplicas))
+	var replicas *int32
+	if config.EnableGatewayScaling {
+		scalingConfig, err := g.ReconcileScaling(ctx, gateway, gcc)
+		if err != nil {
+			g.Log.Error(err, "failed to reconcile scaling configuration")
+			return err
+		}
+		replicas = resolvedDeploymentReplicas(scalingConfig, gcc, currentReplicas)
+	} else {
+		logScalingFeatureDisabled(g.Log, gateway)
+		if err := g.DeleteHPA(ctx, gateway); err != nil {
+			g.Log.Error(err, "failed to delete controller-managed HPA while scaling is disabled")
+			return err
+		}
+		replicas = deploymentReplicas(gcc, currentReplicas)
+	}
+
+	deployment, err := g.deployment(ctx, gateway, gcc, config, replicas)
 	if err != nil {
 		return err
 	}

@@ -99,6 +99,7 @@ type Command struct {
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
 	flagEnableGatewayMetrics        bool
+	flagEnableGatewayScaling        bool
 	flagDefaultEnableMetricsMerging bool
 	flagDefaultMergedMetricsPort    string
 	flagDefaultPrometheusScrapePort string
@@ -268,6 +269,7 @@ func (c *Command) init() {
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
 	c.flagSet.BoolVar(&c.flagEnableGatewayMetrics, "enable-gateway-metrics", false, "Allows enabling Consul gateway metrics.")
+	c.flagSet.BoolVar(&c.flagEnableGatewayScaling, "enable-gateway-scaling", false, "[Enterprise Only] Enables API Gateway scaling annotations, controller-managed HPAs, and manual scaling preservation for the managed GatewayClass.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetricsMerging, "default-enable-metrics-merging", false, "Default for enabling merging of connect service metrics and envoy proxy metrics.")
 	c.flagSet.StringVar(&c.flagDefaultMergedMetricsPort, "default-merged-metrics-port", "20100", "Default port for merged metrics endpoint on the consul-sidecar.")
 	c.flagSet.StringVar(&c.flagDefaultPrometheusScrapePort, "default-prometheus-scrape-port", "20200", "Default port where Prometheus scrapes connect metrics from.")
