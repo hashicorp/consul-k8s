@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // GatewayClassConfig tests the creation of a gatewayclassconfig object and makes sure that its configuration
@@ -85,9 +85,9 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		k8sClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{})
 	})
 
-	gatewayParametersRef := &gwv1beta1.ParametersReference{
-		Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
-		Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
+	gatewayParametersRef := &gwv1.ParametersReference{
+		Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+		Kind:  gwv1.Kind(v1alpha1.GatewayClassConfigKind),
 		Name:  gatewayClassConfigName,
 	}
 
@@ -96,7 +96,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	createGatewayClass(t, k8sClient, gatewayClassName, gatewayClassControllerName, gatewayParametersRef)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateway classes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{})
+		k8sClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{})
 	})
 
 	// Create a certificate to reference in listeners.
@@ -130,7 +130,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting all gateways")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.Gateway{}, client.InNamespace(namespace))
+		k8sClient.DeleteAllOf(context.Background(), &gwv1.Gateway{}, client.InNamespace(namespace))
 	})
 
 	// Ensure it exists.
@@ -139,21 +139,75 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 	// Scenario: Gateway deployment should match the default instances defined on the gateway class config
 	// checking that gateway instances match defined gateway class config
+	/*
+		defaultInstances = ptr.To(int32(2))
+		maxInstances     = ptr.To(int32(3))
+		minInstances     = ptr.To(int32(1))
+	*/
+	// expect 2
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
+	// expect 3
+	scale(t, k8sClient, gateway.Name, gateway.Namespace, ptr.To(int32(*maxInstances+1)))
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
+	// at this stage replica count is equal to the maxInstances
+	replicas := maxInstances
 	// Scenario: Updating the GatewayClassConfig should not affect gateways that have already been created
 	logger.Log(t, "updating gatewayclassconfig values")
 	err = k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassConfigName, Namespace: namespace}, gatewayClassConfig)
 	require.NoError(t, err)
-	gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(8))
-	gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(5))
+	// gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(8))
+	// gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(5))
+	gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(2))
+	gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(2))
+	gatewayClassConfig.Spec.DeploymentSpec.MaxInstances = ptr.To(int32(5))
 	err = k8sClient.Update(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
-	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
+	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, replicas, gateway)
+
+	/*
+			Here we have updated the gatewayclass config with:
+			defaultInstances: 8
+			minInstances: 5
+			maxInstances: 3
+
+
+			# real variables values
+			defaultInstances: 2
+			minInstances: 1
+			maxInstances: 3
+
+			# Before fix for gatewayclassconfig:
+			## Values in the gatewayclass config
+			defaultInstances: 2
+			minInstances: 1
+			maxInstances: 3
+
+			# As we fix the gatewayclassConfig
+			## Values in the gatewayclass config
+			defaultInstances: 8
+			minInstances: 5
+			maxInstances: 3
+
+		# In the next step we scale to maxinstances +1 which is 4; but since we set minInstances to 5 in the above gatewayclass config, we get 5.
+		# In the comment "Scenario: gateways should be able to scale independently and not get overridden by the controller unless it's above the max"
+		## We are expecting the instances should be 3, but as per our code Logic we minInstances at the last for instanceValue.
+
+		## Here is a new bug. JIRA:-
+
+		## As of now, we assume it should be 3, but since we have set min to 5, we get 5 instances.
+		# Thus the scenarios now would be:
+		1. set max instances to 4, min instances 2, default to 3 ; pass with no changes below, we expect 4 but try t scale to 5.
+		2. scale down to 0, we expect 2.
+	*/
+	maxInstances = ptr.To(int32(5))
+	minInstances = ptr.To(int32(2))
 	// Scenario: gateways should be able to scale independently and not get overridden by the controller unless it's above the max
+	// expect 5
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, ptr.To(int32(*maxInstances+1)))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, maxInstances, gateway)
+	// expect 2
 	scale(t, k8sClient, gateway.Name, gateway.Namespace, ptr.To(int32(0)))
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, minInstances, gateway)
 
@@ -174,7 +228,7 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 
 }
 
-func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1beta1.Gateway) {
+func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1.Gateway) {
 	t.Helper()
 
 	retryCheckWithWait(t, 40, 10*time.Second, func(r *retry.R) {

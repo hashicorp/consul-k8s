@@ -1,4 +1,20 @@
-{{- if and .Values.connectInject.enabled .Values.connectInject.apiGateway.manageExternalCRDs }}
+{{- if and
+    .Values.connectInject.enabled 
+    (or 
+        .Values.connectInject.apiGateway.manageExternalCRDs 
+        .Values.connectInject.apiGateway.manageNonStandardCRDs
+    )
+    (or 
+        (not (default false .Values.global.openshift.enabled))
+        (and
+            (default false .Values.global.openshift.enabled)
+            (not (default false .Values.global.openshift.isOcpGreaterthan4_18))
+        )
+    )
+    (
+      .Values.global.installGWCRDs
+    )
+}}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -12,6 +28,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
+    name: consul-v1-gatewayclasses
     component: crd
   name: gatewayclasses.gateway.networking.k8s.io
 spec:
@@ -41,9 +58,7 @@ spec:
           name: Description
           priority: 1
           type: string
-      deprecated: true
-      deprecationWarning: The v1alpha2 version of GatewayClass has been deprecated and will be removed in a future release of the API. Please upgrade to v1beta1.
-      name: v1alpha2
+      name: v1
       schema:
         openAPIV3Schema:
           description: "GatewayClass describes a class of Gateways available to the user for creating Gateway resources. \n It is recommended that this resource be used as a template for Gateways. This means that a Gateway is based on the state of the GatewayClass at the time it was created and changes to the GatewayClass or associated parameters are not propagated down to existing Gateways. This recommendation is intended to limit the blast radius of changes to GatewayClass or associated parameters. If implementations choose to propagate GatewayClass changes to existing Gateways, that MUST be clearly documented by the implementation. \n Whenever one or more Gateways are using a GatewayClass, implementations MUST add the `gateway-exists-finalizer.gateway.networking.k8s.io` finalizer on the associated GatewayClass. This ensures that a GatewayClass associated with a Gateway is not deleted while in use. \n GatewayClass is a Cluster level resource."

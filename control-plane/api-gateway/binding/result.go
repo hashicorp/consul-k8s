@@ -12,7 +12,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
@@ -47,7 +47,7 @@ var (
 // on a given route status.
 type routeValidationResult struct {
 	namespace string
-	backend   gwv1beta1.BackendRef
+	backend   gwv1alpha2.BackendRef
 	err       error
 }
 
@@ -122,7 +122,7 @@ func (e routeValidationResults) Condition() metav1.Condition {
 // an error value here means that the route did not bind successfully, no error means that
 // the route should be considered bound.
 type bindResult struct {
-	section gwv1beta1.SectionName
+	section gwv1alpha2.SectionName
 	err     error
 }
 
@@ -208,7 +208,7 @@ func (b bindResults) Condition() metav1.Condition {
 
 // parentBindResult associates a binding result with the given parent reference.
 type parentBindResult struct {
-	parent  gwv1beta1.ParentReference
+	parent  gwv1alpha2.ParentReference
 	results bindResults
 }
 

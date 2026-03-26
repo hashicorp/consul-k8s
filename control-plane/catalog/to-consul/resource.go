@@ -558,6 +558,23 @@ func (t *ServiceResource) generateRegistrations(key string) {
 			"instances", len(t.consulMap[key]))
 	}()
 
+	// // if ingress
+	// if t.EnableIngress {
+	// 	if addr, ok := t.serviceHostnameMap[key]; ok && addr.hostName != "" {
+
+	// 		r := baseNode
+	// 		rs := baseService
+	// 		r.Service = &rs
+
+	// 		r.Service.ID = serviceID(r.Service.Service, addr.hostName)
+	// 		r.Service.Address = addr.hostName
+	// 		r.Service.Port = int(addr.port)
+
+	// 		t.consulMap[key] = []*consulapi.CatalogRegistration{&r}
+	// 		return
+	// 	}
+	// }
+
 	// If there are external IPs then those become the instance registrations
 	// for any type of service.
 	if ips := svc.Spec.ExternalIPs; len(ips) > 0 {
