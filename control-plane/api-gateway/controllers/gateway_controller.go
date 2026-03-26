@@ -508,6 +508,11 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&v1alpha1.RouteAuthFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter),
 		).
+		Watches(
+			// Subscribe to changes in RouteTLSSDSFilter custom resources referenced by HTTPRoutes.
+			&v1alpha1.RouteTLSSDSFilter{},
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
+		).
 		Complete(r)
 }
 
@@ -642,6 +647,10 @@ func (r *GatewayController) transformRouteTimeoutFilter(ctx context.Context, o c
 
 func (r *GatewayController) transformRouteAuthFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteAuthFilterIndex, client.ObjectKeyFromObject(o).String())
+}
+
+func (r *GatewayController) transformRouteTLSSDSFilter(ctx context.Context, o client.Object) []reconcile.Request {
+	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTLSSDSFilterIndex, client.ObjectKeyFromObject(o).String())
 }
 
 func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
@@ -933,6 +942,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteTimeoutFilter{}
 		case v1alpha1.RouteAuthFilterKind:
 			externalFilter = &v1alpha1.RouteAuthFilter{}
+		case v1alpha1.RouteTLSSDSFilterKind:
+			externalFilter = &v1alpha1.RouteTLSSDSFilter{}
 		default:
 			continue
 		}
@@ -1070,6 +1081,9 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 
 	for _, listener := range gateway.Spec.Listeners {
 		if listener.TLS != nil {
+			if common.ListenerUsesTLSSDS(gateway, listener.TLS) {
+				continue
+			}
 			for _, cert := range listener.TLS.CertificateRefs {
 				if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, common.KindSecret) {
 					certificates.Add(common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace))

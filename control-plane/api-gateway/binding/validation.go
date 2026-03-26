@@ -291,9 +291,22 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 		return nil, nil
 	}
 
+	effectiveSDS := common.ResolveListenerTLSSDSConfig(gateway, tls)
+	if effectiveSDS.Configured {
+		if effectiveSDS.Config == nil {
+			return errListenerTLSSDSIncomplete, nil
+		}
+		if len(tls.CertificateRefs) > 0 {
+			return errListenerTLSSDSAndCertificateRefs, nil
+		}
+	}
+
 	// Validate the certificate references and then return any error
 	// alongside any TLS configuration error that we find below.
-	refsErr := validateCertificateRefs(gateway, tls.CertificateRefs, resources)
+	var refsErr error
+	if effectiveSDS.Config == nil {
+		refsErr = validateCertificateRefs(gateway, tls.CertificateRefs, resources)
+	}
 
 	if tls.Mode != nil && *tls.Mode == gwv1beta1.TLSModePassthrough {
 		return errListenerNoTLSPassthrough, refsErr
@@ -623,6 +636,54 @@ func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, reso
 	}
 
 	return maps.Keys(invalidFilters)
+}
+
+func routeTLSSDSFiltersInvalid(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) []string {
+	invalidFilters := make(map[string]struct{})
+
+	for _, rule := range httproute.Spec.Rules {
+		for _, filter := range rule.Filters {
+			if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+				continue
+			}
+			if string(filter.ExtensionRef.Kind) == v1alpha1.RouteTLSSDSFilterKind {
+				invalidFilters[fmt.Sprintf("%s/%s", httproute.Namespace, filter.ExtensionRef.Name)] = struct{}{}
+			}
+		}
+
+		for _, backendRef := range rule.BackendRefs {
+			for _, filter := range backendRef.Filters {
+				if !routeTLSSDSFilterIsInvalid(filter, resources, httproute.Namespace) {
+					continue
+				}
+				invalidFilters[fmt.Sprintf("%s/%s", httproute.Namespace, filter.ExtensionRef.Name)] = struct{}{}
+			}
+		}
+	}
+
+	return maps.Keys(invalidFilters)
+}
+
+func routeTLSSDSFilterIsInvalid(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string) bool {
+	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+		return false
+	}
+
+	if string(filter.ExtensionRef.Kind) != v1alpha1.RouteTLSSDSFilterKind {
+		return false
+	}
+
+	externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+	if !ok {
+		return true
+	}
+
+	tlsFilter, ok := externalFilter.(*v1alpha1.RouteTLSSDSFilter)
+	if !ok || tlsFilter.Spec.SDS == nil {
+		return true
+	}
+
+	return strings.TrimSpace(tlsFilter.Spec.SDS.ClusterName) == "" || strings.TrimSpace(tlsFilter.Spec.SDS.CertResource) == ""
 }
 
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.
