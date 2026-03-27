@@ -1,0 +1,3 @@
+```release-note:feature
+terminating-gateway: Added support for deploying terminating gateways pod using CRDs. This allows users to manage terminating gateways using Kubernetes-native resources, providing greater flexibility and ease of use when deploying and configuring terminating gateways in their Kubernetes clusters.
+```
