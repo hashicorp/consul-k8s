@@ -607,11 +607,11 @@ spec:
                     {{- end }}
                   {{- end }}
                   2>/dev/null | grep -E '".+"'
-            failureThreshold: 2
-            initialDelaySeconds: 5
-            periodSeconds: 3
-            successThreshold: 1
-            timeoutSeconds: 5
+            failureThreshold: {{ default 2 .Values.server.readinessProbe.failureThreshold }}
+            initialDelaySeconds: {{ default 5 .Values.server.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ default 3 .Values.server.readinessProbe.periodSeconds }}
+            successThreshold: {{ default 1 .Values.server.readinessProbe.successThreshold }}
+            timeoutSeconds: {{ default 5 .Values.server.readinessProbe.timeoutSeconds }}
           {{- if .Values.server.resources }}
           resources:
             {{- if eq (typeOf .Values.server.resources) "string" }}
