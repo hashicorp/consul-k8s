@@ -8,9 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"strings"
 	"text/template"
+	"time"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
@@ -30,6 +33,11 @@ import (
 var _ Controller = (*TerminatingGatewayController)(nil)
 
 const terminatingGatewayByLinkedServiceName = "linkedServiceName"
+
+const (
+	secretOwnerKey      = ".metadata.secretOwner"
+	SecretTriggerSuffix = "-trigger-secret-rotation"
+)
 
 // TerminatingGatewayController is the controller for TerminatingGateway resources.
 type TerminatingGatewayController struct {
@@ -105,9 +113,15 @@ partition "{{.Partition}}" {
 func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.V(1).WithValues("terminating-gateway", req.NamespacedName)
 	log.Info("Reconciling TerminatingGateway")
+	isSecretChange := strings.HasSuffix(req.Name, SecretTriggerSuffix)
+
+	// Strip the suffix to get the actual Gateway name for the K8s Client Get
+	realName := strings.TrimSuffix(req.Name, SecretTriggerSuffix)
+	namespacedName := types.NamespacedName{Name: realName, Namespace: req.Namespace}
+	req.Name = realName
 	termGW := &consulv1alpha1.TerminatingGateway{}
 	// get the registration
-	if err := r.Client.Get(ctx, req.NamespacedName, termGW); err != nil {
+	if err := r.Client.Get(ctx, namespacedName, termGW); err != nil {
 		if !k8serrors.IsNotFound(err) {
 			log.Error(err, "unable to get terminating-gateway")
 		}
@@ -136,6 +150,7 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, err
 		}
 	}
+	ctx = context.WithValue(ctx, "isSecretChange", isSecretChange)
 
 	return r.ConfigEntryController.ReconcileEntry(ctx, r, req, termGW)
 }
@@ -154,7 +169,46 @@ func (r *TerminatingGatewayController) SetupWithManager(ctx context.Context, mgr
 		return err
 	}
 
+	// 2. NEW Indexer: Lookup by Secret Name
+	// This allows the controller to find which TGW is using a specific Secret
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.TerminatingGateway{}, secretOwnerKey, func(rawObj client.Object) []string {
+		tgw := rawObj.(*v1alpha1.TerminatingGateway)
+		var secrets []string
+		for _, svc := range tgw.Spec.Services {
+			if svc.SecretRef != nil && svc.SecretRef.Name != "" {
+				secrets = append(secrets, svc.SecretRef.Name)
+			}
+		}
+		return secrets
+	}); err != nil {
+		return err
+	}
+
 	return setupWithManager(mgr, &consulv1alpha1.TerminatingGateway{}, r)
+}
+
+// MutateConsulEntry is the "Poke" logic.
+// It is called by the generic ReconcileEntry function.
+func (r *TerminatingGatewayController) MutateConsulEntry(obj common.ConfigEntryResource, entry capi.ConfigEntry, req ctrl.Request) error {
+	tgEntry, ok := entry.(*capi.TerminatingGatewayConfigEntry)
+	if !ok {
+		return fmt.Errorf("expected TerminatingGatewayConfigEntry, got %T", entry)
+	}
+
+	// Initialize Meta if it doesn't exist
+	if tgEntry.Meta == nil {
+		tgEntry.Meta = make(map[string]string)
+	}
+	// Adding a timestamp ensures that every time a Secret changes,
+	// the Consul Config Entry gets a new ModifyIndex.
+	// This triggers the SDS Push from Consul to Envoy.
+	for _, service := range obj.(*consulv1alpha1.TerminatingGateway).Spec.Services {
+		if service.SecretRef != nil && service.SecretRef.Name != "" {
+			tgEntry.Meta[fmt.Sprintf("consul.hashicorp.com/secret/%s/last-rotation", service.SecretRef.Name)] = time.Now().Format(time.RFC3339)
+		}
+	}
+
+	return nil
 }
 
 func termGWLinkedServiceIndexer(o client.Object) []string {
@@ -367,6 +421,26 @@ func (r *TerminatingGatewayController) conditionallyDeletePolicies(log logr.Logg
 	}
 
 	return mErr
+}
+
+func (r *TerminatingGatewayController) transformSecret(ctx context.Context, obj client.Object) []reconcile.Request {
+	secret := obj.(*corev1.Secret)
+	var gateways v1alpha1.TerminatingGatewayList
+	_ = r.Client.List(ctx, &gateways, client.InNamespace(secret.Namespace))
+
+	var requests []reconcile.Request
+	for _, gw := range gateways.Items {
+		for _, svc := range gw.Spec.Services {
+			// Link K8s Secret Name to Gateway re-sync
+			if svc.SecretRef != nil && svc.SecretRef.Name == secret.Name {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: gw.Name + SecretTriggerSuffix, Namespace: gw.Namespace},
+				})
+				break
+			}
+		}
+	}
+	return requests
 }
 
 func getPolicyTemplateFor(service string) *template.Template {
