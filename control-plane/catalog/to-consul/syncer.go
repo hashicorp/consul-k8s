@@ -369,6 +369,13 @@ func (s *ConsulSyncer) deregisterRemovedService(ctx context.Context, name, names
 	defer s.lock.Unlock()
 
 	for _, service := range services {
+		// Skip services registered on other nodes to avoid cross-node
+		// deregistration when multiple K8s clusters sync to the same
+		// Consul datacenter.
+		if service.Node != s.ConsulNodeName {
+			continue
+		}
+
 		// Make sure the namespace exists before we run checks against it
 		if _, ok := s.serviceNames[namespace]; ok {
 			// If the service is valid and its info isn't nil, we don't deregister it
@@ -416,8 +423,14 @@ func (s *ConsulSyncer) scheduleReapServiceLocked(name, namespace string) error {
 		return err
 	}
 
-	// Create deregistrations for all of these
+	// Create deregistrations for all of these, but only for services
+	// on this syncer's node to avoid cross-node deregistration when
+	// multiple K8s clusters sync to the same Consul datacenter.
 	for _, svc := range services {
+		if svc.Node != s.ConsulNodeName {
+			continue
+		}
+
 		s.deregs[svc.ServiceID] = &api.CatalogDeregistration{
 			Node:      svc.Node,
 			ServiceID: svc.ServiceID,
