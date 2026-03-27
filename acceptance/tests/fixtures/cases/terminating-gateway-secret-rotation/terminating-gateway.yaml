@@ -4,10 +4,13 @@
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: TerminatingGateway
 metadata:
-  name: terminating-gateway
+  name: tg
 spec:
   services:
-  - name: static-server
+  - name: external-server
+    caFile: /consul/userconfig/tg-client-tls/ca.crt
+    certFile: /consul/userconfig/tg-client-tls/client.crt
+    keyFile: /consul/userconfig/tg-client-tls/client.key
     secretRef:
-      name: tgw-rotation-secret
+      name: tg-client-tls
 
