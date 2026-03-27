@@ -187,6 +187,7 @@ func TestFailover_Connect(t *testing.T) {
 			}
 
 			releaseName := helpers.RandomName()
+			isOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
 
 			var wg sync.WaitGroup
 
@@ -198,6 +199,11 @@ func TestFailover_Connect(t *testing.T) {
 				// Create the cluster-01-a
 				defaultPartitionHelmValues := map[string]string{
 					"global.datacenter": cluster01Datacenter,
+				}
+
+				if isOpenShift {
+					// OpenShift SCCs disallow hostPort by default.
+					defaultPartitionHelmValues["server.exposeGossipAndRPCPorts"] = "false"
 				}
 
 				// On Kind, there are no load balancers but since all clusters
@@ -275,6 +281,11 @@ func TestFailover_Connect(t *testing.T) {
 					"global.datacenter": cluster02Datacenter,
 				}
 
+				if isOpenShift {
+					// OpenShift SCCs disallow hostPort by default.
+					PeerOneHelmValues["server.exposeGossipAndRPCPorts"] = "false"
+				}
+
 				if cfg.UseKind {
 					PeerOneHelmValues["server.exposeGossipAndRPCPorts"] = "true"
 					PeerOneHelmValues["meshGateway.service.type"] = "NodePort"
@@ -292,6 +303,11 @@ func TestFailover_Connect(t *testing.T) {
 				defer wg.Done()
 				PeerTwoHelmValues := map[string]string{
 					"global.datacenter": cluster03Datacenter,
+				}
+
+				if isOpenShift {
+					// OpenShift SCCs disallow hostPort by default.
+					PeerTwoHelmValues["server.exposeGossipAndRPCPorts"] = "false"
 				}
 
 				if cfg.UseKind {
@@ -421,12 +437,14 @@ func TestFailover_Connect(t *testing.T) {
 
 			// Create sameness group after exporting the services, this will reduce flakiness in an automated test
 			for _, v := range testClusters {
-				applyResources(t, cfg, fmt.Sprintf("../fixtures/bases/sameness/%s-default-ns", v.name), v.context.KubectlOptions(t))
+				// SamenessGroup resources are cluster-scoped in Consul semantics but must live in
+				// Kubernetes namespace "default" to pass webhook validation.
+				applyResources(t, cfg, fmt.Sprintf("../fixtures/bases/sameness/%s-default-ns", v.name), v.context.KubectlOptionsForNamespace(metav1.NamespaceDefault))
 			}
 
 			// Setup DNS.
 			for _, v := range testClusters {
-				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services("default").Get(ctx.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
+				dnsService, err := v.context.KubernetesClient(t).CoreV1().Services(v.context.KubectlOptions(t).Namespace).Get(ctx.Background(), fmt.Sprintf("%s-%s", releaseName, "consul-dns"), metav1.GetOptions{})
 				require.NoError(t, err)
 				v.dnsIP = &dnsService.Spec.ClusterIP
 				logger.Logf(t, "%s dnsIP: %s", v.name, *v.dnsIP)
@@ -697,11 +715,10 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 		// the context can be used to determine that failover occured to the expected kubernetes cluster
 		// hosting Consul
 		assert.Contains(r, logs, "ADDITIONAL SECTION:")
-		expectedName := failover.context.KubectlOptions(r).ContextName
 		if cfg.UseKind {
-			expectedName = strings.Replace(expectedName, "kind-", "", -1)
+			expectedName := strings.Replace(failover.context.KubectlOptions(r).ContextName, "kind-", "", -1)
+			assert.Contains(r, logs, expectedName)
 		}
-		assert.Contains(r, logs, expectedName)
 	})
 }
 
@@ -739,10 +756,34 @@ func (c *cluster) checkLocalities(t *testing.T) {
 	} {
 		for _, svc := range svcs {
 			cs := c.getCatalogService(t, svc, ns, c.partition)
+			expectedLocality := c.expectedLocalityForService(t, svc, ns)
 			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
-			assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
+			assert.Equal(t, expectedLocality, *cs.ServiceLocality, "locality for service %s in %s did not match node locality", svc, c.name)
 		}
 	}
+}
+
+func (c *cluster) expectedLocalityForService(t *testing.T, svc, ns string) api.Locality {
+	appName := svc
+	if strings.HasSuffix(appName, "-sidecar-proxy") {
+		appName = strings.TrimSuffix(appName, "-sidecar-proxy")
+	}
+
+	podList, err := c.context.KubernetesClient(t).CoreV1().Pods(ns).List(ctx.Background(), metav1.ListOptions{LabelSelector: fmt.Sprintf("app=%s", appName)})
+	require.NoError(t, err)
+	require.NotEmpty(t, podList.Items, "did not find pod for service %s in namespace %s on cluster %s", svc, ns, c.name)
+
+	nodeName := podList.Items[0].Spec.NodeName
+	require.NotEmpty(t, nodeName, "pod for service %s in namespace %s on cluster %s has no node name", svc, ns, c.name)
+
+	node, err := c.context.KubernetesClient(t).CoreV1().Nodes().Get(ctx.Background(), nodeName, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	region := node.Labels[corev1.LabelTopologyRegion]
+	zone := node.Labels[corev1.LabelTopologyZone]
+	require.NotEmpty(t, region, "node %s missing %s label in cluster %s", nodeName, corev1.LabelTopologyRegion, c.name)
+
+	return api.Locality{Region: region, Zone: zone}
 }
 
 func (c *cluster) getCatalogService(t *testing.T, svc, ns, partition string) *api.CatalogService {
@@ -804,10 +845,27 @@ func copySecret(t *testing.T, cfg *config.TestConfig, sourceContext, destContext
 
 func createNamespaces(t *testing.T, cfg *config.TestConfig, context environment.TestContext) {
 	logger.Logf(t, "creating namespaces in %s", context.KubectlOptions(t).ContextName)
-	k8s.RunKubectl(t, context.KubectlOptions(t), "create", "ns", staticServerNamespace)
-	k8s.RunKubectl(t, context.KubectlOptions(t), "create", "ns", staticClientNamespace)
+	createNamespaceIfMissing := func(namespace string) bool {
+		out, err := k8s.RunKubectlAndGetOutputE(t, context.KubectlOptions(t), "create", "ns", namespace)
+		if err != nil {
+			if strings.Contains(out, "AlreadyExists") {
+				logger.Logf(t, "namespace %s already exists in %s cluster, reusing it", namespace, context.KubectlOptions(t).ContextName)
+				return false
+			}
+			require.NoError(t, err, out)
+		}
+		return true
+	}
+
+	createdClientNamespace := createNamespaceIfMissing(staticClientNamespace)
+	createdServerNamespace := createNamespaceIfMissing(staticServerNamespace)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, context.KubectlOptions(t), "delete", "ns", staticClientNamespace, staticServerNamespace)
+		if createdClientNamespace {
+			k8s.RunKubectl(t, context.KubectlOptions(t), "delete", "ns", staticClientNamespace)
+		}
+		if createdServerNamespace {
+			k8s.RunKubectl(t, context.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+		}
 	})
 }
 
@@ -823,10 +881,13 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 func setK8sNodeLocality(t *testing.T, context environment.TestContext, c *cluster) {
 	nodeList, err := context.KubernetesClient(t).CoreV1().Nodes().List(ctx.Background(), metav1.ListOptions{})
 	require.NoError(t, err)
-	// Get the name of the (only) node from the Kind cluster.
-	node := nodeList.Items[0].Name
-	k8s.KubectlLabel(t, context.KubectlOptions(t), "node", node, corev1.LabelTopologyRegion, c.locality.Region)
-	k8s.KubectlLabel(t, context.KubectlOptions(t), "node", node, corev1.LabelTopologyZone, c.locality.Zone)
+	require.NotEmpty(t, nodeList.Items)
+
+	for _, node := range nodeList.Items {
+		nodeName := node.Name
+		k8s.KubectlLabel(t, context.KubectlOptions(t), "node", nodeName, corev1.LabelTopologyRegion, c.locality.Region)
+		k8s.KubectlLabel(t, context.KubectlOptions(t), "node", nodeName, corev1.LabelTopologyZone, c.locality.Zone)
+	}
 }
 
 // dnsQuery performs a dns query with the provided query string.
@@ -835,9 +896,10 @@ func dnsQuery(t testutil.TestingTB, releaseName string, dnsQuery []string, dnsSe
 	var logs string
 
 	retry.RunWith(timer, t, func(r *retry.R) {
+		dnsNamespace := dnsServer.context.KubectlOptions(r).Namespace
 		args := []string{"exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
-				releaseName)}
+			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.%s",
+				releaseName, dnsNamespace)}
 		args = append(args, dnsQuery...)
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)

@@ -27,6 +27,7 @@ const (
 var kubeAPIConnectErrs = []string{
 	"was refused - did you specify the right host or port?",
 	"Unable to connect to the server",
+	"net/http: TLS handshake timeout",
 }
 
 // Functions included in this file already exist in terratest's k8s library, however,
