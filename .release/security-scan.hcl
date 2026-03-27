@@ -28,7 +28,7 @@ container {
         "ALPINE-CVE-2026-27171",
         "ALPINE-CVE-2026-22184",
         "CVE-2026-27171",
-        "GHSA-p77j-4mvh-x3m3" # vulnerability in go-discover
+        "GHSA-p77j-4mvh-x3m3", # vulnerability in go-discover
         ]  
       paths = [    
         // The OSV scanner will trip on several packages that are included in the
