@@ -34,22 +34,22 @@ func TestTerminatingGatewaySecretRotation(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
 
-			logger.Log(t, "pre-installing referenced gateway secret")
+			helmValues := map[string]string{
+				"connectInject.enabled":                             "true",
+				"terminatingGateways.enabled":                       "true",
+				"terminatingGateways.gateways[0].name":              "tg",
+				"terminatingGateways.gateways[0].replicas":          "1",
+				"terminatingGateways.defaults.extraVolumes[0].type": "secret",
+				"terminatingGateways.defaults.extraVolumes[0].name": "tg-client-tls",
+				"global.acls.manageSystemACLs":                      strconv.FormatBool(tc.secure),
+				"global.tls.enabled":                                strconv.FormatBool(tc.secure),
+			}
+
+			logger.Log(t, "applying referenced gateway secret")
 			k8s.KubectlApply(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/secret.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/secret.yaml")
 			})
-
-			helmValues := map[string]string{
-				"connectInject.enabled":                             "true",
-				"terminatingGateways.enabled":                       "true",
-				"terminatingGateways.gateways[0].name":              "terminating-gateway",
-				"terminatingGateways.gateways[0].replicas":          "1",
-				"terminatingGateways.defaults.extraVolumes[0].type": "secret",
-				"terminatingGateways.defaults.extraVolumes[0].name": "tgw-rotation-secret",
-				"global.acls.manageSystemACLs":                      strconv.FormatBool(tc.secure),
-				"global.tls.enabled":                                strconv.FormatBool(tc.secure),
-			}
 
 			logger.Log(t, "creating consul cluster")
 			releaseName := helpers.RandomName()
@@ -57,17 +57,31 @@ func TestTerminatingGatewaySecretRotation(t *testing.T) {
 			consulCluster.Create(t)
 			consulClient, _ := consulCluster.SetupConsulClient(t, tc.secure)
 
-			logger.Log(t, "applying terminating gateway + secret fixture")
-			k8s.KubectlApplyK(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation")
+			logger.Log(t, "applying terminating gateway fixture")
+			k8s.KubectlApply(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/terminating-gateway.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.KubectlDeleteK(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation")
+				k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/terminating-gateway.yaml")
+			})
+			sleepTime := 10 * time.Second
+			time.Sleep(sleepTime)
+
+			logger.Log(t, "applying unrelated secret")
+			k8s.KubectlApply(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/secret-unrelated.yaml")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/secret-unrelated.yaml")
 			})
 
-			metaKey := "consul.hashicorp.com/secret/tgw-rotation-secret/last-rotation"
+			time.Sleep(sleepTime)
+
+			logger.Log(t, "patching referenced secret to trigger gateway reconcile")
+			secretPatch := fmt.Sprintf(`{"metadata":{"annotations":{"rotation-trigger":"%s"}}}`, strconv.FormatInt(time.Now().UnixNano(), 10))
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "tg-client-tls", "--type=merge", "-p", secretPatch)
+
+			metaKey := "consul.hashicorp.com/secret/tg-client-tls/last-rotation"
 
 			var firstRotation string
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
-				entry, _, err := consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+				entry, _, err := consulClient.ConfigEntries().Get(api.TerminatingGateway, "tg", nil)
 				require.NoError(r, err)
 
 				tgEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
@@ -85,7 +99,7 @@ func TestTerminatingGatewaySecretRotation(t *testing.T) {
 
 			for i := 0; i < 3; i++ {
 				time.Sleep(5 * time.Second)
-				entry, _, err := consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+				entry, _, err := consulClient.ConfigEntries().Get(api.TerminatingGateway, "tg", nil)
 				require.NoError(t, err)
 
 				tgEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
@@ -96,11 +110,11 @@ func TestTerminatingGatewaySecretRotation(t *testing.T) {
 			}
 
 			logger.Log(t, "patching referenced secret to trigger gateway reconcile")
-			secretPatch := fmt.Sprintf(`{"metadata":{"annotations":{"rotation-trigger":"%s"}}}`, strconv.FormatInt(time.Now().UnixNano(), 10))
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "tgw-rotation-secret", "--type=merge", "-p", secretPatch)
+			secretPatch = fmt.Sprintf(`{"metadata":{"annotations":{"rotation-trigger":"%s"}}}`, strconv.FormatInt(time.Now().UnixNano(), 10))
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "tg-client-tls", "--type=merge", "-p", secretPatch)
 
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
-				entry, _, err := consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+				entry, _, err := consulClient.ConfigEntries().Get(api.TerminatingGateway, "tg", nil)
 				require.NoError(r, err)
 
 				tgEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
