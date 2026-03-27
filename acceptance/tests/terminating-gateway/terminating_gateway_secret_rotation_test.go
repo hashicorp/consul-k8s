@@ -34,13 +34,21 @@ func TestTerminatingGatewaySecretRotation(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 			cfg := suite.Config()
 
+			logger.Log(t, "pre-installing referenced gateway secret")
+			k8s.KubectlApply(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/secret.yaml")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDelete(t, ctx.KubectlOptions(t), "../fixtures/cases/terminating-gateway-secret-rotation/secret.yaml")
+			})
+
 			helmValues := map[string]string{
-				"connectInject.enabled":                    "true",
-				"terminatingGateways.enabled":              "true",
-				"terminatingGateways.gateways[0].name":     "terminating-gateway",
-				"terminatingGateways.gateways[0].replicas": "1",
-				"global.acls.manageSystemACLs":             strconv.FormatBool(tc.secure),
-				"global.tls.enabled":                       strconv.FormatBool(tc.secure),
+				"connectInject.enabled":                             "true",
+				"terminatingGateways.enabled":                       "true",
+				"terminatingGateways.gateways[0].name":              "terminating-gateway",
+				"terminatingGateways.gateways[0].replicas":          "1",
+				"terminatingGateways.defaults.extraVolumes[0].type": "secret",
+				"terminatingGateways.defaults.extraVolumes[0].name": "tgw-rotation-secret",
+				"global.acls.manageSystemACLs":                      strconv.FormatBool(tc.secure),
+				"global.tls.enabled":                                strconv.FormatBool(tc.secure),
 			}
 
 			logger.Log(t, "creating consul cluster")
