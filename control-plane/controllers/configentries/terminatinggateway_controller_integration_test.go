@@ -12,6 +12,7 @@ import (
 	logrtest "github.com/go-logr/logr/testr"
 	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,16 +42,23 @@ func TestTerminatingGatewayController_reconcileSecretTriggerUpdatesConsulMeta(t 
 	}
 
 	s := runtime.NewScheme()
-	s.AddKnownTypes(v1alpha1.GroupVersion, termGW)
-	fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(termGW).WithStatusSubresource(termGW).Build()
+	require.NoError(t, v1alpha1.AddToScheme(s))
+	require.NoError(t, corev1.AddToScheme(s))
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(termGW, terminatingGatewayHelmValuesConfigMap(kubeNS)).
+		WithStatusSubresource(termGW).
+		Build()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 	testClient.TestServer.WaitForServiceIntentions(t)
 	consulClient := testClient.APIClient
 
 	reconciler := &TerminatingGatewayController{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:           fakeClient,
+		Log:              logrtest.New(t),
+		ReleaseName:      "consul",
+		ReleaseNamespace: kubeNS,
 		ConfigEntryController: &ConfigEntryController{
 			ConsulClientConfig:  testClient.Cfg,
 			ConsulServerConnMgr: testClient.Watcher,
@@ -63,7 +71,7 @@ func TestTerminatingGatewayController_reconcileSecretTriggerUpdatesConsulMeta(t 
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
 
-	secretReq := ctrl.Request{NamespacedName: types.NamespacedName{Name: kubeName + SecretTriggerSuffix, Namespace: kubeNS}}
+	secretReq := ctrl.Request{NamespacedName: types.NamespacedName{Name: secretTriggerPrefix + kubeName, Namespace: kubeNS}}
 	resp, err = reconciler.Reconcile(ctx, secretReq)
 	require.NoError(t, err)
 	require.False(t, resp.Requeue)
@@ -75,22 +83,25 @@ func TestTerminatingGatewayController_reconcileSecretTriggerUpdatesConsulMeta(t 
 
 	firstRotation, ok := tgEntry.Meta[metaKey]
 	require.True(t, ok)
-	_, parseErr := time.Parse(time.RFC3339, firstRotation)
+	_, parseErr := time.Parse(time.RFC3339Nano, firstRotation)
 	require.NoError(t, parseErr)
 
-	// Sleep for one second so RFC3339 timestamps differ deterministically.
-	time.Sleep(1 * time.Second)
+	var secondRotation string
+	require.Eventually(t, func() bool {
+		resp, err = reconciler.Reconcile(ctx, secretReq)
+		require.NoError(t, err)
+		require.False(t, resp.Requeue)
 
-	resp, err = reconciler.Reconcile(ctx, secretReq)
-	require.NoError(t, err)
-	require.False(t, resp.Requeue)
+		entry, _, err = consulClient.ConfigEntries().Get(capi.TerminatingGateway, kubeName, nil)
+		require.NoError(t, err)
+		tgEntry, ok = entry.(*capi.TerminatingGatewayConfigEntry)
+		require.True(t, ok)
 
-	entry, _, err = consulClient.ConfigEntries().Get(capi.TerminatingGateway, kubeName, nil)
-	require.NoError(t, err)
-	tgEntry, ok = entry.(*capi.TerminatingGatewayConfigEntry)
-	require.True(t, ok)
+		secondRotation, ok = tgEntry.Meta[metaKey]
+		require.True(t, ok)
 
-	secondRotation, ok := tgEntry.Meta[metaKey]
-	require.True(t, ok)
-	require.NotEqual(t, firstRotation, secondRotation)
+		_, parseErr = time.Parse(time.RFC3339Nano, secondRotation)
+		require.NoError(t, parseErr)
+		return secondRotation != firstRotation
+	}, 2*time.Second, 25*time.Millisecond)
 }

@@ -15,12 +15,12 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"
-	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
+	capi "github.com/hashicorp/consul/api"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -286,16 +286,7 @@ func (r *TerminatingGatewayController) SetupWithManager(ctx context.Context, mgr
 
 	// 2. NEW Indexer: Lookup by Secret Name
 	// This allows the controller to find which TGW is using a specific Secret
-	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.TerminatingGateway{}, secretOwnerKey, func(rawObj client.Object) []string {
-		tgw := rawObj.(*v1alpha1.TerminatingGateway)
-		var secrets []string
-		for _, svc := range tgw.Spec.Services {
-			if svc.SecretRef != nil && svc.SecretRef.Name != "" {
-				secrets = append(secrets, svc.SecretRef.Name)
-			}
-		}
-		return secrets
-	}); err != nil {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &v1alpha1.TerminatingGateway{}, secretOwnerKey, termGWSecretIndexer); err != nil {
 		return err
 	}
 
@@ -334,6 +325,18 @@ func termGWLinkedServiceIndexer(o client.Object) []string {
 	}
 
 	return names
+}
+
+func termGWSecretIndexer(o client.Object) []string {
+	termGW := o.(*v1alpha1.TerminatingGateway)
+	var secrets []string
+	for _, service := range termGW.Spec.Services {
+		if service.SecretRef != nil && service.SecretRef.Name != "" {
+			secrets = append(secrets, service.SecretRef.Name)
+		}
+	}
+
+	return secrets
 }
 
 func (r *TerminatingGatewayController) UpdateStatusFailedToSetACLs(ctx context.Context, termGW *consulv1alpha1.TerminatingGateway, err error) {
