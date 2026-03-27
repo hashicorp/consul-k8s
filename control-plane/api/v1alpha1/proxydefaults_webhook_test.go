@@ -44,7 +44,7 @@ func TestValidateProxyDefault(t *testing.T) {
 					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
-					Config: json.RawMessage("1"),
+					Config: JSONRawObject("1"),
 				},
 			},
 			expAllow: false,

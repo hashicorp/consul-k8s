@@ -7,13 +7,13 @@ metadata:
     gateway.networking.k8s.io/bundle-version: v0.6.2
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
+  name: gatewayclasses.gateway.networking.k8s.io
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-  name: gatewayclasses.gateway.networking.k8s.io
 spec:
   group: gateway.networking.k8s.io
   names:
