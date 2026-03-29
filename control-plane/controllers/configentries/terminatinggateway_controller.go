@@ -196,6 +196,13 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		return result, err
 	}
 
+	// If the resource is being deleted, ConfigEntryController already handled
+	// finalizer removal / Consul cleanup. Do not continue with deployment or
+	// status updates because the object may already be gone.
+	if !termGW.GetDeletionTimestamp().IsZero() {
+		return result, nil
+	}
+
 	if deployErr := r.deployTerminatingGatewayDeployment(ctx, log, termGW, helmValues); deployErr != nil {
 		log.Error(deployErr, "error deploying terminating gateway pod")
 		termGW.SetSyncedCondition(corev1.ConditionFalse, "FailedToDeployPod", deployErr.Error())

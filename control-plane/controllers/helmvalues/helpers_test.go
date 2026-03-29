@@ -207,7 +207,7 @@ func TestGetHelmValues(t *testing.T) {
 			namespace:   "consul-ns",
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "consul-consul-helm-values",
+					Name:      "helm-values",
 					Namespace: "consul-ns",
 				},
 				Data: map[string]string{
@@ -234,7 +234,7 @@ func TestGetHelmValues(t *testing.T) {
 			namespace:   "consul-ns",
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "consul-consul-helm-values",
+					Name:      "helm-values",
 					Namespace: "consul-ns",
 				},
 				Data: map[string]string{
@@ -250,7 +250,7 @@ func TestGetHelmValues(t *testing.T) {
 			namespace:   "consul-ns",
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "consul-consul-helm-values",
+					Name:      "helm-values",
 					Namespace: "consul-ns",
 				},
 				Data: map[string]string{
@@ -266,7 +266,7 @@ func TestGetHelmValues(t *testing.T) {
 			namespace:   "default",
 			configMap: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my-consul-consul-helm-values",
+					Name:      "helm-values",
 					Namespace: "default",
 				},
 				Data: map[string]string{

@@ -418,8 +418,10 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
-					Client: client,
-					Log:    logger,
+					Client:           client,
+					Log:              logger,
+					ReleaseName:      "consul",
+					ReleaseNamespace: kubeNS,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
@@ -554,7 +556,18 @@ func TestConfigEntryControllers_createsConfigEntry(t *testing.T) {
 
 				s := runtime.NewScheme()
 				s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-				fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
+				require.NoError(t, corev1.AddToScheme(s))
+
+				objects := []client.Object{c.configEntryResource}
+				if c.kubeKind == "TerminatingGateway" {
+					objects = append(objects, terminatingGatewayHelmValuesConfigMap(kubeNS))
+				}
+
+				fakeClient := fake.NewClientBuilder().
+					WithScheme(s).
+					WithObjects(objects...).
+					WithStatusSubresource(c.configEntryResource).
+					Build()
 
 				var cb testutil.ServerConfigCallback
 				if secure {
@@ -1008,8 +1021,10 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
-					Client: client,
-					Log:    logger,
+					Client:           client,
+					Log:              logger,
+					ReleaseName:      "consul",
+					ReleaseNamespace: kubeNS,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
@@ -1091,7 +1106,18 @@ func TestConfigEntryControllers_updatesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResource)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResource).WithStatusSubresource(c.configEntryResource).Build()
+			require.NoError(t, corev1.AddToScheme(s))
+
+			objects := []client.Object{c.configEntryResource}
+			if c.kubeKind == "TerminatingGateway" {
+				objects = append(objects, terminatingGatewayHelmValuesConfigMap(kubeNS))
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).
+				WithObjects(objects...).
+				WithStatusSubresource(c.configEntryResource).
+				Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -1473,8 +1499,10 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 			},
 			reconciler: func(client client.Client, cfg *consul.Config, watcher consul.ServerConnectionManager, logger logr.Logger) testReconciler {
 				return &TerminatingGatewayController{
-					Client: client,
-					Log:    logger,
+					Client:           client,
+					Log:              logger,
+					ReleaseName:      "consul",
+					ReleaseNamespace: kubeNS,
 					ConfigEntryController: &ConfigEntryController{
 						ConsulClientConfig:  cfg,
 						ConsulServerConnMgr: watcher,
@@ -1522,7 +1550,18 @@ func TestConfigEntryControllers_deletesConfigEntry(t *testing.T) {
 
 			s := runtime.NewScheme()
 			s.AddKnownTypes(v1alpha1.GroupVersion, c.configEntryResourceWithDeletion)
-			fakeClient := fake.NewClientBuilder().WithScheme(s).WithObjects(c.configEntryResourceWithDeletion).WithStatusSubresource(c.configEntryResourceWithDeletion).Build()
+			require.NoError(t, corev1.AddToScheme(s))
+
+			objects := []client.Object{c.configEntryResourceWithDeletion}
+			if c.kubeKind == "TerminatingGateway" {
+				objects = append(objects, terminatingGatewayHelmValuesConfigMap(kubeNS))
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(s).
+				WithObjects(objects...).
+				WithStatusSubresource(c.configEntryResourceWithDeletion).
+				Build()
 
 			testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			testClient.TestServer.WaitForServiceIntentions(t)
@@ -2653,5 +2692,73 @@ func TestDeployTerminatingGatewayDeployment_DisabledNilOrFalse(t *testing.T) {
 			require.NoError(t, fc.List(context.Background(), &list))
 			require.Len(t, list.Items, 0)
 		})
+	}
+}
+
+func terminatingGatewayHelmValuesConfigMap(namespace string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "helm-values",
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"values.json": fmt.Sprintf(`{
+  "release": {
+    "name": "consul",
+    "namespace": %q,
+    "service": "Helm"
+  },
+  "global": {
+    "name": "consul",
+    "enabled": true,
+    "logLevel": "info",
+    "logJSON": false,
+    "datacenter": "dc1",
+    "enableConsulNamespaces": false,
+    "adminPartitions": {
+      "enabled": false,
+      "name": "default"
+    },
+    "tls": {
+      "enabled": false,
+      "caCert": {
+        "secretName": ""
+      }
+    },
+    "acls": {
+      "manageSystemACLs": false
+    },
+    "metrics": {
+      "enabled": false,
+      "enableGatewayMetrics": false
+    },
+    "imageK8S": "hashicorp/consul-k8s-control-plane:1.0.0",
+    "imageConsulDataplane": "hashicorp/consul-dataplane:1.0.0",
+    "extraLabels": {},
+    "consulAPITimeout": "10s",
+    "imagePullPolicy": "IfNotPresent",
+    "enablePodSecurityPolicies": false,
+    "openShiftEnabled": false
+  },
+  "terminatingGateways": {
+    "enabled": true,
+    "logLevel": "",
+    "defaults": {
+      "replicas": 1,
+      "consulNamespace": "default",
+      "annotations": {}
+    }
+  },
+  "externalServers": {
+    "enabled": false,
+    "hosts": [],
+    "httpsPort": 443,
+    "grpcPort": 8502,
+    "tlsServerName": "",
+    "useSystemRoots": false,
+    "skipServerWatch": false
+  }
+}`, namespace),
+		},
 	}
 }
