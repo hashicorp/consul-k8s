@@ -351,6 +351,7 @@ func TestPeering_Gateway(t *testing.T) {
 		// Override api_gateway to use Local mesh gateway mode via service-defaults.
 		// service-defaults takes precedence over proxy-defaults.
 		logger.Log(t, "patching api_gateway to set mesh_gateway mode to local")
+		_, _ = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-local.yaml")
 		out, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-local.yaml")
 		require.NoError(t, err, out)
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -370,6 +371,7 @@ func TestPeering_Gateway(t *testing.T) {
 		// Override api_gateway to use Local mesh gateway mode via service-defaults.
 		// service-defaults takes precedence over proxy-defaults.
 		logger.Log(t, "patching api_gateway to set mesh_gateway mode to remote")
+		_, _ = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "delete", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-remote.yaml")
 		out, err := k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-f", "../fixtures/cases/api-gateways/service-defaults/gateway-remote.yaml")
 		require.NoError(t, err, out)
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
