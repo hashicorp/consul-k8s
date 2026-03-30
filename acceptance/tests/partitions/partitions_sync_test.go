@@ -87,14 +87,11 @@ func TestPartitions_Sync(t *testing.T) {
 			commonHelmValues := map[string]string{
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
-				"global.generateManifests":      "false",
 
 				"global.tls.enabled":   "true",
 				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
-
-				"connectInject.enabled": "false",
 
 				"syncCatalog.enabled": "true",
 				// When mirroringK8S is set, this setting is ignored.
