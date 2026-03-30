@@ -4,7 +4,7 @@
 # More info: https://book.kubebuilder.io/reference/project-config.html
 domain: hashicorp.com
 layout:
-- go.kubebuilder.io/v4
+- go.kubebuilder.io/v2
 plugins:
   go.operator-sdk.io/v2-alpha: {}
 repo: github.com/hashicorp/consul-k8s/control-plane

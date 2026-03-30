@@ -14,6 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var _ Controller = (*RateLimitController)(nil)
+
 // RateLimitController reconciles a RateLimit object.
 type RateLimitController struct {
 	client.Client

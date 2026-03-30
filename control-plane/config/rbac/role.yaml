@@ -46,25 +46,25 @@ rules:
   - patch
   - update
 - apiGroups:
-    - consul.hashicorp.com
+  - consul.hashicorp.com
   resources:
-    - ratelimits
+  - ratelimits
   verbs:
-    - create
-    - delete
-    - get
-    - list
-    - patch
-    - update
-    - watch
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
-    - consul.hashicorp.com
+  - consul.hashicorp.com
   resources:
-    - ratelimits/status
+  - ratelimits/status
   verbs:
-    - get
-    - patch
-    - update
+  - get
+  - patch
+  - update
 - apiGroups:
   - consul.hashicorp.com
   resources:
