@@ -135,6 +135,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
+		setIfNotEmpty(helmValues, "global.openshift.crds.enableTcpRoute", "true")
 	}
 
 	if t.EnablePodSecurityPolicies {

@@ -97,6 +97,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	if runWithEnterpriseOnlyFeatures {
 		fixturePath += "-ent"
 	}
+	fixturePath = namespacedKustomizeOverlay(t, fixturePath, ctx.KubectlOptions(t).Namespace, nil)
 
 	// Use more frequent retries for resource creation
 	applyCounter := &retry.Counter{Count: 30, Wait: 5 * time.Second}
@@ -141,6 +142,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		gatewayAddress string
 		httpRoute      gwv1.HTTPRoute
 	)
+	namespace := ctx.KubectlOptions(t).Namespace
 
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
@@ -149,7 +151,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	logger.Log(t, "waiting for gateway to be ready")
 	retry.RunWith(gatewayCounter, t, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
 		require.NoError(r, err)
 
 		//CHECK TO MAKE SURE EVERYTHING WAS SET UP CORRECTLY BEFORE RUNNING TESTS
@@ -176,7 +178,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	httpRouteCounter := &retry.Counter{Count: 50, Wait: 2 * time.Second}
 	logger.Log(t, "waiting for http route to be ready")
 	retry.RunWith(httpRouteCounter, t, func(r *retry.R) {
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: namespace}, &httpRoute)
 		require.NoError(r, err)
 
 		// check our finalizers
