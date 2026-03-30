@@ -140,7 +140,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		if common.EnsureFinalizer(&b.config.Gateway) || updatedGwcc {
 			// if we've added the finalizer or serialized the class config, then update
 			snapshot.Kubernetes.Updates.Add(&b.config.Gateway)
-			// return snapshot
+			return snapshot
 		}
 
 		// calculate the status for the gateway
@@ -250,12 +250,12 @@ func (b *Binder) Snapshot() *Snapshot {
 		// only mark the gateway as needing a status update if there's a diff with its old
 		// status, this keeps the controller from infinitely reconciling
 		if !common.GatewayStatusesEqual(status, b.config.Gateway.Status) {
+			b.config.Logger.Info("gatewayStatus", "gateway", &b.config.Gateway)
 			b.config.Gateway.Status = status
 			snapshot.Kubernetes.StatusUpdates.Add(&b.config.Gateway)
 		}
 
 		for idx, policy := range b.config.Policies {
-			policy := policy
 
 			var policyStatus v1alpha1.GatewayPolicyStatus
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hashicorp/consul-k8s/control-plane/cni/config"
 	"k8s.io/client-go/rest"
@@ -138,8 +139,18 @@ func kubernetesServer() (string, error) {
 		return "", fmt.Errorf("Unable to get kubernetes api server port from environment")
 	}
 
-	// Server string format is https://[127.0.0.1]:443. The [] are what other plugins are using in their kubeconfig.
-	server := fmt.Sprintf("%s://[%s]:%s", protocol, host, port)
+	// Server string format depends on whether the host is IPv6 or IPv4
+	// IPv6 addresses need brackets: https://[::1]:443
+	// IPv4 addresses don't: https://127.0.0.1:443
+	// Please refer: https://github.com/golang/go/issues/75713
+	var server string
+	if strings.Contains(host, ":") {
+		// IPv6 address, use brackets
+		server = fmt.Sprintf("%s://[%s]:%s", protocol, host, port)
+	} else {
+		// IPv4 address, no brackets
+		server = fmt.Sprintf("%s://%s:%s", protocol, host, port)
+	}
 	return server, nil
 }
 

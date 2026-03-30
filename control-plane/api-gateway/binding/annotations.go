@@ -6,6 +6,7 @@ package binding
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -44,7 +45,7 @@ func serializeGatewayClassConfig(gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayCl
 	// the gateway
 	marshaled, _ := json.Marshal(gwcc.Spec)
 	gw.Annotations[key] = string(marshaled)
-	log.Info("gwcc to be used for stable: " + string(marshaled) + "and generation: " + string(gwcc.Generation))
+	log.Info("gwcc to be used for stable: " + string(marshaled) + "and generation: " + strconv.FormatInt(gwcc.Generation, 10))
 	return gwcc, true
 }
 

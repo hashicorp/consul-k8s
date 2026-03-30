@@ -353,7 +353,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 			group, _ := prMap["group"].(string)
 			if group == "gateway.networking.k8s.io" {
 				prMap["group"] = "consul.hashicorp.com"
-				prMap["name"] = "api-gateway-ocp"
+				prMap["name"] = prMap["name"].(string) + "-custom"
 
 			}
 
@@ -388,7 +388,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 		}
 	}
 
-	// update gatewayclass metadata.labels.component set to api-gateway-ocp
+	// update gatewayclass metadata.labels.component set to api-gateway-custom
 	// if kind == "GatewayClass" {
 	// 	metadata, ok := raw["metadata"].(map[string]interface{})
 	// 	if !ok {
@@ -399,7 +399,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 	// 		labels = make(map[string]interface{})
 	// 		metadata["labels"] = labels
 	// 	}
-	// 	labels["component"] = "api-gateway-ocp"
+	// 	labels["component"] = "api-gateway-custom"
 
 	// 	// also set name --> metadata.name to "consul-ocp"
 	// 	metadata["name"] = "consul-ocp"
@@ -411,15 +411,30 @@ func enforceConsulApiVersion(raw map[string]interface{}) {
 		if !ok {
 			return
 		}
-		spec["gatewayClassName"] = "consul-ocp"
-		// update metadata.name to "api-gateway-ocp"
+		spec["gatewayClassName"] = "consul-custom"
+		// update metadata.name to "api-gateway-custom"
 		metadata, ok := raw["metadata"].(map[string]interface{})
 		if !ok {
 			return
 		}
-		metadata["name"] = "api-gateway-ocp"
+		metadata["name"] = "api-gateway-custom"
 	}
+
 }
+
+// func containsSourceName(sources []interface{}, targetName string) bool {
+// 	for _, s := range sources {
+// 		srcMap, ok := s.(map[string]interface{})
+// 		if !ok {
+// 			continue
+// 		}
+// 		name, _ := srcMap["name"].(string)
+// 		if name == targetName {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
 
 func extractItems(list client.ObjectList) ([]client.Object, error) {
 	switch v := list.(type) {
@@ -530,19 +545,7 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 // 	return c.writeObjects(kindDir, items)
 // }
 
-func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
-	gatewayAPIDir := filepath.Join(c.flagManifestsGatewayAPIDir, kindDir)
-	if err := os.MkdirAll(gatewayAPIDir, 0755); err != nil {
-		return err
-	}
-	var consulDir string
-	if c.consulApiEnabled {
-		consulDir = filepath.Join(c.flagManifestsConsulAPIDir, kindDir)
-		if err := os.MkdirAll(consulDir, 0755); err != nil {
-			return err
-		}
-	}
-
+func (c *Command) writeGatewayObjects(directory string, objs []client.Object) error {
 	for index, obj := range objs {
 		ns := obj.GetNamespace()
 		if ns == "" {
@@ -554,7 +557,7 @@ func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
 
 		filename = safeFileName(filename)
 
-		path := filepath.Join(gatewayAPIDir, filename)
+		path := filepath.Join(directory, filename)
 
 		// Convert to unstructured for sanitization
 		raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
@@ -564,46 +567,85 @@ func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
 
 		sanitizeUnstructured(raw)
 
-		// gateway API manifests
+		enforceGatewayAPIVersion(raw)
 
-		gatewayRaw := deepCopyMap(raw)
-
-		enforceGatewayAPIVersion(gatewayRaw)
-
-		yml, err := yaml.Marshal(gatewayRaw)
+		yml, err := yaml.Marshal(raw)
 		if err != nil {
-			return fmt.Errorf("yaml marshal failed (%s/%s): %w", ns, name, err)
+			return fmt.Errorf("yaml marshal failed for gateway api version(%s/%s): %w", ns, name, err)
 		}
 		if err := os.WriteFile(path, yml, 0644); err != nil {
-			return fmt.Errorf("write failed (%s): %w", path, err)
+			return fmt.Errorf("write failed for gateway api version(%s): %w", path, err)
+		}
+	}
+	fmt.Printf("✅ Gateway API objects dumped into: %s\n", directory)
+	return nil
+}
+
+func (c *Command) writeConsulObjects(directory string, objs []client.Object) error {
+	for index, obj := range objs {
+		ns := obj.GetNamespace()
+		if ns == "" {
+			ns = "cluster"
+		}
+		name := obj.GetName()
+
+		filename := fmt.Sprintf("%d-%s-%s.yaml", index, ns, name)
+
+		filename = safeFileName(filename)
+
+		path := filepath.Join(directory, filename)
+
+		// Convert to unstructured for sanitization
+		raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+		if err != nil {
+			return fmt.Errorf("convert to unstructured failed (%s/%s): %w", ns, name, err)
 		}
 
-		// call this function only when consulApiEnabled is true; This generates another set of manifests for consul.hashicorp.com API group.
-		// make another copy of raw to update the apiVersion for consul.hashicorp.com CRDs without affecting the gateway.networking.k8s.io versions
-		if c.consulApiEnabled {
-			// this will update the apiVersion for consul.hashicorp.com CRDs to v1alpha1
-			consulRaw := deepCopyMap(raw)
-			enforceConsulApiVersion(consulRaw)
-			yml, err := yaml.Marshal(consulRaw)
-			if err != nil {
-				return fmt.Errorf("yaml marshal failed for consul api version (%s/%s): %w", ns, name, err)
-			}
-			path := filepath.Join(consulDir, filename)
-			if err := os.WriteFile(path, yml, 0644); err != nil {
-				return fmt.Errorf("write failed for consul api version (%s): %w", path, err)
-			}
+		sanitizeUnstructured(raw)
 
+		enforceConsulApiVersion(raw)
+
+		yml, err := yaml.Marshal(raw)
+		if err != nil {
+			return fmt.Errorf("yaml marshal failed for consul api version(%s/%s): %w", ns, name, err)
 		}
-
-		// update the apiVersion to remove k8s.io specific versions
+		if err := os.WriteFile(path, yml, 0644); err != nil {
+			return fmt.Errorf("write failed for consul api version(%s): %w", path, err)
+		}
 
 	}
+	fmt.Printf("✅ Consul API objects dumped into: %s\n", directory)
+	return nil
+}
 
-	c.UI.Info(fmt.Sprintf("✅ dumped %d objects into %s", len(objs), gatewayAPIDir))
+func (c *Command) writeObjects(kindDir string, objs []client.Object) error {
+
+	gatewayAPIDir := filepath.Join(c.flagManifestsGatewayAPIDir, kindDir)
+	if err := os.MkdirAll(gatewayAPIDir, 0755); err != nil {
+		return err
+	}
+
+	if err := c.writeGatewayObjects(gatewayAPIDir, objs); err != nil {
+		return err
+	}
+
+	var consulDir string
+	// call this function only when consulApiEnabled is true; This generates another set of manifests for consul.hashicorp.com API group.
+	// make another copy of raw to update the apiVersion for consul.hashicorp.com CRDs without affecting the gateway.networking.k8s.io versions
+
 	if c.consulApiEnabled {
-		c.UI.Info(fmt.Sprintf("✅ dumped %d objects into %s", len(objs), consulDir))
+
+		consulDir = filepath.Join(c.flagManifestsConsulAPIDir, kindDir)
+
+		if err := os.MkdirAll(consulDir, 0755); err != nil {
+			return err
+		}
+		if err := c.writeConsulObjects(consulDir, objs); err != nil {
+			return err
+		}
 	}
 	return nil
+
 }
 
 func sanitizeUnstructured(obj map[string]interface{}) {
