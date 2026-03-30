@@ -173,11 +173,13 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Copy secret from client peer to server peer.
 	k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
+	})
 
 	// Create the peering dialer on the server peer.
 	k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 		k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 	})
 
@@ -266,7 +268,7 @@ func TestPeering_Gateway(t *testing.T) {
 	// leader election so we may need to wait a long time for
 	// the reconcile loop to run (hence the 1m timeout here).
 	var gatewayAddress string
-	counter := &retry.Counter{Count: 10, Wait: 2 * time.Second}
+	counter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: staticClientNamespace}, &gateway)
