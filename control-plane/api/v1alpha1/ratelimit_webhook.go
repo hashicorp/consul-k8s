@@ -58,7 +58,7 @@ func (v *RateLimitWebhook) Handle(ctx context.Context, req admission.Request) ad
 
 		if len(limitList.Items) > 0 {
 			return admission.Errored(http.StatusBadRequest,
-				fmt.Errorf("%s resource already defined - only one control plane request limit entry is supported",
+				fmt.Errorf("%s resource already defined - only one rate limit entry is supported",
 					limit.KubeKind()))
 		}
 	}

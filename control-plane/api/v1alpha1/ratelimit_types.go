@@ -1,3 +1,6 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package v1alpha1
 
 import (
@@ -157,7 +160,6 @@ type RateLimitSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of RateLimit. Edit ratelimit_types.go to remove/update
 	Config GlobalRateLimitConfig `json:"config"`
 }
 
@@ -169,10 +171,10 @@ type GlobalRateLimitConfig struct {
 	ReadRate  *float64 `json:"readRate"`
 	WriteRate *float64 `json:"writeRate"`
 
-	// EmergencyMode enables stricter rate limiting in emergency situations
+	// Priority enables stricter rate limiting in emergency situations.
 	Priority bool `json:"priority"`
 
-	// PriorityEndpoints lists RPC methods that should bypass rate limiting
+	// ExcludeEndpoints lists RPC methods that should bypass rate limiting.
 	// Example: ["Health.Check", "Status.Leader"]
 	ExcludeEndpoints []string `json:"excludeEndpoints"`
 }
