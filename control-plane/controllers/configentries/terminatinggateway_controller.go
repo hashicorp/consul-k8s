@@ -573,10 +573,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		replicas = *termGW.Spec.Deployment.Replicas
 	}
 
-	consulNamespace := defaultIfEmpty(
-		termGW.Spec.Deployment.ConsulNamespace,
-		helmConfigValues.TerminatingGateways.Defaults.ConsulNamespace,
-	)
+	consulNamespace := terminatingGatewayConsulNamespace(termGW, helmConfigValues)
 
 	logLevel := termGW.Spec.Deployment.LogLevel
 	if logLevel == "" {
@@ -743,7 +740,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "spec.nodeName"},
 			},
 		},
-	}, r.consulK8sConsulServerEnvVars(helmConfigValues)...)
+	}, r.consulK8sConsulServerEnvVars(helmConfigValues, consulNamespace)...)
 
 	if !helmConfigValues.ExternalServers.Enabled {
 		initEnv = setOrAppendEnv(
@@ -1218,7 +1215,10 @@ func consulServerTLSCATemplate(secretName string) string {
 
 // consulK8sConsulServerEnvVars returns the environment variables for Consul server connection
 // matching the consul.consulK8sConsulServerEnvVars Helm template helper.
-func (r *TerminatingGatewayController) consulK8sConsulServerEnvVars(helmConfigValues *helmvalues.HelmValues) []corev1.EnvVar {
+func (r *TerminatingGatewayController) consulK8sConsulServerEnvVars(
+	helmConfigValues *helmvalues.HelmValues,
+	consulNamespace string,
+) []corev1.EnvVar {
 	envVars := []corev1.EnvVar{
 		{
 			Name: "CONSUL_ADDRESSES",
@@ -1311,13 +1311,9 @@ func (r *TerminatingGatewayController) consulK8sConsulServerEnvVars(helmConfigVa
 
 	// Consul namespace
 	if helmConfigValues.Global.EnableConsulNamespaces {
-		consulNamespace := helmConfigValues.TerminatingGateways.Defaults.ConsulNamespace
-		if consulNamespace == "" {
-			consulNamespace = "default"
-		}
 		envVars = append(envVars, corev1.EnvVar{
 			Name:  "CONSUL_NAMESPACE",
-			Value: consulNamespace,
+			Value: defaultIfEmpty(consulNamespace),
 		})
 	}
 
@@ -1416,10 +1412,7 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	serviceAccountName := fmt.Sprintf("%s-%s", fullName, gatewayName)
 	authMethodName := fmt.Sprintf("%s-k8s-component-auth-method", fullName)
 
-	consulNamespace := defaultIfEmpty(
-		termGW.Spec.Deployment.ConsulNamespace,
-		helmValues.TerminatingGateways.Defaults.ConsulNamespace,
-	)
+	consulNamespace := terminatingGatewayConsulNamespace(termGW, helmValues)
 
 	rules, err := r.renderTerminatingGatewayACLRules(gatewayName, consulNamespace)
 	if err != nil {
@@ -1578,4 +1571,26 @@ partition "{{ .Partition }}" {
 		return "", err
 	}
 	return out.String(), nil
+}
+
+func terminatingGatewayConsulNamespace(
+	termGW *consulv1alpha1.TerminatingGateway,
+	helmValues *helmvalues.HelmValues,
+) string {
+	if termGW == nil || helmValues == nil {
+		return defaultIfEmpty("")
+	}
+
+	if termGW.Spec.Deployment.ConsulNamespace != "" {
+		return termGW.Spec.Deployment.ConsulNamespace
+	}
+
+	gatewayName := defaultIfEmpty(termGW.Spec.Deployment.GatewayName, termGW.Name)
+	for _, gw := range helmValues.TerminatingGateways.Gateways {
+		if gw.Name == gatewayName && gw.ConsulNamespace != "" {
+			return gw.ConsulNamespace
+		}
+	}
+
+	return defaultIfEmpty(helmValues.TerminatingGateways.Defaults.ConsulNamespace)
 }

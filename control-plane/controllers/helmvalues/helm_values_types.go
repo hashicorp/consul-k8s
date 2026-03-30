@@ -86,7 +86,8 @@ type Defaults struct {
 }
 
 type Gateway struct {
-	Name string `json:"name"`
+	Name            string `json:"name"`
+	ConsulNamespace string `json:"consulNamespace,omitempty"`
 }
 
 type ConnectInjectConfig struct {

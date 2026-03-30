@@ -72,15 +72,24 @@ data:
         "openShiftEnabled": {{ .Values.global.openshift.enabled | default false | toJson }}
       },
 
-      "terminatingGateways": {
-        "enabled": {{ .Values.terminatingGateways.enabled | toJson }},
-        "logLevel": {{ .Values.terminatingGateways.logLevel | default "" | quote }},
-        "defaults": {
-          "replicas": {{ .Values.terminatingGateways.defaults.replicas | default 1 }},
-          "consulNamespace": {{ .Values.terminatingGateways.defaults.consulNamespace | default "default" | quote }},
-          "annotations": {{ .Values.terminatingGateways.defaults.annotations | default dict | toJson }}
-        }
-      },
+            "terminatingGateways": {
+              "enabled": {{ .Values.terminatingGateways.enabled | toJson }},
+              "logLevel": {{ .Values.terminatingGateways.logLevel | default "" | quote }},
+              "defaults": {
+                "replicas": {{ .Values.terminatingGateways.defaults.replicas | default 1 }},
+                "consulNamespace": {{ .Values.terminatingGateways.defaults.consulNamespace | default "default" | quote }},
+                "annotations": {{ .Values.terminatingGateways.defaults.annotations | default dict | toJson }}
+              },
+              "gateways": [
+                {{- range $index, $gateway := .Values.terminatingGateways.gateways }}
+                {{- if $index }},{{- end }}
+                {
+                  "name": {{ $gateway.name | quote }},
+                  "consulNamespace": {{ $gateway.consulNamespace | default "" | quote }}
+                }
+                {{- end }}
+              ]
+            },
 
       "externalServers": {
         "enabled": {{ .Values.externalServers.enabled | default false | toJson }},
@@ -93,90 +102,3 @@ data:
       }
     }
 {{- end }}
-
-
-
-{{/*{{- if .Values.terminatingGateways.enabled }}*/}}
-{{/*apiVersion: v1*/}}
-{{/*kind: ConfigMap*/}}
-{{/*metadata:*/}}
-{{/*  name: helm-values*/}}
-{{/*  namespace: {{ .Release.Namespace }}*/}}
-{{/*  labels:*/}}
-{{/*    app: {{ template "consul.name" . }}*/}}
-{{/*    chart: {{ template "consul.chart" . }}*/}}
-{{/*    heritage: {{ .Release.Service }}*/}}
-{{/*    release: {{ .Release.Name }}*/}}
-{{/*data:*/}}
-{{/*  values.json: |-*/}}
-{{/*    {*/}}
-{{/*      "fullnameOverride": {{ .Values.fullnameOverride | default "" | quote }},*/}}
-{{/*      "nameOverride": {{ .Values.nameOverride | default "" | quote }},*/}}
-{{/*      "release": {*/}}
-{{/*        "name": {{ .Release.Name | quote }},*/}}
-{{/*        "namespace": {{ .Release.Namespace | quote }},*/}}
-{{/*        "service": {{ .Release.Service | quote }}*/}}
-{{/*      },*/}}
-{{/*      "global": {*/}}
-{{/*        "name": {{ .Values.global.name | default "" | quote }},*/}}
-{{/*        "enabled": {{ .Values.global.enabled | default true }},*/}}
-{{/*        "logLevel": {{ .Values.global.logLevel | default "info" | quote }},*/}}
-{{/*        "logJSON": {{ .Values.global.logJSON | default false }},*/}}
-{{/*        "datacenter": {{ .Values.global.datacenter | default "dc1" | quote }},*/}}
-{{/*        "enableConsulNamespaces": {{ .Values.global.enableConsulNamespaces | default false }},*/}}
-{{/*        "adminPartitions": {*/}}
-{{/*          "enabled": {{ if .Values.global.adminPartitions }}{{ .Values.global.adminPartitions.enabled | default false }}{{ else }}false{{ end }},*/}}
-{{/*          "name": {{ if .Values.global.adminPartitions }}{{ .Values.global.adminPartitions.name | default "default" | quote }}{{ else }}"default"{{ end }}*/}}
-{{/*        },*/}}
-{{/*        "tls": {*/}}
-{{/*          "enabled": {{ if .Values.global.tls }}{{ .Values.global.tls.enabled | default false }}{{ else }}false{{ end }},*/}}
-{{/*          "caCert": {*/}}
-{{/*            "secretName": {{ if and .Values.global.tls .Values.global.tls.caCert }}{{ .Values.global.tls.caCert.secretName | default "" | quote }}{{ else }}""{{ end }}*/}}
-{{/*          }*/}}
-{{/*        },*/}}
-{{/*        "acls": {*/}}
-{{/*          "manageSystemACLs": {{ if .Values.global.acls }}{{ .Values.global.acls.manageSystemACLs | default false }}{{ else }}false{{ end }}*/}}
-{{/*        },*/}}
-{{/*        "secretsBackend": {*/}}
-{{/*          "vault": {*/}}
-{{/*            "enabled": {{ if and .Values.global.secretsBackend .Values.global.secretsBackend.vault }}{{ .Values.global.secretsBackend.vault.enabled | default false }}{{ else }}false{{ end }},*/}}
-{{/*            "consulCARole": {{ if and .Values.global.secretsBackend .Values.global.secretsBackend.vault }}{{ .Values.global.secretsBackend.vault.consulCARole | default "" | quote }}{{ else }}""{{ end }},*/}}
-{{/*            "ca": {*/}}
-{{/*              "secretName": {{ if and .Values.global.secretsBackend .Values.global.secretsBackend.vault .Values.global.secretsBackend.vault.ca }}{{ .Values.global.secretsBackend.vault.ca.secretName | default "" | quote }}{{ else }}""{{ end }},*/}}
-{{/*              "secretKey": {{ if and .Values.global.secretsBackend .Values.global.secretsBackend.vault .Values.global.secretsBackend.vault.ca }}{{ .Values.global.secretsBackend.vault.ca.secretKey | default "" | quote }}{{ else }}""{{ end }}*/}}
-{{/*            },*/}}
-{{/*            "agentAnnotations": {{ if and .Values.global.secretsBackend .Values.global.secretsBackend.vault }}{{ .Values.global.secretsBackend.vault.agentAnnotations | default dict | toJson }}{{ else }}{}{{ end }}*/}}
-{{/*          }*/}}
-{{/*        },*/}}
-{{/*        "metrics": {*/}}
-{{/*          "enabled": {{ if .Values.global.metrics }}{{ .Values.global.metrics.enabled | default false }}{{ else }}false{{ end }},*/}}
-{{/*          "enableGatewayMetrics": {{ if .Values.global.metrics }}{{ .Values.global.metrics.enableGatewayMetrics | default false }}{{ else }}false{{ end }}*/}}
-{{/*        },*/}}
-{{/*        "imageK8S": {{ .Values.global.imageK8S | default "" | quote }},*/}}
-{{/*        "imageConsulDataplane": {{ .Values.global.imageConsulDataplane | default "" | quote }},*/}}
-{{/*        "extraLabels": {{ .Values.global.extraLabels | default dict | toJson }},*/}}
-{{/*        "consulAPITimeout": {{ .Values.global.consulAPITimeout | default "10s" | quote }},*/}}
-{{/*        "imagePullPolicy": {{ .Values.global.imagePullPolicy | default "IfNotPresent" | quote }},*/}}
-{{/*        "enablePodSecurityPolicies": {{ .Values.global.enablePodSecurityPolicies | default false }},*/}}
-{{/*        "openShiftEnabled": {{ if .Values.global.openshift }}{{ .Values.global.openshift.enabled | default false }}{{ else }}false{{ end }}*/}}
-{{/*      },*/}}
-{{/*      "terminatingGateways": {*/}}
-{{/*        "enabled": {{ .Values.terminatingGateways.enabled }},*/}}
-{{/*        "logLevel": {{ .Values.terminatingGateways.logLevel | default "" | quote }},*/}}
-{{/*        "defaults": {*/}}
-{{/*          "replicas": {{ if .Values.terminatingGateways.defaults }}{{ .Values.terminatingGateways.defaults.replicas | default 1 }}{{ else }}1{{ end }},*/}}
-{{/*          "consulNamespace": {{ if .Values.terminatingGateways.defaults }}{{ .Values.terminatingGateways.defaults.consulNamespace | default "default" | quote }}{{ else }}"default"{{ end }},*/}}
-{{/*          "annotations": {{ if .Values.terminatingGateways.defaults }}{{ .Values.terminatingGateways.defaults.annotations | default "" | quote }}{{ else }}""{{ end }}*/}}
-{{/*        }*/}}
-{{/*      },*/}}
-{{/*      "externalServers": {*/}}
-{{/*        "enabled": {{ if .Values.externalServers }}{{ .Values.externalServers.enabled | default false }}{{ else }}false{{ end }},*/}}
-{{/*        "hosts": {{ if .Values.externalServers }}{{ .Values.externalServers.hosts | default list | toJson }}{{ else }}[]{{ end }},*/}}
-{{/*        "httpsPort": {{ if .Values.externalServers }}{{ .Values.externalServers.httpsPort | default 443 }}{{ else }}443{{ end }},*/}}
-{{/*        "grpcPort": {{ if .Values.externalServers }}{{ .Values.externalServers.grpcPort | default 8502 }}{{ else }}8502{{ end }},*/}}
-{{/*        "tlsServerName": {{ if .Values.externalServers }}{{ .Values.externalServers.tlsServerName | default "" | quote }}{{ else }}""{{ end }},*/}}
-{{/*        "useSystemRoots": {{ if .Values.externalServers }}{{ .Values.externalServers.useSystemRoots | default false }}{{ else }}false{{ end }},*/}}
-{{/*        "skipServerWatch": {{ if .Values.externalServers }}{{ .Values.externalServers.skipServerWatch | default false }}{{ else }}false{{ end }}*/}}
-{{/*      }*/}}
-{{/*    }*/}}
-{{/*{{- end }}*/}}
