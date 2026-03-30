@@ -164,10 +164,8 @@ type RateLimitSpec struct {
 }
 
 type GlobalRateLimitConfig struct {
-	// RequestLimits allows separate configuration for read and write operations.
-	// This follows the same pattern as limits.request_limits in agent configuration.
-	// If set, takes precedence over the legacy MaxRPS field.
-	// If nil, defaults to infinity (unlimited).
+	// ReadRate and WriteRate configure global limits for read and write operations.
+	// If nil, each rate defaults to infinity (unlimited).
 	ReadRate  *float64 `json:"readRate"`
 	WriteRate *float64 `json:"writeRate"`
 
