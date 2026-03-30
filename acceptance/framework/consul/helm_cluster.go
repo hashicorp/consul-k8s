@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -142,18 +143,25 @@ func NewHelmCluster(
 func applyOpenShiftDefaults(values map[string]string) {
 	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
 	// attempt to adopt or create them for per-test releases.
+	//4.18 either manageExternalCRDs or manageNonStandardCRDs will true with enableTcpRoute true
+	//4.19 pass flag isOCPGreaterThan4_18 to true
+	// OpenShift clusters can already have Gateway API CRDs managed outside this Helm release.
+	// Disable external CRD management to avoid Helm ownership conflicts during install.
 	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
 	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
+	values["global.openshift.crds.enableTcpRoute"] = "true"
 
-	if _, ok := values["connectInject.failurePolicy"]; !ok {
-		values["connectInject.failurePolicy"] = "Ignore"
-	}
+	// OpenShift's default security context constraints can cause issues with Helm test cleanup,
+	// so we set the affinity to null to allow the chart's default anti-affinity rules to take effect.
+	values["server.affinity"] = "null"
 
-	if _, ok := values["server.affinity"]; !ok {
-		// Acceptance clusters are often small; disabling strict anti-affinity
-		// avoids pending server pods and long install stalls.
-		values["server.affinity"] = "null"
-	}
+	// OpenShift: Override container security context to allow OpenShift SCCs to manage permissions
+	// We need to disable runAsNonRoot since the Consul image runs as root by default
+	// OpenShift SCCs will manage the actual user/group assignments
+
+	// Must provide full security context when overriding to avoid using restrictedSecurityContext helper
+	values["server.containerSecurityContext.server.allowPrivilegeEscalation"] = "false"
+	values["server.containerSecurityContext.server.runAsNonRoot"] = "false"
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
@@ -248,11 +256,38 @@ func (h *HelmCluster) deleteStaleGatewayAPICRDs(t *testing.T) {
 
 	// These non-standard CRDs are cluster-scoped and can be left behind with
 	// stale Helm ownership annotations from prior acceptance releases.
-	crds := []string{
-		"gatewayclassconfigs.consul.hashicorp.com",
-		"meshservices.consul.hashicorp.com",
-		"tcproutes.gateway.networking.k8s.io",
+	crdSet := map[string]struct{}{
+		"controlplanerequestlimits.consul.hashicorp.com": {},
+		"gatewayclassconfigs.consul.hashicorp.com":       {},
+		"meshservices.consul.hashicorp.com":              {},
+		"tcproutes.gateway.networking.k8s.io":            {},
 	}
+
+	allCRDNamesOutput, err := k8s.RunKubectlAndGetOutputE(
+		t,
+		h.helmOptions.KubectlOptions,
+		"get", "crd",
+		"-o", "jsonpath={range .items[*]}{.metadata.name}{\"\\n\"}{end}",
+	)
+	if err != nil {
+		require.NoError(t, err)
+	}
+
+	for _, name := range strings.Split(strings.TrimSpace(allCRDNamesOutput), "\n") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if strings.HasSuffix(name, ".consul.hashicorp.com") {
+			crdSet[name] = struct{}{}
+		}
+	}
+
+	crds := make([]string, 0, len(crdSet))
+	for crd := range crdSet {
+		crds = append(crds, crd)
+	}
+	sort.Strings(crds)
 
 	for _, crd := range crds {
 		ownerRelease, err := k8s.RunKubectlAndGetOutputE(

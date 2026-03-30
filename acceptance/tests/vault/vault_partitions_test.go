@@ -16,8 +16,10 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
+	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -98,6 +100,12 @@ func TestVault_Partitions(t *testing.T) {
 			},
 		}, metav1.CreateOptions{})
 		require.NoError(t, err)
+		reviewerTokenTTLSeconds := int64(12 * 60 * 60)
+		tokenReq, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).CreateToken(context.Background(), authMethodRBACName, &authv1.TokenRequest{
+			Spec: authv1.TokenRequestSpec{ExpirationSeconds: &reviewerTokenTTLSeconds},
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+		require.NotEmpty(t, tokenReq.Status.Token)
 		// In Kubernetes 1.24+ the serviceAccount does not automatically populate secrets with permanent JWT tokens, use this instead.
 		// It will be cleaned up by Kubernetes automatically since it references the ServiceAccount.
 		if len(svcAcct.Secrets) == 0 {
@@ -275,6 +283,8 @@ func TestVault_Partitions(t *testing.T) {
 	adminPartitionsRole := "partition-init"
 	partitionInitServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init")
 	prtAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
+		// OpenShift projected service account tokens can be sensitive to SA naming
+		// drift during retries/re-installs in this multi-cluster flow.
 		ServiceAccountName:  partitionInitServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),
@@ -343,6 +353,11 @@ func TestVault_Partitions(t *testing.T) {
 		"server.extraVolumes[0].load": "false",
 	}
 
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		// Keep gossip/RPC exposure enabled for multi-cluster server<->client connectivity.
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+	}
+
 	// On Kind, there are no load balancers but since all clusters
 	// share the same node network (docker bridge), we can use
 	// a NodePort service so that we can access node(s) in a different Kind cluster.
@@ -355,14 +370,44 @@ func TestVault_Partitions(t *testing.T) {
 
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)
 
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		// `restricted-v2` does not permit hostPort, so pre-bind the Consul server
+		// service account to a permissive SCC role before creating server pods.
+		serverSCCRoleBindingName := fmt.Sprintf("%s-consul-server-privileged-scc", consulReleaseName)
+		_, err = serverClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Create(context.Background(), &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serverSCCRoleBindingName,
+				Namespace: ns,
+			},
+			Subjects: []rbacv1.Subject{{
+				Kind:      rbacv1.ServiceAccountKind,
+				Name:      fmt.Sprintf("%s-consul-server", consulReleaseName),
+				Namespace: ns,
+			}},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "system:openshift:scc:privileged",
+			},
+		}, metav1.CreateOptions{})
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			require.NoError(t, err)
+		}
+		t.Cleanup(func() {
+			_ = serverClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Delete(context.Background(), serverSCCRoleBindingName, metav1.DeleteOptions{})
+		})
+	}
+
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
 	consulCluster.Create(t)
 
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
+	logger.Logf(t, "Resolved external server host for %s: %s", partitionServiceName, partitionSvcAddress)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
+	logger.Logf(t, "Using secondary Kubernetes auth method host: %s", k8sAuthMethodHost)
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
@@ -388,10 +433,11 @@ func TestVault_Partitions(t *testing.T) {
 		"global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
 		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
-		"externalServers.enabled":           "true",
-		"externalServers.hosts[0]":          partitionSvcAddress,
-		"externalServers.tlsServerName":     "server.dc1.consul",
-		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
+		"externalServers.enabled":             "true",
+		"externalServers.hosts[0]":            partitionSvcAddress,
+		"externalServers.tlsServerName":       "server.dc1.consul",
+		"externalServers.k8sAuthMethodHost":   k8sAuthMethodHost,
+		"global.federation.k8sAuthMethodHost": k8sAuthMethodHost,
 
 		"client.enabled":           "true",
 		"client.exposeGossipPorts": "true",
@@ -405,6 +451,34 @@ func TestVault_Partitions(t *testing.T) {
 	}
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
+
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		// `restricted-v2` does not permit hostPort, so pre-bind the Consul client
+		// service account to a permissive SCC role before creating client pods.
+		clientSCCRoleBindingName := fmt.Sprintf("%s-consul-client-privileged-scc", consulReleaseName)
+		_, err = clientClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Create(context.Background(), &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      clientSCCRoleBindingName,
+				Namespace: ns,
+			},
+			Subjects: []rbacv1.Subject{{
+				Kind:      rbacv1.ServiceAccountKind,
+				Name:      fmt.Sprintf("%s-consul-client", consulReleaseName),
+				Namespace: ns,
+			}},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "system:openshift:scc:privileged",
+			},
+		}, metav1.CreateOptions{})
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			require.NoError(t, err)
+		}
+		t.Cleanup(func() {
+			_ = clientClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Delete(context.Background(), clientSCCRoleBindingName, metav1.DeleteOptions{})
+		})
+	}
 
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterCtx, cfg, consulReleaseName)
