@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.25.7
+go 1.25.8
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
@@ -86,7 +86,7 @@ require (
 require (
 	cloud.google.com/go/auth v0.9.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
-	cloud.google.com/go/compute/metadata v0.7.0 // indirect
+	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.28 // indirect
