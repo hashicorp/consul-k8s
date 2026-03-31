@@ -54,14 +54,14 @@ type ScalingConfig struct {
 	UseGatewayClassFallback bool
 }
 
-// HPAConfig holds HPA-specific configuration
+// HPAConfig holds HPA-specific configuration.
 type HPAConfig struct {
 	MinReplicas    int32
 	MaxReplicas    int32
 	CPUTargetValue int32
 }
 
-// ParseScalingAnnotations extracts and validates scaling configuration from Gateway annotations
+// ParseScalingAnnotations extracts and validates scaling configuration from Gateway annotations.
 func ParseScalingAnnotations(gateway gwv1beta1.Gateway, log logr.Logger) (*ScalingConfig, error) {
 	annotations := gateway.Annotations
 	if annotations == nil {
@@ -104,7 +104,7 @@ func ParseScalingAnnotations(gateway gwv1beta1.Gateway, log logr.Logger) (*Scali
 	return &ScalingConfig{Mode: "none"}, nil
 }
 
-// parseHPAAnnotations extracts HPA configuration from annotations
+// parseHPAAnnotations extracts HPA configuration from annotations.
 func parseHPAAnnotations(annotations map[string]string, log logr.Logger) (*HPAConfig, error) {
 	config := &HPAConfig{
 		MinReplicas:    defaultHPAMinReplicas,
@@ -192,7 +192,7 @@ func logScalingFeatureDisabled(log logr.Logger, gateway gwv1beta1.Gateway) {
 		"gateway", client.ObjectKeyFromObject(&gateway))
 }
 
-// DetectUserManagedHPA checks if a user has created their own HPA for the gateway
+// DetectUserManagedHPA checks if a user has created their own HPA for the gateway.
 func (g *Gatekeeper) DetectUserManagedHPA(ctx context.Context, gateway gwv1beta1.Gateway) (bool, error) {
 	hpaList := &autoscalingv2.HorizontalPodAutoscalerList{}
 	err := g.Client.List(ctx, hpaList, client.InNamespace(gateway.Namespace))
@@ -223,7 +223,7 @@ func (g *Gatekeeper) DetectUserManagedHPA(ctx context.Context, gateway gwv1beta1
 	return false, nil
 }
 
-// UpsertHPA creates or updates an HPA resource for the gateway
+// UpsertHPA creates or updates an HPA resource for the gateway.
 func (g *Gatekeeper) UpsertHPA(ctx context.Context, gateway gwv1beta1.Gateway, config *HPAConfig) error {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,7 +272,7 @@ func (g *Gatekeeper) UpsertHPA(ctx context.Context, gateway gwv1beta1.Gateway, c
 	return nil
 }
 
-// DeleteHPA removes the controller-managed HPA for a gateway
+// DeleteHPA removes the controller-managed HPA for a gateway.
 func (g *Gatekeeper) DeleteHPA(ctx context.Context, gateway gwv1beta1.Gateway) error {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
 	hpaName := fmt.Sprintf("%s-hpa", gateway.Name)
@@ -312,7 +312,7 @@ func (g *Gatekeeper) DeleteHPA(ctx context.Context, gateway gwv1beta1.Gateway) e
 	return nil
 }
 
-// LogDeprecationWarnings logs warnings for deprecated GatewayClassConfig fields
+// LogDeprecationWarnings logs warnings for deprecated GatewayClassConfig fields.
 func LogDeprecationWarnings(gcc v1alpha1.GatewayClassConfig, log logr.Logger) {
 	if gcc.Spec.DeploymentSpec.DefaultInstances != nil ||
 		gcc.Spec.DeploymentSpec.MaxInstances != nil ||
@@ -326,7 +326,7 @@ func LogDeprecationWarnings(gcc v1alpha1.GatewayClassConfig, log logr.Logger) {
 	}
 }
 
-// DetermineScalingMode determines the final scaling mode considering all sources
+// DetermineScalingMode determines the final scaling mode considering all sources.
 func (g *Gatekeeper) DetermineScalingMode(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) (*ScalingConfig, error) {
 	// Log deprecation warnings for GCC fields
 	LogDeprecationWarnings(gcc, g.Log)
