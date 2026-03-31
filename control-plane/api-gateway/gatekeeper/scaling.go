@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	// Annotation keys for scaling configuration
+	// Annotation keys for scaling configuration.
 	AnnotationDefaultReplicas = "consul.hashicorp.com/default-replicas"
 	AnnotationHPAEnabled      = "consul.hashicorp.com/hpa-enabled"
 	AnnotationHPAMinReplicas  = "consul.hashicorp.com/hpa-minimum-replicas"
@@ -32,13 +32,13 @@ const (
 	// Backward-compatible alias for the earlier hyphenated US spelling.
 	annotationHPACPUTargetUS = "consul.hashicorp.com/hpa-cpu-utilization-target"
 
-	// Default values
+	// Default values.
 	defaultHPAMinReplicas = 1
 	defaultHPAMaxReplicas = 10
 	defaultCPUTarget      = 80
 )
 
-// ScalingConfig holds the parsed scaling configuration from Gateway annotations
+// ScalingConfig holds the parsed scaling configuration from Gateway annotations.
 type ScalingConfig struct {
 	// Mode indicates the scaling mode: "static", "hpa-controller", "hpa-user", or "none"
 	Mode string
@@ -274,14 +274,32 @@ func (g *Gatekeeper) UpsertHPA(ctx context.Context, gateway gwv1beta1.Gateway, c
 
 // DeleteHPA removes the controller-managed HPA for a gateway
 func (g *Gatekeeper) DeleteHPA(ctx context.Context, gateway gwv1beta1.Gateway) error {
-	hpa := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-hpa", gateway.Name),
-			Namespace: gateway.Namespace,
-		},
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
+	hpaName := fmt.Sprintf("%s-hpa", gateway.Name)
+	
+	// First, fetch the HPA to check if it exists and if we own it
+	err := g.Client.Get(ctx, client.ObjectKey{
+		Name:      hpaName,
+		Namespace: gateway.Namespace,
+	}, hpa)
+	
+	if k8serrors.IsNotFound(err) {
+		return nil
+	}
+	
+	if err != nil {
+		return fmt.Errorf("failed to get HPA: %w", err)
+	}
+	
+	// Verify that this controller owns the HPA before deleting
+	if !metav1.IsControlledBy(hpa, &gateway) {
+		g.Log.V(1).Info("HPA exists but is not controller-managed, skipping deletion",
+			"gateway", gateway.Name, "hpa", hpaName)
+		return nil
 	}
 
-	err := g.Client.Delete(ctx, hpa)
+	// Delete the controller-managed HPA
+	err = g.Client.Delete(ctx, hpa)
 	if k8serrors.IsNotFound(err) {
 		return nil
 	}
