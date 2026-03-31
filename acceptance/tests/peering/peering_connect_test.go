@@ -187,9 +187,7 @@ func TestPeering_Connect(t *testing.T) {
 			// Ensure the secret is created.
 			timer = &retry.Timer{Timeout: 30 * time.Minute, Wait: 60 * time.Second}
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
-				require.NoError(r, err)
-				require.NotEmpty(r, acceptorSecretName)
+				helpers.EnsurePeeringAcceptorSecret(t, r, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 
 			// Copy secret from client peer to server peer.

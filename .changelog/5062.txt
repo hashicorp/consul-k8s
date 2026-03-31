@@ -1,0 +1,3 @@
+```release-note:bug
+Updates code logic in CNI during application pod creation.
+```

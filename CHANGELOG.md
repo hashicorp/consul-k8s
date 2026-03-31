@@ -1,3 +1,159 @@
+## 1.9.5 (February 27, 2026)
+
+SECURITY:
+
+* Added input length validation on "consul.hashicorp.com/service-name" annotation [[GH-5107](https://github.com/hashicorp/consul-k8s/issues/5107)]
+* go: upgrade go version to 1.25.7 [[GH-5113](https://github.com/hashicorp/consul-k8s/issues/5113)]
+* docker: upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
+
+## 1.8.10 (February 27, 2026)
+
+SECURITY:
+
+* Added input length validation on "consul.hashicorp.com/service-name" annotation [[GH-5097](https://github.com/hashicorp/consul-k8s/issues/5097)]
+* go: upgrade go version to 1.25.7 [[GH-5113](https://github.com/hashicorp/consul-k8s/issues/5113)]
+* upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
+
+BUG FIXES:
+* cni: Updates code logic in CNI during application pod creation. [[GH-5062](https://github.com/hashicorp/consul-k8s/issues/5062)]
+
+## 1.7.12 (February 27, 2026)
+
+SECURITY:
+
+* Added input length validation on "consul.hashicorp.com/service-name" annotation [[GH-5097](https://github.com/hashicorp/consul-k8s/issues/5097)]
+* go: upgrade go version to 1.25.7 [[GH-5113](https://github.com/hashicorp/consul-k8s/issues/5113)]
+* upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
+
+BUG FIXES:
+* cni: Updates code logic in CNI during application pod creation. [[GH-5062](https://github.com/hashicorp/consul-k8s/issues/5062)]
+
+## 1.9.4, 1.8.9, 1.7.11
+
+**UNRELEASED**
+
+## 1.9.3 (January 27, 2026)
+
+SECURITY:
+
+* Update the Consul Build Go base image to `alpine3.23` [[GH-5065](https://github.com/hashicorp/consul-k8s/issues/5065)]
+
+BUG FIXES:
+* cni: Updates code logic in CNI during application pod creation. [[GH-5062](https://github.com/hashicorp/consul-k8s/issues/5062)]
+
+## 1.8.8 (January 27, 2026)
+
+SECURITY:
+
+* Update the Consul Build Go base image to `alpine3.23` [[GH-5065](https://github.com/hashicorp/consul-k8s/issues/5065)]
+
+## 1.7.10 (January 27, 2026)
+
+SECURITY:
+
+* Update the Consul Build Go base image to `alpine3.23` [[GH-5065](https://github.com/hashicorp/consul-k8s/issues/5065)]
+
+## 1.9.1 (2 December, 2025)
+
+SECURITY:
+
+* crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108 [[GH-4990](https://github.com/hashicorp/consul-k8s/issues/4990)]
+
+FEATURES:
+
+* api-gateway: Add support for configuring Kubernetes probes (liveness, readiness, startup) per-Gateway via annotations. Use `consul.hashicorp.com/liveness-probe`, `consul.hashicorp.com/readiness-probe`, and `consul.hashicorp.com/startup-probe` annotations with JSON probe configuration to customize health checks for individual API Gateways. [[GH-4901](https://github.com/hashicorp/consul-k8s/pull/4901)] [[GH-4901](https://github.com/hashicorp/consul-k8s/issues/4901)]
+* cli: Add `debug` command to collect configs, logs, and other data from a Consul on Kubernetes deployment in a archive/dir. [[GH-4800](https://github.com/hashicorp/consul-k8s/issues/4800)]
+* cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
+* cli: added new -capture flag to proxy loglevel command, enabling users to capture logs for certain duration. [[GH-4788](https://github.com/hashicorp/consul-k8s/issues/4788)]
+
+## 1.8.6 (2 December, 2025)
+
+SECURITY:
+
+* crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108 [[GH-4990](https://github.com/hashicorp/consul-k8s/issues/4990)]
+
+FEATURES:
+
+* api-gateway: Add support for configuring Kubernetes probes (liveness, readiness, startup) per-Gateway via annotations. Use `consul.hashicorp.com/liveness-probe`, `consul.hashicorp.com/readiness-probe`, and `consul.hashicorp.com/startup-probe` annotations with JSON probe configuration to customize health checks for individual API Gateways. [[GH-4901](https://github.com/hashicorp/consul-k8s/pull/4901)] [[GH-4901](https://github.com/hashicorp/consul-k8s/issues/4901)]
+* cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
+
+IMPROVEMENTS:
+
+* cni: fixed race conditions with older versions where no cleanup was done for binary
+cni: cleanup of cni binary on previous pod deletion to improve security posture [[GH-4757](https://github.com/hashicorp/consul-k8s/issues/4757)]
+
+## 1.7.8 (2 December, 2025)
+
+SECURITY:
+
+* crypto: upgrade golang.org/x/crypto to v0.45.0 to fix GO-2025-4134, GO-2025-4135, GO-2025-4116, GHSA-f6x5-jh6r-wrfv
+containerd: upgrade github.com/containerd/containerd to v1.7.29 to fix GO-2025-4100, GO-2025-4108 [[GH-4990](https://github.com/hashicorp/consul-k8s/issues/4990)]
+
+FEATURES:
+
+* cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
+
+IMPROVEMENTS:
+
+* cni: fixed race conditions with older versions where no cleanup was done for binary
+cni: cleanup of cni binary on previous pod deletion to improve security posture [[GH-4757](https://github.com/hashicorp/consul-k8s/issues/4757)]
+
+## 1.8.4 (November 5, 2023)
+
+SECURITY:
+
+* Updated AWS SDK dependencies and added CVE suppressions. Upgraded github.com/aws/aws-sdk-go from v1.38.63 to v1.55.8 in hack/aws-acceptance-test-cleanup utilities and suppressed CVEs:
+[GO-2022-0635](https://pkg.go.dev/vuln/GO-2022-0635) (AWS S3 Crypto SDK - in-band key negotiation issue)
+[GO-2022-0646](https://pkg.go.dev/vuln/GO-2022-0646) (AWS S3 Crypto SDK - CBC padding oracle issue)
+
+These vulnerabilities affect only test cleanup utilities in unused S3 crypto components. They do not impact production consul-k8s deployments. [[GH-4870](https://github.com/hashicorp/consul-k8s/issues/4870)]
+* go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/issues/4897)]
+
+IMPROVEMENTS:
+
+* Consul-dataplane now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used. [[GH-4745](https://github.com/hashicorp/consul-k8s/issues/4745)]
+* control-plane: updated endpoints controller to use podIP from endpoint object [[GH-4809](https://github.com/hashicorp/consul-k8s/issues/4809)]
+
+## 1.7.7 (November 5, 2023)
+
+SECURITY:
+
+* Updated AWS SDK dependencies and added CVE suppressions. Upgraded github.com/aws/aws-sdk-go from v1.38.63 to v1.55.8 in hack/aws-acceptance-test-cleanup utilities and suppressed CVEs:
+[GO-2022-0635](https://pkg.go.dev/vuln/GO-2022-0635) (AWS S3 Crypto SDK - in-band key negotiation issue)
+[GO-2022-0646](https://pkg.go.dev/vuln/GO-2022-0646) (AWS S3 Crypto SDK - CBC padding oracle issue)
+
+These vulnerabilities affect only test cleanup utilities in unused S3 crypto components. They do not impact production consul-k8s deployments. [[GH-4870](https://github.com/hashicorp/consul-k8s/issues/4870)]
+* go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/issues/4897)]
+
+IMPROVEMENTS:
+
+* Consul-dataplane now includes both privileged and non-privileged binaries in the image. By default, all use cases use the non-privileged binaries (without NET_BIND_SERVICE). For Ingress, API, and Mesh Gateway use cases, if a privileged port is configured, the privileged binary (with NET_BIND_SERVICE capability) is automatically selected and used. [[GH-4745](https://github.com/hashicorp/consul-k8s/issues/4745)]
+* control-plane: updated endpoints controller to use podIP from endpoint object [[GH-4809](https://github.com/hashicorp/consul-k8s/issues/4809)]
+
+## 1.9.0 (October 27, 2025)
+
+> **NOTE**: Consul K8s 1.9.x is compatible with Consul 1.22.x and Consul Dataplane 1.9.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+**RELEASE HIGHLIGHTS:**
+* **Enhanced IPv6 Support**: Improved CNI kubeconfig generation with better Kubernetes API server URL handling for IPv6 environments
+* **Updated Dependencies**: All Consul submodules updated to their latest GA versions for improved stability and compatibility
+* **Security Improvements**: Go runtime upgraded to 1.25.3 with latest security patches
+
+BUG FIXES:
+* control-plane: Enhanced IPv6 support in CNI kubeconfig generation for better Kubernetes API server URL handling [[GH-4897](https://github.com/hashicorp/consul-k8s/pull/4897)]
+
+IMPROVEMENTS:
+* deps: update consul/api to v1.33.0  
+* deps: update consul/sdk to v0.17.0  
+* deps: update consul/proto-public to v0.7.0  
+* deps: update consul/envoyextensions to v0.9.0  
+* deps: update consul/troubleshoot to v0.8.0   
+
+SECURITY:
+* go: upgrade go version to 1.25.3 [[GH-4897](https://github.com/hashicorp/consul-k8s/pull/4897)]
+
 ## 1.9.0-rc2 (October 16, 2025)
 
 FEATURES:

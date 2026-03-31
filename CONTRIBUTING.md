@@ -1184,10 +1184,22 @@ generated from our `values.yaml` file.
 
 To generate the docs and update the `helm.mdx` file:
 
-1. Fork `hashicorp/consul` (https://github.com/hashicorp/consul) on GitHub.
+1. Fork `hashicorp/web-unified-docs` (https://github.com/hashicorp/web-unified-docs) on GitHub.
 1. Clone your fork:
    ```shell-session
-   git clone https://github.com/<your-username>/consul.git
+   git clone https://github.com/<your-username>/web-unified-docs.git
+   ```
+1. Change directory to `web-unified-docs`:
+   ```shell-session
+   cd /path/to/web-unified-docs
+   ```
+1. Install NPM dependencies
+   ```shell-session
+   npm i
+   ```
+1. Compile version metadata file
+   ```shell-session
+   npm run prebuild -- --onlyVersionMetadata
    ```
 1. Change directory into your `consul-k8s` repo:
    ```shell-session
@@ -1195,12 +1207,12 @@ To generate the docs and update the `helm.mdx` file:
    ```
 1. Run `make gen-helm-docs` using the path to your consul (not consul-k8s) repo:
    ```shell-session
-   make gen-helm-docs consul=<path-to-consul-repo>
+   make gen-helm-docs docsRepo=<path-to-docs-repo>
    # Examples:
-   # make gen-helm-docs consul=/Users/my-name/code/hashicorp/consul
-   # make gen-helm-docs consul=../consul
+   # make gen-helm-docs docsRepo=/Users/my-name/code/web-unified-docs
+   # make gen-helm-docs docsRepo=../web-unified-docs
    ```
-1. Open up a pull request to `hashicorp/consul` (in addition to your `hashicorp/consul-k8s` pull request)
+1. Open up a pull request to `hashicorp/web-unified-docs` (in addition to your `hashicorp/consul-k8s` pull request)
 
 ### values.yaml Annotations
 
