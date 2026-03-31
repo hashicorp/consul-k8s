@@ -336,7 +336,7 @@ func TestControllerNamespaces(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
 
 				logger.Log(t, "patching rate-limit custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "ratelimit", "global", "-p", `{"spec": {"priority": "false"}}`, "--type=merge")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 20, Wait: 2 * time.Second}
 				retry.RunWith(counter, t, func(r *retry.R) {
