@@ -447,9 +447,12 @@ func (c *ConnectHelper) helmValues() map[string]string {
 		"dns.enableRedirection":        "true",
 	}
 
-	// On OpenShift, disable managing Gateway API CRDs since they already exist
-	if c.Cfg.EnableOpenshift {
+	// On OpenShift, mirror HelmCluster defaults so acceptance installs can
+	// still manage non-standard Gateway API CRDs while avoiding external CRD
+	// ownership conflicts.
+	if c.Cfg.UseOpenshift || c.Cfg.EnableOpenshift {
 		helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
+		helmValues["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
 	}
 
 	helpers.MergeMaps(helmValues, c.HelmValues)
