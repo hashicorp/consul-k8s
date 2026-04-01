@@ -21,6 +21,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -28,40 +29,39 @@ import (
 func TestTransformEndpoints(t *testing.T) {
 	t.Parallel()
 
-	httpRoute := &gwv1beta1.HTTPRoute{
+	httpRoute := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "http",
 			Namespace: "test",
 		},
-		Spec: gwv1beta1.HTTPRouteSpec{
-			Rules: []gwv1beta1.HTTPRouteRule{
-				{BackendRefs: []gwv1beta1.HTTPBackendRef{
-					{BackendRef: gwv1beta1.BackendRef{
-						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "http-test-namespace"},
+		Spec: gwv1.HTTPRouteSpec{
+			Rules: []gwv1.HTTPRouteRule{
+				{BackendRefs: []gwv1.HTTPBackendRef{
+					{BackendRef: gwv1.BackendRef{
+						BackendObjectReference: gwv1.BackendObjectReference{Name: "http-test-namespace"},
 					}},
-					{BackendRef: gwv1beta1.BackendRef{
-						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "http-other-namespace", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
+					{BackendRef: gwv1.BackendRef{
+						BackendObjectReference: gwv1.BackendObjectReference{Name: "http-other-namespace", Namespace: common.PointerTo(gwv1.Namespace("other"))},
 					}},
-					{BackendRef: gwv1beta1.BackendRef{
-						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "http-system-namespace", Namespace: common.PointerTo(gwv1beta1.Namespace("system"))},
+					{BackendRef: gwv1.BackendRef{
+						BackendObjectReference: gwv1.BackendObjectReference{Name: "http-system-namespace", Namespace: common.PointerTo(gwv1.Namespace("system"))},
 					}},
-					{BackendRef: gwv1beta1.BackendRef{
-						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "http-public-namespace", Namespace: common.PointerTo(gwv1beta1.Namespace("public"))},
+					{BackendRef: gwv1.BackendRef{
+						BackendObjectReference: gwv1.BackendObjectReference{Name: "http-public-namespace", Namespace: common.PointerTo(gwv1.Namespace("public"))},
 					}},
-					{BackendRef: gwv1beta1.BackendRef{
-						BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "http-local-path-storage-namespace", Namespace: common.PointerTo(gwv1beta1.Namespace("local-path-storage"))},
+					{BackendRef: gwv1.BackendRef{
+						BackendObjectReference: gwv1.BackendObjectReference{Name: "http-local-path-storage-namespace", Namespace: common.PointerTo(gwv1.Namespace("local-path-storage"))},
 					}}},
 				},
 			},
-			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-				ParentRefs: []gwv1beta1.ParentReference{
+			CommonRouteSpec: gwv1.CommonRouteSpec{
+				ParentRefs: []gwv1.ParentReference{
 					{Name: "http-gateway"},
 					{Name: "general-gateway"},
 				},
 			},
 		},
 	}
-
 	tcpRoute := &gwv1alpha2.TCPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "tcp",
@@ -251,6 +251,7 @@ func TestTransformEndpoints(t *testing.T) {
 			require.NoError(t, clientgoscheme.AddToScheme(s))
 			require.NoError(t, gwv1alpha2.Install(s))
 			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			denySet := mapset.NewSet()
@@ -266,8 +267,10 @@ func TestTransformEndpoints(t *testing.T) {
 
 			controller := GatewayController{
 				Client:                fakeClient,
+				ApiReader:             fakeClient,
 				denyK8sNamespacesSet:  denySet,
 				allowK8sNamespacesSet: allowSet,
+				supportsTCPRoute:      true,
 			}
 
 			require.ElementsMatch(t, tt.expected, controller.transformEndpoints(context.Background(), tt.endpoints))
@@ -279,17 +282,17 @@ func TestTransformHTTPRoute(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		route    *gwv1beta1.HTTPRoute
+		route    *gwv1.HTTPRoute
 		expected []reconcile.Request
 	}{
 		"route with parent empty namespace": {
-			route: &gwv1beta1.HTTPRoute{
+			route: &gwv1.HTTPRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.HTTPRouteSpec{
-					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-						ParentRefs: []gwv1beta1.ParentReference{
+				Spec: gwv1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1.CommonRouteSpec{
+						ParentRefs: []gwv1.ParentReference{
 							{Name: "gateway"},
 						},
 					},
@@ -300,14 +303,14 @@ func TestTransformHTTPRoute(t *testing.T) {
 			},
 		},
 		"route with parent with namespace": {
-			route: &gwv1beta1.HTTPRoute{
+			route: &gwv1.HTTPRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.HTTPRouteSpec{
-					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-						ParentRefs: []gwv1beta1.ParentReference{
-							{Name: "gateway", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
+				Spec: gwv1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1.CommonRouteSpec{
+						ParentRefs: []gwv1.ParentReference{
+							{Name: "gateway", Namespace: common.PointerTo(gwv1.Namespace("other"))},
 						},
 					},
 				},
@@ -317,14 +320,14 @@ func TestTransformHTTPRoute(t *testing.T) {
 			},
 		},
 		"route with non gateway parent with namespace": {
-			route: &gwv1beta1.HTTPRoute{
+			route: &gwv1.HTTPRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.HTTPRouteSpec{
-					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-						ParentRefs: []gwv1beta1.ParentReference{
-							{Name: "gateway", Group: common.PointerTo(gwv1beta1.Group("group"))},
+				Spec: gwv1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1.CommonRouteSpec{
+						ParentRefs: []gwv1.ParentReference{
+							{Name: "gateway", Group: common.PointerTo(gwv1.Group("group"))},
 						},
 					},
 				},
@@ -332,14 +335,14 @@ func TestTransformHTTPRoute(t *testing.T) {
 			expected: []reconcile.Request{},
 		},
 		"route with parent in status and no namespace": {
-			route: &gwv1beta1.HTTPRoute{
+			route: &gwv1.HTTPRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 				},
-				Status: gwv1beta1.HTTPRouteStatus{
-					RouteStatus: gwv1beta1.RouteStatus{
-						Parents: []gwv1beta1.RouteParentStatus{
-							{ParentRef: gwv1beta1.ParentReference{Name: "gateway"}},
+				Status: gwv1.HTTPRouteStatus{
+					RouteStatus: gwv1.RouteStatus{
+						Parents: []gwv1.RouteParentStatus{
+							{ParentRef: gwv1.ParentReference{Name: "gateway"}},
 						},
 					},
 				},
@@ -349,14 +352,14 @@ func TestTransformHTTPRoute(t *testing.T) {
 			},
 		},
 		"route with parent in status and namespace": {
-			route: &gwv1beta1.HTTPRoute{
+			route: &gwv1.HTTPRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 				},
-				Status: gwv1beta1.HTTPRouteStatus{
-					RouteStatus: gwv1beta1.RouteStatus{
-						Parents: []gwv1beta1.RouteParentStatus{
-							{ParentRef: gwv1beta1.ParentReference{Name: "gateway", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))}},
+				Status: gwv1.HTTPRouteStatus{
+					RouteStatus: gwv1.RouteStatus{
+						Parents: []gwv1.RouteParentStatus{
+							{ParentRef: gwv1.ParentReference{Name: "gateway", Namespace: common.PointerTo(gwv1.Namespace("other"))}},
 						},
 					},
 				},
@@ -366,14 +369,14 @@ func TestTransformHTTPRoute(t *testing.T) {
 			},
 		},
 		"route with non gateway parent in status": {
-			route: &gwv1beta1.HTTPRoute{
+			route: &gwv1.HTTPRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 				},
-				Status: gwv1beta1.HTTPRouteStatus{
-					RouteStatus: gwv1beta1.RouteStatus{
-						Parents: []gwv1beta1.RouteParentStatus{
-							{ParentRef: gwv1beta1.ParentReference{Name: "gateway", Group: common.PointerTo(gwv1beta1.Group("group"))}},
+				Status: gwv1.HTTPRouteStatus{
+					RouteStatus: gwv1.RouteStatus{
+						Parents: []gwv1.RouteParentStatus{
+							{ParentRef: gwv1.ParentReference{Name: "gateway", Group: common.PointerTo(gwv1.Group("group"))}},
 						},
 					},
 				},
@@ -381,21 +384,21 @@ func TestTransformHTTPRoute(t *testing.T) {
 			expected: []reconcile.Request{},
 		},
 		"route parent in spec and in status": {
-			route: &gwv1beta1.HTTPRoute{
+			route: &gwv1.HTTPRoute{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.HTTPRouteSpec{
-					CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-						ParentRefs: []gwv1beta1.ParentReference{
+				Spec: gwv1.HTTPRouteSpec{
+					CommonRouteSpec: gwv1.CommonRouteSpec{
+						ParentRefs: []gwv1.ParentReference{
 							{Name: "gateway-one"},
 						},
 					},
 				},
-				Status: gwv1beta1.HTTPRouteStatus{
-					RouteStatus: gwv1beta1.RouteStatus{
-						Parents: []gwv1beta1.RouteParentStatus{
-							{ParentRef: gwv1beta1.ParentReference{Name: "gateway-two"}},
+				Status: gwv1.HTTPRouteStatus{
+					RouteStatus: gwv1.RouteStatus{
+						Parents: []gwv1.RouteParentStatus{
+							{ParentRef: gwv1.ParentReference{Name: "gateway-two"}},
 						},
 					},
 				},
@@ -546,7 +549,9 @@ func TestTransformTCPRoute(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			controller := GatewayController{}
+			controller := GatewayController{
+				supportsTCPRoute: true,
+			}
 
 			require.ElementsMatch(t, tt.expected, controller.transformTCPRoute(context.Background(), tt.route))
 		})
@@ -556,22 +561,22 @@ func TestTransformTCPRoute(t *testing.T) {
 func TestTransformSecret(t *testing.T) {
 	t.Parallel()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "gateway",
 			Namespace: "test",
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			Listeners: []gwv1beta1.Listener{
-				{Name: "terminate", TLS: &gwv1beta1.GatewayTLSConfig{
-					Mode: common.PointerTo(gwv1beta1.TLSModeTerminate),
+				{Name: "terminate", TLS: &gwv1.ListenerTLSConfig{
+					Mode: common.PointerTo(gwv1.TLSModeTerminate),
 					CertificateRefs: []gwv1beta1.SecretObjectReference{
 						{Name: "secret-no-namespace"},
 						{Name: "secret-namespace", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
 					},
 				}},
-				{Name: "passthrough", TLS: &gwv1beta1.GatewayTLSConfig{
-					Mode: common.PointerTo(gwv1beta1.TLSModePassthrough),
+				{Name: "passthrough", TLS: &gwv1.ListenerTLSConfig{
+					Mode: common.PointerTo(gwv1.TLSModePassthrough),
 					CertificateRefs: []gwv1beta1.SecretObjectReference{
 						{Name: "passthrough", Namespace: common.PointerTo(gwv1beta1.Namespace("other"))},
 					},
@@ -625,12 +630,15 @@ func TestTransformSecret(t *testing.T) {
 			require.NoError(t, clientgoscheme.AddToScheme(s))
 			require.NoError(t, gwv1alpha2.Install(s))
 			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			fakeClient := registerFieldIndexersForTest(fake.NewClientBuilder().WithScheme(s)).WithRuntimeObjects(gateway).Build()
 
 			controller := GatewayController{
-				Client: fakeClient,
+				Client:           fakeClient,
+				ApiReader:        fakeClient,
+				supportsTCPRoute: true,
 			}
 
 			require.ElementsMatch(t, tt.expected, controller.transformSecret(context.Background(), tt.secret))

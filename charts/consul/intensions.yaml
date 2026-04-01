@@ -1,0 +1,229 @@
+apiVersion: v1
+items:
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"api-gateway-echo-1","namespace":"default"},"spec":{"destination":{"name":"echo-1"},"sources":[{"action":"allow","name":"api-gateway"}]}}
+    creationTimestamp: "2026-03-13T05:31:15Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: api-gateway-echo-1
+    namespace: default
+    resourceVersion: "725609"
+    uid: 12520a31-a6ed-4cbe-ac11-e0dc6c878a1d
+  spec:
+    destination:
+      name: echo-1
+    sources:
+    - action: allow
+      name: api-gateway
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:31:15Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:31:15Z"
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"api-gateway-echo-2","namespace":"default"},"spec":{"destination":{"name":"echo-2"},"sources":[{"action":"allow","name":"api-gateway"}]}}
+    creationTimestamp: "2026-03-13T05:31:15Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: api-gateway-echo-2
+    namespace: default
+    resourceVersion: "725614"
+    uid: b648b3cc-b33a-40f3-a9ad-11250706e5aa
+  spec:
+    destination:
+      name: echo-2
+    sources:
+    - action: allow
+      name: api-gateway
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:31:15Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:31:15Z"
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"api-gateway-hashicups","namespace":"default"},"spec":{"destination":{"name":"frontend"},"sources":[{"action":"allow","name":"api-gateway"}]}}
+    creationTimestamp: "2026-03-13T05:31:15Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: api-gateway-hashicups
+    namespace: default
+    resourceVersion: "725643"
+    uid: 0a90a5e0-d117-4ad1-b7ac-6294bb5b1f0b
+  spec:
+    destination:
+      name: frontend
+    sources:
+    - action: allow
+      name: api-gateway
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:31:16Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:31:16Z"
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"api-gateway-publicapi","namespace":"default"},"spec":{"destination":{"name":"public-api"},"sources":[{"action":"allow","name":"api-gateway"}]}}
+    creationTimestamp: "2026-03-13T05:31:15Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: api-gateway-publicapi
+    namespace: default
+    resourceVersion: "725628"
+    uid: 7cb1ea3f-7442-4b2e-af5e-561e45e5cf60
+  spec:
+    destination:
+      name: public-api
+    sources:
+    - action: allow
+      name: api-gateway
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:31:16Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:31:16Z"
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"payments","namespace":"default"},"spec":{"destination":{"name":"payments"},"sources":[{"action":"allow","name":"public-api"}]}}
+    creationTimestamp: "2026-03-13T05:29:44Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: payments
+    namespace: default
+    resourceVersion: "724523"
+    uid: b6f6e2be-5667-4833-b959-bd1e1c8ee12b
+  spec:
+    destination:
+      name: payments
+    sources:
+    - action: allow
+      name: public-api
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:29:47Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:29:47Z"
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"product-api","namespace":"default"},"spec":{"destination":{"name":"product-api"},"sources":[{"action":"allow","name":"public-api"}]}}
+    creationTimestamp: "2026-03-13T05:29:44Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: product-api
+    namespace: default
+    resourceVersion: "724410"
+    uid: 81ceba51-4536-470c-b102-eba7d1afb8e9
+  spec:
+    destination:
+      name: product-api
+    sources:
+    - action: allow
+      name: public-api
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:29:45Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:29:45Z"
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"product-api-db","namespace":"default"},"spec":{"destination":{"name":"product-api-db"},"sources":[{"action":"allow","name":"product-api"}]}}
+    creationTimestamp: "2026-03-13T05:29:44Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: product-api-db
+    namespace: default
+    resourceVersion: "724454"
+    uid: 41f80a7c-a8f0-401a-a1eb-06075ab2f4b7
+  spec:
+    destination:
+      name: product-api-db
+    sources:
+    - action: allow
+      name: product-api
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:29:45Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:29:45Z"
+- apiVersion: consul.hashicorp.com/v1alpha1
+  kind: ServiceIntentions
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"consul.hashicorp.com/v1alpha1","kind":"ServiceIntentions","metadata":{"annotations":{},"name":"tcp-echo","namespace":"default"},"spec":{"destination":{"name":"tcp-echo"},"sources":[{"action":"allow","name":"api-gateway"},{"action":"allow","name":"api-gateway-ocp"}]}}
+    creationTimestamp: "2026-03-13T05:34:34Z"
+    finalizers:
+    - finalizers.consul.hashicorp.com
+    generation: 1
+    name: tcp-echo
+    namespace: default
+    resourceVersion: "727430"
+    uid: 5f71f4e4-d2a5-4c04-9df0-1689228284dd
+  spec:
+    destination:
+      name: tcp-echo
+    sources:
+    - action: allow
+      name: api-gateway
+    - action: allow
+      name: api-gateway-ocp
+  status:
+    conditions:
+    - lastTransitionTime: "2026-03-13T05:34:34Z"
+      status: "True"
+      type: Synced
+    lastSyncedTime: "2026-03-13T05:34:34Z"
+kind: List
+metadata:
+  resourceVersion: ""

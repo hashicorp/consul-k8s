@@ -682,7 +682,7 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 
 // Set up test consul agent and fake kubernetes cluster client.
 func completeSetup(t *testing.T) (*fake.Clientset, *test.TestServerClient) {
-	k8s := fake.NewSimpleClientset()
+	k8s := fake.NewClientset()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 

@@ -119,7 +119,7 @@ func TestController_update(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
 
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	resource, data, _, dataLock := testResource(client)
 
 	// Start the controller

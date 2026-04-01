@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -52,32 +53,34 @@ type GatewayControllerConfig struct {
 	Datacenter              string
 	AllowK8sNamespacesSet   mapset.Set
 	DenyK8sNamespacesSet    mapset.Set
+	EnableTCP               bool
 }
 
 // GatewayController reconciles a Gateway object.
 // The Gateway is responsible for defining the behavior of API gateways.
 type GatewayController struct {
-	HelmConfig common.HelmConfig
-	Log        logr.Logger
-	Translator common.ResourceTranslator
-
+	HelmConfig            common.HelmConfig
+	Log                   logr.Logger
+	Translator            common.ResourceTranslator
 	cache                 *cache.Cache
 	gatewayCache          *cache.GatewayCache
 	allowK8sNamespacesSet mapset.Set
 	denyK8sNamespacesSet  mapset.Set
 	client.Client
-	ConsulConfig *consul.Config
+	ConsulConfig     *consul.Config
+	ApiReader        client.Reader
+	supportsTCPRoute bool
 }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
 func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	consulKey := r.Translator.ConfigEntryReference(api.APIGateway, req.NamespacedName)
 	nonNormalizedConsulKey := r.Translator.NonNormalizedConfigEntryReference(api.APIGateway, req.NamespacedName)
+	config := binding.BinderConfig{}
+	var gateway gwv1.Gateway
 
-	var gateway gwv1beta1.Gateway
-
-	log := r.Log.V(1).WithValues("gateway", req.NamespacedName)
-	log.Info("Reconciling Gateway")
+	log := r.Log.V(1).WithValues("gateway-stable", req.NamespacedName)
+	log.Info("Reconciling Gateway -  starting for stable API version")
 
 	// get the gateway
 	if err := r.Client.Get(ctx, req.NamespacedName, &gateway); err != nil {
@@ -100,7 +103,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "error fetching the gateway class config")
 		return ctrl.Result{}, err
 	}
-
 	// get all namespaces
 	namespaces, err := r.getNamespaces(ctx)
 	if err != nil {
@@ -159,12 +161,18 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// get all tcp routes referencing this gateway
-	tcpRoutes, err := r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
-	if err != nil {
-		log.Error(err, "unable to list TCPRoutes")
-		return ctrl.Result{}, err
+	tcpRoutes := []gwv1alpha2.TCPRoute{}
+	log.Info("TCP supporting " + fmt.Sprintf("%+v", r.supportsTCPRoute))
+	if r.supportsTCPRoute {
+		log.Info("inside TCP supporting " + fmt.Sprintf("%+v", r.supportsTCPRoute))
+		tcpRoutes, err = r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
+		if err != nil {
+			log.Error(err, "unable to list TCPRoutes")
+			return ctrl.Result{}, err
+		}
+		r.fetchConsulTCPRoutes(consulKey, resources)
+		config.TCPRoutes = tcpRoutes
 	}
-
 	if err := r.fetchServicesForRoutes(ctx, resources, tcpRoutes, httpRoutes); err != nil {
 		log.Error(err, "unable to fetch services for routes")
 		return ctrl.Result{}, err
@@ -187,29 +195,27 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	consulServices := r.getConsulServices(consulKey)
 	consulGateway := r.getConsulGateway(consulKey)
 	r.fetchConsulHTTPRoutes(consulKey, resources)
-	r.fetchConsulTCPRoutes(consulKey, resources)
 
-	binder := binding.NewBinder(binding.BinderConfig{
-		Logger:                log,
-		Translator:            r.Translator,
-		ControllerName:        common.GatewayClassControllerName,
-		Namespaces:            namespaces,
-		GatewayClassConfig:    gatewayClassConfig,
-		GatewayClass:          gatewayClass,
-		Gateway:               gateway,
-		Pods:                  pods,
-		Service:               service,
-		HTTPRoutes:            httpRoutes,
-		TCPRoutes:             tcpRoutes,
-		Resources:             resources,
-		ConsulGateway:         consulGateway,
-		ConsulGatewayServices: consulServices,
-		Policies:              policies,
-		HelmConfig:            r.HelmConfig,
-	})
+	config.Logger = log
+	config.Translator = r.Translator
+	config.ControllerName = common.GatewayClassControllerName
+	config.Namespaces = namespaces
+	config.GatewayClassConfig = gatewayClassConfig
+	config.GatewayClass = gatewayClass
+	config.Gateway = gateway
+	config.Pods = pods
+	config.Service = service
+	config.HTTPRoutes = httpRoutes
+	config.Resources = resources
+	config.ConsulGateway = consulGateway
+	config.ConsulGatewayServices = consulServices
+	config.Policies = policies
+	config.HelmConfig = r.HelmConfig
+
+	binder := binding.NewBinder(config)
 
 	updates := binder.Snapshot()
-
+	r.Log.Info("updates binder: " + fmt.Sprintf("%+v", updates))
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
@@ -227,7 +233,8 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 		r.gatewayCache.EnsureSubscribed(nonNormalizedConsulKey, req.NamespacedName)
-	} else {
+	} else if gateway.DeletionTimestamp != nil && !gateway.GetDeletionTimestamp().IsZero() {
+		log.Info("gateway delete detected, deleting gateway resources")
 		err := r.deleteGatekeeperResources(ctx, log, &gateway)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
@@ -364,8 +371,8 @@ func configEntriesTo[T api.ConfigEntry](entries []api.ConfigEntry) []T {
 	return es
 }
 
-func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway) error {
-	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
+func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway) error {
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig, r.ApiReader)
 	err := gk.Delete(ctx, *gw)
 	if err != nil {
 		return err
@@ -374,8 +381,8 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
-func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
-	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
+func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
+	gk := gatekeeper.New(log, r.Client, r.ConsulConfig, r.ApiReader)
 	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
 	if err != nil {
 		return err
@@ -385,7 +392,11 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 }
 
 // SetupWithGatewayControllerManager registers the controller with the given manager.
-func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config GatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
+func SetupGatewayControllerWithManager(ctx context.Context,
+	mgr ctrl.Manager,
+	config GatewayControllerConfig,
+) (*cache.Cache, binding.Cleaner, error) {
+
 	cacheConfig := cache.Config{
 		ConsulClientConfig:      config.ConsulClientConfig,
 		ConsulServerConnMgr:     config.ConsulServerConnMgr,
@@ -394,6 +405,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		CrossNamespaceACLPolicy: config.CrossNamespaceACLPolicy,
 		Logger:                  mgr.GetLogger(),
 	}
+
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
 
@@ -406,6 +418,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	r := &GatewayController{
 		Client:     mgr.GetClient(),
 		Log:        mgr.GetLogger(),
+		ApiReader:  mgr.GetAPIReader(),
 		HelmConfig: config.HelmConfig.Normalize(),
 		Translator: common.ResourceTranslator{
 			EnableConsulNamespaces: config.HelmConfig.EnableNamespaces,
@@ -429,8 +442,9 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		AuthMethod:   config.HelmConfig.AuthMethod,
 	}
 
-	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
-		For(&gwv1beta1.Gateway{}).
+	builder := ctrl.NewControllerManagedBy(mgr).
+		Named("gateway-v1").
+		For(&gwv1.Gateway{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
@@ -439,16 +453,12 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
 		).
 		Watches(
-			&gwv1beta1.GatewayClass{},
+			&gwv1.GatewayClass{},
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass),
 		).
 		Watches(
-			&gwv1beta1.HTTPRoute{},
+			&gwv1.HTTPRoute{},
 			handler.EnqueueRequestsFromMapFunc(r.transformHTTPRoute),
-		).
-		Watches(
-			&gwv1alpha2.TCPRoute{},
-			handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute),
 		).
 		Watches(
 			&corev1.Secret{},
@@ -466,30 +476,53 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),
 			builder.WithPredicates(predicate),
+		)
+
+	mgr.GetLogger().Info("config received %v", config.EnableTCP)
+	if config.EnableTCP {
+		r.supportsTCPRoute = true
+		mgr.GetLogger().Info("TCPRoute CRD detected - enabling TCPRoute support")
+
+		builder = builder.
+			Watches(
+				&gwv1alpha2.TCPRoute{},
+				handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute),
+			).
+			WatchesRawSource(
+				source.Channel(
+					c.Subscribe(ctx, api.TCPRoute, r.transformConsulTCPRoute(ctx)).Events(),
+					&handler.EnqueueRequestForObject{},
+				),
+			)
+	} else {
+		r.supportsTCPRoute = false
+		mgr.GetLogger().Info("TCPRoute CRD not found - skipping TCPRoute watch")
+	}
+
+	builder = builder.
+		WatchesRawSource(
+			source.Channel(
+				c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for APIGateways
-			&source.Channel{Source: c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for HTTPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.HTTPRoute, r.transformConsulHTTPRoute(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		WatchesRawSource(
-			// Subscribe to changes from Consul for TCPRoutes
-			&source.Channel{Source: c.Subscribe(ctx, api.TCPRoute, r.transformConsulTCPRoute(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
-		).
-		WatchesRawSource(
-			// Subscribe to changes from Consul for FileSystemCertificates
-			&source.Channel{Source: c.Subscribe(ctx, api.FileSystemCertificate, r.transformConsulFileSystemCertificate(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
-		).
-		WatchesRawSource(
-			&source.Channel{Source: c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events()},
-			&handler.EnqueueRequestForObject{},
+			source.Channel(
+				c.Subscribe(ctx, api.JWTProvider, r.transformConsulJWTProvider(ctx)).Events(),
+				&handler.EnqueueRequestForObject{},
+			),
 		).
 		Watches(
 			&v1alpha1.GatewayPolicy{},
@@ -504,18 +537,22 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteTimeoutFilter),
 		).
 		Watches(
-			// Subscribe to changes in RouteAuthFilter custom resources referenced by HTTPRoutes.
 			&v1alpha1.RouteAuthFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter),
-		).
-		Complete(r)
+		)
+
+	if err := builder.Complete(r); err != nil {
+		return nil, cleaner, err
+	}
+
+	return c, cleaner, nil
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
 // class, then return a list of reconcile Requests for it.
 func (r *GatewayController) transformGatewayClass(ctx context.Context, o client.Object) []reconcile.Request {
-	gatewayClass := o.(*gwv1beta1.GatewayClass)
-	gatewayList := &gwv1beta1.GatewayList{}
+	gatewayClass := o.(*gwv1.GatewayClass)
+	gatewayList := &gwv1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Gateway_GatewayClassIndex, gatewayClass.Name),
 	}); err != nil {
@@ -527,10 +564,10 @@ func (r *GatewayController) transformGatewayClass(ctx context.Context, o client.
 // transformHTTPRoute will check the HTTPRoute object for a matching
 // class, then return a list of reconcile Requests for Gateways referring to it.
 func (r *GatewayController) transformHTTPRoute(ctx context.Context, o client.Object) []reconcile.Request {
-	route := o.(*gwv1beta1.HTTPRoute)
+	route := o.(*gwv1.HTTPRoute)
 
 	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
-	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1.RouteParentStatus) gwv1.ParentReference {
 		return parentStatus.ParentRef
 	})))
 	return append(refs, statusRefs...)
@@ -552,7 +589,7 @@ func (r *GatewayController) transformTCPRoute(ctx context.Context, o client.Obje
 // class, then return a list of reconcile Requests for Gateways referring to it.
 func (r *GatewayController) transformSecret(ctx context.Context, o client.Object) []reconcile.Request {
 	secret := o.(*corev1.Secret)
-	gatewayList := &gwv1beta1.GatewayList{}
+	gatewayList := &gwv1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(Secret_GatewayIndex, client.ObjectKeyFromObject(secret).String()),
 	}); err != nil {
@@ -567,7 +604,7 @@ func (r *GatewayController) transformReferenceGrant(ctx context.Context, o clien
 	// just re-reconcile all gateways for now ideally this will filter down to gateways
 	// affected, but technically the blast radius is gateways in the namespace + referencing
 	// the namespace + the routes that bind to them.
-	gatewayList := &gwv1beta1.GatewayList{}
+	gatewayList := &gwv1.GatewayList{}
 	if err := r.Client.List(ctx, gatewayList); err != nil {
 		return nil
 	}
@@ -763,8 +800,7 @@ func (r *GatewayController) transformEndpoints(ctx context.Context, o client.Obj
 // have a backend associated with the given key and index.
 func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tcpIndex, httpIndex, key string) []reconcile.Request {
 	requestSet := make(map[types.NamespacedName]struct{})
-
-	if tcpIndex != "" {
+	if r.supportsTCPRoute && tcpIndex != "" {
 		tcpRouteList := &gwv1alpha2.TCPRouteList{}
 		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
@@ -778,7 +814,7 @@ func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tc
 		}
 	}
 
-	httpRouteList := &gwv1beta1.HTTPRouteList{}
+	httpRouteList := &gwv1.HTTPRouteList{}
 	if err := r.Client.List(ctx, httpRouteList, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(httpIndex, key),
 	}); err != nil {
@@ -860,7 +896,19 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 	return service, nil
 }
 
-func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1beta1.Gateway) ([]corev1.Pod, error) {
+// get deployment for gateway
+func (c *GatewayController) getDeployedGatewayDeployment(ctx context.Context, gateway types.NamespacedName) (*appsv1.Deployment, error) {
+	deployment := &appsv1.Deployment{}
+	// we use the implicit association of a deployment name/namespace with a corresponding gateway
+	if err := c.Client.Get(ctx, gateway, deployment); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+
+	return deployment, nil
+}
+
+// get pods for gateway
+func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1.Gateway) ([]corev1.Pod, error) {
 	labels := common.LabelsForGateway(&gateway)
 
 	var list corev1.PodList
@@ -872,8 +920,8 @@ func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway 
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1beta1.HTTPRoute, error) {
-	var list gwv1beta1.HTTPRouteList
+func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1.HTTPRoute, error) {
+	var list gwv1.HTTPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(HTTPRoute_GatewayIndex, gateway.String()),
@@ -894,7 +942,7 @@ func (c *GatewayController) getRelatedHTTPRoutes(ctx context.Context, gateway ty
 	return list.Items, nil
 }
 
-func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1beta1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
+func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, route gwv1.HTTPRoute, resources *common.ResourceMap) ([]interface{}, error) {
 	var externalFilters []interface{}
 	for _, rule := range route.Spec.Rules {
 		ruleFilters, err := c.filterFiltersForExternalRefs(ctx, route, rule.Filters, resources)
@@ -916,7 +964,7 @@ func (c *GatewayController) getExternalFiltersForHTTPRoute(ctx context.Context, 
 	return externalFilters, nil
 }
 
-func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, route gwv1beta1.HTTPRoute, filters []gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
+func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, route gwv1.HTTPRoute, filters []gwv1.HTTPRouteFilter, resources *common.ResourceMap) ([]interface{}, error) {
 	var externalFilters []interface{}
 
 	for _, filter := range filters {
@@ -1007,17 +1055,17 @@ func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway typ
 	return list.Items, nil
 }
 
-func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1beta1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
-	if gatewayClassConfig == nil {
+func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClass *gwv1.GatewayClass) (*v1alpha1.GatewayClassConfig, error) {
+	if gatewayClass == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
 	}
 
 	config := &v1alpha1.GatewayClassConfig{}
-	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
+	if ref := gatewayClass.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
 			ref.Kind != v1alpha1.GatewayClassConfigKind ||
-			gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
+			gatewayClass.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}
@@ -1029,8 +1077,8 @@ func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewa
 	return config, nil
 }
 
-func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1beta1.Gateway) (*gwv1beta1.GatewayClass, error) {
-	var gatewayClass gwv1beta1.GatewayClass
+func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gateway gwv1.Gateway) (*gwv1.GatewayClass, error) {
+	var gatewayClass gwv1.GatewayClass
 	if err := c.Client.Get(ctx, types.NamespacedName{Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
@@ -1042,7 +1090,7 @@ func (c *GatewayController) getGatewayClassForGateway(ctx context.Context, gatew
 func (c *GatewayController) fetchControlledGateways(ctx context.Context, resources *common.ResourceMap) error {
 	set := mapset.NewSet()
 
-	list := gwv1beta1.GatewayClassList{}
+	list := gwv1.GatewayClassList{}
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(GatewayClass_ControllerNameIndex, common.GatewayClassControllerName),
 	}); err != nil {
@@ -1052,7 +1100,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 		set.Add(gatewayClass.Name)
 	}
 
-	gateways := &gwv1beta1.GatewayList{}
+	gateways := &gwv1.GatewayList{}
 	if err := c.Client.List(ctx, gateways); err != nil {
 		return err
 	}
@@ -1065,7 +1113,7 @@ func (c *GatewayController) fetchControlledGateways(ctx context.Context, resourc
 	return nil
 }
 
-func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1beta1.Gateway) error {
+func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, resources *common.ResourceMap, gateway gwv1.Gateway) error {
 	certificates := mapset.NewSet()
 
 	for _, listener := range gateway.Spec.Listeners {
@@ -1098,7 +1146,7 @@ func (c *GatewayController) fetchSecret(ctx context.Context, resources *common.R
 	return nil
 }
 
-func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1beta1.HTTPRoute) error {
+func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1.HTTPRoute) error {
 	serviceBackends := mapset.NewSet()
 	meshServiceBackends := mapset.NewSet()
 

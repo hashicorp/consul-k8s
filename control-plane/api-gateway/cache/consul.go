@@ -208,6 +208,7 @@ func (c *Cache) subscribeToConsul(ctx context.Context, kind string) {
 		}
 
 		client, err := consul.NewClientFromConnMgr(c.config, c.serverMgr)
+		fmt.Printf("Consul client config: %+v\n", c.config)
 		if err != nil {
 			c.logger.Error(err, "error initializing consul client")
 			continue

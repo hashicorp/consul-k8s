@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -22,7 +22,7 @@ type MetricsConfig struct {
 	Port    int
 }
 
-func gatewayMetricsEnabled(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) bool {
+func gatewayMetricsEnabled(gateway gwv1alpha2.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) bool {
 	// first check our annotations, if something is there, then it means we've explicitly
 	// annotated metrics collection
 	if scrape, isSet := gateway.Annotations[constants.AnnotationEnableMetrics]; isSet {
@@ -43,7 +43,7 @@ func gatewayMetricsEnabled(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassC
 	return config.EnableGatewayMetrics
 }
 
-func fetchPortString(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) string {
+func fetchPortString(gateway gwv1alpha2.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) string {
 	// first check our annotations, if something is there, then it means we've explicitly
 	// annotated metrics collection
 	if portString, isSet := gateway.Annotations[constants.AnnotationPrometheusScrapePort]; isSet {
@@ -59,7 +59,7 @@ func fetchPortString(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig,
 	return config.DefaultPrometheusScrapePort
 }
 
-func gatewayMetricsPort(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) int {
+func gatewayMetricsPort(gateway gwv1alpha2.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) int {
 	portString := fetchPortString(gateway, gcc, config)
 
 	port, err := strconv.Atoi(portString)
@@ -78,7 +78,7 @@ func gatewayMetricsPort(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConf
 	return port
 }
 
-func gatewayMetricsPath(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) string {
+func gatewayMetricsPath(gateway gwv1alpha2.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) string {
 	// first check our annotations, if something is there, then it means we've explicitly
 	// annotated metrics collection
 	if path, isSet := gateway.Annotations[constants.AnnotationPrometheusScrapePath]; isSet {
@@ -94,7 +94,7 @@ func gatewayMetricsPath(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConf
 	return config.DefaultPrometheusScrapePath
 }
 
-func GatewayMetricsConfig(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) MetricsConfig {
+func GatewayMetricsConfig(gateway gwv1alpha2.Gateway, gcc v1alpha1.GatewayClassConfig, config HelmConfig) MetricsConfig {
 	return MetricsConfig{
 		Enabled: gatewayMetricsEnabled(gateway, gcc, config),
 		Path:    gatewayMetricsPath(gateway, gcc, config),
