@@ -34,6 +34,23 @@ data "aws_availability_zones" "available" {}
 
 data "aws_caller_identity" "caller" {}
 
+data "aws_ami" "hc-base-ubuntu-2404" {
+  for_each = toset(["amd64", "arm64"])
+
+  filter {
+    name   = "name"
+    values = [format("hc-base-ubuntu-2404-%s-*", each.value)]
+  }
+
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+
+  most_recent = true
+  owners      = ["888995627335"] # ami-prod account
+}
+
 resource "random_string" "suffix" {
   length  = 8
   special = false
