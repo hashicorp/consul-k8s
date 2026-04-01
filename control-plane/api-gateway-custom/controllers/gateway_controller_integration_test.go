@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package controllers
 
 import (
@@ -18,9 +15,11 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
 	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
 	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul/agent/netutil"
+	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,13 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/hashicorp/consul/agent/netutil"
-	"github.com/hashicorp/consul/api"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
 func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
@@ -54,7 +49,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 		certFn           func(*testing.T, context.Context, client.WithWatch, string) *corev1.Secret
 		gwFn             func(*testing.T, context.Context, client.WithWatch, string) *gwv1beta1.Gateway
 		httpRouteFn      func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway, *v1alpha1.RouteAuthFilter) *gwv1beta1.HTTPRoute
-		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway) *v1alpha2.TCPRoute
+		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway) *gwv1alpha2.TCPRoute
 		externalFilterFn func(*testing.T, context.Context, client.WithWatch, string) *v1alpha1.RouteAuthFilter
 		policyFn         func(*testing.T, context.Context, client.WithWatch, *gwv1beta1.Gateway, string)
 	}{
@@ -142,6 +137,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 				cache:                 resourceCache,
 				gatewayCache:          gwCache,
 				Client:                k8sClient,
+				ApiReader:             k8sClient,
 				allowK8sNamespacesSet: mapset.NewSet(),
 				denyK8sNamespacesSet:  mapset.NewSet(),
 			}
@@ -369,7 +365,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 			Name: "gatewayclass",
 		},
 		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: "consul.hashicorp.com/gateway-controller",
+			ControllerName: "consul.hashicorp.com/gateway-controller-custom",
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
 				Kind:  "GatewayClassConfig",
@@ -656,8 +652,8 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 	return route
 }
 
-func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *v1alpha2.TCPRoute {
-	route := &v1alpha2.TCPRoute{
+func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *gwv1alpha2.TCPRoute {
+	route := &gwv1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -787,7 +783,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 			Name: "gatewayclass",
 		},
 		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: "consul.hashicorp.com/gateway-controller",
+			ControllerName: "consul.hashicorp.com/gateway-controller-custom",
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
 				Kind:  "GatewayClassConfig",
@@ -967,8 +963,8 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 	return route
 }
 
-func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *v1alpha2.TCPRoute {
-	route := &v1alpha2.TCPRoute{
+func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *gwv1alpha2.TCPRoute {
+	route := &gwv1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -1053,7 +1049,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 			Name: "gatewayclass",
 		},
 		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: "consul.hashicorp.com/gateway-controller",
+			ControllerName: "consul.hashicorp.com/gateway-controller-custom",
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
 				Kind:  "GatewayClassConfig",
@@ -1330,8 +1326,8 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 	return route
 }
 
-func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *v1alpha2.TCPRoute {
-	route := &v1alpha2.TCPRoute{
+func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1beta1.Gateway) *gwv1alpha2.TCPRoute {
+	route := &gwv1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -1564,8 +1560,8 @@ func createRouteAuthFilter(t *testing.T, ctx context.Context, k8sClient client.W
 			Name: "auth-filter",
 		},
 		Spec: v1alpha1.RouteAuthFilterSpec{
-			JWT: &v1alpha1.GatewayJWTRequirement{
-				Providers: []*v1alpha1.GatewayJWTProvider{
+			JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
+				Providers: []*v1alpha1.CustomGatewayJWTProvider{
 					{
 						Name: providerName,
 					},

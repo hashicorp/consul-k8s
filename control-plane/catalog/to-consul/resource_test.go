@@ -5,7 +5,6 @@ package catalog
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -565,7 +564,8 @@ func (t *testServiceResource) Informer() cache.SharedIndexInformer {
 }
 
 func getinformer() (*fake.Clientset, cache.SharedIndexInformer) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
+
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -574,11 +574,33 @@ func getinformer() (*fake.Clientset, cache.SharedIndexInformer) {
 					List(context.Background(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return watch.NewEmptyWatch(), nil // ✅ test-safe
+				return watch.NewEmptyWatch(), nil
 			},
 		},
 		&corev1.Service{},
-		0,
+		500*time.Millisecond,
+		cache.Indexers{},
+	)
+	return client, informer
+}
+
+func getinformer2() (*fake.Clientset, cache.SharedIndexInformer) {
+	client := fake.NewClientset()
+
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.NetworkingV1().
+					Ingresses(metav1.NamespaceAll).
+					List(context.Background(), options)
+			},
+
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewEmptyWatch(), nil
+			},
+		},
+		&networkingv1.Ingress{},
+		500*time.Millisecond,
 		cache.Indexers{},
 	)
 	return client, informer
@@ -2563,26 +2585,45 @@ func TestServiceResource_addIngress(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create the ingress
-			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
+			ing, err := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
+			t.Logf("Created ingress: %v\n", ing)
+			ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{
+				{IP: "1.2.3.4"}, // This is the 'expectedAddress'
+			}
+			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).UpdateStatus(context.Background(), ing, metav1.UpdateOptions{})
+
 			require.NoError(t, err)
+
+			// get the ingress to verify it was updated
+			ingress, err := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Get(context.Background(), "test-ingress", metav1.GetOptions{})
+			require.NoError(t, err)
+			t.Logf("Ingress in the cluster: %v\n", ingress)
 
 			// Start the controller
 			closer := controller.TestControllerRun(resource)
 			time.Sleep(1000 * time.Millisecond)
 			defer closer()
 
-			createNodes(t, client)
 			createEndpointSlice(t, client, "test-service", metav1.NamespaceDefault)
+
+			// get the service and endpoints related to service
+			services, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.Background(), "test-service", metav1.GetOptions{})
+
+			require.NoError(t, err)
+			t.Logf("Service in the cluster: %v\n", services)
+			// get the endpoints related to service
+			endpointsList, err := client.DiscoveryV1().EndpointSlices("default").List(context.Background(), metav1.ListOptions{})
+
+			require.NoError(t, err)
+
+			t.Logf("Endpoints: %v\n", endpointsList)
 
 			// Verify that the service name annotation is preferred
 			retry.Run(t, func(r *retry.R) {
 				syncer.Lock()
 				defer syncer.Unlock()
 				actual := syncer.Registrations
-				for i, r := range actual {
-					b, _ := json.MarshalIndent(r, "", "  ")
-					fmt.Printf("Registration %d:\n%s\n", i, string(b))
-				}
+
 				if test.expectIngressSync {
 					require.Len(r, actual, 1)
 					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
@@ -2723,7 +2764,7 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 	node3 := nodeName3
 	targetRef := corev1.ObjectReference{Kind: "pod", Name: "foobar"}
 
-	_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(
+	endpointSlice, err := client.DiscoveryV1().EndpointSlices(namespace).Create(
 		context.Background(),
 		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2776,6 +2817,7 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 			},
 		},
 		metav1.CreateOptions{})
+	t.Logf("Created the endpoints %+v", endpointSlice)
 	require.NoError(t, err)
 }
 

@@ -106,7 +106,7 @@ func TestRun_flagValidation(t *testing.T) {
 				flagControllerName:         "test",
 				flagTolerations:            "foo",
 			},
-			expectedErr: "error decoding tolerations: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into []gatewayresources.toleration",
+			expectedErr: "error decoding tolerations: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `foo` into []gatewayresourcescustom.toleration",
 		},
 		"required valid nodeSelector": {
 			cmd: &Command{

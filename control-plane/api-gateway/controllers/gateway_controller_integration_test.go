@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package controllers
 
 import (
@@ -29,16 +26,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	"sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-
-	"github.com/hashicorp/consul/agent/netutil"
-	"github.com/hashicorp/consul/api"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
+	"github.com/hashicorp/consul/agent/netutil"
+	"github.com/hashicorp/consul/api"
 )
 
 func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
@@ -47,6 +43,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	require.NoError(t, clientgoscheme.AddToScheme(s))
 	require.NoError(t, gwv1alpha2.Install(s))
 	require.NoError(t, gwv1.Install(s))
+	require.NoError(t, gwv1beta1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	testCases := map[string]struct {
@@ -54,7 +51,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 		certFn           func(*testing.T, context.Context, client.WithWatch, string) *corev1.Secret
 		gwFn             func(*testing.T, context.Context, client.WithWatch, string) *gwv1.Gateway
 		httpRouteFn      func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute
-		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway) *v1alpha2.TCPRoute
+		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway) *gwv1alpha2.TCPRoute
 		externalFilterFn func(*testing.T, context.Context, client.WithWatch, string) *v1alpha1.RouteAuthFilter
 		policyFn         func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, string)
 	}{
@@ -116,8 +113,14 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().WithScheme(s).
-				WithStatusSubresource(&gwv1.Gateway{}, &gwv1.HTTPRoute{}, &gwv1alpha2.TCPRoute{}, &v1alpha1.RouteAuthFilter{})
-			k8sClient := registerFieldIndexersForTest(fakeClient).Build()
+				WithStatusSubresource(
+					&gwv1.Gateway{},
+					&gwv1.HTTPRoute{},
+					&gwv1alpha2.TCPRoute{},
+					&v1alpha1.RouteAuthFilter{},
+				)
+			fclient := registerFieldIndexersForTest(fakeClient)
+			k8sClient := fclient.Build()
 			consulTestServerClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -142,8 +145,10 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 				cache:                 resourceCache,
 				gatewayCache:          gwCache,
 				Client:                k8sClient,
+				ApiReader:             k8sClient,
 				allowK8sNamespacesSet: mapset.NewSet(),
 				denyK8sNamespacesSet:  mapset.NewSet(),
+				supportsTCPRoute:      true,
 			}
 
 			go func() {
@@ -205,6 +210,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			wg := &sync.WaitGroup{}
 			// we never get the event from the cert because when it's created there are no gateways that reference it
 			wg.Add(3)
+			waitDone := make(chan struct{})
 			go func(w *sync.WaitGroup) {
 				gwDone := false
 				httpRouteDone := false
@@ -215,16 +221,19 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 					case <-ctx.Done():
 						return
 					case <-gwSub.Events():
+						t.Log("GW event received")
 						if !gwDone {
 							gwDone = true
 							w.Done()
 						}
 					case <-httpRouteSub.Events():
+						t.Log("HTTPRoute event received")
 						if !httpRouteDone {
 							httpRouteDone = true
 							w.Done()
 						}
 					case <-tcpRouteSub.Events():
+						t.Log("TCPRoute event received")
 						if !tcpRouteDone {
 							tcpRouteDone = true
 							w.Done()
@@ -234,7 +243,13 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 				}
 			}(wg)
 
-			wg.Wait()
+			//wg.Wait()
+			select {
+			case <-waitDone:
+				t.Log("All events received")
+			case <-time.After(150 * time.Second):
+				t.Fatal("timed out waiting for GW/HTTPRoute/TCPRoute events from consul cache")
+			}
 
 			gwNamespaceName := types.NamespacedName{
 				Name:      k8sGWObj.Name,
@@ -288,6 +303,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 					_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: k8sGWObj.Namespace,
+							Name:      k8sGWObj.Name,
 						},
 					})
 					require.NoError(t, err)
@@ -353,7 +369,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 	gwClassCfg := &v1alpha1.GatewayClassConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClassConfig",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gateway-class-config",
@@ -363,7 +379,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 	gwClass := &gwv1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClass",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gatewayclass",
@@ -381,13 +397,15 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 	gw := &gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Gateway",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "gw",
+			Name: "gw",
+
 			Namespace:   namespace,
 			Annotations: make(map[string]string),
 		},
+
 		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1.ObjectName(gwClass.Name),
 			Listeners: []gwv1.Listener{
@@ -452,7 +470,9 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 			},
 		},
 	}
-
+	if namespace == "" {
+		gw.ObjectMeta.Namespace = "default"
+	}
 	err := k8sClient.Create(ctx, gwClassCfg)
 	require.NoError(t, err)
 
@@ -542,7 +562,7 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",
@@ -656,8 +676,8 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 	return route
 }
 
-func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *v1alpha2.TCPRoute {
-	route := &v1alpha2.TCPRoute{
+func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
+	route := &gwv1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -771,7 +791,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 	gwClassCfg := &v1alpha1.GatewayClassConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClassConfig",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gateway-class-config",
@@ -781,7 +801,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 	gwClass := &gwv1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClass",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gatewayclass",
@@ -799,7 +819,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 	gw := &gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Gateway",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "gw",
@@ -926,7 +946,7 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",
@@ -967,8 +987,8 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 	return route
 }
 
-func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *v1alpha2.TCPRoute {
-	route := &v1alpha2.TCPRoute{
+func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
+	route := &gwv1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -1037,7 +1057,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 	gwClassCfg := &v1alpha1.GatewayClassConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClassConfig",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gateway-class-config",
@@ -1047,7 +1067,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 	gwClass := &gwv1.GatewayClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "GatewayClass",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gatewayclass",
@@ -1065,7 +1085,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 	gw := &gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Gateway",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "gw",
@@ -1226,7 +1246,7 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",
@@ -1330,8 +1350,8 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 	return route
 }
 
-func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *v1alpha2.TCPRoute {
-	route := &v1alpha2.TCPRoute{
+func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
+	route := &gwv1alpha2.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -1449,7 +1469,7 @@ func createAllFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient cl
 	route := &gwv1.HTTPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "HTTPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1beta1",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "http-route",

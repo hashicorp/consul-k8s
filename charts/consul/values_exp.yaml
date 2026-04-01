@@ -5,6 +5,7 @@
 
 # Holds values that affect multiple components of the chart.
 global:
+  installK8sNetworkingCRDs: false
   # The main enabled/disabled setting. If true, servers,
   # clients, Consul DNS and the Consul UI will be enabled. Each component can override
   # this default via its component-specific "enabled" config. If false, no components
@@ -85,8 +86,8 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  # imageK8S: hashicorp/consul-k8s-control-plane:1.7.9
-  imageK8S: docker.io/library/consul-k8s-control-plane:13849-c-7
+  # imageK8S: hashicorp/consul-k8s-control-plane:1.9.2
+  imageK8S: localhost/consul-k8s-control-plane-ut:3.0
     #imageK8S: localhost/consul-k8s-control-plane:13047-4
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -809,7 +810,7 @@ global:
   crds:
     enableTcpRoute: true
     consulapi:
-      enabled: true
+      enabled: false
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:

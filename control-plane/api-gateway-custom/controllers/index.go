@@ -345,7 +345,7 @@ func filtersForHTTPRoute(o client.Object) []string {
 }
 
 func gatewayForGatewayPolicy(o client.Object) []string {
-	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+	gatewayPolicy := o.(*v1alpha1.CustomGatewayPolicy)
 
 	targetGateway := gatewayPolicy.Spec.TargetRef
 	if targetGateway.Group == gwv1beta1.GroupVersion.String() && targetGateway.Kind == common.KindGateway {

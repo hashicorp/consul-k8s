@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
@@ -97,7 +97,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Could not add client-go schema: %s", err))
 			return 1
 		}
-		if err := gwv1beta1.Install(s); err != nil {
+		if err := gwv1.Install(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add api-gateway schema: %s", err))
 			return 1
 		}
@@ -144,7 +144,7 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 
 	// find the gateway class
 
-	gatewayClass := &gwv1beta1.GatewayClass{}
+	gatewayClass := &gwv1.GatewayClass{}
 	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
