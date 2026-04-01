@@ -80,6 +80,26 @@ rules:
 - apiGroups:
   - consul.hashicorp.com
   resources:
+  - ratelimits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - ratelimits/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
   - exportedservices
   verbs:
   - create
