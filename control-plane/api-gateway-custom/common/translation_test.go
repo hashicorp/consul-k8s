@@ -1402,11 +1402,11 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							Namespace: "k8s-ns",
 						},
 						Spec: v1alpha1.RouteAuthFilterSpec{
-							JWT: &v1alpha1.GatewayJWTRequirement{
-								Providers: []*v1alpha1.GatewayJWTProvider{
+							JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
 									{
 										Name: "test-jwt-provider",
-										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
+										VerifyClaims: []*v1alpha1.CustomGatewayJWTClaimVerification{
 											{
 												Path:  []string{"/okta"},
 												Value: "okta",

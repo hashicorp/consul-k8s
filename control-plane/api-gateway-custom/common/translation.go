@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package common
 
 import (
@@ -174,7 +171,7 @@ func (t ResourceTranslator) translateRouteTimeoutFilter(routeTimeoutFilter *v1al
 }
 
 func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.RouteAuthFilter) *api.JWTFilter {
-	if routeJWTFilter.Spec.JWT == nil {
+	if routeJWTFilter.Spec.JWTCustom == nil {
 		return nil
 	}
 

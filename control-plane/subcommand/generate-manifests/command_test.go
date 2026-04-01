@@ -381,7 +381,7 @@ func TestEnforceConsulApiVersion(t *testing.T) {
 				require.Equal(t, "api-gateway-custom", md["name"])
 
 				spec := raw["spec"].(map[string]interface{})
-				require.Equal(t, "consul-ocp", spec["gatewayClassName"])
+				require.Equal(t, "consul-custom", spec["gatewayClassName"])
 			},
 		},
 		{
@@ -650,53 +650,7 @@ func TestWriteObjects(t *testing.T) {
 	l2 := listeners[1].(map[string]interface{})
 	require.EqualValues(t, 443, l2["port"])
 	require.Equal(t, "https", l2["name"])
-	require.Equal(t, "consul-ocp", spec["gatewayClassName"])
-}
-
-func TestEnforceConsulApiVersion_ServiceIntentions(t *testing.T) {
-	rawServiceintentions := v1alpha1.ServiceIntentions{}
-	rawServiceintentions.APIVersion = "consul.hashicorp.com/v1alpha1"
-	rawServiceintentions.Kind = "ServiceIntentions"
-	rawServiceintentions.ObjectMeta.Name = "test-intentions"
-	rawServiceintentions.ObjectMeta.Namespace = "default"
-	rawServiceintentions.Spec.Sources = []*v1alpha1.SourceIntention{
-		{
-			Name:   "api-gateway",
-			Action: "allow",
-		},
-		{
-			Name:   "web",
-			Action: "deny",
-		},
-	}
-
-	raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&rawServiceintentions)
-	require.NoError(t, err)
-	enforceConsulApiVersion(raw)
-
-	spec := raw["spec"].(map[string]interface{})
-	sources := spec["sources"].([]interface{})
-
-	// original (2) + new (2)
-	require.Len(t, sources, 3)
-	t.Logf("Sources after mutation: %+v", sources)
-
-	// validate original sources are unchanged, use containsSourceName
-	require.Contains(t, sources, map[string]interface{}{
-		"name":   "api-gateway",
-		"action": "allow",
-	})
-	require.Contains(t, sources, map[string]interface{}{
-		"name":   "web",
-		"action": "deny",
-	})
-
-	// validate new source is added
-	require.Contains(t, sources, map[string]interface{}{
-		"name":   "api-gateway-custom",
-		"action": "allow",
-	})
-
+	require.Equal(t, "consul-custom", spec["gatewayClassName"])
 }
 
 // E2E

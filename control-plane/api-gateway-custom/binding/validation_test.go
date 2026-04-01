@@ -4,6 +4,7 @@
 package binding
 
 import (
+	"fmt"
 	"testing"
 
 	logrtest "github.com/go-logr/logr/testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -567,1005 +569,1005 @@ func TestValidateTLS(t *testing.T) {
 	}
 }
 
-// func TestValidateListeners(t *testing.T) {
-// 	t.Parallel()
+func TestValidateListeners(t *testing.T) {
+	t.Parallel()
 
-// 	for name, tt := range map[string]struct {
-// 		listeners                   []gwv1beta1.Listener
-// 		expectedAcceptedErr         error
-// 		listenerIndexToTest         int
-// 		mapPrivilegedContainerPorts int32
-// 		gateway                     gwv1beta1.Gateway
-// 		resources                   resourceMapResources
-// 	}{
-// 		"valid protocol HTTP": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Protocol: gwv1beta1.HTTPProtocolType},
-// 			},
-// 			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources:           resourceMapResources{},
-// 			expectedAcceptedErr: nil,
-// 		},
-// 		"valid protocol HTTPS": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Protocol: gwv1beta1.HTTPSProtocolType},
-// 			},
-// 			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources:           resourceMapResources{},
-// 			expectedAcceptedErr: nil,
-// 		},
-// 		"valid protocol TCP": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Protocol: gwv1beta1.TCPProtocolType},
-// 			},
-// 			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources:           resourceMapResources{},
-// 			expectedAcceptedErr: nil,
-// 		},
-// 		"invalid protocol UDP": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Protocol: gwv1beta1.UDPProtocolType},
-// 			},
-// 			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources:           resourceMapResources{},
-// 			expectedAcceptedErr: errListenerUnsupportedProtocol,
-// 		},
-// 		"invalid port": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Protocol: gwv1beta1.TCPProtocolType, Port: 20000},
-// 			},
-// 			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources:           resourceMapResources{},
-// 			expectedAcceptedErr: errListenerPortUnavailable,
-// 		},
-// 		"conflicted port": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
-// 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
-// 			},
-// 			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources:           resourceMapResources{},
-// 			expectedAcceptedErr: errListenerPortUnavailable,
-// 			listenerIndexToTest: 1,
-// 		},
-// 		"conflicted mapped port": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
-// 				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
-// 			},
-// 			gateway:                     gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			expectedAcceptedErr:         errListenerMappedToPrivilegedPortMapping,
-// 			resources:                   resourceMapResources{},
-// 			listenerIndexToTest:         1,
-// 			mapPrivilegedContainerPorts: 2000,
-// 		},
-// 		"valid JWT provider in override of policy": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
-// 			},
-// 			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources: resourceMapResources{
-// 				jwtProviders: []*v1alpha1.JWTProvider{
-// 					{
-// 						TypeMeta: metav1.TypeMeta{
-// 							Kind: "JWTProvider",
-// 						},
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "okta",
-// 						},
-// 					},
-// 				},
-// 				gatewayPolicies: []*v1alpha1.OcpGatewayPolicy{
-// 					{
-// 						Spec: v1alpha1.OcpGatewayPolicySpec{
-// 							TargetRef: v1alpha1.OcpPolicyTargetReference{
-// 								Group:       gwv1beta1.GroupVersion.String(),
-// 								Kind:        common.KindGateway,
-// 								Name:        "gateway",
-// 								Namespace:   "default",
-// 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 							},
-// 							Override: &v1alpha1.OcpGatewayPolicyConfig{
-// 								JWT: &v1alpha1.OcpGatewayJWTRequirement{
-// 									Providers: []*v1alpha1.OcpGatewayJWTProvider{
-// 										{
-// 											Name: "okta",
-// 										},
-// 									},
-// 								},
-// 							},
-// 							Default: &v1alpha1.OcpGatewayPolicyConfig{},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			expectedAcceptedErr: nil,
-// 		},
-// 		"valid JWT provider in default of policy": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
-// 			},
-// 			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources: resourceMapResources{
-// 				jwtProviders: []*v1alpha1.JWTProvider{
-// 					{
-// 						TypeMeta: metav1.TypeMeta{
-// 							Kind: "JWTProvider",
-// 						},
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "okta",
-// 						},
-// 					},
-// 				},
-// 				gatewayPolicies: []*v1alpha1.GatewayPolicy{
-// 					{
-// 						Spec: v1alpha1.GatewayPolicySpec{
-// 							TargetRef: v1alpha1.PolicyTargetReference{
-// 								Group:       gwv1beta1.GroupVersion.String(),
-// 								Kind:        common.KindGateway,
-// 								Name:        "gateway",
-// 								Namespace:   "default",
-// 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 							},
-// 							Default: &v1alpha1.GatewayPolicyConfig{
-// 								JWT: &v1alpha1.GatewayJWTRequirement{
-// 									Providers: []*v1alpha1.GatewayJWTProvider{
-// 										{
-// 											Name: "okta",
-// 										},
-// 									},
-// 								},
-// 							},
-// 							Override: &v1alpha1.GatewayPolicyConfig{},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			expectedAcceptedErr: nil,
-// 		},
-// 		"invalid JWT provider in override of policy": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
-// 			},
-// 			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources: resourceMapResources{
-// 				jwtProviders: []*v1alpha1.JWTProvider{
-// 					{
-// 						TypeMeta: metav1.TypeMeta{
-// 							Kind: "JWTProvider",
-// 						},
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "okta",
-// 						},
-// 					},
-// 				},
-// 				gatewayPolicies: []*v1alpha1.OcpGatewayPolicy{
-// 					{
-// 						Spec: v1alpha1.OcpGatewayPolicySpec{
-// 							TargetRef: v1alpha1.OcpPolicyTargetReference{
-// 								Group:       gwv1beta1.GroupVersion.String(),
-// 								Kind:        common.KindGateway,
-// 								Name:        "gateway",
-// 								Namespace:   "default",
-// 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 							},
-// 							Override: &v1alpha1.OcpGatewayPolicyConfig{
-// 								JWT: &v1alpha1.OcpGatewayJWTRequirement{
-// 									Providers: []*v1alpha1.OcpGatewayJWTProvider{
-// 										{
-// 											Name: "local",
-// 										},
-// 									},
-// 								},
-// 							},
-// 							Default: &v1alpha1.OcpGatewayPolicyConfig{},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			expectedAcceptedErr: errListenerJWTProviderNotFound,
-// 		},
-// 		"invalid JWT provider in default of policy": {
-// 			listeners: []gwv1beta1.Listener{
-// 				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
-// 			},
-// 			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-// 			resources: resourceMapResources{
-// 				jwtProviders: []*v1alpha1.JWTProvider{
-// 					{
-// 						TypeMeta: metav1.TypeMeta{
-// 							Kind: "JWTProvider",
-// 						},
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "okta",
-// 						},
-// 					},
-// 				},
-// 				gatewayPolicies: []*v1alpha1.GatewayPolicy{
-// 					{
-// 						Spec: v1alpha1.GatewayPolicySpec{
-// 							TargetRef: v1alpha1.PolicyTargetReference{
-// 								Group:       gwv1beta1.GroupVersion.String(),
-// 								Kind:        common.KindGateway,
-// 								Name:        "gateway",
-// 								Namespace:   "default",
-// 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 							},
-// 							Default: &v1alpha1.GatewayPolicyConfig{
-// 								JWT: &v1alpha1.GatewayJWTRequirement{
-// 									Providers: []*v1alpha1.GatewayJWTProvider{
-// 										{
-// 											Name: "local",
-// 										},
-// 									},
-// 								},
-// 							},
-// 							Override: &v1alpha1.GatewayPolicyConfig{},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			expectedAcceptedErr: errListenerJWTProviderNotFound,
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			gwcc := &v1alpha1.GatewayClassConfig{
-// 				Spec: v1alpha1.GatewayClassConfigSpec{
-// 					MapPrivilegedContainerPorts: tt.mapPrivilegedContainerPorts,
-// 				},
-// 			}
+	for name, tt := range map[string]struct {
+		listeners                   []gwv1beta1.Listener
+		expectedAcceptedErr         error
+		listenerIndexToTest         int
+		mapPrivilegedContainerPorts int32
+		gateway                     gwv1beta1.Gateway
+		resources                   resourceMapResources
+	}{
+		"valid protocol HTTP": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
+			expectedAcceptedErr: nil,
+		},
+		"valid protocol HTTPS": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.HTTPSProtocolType},
+			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
+			expectedAcceptedErr: nil,
+		},
+		"valid protocol TCP": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType},
+			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
+			expectedAcceptedErr: nil,
+		},
+		"invalid protocol UDP": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.UDPProtocolType},
+			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
+			expectedAcceptedErr: errListenerUnsupportedProtocol,
+		},
+		"invalid port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 20000},
+			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
+			expectedAcceptedErr: errListenerPortUnavailable,
+		},
+		"conflicted port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+			},
+			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources:           resourceMapResources{},
+			expectedAcceptedErr: errListenerPortUnavailable,
+			listenerIndexToTest: 1,
+		},
+		"conflicted mapped port": {
+			listeners: []gwv1beta1.Listener{
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
+			},
+			gateway:                     gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			expectedAcceptedErr:         errListenerMappedToPrivilegedPortMapping,
+			resources:                   resourceMapResources{},
+			listenerIndexToTest:         1,
+			mapPrivilegedContainerPorts: 2000,
+		},
+		"valid JWT provider in override of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.CustomGatewayPolicy{
+					{
+						Spec: v1alpha1.CustomGatewayPolicySpec{
+							TargetRef: v1alpha1.CustomPolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Override: &v1alpha1.CustomGatewayPolicyConfig{
+								JWT: &v1alpha1.CustomGatewayJWTRequirement{
+									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+										{
+											Name: "okta",
+										},
+									},
+								},
+							},
+							Default: &v1alpha1.CustomGatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: nil,
+		},
+		"valid JWT provider in default of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.CustomGatewayPolicy{
+					{
+						Spec: v1alpha1.CustomGatewayPolicySpec{
+							TargetRef: v1alpha1.CustomPolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Default: &v1alpha1.CustomGatewayPolicyConfig{
+								JWT: &v1alpha1.CustomGatewayJWTRequirement{
+									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+										{
+											Name: "okta",
+										},
+									},
+								},
+							},
+							Override: &v1alpha1.CustomGatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: nil,
+		},
+		"invalid JWT provider in override of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.CustomGatewayPolicy{
+					{
+						Spec: v1alpha1.CustomGatewayPolicySpec{
+							TargetRef: v1alpha1.CustomPolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Override: &v1alpha1.CustomGatewayPolicyConfig{
+								JWT: &v1alpha1.CustomGatewayJWTRequirement{
+									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+										{
+											Name: "local",
+										},
+									},
+								},
+							},
+							Default: &v1alpha1.CustomGatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: errListenerJWTProviderNotFound,
+		},
+		"invalid JWT provider in default of policy": {
+			listeners: []gwv1beta1.Listener{
+				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			},
+			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			resources: resourceMapResources{
+				jwtProviders: []*v1alpha1.JWTProvider{
+					{
+						TypeMeta: metav1.TypeMeta{
+							Kind: "JWTProvider",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "okta",
+						},
+					},
+				},
+				gatewayPolicies: []*v1alpha1.CustomGatewayPolicy{
+					{
+						Spec: v1alpha1.CustomGatewayPolicySpec{
+							TargetRef: v1alpha1.CustomPolicyTargetReference{
+								Group:       gwv1beta1.GroupVersion.String(),
+								Kind:        common.KindGateway,
+								Name:        "gateway",
+								Namespace:   "default",
+								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							},
+							Default: &v1alpha1.CustomGatewayPolicyConfig{
+								JWT: &v1alpha1.CustomGatewayJWTRequirement{
+									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+										{
+											Name: "local",
+										},
+									},
+								},
+							},
+							Override: &v1alpha1.CustomGatewayPolicyConfig{},
+						},
+					},
+				},
+			},
+			expectedAcceptedErr: errListenerJWTProviderNotFound,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			gwcc := &v1alpha1.GatewayClassConfig{
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					MapPrivilegedContainerPorts: tt.mapPrivilegedContainerPorts,
+				},
+			}
 
-// 			require.Equal(t, tt.expectedAcceptedErr, validateListeners(tt.gateway, tt.listeners, newTestResourceMap(t, tt.resources), gwcc)[tt.listenerIndexToTest].acceptedErr)
-// 		})
-// 	}
-// }
+			require.Equal(t, tt.expectedAcceptedErr, validateListeners(tt.gateway, tt.listeners, newTestResourceMap(t, tt.resources), gwcc)[tt.listenerIndexToTest].acceptedErr)
+		})
+	}
+}
 
-// func TestRouteAllowedForListenerNamespaces(t *testing.T) {
-// 	t.Parallel()
+func TestRouteAllowedForListenerNamespaces(t *testing.T) {
+	t.Parallel()
 
-// 	for name, tt := range map[string]struct {
-// 		allowedRoutes    *gwv1beta1.AllowedRoutes
-// 		gatewayNamespace string
-// 		routeNamespace   corev1.Namespace
-// 		expected         bool
-// 	}{
-// 		"default same namespace allowed": {
-// 			allowedRoutes:    nil,
-// 			gatewayNamespace: "test",
-// 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
-// 			expected:         true,
-// 		},
-// 		"default same namespace not allowed": {
-// 			allowedRoutes:    nil,
-// 			gatewayNamespace: "test",
-// 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
-// 			expected:         false,
-// 		},
-// 		"explicit same namespace allowed": {
-// 			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromSame)}},
-// 			gatewayNamespace: "test",
-// 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
-// 			expected:         true,
-// 		},
-// 		"explicit same namespace not allowed": {
-// 			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromSame)}},
-// 			gatewayNamespace: "test",
-// 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
-// 			expected:         false,
-// 		},
-// 		"all namespace allowed": {
-// 			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromAll)}},
-// 			gatewayNamespace: "test",
-// 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
-// 			expected:         true,
-// 		},
-// 		"invalid namespace from not allowed": {
-// 			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo[gwv1beta1.FromNamespaces]("other")}},
-// 			gatewayNamespace: "test",
-// 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
-// 			expected:         false,
-// 		},
-// 		"labeled namespace allowed": {
-// 			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
-// 				From:     common.PointerTo(gwv1beta1.NamespacesFromSelector),
-// 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-// 			}},
-// 			gatewayNamespace: "test",
-// 			routeNamespace: corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{
-// 				"foo": "bar",
-// 			}}},
-// 			expected: true,
-// 		},
-// 		"labeled namespace not allowed": {
-// 			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
-// 				From:     common.PointerTo(gwv1beta1.NamespacesFromSelector),
-// 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-// 			}},
-// 			gatewayNamespace: "test",
-// 			routeNamespace: corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{
-// 				"foo": "baz",
-// 			}}},
-// 			expected: false,
-// 		},
-// 		"invalid labeled namespace": {
-// 			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
-// 				From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
-// 				Selector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
-// 					{Key: "foo", Operator: "junk", Values: []string{"1"}},
-// 				}},
-// 			}},
-// 			gatewayNamespace: "test",
-// 			routeNamespace: corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{
-// 				"foo": "bar",
-// 			}}},
-// 			expected: false,
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			require.Equal(t, tt.expected, routeAllowedForListenerNamespaces(tt.gatewayNamespace, tt.allowedRoutes, tt.routeNamespace))
-// 		})
-// 	}
-// }
+	for name, tt := range map[string]struct {
+		allowedRoutes    *gwv1beta1.AllowedRoutes
+		gatewayNamespace string
+		routeNamespace   corev1.Namespace
+		expected         bool
+	}{
+		"default same namespace allowed": {
+			allowedRoutes:    nil,
+			gatewayNamespace: "test",
+			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+			expected:         true,
+		},
+		"default same namespace not allowed": {
+			allowedRoutes:    nil,
+			gatewayNamespace: "test",
+			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
+			expected:         false,
+		},
+		"explicit same namespace allowed": {
+			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromSame)}},
+			gatewayNamespace: "test",
+			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+			expected:         true,
+		},
+		"explicit same namespace not allowed": {
+			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromSame)}},
+			gatewayNamespace: "test",
+			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
+			expected:         false,
+		},
+		"all namespace allowed": {
+			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromAll)}},
+			gatewayNamespace: "test",
+			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
+			expected:         true,
+		},
+		"invalid namespace from not allowed": {
+			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo[gwv1beta1.FromNamespaces]("other")}},
+			gatewayNamespace: "test",
+			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
+			expected:         false,
+		},
+		"labeled namespace allowed": {
+			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
+				From:     common.PointerTo(gwv1beta1.NamespacesFromSelector),
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			}},
+			gatewayNamespace: "test",
+			routeNamespace: corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{
+				"foo": "bar",
+			}}},
+			expected: true,
+		},
+		"labeled namespace not allowed": {
+			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
+				From:     common.PointerTo(gwv1beta1.NamespacesFromSelector),
+				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			}},
+			gatewayNamespace: "test",
+			routeNamespace: corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{
+				"foo": "baz",
+			}}},
+			expected: false,
+		},
+		"invalid labeled namespace": {
+			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
+				From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+				Selector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "foo", Operator: "junk", Values: []string{"1"}},
+				}},
+			}},
+			gatewayNamespace: "test",
+			routeNamespace: corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other", Labels: map[string]string{
+				"foo": "bar",
+			}}},
+			expected: false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, routeAllowedForListenerNamespaces(tt.gatewayNamespace, tt.allowedRoutes, tt.routeNamespace))
+		})
+	}
+}
 
-// func TestRouteAllowedForListenerHostname(t *testing.T) {
-// 	t.Parallel()
+func TestRouteAllowedForListenerHostname(t *testing.T) {
+	t.Parallel()
 
-// 	for name, tt := range map[string]struct {
-// 		hostname  *gwv1beta1.Hostname
-// 		hostnames []gwv1beta1.Hostname
-// 		expected  bool
-// 	}{
-// 		"empty hostnames": {
-// 			hostname:  nil,
-// 			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
-// 			expected:  true,
-// 		},
-// 		"empty hostname": {
-// 			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
-// 			hostnames: nil,
-// 			expected:  true,
-// 		},
-// 		"any hostname match": {
-// 			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
-// 			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
-// 			expected:  true,
-// 		},
-// 		"no match": {
-// 			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
-// 			hostnames: []gwv1beta1.Hostname{"bar"},
-// 			expected:  false,
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			require.Equal(t, tt.expected, routeAllowedForListenerHostname(tt.hostname, tt.hostnames))
-// 		})
-// 	}
-// }
+	for name, tt := range map[string]struct {
+		hostname  *gwv1beta1.Hostname
+		hostnames []gwv1beta1.Hostname
+		expected  bool
+	}{
+		"empty hostnames": {
+			hostname:  nil,
+			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
+			expected:  true,
+		},
+		"empty hostname": {
+			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
+			hostnames: nil,
+			expected:  true,
+		},
+		"any hostname match": {
+			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
+			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
+			expected:  true,
+		},
+		"no match": {
+			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
+			hostnames: []gwv1beta1.Hostname{"bar"},
+			expected:  false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, routeAllowedForListenerHostname(tt.hostname, tt.hostnames))
+		})
+	}
+}
 
-// func TestHostnamesMatch(t *testing.T) {
-// 	t.Parallel()
+func TestHostnamesMatch(t *testing.T) {
+	t.Parallel()
 
-// 	for name, tt := range map[string]struct {
-// 		one      gwv1beta1.Hostname
-// 		two      gwv1beta1.Hostname
-// 		expected bool
-// 	}{
-// 		"wildcard one": {
-// 			one:      "*",
-// 			two:      "foo",
-// 			expected: true,
-// 		},
-// 		"wildcard two": {
-// 			one:      "foo",
-// 			two:      "*",
-// 			expected: true,
-// 		},
-// 		"empty one": {
-// 			one:      "",
-// 			two:      "foo",
-// 			expected: true,
-// 		},
-// 		"empty two": {
-// 			one:      "foo",
-// 			two:      "",
-// 			expected: true,
-// 		},
-// 		"subdomain one": {
-// 			one:      "*.foo",
-// 			two:      "sub.foo",
-// 			expected: true,
-// 		},
-// 		"subdomain two": {
-// 			one:      "sub.foo",
-// 			two:      "*.foo",
-// 			expected: true,
-// 		},
-// 		"exact match": {
-// 			one:      "foo",
-// 			two:      "foo",
-// 			expected: true,
-// 		},
-// 		"no match": {
-// 			one:      "foo",
-// 			two:      "bar",
-// 			expected: false,
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			require.Equal(t, tt.expected, hostnamesMatch(tt.one, tt.two))
-// 		})
-// 	}
-// }
+	for name, tt := range map[string]struct {
+		one      gwv1beta1.Hostname
+		two      gwv1beta1.Hostname
+		expected bool
+	}{
+		"wildcard one": {
+			one:      "*",
+			two:      "foo",
+			expected: true,
+		},
+		"wildcard two": {
+			one:      "foo",
+			two:      "*",
+			expected: true,
+		},
+		"empty one": {
+			one:      "",
+			two:      "foo",
+			expected: true,
+		},
+		"empty two": {
+			one:      "foo",
+			two:      "",
+			expected: true,
+		},
+		"subdomain one": {
+			one:      "*.foo",
+			two:      "sub.foo",
+			expected: true,
+		},
+		"subdomain two": {
+			one:      "sub.foo",
+			two:      "*.foo",
+			expected: true,
+		},
+		"exact match": {
+			one:      "foo",
+			two:      "foo",
+			expected: true,
+		},
+		"no match": {
+			one:      "foo",
+			two:      "bar",
+			expected: false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, hostnamesMatch(tt.one, tt.two))
+		})
+	}
+}
 
-// func TestRouteKindIsAllowedForListener(t *testing.T) {
-// 	t.Parallel()
+func TestRouteKindIsAllowedForListener(t *testing.T) {
+	t.Parallel()
 
-// 	for name, tt := range map[string]struct {
-// 		kinds    []gwv1beta1.RouteGroupKind
-// 		gk       schema.GroupKind
-// 		expected bool
-// 	}{
-// 		"empty kinds": {
-// 			kinds:    nil,
-// 			gk:       schema.GroupKind{Group: "a", Kind: "b"},
-// 			expected: true,
-// 		},
-// 		"group specified": {
-// 			kinds: []gwv1beta1.RouteGroupKind{
-// 				{Group: common.PointerTo[gwv1beta1.Group]("a"), Kind: "b"},
-// 			},
-// 			gk:       schema.GroupKind{Group: "a", Kind: "b"},
-// 			expected: true,
-// 		},
-// 		"group unspecified": {
-// 			kinds: []gwv1beta1.RouteGroupKind{
-// 				{Kind: "b"},
-// 			},
-// 			gk:       schema.GroupKind{Group: "a", Kind: "b"},
-// 			expected: true,
-// 		},
-// 		"kind mismatch": {
-// 			kinds: []gwv1beta1.RouteGroupKind{
-// 				{Kind: "b"},
-// 			},
-// 			gk:       schema.GroupKind{Group: "a", Kind: "c"},
-// 			expected: false,
-// 		},
-// 		"group mismatch": {
-// 			kinds: []gwv1beta1.RouteGroupKind{
-// 				{Group: common.PointerTo[gwv1beta1.Group]("a"), Kind: "b"},
-// 			},
-// 			gk:       schema.GroupKind{Group: "d", Kind: "b"},
-// 			expected: false,
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			require.Equal(t, tt.expected, routeKindIsAllowedForListener(tt.kinds, tt.gk))
-// 		})
-// 	}
-// }
+	for name, tt := range map[string]struct {
+		kinds    []gwv1beta1.RouteGroupKind
+		gk       schema.GroupKind
+		expected bool
+	}{
+		"empty kinds": {
+			kinds:    nil,
+			gk:       schema.GroupKind{Group: "a", Kind: "b"},
+			expected: true,
+		},
+		"group specified": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Group: common.PointerTo[gwv1beta1.Group]("a"), Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "a", Kind: "b"},
+			expected: true,
+		},
+		"group unspecified": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "a", Kind: "b"},
+			expected: true,
+		},
+		"kind mismatch": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "a", Kind: "c"},
+			expected: false,
+		},
+		"group mismatch": {
+			kinds: []gwv1beta1.RouteGroupKind{
+				{Group: common.PointerTo[gwv1beta1.Group]("a"), Kind: "b"},
+			},
+			gk:       schema.GroupKind{Group: "d", Kind: "b"},
+			expected: false,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tt.expected, routeKindIsAllowedForListener(tt.kinds, tt.gk))
+		})
+	}
+}
 
-// func TestValidateGatewayPolicies(t *testing.T) {
-// 	for name, tc := range map[string]struct {
-// 		gateway   gwv1beta1.Gateway
-// 		policies  []v1alpha1.GatewayPolicy
-// 		resources *common.ResourceMap
-// 		expected  gatewayPolicyValidationResults
-// 	}{
-// 		"happy path, everything exists": {
-// 			gateway: gwv1beta1.Gateway{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "gw",
-// 				},
-// 				Spec: gwv1beta1.GatewaySpec{
-// 					Listeners: []gwv1beta1.Listener{
-// 						{
-// 							Name: "l1",
-// 						},
-// 					},
-// 				},
-// 			},
-// 			policies: []v1alpha1.GatewayPolicy{
-// 				{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "my-policy",
-// 					},
-// 					Spec: v1alpha1.GatewayPolicySpec{
-// 						TargetRef: v1alpha1.PolicyTargetReference{
-// 							Name:        "gw",
-// 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 						},
-// 						Override: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "local",
-// 									},
-// 								},
-// 							},
-// 						},
-// 						Default: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "okta",
-// 									},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "local",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "local",
-// 					},
-// 				},
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "okta",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "okta",
-// 					},
-// 				},
-// 			}}),
-// 			expected: gatewayPolicyValidationResults{
-// 				{
-// 					acceptedErr:      nil,
-// 					resolvedRefsErrs: []error{},
-// 				},
-// 			},
-// 		},
-// 		"a policy references a gateway that does not exist": {
-// 			gateway: gwv1beta1.Gateway{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "gw",
-// 				},
-// 				Spec: gwv1beta1.GatewaySpec{
-// 					Listeners: []gwv1beta1.Listener{
-// 						{
-// 							Name: "l1",
-// 						},
-// 					},
-// 				},
-// 			},
-// 			policies: []v1alpha1.GatewayPolicy{
-// 				{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "my-policy",
-// 					},
-// 					Spec: v1alpha1.GatewayPolicySpec{
-// 						TargetRef: v1alpha1.PolicyTargetReference{
-// 							Name:        "gw",
-// 							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
-// 						},
-// 						Override: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "auth0",
-// 									},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "auth0",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "auth0",
-// 					},
-// 				},
-// 			}}),
-// 			expected: gatewayPolicyValidationResults{
-// 				{
-// 					acceptedErr:      errNotAcceptedDueToInvalidRefs,
-// 					resolvedRefsErrs: []error{fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, "gw", "does not exist")},
-// 				},
-// 			},
-// 		},
-// 		"a policy references a JWT provider in the override section that does not exist": {
-// 			gateway: gwv1beta1.Gateway{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "gw",
-// 				},
-// 				Spec: gwv1beta1.GatewaySpec{
-// 					Listeners: []gwv1beta1.Listener{
-// 						{
-// 							Name: "l1",
-// 						},
-// 					},
-// 				},
-// 			},
-// 			policies: []v1alpha1.GatewayPolicy{
-// 				{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "my-policy",
-// 					},
-// 					Spec: v1alpha1.GatewayPolicySpec{
-// 						TargetRef: v1alpha1.PolicyTargetReference{
-// 							Name:        "gw",
-// 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 						},
-// 						Override: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "okta",
-// 									},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "auth0",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "auth0",
-// 					},
-// 				},
-// 			}}),
-// 			expected: gatewayPolicyValidationResults{
-// 				{
-// 					acceptedErr:      errNotAcceptedDueToInvalidRefs,
-// 					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta")},
-// 				},
-// 			},
-// 		},
-// 		"a policy references a JWT provider in the default section that does not exist": {
-// 			gateway: gwv1beta1.Gateway{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "gw",
-// 				},
-// 				Spec: gwv1beta1.GatewaySpec{
-// 					Listeners: []gwv1beta1.Listener{
-// 						{
-// 							Name: "l1",
-// 						},
-// 					},
-// 				},
-// 			},
-// 			policies: []v1alpha1.GatewayPolicy{
-// 				{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "my-policy",
-// 					},
-// 					Spec: v1alpha1.GatewayPolicySpec{
-// 						TargetRef: v1alpha1.PolicyTargetReference{
-// 							Name:        "gw",
-// 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 						},
-// 						Default: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "okta",
-// 									},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "auth0",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "auth0",
-// 					},
-// 				},
-// 			}}),
-// 			expected: gatewayPolicyValidationResults{
-// 				{
-// 					acceptedErr:      errNotAcceptedDueToInvalidRefs,
-// 					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta")},
-// 				},
-// 			},
-// 		},
-// 		"a policy references the same JWT provider in the both override and default section that does not exist": {
-// 			gateway: gwv1beta1.Gateway{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "gw",
-// 				},
-// 				Spec: gwv1beta1.GatewaySpec{
-// 					Listeners: []gwv1beta1.Listener{
-// 						{
-// 							Name: "l1",
-// 						},
-// 					},
-// 				},
-// 			},
-// 			policies: []v1alpha1.GatewayPolicy{
-// 				{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "my-policy",
-// 					},
-// 					Spec: v1alpha1.GatewayPolicySpec{
-// 						TargetRef: v1alpha1.PolicyTargetReference{
-// 							Name:        "gw",
-// 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 						},
-// 						Override: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "okta",
-// 									},
-// 								},
-// 							},
-// 						},
-// 						Default: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "okta",
-// 									},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "auth0",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "auth0",
-// 					},
-// 				},
-// 			}}),
-// 			expected: gatewayPolicyValidationResults{
-// 				{
-// 					acceptedErr:      errNotAcceptedDueToInvalidRefs,
-// 					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta")},
-// 				},
-// 			},
-// 		},
-// 		"a policy references different JWT providers in the both override and default section that does not exist": {
-// 			gateway: gwv1beta1.Gateway{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "gw",
-// 				},
-// 				Spec: gwv1beta1.GatewaySpec{
-// 					Listeners: []gwv1beta1.Listener{
-// 						{
-// 							Name: "l1",
-// 						},
-// 					},
-// 				},
-// 			},
-// 			policies: []v1alpha1.GatewayPolicy{
-// 				{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "my-policy",
-// 					},
-// 					Spec: v1alpha1.GatewayPolicySpec{
-// 						TargetRef: v1alpha1.PolicyTargetReference{
-// 							Name:        "gw",
-// 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
-// 						},
-// 						Override: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "local",
-// 									},
-// 								},
-// 							},
-// 						},
-// 						Default: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "okta",
-// 									},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "auth0",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "auth0",
-// 					},
-// 				},
-// 			}}),
-// 			expected: gatewayPolicyValidationResults{
-// 				{
-// 					acceptedErr:      errNotAcceptedDueToInvalidRefs,
-// 					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "local,okta")},
-// 				},
-// 			},
-// 		},
-// 		"everything is wrong: listener does not exist and override and default both reference different missing jwt providers": {
-// 			gateway: gwv1beta1.Gateway{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "gw",
-// 				},
-// 				Spec: gwv1beta1.GatewaySpec{
-// 					Listeners: []gwv1beta1.Listener{
-// 						{
-// 							Name: "l1",
-// 						},
-// 					},
-// 				},
-// 			},
-// 			policies: []v1alpha1.GatewayPolicy{
-// 				{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "my-policy",
-// 					},
-// 					Spec: v1alpha1.GatewayPolicySpec{
-// 						TargetRef: v1alpha1.PolicyTargetReference{
-// 							Name:        "gw",
-// 							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
-// 						},
-// 						Override: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "local",
-// 									},
-// 								},
-// 							},
-// 						},
-// 						Default: &v1alpha1.GatewayPolicyConfig{
-// 							JWT: &v1alpha1.GatewayJWTRequirement{
-// 								Providers: []*v1alpha1.GatewayJWTProvider{
-// 									{
-// 										Name: "okta",
-// 									},
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "auth0",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "auth0",
-// 					},
-// 				},
-// 			}}),
-// 			expected: gatewayPolicyValidationResults{
-// 				{
-// 					acceptedErr: errNotAcceptedDueToInvalidRefs,
-// 					resolvedRefsErrs: []error{
-// 						fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, "gw", "does not exist"),
-// 						fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "local,okta"),
-// 					},
-// 				},
-// 			},
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			require.EqualValues(t, tc.expected, validateGatewayPolicies(tc.gateway, tc.policies, tc.resources))
-// 		})
-// 	}
-// }
+func TestValidateGatewayPolicies(t *testing.T) {
+	for name, tc := range map[string]struct {
+		gateway   gwv1beta1.Gateway
+		policies  []v1alpha1.CustomGatewayPolicy
+		resources *common.ResourceMap
+		expected  gatewayPolicyValidationResults
+	}{
+		"happy path, everything exists": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gw",
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name: "l1",
+						},
+					},
+				},
+			},
+			policies: []v1alpha1.CustomGatewayPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-policy",
+					},
+					Spec: v1alpha1.CustomGatewayPolicySpec{
+						TargetRef: v1alpha1.CustomPolicyTargetReference{
+							Name:        "gw",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+						},
+						Override: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "local",
+									},
+								},
+							},
+						},
+						Default: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "local",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "local",
+					},
+				},
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "okta",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "okta",
+					},
+				},
+			}}),
+			expected: gatewayPolicyValidationResults{
+				{
+					acceptedErr:      nil,
+					resolvedRefsErrs: []error{},
+				},
+			},
+		},
+		"a policy references a gateway that does not exist": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gw",
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name: "l1",
+						},
+					},
+				},
+			},
+			policies: []v1alpha1.CustomGatewayPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-policy",
+					},
+					Spec: v1alpha1.CustomGatewayPolicySpec{
+						TargetRef: v1alpha1.CustomPolicyTargetReference{
+							Name:        "gw",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
+						},
+						Override: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "auth0",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "auth0",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "auth0",
+					},
+				},
+			}}),
+			expected: gatewayPolicyValidationResults{
+				{
+					acceptedErr:      errNotAcceptedDueToInvalidRefs,
+					resolvedRefsErrs: []error{fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, "gw", "does not exist")},
+				},
+			},
+		},
+		"a policy references a JWT provider in the override section that does not exist": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gw",
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name: "l1",
+						},
+					},
+				},
+			},
+			policies: []v1alpha1.CustomGatewayPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-policy",
+					},
+					Spec: v1alpha1.CustomGatewayPolicySpec{
+						TargetRef: v1alpha1.CustomPolicyTargetReference{
+							Name:        "gw",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+						},
+						Override: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "auth0",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "auth0",
+					},
+				},
+			}}),
+			expected: gatewayPolicyValidationResults{
+				{
+					acceptedErr:      errNotAcceptedDueToInvalidRefs,
+					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta")},
+				},
+			},
+		},
+		"a policy references a JWT provider in the default section that does not exist": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gw",
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name: "l1",
+						},
+					},
+				},
+			},
+			policies: []v1alpha1.CustomGatewayPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-policy",
+					},
+					Spec: v1alpha1.CustomGatewayPolicySpec{
+						TargetRef: v1alpha1.CustomPolicyTargetReference{
+							Name:        "gw",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+						},
+						Default: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "auth0",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "auth0",
+					},
+				},
+			}}),
+			expected: gatewayPolicyValidationResults{
+				{
+					acceptedErr:      errNotAcceptedDueToInvalidRefs,
+					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta")},
+				},
+			},
+		},
+		"a policy references the same JWT provider in the both override and default section that does not exist": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gw",
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name: "l1",
+						},
+					},
+				},
+			},
+			policies: []v1alpha1.CustomGatewayPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-policy",
+					},
+					Spec: v1alpha1.CustomGatewayPolicySpec{
+						TargetRef: v1alpha1.CustomPolicyTargetReference{
+							Name:        "gw",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+						},
+						Override: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+						Default: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "auth0",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "auth0",
+					},
+				},
+			}}),
+			expected: gatewayPolicyValidationResults{
+				{
+					acceptedErr:      errNotAcceptedDueToInvalidRefs,
+					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "okta")},
+				},
+			},
+		},
+		"a policy references different JWT providers in the both override and default section that does not exist": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gw",
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name: "l1",
+						},
+					},
+				},
+			},
+			policies: []v1alpha1.CustomGatewayPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-policy",
+					},
+					Spec: v1alpha1.CustomGatewayPolicySpec{
+						TargetRef: v1alpha1.CustomPolicyTargetReference{
+							Name:        "gw",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+						},
+						Override: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "local",
+									},
+								},
+							},
+						},
+						Default: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "auth0",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "auth0",
+					},
+				},
+			}}),
+			expected: gatewayPolicyValidationResults{
+				{
+					acceptedErr:      errNotAcceptedDueToInvalidRefs,
+					resolvedRefsErrs: []error{fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "local,okta")},
+				},
+			},
+		},
+		"everything is wrong: listener does not exist and override and default both reference different missing jwt providers": {
+			gateway: gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gw",
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: []gwv1beta1.Listener{
+						{
+							Name: "l1",
+						},
+					},
+				},
+			},
+			policies: []v1alpha1.CustomGatewayPolicy{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "my-policy",
+					},
+					Spec: v1alpha1.CustomGatewayPolicySpec{
+						TargetRef: v1alpha1.CustomPolicyTargetReference{
+							Name:        "gw",
+							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
+						},
+						Override: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "local",
+									},
+								},
+							},
+						},
+						Default: &v1alpha1.CustomGatewayPolicyConfig{
+							JWT: &v1alpha1.CustomGatewayJWTRequirement{
+								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+									{
+										Name: "okta",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "auth0",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "auth0",
+					},
+				},
+			}}),
+			expected: gatewayPolicyValidationResults{
+				{
+					acceptedErr: errNotAcceptedDueToInvalidRefs,
+					resolvedRefsErrs: []error{
+						fmt.Errorf("%w: gatewayName - %q, listenerName - %q", errPolicyListenerReferenceDoesNotExist, "gw", "does not exist"),
+						fmt.Errorf("%w: missingProviderNames: %s", errPolicyJWTProvidersReferenceDoesNotExist, "local,okta"),
+					},
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.EqualValues(t, tc.expected, validateGatewayPolicies(tc.gateway, tc.policies, tc.resources))
+		})
+	}
+}
 
-// func TestValidateAuthFilters(t *testing.T) {
-// 	for name, tc := range map[string]struct {
-// 		authFilters []*v1alpha1.RouteAuthFilter
-// 		resources   *common.ResourceMap
-// 		expected    authFilterValidationResults
-// 	}{
-// 		"auth filter valid": {
-// 			authFilters: []*v1alpha1.RouteAuthFilter{
-// 				{
-// 					Spec: v1alpha1.RouteAuthFilterSpec{
-// 						JWT: &v1alpha1.GatewayJWTRequirement{
-// 							Providers: []*v1alpha1.GatewayJWTProvider{
-// 								{
-// 									Name: "okta",
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "okta",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "okta",
-// 					},
-// 				},
-// 			}}),
-// 			expected: authFilterValidationResults{authFilterValidationResult{}},
-// 		},
-// 		"auth filter references missing JWT Provider": {
-// 			authFilters: []*v1alpha1.RouteAuthFilter{
-// 				{
-// 					Spec: v1alpha1.RouteAuthFilterSpec{
-// 						JWT: &v1alpha1.GatewayJWTRequirement{
-// 							Providers: []*v1alpha1.GatewayJWTProvider{
-// 								{
-// 									Name: "auth0",
-// 								},
-// 							},
-// 						},
-// 					},
-// 				},
-// 			},
-// 			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
-// 				{
-// 					TypeMeta: metav1.TypeMeta{
-// 						Kind: "JWTProvider",
-// 					},
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "okta",
-// 					},
-// 					Spec: v1alpha1.JWTProviderSpec{
-// 						Issuer: "okta",
-// 					},
-// 				},
-// 			}}),
-// 			expected: authFilterValidationResults{
-// 				authFilterValidationResult{
-// 					acceptedErr:    errRouteFilterNotAcceptedDueToInvalidRefs,
-// 					resolvedRefErr: fmt.Errorf("%w: missingProviderNames: %s", errRouteFilterJWTProvidersReferenceDoesNotExist, "auth0"),
-// 				},
-// 			},
-// 		},
-// 	} {
-// 		t.Run(name, func(t *testing.T) {
-// 			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
-// 		})
-// 	}
-// }
+func TestValidateAuthFilters(t *testing.T) {
+	for name, tc := range map[string]struct {
+		authFilters []*v1alpha1.RouteAuthFilter
+		resources   *common.ResourceMap
+		expected    authFilterValidationResults
+	}{
+		"auth filter valid": {
+			authFilters: []*v1alpha1.RouteAuthFilter{
+				{
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
+							Providers: []*v1alpha1.CustomGatewayJWTProvider{
+								{
+									Name: "okta",
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "okta",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "okta",
+					},
+				},
+			}}),
+			expected: authFilterValidationResults{authFilterValidationResult{}},
+		},
+		"auth filter references missing JWT Provider": {
+			authFilters: []*v1alpha1.RouteAuthFilter{
+				{
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
+							Providers: []*v1alpha1.CustomGatewayJWTProvider{
+								{
+									Name: "auth0",
+								},
+							},
+						},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{jwtProviders: []*v1alpha1.JWTProvider{
+				{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "JWTProvider",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "okta",
+					},
+					Spec: v1alpha1.JWTProviderSpec{
+						Issuer: "okta",
+					},
+				},
+			}}),
+			expected: authFilterValidationResults{
+				authFilterValidationResult{
+					acceptedErr:    errRouteFilterNotAcceptedDueToInvalidRefs,
+					resolvedRefErr: fmt.Errorf("%w: missingProviderNames: %s", errRouteFilterJWTProvidersReferenceDoesNotExist, "auth0"),
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
+		})
+	}
+}

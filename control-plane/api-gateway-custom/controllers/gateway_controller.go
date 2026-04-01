@@ -1037,17 +1037,17 @@ func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway typ
 	return list.Items, nil
 }
 
-func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClassConfig *gwv1beta1.CustomGatewayClass) (*v1alpha1.GatewayClassConfig, error) {
-	if gatewayClassConfig == nil {
+func (c *GatewayController) getConfigForGatewayClass(ctx context.Context, gatewayClass *gwv1beta1.CustomGatewayClass) (*v1alpha1.GatewayClassConfig, error) {
+	if gatewayClass == nil {
 		// if we don't have a gateway class we can't fetch the corresponding config
 		return nil, nil
 	}
 
 	config := &v1alpha1.GatewayClassConfig{}
-	if ref := gatewayClassConfig.Spec.ParametersRef; ref != nil {
+	if ref := gatewayClass.Spec.ParametersRef; ref != nil {
 		if string(ref.Group) != v1alpha1.GroupVersion.Group ||
 			ref.Kind != v1alpha1.GatewayClassConfigKind ||
-			gatewayClassConfig.Spec.ControllerName != common.GatewayClassControllerName {
+			gatewayClass.Spec.ControllerName != common.GatewayClassControllerName {
 			// we don't have supported params, so return nil
 			return nil, nil
 		}

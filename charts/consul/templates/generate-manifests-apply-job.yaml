@@ -52,8 +52,6 @@ spec:
             if [ -d "/consul/config/consulapi" ]; then
               echo "Applying Consul API manifests"
               kubectl apply -R -f /consul/config/consulapi
-              echo "Applying Consul service intentions"
-              kubectl replace -R -f /consul/config/serviceintentions 
             fi
             echo "Done"
         volumeMounts:
@@ -68,12 +66,10 @@ spec:
         args:
           - |
             echo "Applying manifests using oc"
-            oc apply -R -f /consul/config
+            oc apply -R -f /consul/config/gatewayapi 
             if [ -d "/consul/config/consulapi" ]; then
               echo "Applying Consul API manifests"
               oc apply -R -f /consul/config/consulapi
-              echo "Applying Consul service intentions"
-              oc replace -R -f /consul/config/serviceintentions 
             fi
             echo "Done"
         volumeMounts:

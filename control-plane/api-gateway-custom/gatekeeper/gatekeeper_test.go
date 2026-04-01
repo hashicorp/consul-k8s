@@ -933,7 +933,7 @@ func TestUpsert(t *testing.T) {
 						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations:  v1alpha1.CopyAnnotationsSpec{},
-					OpenshiftSCCName: "test-api-gateway",
+					OpenshiftSCCName: "test-api-gateway-custom",
 				},
 			},
 			helmConfig: common.HelmConfig{
@@ -1009,7 +1009,7 @@ func TestUpsert(t *testing.T) {
 						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations:  v1alpha1.CopyAnnotationsSpec{},
-					OpenshiftSCCName: "test-api-gateway",
+					OpenshiftSCCName: "test-api-gateway-custom",
 				},
 			},
 			helmConfig: common.HelmConfig{
@@ -1086,7 +1086,7 @@ func TestUpsert(t *testing.T) {
 						MinInstances:     common.PointerTo(int32(1)),
 					},
 					CopyAnnotations:  v1alpha1.CopyAnnotationsSpec{},
-					OpenshiftSCCName: "test-api-gateway",
+					OpenshiftSCCName: "test-api-gateway-custom",
 				},
 			},
 			helmConfig: common.HelmConfig{
@@ -1155,7 +1155,7 @@ func TestUpsert(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil, nil)
+			gatekeeper := New(log, client, nil, client)
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
@@ -1408,7 +1408,7 @@ func TestDelete(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil, nil)
+			gatekeeper := New(log, client, nil, client)
 
 			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)
@@ -1450,6 +1450,40 @@ func joinResources(resources resources) (objs []client.Object) {
 	return objs
 }
 
+func normalizeDeployment(deployment *appsv1.Deployment) {
+	deployment.TypeMeta = metav1.TypeMeta{}
+	deployment.Status = appsv1.DeploymentStatus{}
+
+}
+
+func normalizeService(s *corev1.Service, ignoreTimestamp bool) {
+	s.TypeMeta = metav1.TypeMeta{}
+	s.Status = corev1.ServiceStatus{}
+
+	if ignoreTimestamp {
+		s.CreationTimestamp = metav1.Time{}
+	}
+}
+
+func normalizeSecret(s *corev1.Secret) {
+	s.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func normalizeServiceAccount(sa *corev1.ServiceAccount) {
+	sa.TypeMeta = metav1.TypeMeta{}
+
+}
+func normalizeRole(r *rbac.Role) {
+	r.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func normalizeRoleBinding(rb *rbac.RoleBinding) {
+	rb.TypeMeta = metav1.TypeMeta{}
+
+}
+
 func validateResourcesExist(t *testing.T, client client.Client, helmConfig common.HelmConfig, resources resources, ignoreTimestampOnService bool) error {
 	t.Helper()
 
@@ -1462,7 +1496,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
-
+		normalizeDeployment(expected)
+		normalizeDeployment(actual)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 		actual.Spec.Selector.MatchLabels[createdAtLabelKey] = createdAtLabelValue
@@ -1544,7 +1579,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
-
+		normalizeSecret(expected)
+		normalizeSecret(actual)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 
@@ -1560,7 +1596,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
-
+		normalizeRole(actual)
+		normalizeRole(expected)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 
@@ -1576,6 +1613,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+		normalizeRoleBinding(actual)
+		normalizeRoleBinding(expected)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1592,7 +1631,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
-
+		normalizeService(actual, ignoreTimestampOnService)
+		normalizeService(expected, ignoreTimestampOnService)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 		actual.Spec.Selector[createdAtLabelKey] = createdAtLabelValue
@@ -1613,6 +1653,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+		normalizeServiceAccount(actual)
+		normalizeServiceAccount(expected)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1702,7 +1744,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "consul.hashicorp.com/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -1762,7 +1804,7 @@ func configureSecret(name, namespace string, labels map[string]string, resourceV
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "consul.hashicorp.com/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -1799,7 +1841,7 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "consul.hashicorp.com/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -1824,7 +1866,7 @@ func configureRoleBinding(name, namespace string, labels map[string]string, reso
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "consul.hashicorp.com/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -1869,7 +1911,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "consul.hashicorp.com/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -1904,7 +1946,7 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "consul.hashicorp.com/v1beta1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
