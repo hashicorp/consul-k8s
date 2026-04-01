@@ -12,18 +12,6 @@ replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17
 
 replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260112121053-7ee7c79b61f0
 
-// replace sigs.k8s.io/gateway-api/apis/v1alpha2 => ./gateway07/gateway-api-0.7.1/apis/v1alpha2
-
-// replace sigs.k8s.io/gateway-api/apis/v1beta1 => ./gateway07/gateway-api-0.7.1/apis/v1beta1
-
-// replace sigs.k8s.io/gateway-api/apis/v1alpha3 => ./gateway07/gateway-api-0.7.1/apis/v1alpha3
-
-// replace sigs.k8s.io/gateway-api => ./gateway07/gateway-api-0.7.1
-
-//replace github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom => ./gateway07/gateway-api-0.7.1-exp
-
-// replace github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom => ./gateway07/gateway-api-0.7.1-exp
-
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -37,7 +25,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul v0.4.1-0.20250919124332-fe5b36f5014c
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
-	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.3
+	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.5
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.12
 	github.com/hashicorp/consul/api v1.33.2
