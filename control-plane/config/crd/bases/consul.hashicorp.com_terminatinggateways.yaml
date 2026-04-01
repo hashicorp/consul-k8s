@@ -5,7 +5,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.20.1
   name: terminatinggateways.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
@@ -1346,6 +1346,15 @@ spec:
                     namespace:
                       description: The namespace the service is registered in.
                       type: string
+                    secretRef:
+                      description: SecretRef references a Kubernetes secret containing
+                        TLS certificates.
+                      properties:
+                        name:
+                          description: Name is the name of the Kubernetes secret.
+                          minLength: 1
+                          type: string
+                      type: object
                     sni:
                       description: SNI is the optional name to specify during the
                         TLS handshake with a linked service.
