@@ -771,7 +771,7 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 
 func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 	var rolesToDelete []*iam.Role
-	rolesToDelete, err := filterIAMRolesWithPrefix(ctx, iamClient, "consul-k8s-")
+	rolesToDelete, err := filterIAMRolesWithPrefixes(ctx, iamClient, []string{"consul-k8s-", "terraform-"})
 	if err != nil {
 		return fmt.Errorf("failed to list roles: %w", err)
 	}
@@ -867,23 +867,25 @@ func cleanupIAMPolicies(ctx context.Context, iamClient *iam.IAM) error {
 	return nil
 }
 
-// filterIAMRolesWithPrefix is a callback function used with ListRolesPages.
-// It filters roles based on specified prefix and appends matching roles to rolesToDelete.
+// filterIAMRolesWithPrefixes is a callback function used with ListRolesPages.
+// It filters roles based on specified prefixes and appends matching roles to rolesToDelete.
 //
 // Parameters:
-// - page: A single page of IAM roles returned by the AWS API
-// - lastPage: A boolean indicating whether this is the last page of results
-// - rolesToDelete: A pointer to the slice where matching roles are accumulated
-// - rolePrefix: The prefix to filter roles by
-func filterIAMRolesWithPrefix(ctx context.Context, iamClient *iam.IAM, prefix string) ([]*iam.Role, error) {
+// - ctx: Context
+// - iamClient: The IAM service client
+// - prefixes: A slice of prefixes to filter roles by
+func filterIAMRolesWithPrefixes(ctx context.Context, iamClient *iam.IAM, prefixes []string) ([]*iam.Role, error) {
 	var roles []*iam.Role
 
 	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
 		func(page *iam.ListRolesOutput, lastPage bool) bool {
 			for _, role := range page.Roles {
 				name := aws.StringValue(role.RoleName)
-				if strings.HasPrefix(name, prefix) {
-					roles = append(roles, role)
+				for _, prefix := range prefixes {
+					if strings.HasPrefix(name, prefix) {
+						roles = append(roles, role)
+						break
+					}
 				}
 			}
 
