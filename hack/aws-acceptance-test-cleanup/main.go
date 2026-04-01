@@ -519,6 +519,10 @@ func realMain(ctx context.Context) error {
 					VpcId:             vpcID,
 				})
 				if err != nil {
+					if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+						fmt.Printf("Internet gateway: Not found (already detached) [id=%s]\n", *igw.InternetGatewayId)
+						return nil
+					}
 					return err
 				}
 
@@ -533,9 +537,14 @@ func realMain(ctx context.Context) error {
 				InternetGatewayId: igw.InternetGatewayId,
 			})
 			if err != nil {
-				return err
+				if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+					fmt.Printf("Internet gateway: Not found (already destroyed) [id=%s]\n", *igw.InternetGatewayId)
+				} else {
+					return err
+				}
+			} else {
+				fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
 			}
-			fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
 		}
 
 		// Delete network interfaces
@@ -559,6 +568,10 @@ func realMain(ctx context.Context) error {
 					NetworkInterfaceId: networkInterface.NetworkInterfaceId,
 				})
 				if err != nil {
+					if strings.Contains(err.Error(), "InvalidNetworkInterfaceID.NotFound") {
+						fmt.Printf("Network interface: Not found (already destroyed) [id=%s]\n", *networkInterface.NetworkInterfaceId)
+						return nil
+					}
 					return err
 				}
 				return nil
@@ -702,6 +715,9 @@ func realMain(ctx context.Context) error {
 			})
 			if err == nil {
 				break
+			} else if strings.Contains(err.Error(), "InvalidVpcID.NotFound") {
+				fmt.Printf("VPC: Not found (already destroyed) [id=%s]\n", *vpcID)
+				break
 			}
 			fmt.Printf("VPC: Destroy error... [id=%s,err=%q,retry=%d]\n", *vpcID, err, retryCount)
 			time.Sleep(5 * time.Second)
@@ -710,7 +726,9 @@ func realMain(ctx context.Context) error {
 			return errors.New("reached max retry count deleting VPC")
 		}
 
-		fmt.Printf("VPC: Destroyed [id=%s]\n", *vpcID)
+		if err == nil {
+			fmt.Printf("VPC: Destroyed [id=%s]\n", *vpcID)
+		}
 	}
 
 	return nil
@@ -788,13 +806,13 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 		roleName := aws.StringValue(role.RoleName)
 		err := detachRolePolicies(iamClient, role.RoleName)
 		if err != nil {
-			fmt.Printf("Failed to detach policies for role %s: %v", roleName, err)
+			fmt.Printf("Failed to detach policies for role %s: %v\n", roleName, err)
 			continue
 		}
 
 		err = removeRoleFromInstanceProfiles(iamClient, role.RoleName)
 		if err != nil {
-			fmt.Printf("Failed to remove role %s from instance profiles: %v", roleName, err)
+			fmt.Printf("Failed to remove role %s from instance profiles: %v\n", roleName, err)
 			continue
 		}
 
@@ -802,9 +820,9 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 			RoleName: role.RoleName,
 		})
 		if err != nil {
-			fmt.Printf("Failed to delete role %s: %v", roleName, err)
+			fmt.Printf("Failed to delete role %s: %v\n", roleName, err)
 		} else {
-			fmt.Printf("Deleted role: %s", roleName)
+			fmt.Printf("Deleted role: %s\n", roleName)
 		}
 	}
 
@@ -937,18 +955,6 @@ func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error 
 				fmt.Printf("Failed to remove role %s from instance profile %s: %v\n", *roleName, *profile.InstanceProfileName, err)
 			} else {
 				fmt.Printf("Removed role %s from instance profile %s\n", *roleName, *profile.InstanceProfileName)
-			}
-
-			// Try to delete the instance profile itself if it matches our prefix, it will fail if attached to an EC2 instance but worth trying to clean up
-			if strings.HasPrefix(aws.StringValue(profile.InstanceProfileName), "consul-k8s-") {
-				_, err := iamClient.DeleteInstanceProfile(&iam.DeleteInstanceProfileInput{
-					InstanceProfileName: profile.InstanceProfileName,
-				})
-				if err != nil {
-					fmt.Printf("Failed to delete instance profile %s: %v\n", *profile.InstanceProfileName, err)
-				} else {
-					fmt.Printf("Deleted instance profile %s\n", *profile.InstanceProfileName)
-				}
 			}
 		}
 		return !lastPage
