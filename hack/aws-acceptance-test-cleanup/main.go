@@ -86,6 +86,11 @@ func realMain(ctx context.Context) error {
 		return err
 	}
 
+	// Find IAM policies and delete
+	if err := cleanupIAMPolicies(ctx, iamClient); err != nil {
+		return err
+	}
+
 	// Find OIDC providers to delete.
 	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
 	if err != nil {
@@ -787,6 +792,12 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 			continue
 		}
 
+		err = removeRoleFromInstanceProfiles(iamClient, role.RoleName)
+		if err != nil {
+			fmt.Printf("Failed to remove role %s from instance profiles: %v", roleName, err)
+			continue
+		}
+
 		_, err = iamClient.DeleteRole(&iam.DeleteRoleInput{
 			RoleName: role.RoleName,
 		})
@@ -794,6 +805,62 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 			fmt.Printf("Failed to delete role %s: %v", roleName, err)
 		} else {
 			fmt.Printf("Deleted role: %s", roleName)
+		}
+	}
+
+	return nil
+}
+
+func cleanupIAMPolicies(ctx context.Context, iamClient *iam.IAM) error {
+	var policiesToDelete []*iam.Policy
+
+	err := iamClient.ListPoliciesPagesWithContext(ctx, &iam.ListPoliciesInput{
+		Scope: aws.String("Local"), // Only customer-managed policies
+	}, func(page *iam.ListPoliciesOutput, lastPage bool) bool {
+		for _, policy := range page.Policies {
+			name := aws.StringValue(policy.PolicyName)
+			if strings.HasPrefix(name, "consul-k8s-") {
+				policiesToDelete = append(policiesToDelete, policy)
+			}
+		}
+		return true
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list policies: %w", err)
+	}
+
+	if len(policiesToDelete) == 0 {
+		fmt.Println("Found no IAM policies to clean up")
+		return nil
+	} else {
+		fmt.Printf("Found %d IAM policies to clean up\n", len(policiesToDelete))
+	}
+
+	for _, policy := range policiesToDelete {
+		policyName := aws.StringValue(policy.PolicyName)
+
+		// First, list and delete non-default versions, as AWS requires before deleting the policy itself.
+		versions, err := iamClient.ListPolicyVersions(&iam.ListPolicyVersionsInput{
+			PolicyArn: policy.Arn,
+		})
+		if err == nil {
+			for _, version := range versions.Versions {
+				if !aws.BoolValue(version.IsDefaultVersion) {
+					_, _ = iamClient.DeletePolicyVersion(&iam.DeletePolicyVersionInput{
+						PolicyArn: policy.Arn,
+						VersionId: version.VersionId,
+					})
+				}
+			}
+		}
+
+		_, err = iamClient.DeletePolicy(&iam.DeletePolicyInput{
+			PolicyArn: policy.Arn,
+		})
+		if err != nil {
+			fmt.Printf("Failed to delete policy %s: %v\n", policyName, err)
+		} else {
+			fmt.Printf("Deleted policy: %s\n", policyName)
 		}
 	}
 
@@ -840,6 +907,47 @@ func detachRolePolicies(iamClient *iam.IAM, roleName *string) error {
 		err := detachPoliciesFromRole(iamClient, roleName, page)
 		if err != nil {
 			fmt.Printf("Error detaching policies from role %s: %v", *roleName, err)
+		}
+		return !lastPage
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error {
+	if roleName == nil {
+		return fmt.Errorf("roleName is nil")
+	}
+
+	err := iamClient.ListInstanceProfilesForRolePages(&iam.ListInstanceProfilesForRoleInput{
+		RoleName: roleName,
+	}, func(page *iam.ListInstanceProfilesForRoleOutput, lastPage bool) bool {
+		for _, profile := range page.InstanceProfiles {
+			_, err := iamClient.RemoveRoleFromInstanceProfile(&iam.RemoveRoleFromInstanceProfileInput{
+				InstanceProfileName: profile.InstanceProfileName,
+				RoleName:            roleName,
+			})
+			if err != nil {
+				fmt.Printf("Failed to remove role %s from instance profile %s: %v\n", *roleName, *profile.InstanceProfileName, err)
+			} else {
+				fmt.Printf("Removed role %s from instance profile %s\n", *roleName, *profile.InstanceProfileName)
+			}
+
+			// Try to delete the instance profile itself if it matches our prefix, it will fail if attached to an EC2 instance but worth trying to clean up
+			if strings.HasPrefix(aws.StringValue(profile.InstanceProfileName), "consul-k8s-") {
+				_, err := iamClient.DeleteInstanceProfile(&iam.DeleteInstanceProfileInput{
+					InstanceProfileName: profile.InstanceProfileName,
+				})
+				if err != nil {
+					fmt.Printf("Failed to delete instance profile %s: %v\n", *profile.InstanceProfileName, err)
+				} else {
+					fmt.Printf("Deleted instance profile %s\n", *profile.InstanceProfileName)
+				}
+			}
 		}
 		return !lastPage
 	})
