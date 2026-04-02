@@ -58,6 +58,9 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
+	if !cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(2) {
+		t.Skipf("skipping this test because it requires at least 2 clusters with -enable-multi-cluster and two kube contexts/configs")
+	}
 
 	cases := []dnsWithPartitionsTestCase{
 		{
@@ -299,8 +302,15 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	serverHelmValues := map[string]string{
-		"server.exposeGossipAndRPCPorts": "true",
 		"server.extraConfig":             `"{\"log_level\": \"TRACE\"}"`,
+	}
+
+	// OpenShift SCCs do not allow host ports by default, and
+	// server.exposeGossipAndRPCPorts configures hostPort bindings.
+	if !(cfg.UseOpenshift || cfg.EnableOpenshift) {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+	} else {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "false"
 	}
 
 	if cfg.UseKind {

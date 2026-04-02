@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -156,6 +157,31 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 	}
 
 	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
+	if err != nil && apierrors.IsUnauthorized(err) {
+		logger.Logf(t, "client-go unauthorized creating secret %q in namespace %q; falling back to kubectl create/apply", secretName, destNamespace)
+
+		createNamespaceOut, createNamespaceErr := RunKubectlAndGetOutputE(t, destContext.KubectlOptions(t), "create", "namespace", destNamespace)
+		if createNamespaceErr != nil && !strings.Contains(createNamespaceOut, "AlreadyExists") {
+			require.NoError(t, createNamespaceErr, createNamespaceOut)
+		}
+
+		_, _ = RunKubectlAndGetOutputE(t, destContext.KubectlOptions(t), "delete", "secret", secretName, "-n", destNamespace, "--ignore-not-found=true")
+
+		createArgs := []string{"create", "secret", "generic", secretName, "-n", destNamespace, "--type", string(secret.Type)}
+		keys := make([]string, 0, len(secret.Data))
+		for k := range secret.Data {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			createArgs = append(createArgs, fmt.Sprintf("--from-literal=%s=%s", key, string(secret.Data[key])))
+		}
+
+		out, createErr := RunKubectlAndGetOutputE(t, destContext.KubectlOptions(t), createArgs...)
+		require.NoError(t, createErr, out)
+		return
+	}
+
 	if err != nil && apierrors.IsAlreadyExists(err) {
 		err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {

@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -172,17 +173,62 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 }
 
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
-	updateCoreDNSFile(t, ctx, releaseName, enableDNSProxy, "coredns-custom.yaml")
-	updateCoreDNS(t, ctx, "coredns-custom.yaml")
+	cfg := suite.Config()
+	dnsConfig := clusterDNSConfigFor(cfg)
+
+	originalConfigFile := backupDNSConfigMap(t, ctx, dnsConfig)
+	customConfigFile := renderDNSConfigMap(t, ctx, releaseName, enableDNSProxy, dnsConfig)
+
+	updateCoreDNS(t, ctx, dnsConfig, customConfigFile)
 
 	t.Cleanup(func() {
-		updateCoreDNS(t, ctx, "coredns-original.yaml")
+		updateCoreDNS(t, ctx, dnsConfig, originalConfigFile)
 		time.Sleep(5 * time.Second)
+		_ = os.Remove(customConfigFile)
+		_ = os.Remove(originalConfigFile)
 	})
 }
 
-func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName string,
-	enableDNSProxy bool, dnsFileName string) {
+type clusterDNSConfig struct {
+	configMapName string
+	namespace     string
+	workloadKind  string
+	workloadName  string
+}
+
+func clusterDNSConfigFor(cfg *config.TestConfig) clusterDNSConfig {
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		return clusterDNSConfig{
+			configMapName: "dns-default",
+			namespace:     "openshift-dns",
+			workloadKind:  "daemonset",
+			workloadName:  "dns-default",
+		}
+	}
+
+	return clusterDNSConfig{
+		configMapName: "coredns",
+		namespace:     "kube-system",
+		workloadKind:  "deployment",
+		workloadName:  "coredns",
+	}
+}
+
+func backupDNSConfigMap(t *testing.T, ctx environment.TestContext, dnsConfig clusterDNSConfig) string {
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "configmap", dnsConfig.configMapName, "-n", dnsConfig.namespace, "-o", "yaml")
+	require.NoError(t, err)
+
+	file, err := os.CreateTemp("", "consul-dns-original-*.yaml")
+	require.NoError(t, err)
+
+	err = os.WriteFile(file.Name(), []byte(out), os.FileMode(0644))
+	require.NoError(t, err)
+
+	return file.Name()
+}
+
+func renderDNSConfigMap(t *testing.T, ctx environment.TestContext, releaseName string,
+	enableDNSProxy bool, dnsConfig clusterDNSConfig) string {
 	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
 	require.NoError(t, err)
 
@@ -195,13 +241,21 @@ func updateCoreDNSFile(t *testing.T, ctx environment.TestContext, releaseName st
 	input, err := os.ReadFile("coredns-template.yaml")
 	require.NoError(t, err)
 	newContents := strings.Replace(string(input), "{{CONSUL_DNS_IP}}", dnsTarget, -1)
-	err = os.WriteFile(dnsFileName, []byte(newContents), os.FileMode(0644))
+	newContents = strings.Replace(newContents, "name: coredns", fmt.Sprintf("name: %s", dnsConfig.configMapName), 1)
+	newContents = strings.Replace(newContents, "namespace: kube-system", fmt.Sprintf("namespace: %s", dnsConfig.namespace), 1)
+
+	file, err := os.CreateTemp("", "consul-dns-custom-*.yaml")
 	require.NoError(t, err)
+
+	err = os.WriteFile(file.Name(), []byte(newContents), os.FileMode(0644))
+	require.NoError(t, err)
+
+	return file.Name()
 }
 
-func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile string) {
+func updateCoreDNS(t *testing.T, ctx environment.TestContext, dnsConfig clusterDNSConfig, coreDNSConfigFile string) {
 	coreDNSCommand := []string{
-		"replace", "-n", "kube-system", "-f", coreDNSConfigFile,
+		"replace", "-n", dnsConfig.namespace, "-f", coreDNSConfigFile,
 	}
 	var logs string
 
@@ -212,12 +266,18 @@ func updateCoreDNS(t *testing.T, ctx environment.TestContext, coreDNSConfigFile 
 		require.NoError(r, err)
 	})
 
-	require.Contains(t, logs, "configmap/coredns replaced")
-	restartCoreDNSCommand := []string{"rollout", "restart", "deployment/coredns", "-n", "kube-system"}
+	require.Contains(t, logs, fmt.Sprintf("configmap/%s replaced", dnsConfig.configMapName))
+	restartCoreDNSCommand := []string{"rollout", "restart", fmt.Sprintf("%s/%s", dnsConfig.workloadKind, dnsConfig.workloadName), "-n", dnsConfig.namespace}
 	_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), restartCoreDNSCommand...)
 	require.NoError(t, err)
+
+	rolloutTimeout := "1m"
+	if dnsConfig.workloadKind == "daemonset" {
+		// OpenShift DNS is managed by a daemonset that commonly rolls slowly.
+		rolloutTimeout = "10m"
+	}
 	// Wait for restart to finish.
-	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "1m", "--watch", "deployment/coredns", "-n", "kube-system")
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", rolloutTimeout, "--watch", fmt.Sprintf("%s/%s", dnsConfig.workloadKind, dnsConfig.workloadName), "-n", dnsConfig.namespace)
 	require.NoError(t, err, out, "rollout status command errored, this likely means the rollout didn't complete in time")
 }
 

@@ -64,6 +64,9 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	entstr := "-ent"
 
 	values := defaultHelmValues(releaseName)
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		values["global.openshift"] = "true"
+	}
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
@@ -136,7 +139,13 @@ func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8200 // use non-secure by default
 
-	serverPod := fmt.Sprintf("%s-vault-0", v.releaseName)
+	var serverPod string
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+		var err error
+		serverPod, err = v.serverPodName(r)
+		require.NoError(r, err)
+	})
+
 	tunnel := terratestk8s.NewTunnelWithLogger(
 		v.helmOptions.KubectlOptions,
 		terratestk8s.ResourceTypePod,
@@ -251,7 +260,7 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext, vaultNa
 	})
 
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.helmOptions, "", v.releaseLabelSelector())
+	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.helmOptions, "vault", v.releaseLabelSelector())
 
 	v.createTLSCerts(t)
 
@@ -414,7 +423,10 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	retrier := &retry.Timer{Timeout: 4 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		// Wait for vault server pod to be running so that we can create Vault client without errors.
-		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
+		serverPodName, err := v.serverPodName(r)
+		require.NoError(r, err)
+
+		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), serverPodName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
 
@@ -455,6 +467,28 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
+}
+
+// serverPodName finds the Vault server pod for this release by labels.
+// Prefer ordinal 0 when present to keep behavior consistent across chart versions.
+func (v *VaultCluster) serverPodName(t testutil.TestingTB) (string, error) {
+	namespace := v.helmOptions.KubectlOptions.Namespace
+	labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s,app.kubernetes.io/name=vault,component=server", v.releaseName)
+	pods, err := v.kubernetesClient.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return "", err
+	}
+	if len(pods.Items) == 0 {
+		return "", fmt.Errorf("no Vault server pods found in namespace %q with selector %q", namespace, labelSelector)
+	}
+
+	for _, pod := range pods.Items {
+		if strings.HasSuffix(pod.Name, "-0") {
+			return pod.Name, nil
+		}
+	}
+
+	return pods.Items[0].Name, nil
 }
 
 // CreateNamespace creates a Vault namespace given the namespacePath.
