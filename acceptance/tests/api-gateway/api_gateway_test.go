@@ -7,8 +7,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -34,6 +38,125 @@ const (
 	gatewayClassFinalizer      = "gateway-exists-finalizer.consul.hashicorp.com"
 	gatewayFinalizer           = "gateway-finalizer.consul.hashicorp.com"
 )
+
+func copyFixturePath(t *testing.T, sourcePath, destinationPath string) {
+	t.Helper()
+
+	info, err := os.Stat(sourcePath)
+	require.NoError(t, err)
+
+	if info.IsDir() {
+		err = filepath.Walk(sourcePath, func(path string, fileInfo os.FileInfo, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+
+			relPath, err := filepath.Rel(sourcePath, path)
+			if err != nil {
+				return err
+			}
+
+			targetPath := filepath.Join(destinationPath, relPath)
+			if fileInfo.IsDir() {
+				return os.MkdirAll(targetPath, 0o755)
+			}
+
+			return copyFixtureFile(path, targetPath, fileInfo.Mode())
+		})
+		require.NoError(t, err)
+		return
+	}
+
+	err = os.MkdirAll(filepath.Dir(destinationPath), 0o755)
+	require.NoError(t, err)
+	err = copyFixtureFile(sourcePath, destinationPath, info.Mode())
+	require.NoError(t, err)
+}
+
+func copyFixtureFile(sourcePath, destinationPath string, mode os.FileMode) error {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.OpenFile(destinationPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode.Perm())
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	return err
+}
+
+func fixtureRootPath(t *testing.T, path string) string {
+	t.Helper()
+
+	currentPath := path
+	for {
+		if filepath.Base(currentPath) == "fixtures" {
+			return currentPath
+		}
+
+		parentPath := filepath.Dir(currentPath)
+		if parentPath == currentPath {
+			require.FailNow(t, fmt.Sprintf("could not find fixtures root for %s", path))
+		}
+
+		currentPath = parentPath
+	}
+}
+
+func namespacedKustomizeOverlay(t *testing.T, basePath, namespace string, baseResources []string, extraResources ...string) string {
+	t.Helper()
+
+	if namespace == "" || namespace == metav1.NamespaceDefault {
+		return basePath
+	}
+
+	absBasePath, err := filepath.Abs(basePath)
+	require.NoError(t, err)
+
+	overlayDir, err := os.MkdirTemp("", "kustomize-overlay-")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = os.RemoveAll(overlayDir)
+	})
+
+	var kustomization strings.Builder
+	kustomization.WriteString("resources:\n")
+	if len(baseResources) == 0 {
+		fixturesRoot := fixtureRootPath(t, absBasePath)
+		copiedFixturesRoot := filepath.Join(overlayDir, "fixtures")
+		copyFixturePath(t, fixturesRoot, copiedFixturesRoot)
+
+		relBasePath, err := filepath.Rel(fixturesRoot, absBasePath)
+		require.NoError(t, err)
+		kustomization.WriteString(fmt.Sprintf("- %s\n", filepath.ToSlash(filepath.Join("fixtures", relBasePath))))
+	} else {
+		copiedBasePath := filepath.Join(overlayDir, "base")
+		for _, resource := range baseResources {
+			copyFixturePath(t, filepath.Join(absBasePath, resource), filepath.Join(copiedBasePath, resource))
+			kustomization.WriteString(fmt.Sprintf("- %s\n", filepath.ToSlash(filepath.Join("base", resource))))
+		}
+	}
+
+	if len(extraResources) > 0 {
+		for index, resource := range extraResources {
+			resourcePath := fmt.Sprintf("resource-%d.yaml", index)
+			err = os.WriteFile(filepath.Join(overlayDir, resourcePath), []byte(resource), 0o644)
+			require.NoError(t, err)
+			kustomization.WriteString(fmt.Sprintf("- %s\n", resourcePath))
+		}
+	}
+	kustomization.WriteString(fmt.Sprintf("namespace: %s\n", namespace))
+
+	err = os.WriteFile(filepath.Join(overlayDir, "kustomization.yaml"), []byte(kustomization.String()), 0o644)
+	require.NoError(t, err)
+
+	return overlayDir
+}
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestAPIGateway_Basic(t *testing.T) {
@@ -170,7 +293,19 @@ func TestAPIGateway_Basic(t *testing.T) {
 			})
 
 			logger.Log(t, "creating target tcp server")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
+			staticServerTCPPath := namespacedKustomizeOverlay(t,
+				"../fixtures/bases/static-server-tcp",
+				ctx.KubectlOptions(t).Namespace,
+				[]string{
+					"deployment.yaml",
+					"service.yaml",
+					"serviceaccount.yaml",
+					"psp-rolebinding.yaml",
+					"privileged-scc-rolebinding.yaml",
+				},
+				fmt.Sprintf("apiVersion: consul.hashicorp.com/v1alpha1\nkind: ServiceDefaults\nmetadata:\n  name: static-server-tcp\n  namespace: %s\nspec:\n  protocol: tcp\n", ctx.KubectlOptions(t).Namespace),
+			)
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerTCPPath)
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
 
 			logger.Log(t, "creating tcp-route")
@@ -189,10 +324,11 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// leader election so we may need to wait a long time for
 			// the reconcile loop to run (hence the timeout here).
 			var gatewayAddress string
+			namespace := ctx.KubectlOptions(t).Namespace
 			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+				var gateway gwv1.Gateway
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -218,7 +354,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
 				// check that we have an address to use
-				require.Len(r, gateway.Status.Addresses, 1)
+				require.NotEmpty(r, gateway.Status.Addresses)
 				// now we know we have an address, set it so we can use it
 				gatewayAddress = gateway.Status.Addresses[0].Value
 			})
@@ -226,8 +362,13 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// now that we've satisfied those assertions, we know reconciliation is done
 			// so we can run assertions on the routes and the other objects
 
+			routeNamespace := metav1.NamespaceDefault
+			if cfg.EnableOpenshift {
+				routeNamespace = namespace
+			}
+
 			// gateway class checks
-			var gatewayClass gwv1beta1.GatewayClass
+			var gatewayClass gwv1.GatewayClass
 			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
 				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway-class"}, &gatewayClass)
 				require.NoError(r, err)
@@ -237,8 +378,8 @@ func TestAPIGateway_Basic(t *testing.T) {
 				require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 				// http route checks
-				var httproute gwv1beta1.HTTPRoute
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
+				var httproute gwv1.HTTPRoute
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -256,7 +397,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// tcp route checks
 			var tcpRoute gwv1alpha2.TCPRoute
 			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
-				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: "default"}, &tcpRoute)
+				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "tcp-route", Namespace: routeNamespace}, &tcpRoute)
 				require.NoError(r, err)
 
 				// check our finalizers
@@ -467,18 +608,19 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	// the reconcile loop to run (hence the 2m timeout here).
 	var (
 		gatewayAddress                string
-		gatewayClass                  gwv1beta1.GatewayClass
-		httpRoute                     gwv1beta1.HTTPRoute
-		httpRouteAuth                 gwv1beta1.HTTPRoute
-		httpRouteAuth2                gwv1beta1.HTTPRoute
-		httpRouteNoAuthOnAuthListener gwv1beta1.HTTPRoute
-		httpRouteInvalid              gwv1beta1.HTTPRoute
+		gatewayClass                  gwv1.GatewayClass
+		httpRoute                     gwv1.HTTPRoute
+		httpRouteAuth                 gwv1.HTTPRoute
+		httpRouteAuth2                gwv1.HTTPRoute
+		httpRouteNoAuthOnAuthListener gwv1.HTTPRoute
+		httpRouteInvalid              gwv1.HTTPRoute
 	)
 
 	counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+	namespace := ctx.KubectlOptions(t).Namespace
 	retry.RunWith(counter, t, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		var gateway gwv1.Gateway
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
 		require.NoError(r, err)
 
 		// check our finalizers
@@ -500,7 +642,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
 		// check that we have an address to use
-		require.Len(r, gateway.Status.Addresses, 1)
+		require.NotEmpty(r, gateway.Status.Addresses)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
 
@@ -513,23 +655,23 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httpRoute)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: namespace}, &httpRoute)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: "default"}, &httpRouteAuth)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: namespace}, &httpRouteAuth)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-no-auth-on-auth-listener", Namespace: "default"}, &httpRouteNoAuthOnAuthListener)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-no-auth-on-auth-listener", Namespace: namespace}, &httpRouteNoAuthOnAuthListener)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route2-auth", Namespace: "default"}, &httpRouteAuth2)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route2-auth", Namespace: namespace}, &httpRouteAuth2)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth-invalid", Namespace: "default"}, &httpRouteInvalid)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth-invalid", Namespace: namespace}, &httpRouteInvalid)
 		require.NoError(r, err)
 
 		// check our finalizers

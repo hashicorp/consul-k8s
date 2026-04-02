@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // Enabled everything possible, see if anything breaks.
@@ -100,6 +100,7 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	if runWithEnterpriseOnlyFeatures {
 		fixturePath += "-ent"
 	}
+	fixturePath = namespacedKustomizeOverlay(t, fixturePath, ctx.KubectlOptions(t).Namespace, nil)
 
 	// Use more frequent retries for resource creation
 	applyCounter := &retry.Counter{Count: 30, Wait: 5 * time.Second}
@@ -140,8 +141,10 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
 	// the reconcile loop to run (hence the 2m timeout here).
-	var gatewayAddress string
-
+	var (
+		gatewayAddress string
+		httpRoute      gwv1.HTTPRoute
+	)
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
 	// Wait for Gateway to be ready
@@ -149,6 +152,60 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 
 	// Wait for HTTPRoute to be ready
 	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", "default", fixturePath, applyCounter)
+
+	//added for OCP testing
+
+	namespace := ctx.KubectlOptions(t).Namespace
+
+	logger.Log(t, "waiting for gateway and httproute to be ready")
+
+	// Waiting for gateway to be ready.
+	gatewayCounter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
+	logger.Log(t, "waiting for gateway to be ready")
+	retry.RunWith(gatewayCounter, t, func(r *retry.R) {
+		var gateway gwv1.Gateway
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
+		require.NoError(r, err)
+
+		//CHECK TO MAKE SURE EVERYTHING WAS SET UP CORRECTLY BEFORE RUNNING TESTS
+		require.Len(r, gateway.Finalizers, 1)
+		require.EqualValues(r, gatewayFinalizer, gateway.Finalizers[0])
+
+		// check our statuses
+		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
+		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
+		require.Len(r, gateway.Status.Listeners, 2)
+
+		require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
+		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
+		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
+		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+
+		// check that we have an address to use
+		require.Len(r, gateway.Status.Addresses, 2)
+		// now we know we have an address, set it so we can use it
+		gatewayAddress = gateway.Status.Addresses[0].Value
+	})
+
+	// Then, wait for HTTP route to be ready with its own retry loop
+	httpRouteCounter := &retry.Counter{Count: 50, Wait: 2 * time.Second}
+	logger.Log(t, "waiting for http route to be ready")
+	retry.RunWith(httpRouteCounter, t, func(r *retry.R) {
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: namespace}, &httpRoute)
+		require.NoError(r, err)
+
+		// check our finalizers
+		require.Len(r, httpRoute.Finalizers, 1)
+		require.EqualValues(r, gatewayFinalizer, httpRoute.Finalizers[0])
+
+		// check parent status
+		require.Len(r, httpRoute.Status.Parents, 1)
+		require.EqualValues(r, gatewayClassControllerName, httpRoute.Status.Parents[0].ControllerName)
+		require.EqualValues(r, "gateway", httpRoute.Status.Parents[0].ParentRef.Name)
+		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+	})
 
 	// GENERAL Asserts- test that assets were created as expected
 	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
@@ -219,7 +276,7 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 
 	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails.
 	for i := 0; i < gatewayCounter.Count; i++ {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &gateway)
 		if err != nil {
 			logger.Log(t, fmt.Sprintf("Gateway check attempt %d: failed to get gateway: %v", i+1, err))
@@ -333,7 +390,7 @@ func waitForGatewayReady(t *testing.T, ctx environment.TestContext, k8sClient cl
 // checkHTTPRouteReady checks if the HTTPRoute resource is ready using existing retry logic.
 func checkHTTPRouteReady(t *testing.T, k8sClient client.Client, routeName, namespace string) bool {
 	var success bool
-	var httpRoute gwv1beta1.HTTPRoute
+	var httpRoute gwv1.HTTPRoute
 	httpRouteCounter := &retry.Counter{Count: 10, Wait: 6 * time.Second}
 
 	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails.
