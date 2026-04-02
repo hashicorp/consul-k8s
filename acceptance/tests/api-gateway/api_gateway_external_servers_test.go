@@ -90,9 +90,11 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	})
 
-	logger.Log(t, "patching certificate secret with generated data")
-	certificate := generateCertificate(t, nil, "gateway.test.local")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "certificate", "-p", fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`, base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)), "--type=merge")
+	if cfg.EnableOpenshift {
+		logger.Log(t, "patching certificate secret with generated data")
+		certificate := generateCertificate(t, nil, "gateway.test.local")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "certificate", "-p", fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`, base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)), "--type=merge")
+	}
 
 	// fetch the api-resources installed
 	logger.Log(t, "fetching api-resources")

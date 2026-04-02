@@ -54,12 +54,9 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: gatewayClassConfigName,
 		},
-		Spec: v1alpha1.GatewayClassConfigSpec{
-			OpenshiftSCCName: "restricted-v2",
-		},
 	}
-	if !cfg.EnableOpenshift {
-		gatewayClassConfig.Spec.OpenshiftSCCName = ""
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
 	}
 	logger.Log(t, "creating gateway class config")
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)
