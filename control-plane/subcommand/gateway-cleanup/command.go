@@ -40,6 +40,7 @@ type Command struct {
 	flagGatewayClassConfigName     string
 	flagGatewayConfigLocation      string
 	flagResourceConfigFileLocation string
+	flagReleaseNamespace           string
 
 	k8sClient client.Client
 
@@ -63,6 +64,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagResourceConfigFileLocation, "resource-config-file-location", resourceConfigFilename,
 		"specify a different location for where the gateway resource config file is")
 
+	c.flags.StringVar(&c.flagReleaseNamespace, "gateway-class-config-namespace", "",
+		"Namespace where the gateway class config and terminating gateways are installed. This is required to be set to delete the terminating gateways, but if left empty, the command will still attempt to delete the gateway class and gateway class config.")
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
@@ -121,7 +124,42 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	err = c.deleteTerminatingGatewaysInNamespace(c.flagReleaseNamespace)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	return 0
+}
+
+func (c *Command) deleteTerminatingGatewaysInNamespace(namespace string) error {
+	if namespace == "" {
+		namespace = "consul"
+	}
+	tgwList := &v1alpha1.TerminatingGatewayList{}
+	if err := c.k8sClient.List(context.Background(), tgwList, client.InNamespace(namespace)); err != nil {
+		return fmt.Errorf("list terminating gateways in namespace %q: %w", namespace, err)
+	}
+
+	for _, item := range tgwList.Items {
+		obj := item
+		_ = c.k8sClient.Delete(context.Background(), &obj)
+	}
+
+	if err := backoff.Retry(func() error {
+		latest := &v1alpha1.TerminatingGatewayList{}
+		if err := c.k8sClient.List(context.Background(), latest, client.InNamespace(namespace)); err != nil {
+			return err
+		}
+		if len(latest.Items) > 0 {
+			return errors.New("terminating gateways still exist")
+		}
+		return nil
+	}, exponentialBackoffWithMaxIntervalAndTime()); err != nil {
+		c.UI.Error(err.Error())
+	}
+	return nil
 }
 
 func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
