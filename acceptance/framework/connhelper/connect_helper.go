@@ -448,6 +448,7 @@ func (c *ConnectHelper) helmValues() map[string]string {
 	}
 
 	if c.Cfg.EnableOpenshift {
+		helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
 		helmValues["global.openshift.crds.enableTcpRoute"] = "true"
 	}
 
