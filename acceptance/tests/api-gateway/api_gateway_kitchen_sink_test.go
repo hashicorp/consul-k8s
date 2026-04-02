@@ -100,8 +100,9 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	if runWithEnterpriseOnlyFeatures {
 		fixturePath += "-ent"
 	}
-	fixturePath = namespacedKustomizeOverlay(t, fixturePath, ctx.KubectlOptions(t).Namespace, nil)
-
+	if cfg.EnableOpenshift {
+		fixturePath = namespacedKustomizeOverlay(t, fixturePath, ctx.KubectlOptions(t).Namespace, nil)
+	}
 	// Use more frequent retries for resource creation
 	applyCounter := &retry.Counter{Count: 30, Wait: 5 * time.Second}
 	logger.Log(t, "applying api-gateway resources")
@@ -153,60 +154,59 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	// Wait for HTTPRoute to be ready
 	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", "default", fixturePath, applyCounter)
 
-	//added for OCP testing
+	if cfg.EnableOpenshift {
+		namespace := ctx.KubectlOptions(t).Namespace
 
-	namespace := ctx.KubectlOptions(t).Namespace
+		logger.Log(t, "waiting for gateway and httproute to be ready")
 
-	logger.Log(t, "waiting for gateway and httproute to be ready")
+		// Waiting for gateway to be ready.
+		gatewayCounter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
+		logger.Log(t, "waiting for gateway to be ready")
+		retry.RunWith(gatewayCounter, t, func(r *retry.R) {
+			var gateway gwv1.Gateway
+			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
+			require.NoError(r, err)
 
-	// Waiting for gateway to be ready.
-	gatewayCounter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
-	logger.Log(t, "waiting for gateway to be ready")
-	retry.RunWith(gatewayCounter, t, func(r *retry.R) {
-		var gateway gwv1.Gateway
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
-		require.NoError(r, err)
+			//CHECK TO MAKE SURE EVERYTHING WAS SET UP CORRECTLY BEFORE RUNNING TESTS
+			require.Len(r, gateway.Finalizers, 1)
+			require.EqualValues(r, gatewayFinalizer, gateway.Finalizers[0])
 
-		//CHECK TO MAKE SURE EVERYTHING WAS SET UP CORRECTLY BEFORE RUNNING TESTS
-		require.Len(r, gateway.Finalizers, 1)
-		require.EqualValues(r, gatewayFinalizer, gateway.Finalizers[0])
+			// check our statuses
+			checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
+			checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
+			require.Len(r, gateway.Status.Listeners, 2)
 
-		// check our statuses
-		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("ConsulAccepted", "Accepted"))
-		require.Len(r, gateway.Status.Listeners, 2)
+			require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
+			checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
+			checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
+			checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
-		require.EqualValues(r, int32(1), gateway.Status.Listeners[0].AttachedRoutes)
-		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, falseCondition("Conflicted", "NoConflicts"))
-		checkStatusCondition(r, gateway.Status.Listeners[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			// check that we have an address to use
+			require.Len(r, gateway.Status.Addresses, 2)
+			// now we know we have an address, set it so we can use it
+			gatewayAddress = gateway.Status.Addresses[0].Value
+		})
 
-		// check that we have an address to use
-		require.Len(r, gateway.Status.Addresses, 2)
-		// now we know we have an address, set it so we can use it
-		gatewayAddress = gateway.Status.Addresses[0].Value
-	})
+		// Then, wait for HTTP route to be ready with its own retry loop
+		httpRouteCounter := &retry.Counter{Count: 50, Wait: 2 * time.Second}
+		logger.Log(t, "waiting for http route to be ready")
+		retry.RunWith(httpRouteCounter, t, func(r *retry.R) {
+			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: namespace}, &httpRoute)
+			require.NoError(r, err)
 
-	// Then, wait for HTTP route to be ready with its own retry loop
-	httpRouteCounter := &retry.Counter{Count: 50, Wait: 2 * time.Second}
-	logger.Log(t, "waiting for http route to be ready")
-	retry.RunWith(httpRouteCounter, t, func(r *retry.R) {
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: namespace}, &httpRoute)
-		require.NoError(r, err)
+			// check our finalizers
+			require.Len(r, httpRoute.Finalizers, 1)
+			require.EqualValues(r, gatewayFinalizer, httpRoute.Finalizers[0])
 
-		// check our finalizers
-		require.Len(r, httpRoute.Finalizers, 1)
-		require.EqualValues(r, gatewayFinalizer, httpRoute.Finalizers[0])
-
-		// check parent status
-		require.Len(r, httpRoute.Status.Parents, 1)
-		require.EqualValues(r, gatewayClassControllerName, httpRoute.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httpRoute.Status.Parents[0].ParentRef.Name)
-		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
-		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
-		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
-	})
-
+			// check parent status
+			require.Len(r, httpRoute.Status.Parents, 1)
+			require.EqualValues(r, gatewayClassControllerName, httpRoute.Status.Parents[0].ControllerName)
+			require.EqualValues(r, "gateway", httpRoute.Status.Parents[0].ParentRef.Name)
+			checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
+			checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
+			checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
+		})
+	}
 	// GENERAL Asserts- test that assets were created as expected
 	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
 	require.NoError(t, err)

@@ -293,19 +293,23 @@ func TestAPIGateway_Basic(t *testing.T) {
 			})
 
 			logger.Log(t, "creating target tcp server")
-			staticServerTCPPath := namespacedKustomizeOverlay(t,
-				"../fixtures/bases/static-server-tcp",
-				ctx.KubectlOptions(t).Namespace,
-				[]string{
-					"deployment.yaml",
-					"service.yaml",
-					"serviceaccount.yaml",
-					"psp-rolebinding.yaml",
-					"privileged-scc-rolebinding.yaml",
-				},
-				fmt.Sprintf("apiVersion: consul.hashicorp.com/v1alpha1\nkind: ServiceDefaults\nmetadata:\n  name: static-server-tcp\n  namespace: %s\nspec:\n  protocol: tcp\n", ctx.KubectlOptions(t).Namespace),
-			)
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerTCPPath)
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-server-tcp")
+
+			if cfg.EnableOpenshift {
+				staticServerTCPPath := namespacedKustomizeOverlay(t,
+					"../fixtures/bases/static-server-tcp",
+					ctx.KubectlOptions(t).Namespace,
+					[]string{
+						"deployment.yaml",
+						"service.yaml",
+						"serviceaccount.yaml",
+						"psp-rolebinding.yaml",
+						"privileged-scc-rolebinding.yaml",
+					},
+					fmt.Sprintf("apiVersion: consul.hashicorp.com/v1alpha1\nkind: ServiceDefaults\nmetadata:\n  name: static-server-tcp\n  namespace: %s\nspec:\n  protocol: tcp\n", ctx.KubectlOptions(t).Namespace),
+				)
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerTCPPath)
+			}
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", "static-server-tcp"))
 
 			logger.Log(t, "creating tcp-route")
@@ -354,7 +358,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 				checkStatusCondition(r, gateway.Status.Listeners[2].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
 				// check that we have an address to use
-				require.NotEmpty(r, gateway.Status.Addresses)
+				require.Len(r, gateway.Status.Addresses, 1)
 				// now we know we have an address, set it so we can use it
 				gatewayAddress = gateway.Status.Addresses[0].Value
 			})
@@ -642,7 +646,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		checkStatusCondition(r, gateway.Status.Listeners[1].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 
 		// check that we have an address to use
-		require.NotEmpty(r, gateway.Status.Addresses)
+		require.Len(r, gateway.Status.Addresses, 1)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
 
