@@ -63,3 +63,15 @@ Participation in the Kubernetes community is governed by the
 [spec]: https://gateway-api.sigs.k8s.io/v1alpha2/references/spec
 [concepts]: https://gateway-api.sigs.k8s.io/concepts/api-overview
 [security-model]: https://gateway-api.sigs.k8s.io/concepts/security-model
+
+
+# Additional Information
+This module is derived from the Kubernetes Gateway API project:
+https://github.com/kubernetes-sigs/gateway-api
+
+Modifications:
+- Changed API group from gateway.networking.k8s.io to consul.hashicorp.com
+- Integrated with Consul-specific controller logic
+
+The original project is licensed under Apache License 2.0.
+This module retains that license.

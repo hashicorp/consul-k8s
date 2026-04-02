@@ -381,7 +381,7 @@ func TestEnforceConsulApiVersion(t *testing.T) {
 				require.Equal(t, "api-gateway-custom", md["name"])
 
 				spec := raw["spec"].(map[string]interface{})
-				require.Equal(t, "consul-ocp", spec["gatewayClassName"])
+				require.Equal(t, "consul-custom", spec["gatewayClassName"])
 			},
 		},
 		{
@@ -650,7 +650,7 @@ func TestWriteObjects(t *testing.T) {
 	l2 := listeners[1].(map[string]interface{})
 	require.EqualValues(t, 443, l2["port"])
 	require.Equal(t, "https", l2["name"])
-	require.Equal(t, "consul-ocp", spec["gatewayClassName"])
+	require.Equal(t, "consul-custom", spec["gatewayClassName"])
 }
 
 func TestEnforceConsulApiVersion_ServiceIntentions(t *testing.T) {

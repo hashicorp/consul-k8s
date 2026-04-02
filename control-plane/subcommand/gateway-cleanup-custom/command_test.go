@@ -6,13 +6,13 @@ package gatewaycleanupocp
 import (
 	"testing"
 
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -22,14 +22,14 @@ func TestRun(t *testing.T) {
 
 	for name, tt := range map[string]struct {
 		gatewayClassConfig *v1alpha1.GatewayClassConfig
-		gatewayClass       *gwv1beta1.GatewayClass
+		gatewayClass       *gwv1beta1.CustomGatewayClass
 	}{
 		"both exist": {
 			gatewayClassConfig: &v1alpha1.GatewayClassConfig{},
-			gatewayClass:       &gwv1beta1.GatewayClass{},
+			gatewayClass:       &gwv1beta1.CustomGatewayClass{},
 		},
 		"gateway class config doesn't exist": {
-			gatewayClass: &gwv1beta1.GatewayClass{},
+			gatewayClass: &gwv1beta1.CustomGatewayClass{},
 		},
 		"gateway class doesn't exist": {
 			gatewayClassConfig: &v1alpha1.GatewayClassConfig{},
@@ -37,11 +37,11 @@ func TestRun(t *testing.T) {
 		"neither exist": {},
 		"finalizers on gatewayclass blocking deletion": {
 			gatewayClassConfig: &v1alpha1.GatewayClassConfig{},
-			gatewayClass:       &gwv1beta1.GatewayClass{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"finalizer"}}},
+			gatewayClass:       &gwv1beta1.CustomGatewayClass{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"finalizer"}}},
 		},
 		"finalizers on gatewayclassconfig blocking deletion": {
 			gatewayClassConfig: &v1alpha1.GatewayClassConfig{ObjectMeta: metav1.ObjectMeta{Finalizers: []string{"finalizer"}}},
-			gatewayClass:       &gwv1beta1.GatewayClass{},
+			gatewayClass:       &gwv1beta1.CustomGatewayClass{},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

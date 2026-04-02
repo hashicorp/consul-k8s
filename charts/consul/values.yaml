@@ -5,7 +5,7 @@
 
 # Holds values that affect multiple components of the chart.
 global:
-  installGWCRDs: true
+  installK8sNetworkingCRDs: true
   # The main enabled/disabled setting. If true, servers,
   # clients, Consul DNS and the Consul UI will be enabled. Each component can override
   # this default via its component-specific "enabled" config. If false, no components

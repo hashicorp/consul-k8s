@@ -48,7 +48,6 @@ rules:
     - get
     - list
     - watch
-    - delete
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]
