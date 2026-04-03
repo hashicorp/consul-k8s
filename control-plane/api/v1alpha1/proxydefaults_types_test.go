@@ -4,7 +4,6 @@
 package v1alpha1
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -49,7 +48,7 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 					Name: common.Global,
 				},
 				Spec: ProxyDefaultsSpec{
-					Config: json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
+					Config: JSONRawObject(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
 					MeshGateway: MeshGateway{
 						Mode: "local",
 					},
@@ -85,12 +84,12 @@ func TestProxyDefaults_MatchesConsul(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
 							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Arguments: JSONRawObject(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
 					},
@@ -275,7 +274,7 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					Name: "name",
 				},
 				Spec: ProxyDefaultsSpec{
-					Config: json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
+					Config: JSONRawObject(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
 					MeshGateway: MeshGateway{
 						Mode: "remote",
 					},
@@ -311,12 +310,12 @@ func TestProxyDefaults_ToConsul(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
 							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Arguments: JSONRawObject(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
 					},
@@ -427,12 +426,12 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
 							Name:      "zipkin",
-							Arguments: json.RawMessage(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
+							Arguments: JSONRawObject(`{"ClusterName": "zipkin_cluster", "Port": "9411", "CollectorEndpoint":"/api/v2/spans"}`),
 							Required:  true,
 						},
 					},
@@ -599,7 +598,7 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
+							Arguments: JSONRawObject(`{"AWSServiceName": "s3", "Region": "us-west-2"}`),
 							Required:  false,
 						},
 						EnvoyExtension{
@@ -643,7 +642,7 @@ func TestProxyDefaults_Validate(t *testing.T) {
 					EnvoyExtensions: EnvoyExtensions{
 						EnvoyExtension{
 							Name:      "aws_request_signing",
-							Arguments: json.RawMessage(`{"SOME_INVALID_JSON"}`),
+							Arguments: JSONRawObject(`{"SOME_INVALID_JSON"}`),
 							Required:  false,
 						},
 					},
@@ -720,14 +719,14 @@ func TestProxyDefaults_Validate(t *testing.T) {
 }
 
 func TestProxyDefaults_ValidateConfigValid(t *testing.T) {
-	cases := map[string]json.RawMessage{
-		"envoy_tracing_json":                     json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
-		"protocol":                               json.RawMessage(`{"protocol":  "http"}`),
-		"members":                                json.RawMessage(`{"members":  3}`),
-		"envoy_tracing_json & protocol":          json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","protocol":  "http"}`),
-		"envoy_tracing_json & members":           json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","members":  3}`),
-		"protocol & members":                     json.RawMessage(`{"protocol": "https","members":  3}`),
-		"envoy_tracing_json, protocol & members": json.RawMessage(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","protocol":  "http", "members": 3}`),
+	cases := map[string]JSONRawObject{
+		"envoy_tracing_json":                     JSONRawObject(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"}`),
+		"protocol":                               JSONRawObject(`{"protocol":  "http"}`),
+		"members":                                JSONRawObject(`{"members":  3}`),
+		"envoy_tracing_json & protocol":          JSONRawObject(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","protocol":  "http"}`),
+		"envoy_tracing_json & members":           JSONRawObject(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","members":  3}`),
+		"protocol & members":                     JSONRawObject(`{"protocol": "https","members":  3}`),
+		"envoy_tracing_json, protocol & members": JSONRawObject(`{"envoy_tracing_json": "{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}","protocol":  "http", "members": 3}`),
 	}
 	for name, c := range cases {
 		proxyDefaults := ProxyDefaults{
@@ -745,11 +744,11 @@ func TestProxyDefaults_ValidateConfigValid(t *testing.T) {
 }
 
 func TestProxyDefaults_ValidateConfigInvalid(t *testing.T) {
-	cases := map[string]json.RawMessage{
-		"non_map json": json.RawMessage(`"{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"`),
-		"yaml":         json.RawMessage(`protocol: http`),
-		"json array":   json.RawMessage(`[1,2,3,4]`),
-		"json literal": json.RawMessage(`1`),
+	cases := map[string]JSONRawObject{
+		"non_map json": JSONRawObject(`"{\"http\":{\"name\":\"envoy.zipkin\",\"config\":{\"collector_cluster\":\"zipkin\",\"collector_endpoint\":\"/api/v1/spans\",\"shared_span_context\":false}}}"`),
+		"yaml":         JSONRawObject(`protocol: http`),
+		"json array":   JSONRawObject(`[1,2,3,4]`),
+		"json literal": JSONRawObject(`1`),
 	}
 	for name, c := range cases {
 		proxyDefaults := ProxyDefaults{

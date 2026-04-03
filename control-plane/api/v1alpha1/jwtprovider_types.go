@@ -409,7 +409,7 @@ type RemoteJWKS struct {
 	// header for TLS connection.
 	//
 	// Default value is false.
-	UseSNI bool `json:",omitempty" alias:"use_sni"`
+	UseSNI bool `json:"useSNI,omitempty" alias:"use_sni"`
 
 	// RetryPolicy defines a retry policy for fetching JWKS.
 	//

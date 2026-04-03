@@ -4,13 +4,13 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
+  name: jwtproviders.consul.hashicorp.com
   labels:
     app: {{ template "consul.name" . }}
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: crd
-  name: jwtproviders.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -147,13 +147,6 @@ spec:
 
                           Default value is false.
                         type: boolean
-                      useSNI:
-                        description: |-
-                          UseSNI determines whether the hostname should be set in SNI
-                          header for TLS connection.
-
-                          Default value is false.
-                        type: boolean
                       jwksCluster:
                         description: JWKSCluster defines how the specified Remote
                           JWKS URI is to be fetched.
@@ -270,6 +263,14 @@ spec:
                         description: URI is the URI of the server to query for the
                           JWKS.
                         type: string
+                      useSNI:
+                        description: |-
+                          UseSNI determines whether the hostname should be set in SNI
+                          header for TLS connection.
+
+
+                          Default value is false.
+                        type: boolean
                     type: object
                 type: object
               locations:
