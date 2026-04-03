@@ -1,0 +1,39 @@
+{{- if (and .Values.connectInject.enabled .Values.global.generateManifests) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-apply-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: generate-manifests-apply
+  annotations:
+    "helm.sh/hook": post-upgrade,post-install
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+rules:
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "delete", "list", "watch"]
+- apiGroups:
+    - gateway.networking.k8s.io
+    - consul.hashicorp.com
+  resources:
+    - gatewayclasses
+    - gateways
+    - httproutes
+    - tcproutes
+    - tlsroutes
+    - referencegrants
+    - grpcroutes
+    - udproutes
+    - serviceintentions
+  verbs:
+    - get
+    - create
+    - update
+    - patch
+{{ end }}

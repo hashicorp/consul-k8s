@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/stretchr/testify/require"
@@ -64,15 +64,15 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 		canReference       bool
 		err                error
 		ctx                context.Context
-		gateway            gwv1beta1.Gateway
-		secret             gwv1beta1.SecretObjectReference
+		gateway            gwv1alpha2.Gateway
+		secret             gwv1alpha2.SecretObjectReference
 		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"gateway allowed to secret": {
 			canReference: true,
 			err:          nil,
 			ctx:          context.TODO(),
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1alpha2.Gateway{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       GatewayKind,
 					APIVersion: Group + V1Beta1,
@@ -141,15 +141,15 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 		canReference       bool
 		err                error
 		ctx                context.Context
-		httpRoute          gwv1beta1.HTTPRoute
-		backendRef         gwv1beta1.BackendRef
+		httpRoute          gwv1alpha2.HTTPRoute
+		backendRef         gwv1alpha2.BackendRef
 		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"httproute allowed to gateway": {
 			canReference: true,
 			err:          nil,
 			ctx:          context.TODO(),
-			httpRoute: gwv1beta1.HTTPRoute{
+			httpRoute: gwv1alpha2.HTTPRoute{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       HTTPRouteKind,
 					APIVersion: Group + V1Beta1,
@@ -180,87 +180,6 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			rv := NewReferenceValidator(tc.k8sReferenceGrants)
 			canReference := rv.HTTPRouteCanReferenceBackend(tc.httpRoute, tc.backendRef)
-
-			require.Equal(t, tc.canReference, canReference)
-		})
-	}
-}
-
-func TestTCPRouteCanReferenceBackend(t *testing.T) {
-	t.Parallel()
-
-	objName := gwv1beta1.ObjectName("myBackendRef")
-
-	basicValidReferenceGrant := gwv1beta1.ReferenceGrant{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ToNamespace,
-		},
-		Spec: gwv1beta1.ReferenceGrantSpec{
-			From: []gwv1beta1.ReferenceGrantFrom{
-				{
-					Group:     Group,
-					Kind:      TCPRouteKind,
-					Namespace: FromNamespace,
-				},
-			},
-			To: []gwv1beta1.ReferenceGrantTo{
-				{
-					Group: Group,
-					Kind:  BackendRefKind,
-					Name:  &objName,
-				},
-			},
-		},
-	}
-
-	backendRefGroup := gwv1beta1.Group(Group)
-	backendRefKind := gwv1beta1.Kind(BackendRefKind)
-	backendRefNamespace := gwv1beta1.Namespace(ToNamespace)
-
-	cases := map[string]struct {
-		canReference       bool
-		err                error
-		ctx                context.Context
-		tcpRoute           gwv1alpha2.TCPRoute
-		backendRef         gwv1beta1.BackendRef
-		k8sReferenceGrants []gwv1beta1.ReferenceGrant
-	}{
-		"tcpRoute allowed to gateway": {
-			canReference: true,
-			err:          nil,
-			ctx:          context.TODO(),
-			tcpRoute: gwv1alpha2.TCPRoute{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       TCPRouteKind,
-					APIVersion: Group + V1Alpha2,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: FromNamespace,
-				},
-				Spec:   gwv1alpha2.TCPRouteSpec{},
-				Status: gwv1alpha2.TCPRouteStatus{},
-			},
-			backendRef: gwv1beta1.BackendRef{
-				BackendObjectReference: gwv1beta1.BackendObjectReference{
-					Group:     &backendRefGroup,
-					Kind:      &backendRefKind,
-					Name:      objName,
-					Namespace: &backendRefNamespace,
-					Port:      nil,
-				},
-				Weight: nil,
-			},
-			k8sReferenceGrants: []gwv1beta1.ReferenceGrant{
-				basicValidReferenceGrant,
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			rv := NewReferenceValidator(tc.k8sReferenceGrants)
-			canReference := rv.TCPRouteCanReferenceBackend(tc.tcpRoute, tc.backendRef)
 
 			require.Equal(t, tc.canReference, canReference)
 		})

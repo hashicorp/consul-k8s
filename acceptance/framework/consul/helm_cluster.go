@@ -6,6 +6,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,7 +15,6 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +75,7 @@ func NewHelmCluster(
 	}
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		configurePSA(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
@@ -156,11 +156,28 @@ func (h *HelmCluster) Create(t *testing.T) {
 	if h.ChartPath != "" {
 		chartName = h.ChartPath
 	}
+	logger.Logf(t, "Helm Chart: %s", chartName)
+	logger.Logf(t, "Helm setValues: %s", h.helmOptions.SetValues)
+	logger.Logf(t, "Helm Value Files: %v", h.helmOptions.ValuesFiles)
+
+	for _, f := range h.helmOptions.ValuesFiles {
+		data, _ := os.ReadFile(f)
+
+		logger.Logf(t, "Values file %s:\n%s", f, string(data))
+	}
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
+
+	// get the helm values
+	// Attempt to fetch the rendered Helm values for the installed release and log them.
+	if vals, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "get", "values", h.releaseName, "--all", "--output", "yaml"); err != nil {
+		logger.Logf(t, "Unable to get helm values for release %s: %v", h.releaseName, err)
+	} else {
+		logger.Logf(t, "Helm release values for %s:\n%s", h.releaseName, vals)
+	}
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -547,112 +564,156 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 	return consulClient, config.Address
 }
 
-// configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
-// and a role binding that binds the default service account in the helm installation namespace to the cluster role.
-// We bind the default service account for tests that are spinning up pods without a service account set so that
-// they will not be rejected by the kube pod security policy controller.
-func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	pspName := "test-psp"
+// PodSecurityPolicies are removed from the kubernetes API in v1.25.
+// Thus using the Pod Security Admission Controller with a privileged policy is the recommended path forward for testing in clusters with Kubernetes v1.25 and above.
 
-	// Pod Security Policy
-	{
-		// Check if the pod security policy with this name already exists
-		_, err := client.PolicyV1beta1().PodSecurityPolicies().Get(context.Background(), pspName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			// This pod security policy can be used by any tests resources.
-			// This policy is fairly simple and only prevents from running privileged containers.
-			psp := &policyv1beta.PodSecurityPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-psp",
-				},
-				Spec: policyv1beta.PodSecurityPolicySpec{
-					Privileged:          true,
-					AllowedCapabilities: []corev1.Capability{"NET_ADMIN"},
-					SELinux: policyv1beta.SELinuxStrategyOptions{
-						Rule: policyv1beta.SELinuxStrategyRunAsAny,
-					},
-					SupplementalGroups: policyv1beta.SupplementalGroupsStrategyOptions{
-						Rule: policyv1beta.SupplementalGroupsStrategyRunAsAny,
-					},
-					RunAsUser: policyv1beta.RunAsUserStrategyOptions{
-						Rule: policyv1beta.RunAsUserStrategyRunAsAny,
-					},
-					FSGroup: policyv1beta.FSGroupStrategyOptions{
-						Rule: policyv1beta.FSGroupStrategyRunAsAny,
-					},
-					Volumes: []policyv1beta.FSType{policyv1beta.All},
-				},
-			}
-			_, err = client.PolicyV1beta1().PodSecurityPolicies().Create(context.Background(), psp, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
+func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	// Create a privileged Pod Security Admission policy for the helm installation namespace.
+	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	labels := ns.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
 	}
 
-	// Cluster role for the PSP.
-	{
-		// Check if we have a cluster role that authorizes the use of the pod security policy.
-		_, err := client.RbacV1().ClusterRoles().Get(context.Background(), pspName, metav1.GetOptions{})
+	labels["pod-security.kubernetes.io/enforce"] = "privileged"
+	labels["pod-security.kubernetes.io/audit"] = "privileged"
+	labels["pod-security.kubernetes.io/warn"] = "privileged"
 
-		// If it doesn't exist, create the clusterrole.
-		if errors.IsNotFound(err) {
-			pspClusterRole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pspName,
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						Verbs:         []string{"use"},
-						APIGroups:     []string{"policy"},
-						Resources:     []string{"podsecuritypolicies"},
-						ResourceNames: []string{pspName},
-					},
-				},
-			}
-			_, err = client.RbacV1().ClusterRoles().Create(context.Background(), pspClusterRole, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
-	}
+	ns.SetLabels(labels)
 
-	// A role binding to allow default service account in the installation namespace access to the PSP.
-	{
-		// Check if this cluster role binding already exists.
-		_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), pspName, metav1.GetOptions{})
-
-		if errors.IsNotFound(err) {
-			pspRoleBinding := &rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pspName,
-				},
-				Subjects: []rbacv1.Subject{
-					{
-						Kind:      rbacv1.ServiceAccountKind,
-						Name:      "default",
-						Namespace: namespace,
-					},
-				},
-				RoleRef: rbacv1.RoleRef{
-					Kind: "ClusterRole",
-					Name: pspName,
-				},
-			}
-
-			_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), pspRoleBinding, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
-	}
+	_, err = client.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+	require.NoError(t, err)
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		// Remove the labels on the namespace.
+		ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+		if err != nil {
+			return
+		}
+
+		labels := ns.GetLabels()
+		if labels == nil {
+			return
+		}
+
+		delete(labels, "pod-security.kubernetes.io/enforce")
+		delete(labels, "pod-security.kubernetes.io/audit")
+		delete(labels, "pod-security.kubernetes.io/warn")
+
+		ns.SetLabels(labels)
+		_, _ = client.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 	})
+
 }
+
+// // configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
+// // and a role binding that binds the default service account in the helm installation namespace to the cluster role.
+// // We bind the default service account for tests that are spinning up pods without a service account set so that
+// // they will not be rejected by the kube pod security policy controller.
+// func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+// 	pspName := "test-psp"
+
+// 	// Pod Security Policy
+// 	{
+// 		// Check if the pod security policy with this name already exists
+// 		_, err := client.PolicyV1beta1().PodSecurityPolicies().Get(context.Background(), pspName, metav1.GetOptions{})
+// 		if errors.IsNotFound(err) {
+// 			// This pod security policy can be used by any tests resources.
+// 			// This policy is fairly simple and only prevents from running privileged containers.
+// 			psp := &policyv1beta.PodSecurityPolicy{
+// 				ObjectMeta: metav1.ObjectMeta{
+// 					Name: "test-psp",
+// 				},
+// 				Spec: policyv1beta.PodSecurityPolicySpec{
+// 					Privileged:          true,
+// 					AllowedCapabilities: []corev1.Capability{"NET_ADMIN"},
+// 					SELinux: policyv1beta.SELinuxStrategyOptions{
+// 						Rule: policyv1beta.SELinuxStrategyRunAsAny,
+// 					},
+// 					SupplementalGroups: policyv1beta.SupplementalGroupsStrategyOptions{
+// 						Rule: policyv1beta.SupplementalGroupsStrategyRunAsAny,
+// 					},
+// 					RunAsUser: policyv1beta.RunAsUserStrategyOptions{
+// 						Rule: policyv1beta.RunAsUserStrategyRunAsAny,
+// 					},
+// 					FSGroup: policyv1beta.FSGroupStrategyOptions{
+// 						Rule: policyv1beta.FSGroupStrategyRunAsAny,
+// 					},
+// 					Volumes: []policyv1beta.FSType{policyv1beta.All},
+// 				},
+// 			}
+// 			_, err = client.PolicyV1beta1().PodSecurityPolicies().Create(context.Background(), psp, metav1.CreateOptions{})
+// 			require.NoError(t, err)
+// 		} else {
+// 			require.NoError(t, err)
+// 		}
+// 	}
+
+// 	// Cluster role for the PSP.
+// 	{
+// 		// Check if we have a cluster role that authorizes the use of the pod security policy.
+// 		_, err := client.RbacV1().ClusterRoles().Get(context.Background(), pspName, metav1.GetOptions{})
+
+// 		// If it doesn't exist, create the clusterrole.
+// 		if errors.IsNotFound(err) {
+// 			pspClusterRole := &rbacv1.ClusterRole{
+// 				ObjectMeta: metav1.ObjectMeta{
+// 					Name: pspName,
+// 				},
+// 				Rules: []rbacv1.PolicyRule{
+// 					{
+// 						Verbs:         []string{"use"},
+// 						APIGroups:     []string{"policy"},
+// 						Resources:     []string{"podsecuritypolicies"},
+// 						ResourceNames: []string{pspName},
+// 					},
+// 				},
+// 			}
+// 			_, err = client.RbacV1().ClusterRoles().Create(context.Background(), pspClusterRole, metav1.CreateOptions{})
+// 			require.NoError(t, err)
+// 		} else {
+// 			require.NoError(t, err)
+// 		}
+// 	}
+
+// 	// A role binding to allow default service account in the installation namespace access to the PSP.
+// 	{
+// 		// Check if this cluster role binding already exists.
+// 		_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), pspName, metav1.GetOptions{})
+
+// 		if errors.IsNotFound(err) {
+// 			pspRoleBinding := &rbacv1.RoleBinding{
+// 				ObjectMeta: metav1.ObjectMeta{
+// 					Name: pspName,
+// 				},
+// 				Subjects: []rbacv1.Subject{
+// 					{
+// 						Kind:      rbacv1.ServiceAccountKind,
+// 						Name:      "default",
+// 						Namespace: namespace,
+// 					},
+// 				},
+// 				RoleRef: rbacv1.RoleRef{
+// 					Kind: "ClusterRole",
+// 					Name: pspName,
+// 				},
+// 			}
+
+// 			_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), pspRoleBinding, metav1.CreateOptions{})
+// 			require.NoError(t, err)
+// 		} else {
+// 			require.NoError(t, err)
+// 		}
+// 	}
+
+// 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+// 		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
+// 		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
+// 		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+// 	})
+// }
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
