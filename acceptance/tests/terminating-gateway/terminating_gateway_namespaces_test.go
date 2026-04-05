@@ -325,7 +325,11 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					Options:             externalServiceRegistrationNSOpts,
 					NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
 					NoCleanup:           cfg.NoCleanup,
-					KustomizeConfigPath: externalServiceRegistrationPath,
+					KustomizeConfigPath: tc.externalServiceRegistrationConfig.path,
+				}
+
+				if cfg.EnableOpenshift || cfg.UseOpenshift {
+					k8sOpts.KustomizeConfigPath = externalServiceRegistrationPath
 				}
 
 				consulOpts := helpers.ConsulOptions{
