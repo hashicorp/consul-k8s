@@ -117,7 +117,7 @@ func KubectlDeleteK(t *testing.T, options *k8s.KubectlOptions, kustomizeDir stri
 	if err != nil {
 		// OpenShift protects certain service accounts from deletion via admission webhooks.
 		// This is expected behavior and should not fail the test.
-		if strings.Contains(err.Error(), "serviceaccount-validation.managed.openshift.io") {
+		if strings.Contains(err.Error(), "serviceaccount-validation.managed.openshift.io") || strings.Contains(output, "serviceaccount-validation.managed.openshift.io") {
 			t.Logf("Ignoring OpenShift service account deletion error: %v", err)
 			return
 		}
