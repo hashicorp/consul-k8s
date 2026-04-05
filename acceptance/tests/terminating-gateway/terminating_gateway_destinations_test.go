@@ -42,7 +42,6 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 		}`
 	)
 
-	staticServerDestinationName := staticServerServiceName
 	hostnameDestinationSupported := !(cfg.EnableOpenshift || cfg.UseOpenshift)
 
 	cases := []struct {
@@ -107,7 +106,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEmpty(t, staticServerIP)
 
-			staticServerHostnameURL := fmt.Sprintf("https://%s", staticServerDestinationName)
+			staticServerHostnameURL := fmt.Sprintf("https://%s", staticServerServiceName)
 			staticServerIPURL := ""
 			if strings.Contains(staticServerIP, ":") {
 				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
@@ -118,7 +117,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			logger.Log(t, "creating tcp-based service defaults")
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
 				if hostnameDestinationSupported {
-					CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerDestinationName)
+					CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
 				}
 				CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "", 80, staticServerIP)
 			})
@@ -154,7 +153,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 				}
 			})
 			// Try running some different scenarios
-			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerDestinationName)
+			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
 
 			if strings.Contains(staticServerIP, ":") {
 				staticServerIPURL = fmt.Sprintf("http://[%s]", staticServerIP)
@@ -167,7 +166,7 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			// You can't use TLS w/ protocol set to anything L7; Envoy can't snoop the traffic when the client encrypts it
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
 				if hostnameDestinationSupported {
-					CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerDestinationName)
+					CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerServiceName)
 				}
 				CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "http", 80, staticServerIP)
 			})
