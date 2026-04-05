@@ -245,6 +245,11 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				ctx := suite.Environment().DefaultContext(t)
 
+				externalServiceRegistrationPath := tc.externalServiceRegistrationConfig.path
+				if (cfg.EnableOpenshift || cfg.UseOpenshift) && tc.externalServiceRegistrationConfig.namespace == "default" {
+					externalServiceRegistrationPath = "../fixtures/cases/terminating-gateway-namespaces/external-service-default/external-service-registration"
+				}
+
 				// Install the Helm chart without the terminating gateway first
 				// so that we can create the namespace for it.
 				helmValues := map[string]string{
@@ -320,7 +325,7 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					Options:             externalServiceRegistrationNSOpts,
 					NoCleanupOnFailure:  cfg.NoCleanupOnFailure,
 					NoCleanup:           cfg.NoCleanup,
-					KustomizeConfigPath: tc.externalServiceRegistrationConfig.path,
+					KustomizeConfigPath: externalServiceRegistrationPath,
 				}
 
 				consulOpts := helpers.ConsulOptions{
