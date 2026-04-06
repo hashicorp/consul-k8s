@@ -107,8 +107,9 @@ type TestConfig struct {
 	UseKind         bool
 	UseOpenshift    bool
 
-	helmChartPath string
-	DualStack     bool
+	helmChartPath              string
+	DualStack                  bool
+	IsOpenshiftGreaterThan4_18 bool
 }
 
 // HelmValuesFromConfig returns a map of Helm values
@@ -178,6 +179,11 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
+
+	if t.UseOpenshift && t.IsOpenshiftGreaterThan4_18 {
+		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.18 and later.
+		setIfNotEmpty(helmValues, "global.openshift.isOcpGreaterthan4_18", "true")
+	}
 
 	return helmValues, nil
 }
