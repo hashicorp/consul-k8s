@@ -940,6 +940,64 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 	}
 }
 
+func TestCreateServiceRegistrations_SingleServiceMultiPort(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, serviceRegistration.Service.Port)
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: true},
+		{Name: "metrics", Port: 5051, Default: false},
+	}, serviceRegistration.Service.Ports)
+
+	require.Equal(t, constants.Getv4orv6Str("127.0.0.1", "::1"), proxyServiceRegistration.Service.Proxy.LocalServiceAddress)
+	require.Equal(t, 5050, proxyServiceRegistration.Service.Proxy.LocalServicePort)
+}
+
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
 // object. This test covers Controller.createServiceRegistrations and Controller.createGatewayRegistrations.
 // This test depends on a Consul binary being present on the host machine.

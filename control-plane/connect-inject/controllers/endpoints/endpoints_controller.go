@@ -430,22 +430,11 @@ func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
 func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
-	// If a port is specified, then we determine the value of that port
-	// and register that port for the host service.
+	// Determine the default service port and optional multi-port definitions.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
-	var consulServicePort int
-	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok && raw != "" {
-		if multiPort := strings.Split(raw, ","); len(multiPort) > 1 {
-			// Figure out which index of the ports annotation to use by
-			// finding the index of the service names annotation.
-			raw = multiPort[getMultiPortIdx(pod, serviceEndpoints)]
-		}
-		if port, err := common.PortValue(pod, raw); port > 0 {
-			if err != nil {
-				return nil, nil, err
-			}
-			consulServicePort = int(port)
-		}
+	consulServicePort, consulServicePorts, err := servicePortsForRegistration(pod, serviceEndpoints)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	var node corev1.Node
@@ -481,11 +470,16 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
+	registrationPort := consulServicePort
+	if len(consulServicePorts) > 0 {
+		registrationPort = 0
+	}
 
 	service := &api.AgentService{
 		ID:        svcID,
 		Service:   svcName,
-		Port:      consulServicePort,
+		Port:      registrationPort,
+		Ports:     consulServicePorts,
 		Address:   podIP,
 		Meta:      meta,
 		Namespace: consulNS,
@@ -603,9 +597,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		if parsedIP != nil {
 			taggedAddresses := make(map[string]api.ServiceAddress)
 
-			// When a service has multiple ports, we need to choose the port that is registered with Consul
-			// and only set that port as the tagged address because Consul currently does not support multiple ports
-			// on a single service.
+			// The virtual tagged address includes one service port, so we use the default registered service port.
 			var k8sServicePort int32
 			for _, sp := range k8sService.Spec.Ports {
 				targetPortValue, err := portValueFromIntOrString(pod, sp.TargetPort)
@@ -1646,6 +1638,149 @@ func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
 		}
 	}
 	return -1
+}
+
+func servicePortsForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (int, api.ServicePorts, error) {
+	raw, ok := pod.Annotations[constants.AnnotationPort]
+	if !ok || strings.TrimSpace(raw) == "" {
+		return 0, nil, nil
+	}
+
+	portTokens := strings.Split(raw, ",")
+	matchingIndexes := matchingServicePortIndexes(pod, serviceEndpoints, len(portTokens))
+	if len(matchingIndexes) == 0 {
+		return 0, nil, nil
+	}
+
+	defaultIdx := matchingIndexes[0]
+	servicePorts := make(api.ServicePorts, 0, len(matchingIndexes))
+	defaultPort := 0
+	seenNames := make(map[string]int)
+
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(portTokens) {
+			continue
+		}
+
+		token := strings.TrimSpace(portTokens[idx])
+		if token == "" {
+			continue
+		}
+
+		portVal, err := common.PortValue(pod, token)
+		if portVal <= 0 {
+			continue
+		}
+		if err != nil {
+			return 0, nil, err
+		}
+
+		portName := servicePortNameForConsul(serviceEndpoints, token, int(portVal), idx, seenNames)
+		servicePort := api.ServicePort{
+			Name:    portName,
+			Port:    int(portVal),
+			Default: idx == defaultIdx,
+		}
+		if servicePort.Default {
+			defaultPort = servicePort.Port
+		}
+		servicePorts = append(servicePorts, servicePort)
+	}
+
+	if len(servicePorts) == 0 {
+		return 0, nil, nil
+	}
+
+	if len(servicePorts) == 1 {
+		return servicePorts[0].Port, nil, nil
+	}
+
+	if !servicePorts.HasDefault() {
+		servicePorts[0].Default = true
+		defaultPort = servicePorts[0].Port
+	}
+
+	if err := servicePorts.Validate(); err != nil {
+		return 0, nil, err
+	}
+
+	return defaultPort, servicePorts, nil
+}
+
+func matchingServicePortIndexes(pod corev1.Pod, serviceEndpoints corev1.Endpoints, portCount int) []int {
+	if portCount <= 0 {
+		return nil
+	}
+
+	indexes := make([]int, 0, portCount)
+	annotationService, hasAnnotationService := pod.Annotations[constants.AnnotationService]
+
+	if !hasAnnotationService || strings.TrimSpace(annotationService) == "" {
+		for i := range portCount {
+			indexes = append(indexes, i)
+		}
+		return indexes
+	}
+
+	serviceParts := strings.Split(annotationService, ",")
+	targetServiceName := serviceName(pod, serviceEndpoints)
+
+	if len(serviceParts) == portCount {
+		for i, servicePart := range serviceParts {
+			if strings.TrimSpace(servicePart) == targetServiceName {
+				indexes = append(indexes, i)
+			}
+		}
+		if len(indexes) > 0 {
+			return indexes
+		}
+	}
+
+	if len(serviceParts) == 1 && strings.TrimSpace(serviceParts[0]) == targetServiceName {
+		for i := 0; i < portCount; i++ {
+			indexes = append(indexes, i)
+		}
+		return indexes
+	}
+
+	if idx := getMultiPortIdx(pod, serviceEndpoints); idx >= 0 && idx < portCount {
+		return []int{idx}
+	}
+
+	return nil
+}
+
+func servicePortNameForConsul(serviceEndpoints corev1.Endpoints, token string, port int, idx int, seenNames map[string]int) string {
+	name := ""
+	for _, subset := range serviceEndpoints.Subsets {
+		for _, endpointPort := range subset.Ports {
+			if int(endpointPort.Port) == port && endpointPort.Name != "" {
+				name = endpointPort.Name
+				break
+			}
+		}
+		if name != "" {
+			break
+		}
+	}
+
+	if name == "" {
+		if _, err := strconv.Atoi(token); err != nil {
+			name = token
+		}
+	}
+
+	if name == "" {
+		name = fmt.Sprintf("port-%d", idx+1)
+	}
+
+	if seenNames[name] == 0 {
+		seenNames[name] = 1
+		return name
+	}
+
+	seenNames[name]++
+	return fmt.Sprintf("%s-%d", name, seenNames[name])
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
