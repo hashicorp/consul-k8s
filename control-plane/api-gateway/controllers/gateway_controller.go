@@ -67,7 +67,10 @@ type GatewayController struct {
 	allowK8sNamespacesSet mapset.Set
 	denyK8sNamespacesSet  mapset.Set
 	client.Client
-	ConsulConfig *consul.Config
+	ConsulConfig                  *consul.Config
+	gatewayScalingEnterpriseCheck interface {
+		enabled(logr.Logger) bool
+	}
 }
 
 // Reconcile handles the reconciliation loop for Gateway objects.
@@ -189,6 +192,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	consulGateway := r.getConsulGateway(consulKey)
 	r.fetchConsulHTTPRoutes(consulKey, resources)
 	r.fetchConsulTCPRoutes(consulKey, resources)
+	effectiveHelmConfig := r.effectiveHelmConfig(log)
 
 	binder := binding.NewBinder(binding.BinderConfig{
 		Logger:                log,
@@ -206,7 +210,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		ConsulGateway:         consulGateway,
 		ConsulGatewayServices: consulServices,
 		Policies:              policies,
-		HelmConfig:            r.HelmConfig,
+		HelmConfig:            effectiveHelmConfig,
 	})
 
 	updates := binder.Snapshot()
@@ -217,7 +221,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
-		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
+		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig, effectiveHelmConfig)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
 				log.Info("error updating object when updating gateway resources, will try to re-reconcile")
@@ -375,9 +379,9 @@ func (r *GatewayController) deleteGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
-func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig) error {
+func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log logr.Logger, gw *gwv1beta1.Gateway, gwcc *v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	gk := gatekeeper.New(log, r.Client, r.ConsulConfig)
-	err := gk.Upsert(ctx, *gw, *gwcc, r.HelmConfig)
+	err := gk.Upsert(ctx, *gw, *gwcc, config)
 	if err != nil {
 		return err
 	}
@@ -421,6 +425,10 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		cache:                 c,
 		gatewayCache:          gwc,
 		ConsulConfig:          config.ConsulClientConfig,
+	}
+
+	if config.HelmConfig.EnableGatewayScaling {
+		r.gatewayScalingEnterpriseCheck = newGatewayScalingEnterpriseCheck(config.ConsulClientConfig)
 	}
 
 	cleaner := binding.Cleaner{
@@ -519,6 +527,16 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter),
 		).
 		Complete(r)
+}
+
+func (r *GatewayController) effectiveHelmConfig(log logr.Logger) common.HelmConfig {
+	config := r.HelmConfig
+	if !config.EnableGatewayScaling || r.gatewayScalingEnterpriseCheck == nil {
+		return config
+	}
+
+	config.EnableGatewayScaling = r.gatewayScalingEnterpriseCheck.enabled(log)
+	return config
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
