@@ -33,7 +33,7 @@ variable "secondary_cluster_name" {
 
 variable "openshift_version" {
   type        = string
-  default     = "4.18.18"
+  default     = "4.18.36"
   description = "OpenShift version passed to rosa create cluster."
 }
 

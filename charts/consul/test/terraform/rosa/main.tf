@@ -354,39 +354,6 @@ resource "null_resource" "primary_cluster" {
     additional_args = local.primary_extra_args
   }
 
-  provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-ec"]
-    command     = <<-EOT
-      rosa describe cluster -c "${self.triggers.cluster_name}" >/dev/null 2>&1 || \
-      rosa create cluster \
-        --cluster-name "${self.triggers.cluster_name}" \
-        --region "${self.triggers.region}" \
-        --version "${self.triggers.version}" \
-        --sts \
-        --mode auto \
-        --yes \
-        ${self.triggers.topology_flag} \
-        --watch \
-        --machine-cidr "${self.triggers.machine_cidr}" \
-        --service-cidr "${self.triggers.service_cidr}" \
-        --pod-cidr "${self.triggers.pod_cidr}" \
-        --host-prefix ${self.triggers.host_prefix} \
-        --subnet-ids "${self.triggers.subnet_ids}" \
-        --replicas ${self.triggers.worker_replicas} \
-        --compute-machine-type "${self.triggers.worker_type}" \
-        ${self.triggers.additional_args}
-    EOT
-  }
-
-  provisioner "local-exec" {
-    when        = destroy
-    interpreter = ["/bin/bash", "-ec"]
-    command     = <<-EOT
-      rosa describe cluster -c "${self.triggers.cluster_name}" >/dev/null 2>&1 && \
-      rosa delete cluster -c "${self.triggers.cluster_name}" -y || true
-    EOT
-  }
-
   depends_on = [
     aws_vpc_peering_connection_options.requester,
     aws_vpc_peering_connection_options.accepter,
@@ -413,39 +380,6 @@ resource "null_resource" "secondary_cluster" {
     additional_args = local.secondary_extra_args
   }
 
-  provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-ec"]
-    command     = <<-EOT
-      rosa describe cluster -c "${self.triggers.cluster_name}" >/dev/null 2>&1 || \
-      rosa create cluster \
-        --cluster-name "${self.triggers.cluster_name}" \
-        --region "${self.triggers.region}" \
-        --version "${self.triggers.version}" \
-        --sts \
-        --mode auto \
-        --yes \
-        ${self.triggers.topology_flag} \
-        --watch \
-        --machine-cidr "${self.triggers.machine_cidr}" \
-        --service-cidr "${self.triggers.service_cidr}" \
-        --pod-cidr "${self.triggers.pod_cidr}" \
-        --host-prefix ${self.triggers.host_prefix} \
-        --subnet-ids "${self.triggers.subnet_ids}" \
-        --replicas ${self.triggers.worker_replicas} \
-        --compute-machine-type "${self.triggers.worker_type}" \
-        ${self.triggers.additional_args}
-    EOT
-  }
-
-  provisioner "local-exec" {
-    when        = destroy
-    interpreter = ["/bin/bash", "-ec"]
-    command     = <<-EOT
-      rosa describe cluster -c "${self.triggers.cluster_name}" >/dev/null 2>&1 && \
-      rosa delete cluster -c "${self.triggers.cluster_name}" -y || true
-    EOT
-  }
-
   depends_on = [
     aws_vpc_peering_connection_options.requester,
     aws_vpc_peering_connection_options.accepter,
@@ -466,71 +400,6 @@ resource "null_resource" "worker_sg_ingress" {
     secondary_vpc_id       = aws_vpc.secondary.id
     primary_vpc_cidr       = var.primary_vpc_cidr
     secondary_vpc_cidr     = var.secondary_vpc_cidr
-  }
-
-  provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-ec"]
-    command     = <<-EOT
-      find_node_sg() {
-        local region="$1"
-        local vpc_id="$2"
-        local infra_id="$3"
-
-        aws ec2 describe-security-groups \
-          --region "$region" \
-          --filters Name=vpc-id,Values="$vpc_id" Name=tag:red-hat-clustertype,Values=rosa \
-          --query 'SecurityGroups[].{GroupId:GroupId,GroupName:GroupName,Tags:Tags}' \
-          --output json | jq -r --arg infra_id "$infra_id" '
-            .[]
-            | select(
-                (.GroupName == ($infra_id + "-node"))
-                or (
-                  ((.Tags // []) | any(.Key == "sigs.k8s.io/cluster-api-provider-aws/role" and .Value == "node"))
-                  and ((.Tags // []) | any(.Key == ("sigs.k8s.io/cluster-api-provider-aws/cluster/" + $infra_id) and .Value == "owned"))
-                )
-              )
-            | .GroupId
-          ' | head -n 1
-      }
-
-      primary_infra_id="$(rosa describe cluster -c "${self.triggers.primary_cluster_name}" -o json | jq -r '.infra_id')"
-      secondary_infra_id="$(rosa describe cluster -c "${self.triggers.secondary_cluster_name}" -o json | jq -r '.infra_id')"
-
-      primary_worker_sg="$(find_node_sg "${self.triggers.primary_region}" "${self.triggers.primary_vpc_id}" "$${primary_infra_id}")"
-      secondary_worker_sg="$(find_node_sg "${self.triggers.secondary_region}" "${self.triggers.secondary_vpc_id}" "$${secondary_infra_id}")"
-
-      if [[ -z "$primary_worker_sg" || "$primary_worker_sg" == "None" ]]; then
-        echo "Unable to find primary node security group for $primary_infra_id in ${self.triggers.primary_vpc_id}" >&2
-        exit 1
-      fi
-
-      if [[ -z "$secondary_worker_sg" || "$secondary_worker_sg" == "None" ]]; then
-        echo "Unable to find secondary node security group for $secondary_infra_id in ${self.triggers.secondary_vpc_id}" >&2
-        exit 1
-      fi
-
-      aws ec2 authorize-security-group-ingress \
-        --region "${self.triggers.primary_region}" \
-        --group-id "$primary_worker_sg" \
-        --ip-permissions '[
-          {"IpProtocol":"tcp","FromPort":8300,"ToPort":8300,"IpRanges":[{"CidrIp":"${self.triggers.secondary_vpc_cidr}","Description":"Consul RPC from secondary ROSA VPC"}]},
-          {"IpProtocol":"tcp","FromPort":8301,"ToPort":8301,"IpRanges":[{"CidrIp":"${self.triggers.secondary_vpc_cidr}","Description":"Consul gossip TCP from secondary ROSA VPC"}]},
-          {"IpProtocol":"udp","FromPort":8301,"ToPort":8301,"IpRanges":[{"CidrIp":"${self.triggers.secondary_vpc_cidr}","Description":"Consul gossip UDP from secondary ROSA VPC"}]},
-          {"IpProtocol":"tcp","FromPort":8501,"ToPort":8501,"IpRanges":[{"CidrIp":"${self.triggers.secondary_vpc_cidr}","Description":"Consul HTTPS from secondary ROSA VPC"}]},
-          {"IpProtocol":"tcp","FromPort":8502,"ToPort":8502,"IpRanges":[{"CidrIp":"${self.triggers.secondary_vpc_cidr}","Description":"Consul gRPC TLS from secondary ROSA VPC"}]}
-        ]' >/dev/null 2>&1 || true
-
-      aws ec2 authorize-security-group-ingress \
-        --region "${self.triggers.secondary_region}" \
-        --group-id "$secondary_worker_sg" \
-        --ip-permissions '[
-          {"IpProtocol":"tcp","FromPort":8300,"ToPort":8300,"IpRanges":[{"CidrIp":"${self.triggers.primary_vpc_cidr}","Description":"Consul RPC from primary ROSA VPC"}]},
-          {"IpProtocol":"tcp","FromPort":8301,"ToPort":8301,"IpRanges":[{"CidrIp":"${self.triggers.primary_vpc_cidr}","Description":"Consul gossip TCP from primary ROSA VPC"}]},
-          {"IpProtocol":"udp","FromPort":8301,"ToPort":8301,"IpRanges":[{"CidrIp":"${self.triggers.primary_vpc_cidr}","Description":"Consul gossip UDP from primary ROSA VPC"}]},
-          {"IpProtocol":"tcp","FromPort":8501,"ToPort":8501,"IpRanges":[{"CidrIp":"${self.triggers.primary_vpc_cidr}","Description":"Consul HTTPS from primary ROSA VPC"}]},
-          {"IpProtocol":"tcp","FromPort":8502,"ToPort":8502,"IpRanges":[{"CidrIp":"${self.triggers.primary_vpc_cidr}","Description":"Consul gRPC TLS from primary ROSA VPC"}]}
-        ]' >/dev/null 2>&1 || true
-    EOT
   }
 
   depends_on = [

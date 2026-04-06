@@ -4,9 +4,9 @@ secondary_region = "us-west-2"
 primary_cluster_name   = "test-bed-east-tf"
 secondary_cluster_name = "test-bed-west-tf"
 
-openshift_version    = "4.18.18"
+openshift_version    = "4.18.36"
 worker_instance_type = "m5.xlarge"
-worker_replicas      = 3
+worker_replicas      = 2
 az_count             = 1
 host_prefix          = 23
 
