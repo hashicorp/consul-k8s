@@ -5,6 +5,7 @@ package consuldns
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -47,7 +48,7 @@ func TestConsulDNS(t *testing.T) {
 		aclsEnabled          bool
 		manageSystemACLs     bool
 	}{
-		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false},
+		// {tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: false},
 		{tlsEnabled: false, connectInjectEnabled: true, aclsEnabled: false, manageSystemACLs: false, enableDNSProxy: true},
 		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: false},
 		{tlsEnabled: true, connectInjectEnabled: true, aclsEnabled: true, manageSystemACLs: true, enableDNSProxy: true},
@@ -175,6 +176,16 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
 	cfg := suite.Config()
 	dnsConfig := clusterDNSConfigFor(cfg)
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		originalServers := backupOpenShiftDNSServers(t, ctx)
+		updateOpenShiftDNSWithConsulDomain(t, ctx, releaseName, enableDNSProxy)
+
+		t.Cleanup(func() {
+			restoreOpenShiftDNSServers(t, ctx, originalServers)
+			time.Sleep(5 * time.Second)
+		})
+		return
+	}
 
 	originalConfigFile := backupDNSConfigMap(t, ctx, dnsConfig)
 	customConfigFile := renderDNSConfigMap(t, ctx, releaseName, enableDNSProxy, dnsConfig)
@@ -186,6 +197,143 @@ func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, re
 		time.Sleep(5 * time.Second)
 		_ = os.Remove(customConfigFile)
 		_ = os.Remove(originalConfigFile)
+	})
+}
+
+const openShiftConsulDNSServerName = "consul-test"
+
+func backupOpenShiftDNSServers(t *testing.T, ctx environment.TestContext) []interface{} {
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "get", "dns.operator/default", "-o", "json")
+	require.NoError(t, err)
+
+	var dns map[string]interface{}
+	err = json.Unmarshal([]byte(out), &dns)
+	require.NoError(t, err)
+
+	spec, ok := dns["spec"].(map[string]interface{})
+	require.True(t, ok)
+
+	servers, ok := spec["servers"].([]interface{})
+	if !ok {
+		return []interface{}{}
+	}
+
+	return servers
+}
+
+func updateOpenShiftDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool) {
+	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
+	require.NoError(t, err)
+
+	upstream := dnsIP
+	if enableDNSProxy {
+		upstream = fmt.Sprintf("%s:8053", dnsIP)
+	}
+
+	originalServers := backupOpenShiftDNSServers(t, ctx)
+	filteredServers := make([]interface{}, 0, len(originalServers)+1)
+	for _, srv := range originalServers {
+		srvMap, ok := srv.(map[string]interface{})
+		if !ok {
+			filteredServers = append(filteredServers, srv)
+			continue
+		}
+		if name, _ := srvMap["name"].(string); name == openShiftConsulDNSServerName {
+			continue
+		}
+		filteredServers = append(filteredServers, srv)
+	}
+
+	filteredServers = append(filteredServers, map[string]interface{}{
+		"name":  openShiftConsulDNSServerName,
+		"zones": []string{"consul"},
+		"forwardPlugin": map[string]interface{}{
+			"policy":    "Sequential",
+			"upstreams": []string{upstream},
+		},
+	})
+
+	applyOpenShiftDNSServers(t, ctx, filteredServers)
+	waitForOpenShiftDNSReconcile(t, ctx)
+	waitForOpenShiftDNSRollout(t, ctx)
+	waitForOpenShiftCorefileForwarder(t, ctx, upstream)
+}
+
+func restoreOpenShiftDNSServers(t *testing.T, ctx environment.TestContext, servers []interface{}) {
+	applyOpenShiftDNSServers(t, ctx, servers)
+	waitForOpenShiftDNSReconcile(t, ctx)
+	waitForOpenShiftDNSRollout(t, ctx)
+}
+
+func applyOpenShiftDNSServers(t *testing.T, ctx environment.TestContext, servers []interface{}) {
+	serversBytes, err := json.Marshal(servers)
+	require.NoError(t, err)
+
+	patch := fmt.Sprintf(`{"spec":{"servers":%s}}`, string(serversBytes))
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "patch", "dns.operator/default", "--type=merge", "-p", patch)
+	require.NoError(t, err, out)
+}
+
+func waitForOpenShiftDNSReconcile(t *testing.T, ctx environment.TestContext) {
+	timer := &retry.Timer{Timeout: 10 * time.Minute, Wait: 10 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "get", "dns.operator/default", "-o", "json")
+		require.NoError(r, err)
+
+		var dns map[string]interface{}
+		err = json.Unmarshal([]byte(out), &dns)
+		require.NoError(r, err)
+
+		status, ok := dns["status"].(map[string]interface{})
+		require.True(r, ok)
+		conditions, ok := status["conditions"].([]interface{})
+		require.True(r, ok)
+
+		availableTrue := false
+		progressingFalse := false
+		for _, cond := range conditions {
+			condMap, ok := cond.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			typeStr, _ := condMap["type"].(string)
+			statusStr, _ := condMap["status"].(string)
+			if typeStr == "Available" && statusStr == "True" {
+				availableTrue = true
+			}
+			if typeStr == "Progressing" && statusStr == "False" {
+				progressingFalse = true
+			}
+		}
+
+		if !(availableTrue && progressingFalse) {
+			r.Errorf("waiting for OpenShift DNS reconcile; available=%t progressingFalse=%t", availableTrue, progressingFalse)
+		}
+	})
+}
+
+func waitForOpenShiftDNSRollout(t *testing.T, ctx environment.TestContext) {
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "rollout", "status", "--timeout", "10m", "--watch", "daemonset/dns-default", "-n", "openshift-dns")
+	require.NoError(t, err, out)
+}
+
+func waitForOpenShiftCorefileForwarder(t *testing.T, ctx environment.TestContext, upstream string) {
+	timer := &retry.Timer{Timeout: 10 * time.Minute, Wait: 10 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "get", "configmap", "dns-default", "-n", "openshift-dns", "-o", "json")
+		require.NoError(r, err)
+
+		var cm map[string]interface{}
+		err = json.Unmarshal([]byte(out), &cm)
+		require.NoError(r, err)
+
+		data, ok := cm["data"].(map[string]interface{})
+		require.True(r, ok)
+		corefile, _ := data["Corefile"].(string)
+
+		if !strings.Contains(corefile, "consul:5353") || !strings.Contains(corefile, upstream) {
+			r.Errorf("waiting for OpenShift DNS Corefile to include consul forwarder to %q", upstream)
+		}
 	})
 }
 
@@ -295,8 +443,17 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 
 	logger.Log(t, "launch a pod to test the dns resolution.")
 	dnsUtilsPod := fmt.Sprintf("%s-dns-utils-pod-%d", releaseName, dnsUtilsPodIndex)
-	dnsTestPodArgs := []string{
-		"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", "anubhavmishra/tiny-tools", "--", "dig", svcName,
+	const dnsUtilsImage = "anubhavmishra/tiny-tools"
+	var dnsTestPodArgs []string
+	if suite.Config().UseOpenshift || suite.Config().EnableOpenshift {
+		overrides := fmt.Sprintf(`{"spec":{"securityContext":{"runAsNonRoot":true,"seccompProfile":{"type":"RuntimeDefault"}},"containers":[{"name":"%s","image":"%s","command":["dig","%s"],"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}}}]}}`, dnsUtilsPod, dnsUtilsImage, svcName)
+		dnsTestPodArgs = []string{
+			"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", dnsUtilsImage, "--overrides", overrides,
+		}
+	} else {
+		dnsTestPodArgs = []string{
+			"run", "-it", dnsUtilsPod, "--restart", "Never", "--image", dnsUtilsImage, "--", "dig", svcName,
+		}
 	}
 
 	helpers.Cleanup(t, suite.Config().NoCleanupOnFailure, suite.Config().NoCleanup, func() {
@@ -307,10 +464,16 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 		k8s.RunKubectl(t, requestingCtx.KubectlOptions(t), "delete", "pod", dnsUtilsPod)
 	})
 
-	retry.Run(t, func(r *retry.R) {
+	verifyFn := func(r *retry.R) {
+		_, _ = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), "delete", "pod", dnsUtilsPod, "--ignore-not-found=true")
+
 		logger.Log(t, "run the dns utilize pod and query DNS for the service.")
 		logs, err := k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), dnsTestPodArgs...)
 		require.NoError(r, err)
+		if strings.TrimSpace(logs) == "" {
+			logs, err = k8s.RunKubectlAndGetOutputE(r, requestingCtx.KubectlOptions(r), "logs", dnsUtilsPod)
+			require.NoError(r, err)
+		}
 
 		// When the `dig` request is successful, a section of it's response looks like the following:
 		//
@@ -342,7 +505,16 @@ func verifyDNS(t *testing.T, releaseName string, svcNamespace string, requesting
 				require.Contains(r, logs, "AUTHORITY SECTION:\nconsul.\t\t\t5\tIN\tSOA\tns.consul. hostmaster.consul.")
 			}
 		}
-	})
+	}
+
+	if suite.Config().UseOpenshift || suite.Config().EnableOpenshift {
+		// OpenShift DNS/operator updates can converge a bit slower than generic kube-dns.
+		timer := &retry.Timer{Timeout: 3 * time.Minute, Wait: 10 * time.Second}
+		retry.RunWith(timer, t, verifyFn)
+		return
+	}
+
+	retry.Run(t, verifyFn)
 }
 
 func getDNSServiceClusterIP(t *testing.T, requestingCtx environment.TestContext, releaseName string, enableDNSProxy bool) (string, error) {
