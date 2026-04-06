@@ -433,11 +433,10 @@ func TestVault_Partitions(t *testing.T) {
 		"global.secretsBackend.vault.agentAnnotations":    fmt.Sprintf("vault.hashicorp.com/tls-server-name: %s-vault", vaultReleaseName),
 		"global.secretsBackend.vault.adminPartitionsRole": adminPartitionsRole,
 
-		"externalServers.enabled":             "true",
-		"externalServers.hosts[0]":            partitionSvcAddress,
-		"externalServers.tlsServerName":       "server.dc1.consul",
-		"externalServers.k8sAuthMethodHost":   k8sAuthMethodHost,
-		"global.federation.k8sAuthMethodHost": k8sAuthMethodHost,
+		"externalServers.enabled":           "true",
+		"externalServers.hosts[0]":          partitionSvcAddress,
+		"externalServers.tlsServerName":     "server.dc1.consul",
+		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
 
 		"client.enabled":           "true",
 		"client.exposeGossipPorts": "true",
