@@ -261,7 +261,12 @@ func (h *HelmCluster) deleteStaleGatewayAPICRDs(t *testing.T) {
 		"controlplanerequestlimits.consul.hashicorp.com": {},
 		"gatewayclassconfigs.consul.hashicorp.com":       {},
 		"meshservices.consul.hashicorp.com":              {},
-		"tcproutes.gateway.networking.k8s.io":            {},
+		//TODO::delete only if OCP greater than 4.18 is false
+		"tcproutes.gateway.networking.k8s.io":       {},
+		"gatewayclasses.gateway.networking.k8s.io":  {},
+		"gateways.gateway.networking.k8s.io":        {},
+		"httproutes.gateway.networking.k8s.io":      {},
+		"referencegrants.gateway.networking.k8s.io": {},
 	}
 
 	allCRDNamesOutput, err := k8s.RunKubectlAndGetOutputE(
@@ -409,7 +414,7 @@ func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 	services, err := h.kubernetesClient.CoreV1().Services(namespace).List(context.Background(), listOptions)
 	require.NoError(t, err)
 	for _, service := range services.Items {
-		deleteList(h.deleteServiceWithFinalizerCleanup(context.Background(), namespace, &service, metav1.DeleteOptions{}))
+		deleteList(h.deleteServiceWithFinalizerCleanup(context.Background(), namespace, &service, h.cleanupDeleteOptions()))
 	}
 
 	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.MatchingLabels{"chart": "consul-helm"})
@@ -448,19 +453,47 @@ func (h *HelmCluster) deleteServiceWithFinalizerCleanup(ctx context.Context, nam
 		return nil
 	}
 
-	if len(service.Finalizers) > 0 {
-		serviceCopy := service.DeepCopy()
+	serviceName := service.Name
+	liveService, err := h.kubernetesClient.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(liveService.Finalizers) > 0 {
+		serviceCopy := liveService.DeepCopy()
 		serviceCopy.Finalizers = nil
-		if _, err := h.kubernetesClient.CoreV1().Services(namespace).Update(ctx, serviceCopy, metav1.UpdateOptions{}); err != nil && !errors.IsNotFound(err) {
+		if _, err := h.kubernetesClient.CoreV1().Services(namespace).Update(ctx, serviceCopy, metav1.UpdateOptions{}); err != nil {
+			if isIgnorableServiceCleanupError(err) {
+				return nil
+			}
 			return err
 		}
 	}
 
-	err := h.kubernetesClient.CoreV1().Services(namespace).Delete(ctx, service.Name, deleteOpts)
-	if err != nil && !errors.IsNotFound(err) {
+	err = h.kubernetesClient.CoreV1().Services(namespace).Delete(ctx, serviceName, deleteOpts)
+	if err != nil {
+		if isIgnorableServiceCleanupError(err) {
+			return nil
+		}
 		return err
 	}
 	return nil
+}
+
+func isIgnorableServiceCleanupError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.IsNotFound(err) || errors.IsConflict(err) || errors.IsInvalid(err) {
+		return true
+	}
+
+	errText := err.Error()
+	return strings.Contains(errText, "StorageError: invalid object") || strings.Contains(errText, "Precondition failed: UID in precondition")
 }
 
 func (h *HelmCluster) deleteStaleNamedSecretsForRelease(t require.TestingT, releaseName string) {
@@ -623,7 +656,7 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		for _, service := range services.Items {
 			if strings.Contains(service.Name, h.releaseName) {
 				if h.isOpenShift {
-					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, metav1.DeleteOptions{})
+					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, h.cleanupDeleteOptions())
 					require.NoError(r, err)
 				} else {
 					err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
