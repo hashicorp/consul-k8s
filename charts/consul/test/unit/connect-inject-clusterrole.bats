@@ -265,7 +265,7 @@ load _helpers
       -s templates/connect-inject-clusterrole.yaml  \
       --set 'global.openshift.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.rules[14].resourceNames | index("restricted-v2")' | tee /dev/stderr)
+      yq -r '.rules[] | select(.apiGroups[] == "security.openshift.io" and .resources[] == "securitycontextconstraints") | .resourceNames | index("restricted-v2")' | tee /dev/stderr)
   [ "${actual}" != null ]
 }
 
@@ -276,6 +276,6 @@ load _helpers
       --set 'global.openshift.enabled=true' \
       --set 'connectInject.apiGateway.managedGatewayClass.openshiftSCCName=fakescc' \
       . | tee /dev/stderr |
-      yq -r '.rules[14].resourceNames | index("fakescc")' | tee /dev/stderr)
+      yq -r '.rules[] | select(.apiGroups[] == "security.openshift.io" and .resources[] == "securitycontextconstraints") | .resourceNames | index("fakescc")' | tee /dev/stderr)
   [ "${actual}" != null ]
 }
