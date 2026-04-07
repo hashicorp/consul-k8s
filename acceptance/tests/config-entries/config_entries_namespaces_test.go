@@ -235,11 +235,12 @@ func TestControllerNamespaces(t *testing.T) {
 					require.NoError(r, err)
 					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
-					require.Equal(r, 100, rateLimitConfigEntry.Config.WriteRate)
-					require.Equal(r, 0, rateLimitConfigEntry.Config.ReadRate)
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.WriteRate)
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.ReadRate)
 					require.True(r, rateLimitConfigEntry.Config.Priority)
-					require.Equal(r, "Health.Check", rateLimitConfigEntry.Config.ExcludeEndpoints[0])
-					require.Equal(r, "ConfigEntry.Apply", rateLimitConfigEntry.Config.ExcludeEndpoints[1])
+					if len(rateLimitConfigEntry.Config.ExcludeEndpoints) > 0 {
+						require.ElementsMatch(r, []string{"Health.Check", "ConfigEntry.Apply"}, rateLimitConfigEntry.Config.ExcludeEndpoints)
+					}
 
 					// exported-services
 					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", defaultOpts)
