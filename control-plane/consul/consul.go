@@ -96,3 +96,19 @@ func NewClientFromConnMgr(config *Config, watcher ServerConnectionManager) (*cap
 	}
 	return consulClient, nil
 }
+
+// IsEnterpriseDistribution returns true when the connected Consul cluster
+// reports a valid enterprise license.
+func IsEnterpriseDistribution(config *Config, watcher ServerConnectionManager) (bool, error) {
+	client, err := NewClientFromConnMgr(config, watcher)
+	if err != nil {
+		return false, err
+	}
+
+	reply, err := client.Operator().LicenseGet(nil)
+	if err != nil {
+		return false, err
+	}
+
+	return reply != nil && reply.Valid, nil
+}
