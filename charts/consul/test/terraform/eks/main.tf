@@ -126,6 +126,7 @@ provider "kubernetes" {
 
 resource "aws_iam_role" "csi-driver-role" {
   count = var.cluster_count
+  name  = "consul-k8s-csi-role-${random_id.suffix[count.index].dec}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
