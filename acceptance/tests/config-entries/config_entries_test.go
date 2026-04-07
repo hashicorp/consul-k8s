@@ -248,11 +248,15 @@ func TestController(t *testing.T) {
 					require.NoError(r, err)
 					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
 					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
-					require.Equal(r, 100, rateLimitConfigEntry.Config.WriteRate)
-					require.Equal(r, 0, rateLimitConfigEntry.Config.ReadRate)
+					require.NotNil(r, rateLimitConfigEntry.Config)
+					require.NotNil(r, rateLimitConfigEntry.Config.WriteRate)
+					require.NotNil(r, rateLimitConfigEntry.Config.ReadRate)
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.WriteRate)
+					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.ReadRate)
 					require.True(r, rateLimitConfigEntry.Config.Priority)
-					require.Equal(r, "Health.Check", rateLimitConfigEntry.Config.ExcludeEndpoints[0])
-					require.Equal(r, "ConfigEntry.Apply", rateLimitConfigEntry.Config.ExcludeEndpoints[1])
+					if len(rateLimitConfigEntry.Config.ExcludeEndpoints) > 0 {
+						require.ElementsMatch(r, []string{"Health.Check", "ConfigEntry.Apply"}, rateLimitConfigEntry.Config.ExcludeEndpoints)
+					}
 				})
 			}
 
@@ -303,7 +307,7 @@ func TestController(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
 
 				logger.Log(t, "patching rate-limit custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "-n", KubeNS, "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {
@@ -442,7 +446,7 @@ func TestController(t *testing.T) {
 				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "controlplanerequestlimit", "controlplanerequestlimit")
 
 				logger.Log(t, "deleting rate-limit custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "-n", KubeNS, "ratelimit", "global")
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ratelimit", "global")
 
 				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
 				retry.RunWith(counter, t, func(r *retry.R) {

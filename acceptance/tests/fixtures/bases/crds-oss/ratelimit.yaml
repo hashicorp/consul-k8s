@@ -4,7 +4,7 @@ metadata:
   name: global
 spec:
   config:
-    readRate: 0
+    readRate: 100
     writeRate: 100
     priority: true
     excludeEndpoints:
