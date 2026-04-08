@@ -178,7 +178,6 @@ var (
 )
 
 func init() {
-	fmt.Printf("adding to the scheme in the inject-connect command\n")
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// We need v1alpha1 here to add the peering api to the scheme
@@ -188,7 +187,6 @@ func init() {
 	utilruntime.Must(gwv1beta1exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-	fmt.Printf("added to the scheme")
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -305,7 +303,7 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
 
-	// enable custom crds controller flags
+	// Enable custom crds controller flags.
 
 	c.consul = &flags.ConsulFlags{}
 
@@ -448,7 +446,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	err = c.configureControllers(ctx, mgr, watcher)
-
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1

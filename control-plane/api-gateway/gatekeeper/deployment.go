@@ -61,10 +61,10 @@ func (g *Gatekeeper) upsertDeployment(ctx context.Context, gateway gwv1.Gateway,
 	if err != nil {
 		return err
 	}
-	g.Log.Info("desired deployment: " + fmt.Sprintf("%+v", deployment))
+	g.Log.V(1).Info("desired deployment: " + fmt.Sprintf("%+v", deployment))
 
 	if exists {
-		g.Log.Info("Existing Gateway Deployment found.")
+		g.Log.V(1).Info("Existing Gateway Deployment found.")
 
 		// If the user has set the number of replicas, let's respect that.
 		deployment.Spec.Replicas = existingDeployment.Spec.Replicas

@@ -164,7 +164,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	tcpRoutes := []gwv1alpha2.TCPRoute{}
 	log.Info("TCP supporting " + fmt.Sprintf("%+v", r.supportsTCPRoute))
 	if r.supportsTCPRoute {
-		log.Info("inside TCP supporting " + fmt.Sprintf("%+v", r.supportsTCPRoute))
 		tcpRoutes, err = r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
 		if err != nil {
 			log.Error(err, "unable to list TCPRoutes")
@@ -215,7 +214,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	binder := binding.NewBinder(config)
 
 	updates := binder.Snapshot()
-	r.Log.Info("updates binder: " + fmt.Sprintf("%+v", updates))
+	log.Info("updates binder: " + fmt.Sprintf("%+v", updates))
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
@@ -478,7 +477,6 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			builder.WithPredicates(predicate),
 		)
 
-	mgr.GetLogger().Info("config received %v", config.EnableTCP)
 	if config.EnableTCP {
 		r.supportsTCPRoute = true
 		mgr.GetLogger().Info("TCPRoute CRD detected - enabling TCPRoute support")
@@ -896,18 +894,7 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 	return service, nil
 }
 
-// get deployment for gateway
-func (c *GatewayController) getDeployedGatewayDeployment(ctx context.Context, gateway types.NamespacedName) (*appsv1.Deployment, error) {
-	deployment := &appsv1.Deployment{}
-	// we use the implicit association of a deployment name/namespace with a corresponding gateway
-	if err := c.Client.Get(ctx, gateway, deployment); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-
-	return deployment, nil
-}
-
-// get pods for gateway
+// Gets pods for gateway.
 func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1.Gateway) ([]corev1.Pod, error) {
 	labels := common.LabelsForGateway(&gateway)
 

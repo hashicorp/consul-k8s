@@ -13,8 +13,6 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
-	// gwv1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -46,11 +44,7 @@ const (
 // These indexes are similar to indexes used in databases to speed up queries.
 // They allow us to quickly find objects based on a field value.
 func RegisterFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
-	// for _, index := range indexes {
-	// 	if err := mgr.GetFieldIndexer().IndexField(ctx, index.target, index.name, index.indexerFunc); err != nil {
-	// 		return err
-	// 	}
-	// }
+
 	log := mgr.GetLogger()
 
 	for _, idx := range indexes {

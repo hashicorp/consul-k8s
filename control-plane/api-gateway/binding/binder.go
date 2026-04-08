@@ -201,7 +201,6 @@ func (b *Binder) Snapshot() *Snapshot {
 		})
 
 		metricsConfig := common.GatewayMetricsConfig(b.config.Gateway, *gatewayClassConfig, b.config.HelmConfig)
-		b.config.Logger.Info("registrationPods count", "count", len(registrationPods))
 		registrations := registrationsForPods(metricsConfig, entry.Namespace, b.config.Gateway, registrationPods)
 		snapshot.Consul.Registrations = registrations
 
@@ -227,9 +226,6 @@ func (b *Binder) Snapshot() *Snapshot {
 		// calculate the status for the gateway
 		var status gwv1.GatewayStatus
 		for i, listener := range b.config.Gateway.Spec.Listeners {
-			b.config.Logger.Info("processing listener for status", "listener", listener.Name, "protocol", listener.Protocol)
-			b.config.Logger.Info("listener supported kinds", listener.AllowedRoutes)
-			b.config.Logger.Info("supported kinds for listener", "kinds", supportedKinds(listener))
 			status.Listeners = append(status.Listeners, gwv1.ListenerStatus{
 				Name:           listener.Name,
 				SupportedKinds: supportedKinds(listener),
@@ -237,7 +233,7 @@ func (b *Binder) Snapshot() *Snapshot {
 				Conditions:     listenerValidation.Conditions(b.config.Gateway.Generation, i),
 			})
 		}
-		b.config.Logger.Info("status listeners", "listeners", status.Listeners)
+
 		status.Conditions = b.config.Gateway.Status.Conditions
 
 		// we do this loop to not accidentally override any additional statuses that
@@ -250,7 +246,6 @@ func (b *Binder) Snapshot() *Snapshot {
 		// only mark the gateway as needing a status update if there's a diff with its old
 		// status, this keeps the controller from infinitely reconciling
 		if !common.GatewayStatusesEqual(status, b.config.Gateway.Status) {
-			b.config.Logger.Info("gatewayStatus", "gateway", &b.config.Gateway)
 			b.config.Gateway.Status = status
 			snapshot.Kubernetes.StatusUpdates.Add(&b.config.Gateway)
 		}
@@ -429,19 +424,6 @@ func addressesFromPodHosts(pods []corev1.Pod) []gwv1.GatewayStatusAddress {
 func isDeleted(object client.Object) bool {
 	return !object.GetDeletionTimestamp().IsZero()
 }
-
-// func supportedKinds(listener gwv1.Listener) []gwv1.RouteGroupKind {
-
-// 	if listener.AllowedRoutes != nil && listener.AllowedRoutes.Kinds != nil {
-// 		return common.Filter(listener.AllowedRoutes.Kinds, func(kind gwv1.RouteGroupKind) bool {
-// 			if _, ok := allSupportedRouteKinds[kind.Kind]; !ok {
-// 				return true
-// 			}
-// 			return !common.NilOrEqual(kind.Group, gwv1.GroupVersion.Group)
-// 		})
-// 	}
-// 	return supportedKindsForProtocol[listener.Protocol]
-// }
 
 func supportedKinds(listener gwv1.Listener) []gwv1.RouteGroupKind {
 	switch listener.Protocol {

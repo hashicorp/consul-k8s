@@ -3,52 +3,18 @@
 
 package generatemanifests
 
-// currently we are generating manifests for all, better to look for helm release name in the future to only generate for specific releases.
-// There is a high chance that all the manifests generated might not have the helm release name, because the applications httproutes can be a
+// Currently we are generating manifests.
+// 1. We generate all the manifests for the gateway API obkects under API version gateway.networking.k8s.io, update the version from v1beta1 to v1
+// for gateways, httproutes; we retain v1beta1 to referencegrants and v1alpha2 tcproutes and dump them into the output dir.
+// 2. We also generate manifests for consul.hashicorp.com API group when the user opts for it.
+
+// NOTE:There is a high chance that all the manifests generated might not have the helm release name, because the applications httproutes can be a
 // separate helm release and the gateway can be a separate helm release.
 // OR the httproutes or any obj is a direct install with kubectl and not managed by helm at all.
 
-// Thus the way to identify the relevant manifests it to look for the parentref of the obj, then get the gatewayclass of the gateway referred
+// TODO: Thus the way to identify the relevant manifests it to look for the parentref of the obj, then get the gatewayclass of the gateway referred
 // then get the helm release name from the gatewayclass labels, and only dump the manifests for the objects which have the same helm release name as the flag provided by user.
 // labels to look for: release: <release-name-flag>
-
-/*
-type GatewayClassControllerMap struct {
-	Gateway GatewayClassDetails `json:"gateway" yaml:"gateway"`
-}
-
-type GatewayClassDetails struct {
-	GatewayClass string `json:"gatewayclass" yaml:"gatewayclass"`
-}
-
-var gatewayclassListMap = GatewayClassControllerMap{
-	Gateway: GatewayClassDetails{
-		GatewayClass: "controller-name",
-	},
-}
-  kind: GatewayClass
-  metadata:
-    creationTimestamp: "2026-03-08T17:10:10Z"
-    finalizers:
-    - gateway-exists-finalizer.consul.hashicorp.com
-    generation: 1
-    labels:
-      app: consul
-      chart: consul-helm
-      component: api-gateway
-      heritage: Helm
-      release: consul
-    name: consul
-    resourceVersion: "8051"
-    uid: e3250842-ed7c-49fc-b111-7bcf0153c1bc
-  spec:
-    controllerName: consul.hashicorp.com/gateway-controller
-    parametersRef:
-      group: consul.hashicorp.com
-      kind: GatewayClassConfig
-      name: consul-api-gateway
-
-*/
 
 import (
 	"context"

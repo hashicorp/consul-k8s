@@ -21,7 +21,6 @@ import (
 
 // bindRoute contains the main logic for binding a route to a given gateway.
 func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1.SectionName]int, snapshot *Snapshot) {
-	r.config.Logger.Info("INside bindRoute", "route", client.ObjectKeyFromObject(route))
 	// use the non-normalized key since we can't write back enterprise metadata
 	// on non-enterprise installations
 	routeConsulKey := r.config.Translator.NonNormalizedConfigEntryReference(entryKind(route), client.ObjectKeyFromObject(route))
@@ -103,7 +102,6 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1.SectionName]
 
 	namespace := r.config.Namespaces[route.GetNamespace()]
 	groupKind := route.GetObjectKind().GroupVersionKind().GroupKind()
-	r.config.Logger.Info("bindRoute", "namespace", namespace, "groupKind", groupKind, "filteredParents", filteredParents)
 
 	var results parentBindResults
 
@@ -111,7 +109,6 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1.SectionName]
 		var result bindResults
 
 		listeners := listenersFor(&r.config.Gateway, ref.SectionName)
-		r.config.Logger.Info("bindRoute", "listeners for ref", listeners, "ref", ref)
 		// If there are no matching listeners, then we failed to find the parent
 		if len(listeners) == 0 {
 			var sectionName gwv1.SectionName
@@ -126,14 +123,7 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1.SectionName]
 		}
 
 		for _, listener := range listeners {
-			r.config.Logger.Info("bindRoute", "checking listener", listener.Name, "protocol", listener.Protocol)
-			// if !routeKindIsAllowedForListener(supportedKindsForProtocol[listener.Protocol], groupKind) {
-			// 	result = append(result, bindResult{
-			// 		section: listener.Name,
-			// 		err:     errRouteNotAllowedByListeners_Protocol,
-			// 	})
-			// 	continue
-			// }
+
 			if !routeAllowedByProtocol(listener, route) {
 				result = append(result, bindResult{
 					section: listener.Name,
@@ -157,14 +147,6 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1.SectionName]
 				})
 				continue
 			}
-
-			// if !routeAllowedForListenerHostname(listener.Hostname, getRouteHostnames(route)) {
-			// 	result = append(result, bindResult{
-			// 		section: listener.Name,
-			// 		err:     errRouteNoMatchingListenerHostname,
-			// 	})
-			// 	continue
-			// }
 
 			if _, ok := route.(*gwv1.HTTPRoute); ok {
 				if !routeAllowedForListenerHostname(listener.Hostname, getRouteHostnames(route)) {

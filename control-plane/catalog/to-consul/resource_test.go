@@ -584,28 +584,6 @@ func getinformer() (*fake.Clientset, cache.SharedIndexInformer) {
 	return client, informer
 }
 
-func getinformer2() (*fake.Clientset, cache.SharedIndexInformer) {
-	client := fake.NewClientset()
-
-	informer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return client.NetworkingV1().
-					Ingresses(metav1.NamespaceAll).
-					List(context.Background(), options)
-			},
-
-			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return watch.NewEmptyWatch(), nil
-			},
-		},
-		&networkingv1.Ingress{},
-		500*time.Millisecond,
-		cache.Indexers{},
-	)
-	return client, informer
-}
-
 // Test externalIP with Prefix.
 func TestServiceResource_externalIPPrefix(t *testing.T) {
 	t.Parallel()
