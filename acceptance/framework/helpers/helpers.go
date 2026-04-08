@@ -406,6 +406,49 @@ func WaitForInput(t *testing.T) {
 // and delete/recreate fallback to make the tests more robust against intermittent issues.
 // It checks for the HTTPRoute's existence multiple times per attempt, and if
 // not found, attempts to delete and recreate the resource by reapplying the kustomize manifest.
+func WaitForGatewayClassConfigWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, configName, kustomizeDir string) {
+	t.Helper()
+
+	logger.Log(t, "waiting for gatewayclassconfig to be created")
+	found := false
+	maxAttempts := 3
+	checksPerAttempt := 5
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		logger.Logf(t, "gatewayclassconfig existence check attempt %d/%d", attempt, maxAttempts)
+
+		for i := range checksPerAttempt {
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "gatewayclassconfig", configName)
+			if err == nil {
+				found = true
+				logger.Logf(t, "gatewayclassconfig %s found successfully", configName)
+				break
+			}
+			logger.Logf(t, "gatewayclassconfig check %d/%d: %v", i+1, checksPerAttempt, err)
+			time.Sleep(2 * time.Second)
+		}
+
+		if found {
+			break
+		}
+
+		if attempt < maxAttempts {
+			logger.Logf(t, "gatewayclassconfig not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", "gatewayclassconfig", configName, "--ignore-not-found=true")
+			if err != nil {
+				logger.Logf(t, "warning: failed to delete gatewayclassconfig %s: %v", configName, err)
+			}
+			out, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "apply", "-k", kustomizeDir)
+			require.NoError(t, err, out)
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if !found {
+		require.Failf(t, "gatewayclassconfig %s was not found after %d attempts with delete/recreate", configName, maxAttempts)
+	}
+}
+
 func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, routeName, kustomizeDir string) {
 	t.Helper()
 

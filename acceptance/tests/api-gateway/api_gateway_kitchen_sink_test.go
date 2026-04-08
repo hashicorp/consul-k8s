@@ -146,17 +146,16 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 		gatewayAddress string
 		httpRoute      gwv1.HTTPRoute
 	)
+	namespace := ctx.KubectlOptions(t).Namespace
 	logger.Log(t, "waiting for gateway and httproute to be ready")
 
 	// Wait for Gateway to be ready
-	gatewayAddress = waitForGatewayReady(t, ctx, k8sClient, "gateway", "default", fixturePath, applyCounter)
+	gatewayAddress = waitForGatewayReady(t, ctx, k8sClient, "gateway", namespace, fixturePath, applyCounter)
 
 	// Wait for HTTPRoute to be ready
-	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", "default", fixturePath, applyCounter)
+	waitForHTTPRouteReady(t, ctx, k8sClient, "http-route", namespace, fixturePath, applyCounter)
 
 	if cfg.EnableOpenshift {
-		namespace := ctx.KubectlOptions(t).Namespace
-
 		logger.Log(t, "waiting for gateway and httproute to be ready")
 
 		// Waiting for gateway to be ready.

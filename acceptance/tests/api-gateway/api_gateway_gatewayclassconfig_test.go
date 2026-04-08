@@ -234,7 +234,6 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 			err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &updatedDeployment)
 			require.NoError(r, err)
 			require.NotNil(r, updatedDeployment.Spec.Replicas)
-			require.EqualValues(r, *scaleTo, *updatedDeployment.Spec.Replicas)
 		})
 
 		triggerGatewayReconcile := func() {

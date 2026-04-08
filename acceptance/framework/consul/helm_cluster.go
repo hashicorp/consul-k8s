@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -171,7 +171,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	// check and remove any CRDs with finalizers
 	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
 
-	if h.isOpenShift {
+	if h.isOpenShift && !h.SkipCheckForPreviousInstallations {
 		h.cleanupOpenShiftBeforeInstall(t)
 	}
 
@@ -226,6 +226,10 @@ func (h *HelmCluster) Create(t *testing.T) {
 			h.deleteGatewayResourcesJobIfExistsForRelease(r, h.releaseName)
 			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		}
+		if err != nil && isServerACLInitCleanupAlreadyExistsError(err) {
+			h.deleteServerACLInitCleanupJobIfExistsForRelease(r, h.releaseName)
+			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+		}
 		require.NoError(r, err)
 	})
 
@@ -245,11 +249,299 @@ func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
 
 	logger.Logf(t, "Cleaning stale Consul resources before Helm install in OpenShift namespace %s", h.helmOptions.KubectlOptions.Namespace)
 
+	h.deleteStaleTestNamespaces(t)
 	h.deleteStaleNamedSecretsForRelease(t, h.releaseName)
 	h.deleteGatewayHookJobsIfExistsForRelease(t, h.releaseName)
 	h.deleteStaleHelmReleases(t)
 	h.deleteStaleGatewayAPICRDs(t)
+	h.deleteStaleGatewayAndConsulAPIResources(t)
+	if strings.HasPrefix(t.Name(), "TestAPIGateway") {
+		h.deleteStaleAPIGatewayTestClusterResources(t)
+	}
+	h.deleteStaleStaticPrefixedResources(t)
 	h.deleteStaleLabeledResources(t)
+}
+
+func (h *HelmCluster) deleteStaleAPIGatewayTestClusterResources(t *testing.T) {
+	t.Helper()
+	h.deleteStaleAPIGatewayTestSecrets(t)
+
+	for _, name := range []string{"gateway-class", "controlled-gateway-class-one", "controlled-gateway-class-two", "uncontrolled-gateway-class"} {
+		h.deleteStaleGatewayClass(t, name)
+	}
+
+	for _, name := range []string{"gateway-class-config", "controlled-gateway-class-config"} {
+		h.deleteStaleGatewayClassConfig(t, name)
+	}
+}
+
+func (h *HelmCluster) deleteStaleAPIGatewayTestSecrets(t *testing.T) {
+	t.Helper()
+
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	secrets, err := h.kubernetesClient.CoreV1().Secrets(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "test-certificate=true",
+	})
+	require.NoError(t, err)
+
+	for _, secret := range secrets.Items {
+		logger.Logf(t, "Deleting stale API gateway test secret %s in namespace %s before Helm install", secret.Name, namespace)
+		err := h.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			require.NoError(t, err)
+		}
+	}
+}
+
+func (h *HelmCluster) deleteStaleGatewayClass(t *testing.T, name string) {
+	t.Helper()
+
+	ctx := context.Background()
+	var gatewayClass gwv1.GatewayClass
+	err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &gatewayClass)
+	if errors.IsNotFound(err) {
+		return
+	}
+	if isMissingRuntimeKindError(err) {
+		logger.Logf(t, "Skipping stale GatewayClass cleanup for %s because the kind is not available yet: %v", name, err)
+		return
+	}
+	require.NoError(t, err)
+
+	if len(gatewayClass.Finalizers) > 0 {
+		gatewayClassCopy := gatewayClass.DeepCopy()
+		gatewayClassCopy.Finalizers = nil
+		err = h.runtimeClient.Update(ctx, gatewayClassCopy)
+		if err != nil && !errors.IsNotFound(err) && !errors.IsConflict(err) {
+			require.NoError(t, err)
+		}
+	}
+
+	logger.Logf(t, "Deleting stale GatewayClass %s before Helm install", name)
+	err = h.runtimeClient.Delete(ctx, &gatewayClass)
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+
+	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+		var liveGatewayClass gwv1.GatewayClass
+		err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &liveGatewayClass)
+		if errors.IsNotFound(err) {
+			return
+		}
+		if isMissingRuntimeKindError(err) {
+			return
+		}
+		require.NoError(r, err)
+		r.Errorf("gatewayclass %s still exists after cleanup", name)
+	})
+}
+
+func (h *HelmCluster) deleteStaleGatewayClassConfig(t *testing.T, name string) {
+	t.Helper()
+
+	ctx := context.Background()
+	var gatewayClassConfig v1alpha1.GatewayClassConfig
+	err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &gatewayClassConfig)
+	if errors.IsNotFound(err) {
+		return
+	}
+	if isMissingRuntimeKindError(err) {
+		logger.Logf(t, "Skipping stale GatewayClassConfig cleanup for %s because the kind is not available yet: %v", name, err)
+		return
+	}
+	require.NoError(t, err)
+
+	if len(gatewayClassConfig.Finalizers) > 0 {
+		gatewayClassConfigCopy := gatewayClassConfig.DeepCopy()
+		gatewayClassConfigCopy.Finalizers = nil
+		err = h.runtimeClient.Update(ctx, gatewayClassConfigCopy)
+		if err != nil && !errors.IsNotFound(err) && !errors.IsConflict(err) {
+			require.NoError(t, err)
+		}
+	}
+
+	logger.Logf(t, "Deleting stale GatewayClassConfig %s before Helm install", name)
+	err = h.runtimeClient.Delete(ctx, &gatewayClassConfig)
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+
+	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+		var liveGatewayClassConfig v1alpha1.GatewayClassConfig
+		err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &liveGatewayClassConfig)
+		if errors.IsNotFound(err) {
+			return
+		}
+		if isMissingRuntimeKindError(err) {
+			return
+		}
+		require.NoError(r, err)
+		r.Errorf("gatewayclassconfig %s still exists after cleanup", name)
+	})
+}
+
+func isMissingRuntimeKindError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errText := err.Error()
+	return strings.Contains(errText, "no matches for kind") ||
+		strings.Contains(errText, "no kind is registered for the type") ||
+		strings.Contains(errText, "unable to retrieve the complete list of server APIs") ||
+		strings.Contains(errText, "no matches for gateway.networking.k8s.io/")
+}
+
+func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
+	t.Helper()
+
+	for _, namespace := range []string{"ns1", "ns2"} {
+		ns, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			continue
+		}
+		require.NoError(t, err)
+
+		if len(ns.Spec.Finalizers) > 0 {
+			nsCopy := ns.DeepCopy()
+			nsCopy.Spec.Finalizers = nil
+			_, err = h.kubernetesClient.CoreV1().Namespaces().Finalize(context.Background(), nsCopy, metav1.UpdateOptions{})
+			if err != nil && !errors.IsNotFound(err) && !errors.IsConflict(err) {
+				require.NoError(t, err)
+			}
+		}
+
+		logger.Logf(t, "Deleting stale test namespace %s before Helm install", namespace)
+		err = h.kubernetesClient.CoreV1().Namespaces().Delete(context.Background(), namespace, h.cleanupDeleteOptions())
+		if err != nil && !errors.IsNotFound(err) {
+			require.NoError(t, err)
+		}
+
+		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+			_, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return
+			}
+			require.NoError(r, err)
+			r.Errorf("namespace %s still exists after cleanup", namespace)
+		})
+	}
+}
+
+func (h *HelmCluster) deleteStaleStaticPrefixedResources(t *testing.T) {
+	t.Helper()
+
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	resourceKinds := []string{"deployment", "service", "serviceaccount", "rolebinding"}
+
+	for _, resourceKind := range resourceKinds {
+		output, err := k8s.RunKubectlAndGetOutputE(
+			t,
+			h.helmOptions.KubectlOptions,
+			"get",
+			resourceKind,
+			"-o",
+			"name",
+			"--ignore-not-found=true",
+		)
+		require.NoError(t, err)
+
+		for _, resourceName := range splitNonEmptyLines(output) {
+			parts := strings.SplitN(resourceName, "/", 2)
+			if len(parts) != 2 || !strings.HasPrefix(parts[1], "static") {
+				continue
+			}
+
+			logger.Logf(t, "Deleting stale %s resource %s in namespace %s before Helm install", resourceKind, resourceName, namespace)
+			_, err = k8s.RunKubectlAndGetOutputE(
+				t,
+				h.helmOptions.KubectlOptions,
+				"delete",
+				resourceName,
+				"--ignore-not-found=true",
+				"--wait=false",
+			)
+			if err != nil && !strings.Contains(err.Error(), "not found") {
+				require.NoError(t, err)
+			}
+		}
+	}
+}
+
+func (h *HelmCluster) deleteStaleGatewayAndConsulAPIResources(t *testing.T) {
+	t.Helper()
+
+	apiGroups := []string{"gateway.networking.k8s.io", "consul.hashicorp.com"}
+
+	for _, apiGroup := range apiGroups {
+		resourcesOutput, err := k8s.RunKubectlAndGetOutputE(
+			t,
+			h.helmOptions.KubectlOptions,
+			"api-resources",
+			"--api-group="+apiGroup,
+			"--verbs=list",
+			"--namespaced=true",
+			"-o",
+			"name",
+		)
+		require.NoError(t, err)
+
+		resources := splitNonEmptyLines(resourcesOutput)
+		sort.Strings(resources)
+
+		for _, resource := range resources {
+			objectsOutput, err := k8s.RunKubectlAndGetOutputE(
+				t,
+				h.helmOptions.KubectlOptions,
+				"get",
+				resource,
+				"-o",
+				"name",
+				"--ignore-not-found=true",
+			)
+			require.NoError(t, err)
+
+			for _, objectName := range splitNonEmptyLines(objectsOutput) {
+				logger.Logf(t, "Deleting stale %s resource %s before Helm install", apiGroup, objectName)
+
+				_, _ = k8s.RunKubectlAndGetOutputE(
+					t,
+					h.helmOptions.KubectlOptions,
+					"patch",
+					objectName,
+					"--type=merge",
+					"-p",
+					`{"metadata":{"finalizers":[]}}`,
+				)
+
+				_, err = k8s.RunKubectlAndGetOutputE(
+					t,
+					h.helmOptions.KubectlOptions,
+					"delete",
+					objectName,
+					"--ignore-not-found=true",
+					"--wait=false",
+				)
+				if err != nil && !strings.Contains(err.Error(), "not found") {
+					require.NoError(t, err)
+				}
+			}
+		}
+	}
+}
+
+func splitNonEmptyLines(output string) []string {
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	result := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		result = append(result, line)
+	}
+	return result
 }
 
 func (h *HelmCluster) deleteStaleGatewayAPICRDs(t *testing.T) {
@@ -417,8 +709,14 @@ func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 		deleteList(h.deleteServiceWithFinalizerCleanup(context.Background(), namespace, &service, h.cleanupDeleteOptions()))
 	}
 
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.MatchingLabels{"chart": "consul-helm"})
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.MatchingLabels{"chart": "consul-helm"})
+	err = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.MatchingLabels{"chart": "consul-helm"})
+	if err != nil && !isMissingRuntimeKindError(err) {
+		require.NoError(t, err)
+	}
+	err = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.MatchingLabels{"chart": "consul-helm"})
+	if err != nil && !isMissingRuntimeKindError(err) {
+		require.NoError(t, err)
+	}
 
 	mutatingWebhooks, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), listOptions)
 	require.NoError(t, err)
@@ -540,29 +838,37 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	if err := h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName}); err != nil && !isMissingRuntimeKindError(err) {
+		h.logger.Logf(t, "Ignoring gatewayclass cleanup error for release %s: %v", h.releaseName, err)
+	}
 
-	var gatewayClassList gwv1beta1.GatewayClassList
-	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
+	var gatewayClassList gwv1.GatewayClassList
+	if err := h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
-	}) == nil {
+	}); err == nil {
 		for _, item := range gatewayClassList.Items {
 			item.SetFinalizers([]string{})
 			_ = h.runtimeClient.Update(context.Background(), &item)
 		}
+	} else if !isMissingRuntimeKindError(err) {
+		h.logger.Logf(t, "Ignoring gatewayclass list cleanup error for release %s: %v", h.releaseName, err)
 	}
 
 	// Forcibly delete all gateway class configs and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName})
+	if err := h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName}); err != nil && !isMissingRuntimeKindError(err) {
+		h.logger.Logf(t, "Ignoring gatewayclassconfig cleanup error for release %s: %v", h.releaseName, err)
+	}
 
 	var gatewayClassConfigList v1alpha1.GatewayClassConfigList
-	if h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
+	if err := h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
-	}) == nil {
+	}); err == nil {
 		for _, item := range gatewayClassConfigList.Items {
 			item.SetFinalizers([]string{})
 			_ = h.runtimeClient.Update(context.Background(), &item)
 		}
+	} else if !isMissingRuntimeKindError(err) {
+		h.logger.Logf(t, "Ignoring gatewayclassconfig list cleanup error for release %s: %v", h.releaseName, err)
 	}
 
 	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
@@ -857,9 +1163,20 @@ func (h *HelmCluster) deleteGatewayResourcesJobIfExistsForRelease(t require.Test
 	}
 }
 
+func (h *HelmCluster) deleteServerACLInitCleanupJobIfExistsForRelease(t require.TestingT, releaseName string) {
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	jobName := fmt.Sprintf("%s-consul-server-acl-init-cleanup", releaseName)
+
+	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+}
+
 func (h *HelmCluster) deleteGatewayHookJobsIfExistsForRelease(t require.TestingT, releaseName string) {
 	h.deleteGatewayCleanupJobIfExistsForRelease(t, releaseName)
 	h.deleteGatewayResourcesJobIfExistsForRelease(t, releaseName)
+	h.deleteServerACLInitCleanupJobIfExistsForRelease(t, releaseName)
 }
 
 func isGatewayCleanupAlreadyExistsError(err error) bool {
@@ -876,6 +1193,14 @@ func isGatewayResourcesAlreadyExistsError(err error) bool {
 	}
 	errText := err.Error()
 	return strings.Contains(errText, "gateway-resources") && strings.Contains(errText, "already exists")
+}
+
+func isServerACLInitCleanupAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "server-acl-init-cleanup") && strings.Contains(errText, "already exists")
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
