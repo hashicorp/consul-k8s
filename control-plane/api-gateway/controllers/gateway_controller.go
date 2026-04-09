@@ -1081,9 +1081,6 @@ func (c *GatewayController) fetchCertificatesForGateway(ctx context.Context, res
 
 	for _, listener := range gateway.Spec.Listeners {
 		if listener.TLS != nil {
-			if common.ListenerUsesTLSSDS(gateway, listener.TLS) {
-				continue
-			}
 			for _, cert := range listener.TLS.CertificateRefs {
 				if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, common.KindSecret) {
 					certificates.Add(common.IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace))

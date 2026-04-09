@@ -116,6 +116,7 @@ type ResourceMap struct {
 	tcpRouteGateways      map[api.ResourceReference]*tcpRoute
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
+	gateways              map[api.ResourceReference]gwv1beta1.Gateway
 	externalFilters       map[corev1.ObjectReference]client.Object
 	gatewayPolicies       map[api.ResourceReference]*v1alpha1.GatewayPolicy
 
@@ -143,6 +144,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
+		gateways:              make(map[api.ResourceReference]gwv1beta1.Gateway),
 		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
 		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
@@ -225,9 +227,6 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
 			continue
 		}
-		if ListenerUsesTLSSDS(gateway, listener.TLS) {
-			continue
-		}
 		for _, cert := range listener.TLS.CertificateRefs {
 			if NilOrEqual(cert.Group, "") && NilOrEqual(cert.Kind, "Secret") {
 				certificateKey := IndexedNamespacedNameWithDefault(cert.Name, cert.Namespace, gateway.Namespace)
@@ -245,6 +244,51 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 	}
 
 	s.gatewayResources[consulKey] = set
+	s.gateways[consulKey] = gateway
+}
+
+// InheritedTLSSDSClusterForHTTPRoute returns a single unambiguous listener-level
+// SDS cluster name inherited through a route's Gateway parent refs.
+func (s *ResourceMap) InheritedTLSSDSClusterForHTTPRoute(route gwv1beta1.HTTPRoute) (string, bool) {
+	clusters := make(map[string]struct{})
+
+	for _, parent := range route.Spec.ParentRefs {
+		if !NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) || !NilOrEqual(parent.Kind, KindGateway) {
+			continue
+		}
+
+		key := IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, route.Namespace)
+		consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
+
+		gateway, ok := s.gateways[consulKey]
+		if !ok {
+			continue
+		}
+
+		for _, listener := range gateway.Spec.Listeners {
+			if parent.SectionName != nil && listener.Name != *parent.SectionName {
+				continue
+			}
+			if listener.TLS == nil {
+				continue
+			}
+
+			effective := ResolveListenerTLSSDSConfig(gateway, listener, s)
+			if effective.Config != nil && effective.Config.ClusterName != "" {
+				clusters[effective.Config.ClusterName] = struct{}{}
+			}
+		}
+	}
+
+	if len(clusters) != 1 {
+		return "", false
+	}
+
+	for cluster := range clusters {
+		return cluster, true
+	}
+
+	return "", false
 }
 
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
@@ -465,9 +509,14 @@ func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.Gat
 }
 
 func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+	kind := gateway.Kind
+	if kind == "" {
+		kind = KindGateway
+	}
+
 	key := api.ResourceReference{
 		Name:        gateway.Name,
-		Kind:        gateway.Kind,
+		Kind:        kind,
 		SectionName: string(gatewayListener.Name),
 		Namespace:   gateway.Namespace,
 	}

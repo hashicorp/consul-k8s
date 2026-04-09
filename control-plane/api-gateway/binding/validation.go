@@ -285,28 +285,23 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, resources *common.ResourceMap) (error, error) {
+func validateTLS(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *common.ResourceMap) (error, error) {
+	tls := listener.TLS
 	// If there's no TLS, there's nothing to validate
 	if tls == nil {
 		return nil, nil
 	}
 
-	effectiveSDS := common.ResolveListenerTLSSDSConfig(gateway, tls)
+	effectiveSDS := common.ResolveListenerTLSSDSConfig(gateway, listener, resources)
 	if effectiveSDS.Configured {
 		if effectiveSDS.Config == nil {
 			return errListenerTLSSDSIncomplete, nil
-		}
-		if len(tls.CertificateRefs) > 0 {
-			return errListenerTLSSDSAndCertificateRefs, nil
 		}
 	}
 
 	// Validate the certificate references and then return any error
 	// alongside any TLS configuration error that we find below.
-	var refsErr error
-	if effectiveSDS.Config == nil {
-		refsErr = validateCertificateRefs(gateway, tls.CertificateRefs, resources)
-	}
+	refsErr := validateCertificateRefs(gateway, tls.CertificateRefs, resources)
 
 	if tls.Mode != nil && *tls.Mode == gwv1beta1.TLSModePassthrough {
 		return errListenerNoTLSPassthrough, refsErr
@@ -463,7 +458,7 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 	for i, listener := range listeners {
 		var result listenerValidationResult
 
-		err, refErr := validateTLS(gateway, listener.TLS, resources)
+		err, refErr := validateTLS(gateway, listener, resources)
 		if refErr != nil {
 			result.refErrs = append(result.refErrs, refErr)
 		}
@@ -653,7 +648,7 @@ func routeTLSSDSFiltersInvalid(httproute *gwv1beta1.HTTPRoute, resources *common
 
 		for _, backendRef := range rule.BackendRefs {
 			for _, filter := range backendRef.Filters {
-				if !routeTLSSDSFilterIsInvalid(filter, resources, httproute.Namespace) {
+				if !routeTLSSDSFilterIsInvalid(filter, httproute, resources, httproute.Namespace) {
 					continue
 				}
 				invalidFilters[fmt.Sprintf("%s/%s", httproute.Namespace, filter.ExtensionRef.Name)] = struct{}{}
@@ -664,7 +659,7 @@ func routeTLSSDSFiltersInvalid(httproute *gwv1beta1.HTTPRoute, resources *common
 	return maps.Keys(invalidFilters)
 }
 
-func routeTLSSDSFilterIsInvalid(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string) bool {
+func routeTLSSDSFilterIsInvalid(filter gwv1beta1.HTTPRouteFilter, route *gwv1beta1.HTTPRoute, resources *common.ResourceMap, namespace string) bool {
 	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
 		return false
 	}
@@ -683,7 +678,23 @@ func routeTLSSDSFilterIsInvalid(filter gwv1beta1.HTTPRouteFilter, resources *com
 		return true
 	}
 
-	return strings.TrimSpace(tlsFilter.Spec.SDS.ClusterName) == "" || strings.TrimSpace(tlsFilter.Spec.SDS.CertResource) == ""
+	clusterName := strings.TrimSpace(tlsFilter.Spec.SDS.ClusterName)
+	certResource := strings.TrimSpace(tlsFilter.Spec.SDS.CertResource)
+
+	if certResource == "" {
+		return true
+	}
+
+	if clusterName != "" {
+		return false
+	}
+
+	if route == nil || resources == nil {
+		return true
+	}
+
+	inheritedCluster, inherited := resources.InheritedTLSSDSClusterForHTTPRoute(*route)
+	return !inherited || strings.TrimSpace(inheritedCluster) == ""
 }
 
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.

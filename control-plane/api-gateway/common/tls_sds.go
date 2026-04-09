@@ -17,7 +17,10 @@ type EffectiveTLSSDSConfig struct {
 	Configured bool
 }
 
-func ResolveListenerTLSSDSConfig(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig) EffectiveTLSSDSConfig {
+func ResolveListenerTLSSDSConfig(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, _ *ResourceMap) EffectiveTLSSDSConfig {
+	var tls *gwv1beta1.GatewayTLSConfig
+	tls = listener.TLS
+
 	clusterName, clusterSet := stringValueFromAnnotations(gateway.Annotations, TLSSDSClusterNameAnnotationKey)
 	certResource, certSet := stringValueFromAnnotations(gateway.Annotations, TLSSDSCertResourceAnnotationKey)
 
@@ -51,7 +54,8 @@ func ResolveListenerTLSSDSConfig(gateway gwv1beta1.Gateway, tls *gwv1beta1.Gatew
 }
 
 func ListenerUsesTLSSDS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig) bool {
-	return ResolveListenerTLSSDSConfig(gateway, tls).Config != nil
+	listener := gwv1beta1.Listener{TLS: tls}
+	return ResolveListenerTLSSDSConfig(gateway, listener, nil).Config != nil
 }
 
 func stringValueFromAnnotations(annotations map[string]string, key string) (string, bool) {

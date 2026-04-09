@@ -16,23 +16,24 @@ func TestResolveListenerTLSSDSConfig(t *testing.T) {
 
 	for name, tc := range map[string]struct {
 		gateway        gwv1beta1.Gateway
-		listenerTLS    *gwv1beta1.GatewayTLSConfig
+		listener       gwv1beta1.Listener
+		resources      *ResourceMap
 		expectConfig   bool
 		expectResolved string
 		expectResource string
 		expectSet      bool
 	}{
 		"not configured": {
-			gateway:     gwv1beta1.Gateway{},
-			listenerTLS: &gwv1beta1.GatewayTLSConfig{},
-			expectSet:   false,
+			gateway:   gwv1beta1.Gateway{},
+			listener:  gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{}},
+			expectSet: false,
 		},
 		"gateway defaults": {
 			gateway: gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 				TLSSDSClusterNameAnnotationKey:  "sds-cluster",
 				TLSSDSCertResourceAnnotationKey: "default-cert",
 			}}},
-			listenerTLS:    &gwv1beta1.GatewayTLSConfig{},
+			listener:       gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{}},
 			expectConfig:   true,
 			expectResolved: "sds-cluster",
 			expectResource: "default-cert",
@@ -43,10 +44,10 @@ func TestResolveListenerTLSSDSConfig(t *testing.T) {
 				TLSSDSClusterNameAnnotationKey:  "sds-cluster",
 				TLSSDSCertResourceAnnotationKey: "default-cert",
 			}}},
-			listenerTLS: &gwv1beta1.GatewayTLSConfig{Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+			listener: gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
 				gwv1beta1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "listener-cluster",
 				gwv1beta1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
-			}},
+			}}},
 			expectConfig:   true,
 			expectResolved: "listener-cluster",
 			expectResource: "listener-cert",
@@ -56,15 +57,15 @@ func TestResolveListenerTLSSDSConfig(t *testing.T) {
 			gateway: gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 				TLSSDSClusterNameAnnotationKey: "sds-cluster",
 			}}},
-			listenerTLS: &gwv1beta1.GatewayTLSConfig{},
-			expectSet:   true,
+			listener:  gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{}},
+			expectSet: true,
 		},
 	} {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			resolved := ResolveListenerTLSSDSConfig(tc.gateway, tc.listenerTLS)
+			resolved := ResolveListenerTLSSDSConfig(tc.gateway, tc.listener, tc.resources)
 			require.Equal(t, tc.expectSet, resolved.Configured)
 			if tc.expectConfig {
 				require.NotNil(t, resolved.Config)

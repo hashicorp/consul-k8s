@@ -252,7 +252,6 @@ var (
 	// an Accepted status type.
 	errListenerNoTLSPassthrough              = errors.New("TLS passthrough is not supported")
 	errListenerTLSSDSIncomplete              = errors.New("tls SDS configuration requires both tls_sds_cluster_name and tls_sds_cert_resource")
-	errListenerTLSSDSAndCertificateRefs      = errors.New("certificateRefs cannot be configured when tls SDS is configured")
 	errListenerTLSCipherSuiteNotConfigurable = errors.New("tls_min_version does not allow tls_cipher_suites configuration")
 	errListenerUnsupportedTLSCipherSuite     = errors.New("unsupported cipher suite in tls_cipher_suites")
 	errListenerUnsupportedTLSMaxVersion      = errors.New("unsupported tls_max_version")

@@ -185,9 +185,6 @@ func gatewayForSecret(o client.Object) []string {
 		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
 			continue
 		}
-		if common.ListenerUsesTLSSDS(*gateway, listener.TLS) {
-			continue
-		}
 		for _, cert := range listener.TLS.CertificateRefs {
 			if common.NilOrEqual(cert.Group, "") && common.NilOrEqual(cert.Kind, "Secret") {
 				// If an explicit Secret namespace is not provided, use the Gateway namespace to lookup the provided Secret Name.

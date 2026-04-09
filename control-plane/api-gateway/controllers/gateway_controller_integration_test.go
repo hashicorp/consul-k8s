@@ -236,6 +236,35 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 
 			wg.Wait()
 
+			// Drain any trailing subscription events so baseline resource/index snapshots
+			// are taken after the initial reconcile burst has settled.
+			drainUntilIdle := func(idle time.Duration) {
+				timer := time.NewTimer(idle)
+				defer timer.Stop()
+
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-gwSub.Events():
+					case <-httpRouteSub.Events():
+					case <-tcpRouteSub.Events():
+					case <-fileSystemCertSub.Events():
+					case <-timer.C:
+						return
+					}
+
+					if !timer.Stop() {
+						select {
+						case <-timer.C:
+						default:
+						}
+					}
+					timer.Reset(idle)
+				}
+			}
+			drainUntilIdle(250 * time.Millisecond)
+
 			gwNamespaceName := types.NamespacedName{
 				Name:      k8sGWObj.Name,
 				Namespace: k8sGWObj.Namespace,

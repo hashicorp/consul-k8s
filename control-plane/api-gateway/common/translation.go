@@ -92,7 +92,7 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 	var sdsConfig *api.GatewayTLSSDSConfig
 
 	if listener.TLS != nil {
-		effectiveSDS := ResolveListenerTLSSDSConfig(gateway, listener.TLS)
+		effectiveSDS := ResolveListenerTLSSDSConfig(gateway, listener, resources)
 		sdsConfig = effectiveSDS.Config
 
 		cipherSuitesVal := string(listener.TLS.Options[TLSCipherSuitesAnnotationKey])
@@ -102,21 +102,19 @@ func (t ResourceTranslator) toAPIGatewayListener(gateway gwv1beta1.Gateway, list
 		maxVersion = string(listener.TLS.Options[TLSMaxVersionAnnotationKey])
 		minVersion = string(listener.TLS.Options[TLSMinVersionAnnotationKey])
 
-		if sdsConfig == nil {
-			for _, ref := range listener.TLS.CertificateRefs {
-				if !resources.GatewayCanReferenceSecret(gateway, ref) {
-					return api.APIGatewayListener{}, false
-				}
+		for _, ref := range listener.TLS.CertificateRefs {
+			if !resources.GatewayCanReferenceSecret(gateway, ref) {
+				return api.APIGatewayListener{}, false
+			}
 
-				if !NilOrEqual(ref.Group, "") || !NilOrEqual(ref.Kind, "Secret") {
-					// only translate the valid types we support
-					continue
-				}
+			if !NilOrEqual(ref.Group, "") || !NilOrEqual(ref.Kind, "Secret") {
+				// only translate the valid types we support
+				continue
+			}
 
-				ref := IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, namespace)
-				if resources.Certificate(ref) != nil {
-					certificates = append(certificates, t.NonNormalizedConfigEntryReference(api.FileSystemCertificate, ref))
-				}
+			ref := IndexedNamespacedNameWithDefault(ref.Name, ref.Namespace, namespace)
+			if resources.Certificate(ref) != nil {
+				certificates = append(certificates, t.NonNormalizedConfigEntryReference(api.FileSystemCertificate, ref))
 			}
 		}
 	}
@@ -283,7 +281,7 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 	}
 
 	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
-	filters, responseFilters, _ := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+	filters, responseFilters, _ := t.translateHTTPFilters(rule.Filters, resources, route.Namespace, &route)
 
 	return api.HTTPRouteRule{
 		Filters:         filters,
@@ -302,7 +300,7 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 	isServiceRef := NilOrEqual(ref.Group, "") && NilOrEqual(ref.Kind, "Service")
 
 	if isServiceRef && resources.HasService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters, tlsConfig := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters, responseFilters, tlsConfig := t.translateHTTPFilters(ref.Filters, resources, route.Namespace, &route)
 		service := resources.Service(id)
 		return api.HTTPService{
 			Name:            service.Name,
@@ -317,7 +315,7 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1beta1.HTTPRoute, r
 
 	isMeshServiceRef := DerefEqual(ref.Group, v1alpha1.ConsulHashicorpGroup) && DerefEqual(ref.Kind, v1alpha1.MeshServiceKind)
 	if isMeshServiceRef && resources.HasMeshService(id) && resources.HTTPRouteCanReferenceBackend(route, ref.BackendRef) {
-		filters, responseFilters, tlsConfig := t.translateHTTPFilters(ref.Filters, resources, route.Namespace)
+		filters, responseFilters, tlsConfig := t.translateHTTPFilters(ref.Filters, resources, route.Namespace, &route)
 		service := resources.MeshService(id)
 
 		return api.HTTPService{
@@ -385,7 +383,7 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1beta1.HTTPQueryPar
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string) (api.HTTPFilters, api.HTTPResponseFilters, *api.GatewayServiceTLSConfig) {
+func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string, route *gwv1beta1.HTTPRoute) (api.HTTPFilters, api.HTTPResponseFilters, *api.GatewayServiceTLSConfig) {
 	var (
 		urlRewrite            *api.URLRewrite
 		retryFilter           *api.RetryFilter
@@ -469,8 +467,15 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 			case v1alpha1.RouteTLSSDSFilterKind:
 				routeTLSFilter := crdFilter.(*v1alpha1.RouteTLSSDSFilter)
 				if routeTLSFilter.Spec.SDS != nil {
+					clusterName := routeTLSFilter.Spec.SDS.ClusterName
+					if strings.TrimSpace(clusterName) == "" && route != nil && resourceMap != nil {
+						if inheritedCluster, inherited := resourceMap.InheritedTLSSDSClusterForHTTPRoute(*route); inherited {
+							clusterName = inheritedCluster
+						}
+					}
+
 					tlsConfig = &api.GatewayServiceTLSConfig{SDS: &api.GatewayTLSSDSConfig{
-						ClusterName:  routeTLSFilter.Spec.SDS.ClusterName,
+						ClusterName:  clusterName,
 						CertResource: routeTLSFilter.Spec.SDS.CertResource,
 					}}
 				}
