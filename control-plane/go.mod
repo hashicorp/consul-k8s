@@ -65,11 +65,6 @@ require (
 	sigs.k8s.io/gateway-api v1.5.1
 )
 
-// require (
-// 	k8s.io/api v0.34.1
-// 	k8s.io/apimachinery v0.34.1
-// 	k8s.io/client-go v0.34.1
-// )
 
 require (
 	cloud.google.com/go/auth v0.9.1 // indirect

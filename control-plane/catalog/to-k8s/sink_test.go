@@ -290,7 +290,6 @@ func TestK8SSink_updateService(t *testing.T) {
 		if actual == nil {
 			r.Fatal("service not found")
 		}
-		t.Logf("actual is %v", actual)
 
 		if actual.Spec.ExternalName != "web2.service.local." {
 			r.Fatal("not updated")
@@ -415,18 +414,6 @@ func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 		}
 	})
 }
-
-// func testSink(t *testing.T, client kubernetes.Interface) (*K8SSink, func()) {
-// 	sink := &K8SSink{
-// 		Client:         client,
-// 		Log:            hclog.Default(),
-// 		Ctx:            context.Background(),
-// 		PrometheusSink: &prometheus.PrometheusSink{},
-// 	}
-
-// 	closer := controller.TestControllerRun(sink)
-// 	return sink, closer
-// }
 
 func testSink(t *testing.T, client kubernetes.Interface) (*K8SSink, func()) {
 	sink := &K8SSink{

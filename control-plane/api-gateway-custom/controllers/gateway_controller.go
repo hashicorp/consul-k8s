@@ -389,23 +389,6 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
-func mapToCustomGateway(obj client.Object) []reconcile.Request {
-	for _, owner := range obj.GetOwnerReferences() {
-		if owner.Controller != nil && *owner.Controller &&
-			owner.Kind == "Gateway" &&
-			owner.APIVersion == "consul.hashicorp.com/v1beta1" {
-
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Name:      owner.Name,
-					Namespace: obj.GetNamespace(),
-				},
-			}}
-		}
-	}
-	return nil
-}
-
 // SetupWithGatewayControllerManager registers the controller with the given manager.
 func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config CustomGatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
 	cacheConfig := cache.Config{

@@ -141,11 +141,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 	// Scenario: Gateway deployment should match the default instances defined on the gateway class config
 	// checking that gateway instances match defined gateway class config
-	/*
-		defaultInstances = ptr.To(int32(2))
-		maxInstances     = ptr.To(int32(3))
-		minInstances     = ptr.To(int32(1))
-	*/
+
 	// expect 2
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, defaultInstances, gateway)
 
@@ -158,8 +154,6 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	logger.Log(t, "updating gatewayclassconfig values")
 	err = k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassConfigName, Namespace: namespace}, gatewayClassConfig)
 	require.NoError(t, err)
-	// gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(8))
-	// gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(5))
 	gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(2))
 	gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(2))
 	gatewayClassConfig.Spec.DeploymentSpec.MaxInstances = ptr.To(int32(5))

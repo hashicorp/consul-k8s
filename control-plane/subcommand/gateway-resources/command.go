@@ -181,7 +181,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(err.Error())
 		return 1
 	}
-	c.UI.Info("Starting gateway resources init")
+
 	// Load apigw resource config from the configmap.
 	if c.resources, err = c.loadResourceConfig(c.flagResourceConfigFileLocation); err != nil {
 		c.UI.Error(fmt.Sprintf("Error loading api-gateway resource config: %s", err))
