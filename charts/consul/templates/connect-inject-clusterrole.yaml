@@ -86,7 +86,7 @@ rules:
     - create
     - update
 - apiGroups: [ "" ]
-  resources: ["endpoints", "namespaces", "nodes"]
+  resources: ["endpoints", "namespaces", "nodes", "configmaps"]
   verbs:
   - get
   - list
