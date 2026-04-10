@@ -48,7 +48,7 @@ load _helpers
       --namespace foo \
       . | tee /dev/stderr |
       yq '.webhooks[0].clientConfig.service.namespace' | tee /dev/stderr)
-  [ "${actual}" = "foo" ]
+  [ "${actual}" = "\"foo\"" ]
 }
 
 @test "connectInject/MutatingWebhookConfiguration: peering is enabled, so webhooks for peering exist" {
