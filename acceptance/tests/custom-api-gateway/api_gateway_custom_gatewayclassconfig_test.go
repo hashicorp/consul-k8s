@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul/api"
@@ -29,6 +30,7 @@ import (
 // is properly applied to any child gateway objects, namely that the number of gateway instances match the defined
 // minInstances,maxInstances and defaultInstances parameters, and that changing the parent gateway does not affect
 // the child gateways.
+// TestAPIGateway_GatewayClassConfig
 func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	var (
 		defaultInstances = ptr.To(int32(2))
@@ -275,9 +277,9 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *
 		// Ensure the number of gateway pods matches the replicas generated.
 		podList := corev1.PodList{}
 		//TODO:: Label check
-		//labels := common.LabelsForGateway(gateway)
-		//err = k8client.List(context.Background(), &podList, client.InNamespace(namespace), client.MatchingLabels(labels))
-		//require.NoError(r, err)
+		labels := common.LabelsForGateway(gateway)
+		err = k8client.List(context.Background(), &podList, client.InNamespace(namespace), client.MatchingLabels(labels))
+		require.NoError(r, err)
 		logger.Log(t, fmt.Sprintf("number of pods: %d", len(podList.Items)))
 		require.EqualValues(r, *wantNumber, len(podList.Items), "number of pods should match the number of instances defined on the gateway class config")
 
