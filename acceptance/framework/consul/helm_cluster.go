@@ -14,6 +14,7 @@ import (
 
 	"github.com/gruntwork-io/terratest/modules/helm"
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
+	gwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -41,9 +42,52 @@ const (
 	retryWaitDuration        = 20 * time.Second
 	retryMaxCount            = 5
 	staleConsulLabelSelector = "chart=consul-helm"
-	openShiftCleanupWait     = 5 * time.Second
-	openShiftCleanupCount    = 3
+	openShiftCleanupWait     = 20 * time.Second
+	openShiftCleanupCount    = 5
 )
+
+var staleConsulCRDs = []string{
+	"controlplanerequestlimits.consul.hashicorp.com",
+	"customgatewayclasses.consul.hashicorp.com",
+	"customgatewaypolicies.consul.hashicorp.com",
+	"exportedservices.consul.hashicorp.com",
+	"gatewayclassconfigs.consul.hashicorp.com",
+	"gatewaypolicies.consul.hashicorp.com",
+	"gateways.consul.hashicorp.com",
+	"grpcroutes.consul.hashicorp.com",
+	"httproutes.consul.hashicorp.com",
+	"ingressgateways.consul.hashicorp.com",
+	"jwtproviders.consul.hashicorp.com",
+	"meshes.consul.hashicorp.com",
+	"meshservices.consul.hashicorp.com",
+	"peeringacceptors.consul.hashicorp.com",
+	"peeringdialers.consul.hashicorp.com",
+	"proxydefaults.consul.hashicorp.com",
+	"referencegrants.consul.hashicorp.com",
+	"registrations.consul.hashicorp.com",
+	"routeauthfilters.consul.hashicorp.com",
+	"routeretryfilters.consul.hashicorp.com",
+	"routetimeoutfilters.consul.hashicorp.com",
+	"samenessgroups.consul.hashicorp.com",
+	"servicedefaults.consul.hashicorp.com",
+	"serviceintentions.consul.hashicorp.com",
+	"serviceresolvers.consul.hashicorp.com",
+	"servicerouters.consul.hashicorp.com",
+	"servicesplitters.consul.hashicorp.com",
+	"tcproutes.consul.hashicorp.com",
+	"terminatinggateways.consul.hashicorp.com",
+	"tlsroutes.consul.hashicorp.com",
+	"trafficpermissions.auth.consul.hashicorp.com",
+	"udproutes.consul.hashicorp.com",
+}
+
+var staleGatewayAPICRDs = []string{
+	"gatewayclasses.gateway.networking.k8s.io",
+	"gateways.gateway.networking.k8s.io",
+	"httproutes.gateway.networking.k8s.io",
+	"referencegrants.gateway.networking.k8s.io",
+	"tcproutes.gateway.networking.k8s.io",
+}
 
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul.
@@ -67,6 +111,7 @@ type HelmCluster struct {
 	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
 	isOpenShift        bool
+	isOpenShiftGTE419  bool
 	noCleanupOnFailure bool
 	noCleanup          bool
 	debugDirectory     string
@@ -133,6 +178,7 @@ func NewHelmCluster(
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
 		isOpenShift:        cfg.UseOpenshift || cfg.EnableOpenshift,
+		isOpenShiftGTE419:  cfg.IsOpenshiftGreaterThan4_18,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
@@ -253,6 +299,10 @@ func (h *HelmCluster) deleteStaleAPIGatewayTestClusterResources(t *testing.T) {
 		h.deleteStaleGatewayClass(t, name)
 	}
 
+	for _, name := range []string{"custom-gateway-class", "custom-controlled-gateway-class-one", "custom-controlled-gateway-class-two", "custom-uncontrolled-gateway-class"} {
+		h.deleteCustomStaleGatewayClass(t, name)
+	}
+
 	for _, name := range []string{"gateway-class-config", "controlled-gateway-class-config"} {
 		h.deleteStaleGatewayClassConfig(t, name)
 	}
@@ -317,6 +367,50 @@ func (h *HelmCluster) deleteStaleGatewayClass(t *testing.T, name string) {
 		}
 		require.NoError(r, err)
 		r.Errorf("gatewayclass %s still exists after cleanup", name)
+	})
+}
+
+func (h *HelmCluster) deleteCustomStaleGatewayClass(t *testing.T, name string) {
+	t.Helper()
+
+	ctx := context.Background()
+	var gatewayClass gwv1beta1.CustomGatewayClass
+	err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &gatewayClass)
+	if errors.IsNotFound(err) {
+		return
+	}
+	if isMissingRuntimeKindError(err) {
+		logger.Logf(t, "Skipping stale CustomGatewayClass cleanup for %s because the kind is not available yet: %v", name, err)
+		return
+	}
+	require.NoError(t, err)
+
+	if len(gatewayClass.Finalizers) > 0 {
+		gatewayClassCopy := gatewayClass.DeepCopy()
+		gatewayClassCopy.Finalizers = nil
+		err = h.runtimeClient.Update(ctx, gatewayClassCopy)
+		if err != nil && !errors.IsNotFound(err) && !errors.IsConflict(err) {
+			require.NoError(t, err)
+		}
+	}
+
+	logger.Logf(t, "Deleting stale CustomGatewayClass %s before Helm install", name)
+	err = h.runtimeClient.Delete(ctx, &gatewayClass)
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+
+	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+		var liveGatewayClass gwv1.GatewayClass
+		err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &liveGatewayClass)
+		if errors.IsNotFound(err) {
+			return
+		}
+		if isMissingRuntimeKindError(err) {
+			return
+		}
+		require.NoError(r, err)
+		r.Errorf("customgatewayclass %s still exists after cleanup", name)
 	})
 }
 
@@ -400,7 +494,7 @@ func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
 		if err != nil && !errors.IsNotFound(err) {
 			require.NoError(t, err)
 		}
-
+		time.Sleep(15 * time.Second)
 		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
 			_, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
@@ -530,43 +624,12 @@ func splitNonEmptyLines(output string) []string {
 func (h *HelmCluster) deleteStaleGatewayAPICRDs(t *testing.T) {
 	t.Helper()
 
-	// These non-standard CRDs are cluster-scoped and can be left behind with
-	// stale Helm ownership annotations from prior acceptance releases.
-	crdSet := map[string]struct{}{
-		"controlplanerequestlimits.consul.hashicorp.com": {},
-		"gatewayclassconfigs.consul.hashicorp.com":       {},
-		"meshservices.consul.hashicorp.com":              {},
-		//TODO::delete only if OCP greater than 4.18 is false
-		"tcproutes.gateway.networking.k8s.io":       {},
-		"gatewayclasses.gateway.networking.k8s.io":  {},
-		"gateways.gateway.networking.k8s.io":        {},
-		"httproutes.gateway.networking.k8s.io":      {},
-		"referencegrants.gateway.networking.k8s.io": {},
-	}
-
-	allCRDNamesOutput, err := k8s.RunKubectlAndGetOutputE(
-		t,
-		h.helmOptions.KubectlOptions,
-		"get", "crd",
-		"-o", "jsonpath={range .items[*]}{.metadata.name}{\"\\n\"}{end}",
-	)
-	if err != nil {
-		require.NoError(t, err)
-	}
-
-	for _, name := range strings.Split(strings.TrimSpace(allCRDNamesOutput), "\n") {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		if strings.HasSuffix(name, ".consul.hashicorp.com") {
-			crdSet[name] = struct{}{}
-		}
-	}
-
-	crds := make([]string, 0, len(crdSet))
-	for crd := range crdSet {
-		crds = append(crds, crd)
+	// These cluster-scoped CRDs can keep stale Helm ownership annotations from
+	// earlier acceptance releases. Limit cleanup to Consul-owned CRDs and only
+	// include Gateway API CRDs on OpenShift versions where tests install them.
+	crds := append([]string{}, staleConsulCRDs...)
+	if !h.isOpenShiftGTE419 {
+		crds = append(crds, staleGatewayAPICRDs...)
 	}
 	sort.Strings(crds)
 
