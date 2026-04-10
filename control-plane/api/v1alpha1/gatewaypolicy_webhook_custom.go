@@ -32,7 +32,7 @@ type CustomGatewayPolicyWebhook struct {
 	client.Client
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-customgatewaypolicy,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=customgatewaypolicies,versions=v1alpha1,name=validate-customgatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-gatewaypolicy-custom,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=customgatewaypolicies,versions=v1alpha1,name=validate-customgatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *CustomGatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var resource CustomGatewayPolicy
@@ -72,7 +72,7 @@ func differentCustomPolicySameTarget(resource, policy CustomGatewayPolicy) bool 
 
 func (v *CustomGatewayPolicyWebhook) SetupWithManager(mgr ctrl.Manager) {
 	v.decoder = admission.NewDecoder(mgr.GetScheme())
-	mgr.GetWebhookServer().Register("/validate-v1alpha1-customgatewaypolicy", &admission.Webhook{Handler: v})
+	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy-custom", &admission.Webhook{Handler: v})
 }
 
 // func DerefStringOr[T ~string, U ~string](v *T, val U) string {

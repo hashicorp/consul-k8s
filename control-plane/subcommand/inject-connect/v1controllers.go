@@ -588,6 +588,12 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
+	(&v1alpha1.CustomGatewayPolicyWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.CustomGatewayPolicy),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
 	(&v1alpha1.RegistrationWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.Registration),
