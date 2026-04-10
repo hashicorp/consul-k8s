@@ -183,6 +183,18 @@ type LinkedService struct {
 
 	// DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
 	DisableAutoHostRewrite bool `json:"disableAutoHostRewrite,omitempty"`
+
+	// SecretRef references a Kubernetes secret containing TLS certificates.
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty"`
+}
+
+// SecretReference defines the name of the Kubernetes secret.
+// +kubebuilder:object:generate=true
+type SecretReference struct {
+	// Name is the name of the Kubernetes secret.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name,omitempty"`
 }
 
 func (l LinkedService) NamespaceName() string {
