@@ -47,6 +47,12 @@ var (
 	tcpRouteKind    = gwv1beta1.Kind("TCPRoute")
 )
 
+const (
+	tenancyGatewayName = "custom-gateway"
+	tenancyRouteName   = "custom-route"
+)
+
+// TestAPIGateway_Tenancy
 func TestAPIGateway_Tenancy(t *testing.T) {
 	cases := []struct {
 		secure             bool
@@ -103,13 +109,15 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			k8s.DeployKustomize(t, serviceK8SOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 			logger.Logf(t, "creating certificate resources in %s namespace", certificateNamespace)
-			applyFixture(t, cfg, certificateK8SOptions, "cases/api-gateways/certificate")
+			applyFixture(t, cfg, certificateK8SOptions, "cases/custom-api-gateway/certificate")
 
 			logger.Logf(t, "creating gateway in %s namespace", gatewayNamespace)
-			applyFixture(t, cfg, gatewayK8SOptions, "cases/api-gateways/gateway")
+			applyFixture(t, cfg, gatewayK8SOptions, "cases/custom-api-gateway/gateway")
 
 			logger.Logf(t, "creating route resources in %s namespace", routeNamespace)
-			applyFixture(t, cfg, routeK8SOptions, "cases/api-gateways/httproute")
+			applyFixture(t, cfg, routeK8SOptions, "cases/custom-api-gateway/httproute")
+
+			k8sClient := ctx.ControllerRuntimeClient(t)
 
 			// patch certificate with data
 			logger.Log(t, "patching certificate with generated data")
@@ -117,24 +125,55 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			k8s.RunKubectl(t, certificateK8SOptions, "patch", "secret", "certificate", "-p", fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`, base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)), "--type=merge")
 
 			// patch the resources to reference each other
+			gatewayClassConfig := &v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: customGatewayClassConfigName,
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					MapPrivilegedContainerPorts: 8000,
+				},
+			}
+			if cfg.EnableOpenshift {
+				gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
+			}
+			logger.Log(t, "creating gateway class config")
+			err := k8sClient.Create(context.Background(), gatewayClassConfig)
+			require.NoError(t, err)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				logger.Log(t, "deleting gateway class config")
+				_ = k8sClient.Delete(context.Background(), gatewayClassConfig)
+			})
+
+			gatewayParametersRef := &gwv1beta1.ParametersReference{
+				Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+				Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
+				Name:  customGatewayClassConfigName,
+			}
+
+			logger.Log(t, "creating controlled gateway class")
+			createGatewayClass(t, k8sClient, customGatewayClassName, gatewayClassControllerName, gatewayParametersRef)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				logger.Log(t, "deleting gateway class")
+				_ = k8sClient.Delete(context.Background(), &gwv1beta1.CustomGatewayClass{ObjectMeta: metav1.ObjectMeta{Name: customGatewayClassName}})
+			})
+
 			logger.Log(t, "patching gateway to certificate")
-			k8s.RunKubectl(t, gatewayK8SOptions, "patch", consulGatewayResource, "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
+			k8s.RunKubectl(t, gatewayK8SOptions, "patch", consulGatewayResource, tenancyGatewayName, "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to target server")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", consulHTTPRouteResource, "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", consulHTTPRouteResource, tenancyRouteName, "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to gateway")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", consulHTTPRouteResource, "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", consulHTTPRouteResource, tenancyRouteName, "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"%s","namespace":"%s"}]}}`, tenancyGatewayName, gatewayNamespace), "--type=merge")
 
 			// Grab a kubernetes and consul client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
-			k8sClient := ctx.ControllerRuntimeClient(t)
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
 			// check if there are any reference grants and if there are any then log the content of the objects for debugging
 			logger.Log(t, "checking for reference grants")
 			var referenceGrants gwv1beta1.ReferenceGrantList
-			err := k8sClient.List(context.Background(), &referenceGrants)
+			err = k8sClient.List(context.Background(), &referenceGrants)
 			require.NoError(t, err)
 			// instead describe each reference grant and log it for debugging purposes
 			if len(referenceGrants.Items) > 0 {
@@ -146,18 +185,18 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// log the gateway and route for debugging purposes
 			var gateway gwv1beta1.Gateway
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
+			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: tenancyGatewayName, Namespace: gatewayNamespace}, &gateway)
 			require.NoError(t, err)
 			logger.Logf(t, "gateway: %+v", gateway)
 
 			var httproute gwv1beta1.HTTPRoute
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
+			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: tenancyRouteName, Namespace: routeNamespace}, &httproute)
 			require.NoError(t, err)
 			logger.Logf(t, "httproute: %+v", httproute)
 
 			retryCheck(t, 200, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: tenancyGatewayName, Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
 				// check our statuses
@@ -174,17 +213,17 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			})
 
 			// since the sync operation should fail above, check that we don't have the entry in Consul.
-			checkConsulNotExists(t, consulClient, api.APIGateway, "gateway", namespaceForConsul(c.namespaceMirroring, gatewayNamespace))
+			checkConsulNotExists(t, consulClient, api.APIGateway, tenancyGatewayName, namespaceForConsul(c.namespaceMirroring, gatewayNamespace))
 
 			// route failure
 			retryCheck(t, 60, func(r *retry.R) {
 				var httproute gwv1beta1.HTTPRoute
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: tenancyRouteName, Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
 				require.Len(r, httproute.Status.Parents, 1)
 				require.EqualValues(r, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
-				require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
+				require.EqualValues(r, tenancyGatewayName, httproute.Status.Parents[0].ParentRef.Name)
 				require.NotNil(r, httproute.Status.Parents[0].ParentRef.Namespace)
 				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
@@ -201,7 +240,7 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			// gateway updated with references allowed
 			retryCheck(t, 60, func(r *retry.R) {
 				var gateway gwv1beta1.Gateway
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: tenancyGatewayName, Namespace: gatewayNamespace}, &gateway)
 				require.NoError(r, err)
 
 				// check our statuses
@@ -217,13 +256,13 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// check the Consul gateway is updated, with the listener.
 			retryCheck(t, 30, func(r *retry.R) {
-				entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", &api.QueryOptions{
+				entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, tenancyGatewayName, &api.QueryOptions{
 					Namespace: namespaceForConsul(c.namespaceMirroring, gatewayNamespace),
 				})
 				require.NoError(r, err)
 				gateway := entry.(*api.APIGatewayConfigEntry)
 
-				require.EqualValues(r, "gateway", gateway.Meta["k8s-name"])
+				require.EqualValues(r, tenancyGatewayName, gateway.Meta["k8s-name"])
 				require.EqualValues(r, gatewayNamespace, gateway.Meta["k8s-namespace"])
 				require.Len(r, gateway.Listeners, 1)
 				checkConsulStatusCondition(t, gateway.Status.Conditions, trueConsulCondition("Accepted", "Accepted"))
@@ -233,12 +272,12 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			// route updated with gateway and services allowed
 			retryCheck(t, 30, func(r *retry.R) {
 				var httproute gwv1beta1.HTTPRoute
-				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "route", Namespace: routeNamespace}, &httproute)
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: tenancyRouteName, Namespace: routeNamespace}, &httproute)
 				require.NoError(r, err)
 
 				require.Len(r, httproute.Status.Parents, 1)
 				require.EqualValues(r, gatewayClassControllerName, httproute.Status.Parents[0].ControllerName)
-				require.EqualValues(r, "gateway", httproute.Status.Parents[0].ParentRef.Name)
+				require.EqualValues(r, tenancyGatewayName, httproute.Status.Parents[0].ParentRef.Name)
 				require.NotNil(r, httproute.Status.Parents[0].ParentRef.Namespace)
 				require.EqualValues(r, gatewayNamespace, *httproute.Status.Parents[0].ParentRef.Namespace)
 				checkStatusCondition(r, httproute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
@@ -248,13 +287,13 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			// now check to make sure that the route is updated and valid
 			retryCheck(t, 30, func(r *retry.R) {
 				// since we're not bound, check to make sure that the route doesn't target the gateway in Consul.
-				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, "route", &api.QueryOptions{
+				entry, _, err := consulClient.ConfigEntries().Get(api.HTTPRoute, tenancyRouteName, &api.QueryOptions{
 					Namespace: namespaceForConsul(c.namespaceMirroring, routeNamespace),
 				})
 				require.NoError(r, err)
 				route := entry.(*api.HTTPRouteConfigEntry)
 
-				require.EqualValues(r, "route", route.Meta["k8s-name"])
+				require.EqualValues(r, tenancyRouteName, route.Meta["k8s-name"])
 				require.EqualValues(r, routeNamespace, route.Meta["k8s-namespace"])
 				require.Len(r, route.Parents, 1)
 			})

@@ -6,7 +6,7 @@ kind: Gateway
 metadata:
   name: custom-gateway
 spec:
-  gatewayClassName: consul-custom #TODO: update to custom-gateway-class after updating the fixture
+  gatewayClassName: custom-gateway-class
   listeners:
   - protocol: HTTPS
     port: 8080

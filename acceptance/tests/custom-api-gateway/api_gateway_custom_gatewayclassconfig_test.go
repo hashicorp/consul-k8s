@@ -36,6 +36,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		defaultInstances = ptr.To(int32(2))
 		maxInstances     = ptr.To(int32(3))
 		minInstances     = ptr.To(int32(1))
+		serviceType      = corev1.ServiceTypeClusterIP
 		gatewayClassName = "custom-gateway-class"
 	)
 
@@ -70,6 +71,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 			Name: gatewayClassConfigName,
 		},
 		Spec: v1alpha1.GatewayClassConfigSpec{
+			ServiceType: &serviceType,
 			DeploymentSpec: v1alpha1.DeploymentSpec{
 				DefaultInstances: defaultInstances,
 				MaxInstances:     maxInstances,
@@ -84,8 +86,10 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	err = k8sClient.Create(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		logger.Log(t, "deleting all gateway class configs")
-		k8sClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{})
+		logger.Log(t, "deleting gateway class config")
+		_ = k8sClient.Delete(context.Background(), &v1alpha1.GatewayClassConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: gatewayClassConfigName},
+		})
 	})
 
 	gatewayParametersRef := &gwv1beta1.ParametersReference{
@@ -98,8 +102,10 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	logger.Log(t, "creating controlled gateway class")
 	createGatewayClass(t, k8sClient, gatewayClassName, gatewayClassControllerName, gatewayParametersRef)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		logger.Log(t, "deleting all gateway classes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.CustomGatewayClass{})
+		logger.Log(t, "deleting gateway class")
+		_ = k8sClient.Delete(context.Background(), &gwv1beta1.CustomGatewayClass{
+			ObjectMeta: metav1.ObjectMeta{Name: gatewayClassName},
+		})
 	})
 
 	// Create a certificate to reference in listeners.
@@ -157,15 +163,13 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	replicas := maxInstances
 	// Scenario: Updating the GatewayClassConfig should not affect gateways that have already been created
 	logger.Log(t, "updating gatewayclassconfig values")
-	err = k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassConfigName, Namespace: namespace}, gatewayClassConfig)
-	require.NoError(t, err)
-	// gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(8))
-	// gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(5))
-	gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(2))
-	gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(2))
-	gatewayClassConfig.Spec.DeploymentSpec.MaxInstances = ptr.To(int32(5))
-	err = k8sClient.Update(context.Background(), gatewayClassConfig)
-	require.NoError(t, err)
+	updateKubernetes(t, k8sClient, gatewayClassConfig, func(gcc *v1alpha1.GatewayClassConfig) {
+		// gatewayClassConfig.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(8))
+		// gatewayClassConfig.Spec.DeploymentSpec.MinInstances = ptr.To(int32(5))
+		gcc.Spec.DeploymentSpec.DefaultInstances = ptr.To(int32(2))
+		gcc.Spec.DeploymentSpec.MinInstances = ptr.To(int32(2))
+		gcc.Spec.DeploymentSpec.MaxInstances = ptr.To(int32(5))
+	})
 
 	checkNumberOfInstances(t, k8sClient, consulClient, gateway.Name, gateway.Namespace, replicas, gateway)
 
@@ -225,9 +229,9 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 
 	logger.Log(t, fmt.Sprintf("scaling gateway from %d to %d", *deployment.Spec.Replicas, *scaleTo))
 
-	deployment.Spec.Replicas = scaleTo
-	err = client.Update(context.Background(), &deployment)
-	require.NoError(t, err)
+	updateKubernetes(t, client, &deployment, func(d *appsv1.Deployment) {
+		d.Spec.Replicas = scaleTo
+	})
 
 	if cfg.EnableOpenshift {
 		retryCheckWithWait(t, 12, 5*time.Second, func(r *retry.R) {
@@ -238,15 +242,18 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 		})
 
 		triggerGatewayReconcile := func() {
-			var gateway gwv1beta1.Gateway
-			err = client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &gateway)
-			require.NoError(t, err)
-			if gateway.Annotations == nil {
-				gateway.Annotations = map[string]string{}
+			gateway := &gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
 			}
-			gateway.Annotations["acceptance.hashicorp.com/reconcile-trigger"] = time.Now().UTC().Format(time.RFC3339Nano)
-			err = client.Update(context.Background(), &gateway)
-			require.NoError(t, err)
+			updateKubernetes(t, client, gateway, func(g *gwv1beta1.Gateway) {
+				if g.Annotations == nil {
+					g.Annotations = map[string]string{}
+				}
+				g.Annotations["acceptance.hashicorp.com/reconcile-trigger"] = time.Now().UTC().Format(time.RFC3339Nano)
+			})
 		}
 
 		triggerGatewayReconcile()
@@ -275,9 +282,12 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *
 		require.EqualValues(r, *wantNumber, *deployment.Spec.Replicas, "deployment replicas should match the number of instances defined on the gateway class config")
 
 		// Ensure the number of gateway pods matches the replicas generated.
+		var currentGateway gwv1beta1.Gateway
+		err = k8client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &currentGateway)
+		require.NoError(r, err)
+
 		podList := corev1.PodList{}
-		//TODO:: Label check
-		labels := common.LabelsForGateway(gateway)
+		labels := common.LabelsForGateway(&currentGateway)
 		err = k8client.List(context.Background(), &podList, client.InNamespace(namespace), client.MatchingLabels(labels))
 		require.NoError(r, err)
 		logger.Log(t, fmt.Sprintf("number of pods: %d", len(podList.Items)))

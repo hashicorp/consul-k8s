@@ -64,8 +64,10 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		logger.Log(t, "deleting all gateway class configs")
-		k8sClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{})
+		logger.Log(t, "deleting gateway class config")
+		_ = k8sClient.Delete(context.Background(), &v1alpha1.GatewayClassConfig{
+			ObjectMeta: metav1.ObjectMeta{Name: gatewayClassConfigName},
+		})
 	})
 
 	gatewayParametersRef := &gwv1beta1.ParametersReference{
@@ -79,11 +81,6 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	logger.Log(t, "creating controlled gateway class one")
 	createGatewayClass(t, k8sClient, controlledGatewayClassOneName, gatewayClassControllerName, gatewayParametersRef)
 
-	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		logger.Log(t, "deleting all gateway classes")
-		k8sClient.DeleteAllOf(context.Background(), &gwv1beta1.CustomGatewayClass{})
-	})
-
 	controlledGatewayClassTwoName := "custom-controlled-gateway-class-two"
 	logger.Log(t, "creating controlled gateway class two")
 	createGatewayClass(t, k8sClient, controlledGatewayClassTwoName, gatewayClassControllerName, gatewayParametersRef)
@@ -91,6 +88,15 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	uncontrolledGatewayClassName := "custom-uncontrolled-gateway-class"
 	logger.Log(t, "creating uncontrolled gateway class")
 	createGatewayClass(t, k8sClient, uncontrolledGatewayClassName, "example.com/some-controller", nil)
+
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		logger.Log(t, "deleting gateway classes")
+		for _, name := range []string{controlledGatewayClassOneName, controlledGatewayClassTwoName, uncontrolledGatewayClassName} {
+			_ = k8sClient.Delete(context.Background(), &gwv1beta1.CustomGatewayClass{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+			})
+		}
+	})
 
 	// Create a certificate to reference in listeners
 	certificateInfo := generateCertificate(t, nil, "certificate.consul.local")
