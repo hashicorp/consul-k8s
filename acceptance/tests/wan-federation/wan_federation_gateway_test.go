@@ -168,7 +168,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		})
 
 		// Wait for the httproute to exist before patching, with delete/recreate fallback
-		helpers.WaitForHTTPRouteWithRetry(t, primaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+		helpers.WaitForHTTPRouteWithRetry(t, primaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
@@ -201,7 +201,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		})
 
 		// Wait for the httproute to exist before patching, with delete/recreate fallback
-		helpers.WaitForHTTPRouteWithRetry(t, secondaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+		helpers.WaitForHTTPRouteWithRetry(t, secondaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.

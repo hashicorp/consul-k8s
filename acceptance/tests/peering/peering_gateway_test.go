@@ -289,7 +289,7 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
-	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway")
+	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")

@@ -259,7 +259,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), "gateway-class-config", "../fixtures/bases/api-gateway")
 
 			// Wait for the httproute to exist before patching, with delete/recreate fallback
-			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 			// Create certificate secret, we do this separately since
 			// applying the secret will make an invalid certificate that breaks other tests
@@ -586,7 +586,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	logger.Log(t, "waiting for httproutes to be created")
 	routeNames := []string{"http-route", "http-route-auth", "http-route-no-auth-on-auth-listener", "http-route2-auth", "http-route-auth-invalid"}
 	for _, routeName := range routeNames {
-		helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), routeName, "../fixtures/cases/api-gateways/jwt-auth")
+		helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), routeName, "../fixtures/cases/api-gateways/jwt-auth", "httproute.gateway.networking.k8s.io")
 	}
 
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")

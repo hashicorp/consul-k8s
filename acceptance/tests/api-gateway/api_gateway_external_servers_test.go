@@ -116,7 +116,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
-	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
