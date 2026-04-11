@@ -84,7 +84,7 @@ rules:
     - create
     - update
 - apiGroups: [ "" ]
-  resources: ["endpoints", "namespaces", "nodes"]
+  resources: ["endpoints", "namespaces", "nodes", "configmaps"]
   verbs:
   - get
   - list
@@ -220,7 +220,7 @@ rules:
   resources:
     - securitycontextconstraints
   resourceNames:
-    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName | default "restricted-v2" }}
   verbs:
     - use
   {{- end }}
