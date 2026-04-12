@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 # This is used to show that a gateway cannot have more than one gateway policy attached to it
 apiVersion: consul.hashicorp.com/v1alpha1
-kind: GatewayPolicy
+kind: CustomGatewayPolicy
 metadata:
   name: custom-bad-policy
 spec:

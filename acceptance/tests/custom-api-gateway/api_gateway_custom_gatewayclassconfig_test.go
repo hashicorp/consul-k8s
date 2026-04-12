@@ -85,6 +85,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	logger.Log(t, "creating gateway class config")
 	err = k8sClient.Create(context.Background(), gatewayClassConfig)
 	require.NoError(t, err)
+	helpers.WaitForGatewayClassConfigWithClientRetry(t, k8sClient, gatewayClassConfigName)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting gateway class config")
 		_ = k8sClient.Delete(context.Background(), &v1alpha1.GatewayClassConfig{
@@ -101,6 +102,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	// Create gateway class referencing gateway-class-config.
 	logger.Log(t, "creating controlled gateway class")
 	createGatewayClass(t, k8sClient, gatewayClassName, gatewayClassControllerName, gatewayParametersRef)
+	helpers.WaitForResourceWithClientRetry(t, k8sClient, client.ObjectKey{Name: gatewayClassName}, &gwv1beta1.CustomGatewayClass{}, "customgatewayclass")
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		logger.Log(t, "deleting gateway class")
 		_ = k8sClient.Delete(context.Background(), &gwv1beta1.CustomGatewayClass{
@@ -241,36 +243,41 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 			require.NotNil(r, updatedDeployment.Spec.Replicas)
 		})
 
-		triggerGatewayReconcile := func() {
-			gateway := &gwv1beta1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: namespace,
-				},
-			}
-			updateKubernetes(t, client, gateway, func(g *gwv1beta1.Gateway) {
-				if g.Annotations == nil {
-					g.Annotations = map[string]string{}
-				}
-				g.Annotations["acceptance.hashicorp.com/reconcile-trigger"] = time.Now().UTC().Format(time.RFC3339Nano)
-			})
-		}
-
-		triggerGatewayReconcile()
+		triggerGatewayReconcile(t, client, name, namespace)
 
 		// The gateway controller can observe the owned Deployment update before its cache
 		// reflects the new replica count. Trigger a second reconcile after a short delay so
 		// the clamp logic uses the latest Deployment state.
 		time.Sleep(15 * time.Second)
-		triggerGatewayReconcile()
+		triggerGatewayReconcile(t, client, name, namespace)
 	}
 
+}
+
+func triggerGatewayReconcile(t *testing.T, client client.Client, name, namespace string) {
+	gateway := &gwv1beta1.Gateway{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "consul.hashicorp.com/v1beta1",
+			Kind:       "Gateway",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	updateKubernetes(t, client, gateway, func(g *gwv1beta1.Gateway) {
+		if g.Annotations == nil {
+			g.Annotations = map[string]string{}
+		}
+		g.Annotations["acceptance.hashicorp.com/reconcile-trigger"] = time.Now().UTC().Format(time.RFC3339Nano)
+	})
 }
 
 func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1beta1.Gateway) {
 	t.Helper()
 
 	retryCheckWithWait(t, 40, 10*time.Second, func(r *retry.R) {
+		triggerGatewayReconcile(t, k8client, name, namespace)
 		logger.Log(t, "checking that gateway instances match defined gateway class config")
 		logger.Log(t, fmt.Sprintf("want: %d", *wantNumber))
 
@@ -279,7 +286,9 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *
 		err := k8client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &deployment)
 		require.NoError(r, err)
 		logger.Log(t, fmt.Sprintf("deployment replicas: %d", *deployment.Spec.Replicas))
+		logger.Log(t, fmt.Sprintf("deployment status: ready=%d available=%d updated=%d", deployment.Status.ReadyReplicas, deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas))
 		require.EqualValues(r, *wantNumber, *deployment.Spec.Replicas, "deployment replicas should match the number of instances defined on the gateway class config")
+		require.EqualValues(r, *wantNumber, deployment.Status.ReadyReplicas, "deployment ready replicas should match the number of instances defined on the gateway class config")
 
 		// Ensure the number of gateway pods matches the replicas generated.
 		var currentGateway gwv1beta1.Gateway
@@ -290,8 +299,22 @@ func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *
 		labels := common.LabelsForGateway(&currentGateway)
 		err = k8client.List(context.Background(), &podList, client.InNamespace(namespace), client.MatchingLabels(labels))
 		require.NoError(r, err)
-		logger.Log(t, fmt.Sprintf("number of pods: %d", len(podList.Items)))
-		require.EqualValues(r, *wantNumber, len(podList.Items), "number of pods should match the number of instances defined on the gateway class config")
+		readyPods := 0
+		for _, pod := range podList.Items {
+			if pod.DeletionTimestamp != nil || pod.Status.Phase != corev1.PodRunning {
+				continue
+			}
+
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+					readyPods++
+					break
+				}
+			}
+		}
+		logger.Log(t, fmt.Sprintf("matching pods: %d", len(podList.Items)))
+		logger.Log(t, fmt.Sprintf("ready pods: %d", readyPods))
+		require.EqualValues(r, *wantNumber, readyPods, "number of ready pods should match the number of instances defined on the gateway class config")
 
 		// Ensure the number of services matches the replicas generated.
 		services, _, err := consulClient.Catalog().Service(name, "", nil)

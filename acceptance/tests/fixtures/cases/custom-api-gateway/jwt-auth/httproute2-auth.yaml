@@ -1,7 +1,7 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
-apiVersion: gateway.networking.k8s.io/v1
+apiVersion: consul.hashicorp.com/v1beta1
 kind: HTTPRoute
 metadata:
   name: custom-http-route2-auth

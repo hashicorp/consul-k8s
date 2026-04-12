@@ -17,7 +17,7 @@ const (
 	customGatewayCertificatePath = customGatewayFixturesDir + "/certificate.yaml"
 	customGatewayName            = "custom-gateway"
 	customGatewayClassName       = "custom-gateway-class"
-	customGatewayClassConfigName = "custom-gateway-class-config"
+	customGatewayClassConfigName = "gateway-class-config"
 	customGatewayHTTPRouteName   = "custom-http-route"
 	customGatewayCertificateName = "certificate"
 	consulGatewayResource        = "gateways.consul.hashicorp.com"

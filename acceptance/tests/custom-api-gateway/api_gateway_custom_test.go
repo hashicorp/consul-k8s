@@ -256,7 +256,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", customGatewayFixturesDir)
 			})
 
-			helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), customGatewayClassConfigName, customGatewayFixturesDir)
+			helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), customGatewayClassConfigName, customGatewayFixturesDir, "gatewayclassconfigs.consul.hashicorp.com")
 
 			// Wait for the httproute to exist before patching, with delete/recreate fallback
 			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), customGatewayHTTPRouteName, customGatewayFixturesDir, consulHTTPRouteResource)
@@ -565,8 +565,11 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	require.NoError(t, err)
 
 	logger.Log(t, "creating other namespace")
-	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "namespace", "other")
-	require.NoError(t, err, out)
+
+	output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "ns", "other")
+	if err != nil && !(strings.Contains(err.Error(), "AlreadyExists") || strings.Contains(output, "AlreadyExists")) {
+		require.NoError(t, err, output)
+	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -574,38 +577,39 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	})
 
 	logger.Log(t, "creating api-gateway resources")
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/api-gateways/jwt-auth")
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/custom-api-gateway/jwt-auth")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
-		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth")
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/custom-api-gateway/jwt-auth")
 	})
 
-	helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), "gateway-class-config", "../fixtures/cases/api-gateways/jwt-auth")
+	logger.Log(t, "creating api-gateway resources")
+	helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), customGatewayClassConfigName, "../fixtures/cases/custom-api-gateway/jwt-auth", "gatewayclassconfigs.consul.hashicorp.com")
 
 	// Wait for all the httproutes to be created immediately after applying the main resources
 	logger.Log(t, "waiting for httproutes to be created")
-	routeNames := []string{"http-route", "http-route-auth", "http-route-no-auth-on-auth-listener", "http-route2-auth", "http-route-auth-invalid"}
+	routeNames := []string{"custom-http-route", "custom-http-route-auth", "custom-http-route-no-auth-on-auth-listener", "custom-http-route2-auth", "custom-http-route-auth-invalid"}
 	for _, routeName := range routeNames {
-		helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), routeName, "../fixtures/cases/api-gateways/jwt-auth", "httproute.consul.hashicorp.com")
+		helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), routeName, "../fixtures/cases/custom-api-gateway/jwt-auth", "httproute.consul.hashicorp.com")
 	}
 
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-n", "other", "-f", "../fixtures/cases/custom-api-gateway/jwt-auth/external-ref-other-ns.yaml")
 	require.NoError(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
-		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-n", "other", "-f", "../fixtures/cases/api-gateways/jwt-auth/external-ref-other-ns.yaml")
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-n", "other", "-f", "../fixtures/cases/custom-api-gateway/jwt-auth/external-ref-other-ns.yaml")
 	})
 
 	logger.Log(t, "try (and fail) to add a second gateway policy to the gateway")
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/api-gateways/jwt-auth/extraGatewayPolicy")
+	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "apply", "-k", "../fixtures/cases/custom-api-gateway/jwt-auth/extraGatewayPolicy")
 	require.Error(t, err, out)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
-		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/api-gateways/jwt-auth/extraGatewayPolicy")
+		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/cases/custom-api-gateway/jwt-auth/extraGatewayPolicy")
 	})
 
 	// Create certificate secret, we do this separately since

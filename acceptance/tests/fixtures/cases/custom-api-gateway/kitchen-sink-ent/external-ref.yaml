@@ -7,6 +7,7 @@ metadata:
   name: route-jwt-auth-filter
   namespace: default
 spec:
+  #TODO:: if we remove it then we need to update the test to not use this filter
   jwtCustom:
     providers:
     - name: "local"

@@ -10,4 +10,4 @@ spec:
   parametersRef:
     group: consul.hashicorp.com
     kind: GatewayClassConfig
-    name: custom-gateway-class-config
+    name: gateway-class-config

@@ -410,6 +410,10 @@ func createRoute(t *testing.T, client client.Client, name, namespace, parent, ta
 	targetPort := gwv1beta1.PortNumber(80)
 
 	route := &gwv1beta1.HTTPRoute{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "consul.hashicorp.com/v1beta1",
+			Kind:       "HTTPRoute",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -442,6 +446,10 @@ func createGateway(t *testing.T, client client.Client, name, namespace, gatewayC
 	t.Helper()
 
 	gateway := &gwv1beta1.Gateway{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "consul.hashicorp.com/v1beta1",
+			Kind:       "Gateway",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -471,6 +479,10 @@ func createGatewayClass(t *testing.T, client client.Client, name, controllerName
 	t.Helper()
 
 	gatewayClass := &gwv1beta1.CustomGatewayClass{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "consul.hashicorp.com/v1beta1",
+			Kind:       "CustomGatewayClass",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
