@@ -4,6 +4,8 @@
 package common
 
 import (
+	"strings"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	gwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
@@ -429,7 +431,7 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.CustomGatewayPoli
 
 	key := api.ResourceReference{
 		Kind:        gatewayPolicy.Spec.TargetRef.Kind,
-		Name:        gatewayPolicy.Spec.TargetRef.Name,
+		Name:        gatewayPolicy.Spec.TargetRef.Name + "-" + strings.ReplaceAll(gatewayPolicy.Spec.TargetRef.Group, ".", "-"),
 		SectionName: sectionName,
 		Namespace:   gwNamespace,
 	}
@@ -451,7 +453,7 @@ func (s *ResourceMap) AddJWTProvider(provider *v1alpha1.JWTProvider) {
 	s.jwtProviders[key] = provider
 }
 
-func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.CustomGatewayJWTProvider) (*v1alpha1.JWTProvider, bool) {
+func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.GatewayJWTProvider) (*v1alpha1.JWTProvider, bool) {
 	key := api.ResourceReference{
 		Name: provider.Name,
 		Kind: "JWTProvider",

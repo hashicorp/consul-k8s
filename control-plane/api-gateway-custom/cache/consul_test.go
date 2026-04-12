@@ -2230,9 +2230,9 @@ func TestCache_RemoveRoleBinding(t *testing.T) {
 			gatewayName := "my-api-gateway"
 			namespace := "ns"
 			// file the acl binding rule, acl policy, and acl role maps with the necessary data
-			c.gatewayNameToACLBindingRule[gatewayName] = tt.bindingRule
-			c.gatewayNameToACLRole[gatewayName] = tt.role
-			c.gatewayNameToACLPolicy[gatewayName] = tt.policy
+			c.gatewayToACLBindingRule[gatewayName] = tt.bindingRule
+			c.gatewayToACLRole[gatewayName] = tt.role
+			c.gatewayToACLPolicy[gatewayName] = tt.policy
 
 			err = c.RemoveRoleBinding(authMethod, gatewayName, namespace)
 			require.ErrorIs(t, err, tt.expectedErr)

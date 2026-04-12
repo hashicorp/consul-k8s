@@ -1560,8 +1560,8 @@ func createRouteAuthFilter(t *testing.T, ctx context.Context, k8sClient client.W
 			Name: "auth-filter",
 		},
 		Spec: v1alpha1.RouteAuthFilterSpec{
-			JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
-				Providers: []*v1alpha1.CustomGatewayJWTProvider{
+			JWT: &v1alpha1.GatewayJWTRequirement{
+				Providers: []*v1alpha1.GatewayJWTProvider{
 					{
 						Name: providerName,
 					},
@@ -1612,8 +1612,8 @@ func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatc
 				SectionName: &gw.Spec.Listeners[0].Name,
 			},
 			Override: &v1alpha1.CustomGatewayPolicyConfig{
-				JWT: &v1alpha1.CustomGatewayJWTRequirement{
-					Providers: []*v1alpha1.CustomGatewayJWTProvider{
+				JWT: &v1alpha1.GatewayJWTRequirement{
+					Providers: []*v1alpha1.GatewayJWTProvider{
 						{
 							Name: providerName,
 						},
@@ -1621,8 +1621,8 @@ func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatc
 				},
 			},
 			Default: &v1alpha1.CustomGatewayPolicyConfig{
-				JWT: &v1alpha1.CustomGatewayJWTRequirement{
-					Providers: []*v1alpha1.CustomGatewayJWTProvider{
+				JWT: &v1alpha1.GatewayJWTRequirement{
+					Providers: []*v1alpha1.GatewayJWTProvider{
 						{
 							Name: providerName,
 						},

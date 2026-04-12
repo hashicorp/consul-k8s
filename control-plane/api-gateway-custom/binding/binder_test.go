@@ -1144,8 +1144,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 							Namespace: "default",
 						},
 						Spec: v1alpha1.RouteAuthFilterSpec{
-							JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1332,8 +1332,8 @@ func TestBinder_Lifecycle(t *testing.T) {
 					TypeMeta:   metav1.TypeMeta{Kind: "RouteAuthFilter"},
 					ObjectMeta: metav1.ObjectMeta{Name: "route-auth", Namespace: "default"},
 					Spec: v1alpha1.RouteAuthFilterSpec{
-						JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
-							Providers: []*v1alpha1.CustomGatewayJWTProvider{
+						JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
 								{
 									Name: "okta",
 								},

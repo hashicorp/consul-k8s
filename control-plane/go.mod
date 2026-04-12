@@ -25,7 +25,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hashicorp/consul v0.4.1-0.20250919124332-fe5b36f5014c
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
-	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.5
+	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.6
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.12
 	github.com/hashicorp/consul/api v1.33.2
@@ -64,7 +64,6 @@ require (
 	sigs.k8s.io/controller-runtime v0.22.1
 	sigs.k8s.io/gateway-api v1.5.1
 )
-
 
 require (
 	cloud.google.com/go/auth v0.9.1 // indirect
