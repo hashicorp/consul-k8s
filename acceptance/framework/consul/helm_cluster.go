@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -280,22 +281,59 @@ func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
 
 	logger.Logf(t, "Cleaning stale Consul resources before Helm install in OpenShift namespace %s", h.helmOptions.KubectlOptions.Namespace)
 
+	h.resetNamespacePSAEnforcementLabel(t)
 	h.deleteStaleTestNamespaces(t)
 	h.deleteStaleNamedSecretsForRelease(t, h.releaseName)
 	h.deleteGatewayHookJobsIfExistsForRelease(t, h.releaseName)
-	h.deleteStaleHelmReleases(t)
-	h.deleteStaleGatewayAPICRDs(t)
 	h.deleteStaleGatewayAndConsulAPIResources(t)
 	if strings.HasPrefix(t.Name(), "TestAPIGateway") {
+		logger.Logf(t, "Deleting stale Gateway API and Consul API resources before Helm install for API gateway test %s", t.Name())
 		h.deleteStaleAPIGatewayTestClusterResources(t)
 	}
+	h.deleteStaleHelmReleases(t)
+	h.deleteStaleConsulOwnedCRDs(t)
 	h.deleteStaleStaticPrefixedResources(t)
 	h.deleteStaleLabeledResources(t)
+}
+
+func (h *HelmCluster) resetNamespacePSAEnforcementLabel(t *testing.T) {
+	t.Helper()
+	logger.Logf(t, "Resetting stale PSA enforcement label on namespace %s before Helm install", h.helmOptions.KubectlOptions.Namespace)
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	ns, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		return
+	}
+	require.NoError(t, err)
+
+	labels := ns.GetLabels()
+	if labels == nil {
+		return
+	}
+
+	if labels["pod-security.kubernetes.io/enforce"] != "restricted" {
+		return
+	}
+
+	nsCopy := ns.DeepCopy()
+	labelsCopy := nsCopy.GetLabels()
+	if labelsCopy == nil {
+		labelsCopy = map[string]string{}
+	}
+	labelsCopy["pod-security.kubernetes.io/enforce"] = "privileged"
+	nsCopy.SetLabels(labelsCopy)
+
+	logger.Logf(t, "Resetting stale PSA enforcement label on namespace %s from restricted to privileged before Helm install", namespace)
+	_, err = h.kubernetesClient.CoreV1().Namespaces().Update(context.Background(), nsCopy, metav1.UpdateOptions{})
+	require.NoError(t, err)
 }
 
 func (h *HelmCluster) deleteStaleAPIGatewayTestClusterResources(t *testing.T) {
 	t.Helper()
 	h.deleteStaleAPIGatewayTestSecrets(t)
+	for _, name := range []string{"gateway-class-config", "controlled-gateway-class-config"} {
+		h.deleteStaleGatewayClassConfig(t, name)
+	}
 
 	for _, name := range []string{"gateway-class", "controlled-gateway-class-one", "controlled-gateway-class-two", "uncontrolled-gateway-class"} {
 		h.deleteStaleGatewayClass(t, name)
@@ -303,10 +341,6 @@ func (h *HelmCluster) deleteStaleAPIGatewayTestClusterResources(t *testing.T) {
 
 	for _, name := range []string{"custom-gateway-class", "custom-controlled-gateway-class-one", "custom-controlled-gateway-class-two", "custom-uncontrolled-gateway-class"} {
 		h.deleteCustomStaleGatewayClass(t, name)
-	}
-
-	for _, name := range []string{"gateway-class-config", "controlled-gateway-class-config"} {
-		h.deleteStaleGatewayClassConfig(t, name)
 	}
 }
 
@@ -330,7 +364,7 @@ func (h *HelmCluster) deleteStaleAPIGatewayTestSecrets(t *testing.T) {
 
 func (h *HelmCluster) deleteStaleGatewayClass(t *testing.T, name string) {
 	t.Helper()
-
+	logger.Logf(t, "Checking for stale stable GatewayClass %s before Helm install", name)
 	ctx := context.Background()
 	var gatewayClass gwv1.GatewayClass
 	err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &gatewayClass)
@@ -374,7 +408,7 @@ func (h *HelmCluster) deleteStaleGatewayClass(t *testing.T, name string) {
 
 func (h *HelmCluster) deleteCustomStaleGatewayClass(t *testing.T, name string) {
 	t.Helper()
-
+	logger.Logf(t, "Checking for stale CustomGatewayClass %s before Helm install", name)
 	ctx := context.Background()
 	var gatewayClass gwv1beta1.CustomGatewayClass
 	err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &gatewayClass)
@@ -403,7 +437,7 @@ func (h *HelmCluster) deleteCustomStaleGatewayClass(t *testing.T, name string) {
 	}
 
 	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
-		var liveGatewayClass gwv1.GatewayClass
+		var liveGatewayClass gwv1beta1.CustomGatewayClass
 		err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &liveGatewayClass)
 		if errors.IsNotFound(err) {
 			return
@@ -418,7 +452,7 @@ func (h *HelmCluster) deleteCustomStaleGatewayClass(t *testing.T, name string) {
 
 func (h *HelmCluster) deleteStaleGatewayClassConfig(t *testing.T, name string) {
 	t.Helper()
-
+	logger.Logf(t, "Checking for stale GatewayClassConfig %s before Helm install", name)
 	ctx := context.Background()
 	var gatewayClassConfig v1alpha1.GatewayClassConfig
 	err := h.runtimeClient.Get(ctx, client.ObjectKey{Name: name}, &gatewayClassConfig)
@@ -464,12 +498,32 @@ func isMissingRuntimeKindError(err error) bool {
 	if err == nil {
 		return false
 	}
+	if errors.IsNotFound(err) || apimeta.IsNoMatchError(err) {
+		return true
+	}
 
 	errText := err.Error()
 	return strings.Contains(errText, "no matches for kind") ||
 		strings.Contains(errText, "no kind is registered for the type") ||
 		strings.Contains(errText, "unable to retrieve the complete list of server APIs") ||
-		strings.Contains(errText, "no matches for gateway.networking.k8s.io/")
+		strings.Contains(errText, "no matches for gateway.networking.k8s.io/") ||
+		strings.Contains(errText, "the server could not find the requested resource")
+}
+
+func isTransientKubeAPIError(err error, output string) bool {
+	if err == nil {
+		return false
+	}
+
+	combined := err.Error()
+	if output != "" {
+		combined += "\n" + output
+	}
+
+	return strings.Contains(combined, "Unable to connect to the server") ||
+		strings.Contains(combined, "TLS handshake timeout") ||
+		strings.Contains(combined, "Client.Timeout exceeded") ||
+		strings.Contains(combined, "EOF")
 }
 
 func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
@@ -510,7 +564,7 @@ func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
 
 func (h *HelmCluster) deleteStaleStaticPrefixedResources(t *testing.T) {
 	t.Helper()
-
+	logger.Logf(t, "Deleting static resources in deployment, service, serviceaccount and rolebinding")
 	namespace := h.helmOptions.KubectlOptions.Namespace
 	resourceKinds := []string{"deployment", "service", "serviceaccount", "rolebinding"}
 
@@ -550,7 +604,7 @@ func (h *HelmCluster) deleteStaleStaticPrefixedResources(t *testing.T) {
 
 func (h *HelmCluster) deleteStaleGatewayAndConsulAPIResources(t *testing.T) {
 	t.Helper()
-
+	logger.Logf(t, "Deleting stale Gateway API and Consul API resources before Helm install")
 	apiGroups := []string{"gateway.networking.k8s.io", "consul.hashicorp.com"}
 
 	for _, apiGroup := range apiGroups {
@@ -623,9 +677,10 @@ func splitNonEmptyLines(output string) []string {
 	return result
 }
 
-func (h *HelmCluster) deleteStaleGatewayAPICRDs(t *testing.T) {
+func (h *HelmCluster) deleteStaleConsulOwnedCRDs(t *testing.T) {
 	t.Helper()
 
+	logger.Logf(t, "Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts")
 	// These cluster-scoped CRDs can keep stale Helm ownership annotations from
 	// earlier acceptance releases. Limit cleanup to Consul-owned CRDs and only
 	// include Gateway API CRDs on OpenShift versions where tests install them.
@@ -633,23 +688,34 @@ func (h *HelmCluster) deleteStaleGatewayAPICRDs(t *testing.T) {
 	if !h.isOpenShiftGTE419 {
 		crds = append(crds, staleGatewayAPICRDs...)
 	}
-	sort.Strings(crds)
+	//sort.Strings(crds)
 
 	for _, crd := range crds {
-		ownerRelease, err := k8s.RunKubectlAndGetOutputE(
-			t,
-			h.helmOptions.KubectlOptions,
-			"get", "crd", crd,
-			"--ignore-not-found=true",
-			"-o", "jsonpath={.metadata.annotations.meta\\.helm\\.sh/release-name}",
-		)
-		if err != nil {
-			require.NoError(t, err)
-		}
+		var ownerRelease string
+		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+			var output string
+			var err error
+			output, err = k8s.RunKubectlAndGetOutputE(
+				r,
+				h.helmOptions.KubectlOptions,
+				"get", "crd", crd,
+				"--ignore-not-found=true",
+				"-o", "jsonpath={.metadata.annotations.meta\\.helm\\.sh/release-name}",
+			)
+			if err != nil {
+				if isTransientKubeAPIError(err, output) {
+					r.Errorf("transient kube API error checking stale CRD %s ownership: %s", crd, strings.TrimSpace(err.Error()+"\n"+output))
+					return
+				}
+				require.NoError(r, err)
+			}
+
+			ownerRelease = strings.TrimSpace(output)
+		})
 
 		if ownerRelease != "" && ownerRelease != h.releaseName {
 			logger.Logf(t, "Deleting stale CRD %s owned by release %s before installing release %s", crd, ownerRelease, h.releaseName)
-			_, err = k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "delete", "crd", crd, "--ignore-not-found=true")
+			_, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "delete", "crd", crd, "--ignore-not-found=true")
 			require.NoError(t, err)
 		}
 	}
@@ -723,6 +789,7 @@ func (h *HelmCluster) cleanupRetryCounter() *retry.Counter {
 
 func (h *HelmCluster) deleteStaleLabeledResources(t *testing.T) {
 	t.Helper()
+	logger.Logf(t, "Deleting stale Consul resources with label selector %s before Helm install", staleConsulLabelSelector)
 
 	deleteList := func(err error) {
 		if err != nil && !errors.IsNotFound(err) {
