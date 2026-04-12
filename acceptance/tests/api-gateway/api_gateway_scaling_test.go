@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -36,14 +37,14 @@ const (
 )
 
 func TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *testing.T) {
-	cfg := suite.Config()
-	if !cfg.EnableEnterprise {
-		t.Skipf("skipping this test because -enable-enterprise is not set")
-	}
+	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
-	installScalingCluster(t, false)
+	consulCluster := installScalingCluster(t, false)
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	requireEnterpriseLicenseValid(t, consulClient)
 
+	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	gatewayClassName := createScalingGatewayClassResources(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{
 		DefaultInstances: ptr.To(int32(3)),
@@ -63,14 +64,14 @@ func TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *t
 }
 
 func TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas(t *testing.T) {
-	cfg := suite.Config()
-	if !cfg.EnableEnterprise {
-		t.Skipf("skipping this test because -enable-enterprise is not set")
-	}
+	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
-	installScalingCluster(t, true)
+	consulCluster := installScalingCluster(t, true)
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	requireEnterpriseLicenseValid(t, consulClient)
 
+	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	gatewayClassName := createScalingGatewayClassResources(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{})
 
@@ -82,14 +83,14 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas(t *testing.T) {
 }
 
 func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing.T) {
-	cfg := suite.Config()
-	if !cfg.EnableEnterprise {
-		t.Skipf("skipping this test because -enable-enterprise is not set")
-	}
+	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
-	installScalingCluster(t, true)
+	consulCluster := installScalingCluster(t, true)
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	requireEnterpriseLicenseValid(t, consulClient)
 
+	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	gatewayClassName := createScalingGatewayClassResources(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{})
 
@@ -113,14 +114,14 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing
 }
 
 func TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(t *testing.T) {
-	cfg := suite.Config()
-	if !cfg.EnableEnterprise {
-		t.Skipf("skipping this test because -enable-enterprise is not set")
-	}
+	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
-	installScalingCluster(t, true)
+	consulCluster := installScalingCluster(t, true)
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	requireEnterpriseLicenseValid(t, consulClient)
 
+	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	gatewayClassName := createScalingGatewayClassResources(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{
 		DefaultInstances: ptr.To(int32(2)),
@@ -136,7 +137,7 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(t *testing
 	waitForGatewayDeploymentReplicas(t, k8sClient, gateway.Name, gateway.Namespace, 5)
 }
 
-func installScalingCluster(t *testing.T, scalingEnabled bool) {
+func installScalingCluster(t *testing.T, scalingEnabled bool) *consul.HelmCluster {
 	t.Helper()
 
 	ctx := suite.Environment().DefaultContext(t)
@@ -150,7 +151,32 @@ func installScalingCluster(t *testing.T, scalingEnabled bool) {
 	}
 
 	releaseName := helpers.RandomName()
-	consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName).Create(t)
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	consulCluster.Create(t)
+	return consulCluster
+}
+
+func skipUnlessEnterpriseLicenseConfigured(t *testing.T) {
+	t.Helper()
+
+	cfg := suite.Config()
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+	if cfg.EnterpriseLicense == "" {
+		t.Skipf("skipping this test because no enterprise license is configured")
+	}
+}
+
+func requireEnterpriseLicenseValid(t *testing.T, consulClient *api.Client) {
+	t.Helper()
+
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		license, err := consulClient.Operator().LicenseGet(nil)
+		require.NoError(r, err)
+		require.NotNil(r, license)
+		require.True(r, license.Valid)
+	})
 }
 
 func createScalingGatewayClassResources(
