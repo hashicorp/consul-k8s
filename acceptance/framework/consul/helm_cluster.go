@@ -47,49 +47,6 @@ const (
 	openShiftCleanupCount    = 5
 )
 
-var staleConsulCRDs = []string{
-	"controlplanerequestlimits.consul.hashicorp.com",
-	"customgatewayclasses.consul.hashicorp.com",
-	"customgatewaypolicies.consul.hashicorp.com",
-	"exportedservices.consul.hashicorp.com",
-	"gatewayclassconfigs.consul.hashicorp.com",
-	"gatewaypolicies.consul.hashicorp.com",
-	"gateways.consul.hashicorp.com",
-	"grpcroutes.consul.hashicorp.com",
-	"httproutes.consul.hashicorp.com",
-	"ingressgateways.consul.hashicorp.com",
-	"jwtproviders.consul.hashicorp.com",
-	"meshes.consul.hashicorp.com",
-	"meshservices.consul.hashicorp.com",
-	"peeringacceptors.consul.hashicorp.com",
-	"peeringdialers.consul.hashicorp.com",
-	"proxydefaults.consul.hashicorp.com",
-	"referencegrants.consul.hashicorp.com",
-	"registrations.consul.hashicorp.com",
-	"routeauthfilters.consul.hashicorp.com",
-	"routeretryfilters.consul.hashicorp.com",
-	"routetimeoutfilters.consul.hashicorp.com",
-	"samenessgroups.consul.hashicorp.com",
-	"servicedefaults.consul.hashicorp.com",
-	"serviceintentions.consul.hashicorp.com",
-	"serviceresolvers.consul.hashicorp.com",
-	"servicerouters.consul.hashicorp.com",
-	"servicesplitters.consul.hashicorp.com",
-	"tcproutes.consul.hashicorp.com",
-	"terminatinggateways.consul.hashicorp.com",
-	"tlsroutes.consul.hashicorp.com",
-	"trafficpermissions.auth.consul.hashicorp.com",
-	"udproutes.consul.hashicorp.com",
-}
-
-var staleGatewayAPICRDs = []string{
-	"gatewayclasses.gateway.networking.k8s.io",
-	"gateways.gateway.networking.k8s.io",
-	"httproutes.gateway.networking.k8s.io",
-	"referencegrants.gateway.networking.k8s.io",
-	"tcproutes.gateway.networking.k8s.io",
-}
-
 // HelmCluster implements Cluster and uses Helm
 // to create, destroy, and upgrade consul.
 type HelmCluster struct {
@@ -217,7 +174,11 @@ func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
 
 	// check and remove any CRDs with finalizers
-	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	if h.isOpenShift {
+		helpers.GetCRDRemoveFinalizersForCRDNames(t, h.helmOptions.KubectlOptions, helpers.OpenShiftCleanupCRDs(!h.isOpenShiftGTE419))
+	} else {
+		helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	}
 
 	if h.isOpenShift && !h.SkipCheckForPreviousInstallations {
 		h.cleanupOpenShiftBeforeInstall(t)
@@ -684,10 +645,7 @@ func (h *HelmCluster) deleteStaleConsulOwnedCRDs(t *testing.T) {
 	// These cluster-scoped CRDs can keep stale Helm ownership annotations from
 	// earlier acceptance releases. Limit cleanup to Consul-owned CRDs and only
 	// include Gateway API CRDs on OpenShift versions where tests install them.
-	crds := append([]string{}, staleConsulCRDs...)
-	if !h.isOpenShiftGTE419 {
-		crds = append(crds, staleGatewayAPICRDs...)
-	}
+	crds := helpers.OpenShiftCleanupCRDs(!h.isOpenShiftGTE419)
 	//sort.Strings(crds)
 
 	for _, crd := range crds {

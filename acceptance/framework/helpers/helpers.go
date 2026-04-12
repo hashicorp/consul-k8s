@@ -175,6 +175,57 @@ type ConsulOptions struct {
 	ExternalServiceNameRegistration string
 }
 
+var CommonConsulCRDs = []string{
+	"controlplanerequestlimits.consul.hashicorp.com",
+	"customgatewayclasses.consul.hashicorp.com",
+	"customgatewaypolicies.consul.hashicorp.com",
+	"exportedservices.consul.hashicorp.com",
+	"gatewayclassconfigs.consul.hashicorp.com",
+	"gatewaypolicies.consul.hashicorp.com",
+	"gateways.consul.hashicorp.com",
+	"grpcroutes.consul.hashicorp.com",
+	"httproutes.consul.hashicorp.com",
+	"ingressgateways.consul.hashicorp.com",
+	"jwtproviders.consul.hashicorp.com",
+	"meshes.consul.hashicorp.com",
+	"meshservices.consul.hashicorp.com",
+	"peeringacceptors.consul.hashicorp.com",
+	"peeringdialers.consul.hashicorp.com",
+	"proxydefaults.consul.hashicorp.com",
+	"referencegrants.consul.hashicorp.com",
+	"registrations.consul.hashicorp.com",
+	"routeauthfilters.consul.hashicorp.com",
+	"routeretryfilters.consul.hashicorp.com",
+	"routetimeoutfilters.consul.hashicorp.com",
+	"samenessgroups.consul.hashicorp.com",
+	"servicedefaults.consul.hashicorp.com",
+	"serviceintentions.consul.hashicorp.com",
+	"serviceresolvers.consul.hashicorp.com",
+	"servicerouters.consul.hashicorp.com",
+	"servicesplitters.consul.hashicorp.com",
+	"tcproutes.consul.hashicorp.com",
+	"terminatinggateways.consul.hashicorp.com",
+	"tlsroutes.consul.hashicorp.com",
+	"trafficpermissions.auth.consul.hashicorp.com",
+	"udproutes.consul.hashicorp.com",
+}
+
+var CommonGatewayAPICRDs = []string{
+	"gatewayclasses.gateway.networking.k8s.io",
+	"gateways.gateway.networking.k8s.io",
+	"httproutes.gateway.networking.k8s.io",
+	"referencegrants.gateway.networking.k8s.io",
+	"tcproutes.gateway.networking.k8s.io",
+}
+
+func OpenShiftCleanupCRDs(includeGatewayAPICRDs bool) []string {
+	crds := append([]string{}, CommonConsulCRDs...)
+	if includeGatewayAPICRDs {
+		crds = append(crds, CommonGatewayAPICRDs...)
+	}
+	return crds
+}
+
 func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptions ConsulOptions) {
 	t.Helper()
 	t.Logf("Registering external service %s", k8sOptions.KustomizeConfigPath)
@@ -278,6 +329,18 @@ func GetCRDRemoveFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions) {
 	}
 }
 
+func GetCRDRemoveFinalizersForCRDNames(t testutil.TestingTB, options *k8s.KubectlOptions, crdCandidates []string) {
+	t.Helper()
+	crdNames, err := getCRDsWithFinalizersForCRDNames(options, crdCandidates)
+	if err != nil {
+		logger.Logf(t, "Unable to get CRDs with finalizers from the targeted list, %v.", err)
+	}
+
+	if len(crdNames) > 0 {
+		removeFinalizers(t, options, crdNames)
+	}
+}
+
 // CRD struct to parse CRD JSON output.
 type CRD struct {
 	Items []struct {
@@ -317,6 +380,42 @@ func getCRDsWithFinalizers(options *k8s.KubectlOptions) ([]string, error) {
 	}
 
 	return crdNames, err
+}
+
+func getCRDsWithFinalizersForCRDNames(options *k8s.KubectlOptions, crdCandidates []string) ([]string, error) {
+	if len(crdCandidates) == 0 {
+		return nil, nil
+	}
+
+	cmdArgs := createCmdArgs(options)
+	args := append([]string{"get", "crd"}, crdCandidates...)
+	args = append(args, "-o=json", "--ignore-not-found=true")
+
+	cmdArgs = append(cmdArgs, args...)
+	command := Command{
+		Command: "kubectl",
+		Args:    cmdArgs,
+		Env:     options.Env,
+	}
+
+	output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error running kubectl command: %v, output: %s", err, string(output))
+	}
+
+	var crds CRD
+	if err := json.Unmarshal(output, &crds); err != nil {
+		return nil, fmt.Errorf("error parsing JSON: %v, output: %s", err, string(output))
+	}
+
+	var crdNames []string
+	for _, item := range crds.Items {
+		if len(item.Metadata.Finalizers) > 0 {
+			crdNames = append(crdNames, item.Metadata.Name)
+		}
+	}
+
+	return crdNames, nil
 }
 
 // removeFinalizers removes finalizers from CRDs.
