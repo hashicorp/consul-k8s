@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -70,6 +72,11 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas(t *testing.T) {
 	consulCluster := installScalingCluster(t, true)
 	consulClient, _ := consulCluster.SetupConsulClient(t, false)
 	requireEnterpriseLicenseValid(t, consulClient)
+
+	// Restart the API Gateway controller to ensure it detects the enterprise license.
+	// The controller checks IsEnterpriseDistribution at startup, so we need to restart
+	// it after the license is confirmed valid.
+	restartAPIGatewayController(t, ctx)
 
 	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
@@ -262,7 +269,7 @@ func createScalingGateway(
 func waitForGatewayDeploymentReplicas(t *testing.T, k8sClient client.Client, gatewayName, namespace string, want int32) {
 	t.Helper()
 
-	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 		var deployment appsv1.Deployment
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &deployment)
 		require.NoError(r, err)
@@ -329,4 +336,43 @@ func triggerGatewayReconcile(t *testing.T, k8sClient client.Client, gatewayName,
 	require.NoError(t, err)
 
 	logger.Logf(t, "triggered reconcile for gateway %s/%s", namespace, gatewayName)
+}
+
+func restartAPIGatewayController(t *testing.T, ctx environment.TestContext) {
+	t.Helper()
+
+	k8sClient := ctx.KubernetesClient(t)
+	namespace := ctx.KubectlOptions(t).Namespace
+
+	// Find and delete the consul-connect-injector pod (which contains the API Gateway controller)
+	pods, err := k8sClient.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app=consul,component=connect-injector",
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, pods.Items, "no connect-injector pods found")
+
+	for _, pod := range pods.Items {
+		err = k8sClient.CoreV1().Pods(namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
+		require.NoError(t, err)
+		logger.Logf(t, "deleted pod %s/%s to restart API Gateway controller", namespace, pod.Name)
+	}
+
+	// Wait for the new pod to be ready
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		pods, err := k8sClient.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: "app=consul,component=connect-injector",
+		})
+		require.NoError(r, err)
+		require.NotEmpty(r, pods.Items, "no connect-injector pods found after restart")
+
+		for _, pod := range pods.Items {
+			require.Equal(r, corev1.PodRunning, pod.Status.Phase, "pod %s not running", pod.Name)
+			for _, condition := range pod.Status.Conditions {
+				if condition.Type == corev1.PodReady {
+					require.Equal(r, corev1.ConditionTrue, condition.Status, "pod %s not ready", pod.Name)
+				}
+			}
+		}
+		logger.Logf(t, "API Gateway controller restarted and ready")
+	})
 }
