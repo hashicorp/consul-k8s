@@ -29,8 +29,10 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RandomName generates a random string with a 'test-' prefix.
@@ -333,6 +335,7 @@ func removeFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions, crdName
 		_, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 		if err != nil {
 			logger.Logf(t, "Unable to remove finalizers, proceeding anyway: %v.", err)
+			continue
 		}
 		fmt.Printf("Finalizers removed from CRD %s\n", crd)
 	}
@@ -443,6 +446,26 @@ func WaitForGatewayClassConfigWithRetry(t *testing.T, kubectlOptions *k8s.Kubect
 	if !found {
 		require.Failf(t, "gatewayclassconfig %s was not found after %d attempts with delete/recreate", configName, maxAttempts)
 	}
+}
+
+func WaitForGatewayClassConfigWithClientRetry(t *testing.T, k8sClient client.Client, configName string) {
+	t.Helper()
+
+	WaitForResourceWithClientRetry(t, k8sClient, client.ObjectKey{Name: configName}, &v1alpha1.GatewayClassConfig{}, "gatewayclassconfig")
+}
+
+func WaitForResourceWithClientRetry(t *testing.T, k8sClient client.Client, objectKey client.ObjectKey, object client.Object, resourceKind string) {
+	t.Helper()
+
+	logger.Logf(t, "waiting for %s %s to be readable via controller-runtime client", resourceKind, objectKey.Name)
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
+		err := k8sClient.Get(context.Background(), objectKey, object)
+		if k8serrors.IsNotFound(err) {
+			r.Errorf("%s %s not found yet", resourceKind, objectKey.Name)
+			return
+		}
+		require.NoError(r, err)
+	})
 }
 
 // WaitForHTTPRouteWithRetry waits for an HTTPRoute to exist with retry logic
