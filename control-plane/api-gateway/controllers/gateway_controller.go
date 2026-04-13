@@ -96,6 +96,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
+	log.Info("gatewayclass(stable): " + fmt.Sprintf("%+v", gatewayClass))
+
+	if gatewayClass.Spec.ControllerName != common.GatewayClassControllerName {
+		log.Info("skipping reconciliation since controller name does not match", "expected", common.GatewayClassControllerName, "actual", gatewayClass.Spec.ControllerName)
+		return ctrl.Result{}, nil
+	}
 
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)

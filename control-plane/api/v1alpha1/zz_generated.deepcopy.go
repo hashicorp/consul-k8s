@@ -829,7 +829,7 @@ func (in *CustomGatewayPolicyConfig) DeepCopyInto(out *CustomGatewayPolicyConfig
 	*out = *in
 	if in.JWT != nil {
 		in, out := &in.JWT, &out.JWT
-		*out = new(CustomGatewayJWTRequirement)
+		*out = new(GatewayJWTRequirement)
 		(*in).DeepCopyInto(*out)
 	}
 }

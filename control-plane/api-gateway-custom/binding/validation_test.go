@@ -668,8 +668,8 @@ func TestValidateListeners(t *testing.T) {
 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 							},
 							Override: &v1alpha1.CustomGatewayPolicyConfig{
-								JWT: &v1alpha1.CustomGatewayJWTRequirement{
-									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
 										{
 											Name: "okta",
 										},
@@ -710,8 +710,8 @@ func TestValidateListeners(t *testing.T) {
 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 							},
 							Default: &v1alpha1.CustomGatewayPolicyConfig{
-								JWT: &v1alpha1.CustomGatewayJWTRequirement{
-									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
 										{
 											Name: "okta",
 										},
@@ -752,8 +752,8 @@ func TestValidateListeners(t *testing.T) {
 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 							},
 							Override: &v1alpha1.CustomGatewayPolicyConfig{
-								JWT: &v1alpha1.CustomGatewayJWTRequirement{
-									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
 										{
 											Name: "local",
 										},
@@ -794,8 +794,8 @@ func TestValidateListeners(t *testing.T) {
 								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 							},
 							Default: &v1alpha1.CustomGatewayPolicyConfig{
-								JWT: &v1alpha1.CustomGatewayJWTRequirement{
-									Providers: []*v1alpha1.CustomGatewayJWTProvider{
+								JWT: &v1alpha1.GatewayJWTRequirement{
+									Providers: []*v1alpha1.GatewayJWTProvider{
 										{
 											Name: "local",
 										},
@@ -1078,8 +1078,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
 						Override: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "local",
 									},
@@ -1087,8 +1087,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							},
 						},
 						Default: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1153,8 +1153,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
 						},
 						Override: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "auth0",
 									},
@@ -1208,8 +1208,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
 						Override: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1263,8 +1263,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
 						Default: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1318,8 +1318,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
 						Override: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1327,8 +1327,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							},
 						},
 						Default: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1382,8 +1382,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
 						},
 						Override: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "local",
 									},
@@ -1391,8 +1391,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							},
 						},
 						Default: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1446,8 +1446,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
 						},
 						Override: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "local",
 									},
@@ -1455,8 +1455,8 @@ func TestValidateGatewayPolicies(t *testing.T) {
 							},
 						},
 						Default: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "okta",
 									},
@@ -1506,8 +1506,8 @@ func TestValidateAuthFilters(t *testing.T) {
 			authFilters: []*v1alpha1.RouteAuthFilter{
 				{
 					Spec: v1alpha1.RouteAuthFilterSpec{
-						JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
-							Providers: []*v1alpha1.CustomGatewayJWTProvider{
+						JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
 								{
 									Name: "okta",
 								},
@@ -1535,8 +1535,8 @@ func TestValidateAuthFilters(t *testing.T) {
 			authFilters: []*v1alpha1.RouteAuthFilter{
 				{
 					Spec: v1alpha1.RouteAuthFilterSpec{
-						JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
-							Providers: []*v1alpha1.CustomGatewayJWTProvider{
+						JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
 								{
 									Name: "auth0",
 								},

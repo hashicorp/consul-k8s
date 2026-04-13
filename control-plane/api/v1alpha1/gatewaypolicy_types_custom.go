@@ -83,7 +83,7 @@ type CustomPolicyTargetReference struct {
 
 type CustomGatewayPolicyConfig struct {
 	//+kubebuilder:validation:Optional
-	JWT *CustomGatewayJWTRequirement `json:"jwt,omitempty"`
+	JWT *GatewayJWTRequirement `json:"jwt,omitempty"`
 }
 
 // CustomGatewayJWTRequirement holds the list of JWT providers to be verified against.

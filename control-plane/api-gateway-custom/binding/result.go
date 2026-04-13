@@ -632,6 +632,8 @@ func (g gatewayPolicyValidationResult) acceptedCondition(generation int64) metav
 
 func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) []metav1.Condition {
 	now := timeFunc()
+
+	// ✅ No errors → ResolvedRefs = True
 	if len(g.resolvedRefsErrs) == 0 {
 		return []metav1.Condition{
 			{
@@ -645,30 +647,39 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 		}
 	}
 
-	conditions := make([]metav1.Condition, 0, len(g.resolvedRefsErrs))
+	// ✅ Aggregate all errors into ONE condition
+	var messages []string
+	reasonSet := make(map[string]struct{})
+
 	for _, err := range g.resolvedRefsErrs {
+		messages = append(messages, err.Error())
+
 		switch {
 		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingListenerReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
+			reasonSet["MissingListenerReference"] = struct{}{}
 		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingJWTProviderReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
+			reasonSet["MissingJWTProviderReference"] = struct{}{}
 		}
 	}
-	return conditions
+
+	// Pick a combined reason
+	reason := "InvalidRefs"
+	if len(reasonSet) == 1 {
+		for r := range reasonSet {
+			reason = r
+		}
+	}
+
+	return []metav1.Condition{
+		{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionFalse,
+			Reason:             reason,
+			ObservedGeneration: generation,
+			Message:            strings.Join(messages, "; "),
+			LastTransitionTime: now,
+		},
+	}
 }
 
 type authFilterValidationResults []authFilterValidationResult

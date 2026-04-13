@@ -89,7 +89,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 
 	}
-	log.Info("Gateway found: " + fmt.Sprintf("%+v", gateway))
 
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
@@ -181,6 +180,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// get all jwt providers referencing this gateway
 	_, err = r.getJWTProviders(ctx, resources)
 	if err != nil {
 		log.Error(err, "unable to list JWT providers")
@@ -404,8 +404,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 
 	predicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
-			common.ManagedLabel:  "true",
-			common.NameLabelTest: "api-gateway-custom",
+			common.ManagedLabel: "true",
 		}),
 	)
 
@@ -627,7 +626,7 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 
 // transformGatewayPolicy will return a list of all gateways that need to be reconcilled.
 func (r *GatewayController) transformGatewayPolicy(ctx context.Context, o client.Object) []reconcile.Request {
-	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+	gatewayPolicy := o.(*v1alpha1.CustomGatewayPolicy)
 	gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
 	if gwNamespace == "" {
 		gwNamespace = gatewayPolicy.Namespace

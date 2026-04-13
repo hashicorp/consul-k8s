@@ -599,7 +599,7 @@ func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resou
 		return
 	}
 
-	for _, provider := range authFilter.Spec.JWTCustom.Providers {
+	for _, provider := range authFilter.Spec.JWT.Providers {
 		_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 		if !ok {
 			invalidFilters[fmt.Sprintf("%s/%s", namespace, authFilter.Name)] = struct{}{}
@@ -714,7 +714,7 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 		}
 		var result authFilterValidationResult
 		missingJWTProviders := make([]string, 0)
-		for _, provider := range filter.Spec.JWTCustom.Providers {
+		for _, provider := range filter.Spec.JWT.Providers {
 			if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
 				missingJWTProviders = append(missingJWTProviders, provider.Name)
 			}

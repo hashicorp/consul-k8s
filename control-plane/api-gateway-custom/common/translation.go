@@ -171,12 +171,12 @@ func (t ResourceTranslator) translateRouteTimeoutFilter(routeTimeoutFilter *v1al
 }
 
 func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.RouteAuthFilter) *api.JWTFilter {
-	if routeJWTFilter.Spec.JWTCustom == nil {
+	if routeJWTFilter.Spec.JWT == nil {
 		return nil
 	}
 
 	return &api.JWTFilter{
-		Providers: ConvertSliceFunc(routeJWTFilter.Spec.JWTCustom.Providers, t.translateJWTProvider),
+		Providers: ConvertSliceFunc(routeJWTFilter.Spec.JWT.Providers, t.translateJWTProvider),
 	}
 }
 
@@ -201,14 +201,14 @@ func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.CustomGatewa
 	return defaultPolicy, overridePolicy
 }
 
-func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.CustomGatewayJWTRequirement) *api.APIGatewayJWTRequirement {
+func (t ResourceTranslator) translateJWTRequirement(crdRequirement *v1alpha1.GatewayJWTRequirement) *api.APIGatewayJWTRequirement {
 	apiRequirement := api.APIGatewayJWTRequirement{}
 	providers := ConvertSliceFunc(crdRequirement.Providers, t.translateJWTProvider)
 	apiRequirement.Providers = providers
 	return &apiRequirement
 }
 
-func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.CustomGatewayJWTProvider) *api.APIGatewayJWTProvider {
+func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.GatewayJWTProvider) *api.APIGatewayJWTProvider {
 	if crdProvider == nil {
 		return nil
 	}
@@ -222,7 +222,7 @@ func (t ResourceTranslator) translateJWTProvider(crdProvider *v1alpha1.CustomGat
 	return &apiProvider
 }
 
-func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.CustomGatewayJWTClaimVerification) *api.APIGatewayJWTClaimVerification {
+func (t ResourceTranslator) translateVerifyClaims(crdClaims *v1alpha1.GatewayJWTClaimVerification) *api.APIGatewayJWTClaimVerification {
 	if crdClaims == nil {
 		return nil
 	}
