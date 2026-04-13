@@ -7,16 +7,10 @@ metadata:
   name: route-jwt-auth-filter
 spec:
   jwt:
-      providers:
-      - name: "local"
-        verifyClaims:
-        - path:
-            - role
-          value: doctor
-  jwtCustom:
     providers:
     - name: "local"
       verifyClaims:
       - path:
           - role
         value: doctor
+

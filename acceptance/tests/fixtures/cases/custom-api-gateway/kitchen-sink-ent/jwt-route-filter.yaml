@@ -13,10 +13,3 @@ spec:
       - path:
           - role
         value: doctor
-  jwtCustom:
-    providers:
-    - name: "local"
-      verifyClaims:
-      - path:
-          - role
-        value: doctor
