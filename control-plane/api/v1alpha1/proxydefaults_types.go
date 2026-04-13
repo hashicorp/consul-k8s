@@ -52,8 +52,6 @@ type ProxyDefaultsList struct {
 	Items           []ProxyDefaults `json:"items"`
 }
 
-// RawMessage for Config based on recommendation here: https://github.com/kubernetes-sigs/controller-tools/issues/294#issuecomment-518380816
-
 // ProxyDefaultsSpec defines the desired state of ProxyDefaults.
 type ProxyDefaultsSpec struct {
 	// Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
@@ -85,7 +83,7 @@ type ProxyDefaultsSpec struct {
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:pruning:PreserveUnknownFields
-	Config json.RawMessage `json:"config,omitempty"`
+	Config JSONRawObject `json:"config,omitempty"`
 	// MeshGateway controls the default mesh gateway configuration for this service.
 	MeshGateway MeshGateway `json:"meshGateway,omitempty"`
 	// Expose controls the default expose path configuration for Envoy.
@@ -248,7 +246,7 @@ func (in *ProxyDefaults) Validate(_ common.ConsulMeta) error {
 func (in *ProxyDefaults) DefaultNamespaceFields(_ common.ConsulMeta) {
 }
 
-// convertConfig converts the config of type json.RawMessage which is stored
+// convertConfig converts the config of type JSONRawObject which is stored
 // by the resource into type map[string]interface{} which is saved by the
 // consul API.
 func (in *ProxyDefaults) convertConfig() map[string]interface{} {

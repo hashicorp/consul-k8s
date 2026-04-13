@@ -122,7 +122,7 @@ type EnvoyExtension struct {
 	// +kubebuilder:validation:Type=object
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:pruning:PreserveUnknownFields
-	Arguments json.RawMessage `json:"arguments,omitempty"`
+	Arguments JSONRawObject `json:"arguments,omitempty"`
 }
 
 // EnvoyExtensions represents a list of the EnvoyExtension configuration.
