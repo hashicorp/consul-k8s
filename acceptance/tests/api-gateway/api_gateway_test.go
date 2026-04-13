@@ -290,7 +290,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			logger.Log(t, "patching route to target http server")
 			// Use retries to handle intermittent failures when patching the httproute
 			retry.Run(t, func(r *retry.R) {
-				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "patch", gatewayHTTPRouteResource, "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
 				require.NoError(r, err, out)
 				logger.Log(t, "successfully patched httproute")
 			})
