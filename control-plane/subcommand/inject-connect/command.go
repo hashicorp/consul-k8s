@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	gwv1alpha2exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
@@ -31,6 +33,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -162,6 +165,11 @@ type Command struct {
 	flagDefaultSidecarProbePeriodSeconds            int
 	flagDefaultSidecarProbeFailureThreshold         int
 	flagDefaultSidecarProbeCheckTimeoutSeconds      int
+
+	// enable custom crds controller flags
+	flagEnableCustomGatewayCRDController bool
+	//enable tcp routes
+	flagEnableTCPRoute bool
 }
 
 var (
@@ -170,13 +178,17 @@ var (
 )
 
 func init() {
+	fmt.Printf("adding to the scheme in the inject-connect command\n")
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
+	utilruntime.Must(gwv1.AddToScheme(scheme))
+	utilruntime.Must(gwv1beta1exp.AddToScheme(scheme))
+	utilruntime.Must(gwv1alpha2exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-
+	fmt.Printf("added to the scheme")
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -247,6 +259,12 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
+	// enable TCP watch
+	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
+
+	// custom controller flags
+	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")
+
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
@@ -286,6 +304,8 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbePeriodSeconds, "default-sidecar-probe-period-seconds", 1, "Default number of seconds for the k8s period between startup probe checks.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
+
+	// enable custom crds controller flags
 
 	c.consul = &flags.ConsulFlags{}
 
@@ -428,6 +448,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	err = c.configureControllers(ctx, mgr, watcher)
+
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1

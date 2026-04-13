@@ -11,7 +11,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	// gwv1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -30,7 +32,7 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 
 	testCases := []struct {
 		name                        string
-		gateway                     gwv1beta1.Gateway
+		gateway                     gwv1.Gateway
 		gcc                         v1alpha1.GatewayClassConfig
 		expectedCommand             []string
 		expectedHasEnvoyArg         bool
@@ -39,13 +41,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 	}{
 		{
 			name: "privileged port with mapping disabled",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "https",
 							Port: PrivilegedPort443, // Privileged port
@@ -65,13 +67,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 		},
 		{
 			name: "privileged port with mapping enabled",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "https",
 							Port: PrivilegedPort443, // Privileged port
@@ -91,13 +93,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 		},
 		{
 			name: "non-privileged port",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "http",
 							Port: NonPrivilegedPort8080, // Non-privileged port
@@ -117,13 +119,13 @@ func TestConsulDataplaneContainer_PrivilegedPorts(t *testing.T) {
 		},
 		{
 			name: "multiple listeners with one privileged",
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-gateway",
 					Namespace: "default",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "http",
 							Port: NonPrivilegedPort8080, // Non-privileged port
@@ -211,13 +213,13 @@ func TestConsulDataplaneContainer_SecurityContext(t *testing.T) {
 		},
 	}
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-gateway",
 			Namespace: "default",
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			Listeners: []gwv1beta1.Listener{
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{
 				{
 					Name: "http",
 					Port: NonPrivilegedPort8080,
@@ -268,13 +270,13 @@ func TestConsulDataplaneContainer_BasicFunctionality(t *testing.T) {
 		},
 	}
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-gateway",
 			Namespace: "default",
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			Listeners: []gwv1beta1.Listener{
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{
 				{
 					Name: "http",
 					Port: NonPrivilegedPort8080,
