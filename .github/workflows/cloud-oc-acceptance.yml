@@ -8,7 +8,7 @@ on:
 
 # these should be the only settings that you will ever need to change
 env:
-  BRANCH: ${{ github.ref_name }}
+  BRANCH: "anilvpatel/dinesh-ocp-peering-test"
   CONTEXT: "pr"
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
       - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
         name: cloud
         with:
-          workflow: cloud.yml
+          workflow: oc-cloud.yml
           repo: hashicorp/consul-k8s-workflows
           ref: "anilvpatel/openshift-acceptance-test"
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
