@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
+# It won't trigger in pr merges in git ref is not used in workflow
 - {runner: 0, test-packages: "basic"}
 - {runner: 1, test-packages: "metrics"}
 - {runner: 2, test-packages: "snapshot-agent"}
