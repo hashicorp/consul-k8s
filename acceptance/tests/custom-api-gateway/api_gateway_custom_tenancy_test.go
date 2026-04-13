@@ -52,7 +52,6 @@ const (
 	tenancyRouteName   = "custom-route"
 )
 
-// TestAPIGateway_Tenancy
 func TestAPIGateway_Tenancy(t *testing.T) {
 	cases := []struct {
 		secure             bool
