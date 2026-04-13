@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	componentLabel = "component"
+	ComponentLabel = "component"
 	nameLabel      = "gateway.consul.hashicorp.com/name"
 	namespaceLabel = "gateway.consul.hashicorp.com/namespace"
 	createdAtLabel = "gateway.consul.hashicorp.com/created"
@@ -22,7 +22,7 @@ const (
 // LabelsForGateway formats the default labels that appear on objects managed by the controllers.
 func LabelsForGateway(gateway *gwv1.Gateway) map[string]string {
 	return map[string]string{
-		componentLabel: "api-gateway",
+		ComponentLabel: "api-gateway",
 		nameLabel:      gateway.Name,
 		namespaceLabel: gateway.Namespace,
 		createdAtLabel: fmt.Sprintf("%d", gateway.CreationTimestamp.Unix()),

@@ -234,7 +234,7 @@ func (g *Gatekeeper) initContainer(config common.HelmConfig, name, namespace str
 // the init container.
 const initContainerCommandTpl = `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
-	-gateway-kind="api-gateway-custom" \
+	-gateway-kind="api-gateway-consul" \
   -log-json={{ .LogJSON }} \
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \

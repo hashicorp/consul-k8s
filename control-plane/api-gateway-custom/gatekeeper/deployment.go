@@ -104,7 +104,7 @@ func (g *Gatekeeper) deployment(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayC
 	annotations := map[string]string{
 		"consul.hashicorp.com/connect-inject":        "false",
 		constants.AnnotationGatewayConsulServiceName: gateway.Name,
-		constants.AnnotationGatewayKind:              "api-gateway-custom",
+		constants.AnnotationGatewayKind:              "api-gateway-consul",
 	}
 
 	metrics := common.GatewayMetricsConfig(gateway, gcc, config)
