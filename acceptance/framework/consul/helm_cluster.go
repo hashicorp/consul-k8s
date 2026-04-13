@@ -153,6 +153,7 @@ func applyOpenShiftDefaults(values map[string]string) {
 	//4.19 pass flag isOCPGreaterThan4_18 to true
 	// OpenShift clusters can already have Gateway API CRDs managed outside this Helm release.
 	// Disable external CRD management to avoid Helm ownership conflicts during install.
+	values["global.openshift.enabled"] = "true"
 	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
 	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
 	values["global.openshift.crds.enableTcpRoute"] = "true"
@@ -212,22 +213,27 @@ func (h *HelmCluster) Create(t *testing.T) {
 
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+		logger.Logf(t, "Installing Helm chart %s with release name %s in namespace %s", chartName, h.releaseName, h.helmOptions.KubectlOptions.Namespace)
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		if err != nil && strings.Contains(err.Error(), "has no deployed releases") {
 			//TODO:: recheck this
 			// Helm can leave a release in history-only state; remove it so upgrade --install can succeed.
+			logger.Logf(t, "Release %s is in history-only state, deleting release and retrying install: %s", h.releaseName, err)
 			_ = h.uninstallReleaseNoHooks(t, h.releaseName)
 			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		}
 		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+			logger.Logf(t, "Gateway cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
 			h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
 			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		}
 		if err != nil && isGatewayResourcesAlreadyExistsError(err) {
+			logger.Logf(t, "Gateway resources already exist for release %s, deleting resources and retrying install: %s", h.releaseName, err)
 			h.deleteGatewayResourcesJobIfExistsForRelease(r, h.releaseName)
 			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		}
 		if err != nil && isServerACLInitCleanupAlreadyExistsError(err) {
+			logger.Logf(t, "Server ACL init cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
 			h.deleteServerACLInitCleanupJobIfExistsForRelease(r, h.releaseName)
 			err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		}
