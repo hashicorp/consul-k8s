@@ -86,6 +86,11 @@ func realMain(ctx context.Context) error {
 		return err
 	}
 
+	// Find IAM policies and delete
+	if err := cleanupIAMPolicies(ctx, iamClient); err != nil {
+		return err
+	}
+
 	// Find OIDC providers to delete.
 	oidcProvidersOutput, err := iamClient.ListOpenIDConnectProvidersWithContext(ctx, &iam.ListOpenIDConnectProvidersInput{})
 	if err != nil {
@@ -514,6 +519,10 @@ func realMain(ctx context.Context) error {
 					VpcId:             vpcID,
 				})
 				if err != nil {
+					if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+						fmt.Printf("Internet gateway: Not found (already detached) [id=%s]\n", *igw.InternetGatewayId)
+						return nil
+					}
 					return err
 				}
 
@@ -528,9 +537,14 @@ func realMain(ctx context.Context) error {
 				InternetGatewayId: igw.InternetGatewayId,
 			})
 			if err != nil {
-				return err
+				if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+					fmt.Printf("Internet gateway: Not found (already destroyed) [id=%s]\n", *igw.InternetGatewayId)
+				} else {
+					return err
+				}
+			} else {
+				fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
 			}
-			fmt.Printf("Internet gateway: Destroyed [id=%s]\n", *igw.InternetGatewayId)
 		}
 
 		// Delete network interfaces
@@ -554,6 +568,10 @@ func realMain(ctx context.Context) error {
 					NetworkInterfaceId: networkInterface.NetworkInterfaceId,
 				})
 				if err != nil {
+					if strings.Contains(err.Error(), "InvalidNetworkInterfaceID.NotFound") {
+						fmt.Printf("Network interface: Not found (already destroyed) [id=%s]\n", *networkInterface.NetworkInterfaceId)
+						return nil
+					}
 					return err
 				}
 				return nil
@@ -697,6 +715,9 @@ func realMain(ctx context.Context) error {
 			})
 			if err == nil {
 				break
+			} else if strings.Contains(err.Error(), "InvalidVpcID.NotFound") {
+				fmt.Printf("VPC: Not found (already destroyed) [id=%s]\n", *vpcID)
+				break
 			}
 			fmt.Printf("VPC: Destroy error... [id=%s,err=%q,retry=%d]\n", *vpcID, err, retryCount)
 			time.Sleep(5 * time.Second)
@@ -705,7 +726,9 @@ func realMain(ctx context.Context) error {
 			return errors.New("reached max retry count deleting VPC")
 		}
 
-		fmt.Printf("VPC: Destroyed [id=%s]\n", *vpcID)
+		if err == nil {
+			fmt.Printf("VPC: Destroyed [id=%s]\n", *vpcID)
+		}
 	}
 
 	return nil
@@ -766,7 +789,7 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 
 func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 	var rolesToDelete []*iam.Role
-	rolesToDelete, err := filterIAMRolesWithPrefix(ctx, iamClient, "consul-k8s-")
+	rolesToDelete, err := filterIAMRolesWithPrefixes(ctx, iamClient, []string{"consul-k8s-", "terraform-"})
 	if err != nil {
 		return fmt.Errorf("failed to list roles: %w", err)
 	}
@@ -783,7 +806,13 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 		roleName := aws.StringValue(role.RoleName)
 		err := detachRolePolicies(iamClient, role.RoleName)
 		if err != nil {
-			fmt.Printf("Failed to detach policies for role %s: %v", roleName, err)
+			fmt.Printf("Failed to detach policies for role %s: %v\n", roleName, err)
+			continue
+		}
+
+		err = removeRoleFromInstanceProfiles(iamClient, role.RoleName)
+		if err != nil {
+			fmt.Printf("Failed to remove role %s from instance profiles: %v\n", roleName, err)
 			continue
 		}
 
@@ -791,32 +820,90 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 			RoleName: role.RoleName,
 		})
 		if err != nil {
-			fmt.Printf("Failed to delete role %s: %v", roleName, err)
+			fmt.Printf("Failed to delete role %s: %v\n", roleName, err)
 		} else {
-			fmt.Printf("Deleted role: %s", roleName)
+			fmt.Printf("Deleted role: %s\n", roleName)
 		}
 	}
 
 	return nil
 }
 
-// filterIAMRolesWithPrefix is a callback function used with ListRolesPages.
-// It filters roles based on specified prefix and appends matching roles to rolesToDelete.
+func cleanupIAMPolicies(ctx context.Context, iamClient *iam.IAM) error {
+	var policiesToDelete []*iam.Policy
+
+	err := iamClient.ListPoliciesPagesWithContext(ctx, &iam.ListPoliciesInput{
+		Scope: aws.String("Local"), // Only customer-managed policies
+	}, func(page *iam.ListPoliciesOutput, lastPage bool) bool {
+		for _, policy := range page.Policies {
+			name := aws.StringValue(policy.PolicyName)
+			if strings.HasPrefix(name, "consul-k8s-") {
+				policiesToDelete = append(policiesToDelete, policy)
+			}
+		}
+		return true
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list policies: %w", err)
+	}
+
+	if len(policiesToDelete) == 0 {
+		fmt.Println("Found no IAM policies to clean up")
+		return nil
+	} else {
+		fmt.Printf("Found %d IAM policies to clean up\n", len(policiesToDelete))
+	}
+
+	for _, policy := range policiesToDelete {
+		policyName := aws.StringValue(policy.PolicyName)
+
+		// First, list and delete non-default versions, as AWS requires before deleting the policy itself.
+		versions, err := iamClient.ListPolicyVersions(&iam.ListPolicyVersionsInput{
+			PolicyArn: policy.Arn,
+		})
+		if err == nil {
+			for _, version := range versions.Versions {
+				if !aws.BoolValue(version.IsDefaultVersion) {
+					_, _ = iamClient.DeletePolicyVersion(&iam.DeletePolicyVersionInput{
+						PolicyArn: policy.Arn,
+						VersionId: version.VersionId,
+					})
+				}
+			}
+		}
+
+		_, err = iamClient.DeletePolicy(&iam.DeletePolicyInput{
+			PolicyArn: policy.Arn,
+		})
+		if err != nil {
+			fmt.Printf("Failed to delete policy %s: %v\n", policyName, err)
+		} else {
+			fmt.Printf("Deleted policy: %s\n", policyName)
+		}
+	}
+
+	return nil
+}
+
+// filterIAMRolesWithPrefixes is a callback function used with ListRolesPages.
+// It filters roles based on specified prefixes and appends matching roles to rolesToDelete.
 //
 // Parameters:
-// - page: A single page of IAM roles returned by the AWS API
-// - lastPage: A boolean indicating whether this is the last page of results
-// - rolesToDelete: A pointer to the slice where matching roles are accumulated
-// - rolePrefix: The prefix to filter roles by
-func filterIAMRolesWithPrefix(ctx context.Context, iamClient *iam.IAM, prefix string) ([]*iam.Role, error) {
+// - ctx: Context
+// - iamClient: The IAM service client
+// - prefixes: A slice of prefixes to filter roles by
+func filterIAMRolesWithPrefixes(ctx context.Context, iamClient *iam.IAM, prefixes []string) ([]*iam.Role, error) {
 	var roles []*iam.Role
 
 	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
 		func(page *iam.ListRolesOutput, lastPage bool) bool {
 			for _, role := range page.Roles {
 				name := aws.StringValue(role.RoleName)
-				if strings.HasPrefix(name, prefix) {
-					roles = append(roles, role)
+				for _, prefix := range prefixes {
+					if strings.HasPrefix(name, prefix) {
+						roles = append(roles, role)
+						break
+					}
 				}
 			}
 
@@ -840,6 +927,35 @@ func detachRolePolicies(iamClient *iam.IAM, roleName *string) error {
 		err := detachPoliciesFromRole(iamClient, roleName, page)
 		if err != nil {
 			fmt.Printf("Error detaching policies from role %s: %v", *roleName, err)
+		}
+		return !lastPage
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error {
+	if roleName == nil {
+		return fmt.Errorf("roleName is nil")
+	}
+
+	err := iamClient.ListInstanceProfilesForRolePages(&iam.ListInstanceProfilesForRoleInput{
+		RoleName: roleName,
+	}, func(page *iam.ListInstanceProfilesForRoleOutput, lastPage bool) bool {
+		for _, profile := range page.InstanceProfiles {
+			_, err := iamClient.RemoveRoleFromInstanceProfile(&iam.RemoveRoleFromInstanceProfileInput{
+				InstanceProfileName: profile.InstanceProfileName,
+				RoleName:            roleName,
+			})
+			if err != nil {
+				fmt.Printf("Failed to remove role %s from instance profile %s: %v\n", *roleName, *profile.InstanceProfileName, err)
+			} else {
+				fmt.Printf("Removed role %s from instance profile %s\n", *roleName, *profile.InstanceProfileName)
+			}
 		}
 		return !lastPage
 	})
