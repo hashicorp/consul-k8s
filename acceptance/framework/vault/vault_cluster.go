@@ -87,6 +87,11 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		values["server.image.repository"] = "docker.io/hashicorp/vault"
+		values["injector.image.repository"] = "docker.io/hashicorp/vault-k8s"
+		values["injector.agentImage.repository"] = "docker.io/hashicorp/vault"
+	}
 	if cfg.VaultServerVersion != "" {
 
 		if strings.Contains(cfg.VaultServerVersion, entstr) {
@@ -95,6 +100,10 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
 
 			values["server.image.repository"] = "hashicorp/vault-enterprise"
+			if cfg.UseOpenshift || cfg.EnableOpenshift {
+				values["server.image.repository"] = "docker.io/hashicorp/vault-enterprise"
+				values["injector.agentImage.repository"] = "docker.io/hashicorp/vault-enterprise"
+			}
 			values["server.enterpriseLicense.secretName"] = vaultLicenseSecretName
 			values["server.enterpriseLicense.secretKey"] = vaultLicenseSecretKey
 		}
