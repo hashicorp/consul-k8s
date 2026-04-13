@@ -244,7 +244,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			}, nil)
 			require.NoError(t, err)
 
-			logger.Log(t, "creating api-gateway resources")
+			logger.Log(t, "creating custom api-gateway resources")
 			// Apply api-gateway resources with retry logic to handle intermittent failures
 			retry.Run(t, func(r *retry.R) {
 				out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", customGatewayFixturesDir)
@@ -256,7 +256,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 				k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", customGatewayFixturesDir)
 			})
 
-			helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), customGatewayClassConfigName, customGatewayFixturesDir, "gatewayclassconfigs.consul.hashicorp.com")
+			helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), customGatewayClassConfigName, customGatewayFixturesDir)
 
 			// Wait for the httproute to exist before patching, with delete/recreate fallback
 			helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), customGatewayHTTPRouteName, customGatewayFixturesDir, consulHTTPRouteResource)
@@ -530,6 +530,7 @@ const (
 	petToken = "eyJ0eXAiOiJKV1QiLCJhbGciOiJQUzI1NiIsImtpZCI6IkMtRTFuQ2p3Z0JDLVB1R00yTzQ2N0ZSRGhLeDhBa1ZjdElTQWJvM3JpZXcifQ.eyJpc3MiOiJsb2NhbCIsInJvbGUiOiJwZXQifQ.l94rJayGGTMB426HwEw5ipSjaIHjm-UWDHiBAlB_Slmi814AxAfl_0AdRwSz67UDnkoygKbvPpR5xUB03JCXNshLZuKLegWsBeQg_OJYvZGmFagl5NglBFvH7Jbta4e1eQoAxZI6Xyy1jHbu7jFBjQPVnK8EaRvWoW8Pe8a8rp_5xhub0pomhvRF6Pm5kAS4cMnxvqpVc5Oo5nO7ws_SmoNnbt2Ok14k23Zx5E2EWmGStOfbgFsdbhVbepB2DMzqv1j8jvBbwa_OxCwc_7pEOthOOxRV6L3ZjgbRSB4GumlXAOCBYXD1cRLgrMSrWB1GkefAKu8PV0Ho1px6sI9Evg"
 )
 
+// TestAPIGateway_JWTAuth_Basic
 func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
@@ -586,7 +587,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	})
 
 	logger.Log(t, "creating api-gateway resources")
-	helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), customGatewayClassConfigName, "../fixtures/cases/custom-api-gateway/jwt-auth", "gatewayclassconfigs.consul.hashicorp.com")
+	helpers.WaitForGatewayClassConfigWithRetry(t, ctx.KubectlOptions(t), customGatewayClassConfigName, "../fixtures/cases/custom-api-gateway/jwt-auth")
 
 	// Wait for all the httproutes to be created immediately after applying the main resources
 	logger.Log(t, "waiting for httproutes to be created")
@@ -656,7 +657,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	namespace := ctx.KubectlOptions(t).Namespace
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: customGatewayName, Namespace: namespace}, &gateway)
 		require.NoError(r, err)
 
 		// check our finalizers
@@ -683,7 +684,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		gatewayAddress = gateway.Status.Addresses[0].Value
 
 		// gateway class checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway-class"}, &gatewayClass)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: customGatewayClassName}, &gatewayClass)
 		require.NoError(r, err)
 
 		// check our finalizers
@@ -691,23 +692,23 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: namespace}, &httpRoute)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "custom-http-route", Namespace: namespace}, &httpRoute)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth", Namespace: namespace}, &httpRouteAuth)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "custom-http-route-auth", Namespace: namespace}, &httpRouteAuth)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-no-auth-on-auth-listener", Namespace: namespace}, &httpRouteNoAuthOnAuthListener)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "custom-http-route-no-auth-on-auth-listener", Namespace: namespace}, &httpRouteNoAuthOnAuthListener)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route2-auth", Namespace: namespace}, &httpRouteAuth2)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "custom-http-route2-auth", Namespace: namespace}, &httpRouteAuth2)
 		require.NoError(r, err)
 
 		// http route checks
-		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route-auth-invalid", Namespace: namespace}, &httpRouteInvalid)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "custom-http-route-auth-invalid", Namespace: namespace}, &httpRouteInvalid)
 		require.NoError(r, err)
 
 		// check our finalizers
@@ -717,7 +718,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		// check parent status
 		require.Len(r, httpRoute.Status.Parents, 1)
 		require.EqualValues(r, gatewayClassControllerName, httpRoute.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httpRoute.Status.Parents[0].ParentRef.Name)
+		require.EqualValues(r, customGatewayName, httpRoute.Status.Parents[0].ParentRef.Name)
 		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 		checkStatusCondition(r, httpRoute.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
@@ -729,7 +730,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		// check parent status
 		require.Len(r, httpRouteAuth.Status.Parents, 1)
 		require.EqualValues(r, gatewayClassControllerName, httpRouteAuth.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httpRouteAuth.Status.Parents[0].ParentRef.Name)
+		require.EqualValues(r, customGatewayName, httpRouteAuth.Status.Parents[0].ParentRef.Name)
 		checkStatusCondition(r, httpRouteAuth.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, httpRouteAuth.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 		checkStatusCondition(r, httpRouteAuth.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
@@ -741,7 +742,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		// check parent status
 		require.Len(r, httpRouteNoAuthOnAuthListener.Status.Parents, 1)
 		require.EqualValues(r, gatewayClassControllerName, httpRouteNoAuthOnAuthListener.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httpRouteNoAuthOnAuthListener.Status.Parents[0].ParentRef.Name)
+		require.EqualValues(r, customGatewayName, httpRouteNoAuthOnAuthListener.Status.Parents[0].ParentRef.Name)
 		checkStatusCondition(r, httpRouteNoAuthOnAuthListener.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, httpRouteNoAuthOnAuthListener.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 		checkStatusCondition(r, httpRouteNoAuthOnAuthListener.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
@@ -753,7 +754,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		// check parent status
 		require.Len(r, httpRouteAuth2.Status.Parents, 1)
 		require.EqualValues(r, gatewayClassControllerName, httpRouteAuth2.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httpRouteAuth2.Status.Parents[0].ParentRef.Name)
+		require.EqualValues(r, customGatewayName, httpRouteAuth2.Status.Parents[0].ParentRef.Name)
 		checkStatusCondition(r, httpRouteAuth2.Status.Parents[0].Conditions, trueCondition("Accepted", "Accepted"))
 		checkStatusCondition(r, httpRouteAuth2.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 		checkStatusCondition(r, httpRouteAuth2.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
@@ -761,22 +762,26 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		// check parent status
 		require.Len(r, httpRouteInvalid.Status.Parents, 1)
 		require.EqualValues(r, gatewayClassControllerName, httpRouteInvalid.Status.Parents[0].ControllerName)
-		require.EqualValues(r, "gateway", httpRouteInvalid.Status.Parents[0].ParentRef.Name)
+		require.EqualValues(r, customGatewayName, httpRouteInvalid.Status.Parents[0].ParentRef.Name)
 		checkStatusCondition(r, httpRouteInvalid.Status.Parents[0].Conditions, falseCondition("Accepted", "FilterNotFound"))
 		checkStatusCondition(r, httpRouteInvalid.Status.Parents[0].Conditions, trueCondition("ResolvedRefs", "ResolvedRefs"))
 		checkStatusCondition(r, httpRouteInvalid.Status.Parents[0].Conditions, trueCondition("ConsulAccepted", "Accepted"))
 	})
 
 	// check that the Consul entries were created
-	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, "gateway", nil)
+	logger.Log(t, "checking that Consul entries were created for the gateway and routes")
+	logger.Log(t, "checking that Consul entries were created for the gateway %s", customGatewayName)
+	entry, _, err := consulClient.ConfigEntries().Get(api.APIGateway, customGatewayName, nil)
 	require.NoError(t, err)
 	gateway := entry.(*api.APIGatewayConfigEntry)
 
-	entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route", nil)
+	logger.Log(t, "checking that Consul entries were created for the http routes %s", "custom-http-route")
+	entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "custom-http-route", nil)
 	require.NoError(t, err)
 	consulHTTPRoute := entry.(*api.HTTPRouteConfigEntry)
 
-	entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "http-route-auth", nil)
+	logger.Log(t, "checking that Consul entries were created for the http routes %s", "custom-http-route-auth")
+	entry, _, err = consulClient.ConfigEntries().Get(api.HTTPRoute, "custom-http-route-auth", nil)
 	require.NoError(t, err)
 	consulHTTPRouteAuth := entry.(*api.HTTPRouteConfigEntry)
 
@@ -803,7 +808,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		Name: "static-server",
 		Sources: []*api.SourceIntention{
 			{
-				Name:   "gateway",
+				Name:   customGatewayName,
 				Action: api.IntentionActionAllow,
 			},
 		},
@@ -815,7 +820,7 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 		Name: "static-server-protected",
 		Sources: []*api.SourceIntention{
 			{
-				Name:   "gateway",
+				Name:   customGatewayName,
 				Action: api.IntentionActionAllow,
 			},
 		},
