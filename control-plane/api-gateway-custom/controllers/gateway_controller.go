@@ -96,7 +96,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
+	log.Info("gatewayclass(custom): " + fmt.Sprintf("%+v", gatewayClass))
 
+	if gatewayClass.Spec.ControllerName != common.GatewayClassControllerName {
+		log.Info("skipping reconciliation since controller name does not match", "expected", common.GatewayClassControllerName, "actual", gatewayClass.Spec.ControllerName)
+		return ctrl.Result{}, nil
+	}
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
 	if err != nil {
@@ -402,9 +407,14 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
 
-	predicate, _ := predicate.LabelSelectorPredicate(
+	podPredicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
 			common.ManagedLabel: "true",
+		}),
+	)
+	gwPredicate, _ := predicate.LabelSelectorPredicate(
+		*metav1.SetAsLabelSelector(map[string]string{
+			common.ComponentLabel: "api-gateway-consul",
 		}),
 	)
 
@@ -436,8 +446,8 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	}
 
 	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
-		Named("gateway-custom").
-		For(&gwv1beta1.Gateway{}).
+		Named("gateway-consul").
+		For(&gwv1beta1.Gateway{}, builder.WithPredicates(gwPredicate)).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
@@ -472,7 +482,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),
-			builder.WithPredicates(predicate),
+			builder.WithPredicates(podPredicate),
 		).
 		WatchesRawSource(
 			source.Channel(

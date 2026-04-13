@@ -414,9 +414,14 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
 
-	predicate, _ := predicate.LabelSelectorPredicate(
+	podPredicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
 			common.ManagedLabel: "true",
+		}),
+	)
+	gwPredicate, _ := predicate.LabelSelectorPredicate(
+		*metav1.SetAsLabelSelector(map[string]string{
+			common.ComponentLabel: "api-gateway",
 		}),
 	)
 
@@ -449,7 +454,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 
 	builder := ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-v1").
-		For(&gwv1.Gateway{}).
+		For(&gwv1.Gateway{}, builder.WithPredicates(gwPredicate)).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
@@ -480,7 +485,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),
-			builder.WithPredicates(predicate),
+			builder.WithPredicates(podPredicate),
 		)
 
 	if config.EnableTCP {

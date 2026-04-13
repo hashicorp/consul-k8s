@@ -52,6 +52,11 @@ func (v *CustomGatewayPolicyWebhook) Handle(ctx context.Context, req admission.R
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
+	// check if the service if the resource is Gateway
+	if !v.isTargetRefKindGateway(resource) {
+		return admission.Denied(fmt.Sprintf("policy targetRef kind %q is not supported, only Gateway is allowed", resource.Spec.TargetRef.Kind))
+	}
+
 	for _, policy := range list.Items {
 		if differentCustomPolicySameTarget(resource, policy) {
 			return admission.Denied(fmt.Sprintf("policy targets gateway listener %q that is already the target of an existing policy %q", DerefStringOr(resource.Spec.TargetRef.SectionName, ""), policy.Name))
@@ -59,6 +64,11 @@ func (v *CustomGatewayPolicyWebhook) Handle(ctx context.Context, req admission.R
 	}
 
 	return admission.Allowed("gateway policy is valid")
+}
+
+// func to check the resource targetref.kind is Gateway
+func (v *CustomGatewayPolicyWebhook) isTargetRefKindGateway(resource CustomGatewayPolicy) bool {
+	return resource.Spec.TargetRef.Kind == "Gateway"
 }
 
 func differentCustomPolicySameTarget(resource, policy CustomGatewayPolicy) bool {
