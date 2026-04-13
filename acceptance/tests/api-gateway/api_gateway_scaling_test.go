@@ -96,6 +96,11 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing
 	consulCluster := installScalingCluster(t, true)
 	consulClient, _ := consulCluster.SetupConsulClient(t, false)
 	requireEnterpriseLicenseValid(t, consulClient)
+	
+	// Restart the API Gateway controller to ensure it detects the enterprise license.
+	// The controller checks IsEnterpriseDistribution at startup, so we need to restart
+	// it after the license is confirmed valid.
+	restartAPIGatewayController(t, ctx)
 
 	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
@@ -127,6 +132,11 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(t *testing
 	consulCluster := installScalingCluster(t, true)
 	consulClient, _ := consulCluster.SetupConsulClient(t, false)
 	requireEnterpriseLicenseValid(t, consulClient)
+
+	// Restart the API Gateway controller to ensure it detects the enterprise license.
+	// The controller checks IsEnterpriseDistribution at startup, so we need to restart
+	// it after the license is confirmed valid.
+	restartAPIGatewayController(t, ctx)
 
 	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
