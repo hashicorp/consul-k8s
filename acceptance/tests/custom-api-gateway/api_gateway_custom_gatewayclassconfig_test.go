@@ -263,6 +263,9 @@ func triggerGatewayReconcile(t *testing.T, client client.Client, name, namespace
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"component": "api-gateway-consul",
+			},
 		},
 	}
 	updateKubernetes(t, client, gateway, func(g *gwv1beta1.Gateway) {
