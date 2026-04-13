@@ -71,7 +71,7 @@ find_node_sg() {
 create_or_wait_cluster "$PRIMARY_CLUSTER_NAME" \
   --cluster-name "$PRIMARY_CLUSTER_NAME" \
   --region "$PRIMARY_REGION" \
-  --version "4.18.36" \
+  --version "4.19.26" \
   --sts \
   --mode auto \
   --yes \
@@ -90,7 +90,7 @@ primary_cluster_pid=$!
 create_or_wait_cluster "$SECONDARY_CLUSTER_NAME" \
   --cluster-name "$SECONDARY_CLUSTER_NAME" \
   --region "$SECONDARY_REGION" \
-  --version "4.18.36" \
+  --version "4.19.26" \
   --sts \
   --mode auto \
   --yes \
