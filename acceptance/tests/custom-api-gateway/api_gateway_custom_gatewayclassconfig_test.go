@@ -30,7 +30,6 @@ import (
 // is properly applied to any child gateway objects, namely that the number of gateway instances match the defined
 // minInstances,maxInstances and defaultInstances parameters, and that changing the parent gateway does not affect
 // the child gateways.
-// TestAPIGateway_GatewayClassConfig
 func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	var (
 		defaultInstances = ptr.To(int32(2))
