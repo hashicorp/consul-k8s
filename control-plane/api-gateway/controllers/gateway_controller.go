@@ -416,7 +416,8 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 
 	podPredicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
-			common.ManagedLabel: "true",
+			common.ManagedLabel:   "true",
+			common.ComponentLabel: "api-gateway",
 		}),
 	)
 	gwPredicate, _ := predicate.LabelSelectorPredicate(

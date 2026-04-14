@@ -4,8 +4,6 @@
 package common
 
 import (
-	"strings"
-
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -431,7 +429,7 @@ func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v
 
 	key := api.ResourceReference{
 		Kind:        gatewayPolicy.Spec.TargetRef.Kind,
-		Name:        gatewayPolicy.Spec.TargetRef.Name + "-" + strings.ReplaceAll(gatewayPolicy.Spec.TargetRef.Group, ".", "-"),
+		Name:        gatewayPolicy.Spec.TargetRef.Name,
 		SectionName: sectionName,
 		Namespace:   gwNamespace,
 	}

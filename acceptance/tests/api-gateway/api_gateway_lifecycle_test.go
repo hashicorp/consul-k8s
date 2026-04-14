@@ -421,6 +421,9 @@ func createGateway(t *testing.T, client client.Client, name, namespace, gatewayC
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				"component": "api-gateway",
+			},
 		},
 		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1.ObjectName(gatewayClass),
