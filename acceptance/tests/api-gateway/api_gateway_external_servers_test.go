@@ -119,7 +119,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 	logger.Log(t, "patching route to target server")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", gatewayHTTPRouteResource, "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
 
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.

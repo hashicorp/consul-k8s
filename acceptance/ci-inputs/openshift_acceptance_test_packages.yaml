@@ -2,12 +2,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-# It won't trigger thess package in pr merges as it yet to merge... only works in git ref is not used in workflow
-- {runner: 0, test-packages: "basic"}
-- {runner: 1, test-packages: "metrics"}
-- {runner: 2, test-packages: "snapshot-agent"}
-- {runner: 3, test-packages: "api-gateway"}
-- {runner: 4, test-packages: "custom-api-gateway"}
-- {runner: 5, test-packages: "sync"}
-- {runner: 6, test-packages: "wan-federation"}
-
+- {runner: 1, test-packages: "snapshot-agent"}
+- {runner: 2, test-packages: "api-gateway"}
+- {runner: 3, test-packages: "custom-api-gateway"}
+- {runner: 4, test-packages: "sync"}
+- {runner: 5, test-packages: "wan-federation"}
