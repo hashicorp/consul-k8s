@@ -389,6 +389,7 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 				"client-policy",
 				"sync-catalog-policy",
 				"connect-inject-policy",
+				"connect-inject-operator-policy",
 				"mesh-gateway-policy",
 				"snapshot-agent-policy",
 				"enterprise-license-token",
@@ -417,9 +418,12 @@ func TestRun_ACLPolicyUpdates(t *testing.T) {
 
 				switch expected {
 				case "connect-inject-policy":
-					// The connect inject token doesn't have namespace config,
-					// but does change to operator:write from an empty string.
+					// The partition-scoped connect inject policy should not include operator
+					// rules, but it should still include write permissions.
 					require.Contains(t, aclRule, "policy = \"write\"")
+					require.NotContains(t, aclRule, "operator = \"write\"")
+				case "connect-inject-operator-policy":
+					require.Equal(t, injectOperatorRules, aclRule)
 				case "snapshot-agent-policy", "enterprise-license-token":
 					// The snapshot agent and enterprise license tokens shouldn't change.
 					require.NotContains(t, aclRule, "namespace")

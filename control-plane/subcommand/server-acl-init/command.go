@@ -559,7 +559,11 @@ func (c *Command) Run(args []string) int {
 		if !primary {
 			componentAuthMethodName = globalComponentAuthMethodName
 		}
-		err = c.createACLPolicyRoleAndBindingRule("connect-inject", injectRules, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, dynamicClient)
+		injectPolicies := []aclPolicySpec{{NamePrefix: "connect-inject", Rules: injectRules}}
+		if c.consulFlags.Partition != "" {
+			injectPolicies = append(injectPolicies, aclPolicySpec{NamePrefix: "connect-inject-operator", Rules: injectOperatorRules})
+		}
+		err = c.createACLPoliciesRoleAndBindingRule("connect-inject", injectPolicies, consulDC, primaryDC, globalPolicy, primary, componentAuthMethodName, serviceAccountName, dynamicClient)
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
