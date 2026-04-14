@@ -215,7 +215,7 @@ func patchHTTPRouteBackendToMeshService(t *testing.T, options *terratestK8s.Kube
 	t.Helper()
 
 	logger.Logf(t, "patching httproute %s to target MeshService mesh-service:80", routeName)
-	k8s.RunKubectl(t, options, "patch", "httproute", routeName, "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+	k8s.RunKubectl(t, options, "patch", "httproutes.gateway.networking.k8s.io", routeName, "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 	retrier := &retry.Counter{Count: 30, Wait: 2 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {

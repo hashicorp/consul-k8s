@@ -292,7 +292,7 @@ func TestPeering_Gateway(t *testing.T) {
 	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 	logger.Log(t, "patching route to target server")
-	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+	k8s.RunKubectl(t, staticClientOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, staticClientOpts, staticClientName, targetAddress)
