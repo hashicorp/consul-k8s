@@ -192,6 +192,18 @@ rules:
     - watch
     - delete
 - apiGroups:
+    - autoscaling
+  resources:
+    - horizontalpodautoscalers
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
     - core
   resources:
     - services
@@ -210,7 +222,7 @@ rules:
   resources:
     - securitycontextconstraints
   resourceNames:
-    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName | default "restricted-v2" }}
   verbs:
     - use
   {{- end }}
