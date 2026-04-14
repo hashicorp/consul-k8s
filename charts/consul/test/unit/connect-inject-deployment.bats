@@ -874,6 +874,47 @@ load _helpers
   [ "${actual}" = "1" ]
 }
 
+@test "connectInject/Deployment: globalConfigACLToken disabled when secretName is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_GLOBAL_CONFIG_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: globalConfigACLToken disabled when secretKey is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_GLOBAL_CONFIG_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: globalConfigACLToken enabled when secretName and secretKey is provided" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq '[.spec.template.spec.containers[0].env[].name]' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'any(contains("CONSUL_GLOBAL_CONFIG_TOKEN"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'map(select(test("CONSUL_GLOBAL_CONFIG_TOKEN"))) | length' | tee /dev/stderr)
+  [ "${actual}" = "1" ]
+}
+
 #--------------------------------------------------------------------
 # global.acls.manageSystemACLs
 

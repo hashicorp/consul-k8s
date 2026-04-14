@@ -135,6 +135,13 @@ spec:
                   name: {{ .Values.connectInject.aclInjectToken.secretName }}
                   key: {{ .Values.connectInject.aclInjectToken.secretKey }}
             {{- end }}
+            {{- if (and .Values.connectInject.globalConfigACLToken.secretName .Values.connectInject.globalConfigACLToken.secretKey) }}
+            - name: CONSUL_GLOBAL_CONFIG_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.connectInject.globalConfigACLToken.secretName }}
+                  key: {{ .Values.connectInject.globalConfigACLToken.secretKey }}
+            {{- end }}
           command:
             - "/bin/sh"
             - "-ec"

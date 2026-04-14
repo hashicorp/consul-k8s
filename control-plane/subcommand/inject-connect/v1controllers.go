@@ -30,6 +30,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
+const globalConfigACLTokenEnvVar = "CONSUL_GLOBAL_CONFIG_TOKEN"
+
 func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
@@ -202,6 +204,23 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ConsulPartition:            c.consul.Partition,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
 	}
+
+	globalConfigEntryReconciler := configEntryReconciler
+	if globalConfigToken := os.Getenv(globalConfigACLTokenEnvVar); globalConfigToken != "" {
+		globalConfigEntryReconciler = &controllers.ConfigEntryController{
+			ConsulClientConfig:         consulConfig,
+			ConsulServerConnMgr:        watcher,
+			DatacenterName:             c.consul.Datacenter,
+			EnableConsulNamespaces:     c.flagEnableNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			ConsulPartition:            c.consul.Partition,
+			CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+			ACLTokenOverride:           globalConfigToken,
+		}
+		setupLog.Info("using dedicated ACL token for global config entry controllers", "envVar", globalConfigACLTokenEnvVar)
+	}
 	if err := (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
@@ -323,7 +342,15 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ControlPlaneRequestLimit)
 		return err
 	}
-
+	if err := (&controllers.RateLimitController{
+		ConfigEntryController: globalConfigEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.RateLimit),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.RateLimit)
+		return err
+	}
 	if err := (&registration.RegistrationsController{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -512,6 +539,12 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	(&v1alpha1.ControlPlaneRequestLimitWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.RateLimitWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.RateLimit),
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
