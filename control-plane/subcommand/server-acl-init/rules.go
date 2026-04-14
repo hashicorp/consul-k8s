@@ -62,8 +62,6 @@ partition_prefix "" {
   }
 }`
 
-const injectOperatorRules = `operator = "write"`
-
 func (c *Command) crossNamespaceRules() (string, error) {
 	crossNamespaceRulesTpl := `{{- if .EnablePartitions }}
 partition "{{ .PartitionName }}" {
@@ -293,11 +291,11 @@ func (c *Command) injectRules() (string, error) {
 	// It must also create/update service health checks via the endpoints controller.
 	// When ACLs are enabled, the endpoints controller (V1) or pod controller (v2)
 	// needs "acl:write" permissions to delete ACL tokens created via "consul login".
-	// Namespace creation inside a partition requires partition-scoped policy = "write".
-	// Global operator access used by RateLimit is attached via a separate policy in
-	// partition mode because operator rules are not allowed in partitioned policies.
+	// RateLimit is a global config entry that requires operator write access, while
+	// namespace creation inside a partition requires partition-scoped policy = "write".
 	injectRulesTpl := `
 {{- if .EnablePartitions }}
+operator = "write"
 partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"

@@ -921,6 +921,7 @@ func TestInjectRules(t *testing.T) {
 			EnablePeering:    false,
 			PartitionName:    "part-1",
 			Expected: `
+operator = "write"
 partition "part-1" {
   mesh = "write"
   acl = "write"
@@ -965,6 +966,7 @@ partition "part-1" {
 			EnablePeering:    false,
 			PartitionName:    "part-1",
 			Expected: `
+operator = "write"
 partition "part-1" {
   mesh = "write"
   acl = "write"
@@ -1015,6 +1017,7 @@ partition "part-1" {
 			EnablePeering:    true,
 			PartitionName:    "part-1",
 			Expected: `
+operator = "write"
 partition "part-1" {
   mesh = "write"
   acl = "write"
@@ -1039,6 +1042,7 @@ partition "part-1" {
 			EnablePeering:    true,
 			PartitionName:    "part-1",
 			Expected: `
+operator = "write"
 partition "part-1" {
   mesh = "write"
   acl = "write"

@@ -15,53 +15,44 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/common"
 )
 
-type aclPolicySpec struct {
-	NamePrefix string
-	Rules      string
-}
-
 // createACLPolicyRoleAndBindingRule will create the ACL Policy for the component
 // then create a set of ACLRole and ACLBindingRule which tie the component's serviceaccount
 // to the authMethod, allowing the serviceaccount to later be allowed to issue a Consul Login.
 func (c *Command) createACLPolicyRoleAndBindingRule(componentName, rules, dc, primaryDC string, global, primary bool, authMethodName, serviceAccountName string, client *consul.DynamicClient) error {
-	return c.createACLPoliciesRoleAndBindingRule(componentName, []aclPolicySpec{{NamePrefix: componentName, Rules: rules}}, dc, primaryDC, global, primary, authMethodName, serviceAccountName, client)
-}
-
-func (c *Command) createACLPoliciesRoleAndBindingRule(componentName string, policies []aclPolicySpec, dc, primaryDC string, global, primary bool, authMethodName, serviceAccountName string, client *consul.DynamicClient) error {
-	var links []*api.ACLRolePolicyLink
-	for _, policySpec := range policies {
-		// Create policy with the given rules.
-		policyName := fmt.Sprintf("%s-policy", policySpec.NamePrefix)
-		if c.flagFederation && !primary {
-			// If performing ACL replication, we must ensure policy names are
-			// globally unique so we append the datacenter name but only in secondary datacenters..
-			policyName += fmt.Sprintf("-%s", dc)
-		}
-		var datacenters []string
-		if !global && dc != "" {
-			datacenters = append(datacenters, dc)
-		}
-		policyTmpl := api.ACLPolicy{
-			Name:        policyName,
-			Description: fmt.Sprintf("%s Token Policy", policyName),
-			Rules:       policySpec.Rules,
-			Datacenters: datacenters,
-		}
-		err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
-			func() error {
-				return c.createOrUpdateACLPolicy(policyTmpl, client)
-			})
-		if err != nil {
-			return err
-		}
-
-		links = append(links, &api.ACLRolePolicyLink{
-			Name: policyName,
+	// Create policy with the given rules.
+	policyName := fmt.Sprintf("%s-policy", componentName)
+	if c.flagFederation && !primary {
+		// If performing ACL replication, we must ensure policy names are
+		// globally unique so we append the datacenter name but only in secondary datacenters..
+		policyName += fmt.Sprintf("-%s", dc)
+	}
+	var datacenters []string
+	if !global && dc != "" {
+		datacenters = append(datacenters, dc)
+	}
+	policyTmpl := api.ACLPolicy{
+		Name:        policyName,
+		Description: fmt.Sprintf("%s Token Policy", policyName),
+		Rules:       rules,
+		Datacenters: datacenters,
+	}
+	err := c.untilSucceeds(fmt.Sprintf("creating %s policy", policyTmpl.Name),
+		func() error {
+			return c.createOrUpdateACLPolicy(policyTmpl, client)
 		})
+	if err != nil {
+		return err
 	}
 
+	// Create an ACLRolePolicyLink list to attach to the ACLRole.
+	ap := &api.ACLRolePolicyLink{
+		Name: policyName,
+	}
+	var apl []*api.ACLRolePolicyLink
+	apl = append(apl, ap)
+
 	// Add the ACLRole and ACLBindingRule.
-	return c.addRoleAndBindingRule(client, componentName, serviceAccountName, authMethodName, links, global, primary, primaryDC, dc)
+	return c.addRoleAndBindingRule(client, componentName, serviceAccountName, authMethodName, apl, global, primary, primaryDC, dc)
 }
 
 // addRoleAndBindingRule adds an ACLRole and ACLBindingRule which reference the authMethod.
@@ -116,8 +107,7 @@ func (c *Command) updateOrCreateACLRole(client *consul.DynamicClient, role *api.
 				return err
 			}
 			if aclRole != nil {
-				role.ID = aclRole.ID
-				_, _, err := client.ConsulClient.ACL().RoleUpdate(role, &api.WriteOptions{})
+				_, _, err := client.ConsulClient.ACL().RoleUpdate(aclRole, &api.WriteOptions{})
 				if err != nil {
 					c.log.Error("unable to update role", err)
 					return err
