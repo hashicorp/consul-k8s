@@ -219,7 +219,7 @@ func patchHTTPRouteBackendToMeshService(t *testing.T, options *terratestK8s.Kube
 
 	retrier := &retry.Counter{Count: 30, Wait: 2 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
-		output, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "httproute", routeName, "-o", `jsonpath={.spec.rules[0].backendRefs[0].group}|{.spec.rules[0].backendRefs[0].kind}|{.spec.rules[0].backendRefs[0].name}|{.spec.rules[0].backendRefs[0].port}`)
+		output, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "httproutes.gateway.networking.k8s.io", routeName, "-o", `jsonpath={.spec.rules[0].backendRefs[0].group}|{.spec.rules[0].backendRefs[0].kind}|{.spec.rules[0].backendRefs[0].name}|{.spec.rules[0].backendRefs[0].port}`)
 		require.NoError(r, err)
 		require.Equal(r, "consul.hashicorp.com|MeshService|mesh-service|80", output)
 	})
