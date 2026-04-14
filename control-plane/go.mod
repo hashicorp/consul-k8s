@@ -6,7 +6,7 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => ../../consul/api
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.34.1
 
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17.2
 
