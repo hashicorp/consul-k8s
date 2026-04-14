@@ -23,4 +23,4 @@ jobs:
           repo: hashicorp/consul-k8s-workflows
           ref: "anilvpatel/openshift-acceptance-test"
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-          inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.run_id }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}" }'
+          inputs: '{ "context":"${{ env.CONTEXT }}-test", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}" }'
