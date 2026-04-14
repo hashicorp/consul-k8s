@@ -29,6 +29,8 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
+const globalConfigACLTokenEnvVar = "CONSUL_GLOBAL_CONFIG_TOKEN"
+
 func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
@@ -191,6 +193,23 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ConsulPartition:            c.consul.Partition,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
 	}
+
+	globalConfigEntryReconciler := configEntryReconciler
+	if globalConfigToken := os.Getenv(globalConfigACLTokenEnvVar); globalConfigToken != "" {
+		globalConfigEntryReconciler = &controllers.ConfigEntryController{
+			ConsulClientConfig:         consulConfig,
+			ConsulServerConnMgr:        watcher,
+			DatacenterName:             c.consul.Datacenter,
+			EnableConsulNamespaces:     c.flagEnableNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			ConsulPartition:            c.consul.Partition,
+			CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+			ACLTokenOverride:           globalConfigToken,
+		}
+		setupLog.Info("using dedicated ACL token for global config entry controllers", "envVar", globalConfigACLTokenEnvVar)
+	}
 	if err := (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
 		Client:                mgr.GetClient(),
@@ -313,7 +332,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 	if err := (&controllers.RateLimitController{
-		ConfigEntryController: configEntryReconciler,
+		ConfigEntryController: globalConfigEntryReconciler,
 		Client:                mgr.GetClient(),
 		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.RateLimit),
 		Scheme:                mgr.GetScheme(),

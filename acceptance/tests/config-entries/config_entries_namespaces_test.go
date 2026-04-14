@@ -78,6 +78,7 @@ func TestControllerNamespaces(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
+			releaseName := helpers.RandomName()
 
 			helmValues := map[string]string{
 				"global.enableConsulNamespaces":  "true",
@@ -96,7 +97,10 @@ func TestControllerNamespaces(t *testing.T) {
 				"terminatingGateways.gateways[0].replicas": "1",
 			}
 
-			releaseName := helpers.RandomName()
+			if c.secure {
+				helmValues["connectInject.globalConfigACLToken.secretName"] = fmt.Sprintf("%s-consul-bootstrap-acl-token", releaseName)
+				helmValues["connectInject.globalConfigACLToken.secretKey"] = "token"
+			}
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
 			consulCluster.Create(t)

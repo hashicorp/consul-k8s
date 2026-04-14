@@ -112,6 +112,11 @@ type ConfigEntryController struct {
 	// any created Consul namespaces to allow cross namespace service discovery.
 	// Only necessary if ACLs are enabled.
 	CrossNSACLPolicy string
+
+	// ACLTokenOverride, if non-empty, is attached to all Consul reads/writes made
+	// by this reconciler instance. This is used for controllers that need a
+	// dedicated token with different ACL scope than the default login token.
+	ACLTokenOverride string
 }
 
 // ReconcileEntry reconciles an update to a resource. CRD-specific controller's
@@ -556,6 +561,9 @@ func (r *ConfigEntryController) queryOpts(ns string) *capi.QueryOptions {
 	opts := &capi.QueryOptions{
 		Namespace: ns,
 	}
+	if r.ACLTokenOverride != "" {
+		opts.Token = r.ACLTokenOverride
+	}
 	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
 		// Only add ?partition=… for Enterprise clusters
 		opts.Partition = r.ConsulPartition
@@ -567,6 +575,9 @@ func (r *ConfigEntryController) queryOpts(ns string) *capi.QueryOptions {
 func (r *ConfigEntryController) writeOpts(ns string) *capi.WriteOptions {
 	opts := &capi.WriteOptions{
 		Namespace: ns,
+	}
+	if r.ACLTokenOverride != "" {
+		opts.Token = r.ACLTokenOverride
 	}
 	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
 		opts.Partition = r.ConsulPartition
