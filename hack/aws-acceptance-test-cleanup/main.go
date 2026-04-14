@@ -279,6 +279,10 @@ func realMain(ctx context.Context) error {
 				Name: cluster,
 			})
 			if err != nil {
+				if strings.Contains(err.Error(), eks.ErrCodeResourceNotFoundException) {
+					fmt.Printf("EKS cluster: Not found (already deleted) [id=%s]\n", *cluster)
+					continue
+				}
 				return err
 			}
 			if _, ok := clusterData.Cluster.Tags[buildURLTag]; ok {
