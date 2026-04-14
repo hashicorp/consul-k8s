@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package connectinject
 
 import (
@@ -14,6 +11,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	gatewaycommoncustom "github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/common"
+	gatewaycontrollerscustom "github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/controllers"
 	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -73,7 +72,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
-
 	if err := (&endpoints.Controller{
 		Client:                     mgr.GetClient(),
 		ConsulClientConfig:         consulConfig,
@@ -107,8 +105,88 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 
 	// API Gateway Controllers
 	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to register field indexes")
+		setupLog.Error(err, "unable to register field indexes for gateway.networking.k8s.io API")
 		return err
+	}
+
+	if c.flagEnableCustomGatewayCRDController {
+		// register field indexes for consul.hashicorp.com API controllers for custom
+		if err := gatewaycontrollerscustom.RegisterFieldIndexes(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to register field indexes for consul.hashicorp.com API ")
+			return err
+		}
+		// custom config controller
+		if err := (&gatewaycontrollerscustom.CustomGatewayClassConfigController{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controller").WithName("custom-gateways"),
+		}).SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollerscustom.CustomGatewayClassConfigController{})
+			return err
+		}
+
+		// custom gatewayclass controller
+		if err := (&gatewaycontrollerscustom.CustomGatewayClassController{
+			ControllerName: gatewaycommoncustom.GatewayClassControllerName,
+			Client:         mgr.GetClient(),
+			Log:            ctrl.Log.WithName("controllers").WithName("CustomGatewayClass"),
+		}).SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "CustomGatewayClass")
+			return err
+		}
+
+		// custom gateway controller
+		customcache, customcleaner, err := gatewaycontrollerscustom.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollerscustom.CustomGatewayControllerConfig{
+			HelmConfig: gatewaycommoncustom.HelmConfig{
+				ConsulConfig: gatewaycommoncustom.ConsulConfig{
+					Address:    c.consul.Addresses,
+					GRPCPort:   consulConfig.GRPCPort,
+					HTTPPort:   consulConfig.HTTPPort,
+					APITimeout: consulConfig.APITimeout,
+				},
+				ImageDataplane:              c.flagConsulDataplaneImage,
+				ImageConsulK8S:              c.flagConsulK8sImage,
+				ImagePullSecrets:            cfgFile.ImagePullSecrets,
+				GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
+				ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
+				NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
+				EnableNamespaces:            c.flagEnableNamespaces,
+				PeeringEnabled:              c.flagEnablePeering,
+				EnableOpenShift:             c.flagEnableOpenShift,
+				EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
+				AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
+				LogLevel:                    c.flagLogLevel,
+				LogJSON:                     c.flagLogJSON,
+				TLSEnabled:                  c.consul.UseTLS,
+				ConsulTLSServerName:         c.consul.TLSServerName,
+				ConsulPartition:             c.consul.Partition,
+				ConsulCACert:                string(c.caCertPem),
+				EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
+				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
+				InitContainerResources:      &c.initContainerResources,
+			},
+			AllowK8sNamespacesSet:   allowK8sNamespaces,
+			DenyK8sNamespacesSet:    denyK8sNamespaces,
+			ConsulClientConfig:      consulConfig,
+			ConsulServerConnMgr:     watcher,
+			NamespacesEnabled:       c.flagEnableNamespaces,
+			CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
+			Partition:               c.consul.Partition,
+			Datacenter:              c.consul.Datacenter,
+		})
+		if err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Gateway")
+			return err
+		}
+
+		go customcache.Run(ctx)
+		go customcleaner.Run(ctx)
+
+		// wait for the cache to fill
+		setupLog.Info("waiting for Consul custom cache sync")
+		customcache.WaitSynced(ctx)
+		setupLog.Info("Consul custom cache synced")
+
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassConfigController{
@@ -166,6 +244,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
 		Datacenter:              c.consul.Datacenter,
+		EnableTCP:               c.flagEnableTCPRoute,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Gateway")
@@ -506,6 +585,12 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	(&v1alpha1.GatewayPolicyWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.CustomGatewayPolicyWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.CustomGatewayPolicy),
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 
