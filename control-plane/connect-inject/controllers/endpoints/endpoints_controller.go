@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -309,6 +310,9 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
 		}
+		r.Log.Info("created service registration objects",
+			"serviceRegistration", serviceRegistration,
+			"proxyServiceRegistration", proxyServiceRegistration)
 
 		// Register the service instance with Consul.
 		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
@@ -430,12 +434,16 @@ func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
 func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+	r.Log.Info("creating service and proxy service registrations for pod", "pod", pod.Name, "namespace", pod.Namespace)
+
 	// Determine the default service port and optional multi-port definitions.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
-	consulServicePort, consulServicePorts, err := servicePortsForRegistration(pod, serviceEndpoints)
+	consulServicePort, consulServicePorts, err := r.servicePortsForRegistration(pod, serviceEndpoints)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	r.Log.Info("determined service ports for registration", "defaultPort", consulServicePort, "multiPorts", consulServicePorts)
 
 	var node corev1.Node
 	// Ignore errors because we don't want failures to block running services.
@@ -464,6 +472,22 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = pod.Name
 			} else {
 				meta[strings.TrimPrefix(k, constants.AnnotationMeta)] = v
+			}
+		}
+	}
+	if len(consulServicePorts) > 1 {
+		if _, ok := meta["ports"]; !ok {
+			if portsMeta := legacyMultiportPortsMeta(consulServicePorts); portsMeta != "" {
+				meta["ports"] = portsMeta
+			}
+		}
+		for _, sp := range consulServicePorts {
+			if sp.Name == "" || sp.Port <= 0 {
+				continue
+			}
+			metaKey := "port-" + sp.Name
+			if _, ok := meta[metaKey]; !ok {
+				meta[metaKey] = strconv.Itoa(sp.Port)
 			}
 		}
 	}
@@ -543,7 +567,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		proxyConfig.Config[envoyTelemetryCollectorBindSocketDir] = "/consul/connect-inject"
 	}
 
-	if consulServicePort > 0 {
+	if consulServicePort > 0 && len(consulServicePorts) == 0 {
 		proxyConfig.LocalServiceAddress = constants.Getv4orv6Str("127.0.0.1", "::1")
 		proxyConfig.LocalServicePort = consulServicePort
 	}
@@ -563,6 +587,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		ID:        proxySvcID,
 		Service:   proxySvcName,
 		Port:      proxyPort,
+		Ports:     consulServicePorts,
 		Address:   podIP,
 		Meta:      meta,
 		Namespace: consulNS,
@@ -706,6 +731,18 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	r.appendNodeMeta(proxyServiceRegistration)
 
 	return serviceRegistration, proxyServiceRegistration, nil
+}
+
+func legacyMultiportPortsMeta(servicePorts api.ServicePorts) string {
+	parts := make([]string, 0, len(servicePorts))
+	for _, sp := range servicePorts {
+		if sp.Name == "" || sp.Port <= 0 {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s:%d", sp.Name, sp.Port))
+	}
+
+	return strings.Join(parts, ",")
 }
 
 // createGatewayRegistrations creates the gateway service registrations with the information from the Pod.
@@ -1211,6 +1248,7 @@ func (r *Controller) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints
 	var upstreams []api.Upstream
 	if raw, ok := pod.Annotations[constants.AnnotationUpstreams]; ok && raw != "" {
 		for _, raw := range strings.Split(raw, ",") {
+			raw = strings.TrimSpace(raw)
 			var upstream api.Upstream
 
 			// parts separates out the port, and determines whether it's a prepared query or not, since parts[0] would
@@ -1232,7 +1270,11 @@ func (r *Controller) processUpstreams(pod corev1.Pod, endpoints corev1.Endpoints
 			}
 
 			if strings.TrimSpace(parts[0]) == "prepared_query" {
-				upstream = processPreparedQueryUpstream(pod, raw)
+				var err error
+				upstream, err = processPreparedQueryUpstream(pod, raw)
+				if err != nil {
+					return []api.Upstream{}, err
+				}
 			} else if labeledFormat {
 				var err error
 				upstream, err = r.processLabeledUpstream(pod, raw)
@@ -1371,35 +1413,60 @@ func (r *Controller) servicesForK8SServiceNameAndNamespace(apiClient *api.Client
 
 // processPreparedQueryUpstream processes an upstream in the format:
 // prepared_query:[query name]:[port].
-func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) api.Upstream {
+func processPreparedQueryUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var preparedQuery string
 	var port int32
 	parts := strings.SplitN(rawUpstream, ":", 3)
-
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[2]))
-	preparedQuery = strings.TrimSpace(parts[1])
-	var upstream api.Upstream
-	if port > 0 {
-		upstream = api.Upstream{
-			DestinationType: api.UpstreamDestTypePreparedQuery,
-			DestinationName: preparedQuery,
-			LocalBindPort:   int(port),
-		}
+	if len(parts) < 3 {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
 	}
-	return upstream
+
+	localBindPortToken := strings.TrimSpace(parts[2])
+	port, err := common.PortValue(pod, localBindPortToken)
+	if err != nil {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+	preparedQuery = strings.TrimSpace(parts[1])
+	if preparedQuery == "" {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
+
+	if port <= 0 {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+
+	upstream := api.Upstream{
+		DestinationType: api.UpstreamDestTypePreparedQuery,
+		DestinationName: preparedQuery,
+		LocalBindPort:   int(port),
+	}
+	return upstream, nil
 }
 
 // processUnlabeledUpstream processes an upstream in the format:
 // [service-name].[service-namespace].[service-partition]:[port]:[optional datacenter].
+// Optional query-style options can be provided in the third segment, for example:
+// [service]:[port]:destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>
+// [service]:[port]:<dc>?destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>
 // There is no unlabeled field for peering.
 func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var datacenter, svcName, namespace, partition string
 	var port int32
-	var upstream api.Upstream
 
 	parts := strings.SplitN(rawUpstream, ":", 3)
+	if len(parts) < 2 {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
 
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[1]))
+	localBindPortToken := strings.TrimSpace(parts[1])
+	parsedPort, err := common.PortValue(pod, localBindPortToken)
+	if err != nil {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+	port = parsedPort
+	if port <= 0 {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
 
 	// If Consul Namespaces or Admin Partitions are enabled, attempt to parse the
 	// upstream for a namespace.
@@ -1419,21 +1486,31 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 		svcName = strings.TrimSpace(parts[0])
 	}
 
-	// parse the optional datacenter
+	// Parse optional datacenter and optional query-style options.
+	var options upstreamExtraFields
 	if len(parts) > 2 {
-		datacenter = strings.TrimSpace(parts[2])
-	}
-	if port > 0 {
-		upstream = api.Upstream{
-			DestinationType:      api.UpstreamDestTypeService,
-			DestinationPartition: partition,
-			DestinationPeer:      "",
-			DestinationNamespace: namespace,
-			DestinationName:      svcName,
-			Datacenter:           datacenter,
-			LocalBindPort:        int(port),
+		options, err = parseUnlabeledUpstreamExtraFields(parts[2], rawUpstream)
+		if err != nil {
+			return api.Upstream{}, err
 		}
+		datacenter = options.Datacenter
 	}
+
+	upstream := api.Upstream{
+		DestinationType:      api.UpstreamDestTypeService,
+		DestinationPartition: partition,
+		DestinationPeer:      "",
+		DestinationNamespace: namespace,
+		DestinationName:      svcName,
+		Datacenter:           datacenter,
+		DestinationPort:      options.DestinationPort,
+		LocalBindAddress:     options.LocalBindAddress,
+		LocalBindPort:        int(port),
+	}
+	if options.MeshGatewayMode != "" {
+		upstream.MeshGateway = api.MeshGatewayConfig{Mode: options.MeshGatewayMode}
+	}
+
 	return upstream, nil
 }
 
@@ -1441,14 +1518,27 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 // [service-name].svc.[service-namespace].ns.[service-peer].peer:[port]
 // [service-name].svc.[service-namespace].ns.[service-partition].ap:[port]
 // [service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port].
+// Optional fields can be provided as a third segment:
+// [service-name].svc...:[port]:<destination-port>
+// [service-name].svc...:[port]:destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>
 func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var datacenter, svcName, namespace, partition, peer string
 	var port int32
-	var upstream api.Upstream
 
 	parts := strings.SplitN(rawUpstream, ":", 3)
+	if len(parts) < 2 {
+		return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
 
-	port, _ = common.PortValue(pod, strings.TrimSpace(parts[1]))
+	localBindPortToken := strings.TrimSpace(parts[1])
+	parsedPort, err := common.PortValue(pod, localBindPortToken)
+	if err != nil {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
+	port = parsedPort
+	if port <= 0 {
+		return api.Upstream{}, fmt.Errorf("invalid upstream local bind port %q in %q", localBindPortToken, rawUpstream)
+	}
 
 	service := parts[0]
 
@@ -1503,18 +1593,133 @@ func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) 
 		}
 	}
 
-	if port > 0 {
-		upstream = api.Upstream{
-			DestinationType:      api.UpstreamDestTypeService,
-			DestinationPartition: partition,
-			DestinationPeer:      peer,
-			DestinationNamespace: namespace,
-			DestinationName:      svcName,
-			Datacenter:           datacenter,
-			LocalBindPort:        int(port),
+	var options upstreamExtraFields
+	if len(parts) > 2 {
+		options, err = parseLabeledUpstreamExtraFields(parts[2], rawUpstream)
+		if err != nil {
+			return api.Upstream{}, err
+		}
+		if options.Datacenter != "" {
+			if datacenter != "" && datacenter != options.Datacenter {
+				return api.Upstream{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+			}
+			datacenter = options.Datacenter
 		}
 	}
+
+	upstream := api.Upstream{
+		DestinationType:      api.UpstreamDestTypeService,
+		DestinationPartition: partition,
+		DestinationPeer:      peer,
+		DestinationNamespace: namespace,
+		DestinationName:      svcName,
+		Datacenter:           datacenter,
+		DestinationPort:      options.DestinationPort,
+		LocalBindAddress:     options.LocalBindAddress,
+		LocalBindPort:        int(port),
+	}
+	if options.MeshGatewayMode != "" {
+		upstream.MeshGateway = api.MeshGatewayConfig{Mode: options.MeshGatewayMode}
+	}
+
 	return upstream, nil
+}
+
+type upstreamExtraFields struct {
+	Datacenter       string
+	DestinationPort  string
+	LocalBindAddress string
+	MeshGatewayMode  api.MeshGatewayMode
+}
+
+func parseUnlabeledUpstreamExtraFields(rawExtra, rawUpstream string) (upstreamExtraFields, error) {
+	extra := strings.TrimSpace(rawExtra)
+	if extra == "" {
+		return upstreamExtraFields{}, nil
+	}
+
+	if idx := strings.Index(extra, "?"); idx != -1 {
+		prefix := strings.TrimSpace(extra[:idx])
+		query := strings.TrimSpace(extra[idx+1:])
+		if prefix == "" {
+			return parseUpstreamOptionString(query, rawUpstream)
+		}
+
+		fields, err := parseUpstreamOptionString(query, rawUpstream)
+		if err != nil {
+			return upstreamExtraFields{}, err
+		}
+		if fields.Datacenter == "" {
+			fields.Datacenter = prefix
+		}
+		return fields, nil
+	}
+
+	if strings.Contains(extra, "=") || strings.Contains(extra, "&") {
+		return parseUpstreamOptionString(extra, rawUpstream)
+	}
+
+	return upstreamExtraFields{Datacenter: extra}, nil
+}
+
+func parseLabeledUpstreamExtraFields(rawExtra, rawUpstream string) (upstreamExtraFields, error) {
+	extra := strings.TrimSpace(rawExtra)
+	if extra == "" {
+		return upstreamExtraFields{}, nil
+	}
+
+	if strings.Contains(extra, "=") || strings.Contains(extra, "&") || strings.Contains(extra, "?") {
+		return parseUpstreamOptionString(extra, rawUpstream)
+	}
+
+	// Backwards-compatible positional extension for labeled upstreams:
+	// <service>.svc...:<local-bind-port>:<destination-port>
+	return upstreamExtraFields{DestinationPort: extra}, nil
+}
+
+func parseUpstreamOptionString(rawOptions, rawUpstream string) (upstreamExtraFields, error) {
+	cleaned := strings.TrimSpace(rawOptions)
+	cleaned = strings.TrimPrefix(cleaned, "?")
+	cleaned = strings.ReplaceAll(cleaned, ";", "&")
+	if cleaned == "" {
+		return upstreamExtraFields{}, nil
+	}
+
+	values, err := url.ParseQuery(cleaned)
+	if err != nil {
+		return upstreamExtraFields{}, fmt.Errorf("upstream structured incorrectly: %s", rawUpstream)
+	}
+
+	fields := upstreamExtraFields{}
+	for k, v := range values {
+		if len(v) == 0 {
+			continue
+		}
+		value := strings.TrimSpace(v[0])
+		if value == "" {
+			continue
+		}
+
+		switch strings.TrimSpace(k) {
+		case "destination_port", "destination-port", "destinationPort", "port":
+			fields.DestinationPort = value
+		case "local_bind_address", "local-bind-address", "localBindAddress":
+			fields.LocalBindAddress = value
+		case "mesh_gateway_mode", "mesh-gateway-mode", "meshGatewayMode":
+			switch value {
+			case string(api.MeshGatewayModeNone), string(api.MeshGatewayModeLocal), string(api.MeshGatewayModeRemote):
+				fields.MeshGatewayMode = api.MeshGatewayMode(value)
+			default:
+				return upstreamExtraFields{}, fmt.Errorf("invalid upstream mesh gateway mode %q in %q", value, rawUpstream)
+			}
+		case "datacenter", "dc":
+			fields.Datacenter = value
+		default:
+			return upstreamExtraFields{}, fmt.Errorf("unsupported upstream option %q in %q", k, rawUpstream)
+		}
+	}
+
+	return fields, nil
 }
 
 // consulNamespace returns the Consul destination namespace for a provided Kubernetes namespace
@@ -1640,14 +1845,71 @@ func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
 	return -1
 }
 
-func servicePortsForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (int, api.ServicePorts, error) {
+func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (int, api.ServicePorts, error) {
 	raw, ok := pod.Annotations[constants.AnnotationPort]
 	if !ok || strings.TrimSpace(raw) == "" {
-		return 0, nil, nil
+		endpointPorts := endpointPortsForRegistration(serviceEndpoints)
+		matchingIndexes := matchingServicePortIndexes(pod, serviceEndpoints, len(endpointPorts))
+		r.Log.Info("determined matching service port indexes from endpoints", "indexes", matchingIndexes)
+		if len(matchingIndexes) == 0 {
+			return 0, nil, nil
+		}
+
+		defaultIdx := matchingIndexes[0]
+		servicePorts := make(api.ServicePorts, 0, len(matchingIndexes))
+		defaultPort := 0
+		seenNames := make(map[string]int)
+
+		for _, idx := range matchingIndexes {
+			if idx < 0 || idx >= len(endpointPorts) {
+				continue
+			}
+
+			endpointPort := endpointPorts[idx]
+			if endpointPort.Port <= 0 {
+				continue
+			}
+
+			token := endpointPort.Name
+			if token == "" {
+				token = strconv.Itoa(int(endpointPort.Port))
+			}
+
+			portName := servicePortNameForConsul(serviceEndpoints, token, int(endpointPort.Port), idx, seenNames)
+			servicePort := api.ServicePort{
+				Name:    portName,
+				Port:    int(endpointPort.Port),
+				Default: idx == defaultIdx,
+			}
+			if servicePort.Default {
+				defaultPort = servicePort.Port
+			}
+			servicePorts = append(servicePorts, servicePort)
+		}
+
+		if len(servicePorts) == 0 {
+			return 0, nil, nil
+		}
+
+		if len(servicePorts) == 1 {
+			return servicePorts[0].Port, nil, nil
+		}
+
+		if !servicePorts.HasDefault() {
+			servicePorts[0].Default = true
+			defaultPort = servicePorts[0].Port
+		}
+
+		if err := servicePorts.Validate(); err != nil {
+			return 0, nil, err
+		}
+
+		return defaultPort, servicePorts, nil
 	}
 
 	portTokens := strings.Split(raw, ",")
 	matchingIndexes := matchingServicePortIndexes(pod, serviceEndpoints, len(portTokens))
+	r.Log.Info("determined matching service port indexes", "indexes", matchingIndexes)
 	if len(matchingIndexes) == 0 {
 		return 0, nil, nil
 	}
@@ -1705,6 +1967,14 @@ func servicePortsForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoin
 	}
 
 	return defaultPort, servicePorts, nil
+}
+
+func endpointPortsForRegistration(serviceEndpoints corev1.Endpoints) []corev1.EndpointPort {
+	ports := make([]corev1.EndpointPort, 0)
+	for _, subset := range serviceEndpoints.Subsets {
+		ports = append(ports, subset.Ports...)
+	}
+	return ports
 }
 
 func matchingServicePortIndexes(pod corev1.Pod, serviceEndpoints corev1.Endpoints, portCount int) []int {
