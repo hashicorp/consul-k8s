@@ -564,7 +564,9 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 
 	logger.Log(t, "creating other namespace")
 	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "create", "namespace", "other")
-	require.NoError(t, err, out)
+	if err != nil && !(strings.Contains(err.Error(), "AlreadyExists") || strings.Contains(out, "AlreadyExists")) {
+		require.NoError(t, err, out)
+	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
