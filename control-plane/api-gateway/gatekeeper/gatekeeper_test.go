@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1150,6 +1151,7 @@ func TestUpsert(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, autoscalingv2.AddToScheme(s))
 
 			log := logrtest.New(t)
 
@@ -1405,6 +1407,7 @@ func TestDelete(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, autoscalingv2.AddToScheme(s))
 
 			log := logrtest.New(t)
 
@@ -1421,6 +1424,251 @@ func TestDelete(t *testing.T) {
 		})
 	}
 
+}
+
+func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+	require.NoError(t, rbac.AddToScheme(s))
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, appsv1.AddToScheme(s))
+	require.NoError(t, autoscalingv2.AddToScheme(s))
+
+	gateway := gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				AnnotationHPAEnabled:     "true",
+				AnnotationHPAMinReplicas: "3",
+				AnnotationHPAMaxReplicas: "25",
+				AnnotationHPACPUTarget:   "70",
+			},
+		},
+		Spec: gwv1beta1.GatewaySpec{
+			Listeners: listeners,
+		},
+	}
+
+	gcc := v1alpha1.GatewayClassConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-gatewayclassconfig",
+		},
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			DeploymentSpec: v1alpha1.DeploymentSpec{
+				DefaultInstances: common.PointerTo(int32(3)),
+				MaxInstances:     common.PointerTo(int32(8)),
+				MinInstances:     common.PointerTo(int32(1)),
+			},
+			CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+			ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+		},
+	}
+
+	helmConfig := common.HelmConfig{
+		ImageDataplane:       dataplaneImage,
+		EnableGatewayScaling: true,
+	}
+
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+
+	g := New(logrtest.New(t), client, nil)
+
+	require.NoError(t, g.Upsert(ctx, gateway, gcc, helmConfig))
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, deployment))
+	require.NotNil(t, deployment.Spec.Replicas)
+	require.Equal(t, int32(3), *deployment.Spec.Replicas)
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
+	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name + "-hpa", Namespace: gateway.Namespace}, hpa))
+	require.NotNil(t, hpa.Spec.MinReplicas)
+	require.Equal(t, int32(3), *hpa.Spec.MinReplicas)
+	require.Equal(t, int32(25), hpa.Spec.MaxReplicas)
+	require.Len(t, hpa.Spec.Metrics, 1)
+	require.NotNil(t, hpa.Spec.Metrics[0].Resource)
+	require.NotNil(t, hpa.Spec.Metrics[0].Resource.Target.AverageUtilization)
+	require.Equal(t, int32(70), *hpa.Spec.Metrics[0].Resource.Target.AverageUtilization)
+
+	deployment.Spec.Replicas = common.PointerTo(int32(11))
+	require.NoError(t, client.Update(ctx, deployment))
+
+	updatedGateway := gateway.DeepCopy()
+	updatedGateway.Annotations[AnnotationHPAMinReplicas] = "5"
+	updatedGateway.Annotations[AnnotationHPAMaxReplicas] = "30"
+	updatedGateway.Annotations[AnnotationHPACPUTarget] = "80"
+
+	require.NoError(t, g.Upsert(ctx, *updatedGateway, gcc, helmConfig))
+
+	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, deployment))
+	require.NotNil(t, deployment.Spec.Replicas)
+	require.Equal(t, int32(11), *deployment.Spec.Replicas)
+
+	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name + "-hpa", Namespace: gateway.Namespace}, hpa))
+	require.NotNil(t, hpa.Spec.MinReplicas)
+	require.Equal(t, int32(5), *hpa.Spec.MinReplicas)
+	require.Equal(t, int32(30), hpa.Spec.MaxReplicas)
+	require.NotNil(t, hpa.Spec.Metrics[0].Resource)
+	require.NotNil(t, hpa.Spec.Metrics[0].Resource.Target.AverageUtilization)
+	require.Equal(t, int32(80), *hpa.Spec.Metrics[0].Resource.Target.AverageUtilization)
+}
+
+func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+	require.NoError(t, rbac.AddToScheme(s))
+	require.NoError(t, corev1.AddToScheme(s))
+	require.NoError(t, appsv1.AddToScheme(s))
+	require.NoError(t, autoscalingv2.AddToScheme(s))
+
+	gateway := gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				AnnotationHPAEnabled:     "true",
+				AnnotationHPAMinReplicas: "3",
+				AnnotationHPAMaxReplicas: "25",
+				AnnotationHPACPUTarget:   "70",
+			},
+		},
+		Spec: gwv1beta1.GatewaySpec{
+			Listeners: listeners,
+		},
+	}
+
+	gcc := v1alpha1.GatewayClassConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consul-gatewayclassconfig",
+		},
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			DeploymentSpec: v1alpha1.DeploymentSpec{
+				DefaultInstances: common.PointerTo(int32(3)),
+				MaxInstances:     common.PointerTo(int32(8)),
+				MinInstances:     common.PointerTo(int32(1)),
+			},
+			CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+			ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+		},
+	}
+
+	helmConfig := common.HelmConfig{
+		ImageDataplane: dataplaneImage,
+	}
+
+	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
+	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+
+	g := New(logrtest.New(t), client, nil)
+
+	require.NoError(t, g.Upsert(ctx, gateway, gcc, helmConfig))
+
+	deployment := &appsv1.Deployment{}
+	require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, deployment))
+	require.NotNil(t, deployment.Spec.Replicas)
+	require.Equal(t, int32(3), *deployment.Spec.Replicas)
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
+	err := client.Get(ctx, types.NamespacedName{Name: gateway.Name + "-hpa", Namespace: gateway.Namespace}, hpa)
+	require.True(t, k8serrors.IsNotFound(err))
+}
+
+func TestUpsertPreservesManualScaleWithoutScalingAnnotations(t *testing.T) {
+	t.Parallel()
+
+	for testName, tc := range map[string]struct {
+		gatewayClassConfig v1alpha1.GatewayClassConfig
+		initialReplicas    int32
+		manualReplicas     int32
+	}{
+		"no deprecated gateway class scaling fields": {
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			initialReplicas: 1,
+			manualReplicas:  4,
+		},
+		"deprecated gateway class scaling only seeds initial deployment": {
+			gatewayClassConfig: v1alpha1.GatewayClassConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "consul-gatewayclassconfig",
+				},
+				Spec: v1alpha1.GatewayClassConfigSpec{
+					DeploymentSpec: v1alpha1.DeploymentSpec{
+						DefaultInstances: common.PointerTo(int32(3)),
+						MaxInstances:     common.PointerTo(int32(8)),
+						MinInstances:     common.PointerTo(int32(1)),
+					},
+					CopyAnnotations: v1alpha1.CopyAnnotationsSpec{},
+					ServiceType:     (*corev1.ServiceType)(common.PointerTo("NodePort")),
+				},
+			},
+			initialReplicas: 3,
+			manualReplicas:  11,
+		},
+	} {
+		t.Run(testName, func(t *testing.T) {
+			ctx := context.Background()
+			s := runtime.NewScheme()
+			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, v1alpha1.AddToScheme(s))
+			require.NoError(t, rbac.AddToScheme(s))
+			require.NoError(t, corev1.AddToScheme(s))
+			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, autoscalingv2.AddToScheme(s))
+
+			gateway := gwv1beta1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: namespace,
+				},
+				Spec: gwv1beta1.GatewaySpec{
+					Listeners: listeners,
+				},
+			}
+
+			helmConfig := common.HelmConfig{
+				ImageDataplane:       dataplaneImage,
+				EnableGatewayScaling: true,
+			}
+
+			client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &tc.gatewayClassConfig).Build()
+			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
+
+			g := New(logrtest.New(t), client, nil)
+			require.NoError(t, g.Upsert(ctx, gateway, tc.gatewayClassConfig, helmConfig))
+
+			deployment := &appsv1.Deployment{}
+			require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, deployment))
+			require.NotNil(t, deployment.Spec.Replicas)
+			require.Equal(t, tc.initialReplicas, *deployment.Spec.Replicas)
+
+			deployment.Spec.Replicas = common.PointerTo(tc.manualReplicas)
+			require.NoError(t, client.Update(ctx, deployment))
+
+			require.NoError(t, g.Upsert(ctx, gateway, tc.gatewayClassConfig, helmConfig))
+
+			require.NoError(t, client.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, deployment))
+			require.NotNil(t, deployment.Spec.Replicas)
+			require.Equal(t, tc.manualReplicas, *deployment.Spec.Replicas)
+		})
+	}
 }
 
 func joinResources(resources resources) (objs []client.Object) {

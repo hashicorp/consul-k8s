@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 
 	"github.com/stretchr/testify/require"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -274,6 +275,66 @@ func TestTransformEndpoints(t *testing.T) {
 			}
 
 			require.ElementsMatch(t, tt.expected, controller.transformEndpoints(context.Background(), tt.endpoints))
+		})
+	}
+}
+
+func TestTransformHPA(t *testing.T) {
+	t.Parallel()
+
+	controller := GatewayController{}
+
+	for name, tt := range map[string]struct {
+		hpa      *autoscalingv2.HorizontalPodAutoscaler
+		expected []reconcile.Request
+	}{
+		"deployment target enqueues gateway deployment name": {
+			hpa: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "api-gateway-hpa",
+					Namespace: "default",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						Kind: "Deployment",
+						Name: "api-gateway",
+					},
+				},
+			},
+			expected: []reconcile.Request{
+				{NamespacedName: types.NamespacedName{Name: "api-gateway", Namespace: "default"}},
+			},
+		},
+		"non deployment target is ignored": {
+			hpa: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "service-hpa",
+					Namespace: "default",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						Kind: "StatefulSet",
+						Name: "api-gateway",
+					},
+				},
+			},
+		},
+		"empty deployment target name is ignored": {
+			hpa: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "api-gateway-hpa",
+					Namespace: "default",
+				},
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
+						Kind: "Deployment",
+					},
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ElementsMatch(t, tt.expected, controller.transformHPA(context.Background(), tt.hpa))
 		})
 	}
 }

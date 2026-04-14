@@ -263,7 +263,7 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 		},
 	}
 
-	merged := mergeDeployments(log, gcc, gateway, deployment, &appsv1.Deployment{})
+	merged := mergeDeployments(log, gateway, deployment, &appsv1.Deployment{})
 	assert.NotNil(t, merged)
 
 	// Verify probe was applied to the container
@@ -288,7 +288,7 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 		},
 	}
 
-	mergedUpdated := mergeDeployments(log, gcc, gatewayUpdated, merged, &appsv1.Deployment{})
+	mergedUpdated := mergeDeployments(log, gatewayUpdated, merged, &appsv1.Deployment{})
 	assert.NotNil(t, mergedUpdated)
 
 	// Verify the probe handler was replaced (TCPSocket instead of HTTPGet)
