@@ -291,12 +291,13 @@ func (c *Command) injectRules() (string, error) {
 	// It must also create/update service health checks via the endpoints controller.
 	// When ACLs are enabled, the endpoints controller (V1) or pod controller (v2)
 	// needs "acl:write" permissions to delete ACL tokens created via "consul login".
-	// policy = "write" is required when creating namespaces within a partition.
+	// RateLimit is a global config entry that requires operator write access, while
+	// namespace creation inside a partition requires partition-scoped policy = "write".
 	injectRulesTpl := `
 {{- if .EnablePartitions }}
+operator = "write"
 partition "{{ .PartitionName }}" {
   mesh = "write"
-  operator = "write"
   acl = "write"
 {{- else }}
   mesh = "write"
