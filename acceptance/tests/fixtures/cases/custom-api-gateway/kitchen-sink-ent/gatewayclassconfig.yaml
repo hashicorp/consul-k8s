@@ -4,7 +4,7 @@
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: GatewayClassConfig
 metadata:
-  name: custom-gateway-class-config
+  name: gateway-class-config
 spec:
   deployment:
     defaultInstances: 2
