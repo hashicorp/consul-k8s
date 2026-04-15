@@ -84,14 +84,13 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
-	ensureNamespaceExists(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace)
 
 	if cfg.EnableRestrictedPSAEnforcement {
 		configureNamespace(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePSA(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
@@ -176,8 +175,6 @@ func applyOpenShiftDefaults(values map[string]string) {
 
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
-
-	ensureNamespaceExists(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace)
 
 	// check and remove any CRDs with finalizers
 	if h.isOpenShift {
@@ -1443,7 +1440,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 // PodSecurityPolicies are removed from the kubernetes API in v1.25.
 // Thus using the Pod Security Admission Controller with a privileged policy is the recommended path forward for testing in clusters with Kubernetes v1.25 and above.
 
-func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	// Create a privileged Pod Security Admission policy for the helm installation namespace.
 	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -1486,28 +1483,6 @@ func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestCon
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
-}
-
-func ensureNamespaceExists(t *testing.T, client kubernetes.Interface, namespace string) {
-	t.Helper()
-
-	if namespace == "" {
-		return
-	}
-
-	_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
-	if err == nil {
-		return
-	}
-
-	if errors.IsNotFound(err) {
-		_, err = client.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}, metav1.CreateOptions{})
-		require.NoError(t, err)
-		logger.Logf(t, "Created namespace %s", namespace)
-		return
-	}
-
-	require.NoError(t, err)
 }
 
 func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
