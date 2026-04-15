@@ -95,6 +95,9 @@ func TestPartitions_Connect(t *testing.T) {
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
 				"global.logLevel":                "debug",
+				"global.generateManifests":       "false",
+				"global.openshift.isOcpGreaterthan4_18": "false",
+				"global.openshift.crds.enableTcpRoute":  "true",
 
 				"global.tls.enabled":   "true",
 				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
@@ -134,6 +137,10 @@ func TestPartitions_Connect(t *testing.T) {
 			// Install the consul cluster with servers in the default kubernetes context.
 			serverConsulCluster := consul.NewHelmCluster(t, defaultPartitionHelmValues, defaultPartitionClusterContext, cfg, releaseName)
 			serverConsulCluster.Create(t)
+
+			logger.Log(t, "verifying gateway.networking.k8s.io TCPRoute CRD exists in server cluster")
+			out, err := k8s.RunKubectlAndGetOutputE(t, defaultPartitionClusterContext.KubectlOptions(t), "get", "crd", "tcproutes.gateway.networking.k8s.io")
+			require.NoError(t, err, out)
 
 			// Copy secrets from the default partition to the secondary partition
 			// Get the TLS CA certificate and key secret from the server cluster and apply it to the client cluster.
@@ -186,6 +193,10 @@ func TestPartitions_Connect(t *testing.T) {
 			// Install the consul cluster without servers in the client cluster kubernetes context.
 			clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 			clientConsulCluster.Create(t)
+
+			logger.Log(t, "verifying gateway.networking.k8s.io TCPRoute CRD exists in client cluster")
+			out, err = k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterContext.KubectlOptions(t), "get", "crd", "tcproutes.gateway.networking.k8s.io")
+			require.NoError(t, err, out)
 
 			defaultPartitionClusterStaticServerOpts := &terratestk8s.KubectlOptions{
 				ContextName: defaultPartitionClusterContext.KubectlOptions(t).ContextName,

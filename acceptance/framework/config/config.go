@@ -48,13 +48,13 @@ func NewKubeTestConfigList(kubeConfigs, kubeContexts, kubeNamespaces []string) [
 	out := make([]KubeTestConfig, int(l))
 	for i := range out {
 		kenv := KubeTestConfig{}
-		if len(kubeConfigs) != 0 {
+		if i < len(kubeConfigs) {
 			kenv.KubeConfig = kubeConfigs[i]
 		}
-		if len(kubeContexts) != 0 {
+		if i < len(kubeContexts) {
 			kenv.KubeContext = kubeContexts[i]
 		}
-		if len(kubeNamespaces) != 0 {
+		if i < len(kubeNamespaces) {
 			kenv.KubeNamespace = kubeNamespaces[i]
 		}
 		out[i] = kenv

@@ -37,7 +37,6 @@ import (
 
 // RandomName generates a random string with a 'test-' prefix.
 func RandomName() string {
-
 	return fmt.Sprintf("test-%s", strings.ToLower(random.UniqueId()))
 }
 

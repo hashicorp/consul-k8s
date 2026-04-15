@@ -30,6 +30,7 @@ const (
 	ServerRole               = "server"
 )
 
+// TestController
 func TestController(t *testing.T) {
 	cfg := suite.Config()
 	if cfg.EnableCNI {
