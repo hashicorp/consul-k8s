@@ -30,6 +30,7 @@ const (
 	HTTPRoute_RouteRetryFilterIndex   = "__httproute_referencing_retryfilter"
 	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
 	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
+	HTTPRoute_RouteTLSSDSFilterIndex  = "__httproute_referencing_routetlssdsfilter"
 
 	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
 	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
@@ -130,6 +131,11 @@ var indexes = []index{
 		indexerFunc: filtersForHTTPRoute,
 	},
 	{
+		name:        HTTPRoute_RouteTLSSDSFilterIndex,
+		target:      &gwv1beta1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{
 		name:        Gatewaypolicy_GatewayIndex,
 		target:      &v1alpha1.GatewayPolicy{},
 		indexerFunc: gatewayForGatewayPolicy,
@@ -176,7 +182,7 @@ func gatewayForSecret(o client.Object) []string {
 	gateway := o.(*gwv1beta1.Gateway)
 	var secretReferences []string
 	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS == nil || *listener.TLS.Mode != gwv1beta1.TLSModeTerminate {
+		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
 			continue
 		}
 		for _, cert := range listener.TLS.CertificateRefs {

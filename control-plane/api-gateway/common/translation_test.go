@@ -355,6 +355,59 @@ func TestTranslator_ToAPIGateway(t *testing.T) {
 	}
 }
 
+func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{
+		EnableConsulNamespaces: true,
+		EnableK8sMirroring:     true,
+	}
+
+	gateway := gwv1beta1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "api-gateway",
+			Namespace: "default",
+			Annotations: map[string]string{
+				TLSSDSClusterNameAnnotationKey:  "gateway-sds",
+				TLSSDSCertResourceAnnotationKey: "default-cert",
+			},
+		},
+		Spec: gwv1beta1.GatewaySpec{
+			Listeners: []gwv1beta1.Listener{
+				{
+					Name:     "gateway-default-sds",
+					Port:     8443,
+					Protocol: gwv1beta1.HTTPSProtocolType,
+					TLS:      &gwv1beta1.GatewayTLSConfig{},
+				},
+				{
+					Name:     "listener-override-sds",
+					Port:     9443,
+					Protocol: gwv1beta1.HTTPSProtocolType,
+					TLS: &gwv1beta1.GatewayTLSConfig{Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+						gwv1beta1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "listener-sds",
+						gwv1beta1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
+					}},
+				},
+			},
+		},
+	}
+
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	translated := translator.ToAPIGateway(gateway, resources, &v1alpha1.GatewayClassConfig{})
+
+	require.Len(t, translated.Listeners, 2)
+	require.NotNil(t, translated.Listeners[0].TLS.SDS)
+	require.Equal(t, "gateway-sds", translated.Listeners[0].TLS.SDS.ClusterName)
+	require.Equal(t, "default-cert", translated.Listeners[0].TLS.SDS.CertResource)
+	require.Empty(t, translated.Listeners[0].TLS.Certificates)
+
+	require.NotNil(t, translated.Listeners[1].TLS.SDS)
+	require.Equal(t, "listener-sds", translated.Listeners[1].TLS.SDS.ClusterName)
+	require.Equal(t, "listener-cert", translated.Listeners[1].TLS.SDS.CertResource)
+	require.Empty(t, translated.Listeners[1].TLS.Certificates)
+}
+
 func TestTranslator_ToHTTPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
@@ -1746,11 +1799,160 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 				ConsulPartition:        tt.fields.ConsulPartition,
 				Datacenter:             tt.fields.Datacenter,
 			}
-			requestHeaders, responseHeaders := t.translateHTTPFilters(tt.args.filters, nil, "")
+			requestHeaders, responseHeaders, _ := t.translateHTTPFilters(tt.args.filters, nil, "", nil)
 			assert.Equalf(t1, tt.want, requestHeaders, "translateHTTPFilters(%v)", tt.args.filters)
 			assert.Equalf(t1, tt.wantResponseFilters, responseHeaders, "translateHTTPFilters(%v)", tt.args.filters)
 		})
 	}
+}
+
+func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{EnableConsulNamespaces: true, EnableK8sMirroring: true}
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	resources.AddService(types.NamespacedName{Namespace: "default", Name: "backend"}, "backend")
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta: metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backend-sds",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{
+			SDS: &v1alpha1.GatewayTLSSDSConfig{
+				ClusterName:  "sds-cluster",
+				CertResource: "backend-cert",
+			},
+		},
+	})
+
+	route := gwv1beta1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1beta1.HTTPRouteSpec{
+			Rules: []gwv1beta1.HTTPRouteRule{{
+				BackendRefs: []gwv1beta1.HTTPBackendRef{{
+					BackendRef: gwv1beta1.BackendRef{BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "backend"}},
+					Filters: []gwv1beta1.HTTPRouteFilter{{
+						Type: gwv1beta1.HTTPRouteFilterExtensionRef,
+						ExtensionRef: &gwv1beta1.LocalObjectReference{
+							Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+							Kind:  gwv1beta1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+							Name:  "backend-sds",
+						},
+					}},
+				}},
+			}},
+		},
+	}
+
+	out := translator.ToHTTPRoute(route, resources)
+	require.Len(t, out.Rules, 1)
+	require.Len(t, out.Rules[0].Services, 1)
+	require.NotNil(t, out.Rules[0].Services[0].TLS)
+	require.NotNil(t, out.Rules[0].Services[0].TLS.SDS)
+	require.Equal(t, "sds-cluster", out.Rules[0].Services[0].TLS.SDS.ClusterName)
+	require.Equal(t, "backend-cert", out.Rules[0].Services[0].TLS.SDS.CertResource)
+}
+
+func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter_InheritsCluster(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{EnableConsulNamespaces: true, EnableK8sMirroring: true}
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+
+	gateway := gwv1beta1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sds-gateway",
+			Namespace: "default",
+			Annotations: map[string]string{
+				TLSSDSClusterNameAnnotationKey:  "inherited-sds-cluster",
+				TLSSDSCertResourceAnnotationKey: "listener-cert",
+			},
+		},
+		Spec: gwv1beta1.GatewaySpec{
+			Listeners: []gwv1beta1.Listener{{
+				Name:     "https",
+				Port:     8443,
+				Protocol: gwv1beta1.HTTPSProtocolType,
+				TLS:      &gwv1beta1.GatewayTLSConfig{},
+			}},
+		},
+	}
+	resources.ReferenceCountGateway(gateway)
+	resources.AddService(types.NamespacedName{Namespace: "default", Name: "backend"}, "backend")
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta: metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "backend-sds",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{
+			SDS: &v1alpha1.GatewayTLSSDSConfig{
+				ClusterName:  "",
+				CertResource: "backend-cert",
+			},
+		},
+	})
+
+	httpsSection := gwv1beta1.SectionName("https")
+	route := gwv1beta1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1beta1.HTTPRouteSpec{
+			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
+				ParentRefs: []gwv1beta1.ParentReference{{
+					Name:        gwv1beta1.ObjectName("sds-gateway"),
+					SectionName: &httpsSection,
+				}},
+			},
+			Rules: []gwv1beta1.HTTPRouteRule{{
+				BackendRefs: []gwv1beta1.HTTPBackendRef{{
+					BackendRef: gwv1beta1.BackendRef{BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "backend"}},
+					Filters: []gwv1beta1.HTTPRouteFilter{{
+						Type: gwv1beta1.HTTPRouteFilterExtensionRef,
+						ExtensionRef: &gwv1beta1.LocalObjectReference{
+							Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+							Kind:  gwv1beta1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+							Name:  "backend-sds",
+						},
+					}},
+				}},
+			}},
+		},
+	}
+
+	out := translator.ToHTTPRoute(route, resources)
+	require.Len(t, out.Rules, 1)
+	require.Len(t, out.Rules[0].Services, 1)
+	require.NotNil(t, out.Rules[0].Services[0].TLS)
+	require.NotNil(t, out.Rules[0].Services[0].TLS.SDS)
+	require.Equal(t, "inherited-sds-cluster", out.Rules[0].Services[0].TLS.SDS.ClusterName)
+	require.Equal(t, "backend-cert", out.Rules[0].Services[0].TLS.SDS.CertResource)
+}
+
+func TestTranslator_ToHTTPRoute_NoBackendTLSSDSFilter(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{EnableConsulNamespaces: true, EnableK8sMirroring: true}
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	resources.AddService(types.NamespacedName{Namespace: "default", Name: "backend"}, "backend")
+
+	route := gwv1beta1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1beta1.HTTPRouteSpec{
+			Rules: []gwv1beta1.HTTPRouteRule{{
+				BackendRefs: []gwv1beta1.HTTPBackendRef{{
+					BackendRef: gwv1beta1.BackendRef{BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "backend"}},
+				}},
+			}},
+		},
+	}
+
+	out := translator.ToHTTPRoute(route, resources)
+	require.Len(t, out.Rules, 1)
+	require.Len(t, out.Rules[0].Services, 1)
+	// No backend RouteTLSSDSFilter means no service-level override; listener SDS can remain the default.
+	require.Nil(t, out.Rules[0].Services[0].TLS)
 }
 
 func newSectionNamePtr(s string) *gwv1beta1.SectionName {
@@ -1897,4 +2099,51 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 			assert.Equalf(t, tt.want1, got1, "toAPIGatewayListener(%v, %v, %v, %v)", tt.args.gateway, tt.args.listener, resources, tt.args.gwcc)
 		})
 	}
+}
+
+func TestResourceTranslator_toAPIGatewayListener_WithSDSAndCertificateRefs(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{
+		EnableConsulNamespaces: true,
+		ConsulDestNamespace:    "",
+		EnableK8sMirroring:     true,
+		MirroringPrefix:        "",
+	}
+
+	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+	resources.ReferenceCountCertificate(generateTestCertificate(t, "default", "gw-cert"))
+
+	gateway := gwv1beta1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: "default",
+		},
+	}
+
+	listener := gwv1beta1.Listener{
+		Name:     "https",
+		Port:     8443,
+		Protocol: gwv1beta1.HTTPSProtocolType,
+		TLS: &gwv1beta1.GatewayTLSConfig{
+			Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+				gwv1beta1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "sds-cluster",
+				gwv1beta1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
+			},
+			CertificateRefs: []gwv1beta1.SecretObjectReference{{
+				Name:      "gw-cert",
+				Namespace: PointerTo(gwv1beta1.Namespace("default")),
+			}},
+		},
+	}
+
+	got, ok := translator.toAPIGatewayListener(gateway, listener, resources, nil)
+	require.True(t, ok)
+	require.NotNil(t, got.TLS.SDS)
+	require.Equal(t, "sds-cluster", got.TLS.SDS.ClusterName)
+	require.Equal(t, "listener-cert", got.TLS.SDS.CertResource)
+
+	expectedCert := translator.NonNormalizedConfigEntryReference(api.FileSystemCertificate, types.NamespacedName{Name: "gw-cert", Namespace: "default"})
+	require.Contains(t, got.TLS.Certificates, expectedCert)
 }

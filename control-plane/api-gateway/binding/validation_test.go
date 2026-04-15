@@ -562,7 +562,7 @@ func TestValidateTLS(t *testing.T) {
 				resources.ReferenceCountCertificate(certificate)
 			}
 
-			actualAcceptedError, actualResolvedRefsError := validateTLS(tt.gateway, tt.tls, resources)
+			actualAcceptedError, actualResolvedRefsError := validateTLS(tt.gateway, gwv1beta1.Listener{TLS: tt.tls}, resources)
 			require.ErrorIs(t, actualResolvedRefsError, tt.expectedResolvedRefsErr)
 			require.ErrorIs(t, actualAcceptedError, tt.expectedAcceptedErr)
 		})
@@ -1570,4 +1570,90 @@ func TestValidateAuthFilters(t *testing.T) {
 			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
 		})
 	}
+}
+
+func TestRouteTLSSDSFilterIsInvalid_ClusterInheritance(t *testing.T) {
+	t.Parallel()
+
+	resources := common.NewResourceMap(common.ResourceTranslator{}, nil, logrtest.NewTestLogger(t))
+	resources.ReferenceCountGateway(gwv1beta1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: common.KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: "default",
+			Annotations: map[string]string{
+				common.TLSSDSClusterNameAnnotationKey:  "inherited-cluster",
+				common.TLSSDSCertResourceAnnotationKey: "listener-cert",
+			},
+		},
+		Spec: gwv1beta1.GatewaySpec{Listeners: []gwv1beta1.Listener{{
+			Name:     "https",
+			Port:     8443,
+			Protocol: gwv1beta1.HTTPSProtocolType,
+			TLS:      &gwv1beta1.GatewayTLSConfig{},
+		}}},
+	})
+
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta:   metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{Name: "route-sds", Namespace: "default"},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{SDS: &v1alpha1.GatewayTLSSDSConfig{
+			ClusterName:  "",
+			CertResource: "backend-cert",
+		}},
+	})
+
+	httpsSection := gwv1beta1.SectionName("https")
+	route := &gwv1beta1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1beta1.HTTPRouteSpec{CommonRouteSpec: gwv1beta1.CommonRouteSpec{ParentRefs: []gwv1beta1.ParentReference{{
+			Name:        "gw",
+			SectionName: &httpsSection,
+		}}}},
+	}
+
+	filter := gwv1beta1.HTTPRouteFilter{
+		Type: gwv1beta1.HTTPRouteFilterExtensionRef,
+		ExtensionRef: &gwv1beta1.LocalObjectReference{
+			Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+			Kind:  gwv1beta1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+			Name:  "route-sds",
+		},
+	}
+
+	require.False(t, routeTLSSDSFilterIsInvalid(filter, route, resources, route.Namespace))
+}
+
+func TestRouteTLSSDSFilterIsInvalid_ClusterInheritanceMissing(t *testing.T) {
+	t.Parallel()
+
+	resources := common.NewResourceMap(common.ResourceTranslator{}, nil, logrtest.NewTestLogger(t))
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta:   metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{Name: "route-sds", Namespace: "default"},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{SDS: &v1alpha1.GatewayTLSSDSConfig{
+			ClusterName:  "",
+			CertResource: "backend-cert",
+		}},
+	})
+
+	httpsSection := gwv1beta1.SectionName("https")
+	route := &gwv1beta1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1beta1.HTTPRouteSpec{CommonRouteSpec: gwv1beta1.CommonRouteSpec{ParentRefs: []gwv1beta1.ParentReference{{
+			Name:        "gw",
+			SectionName: &httpsSection,
+		}}}},
+	}
+
+	filter := gwv1beta1.HTTPRouteFilter{
+		Type: gwv1beta1.HTTPRouteFilterExtensionRef,
+		ExtensionRef: &gwv1beta1.LocalObjectReference{
+			Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+			Kind:  gwv1beta1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+			Name:  "route-sds",
+		},
+	}
+
+	require.True(t, routeTLSSDSFilterIsInvalid(filter, route, resources, route.Namespace))
 }
