@@ -85,7 +85,7 @@ func NewHelmCluster(
 	}
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		configurePSA(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
@@ -691,11 +691,8 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 
 // PodSecurityPolicies are removed from the kubernetes API in v1.25.
 // Thus using the Pod Security Admission Controller with a privileged policy is the recommended path forward for testing in clusters with Kubernetes v1.25 and above.
-// configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
-// and a role binding that binds the default service account in the helm installation namespace to the cluster role.
-// We bind the default service account for tests that are spinning up pods without a service account set so that
-// they will not be rejected by the kube pod security policy controller.
-func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+
+func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	// Create a privileged Pod Security Admission policy for the helm installation namespace.
 	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 	require.NoError(t, err)
