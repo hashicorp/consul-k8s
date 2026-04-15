@@ -33,6 +33,10 @@ func TestPeering_Gateway(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		t.Skipf("skipping this test because peering changes related to aws CSL-13250 is not yet merged into main branch and those changes are required to run peering tests on OpenShift")
+	}
+
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {

@@ -356,6 +356,10 @@ func TestVault_Partitions(t *testing.T) {
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
 		// Keep gossip/RPC exposure enabled for multi-cluster server<->client connectivity.
 		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+		// The current OpenShift server StatefulSet path omits pod fsGroup, so run the
+		// server container as root in this test to keep the data PVC writable.
+		serverHelmValues["server.containerSecurityContext.server.runAsUser"] = "0"
+		serverHelmValues["server.containerSecurityContext.server.runAsGroup"] = "0"
 	}
 
 	// On Kind, there are no load balancers but since all clusters
@@ -371,8 +375,8 @@ func TestVault_Partitions(t *testing.T) {
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)
 
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		// `restricted-v2` does not permit hostPort, so pre-bind the Consul server
-		// service account to a permissive SCC role before creating server pods.
+		// This test enables hostPorts and needs a permissive SCC regardless of the
+		// chart-generated SCC behavior on the target OpenShift version.
 		serverSCCRoleBindingName := fmt.Sprintf("%s-consul-server-privileged-scc", consulReleaseName)
 		_, err = serverClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Create(context.Background(), &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
@@ -452,8 +456,14 @@ func TestVault_Partitions(t *testing.T) {
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		// `restricted-v2` does not permit hostPort, so pre-bind the Consul client
-		// service account to a permissive SCC role before creating client pods.
+		// Match the server-side test-only root override so the client does not inherit
+		// incompatible non-root settings from the OpenShift defaults path.
+		clientHelmValues["client.containerSecurityContext.client.runAsNonRoot"] = "false"
+		clientHelmValues["client.containerSecurityContext.client.runAsUser"] = "0"
+		clientHelmValues["client.containerSecurityContext.client.runAsGroup"] = "0"
+
+		// This test enables hostPorts and needs a permissive SCC regardless of the
+		// chart-generated SCC behavior on the target OpenShift version.
 		clientSCCRoleBindingName := fmt.Sprintf("%s-consul-client-privileged-scc", consulReleaseName)
 		_, err = clientClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Create(context.Background(), &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{

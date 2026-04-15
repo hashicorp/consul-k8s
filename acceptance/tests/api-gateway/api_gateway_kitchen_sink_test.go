@@ -468,7 +468,7 @@ func waitForHTTPRouteReady(t *testing.T, ctx environment.TestContext, k8sClient 
 			logger.Log(t, fmt.Sprintf("Attempt %d: Recreating HTTPRoute resource", attempt+1))
 
 			// Delete the HTTPRoute resource
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "httproute", routeName, "--ignore-not-found=true")
+			k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", gatewayHTTPRouteResource, routeName, "--ignore-not-found=true")
 
 			// Wait for deletion
 			time.Sleep(10 * time.Second)
