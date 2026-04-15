@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func DerefAll[T any](vs []*T) []T {
@@ -28,8 +28,8 @@ func NilOrEqual[T ~string](v *T, check string) bool {
 	return v == nil || string(*v) == check
 }
 
-func FilterIsExternalFilter(filter gwv1beta1.HTTPRouteFilter) bool {
-	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+func FilterIsExternalFilter(filter gwv1.HTTPRouteFilter) bool {
+	if filter.Type != gwv1.HTTPRouteFilterExtensionRef {
 		return false
 	}
 
@@ -176,7 +176,7 @@ func ObjectsToReconcileRequests[T metav1.Object](objects []T) []reconcile.Reques
 }
 
 // ParentRefs takes a list of ParentReference objects and returns a list of NamespacedName objects.
-func ParentRefs(group, kind, namespace string, refs []gwv1beta1.ParentReference) []types.NamespacedName {
+func ParentRefs(group, kind, namespace string, refs []gwv1.ParentReference) []types.NamespacedName {
 	indexed := make([]types.NamespacedName, 0, len(refs))
 	for _, parent := range refs {
 		if NilOrEqual(parent.Group, group) && NilOrEqual(parent.Kind, kind) {
@@ -219,7 +219,7 @@ func PointerTo[T any](v T) *T {
 }
 
 // ParentsEqual checks for equality between two parent references.
-func ParentsEqual(one, two gwv1beta1.ParentReference) bool {
+func ParentsEqual(one, two gwv1.ParentReference) bool {
 	return BothNilOrEqual(one.Group, two.Group) &&
 		BothNilOrEqual(one.Kind, two.Kind) &&
 		BothNilOrEqual(one.SectionName, two.SectionName) &&

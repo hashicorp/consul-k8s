@@ -119,35 +119,22 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// patch the resources to reference each other
 			logger.Log(t, "patching gateway to certificate")
-			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateway", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
+			k8s.RunKubectl(t, gatewayK8SOptions, "patch", gatewayGatewayResource, "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to target server")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", gatewayHTTPRouteResource, "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to gateway")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", gatewayHTTPRouteResource, "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
 
 			// Grab a kubernetes and consul client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
 			k8sClient := ctx.ControllerRuntimeClient(t)
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
-			// check if there are any reference grants and if there are any then log the content of the objects for debugging
-			logger.Log(t, "checking for reference grants")
-			var referenceGrants gwv1beta.ReferenceGrantList
-			err := k8sClient.List(context.Background(), &referenceGrants)
-			require.NoError(t, err)
-			// instead describe each reference grant and log it for debugging purposes
-			if len(referenceGrants.Items) > 0 {
-				logger.Logf(t, "found %d reference grants", len(referenceGrants.Items))
-				for i, rg := range referenceGrants.Items {
-					logger.Logf(t, "refeerence grant %d: %+v", i, rg)
-				}
-			}
-
 			// log the gateway and route for debugging purposes
 			var gateway gwv1.Gateway
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 			require.NoError(t, err)
 			logger.Logf(t, "gateway: %+v", gateway)
 

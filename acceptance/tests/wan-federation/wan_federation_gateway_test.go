@@ -6,9 +6,12 @@ package wanfederation
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"testing"
 	"time"
 
+	terratestK8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -35,6 +38,13 @@ func TestWANFederation_Gateway(t *testing.T) {
 
 	primaryContext := env.DefaultContext(t)
 	secondaryContext := env.Context(t, 1)
+
+	cleanupWANTestDeployments(t, cfg, primaryContext)
+	cleanupWANTestDeployments(t, cfg, secondaryContext)
+	cleanupWANTestDeploymentsInNamespace(t, primaryContext, "ns1")
+	cleanupWANTestDeploymentsInNamespace(t, primaryContext, "ns2")
+	cleanupWANTestDeploymentsInNamespace(t, secondaryContext, "ns1")
+	cleanupWANTestDeploymentsInNamespace(t, secondaryContext, "ns2")
 
 	primaryHelmValues := map[string]string{
 		"global.datacenter": "dc1",
@@ -69,7 +79,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 		kubernetesEndpoint, err := secondaryContext.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
 		require.NoError(t, err)
-		k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+		k8sAuthMethodHost = net.JoinHostPort(kubernetesEndpoint.Subsets[0].Addresses[0].IP, strconv.Itoa(int(kubernetesEndpoint.Subsets[0].Ports[0].Port)))
 	} else {
 		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
 	}
@@ -140,8 +150,11 @@ func TestWANFederation_Gateway(t *testing.T) {
 		k8s.DeployKustomize(t, secondaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 		logger.Log(t, "creating api-gateway resources in dc1")
-		out, err := k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-		require.NoError(t, err, out)
+		// Apply api-gateway resources with retry logic to handle intermittent failures
+		retry.Run(t, func(r *retry.R) {
+			out, err := k8s.RunKubectlAndGetOutputE(t, primaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
+			require.NoError(r, err, out)
+		})
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			// Ignore errors here because if the test ran as expected
 			// the custom resources will have been deleted.
@@ -154,9 +167,12 @@ func TestWANFederation_Gateway(t *testing.T) {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc1-to-dc2-resolver")
 		})
 
+		// Wait for the httproute to exist before patching, with delete/recreate fallback
+		helpers.WaitForHTTPRouteWithRetry(t, primaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
+
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
-		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		patchHTTPRouteBackendToMeshService(t, primaryContext.KubectlOptions(t), "http-route")
 
 		checkConnectivity(t, primaryContext, primaryClient)
 	})
@@ -167,8 +183,11 @@ func TestWANFederation_Gateway(t *testing.T) {
 		k8s.DeployKustomize(t, primaryContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 
 		logger.Log(t, "creating api-gateway resources in dc2")
-		out, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
-		require.NoError(t, err, out)
+		// Apply api-gateway resources with retry logic to handle intermittent failures
+		retry.Run(t, func(r *retry.R) {
+			out, err := k8s.RunKubectlAndGetOutputE(t, secondaryContext.KubectlOptions(t), "apply", "-k", "../fixtures/bases/api-gateway")
+			require.NoError(r, err, out)
+		})
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			// Ignore errors here because if the test ran as expected
 			// the custom resources will have been deleted.
@@ -181,16 +200,35 @@ func TestWANFederation_Gateway(t *testing.T) {
 			k8s.KubectlDeleteK(t, secondaryContext.KubectlOptions(t), "../fixtures/cases/api-gateways/dc2-to-dc1-resolver")
 		})
 
+		// Wait for the httproute to exist before patching, with delete/recreate fallback
+		helpers.WaitForHTTPRouteWithRetry(t, secondaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
+
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
-		k8s.RunKubectl(t, secondaryContext.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		patchHTTPRouteBackendToMeshService(t, secondaryContext.KubectlOptions(t), "http-route")
 
 		checkConnectivity(t, secondaryContext, primaryClient)
 	})
 }
 
+func patchHTTPRouteBackendToMeshService(t *testing.T, options *terratestK8s.KubectlOptions, routeName string) {
+	t.Helper()
+
+	logger.Logf(t, "patching httproute %s to target MeshService mesh-service:80", routeName)
+	k8s.RunKubectl(t, options, "patch", "httproutes.gateway.networking.k8s.io", routeName, "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+
+	retrier := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "httproutes.gateway.networking.k8s.io", routeName, "-o", `jsonpath={.spec.rules[0].backendRefs[0].group}|{.spec.rules[0].backendRefs[0].kind}|{.spec.rules[0].backendRefs[0].name}|{.spec.rules[0].backendRefs[0].port}`)
+		require.NoError(r, err)
+		require.Equal(r, "consul.hashicorp.com|MeshService|mesh-service|80", output)
+	})
+	logger.Logf(t, "httproute %s successfully patched to MeshService backend", routeName)
+}
+
 func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Client) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
+	gatewayNamespace := ctx.KubectlOptions(t).Namespace
 
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
@@ -199,7 +237,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use
@@ -208,8 +246,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
-
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, targetAddress)
 

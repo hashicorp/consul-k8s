@@ -213,7 +213,7 @@ func (c *Command) Run(args []string) int {
 	}
 
 	name = fmt.Sprintf("server.%s.%s", c.flagDC, c.flagDomain)
-	hosts = append(hosts, name, "localhost", "127.0.0.1")
+	hosts = append(hosts, name, "localhost", "127.0.0.1", "::1")
 
 	c.log.Info("parsing certificate signer from CA private key")
 	signer, err := cert.ParseSigner(pk)

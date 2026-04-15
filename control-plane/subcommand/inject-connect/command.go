@@ -14,9 +14,10 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
-	gwv1alpha2exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1alpha2"
-	gwv1beta1exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-exp/apis/v1beta1"
+	gwv1alpha2exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
@@ -28,6 +29,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -176,7 +178,6 @@ var (
 )
 
 func init() {
-	fmt.Printf("adding to the scheme in the inject-connect command\n")
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// We need v1alpha1 here to add the peering api to the scheme
@@ -186,7 +187,6 @@ func init() {
 	utilruntime.Must(gwv1beta1exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-	fmt.Printf("added to the scheme")
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -304,7 +304,7 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
 
-	// enable custom crds controller flags
+	// Enable custom crds controller flags.
 
 	c.consul = &flags.ConsulFlags{}
 
@@ -415,15 +415,26 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:           scheme,
-		LeaderElection:   true,
-		LeaderElectionID: "consul-controller-lock",
-		Logger:           zapLogger,
+	healthProbeBindAddress := constants.Getv4orv6Str("0.0.0.0:9445", "[::]:9445")
+	metricsServiceBindAddress := constants.Getv4orv6Str("0.0.0.0:9444", "[::]:9444")
+	cfg := ctrl.GetConfigOrDie()
+	cfg.Timeout = 90 * time.Second
+	cfg.QPS = 50
+	cfg.Burst = 100
+
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:                  scheme,
+		LeaderElection:          true,
+		LeaderElectionID:        "consul-controller-lock",
+		Logger:                  zapLogger,
+		LeaderElectionNamespace: c.flagReleaseNamespace,
+		LeaseDuration:           ptr.To(90 * time.Second),
+		RenewDeadline:           ptr.To(60 * time.Second),
+		RetryPeriod:             ptr.To(15 * time.Second),
 		Metrics: metricsserver.Options{
-			BindAddress: "0.0.0.0:9444",
+			BindAddress: metricsServiceBindAddress,
 		},
-		HealthProbeBindAddress: "0.0.0.0:9445",
+		HealthProbeBindAddress: healthProbeBindAddress,
 		WebhookServer: webhook.NewServer(webhook.Options{
 			CertDir: c.flagCertDir,
 			Host:    listenSplits[0],
@@ -436,7 +447,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	err = c.configureControllers(ctx, mgr, watcher)
-
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1

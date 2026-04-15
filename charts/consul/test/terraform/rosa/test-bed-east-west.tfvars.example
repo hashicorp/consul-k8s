@@ -1,0 +1,35 @@
+primary_region         = "us-east-2"
+secondary_region       = "us-west-2"
+
+primary_cluster_name   = "test-bed-east"
+secondary_cluster_name = "test-bed-west"
+
+openshift_version    = "4.18.18"
+worker_instance_type = "m5.xlarge"
+worker_replicas      = 3
+az_count             = 1
+host_prefix          = 23
+
+# These CIDRs are examples for a new peered ROSA setup. They must remain
+# non-overlapping with each other and with any other routed networks in the account.
+primary_vpc_cidr      = "10.10.0.0/16"
+secondary_vpc_cidr    = "10.20.0.0/16"
+primary_service_cidr  = "172.30.0.0/16"
+secondary_service_cidr = "172.31.0.0/16"
+primary_pod_cidr      = "10.128.0.0/14"
+secondary_pod_cidr    = "10.132.0.0/14"
+
+primary_additional_rosa_args = [
+  "--channel-group",
+  "stable",
+]
+
+secondary_additional_rosa_args = [
+  "--channel-group",
+  "stable",
+]
+
+tags = {
+  owner   = "consul-k8s"
+  purpose = "rosa-peered-testbed"
+}

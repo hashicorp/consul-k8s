@@ -14,11 +14,12 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/mitchellh/cli"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand"
@@ -40,6 +41,7 @@ type Command struct {
 	flagGatewayClassConfigName     string
 	flagGatewayConfigLocation      string
 	flagResourceConfigFileLocation string
+	flagReleaseNamespace           string
 
 	k8sClient client.Client
 
@@ -63,6 +65,8 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagResourceConfigFileLocation, "resource-config-file-location", resourceConfigFilename,
 		"specify a different location for where the gateway resource config file is")
 
+	c.flags.StringVar(&c.flagReleaseNamespace, "gateway-class-config-namespace", "",
+		"Namespace where the gateway class config and terminating gateways are installed. This is required to be set to delete the terminating gateways, but if left empty, the command will still attempt to delete the gateway class and gateway class config.")
 	c.k8s = &flags.K8SFlags{}
 	flags.Merge(c.flags, c.k8s.Flags())
 	c.help = flags.Usage(help, c.flags)
@@ -97,7 +101,7 @@ func (c *Command) Run(args []string) int {
 			c.UI.Error(fmt.Sprintf("Could not add client-go schema: %s", err))
 			return 1
 		}
-		if err := gwv1beta1.Install(s); err != nil {
+		if err := gwv1.Install(s); err != nil {
 			c.UI.Error(fmt.Sprintf("Could not add api-gateway schema: %s", err))
 			return 1
 		}
@@ -121,7 +125,42 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	err = c.deleteTerminatingGatewaysInNamespace(c.flagReleaseNamespace)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	return 0
+}
+
+func (c *Command) deleteTerminatingGatewaysInNamespace(namespace string) error {
+	if namespace == "" {
+		namespace = "consul"
+	}
+	tgwList := &v1alpha1.TerminatingGatewayList{}
+	if err := c.k8sClient.List(context.Background(), tgwList, client.InNamespace(namespace)); err != nil {
+		return fmt.Errorf("list terminating gateways in namespace %q: %w", namespace, err)
+	}
+
+	for _, item := range tgwList.Items {
+		obj := item
+		_ = c.k8sClient.Delete(context.Background(), &obj)
+	}
+
+	if err := backoff.Retry(func() error {
+		latest := &v1alpha1.TerminatingGatewayList{}
+		if err := c.k8sClient.List(context.Background(), latest, client.InNamespace(namespace)); err != nil {
+			return err
+		}
+		if len(latest.Items) > 0 {
+			return errors.New("terminating gateways still exist")
+		}
+		return nil
+	}, exponentialBackoffWithMaxIntervalAndTime()); err != nil {
+		c.UI.Error(err.Error())
+	}
+	return nil
 }
 
 func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
@@ -130,8 +169,7 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 	config := &v1alpha1.GatewayClassConfig{}
 	err := c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
 	if err != nil {
-
-		if k8serrors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) || meta.IsNoMatchError(err) {
 			// no gateway class config, just ignore and return
 			return nil
 		}
@@ -144,10 +182,10 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 
 	// find the gateway class
 
-	gatewayClass := &gwv1beta1.GatewayClass{}
+	gatewayClass := &gwv1.GatewayClass{}
 	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) || meta.IsNoMatchError(err) {
 			// no gateway class, just ignore and return
 			return nil
 		}
@@ -161,12 +199,12 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 	// make sure they're gone
 	if err := backoff.Retry(func() error {
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
-		if err == nil || !k8serrors.IsNotFound(err) {
+		if err == nil || (!k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err)) {
 			return errors.New("gateway class config still exists")
 		}
 
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
-		if err == nil || !k8serrors.IsNotFound(err) {
+		if err == nil || (!k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err)) {
 			return errors.New("gateway class still exists")
 		}
 

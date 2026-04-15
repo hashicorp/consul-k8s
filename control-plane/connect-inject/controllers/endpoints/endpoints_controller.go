@@ -47,7 +47,7 @@ const (
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
 	apiGateway         = "api-gateway"
-	apiGatewayOCP      = "api-gateway-ocp"
+	apiGatewayConsul   = "api-gateway-consul"
 
 	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
 	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
@@ -541,7 +541,8 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		if err != nil {
 			return nil, nil, err
 		}
-		prometheusScrapeListener := fmt.Sprintf("0.0.0.0:%s", prometheusScrapePort)
+		prometheusScrapeAddr := constants.Getv4orv6Str("0.0.0.0", "::")
+		prometheusScrapeListener := net.JoinHostPort(prometheusScrapeAddr, prometheusScrapePort)
 		proxyConfig.Config[envoyPrometheusBindAddr] = prometheusScrapeListener
 	}
 
@@ -550,7 +551,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	}
 
 	if consulServicePort > 0 {
-		proxyConfig.LocalServiceAddress = "127.0.0.1"
+		proxyConfig.LocalServiceAddress = constants.Getv4orv6Str("127.0.0.1", "::1")
 		proxyConfig.LocalServicePort = consulServicePort
 	}
 
@@ -813,23 +814,24 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 			},
 		}
 		service.Proxy.Config["envoy_gateway_no_default_bind"] = true
+		addr := constants.Getv4orv6Str("0.0.0.0", "::")
 		service.Proxy.Config["envoy_gateway_bind_addresses"] = map[string]interface{}{
 			"all-interfaces": map[string]interface{}{
-				"address": "0.0.0.0",
+				"address": addr,
 			},
 		}
 	case apiGateway:
 		// Do nothing. This is only here so that API gateway pods have annotations
 		// consistent with other gateway types but don't return an error below.
-	case apiGatewayOCP:
+	case apiGatewayConsul:
 		// Do nothing. This is only here so that API gateway pods have annotations
 		// consistent with other gateway types but don't return an error below.
 	default:
-		return nil, fmt.Errorf("%s must be one of %s, %s, %s, %s, or %s ", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway, apiGatewayOCP)
+		return nil, fmt.Errorf("%s must be one of %s, %s, %s, %s, or %s ", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway, apiGatewayConsul)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {
-		service.Proxy.Config["envoy_prometheus_bind_addr"] = fmt.Sprintf("%s:20200", podIP)
+		service.Proxy.Config["envoy_prometheus_bind_addr"] = net.JoinHostPort(pod.Status.PodIP, "20200")
 	}
 
 	if r.EnableTelemetryCollector && service.Proxy != nil && service.Proxy.Config != nil {

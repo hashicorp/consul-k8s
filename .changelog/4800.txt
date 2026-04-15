@@ -1,0 +1,3 @@
+```release-note:feature
+cli: Add `debug` command to collect configs, logs, and other data from a Consul on Kubernetes deployment in a archive/dir.
+```

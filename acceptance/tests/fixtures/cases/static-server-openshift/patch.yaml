@@ -1,6 +1,9 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+# This fixture is for OpenShift WITHOUT CNI enabled.
+# For OpenShift WITH CNI, use static-server-openshift-cni instead.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:

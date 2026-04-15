@@ -218,20 +218,20 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				k8s.KubectlDelete(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 
-			// Ensure the secret is created.
+			// Ensure the secret is created with retry logic for recreating the peering acceptor if needed.
 			retry.RunWith(timer, t, func(r *retry.R) {
-				acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
-				require.NoError(r, err)
-				require.NotEmpty(r, acceptorSecretName)
+				helpers.EnsurePeeringAcceptorSecret(t, r, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			})
 
 			// Copy secret from client peer to server peer.
 			k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
+			})
 
 			// Create the peering dialer on the server peer.
 			k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 				k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 			})
 
@@ -317,14 +317,17 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 			// to be registered in that destination Consul namespace.
 
 			// Server cluster.
-			services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", serverQueryOpts)
-			require.NoError(t, err)
-			require.Len(t, services, 1)
-
+			retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				services, _, err := staticServerPeerClient.Catalog().Service(staticServerName, "", serverQueryOpts)
+				require.NoError(r, err)
+				require.Len(r, services, 1)
+			})
 			// Client cluster.
-			services, _, err = staticClientPeerClient.Catalog().Service(staticClientName, "", clientQueryOpts)
-			require.NoError(t, err)
-			require.Len(t, services, 1)
+			retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				services, _, err := staticClientPeerClient.Catalog().Service(staticClientName, "", clientQueryOpts)
+				require.NoError(r, err)
+				require.Len(r, services, 1)
+			})
 
 			logger.Log(t, "creating exported services")
 			if c.destinationNamespace == defaultNamespace {

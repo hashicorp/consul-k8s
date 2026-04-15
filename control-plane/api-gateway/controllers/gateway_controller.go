@@ -96,6 +96,12 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
+	log.Info("gatewayclass(stable): " + fmt.Sprintf("%+v", gatewayClass))
+
+	if gatewayClass.Spec.ControllerName != common.GatewayClassControllerName {
+		log.Info("skipping reconciliation since controller name does not match", "expected", common.GatewayClassControllerName, "actual", gatewayClass.Spec.ControllerName)
+		return ctrl.Result{}, nil
+	}
 
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
@@ -164,7 +170,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	tcpRoutes := []gwv1alpha2.TCPRoute{}
 	log.Info("TCP supporting " + fmt.Sprintf("%+v", r.supportsTCPRoute))
 	if r.supportsTCPRoute {
-		log.Info("inside TCP supporting " + fmt.Sprintf("%+v", r.supportsTCPRoute))
 		tcpRoutes, err = r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
 		if err != nil {
 			log.Error(err, "unable to list TCPRoutes")
@@ -215,7 +220,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	binder := binding.NewBinder(config)
 
 	updates := binder.Snapshot()
-	r.Log.Info("updates binder: " + fmt.Sprintf("%+v", updates))
+	log.Info("updates binder: " + fmt.Sprintf("%+v", updates))
 	if updates.UpsertGatewayDeployment {
 		if err := r.cache.EnsureRoleBinding(r.HelmConfig.AuthMethod, gateway.Name, gateway.Namespace); err != nil {
 			log.Error(err, "error creating role binding")
@@ -409,9 +414,15 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
 
-	predicate, _ := predicate.LabelSelectorPredicate(
+	podPredicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
-			common.ManagedLabel: "true",
+			common.ManagedLabel:   "true",
+			common.ComponentLabel: "api-gateway",
+		}),
+	)
+	gwPredicate, _ := predicate.LabelSelectorPredicate(
+		*metav1.SetAsLabelSelector(map[string]string{
+			common.ComponentLabel: "api-gateway",
 		}),
 	)
 
@@ -444,7 +455,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 
 	builder := ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-v1").
-		For(&gwv1.Gateway{}).
+		For(&gwv1.Gateway{}, builder.WithPredicates(gwPredicate)).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
@@ -475,17 +486,10 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),
-			builder.WithPredicates(predicate),
+			builder.WithPredicates(podPredicate),
 		)
 
-	// tcpGVK := schema.GroupVersionKind{
-	// 	Group:   "gateway.networking.k8s.io",
-	// 	Version: "v1alpha2",
-	// 	Kind:    "TCPRoute",
-	// }
-	mgr.GetLogger().Info("config received %v", config.EnableTCP)
 	if config.EnableTCP {
-		//if _, err := mgr.GetRESTMapper().RESTMapping(tcpGVK.GroupKind(), tcpGVK.Version); err == nil {
 		r.supportsTCPRoute = true
 		mgr.GetLogger().Info("TCPRoute CRD detected - enabling TCPRoute support")
 
@@ -902,18 +906,7 @@ func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gatew
 	return service, nil
 }
 
-// get deployment for gateway
-func (c *GatewayController) getDeployedGatewayDeployment(ctx context.Context, gateway types.NamespacedName) (*appsv1.Deployment, error) {
-	deployment := &appsv1.Deployment{}
-	// we use the implicit association of a deployment name/namespace with a corresponding gateway
-	if err := c.Client.Get(ctx, gateway, deployment); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-
-	return deployment, nil
-}
-
-// get pods for gateway
+// Gets pods for gateway.
 func (c *GatewayController) getDeployedGatewayPods(ctx context.Context, gateway gwv1.Gateway) ([]corev1.Pod, error) {
 	labels := common.LabelsForGateway(&gateway)
 

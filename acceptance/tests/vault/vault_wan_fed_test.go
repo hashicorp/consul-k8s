@@ -6,7 +6,11 @@ package vault
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -16,6 +20,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
@@ -409,7 +414,7 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 		kubernetesEndpoint, err := secondaryCtx.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), KubernetesAuthMethodPath, metav1.GetOptions{})
 		require.NoError(t, err)
-		k8sAuthMethodHost = fmt.Sprintf("%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
+		k8sAuthMethodHost = net.JoinHostPort(kubernetesEndpoint.Subsets[0].Addresses[0].IP, strconv.Itoa(int(kubernetesEndpoint.Subsets[0].Ports[0].Port)))
 	} else {
 		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryCtx.KubectlOptions(t))
 	}
@@ -486,6 +491,8 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 	secondaryConsulCluster.ACLToken = replicationToken
 	secondaryClient, _ := secondaryConsulCluster.SetupConsulClient(t, true)
 	helpers.VerifyFederation(t, primaryClient, secondaryClient, consulReleaseName, true)
+	cleanupVaultWANTestDeployments(t, cfg, primaryCtx)
+	cleanupVaultWANTestDeployments(t, cfg, secondaryCtx)
 
 	// Create a ProxyDefaults resource to configure services to use the mesh
 	// gateways.
@@ -527,17 +534,71 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 func vaultAddress(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext, vaultReleaseName string) string {
 	vaultHost := k8s.ServiceHost(t, cfg, ctx, fmt.Sprintf("%s-vault", vaultReleaseName))
 	if cfg.UseKind {
-		return fmt.Sprintf("https://%s:31000", vaultHost)
+		return fmt.Sprintf("https://%s", net.JoinHostPort(vaultHost, "31000"))
 	}
-	return fmt.Sprintf("https://%s:8200", vaultHost)
+	return fmt.Sprintf("https://%s", net.JoinHostPort(vaultHost, "8200"))
 }
 
 // meshGatewayAddress returns a full address of the mesh gateway depending on configuration.
 func meshGatewayAddress(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext, consulReleaseName string) string {
 	primaryMeshGWHost := k8s.ServiceHost(t, cfg, ctx, fmt.Sprintf("%s-consul-mesh-gateway", consulReleaseName))
 	if cfg.UseKind {
-		return fmt.Sprintf("%s:%d", primaryMeshGWHost, 30000)
+		return net.JoinHostPort(primaryMeshGWHost, "30000")
 	} else {
-		return fmt.Sprintf("%s:%d", primaryMeshGWHost, 443)
+		return net.JoinHostPort(primaryMeshGWHost, "443")
 	}
+}
+
+func cleanupVaultWANTestDeployments(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext) {
+	t.Helper()
+
+	cleanupVaultWANTestDeploymentsInNamespace(t, ctx, ctx.KubectlOptions(t).Namespace)
+
+	if cfg.EnableRestrictedPSAEnforcement {
+		cleanupVaultWANTestDeploymentsInNamespace(t, ctx, ctx.KubectlOptions(t).Namespace+"-apps")
+	}
+}
+
+func cleanupVaultWANTestDeploymentsInNamespace(t *testing.T, ctx environment.TestContext, namespace string) {
+	t.Helper()
+
+	options := ctx.KubectlOptionsForNamespace(namespace)
+	resources := []string{
+		"deployment/static-client",
+		"deployment/static-server",
+		"service/static-client",
+		"service/static-server",
+		"serviceaccount/static-client",
+		"serviceaccount/static-server",
+		"rolebinding/static-client-psp",
+		"rolebinding/static-server-psp",
+		"rolebinding/static-client-openshift-privileged",
+		"rolebinding/static-server-openshift-privileged",
+	}
+
+	logger.Logf(t, "cleaning up stale vault WAN test workloads in namespace %s", namespace)
+	retrier := &retry.Counter{Count: 5, Wait: 5 * time.Second}
+	var output string
+	var err error
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err = k8s.RunKubectlAndGetOutputE(r, options, append([]string{"delete", "--ignore-not-found=true", "--wait=true"}, resources...)...)
+		if err == nil {
+			return
+		}
+
+		if strings.Contains(err.Error(), "namespaces \""+namespace+"\" not found") {
+			err = nil
+			return
+		}
+
+		combined := err.Error() + "\n" + output
+		if strings.Contains(combined, "Unable to connect to the server") ||
+			strings.Contains(combined, "TLS handshake timeout") ||
+			strings.Contains(combined, "Client.Timeout exceeded") ||
+			strings.Contains(combined, "EOF") {
+			r.Errorf("transient cleanup error for namespace %s: %s", namespace, strings.TrimSpace(combined))
+			return
+		}
+	})
+	require.NoError(t, err)
 }

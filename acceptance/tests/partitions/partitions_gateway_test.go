@@ -6,6 +6,7 @@ package partitions
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 	"time"
@@ -231,8 +232,11 @@ func TestPartitions_Gateway(t *testing.T) {
 	})
 
 	logger.Log(t, "creating api-gateway resources")
-	out, err = k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
-	require.NoError(t, err, out)
+	// Apply api-gateway resources with retry logic to handle intermittent failures
+	retry.Run(t, func(r *retry.R) {
+		out, err := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterStaticServerOpts, "apply", "-k", "../fixtures/bases/api-gateway")
+		require.NoError(r, err, out)
+	})
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -259,7 +263,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})
 
-	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
+	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	// This section of the tests runs the in-partition networking tests.
 	t.Run("in-partition", func(t *testing.T) {
@@ -278,7 +282,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		}
 
 		logger.Log(t, "patching route to target server")
-		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 		logger.Log(t, "checking that the connection is not successful because there's no intention")
 		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, targetAddress)
@@ -338,7 +342,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		})
 
 		logger.Log(t, "patching route to target server")
-		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 		logger.Log(t, "checking that the connection is not successful because there's no intention")
 		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, targetAddress)

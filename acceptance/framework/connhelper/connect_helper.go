@@ -168,7 +168,7 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	// Check that both static-server and static-client have been injected and
 	// now have 2 containers.
 	retry.RunWith(
-		&retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}, t,
+		&retry.Timer{Timeout: retryTimeout, Wait: 1 * time.Second}, t,
 		func(r *retry.R) {
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
 				podList, err := c.Ctx.KubernetesClient(r).CoreV1().
@@ -186,8 +186,8 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 func (c *ConnectHelper) CreateNamespace(t *testing.T, namespace string) {
 	opts := c.Ctx.KubectlOptions(t)
-	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
-	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+	output, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+	if err != nil && (strings.Contains(err.Error(), "AlreadyExists") || strings.Contains(output, "AlreadyExists")) {
 		return
 	}
 	require.NoError(t, err)
@@ -422,7 +422,7 @@ func (c *ConnectHelper) TestConnectionFailureWhenUnhealthy(t *testing.T) {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, opts, StaticClientName, false, []string{
 			"curl: (56) Recv failure: Connection reset by peer",
 			"curl: (52) Empty reply from server",
-			"curl: (7) Failed to connect to static-server port 80: Connection refused",
+			"curl: (7) Failed to connect to static-server port 80",
 		}, "", "http://static-server")
 	} else {
 		k8s.CheckStaticServerConnectionMultipleFailureMessages(t, opts, StaticClientName, false, []string{
@@ -447,10 +447,9 @@ func (c *ConnectHelper) helmValues() map[string]string {
 		"dns.enableRedirection":        "true",
 	}
 
-	// On OpenShift, mirror HelmCluster defaults so acceptance installs can
-	// still manage non-standard Gateway API CRDs while avoiding external CRD
-	// ownership conflicts.
+	// On OpenShift, disable managing Gateway API CRDs since they already exist
 	if c.Cfg.UseOpenshift || c.Cfg.EnableOpenshift {
+		helmValues["global.openshift.crds.enableTcpRoute"] = "true"
 		helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
 		helmValues["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
 	}

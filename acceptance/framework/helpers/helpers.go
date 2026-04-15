@@ -29,12 +29,15 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RandomName generates a random string with a 'test-' prefix.
 func RandomName() string {
+
 	return fmt.Sprintf("test-%s", strings.ToLower(random.UniqueId()))
 }
 
@@ -172,6 +175,57 @@ type ConsulOptions struct {
 	ExternalServiceNameRegistration string
 }
 
+var CommonConsulCRDs = []string{
+	"controlplanerequestlimits.consul.hashicorp.com",
+	"customgatewayclasses.consul.hashicorp.com",
+	"customgatewaypolicies.consul.hashicorp.com",
+	"exportedservices.consul.hashicorp.com",
+	"gatewayclassconfigs.consul.hashicorp.com",
+	"gatewaypolicies.consul.hashicorp.com",
+	"gateways.consul.hashicorp.com",
+	"grpcroutes.consul.hashicorp.com",
+	"httproutes.consul.hashicorp.com",
+	"ingressgateways.consul.hashicorp.com",
+	"jwtproviders.consul.hashicorp.com",
+	"meshes.consul.hashicorp.com",
+	"meshservices.consul.hashicorp.com",
+	"peeringacceptors.consul.hashicorp.com",
+	"peeringdialers.consul.hashicorp.com",
+	"proxydefaults.consul.hashicorp.com",
+	"referencegrants.consul.hashicorp.com",
+	"registrations.consul.hashicorp.com",
+	"routeauthfilters.consul.hashicorp.com",
+	"routeretryfilters.consul.hashicorp.com",
+	"routetimeoutfilters.consul.hashicorp.com",
+	"samenessgroups.consul.hashicorp.com",
+	"servicedefaults.consul.hashicorp.com",
+	"serviceintentions.consul.hashicorp.com",
+	"serviceresolvers.consul.hashicorp.com",
+	"servicerouters.consul.hashicorp.com",
+	"servicesplitters.consul.hashicorp.com",
+	"tcproutes.consul.hashicorp.com",
+	"terminatinggateways.consul.hashicorp.com",
+	"tlsroutes.consul.hashicorp.com",
+	"trafficpermissions.auth.consul.hashicorp.com",
+	"udproutes.consul.hashicorp.com",
+}
+
+var CommonGatewayAPICRDs = []string{
+	"gatewayclasses.gateway.networking.k8s.io",
+	"gateways.gateway.networking.k8s.io",
+	"httproutes.gateway.networking.k8s.io",
+	"referencegrants.gateway.networking.k8s.io",
+	"tcproutes.gateway.networking.k8s.io",
+}
+
+func OpenShiftCleanupCRDs(includeGatewayAPICRDs bool) []string {
+	crds := append([]string{}, CommonConsulCRDs...)
+	if includeGatewayAPICRDs {
+		crds = append(crds, CommonGatewayAPICRDs...)
+	}
+	return crds
+}
+
 func RegisterExternalServiceCRD(t *testing.T, k8sOptions K8sOptions, consulOptions ConsulOptions) {
 	t.Helper()
 	t.Logf("Registering external service %s", k8sOptions.KustomizeConfigPath)
@@ -275,6 +329,18 @@ func GetCRDRemoveFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions) {
 	}
 }
 
+func GetCRDRemoveFinalizersForCRDNames(t testutil.TestingTB, options *k8s.KubectlOptions, crdCandidates []string) {
+	t.Helper()
+	crdNames, err := getCRDsWithFinalizersForCRDNames(options, crdCandidates)
+	if err != nil {
+		logger.Logf(t, "Unable to get CRDs with finalizers from the targeted list, %v.", err)
+	}
+
+	if len(crdNames) > 0 {
+		removeFinalizers(t, options, crdNames)
+	}
+}
+
 // CRD struct to parse CRD JSON output.
 type CRD struct {
 	Items []struct {
@@ -316,6 +382,42 @@ func getCRDsWithFinalizers(options *k8s.KubectlOptions) ([]string, error) {
 	return crdNames, err
 }
 
+func getCRDsWithFinalizersForCRDNames(options *k8s.KubectlOptions, crdCandidates []string) ([]string, error) {
+	if len(crdCandidates) == 0 {
+		return nil, nil
+	}
+
+	cmdArgs := createCmdArgs(options)
+	args := append([]string{"get", "crd"}, crdCandidates...)
+	args = append(args, "-o=json", "--ignore-not-found=true")
+
+	cmdArgs = append(cmdArgs, args...)
+	command := Command{
+		Command: "kubectl",
+		Args:    cmdArgs,
+		Env:     options.Env,
+	}
+
+	output, err := exec.Command(command.Command, command.Args...).CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error running kubectl command: %v, output: %s", err, string(output))
+	}
+
+	var crds CRD
+	if err := json.Unmarshal(output, &crds); err != nil {
+		return nil, fmt.Errorf("error parsing JSON: %v, output: %s", err, string(output))
+	}
+
+	var crdNames []string
+	for _, item := range crds.Items {
+		if len(item.Metadata.Finalizers) > 0 {
+			crdNames = append(crdNames, item.Metadata.Name)
+		}
+	}
+
+	return crdNames, nil
+}
+
 // removeFinalizers removes finalizers from CRDs.
 func removeFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions, crdNames []string) {
 	cmdArgs := createCmdArgs(options)
@@ -332,6 +434,7 @@ func removeFinalizers(t testutil.TestingTB, options *k8s.KubectlOptions, crdName
 		_, err := exec.Command(command.Command, command.Args...).CombinedOutput()
 		if err != nil {
 			logger.Logf(t, "Unable to remove finalizers, proceeding anyway: %v.", err)
+			continue
 		}
 		fmt.Printf("Finalizers removed from CRD %s\n", crd)
 	}
@@ -399,4 +502,168 @@ func WaitForInput(t *testing.T) {
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		t.Fatal(err)
 	}
+}
+
+func WaitForGatewayClassConfigWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, configName, kustomizeDir string) {
+	t.Helper()
+
+	logger.Log(t, "waiting for gatewayclassconfig to be created")
+	found := false
+	maxAttempts := 3
+	checksPerAttempt := 5
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		logger.Logf(t, "gatewayclassconfig existence check attempt %d/%d", attempt, maxAttempts)
+
+		for i := range checksPerAttempt {
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", "gatewayclassconfig", configName)
+			if err == nil {
+				found = true
+				logger.Logf(t, "gatewayclassconfig %s found successfully", configName)
+				break
+			}
+			logger.Logf(t, "gatewayclassconfig check %d/%d: %v", i+1, checksPerAttempt, err)
+			time.Sleep(2 * time.Second)
+		}
+
+		if found {
+			break
+		}
+
+		if attempt < maxAttempts {
+			logger.Logf(t, "gatewayclassconfig not found after %d seconds, attempting delete/recreate (attempt %d/%d)", checksPerAttempt*2, attempt, maxAttempts)
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", "gatewayclassconfig", configName, "--ignore-not-found=true")
+			if err != nil {
+				logger.Logf(t, "warning: failed to delete gatewayclassconfig %s: %v", configName, err)
+			}
+			out, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "apply", "-k", kustomizeDir)
+			require.NoError(t, err, out)
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if !found {
+		require.Failf(t, "gatewayclassconfig %s was not found after %d attempts with delete/recreate", configName, maxAttempts)
+	}
+}
+
+func WaitForGatewayClassConfigWithClientRetry(t *testing.T, k8sClient client.Client, configName string) {
+	t.Helper()
+
+	WaitForResourceWithClientRetry(t, k8sClient, client.ObjectKey{Name: configName}, &v1alpha1.GatewayClassConfig{}, "gatewayclassconfig")
+}
+
+func WaitForResourceWithClientRetry(t *testing.T, k8sClient client.Client, objectKey client.ObjectKey, object client.Object, resourceKind string) {
+	t.Helper()
+
+	logger.Logf(t, "waiting for %s %s to be readable via controller-runtime client", resourceKind, objectKey.Name)
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 10}, t, func(r *retry.R) {
+		err := k8sClient.Get(context.Background(), objectKey, object)
+		if k8serrors.IsNotFound(err) {
+			r.Errorf("%s %s not found yet", resourceKind, objectKey.Name)
+			return
+		}
+		require.NoError(r, err)
+	})
+}
+
+// WaitForHTTPRouteWithRetry waits for an HTTPRoute to exist with retry logic
+// and delete/recreate fallback to make the tests more robust against intermittent issues.
+// It checks for the HTTPRoute's existence multiple times per attempt, and if
+// not found, attempts to delete and recreate the resource by reapplying the kustomize manifest.
+func WaitForHTTPRouteWithRetry(t *testing.T, kubectlOptions *k8s.KubectlOptions, routeName, kustomizeDir, fqdn string) {
+	t.Helper()
+
+	logger.Logf(t, "waiting for %s to be created", fqdn)
+	found := false
+	maxAttempts := 3
+	checksPerAttempt := 5
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		logger.Logf(t, "%s existence check attempt %d/%d", fqdn, attempt, maxAttempts)
+
+		// Check for httproute existence using simple loop
+		for i := range checksPerAttempt {
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "get", fqdn, routeName)
+			if err == nil {
+				found = true
+				logger.Logf(t, "%s %s found successfully", fqdn, routeName)
+				break
+			}
+			logger.Logf(t, "%s check %d/%d: %v", fqdn, i+1, checksPerAttempt, err)
+			time.Sleep(2 * time.Second)
+		}
+
+		if found {
+			break
+		}
+
+		if attempt < maxAttempts {
+			logger.Logf(t, "%s not found after %d seconds, attempting delete/recreate (attempt %d/%d)", fqdn, checksPerAttempt*2, attempt, maxAttempts)
+			// Delete the httproute if it exists in a bad state
+			_, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "delete", fqdn, routeName, "--ignore-not-found=true")
+			if err != nil {
+				logger.Logf(t, "warning: failed to delete %s %s: %v", fqdn, routeName, err)
+			}
+			// Recreate by reapplying the base resources
+			out, err := k8s.RunKubectlAndGetOutputE(t, kubectlOptions, "apply", "-k", kustomizeDir)
+			require.NoError(t, err, out)
+			// Brief pause to let the recreation start
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	if !found {
+		require.Failf(t, "%s %s was not found after %d attempts with delete/recreate", fqdn, routeName, maxAttempts)
+	}
+}
+
+// EnsurePeeringAcceptorSecret ensures that a peering acceptor secret is created,
+// retrying by deleting and recreating the peering acceptor if the secret name is empty.
+// This is a helper function to handle flakiness in peering acceptor secret creation.
+func EnsurePeeringAcceptorSecret(t *testing.T, r *retry.R, kubectlOptions *k8s.KubectlOptions, peeringAcceptorPath string) string {
+	t.Helper()
+
+	acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, kubectlOptions, "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+	require.NoError(r, err)
+
+	// If the secret name is empty, retry recreating the peering acceptor up to 5 times
+	if acceptorSecretName == "" {
+		const maxRetries = 5
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			logger.Logf(t, "peering acceptor secret name is empty, recreating peering acceptor (attempt %d/%d)", attempt, maxRetries)
+			k8s.KubectlDelete(t, kubectlOptions, peeringAcceptorPath)
+
+			time.Sleep(5 * time.Second)
+
+			k8s.KubectlApply(t, kubectlOptions, peeringAcceptorPath)
+
+			time.Sleep(10 * time.Second)
+
+			acceptorSecretName, err = k8s.RunKubectlAndGetOutputE(r, kubectlOptions, "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
+			require.NoError(r, err)
+
+			if acceptorSecretName != "" {
+				logger.Logf(t, "peering acceptor secret name successfully created after %d attempts", attempt)
+				break
+			}
+
+			if attempt == maxRetries {
+				logger.Logf(t, "peering acceptor secret name still empty after %d attempts", maxRetries)
+			}
+		}
+	}
+
+	require.NotEmpty(r, acceptorSecretName)
+	return acceptorSecretName
+}
+
+// HasStatusCondition checks if a condition exists with the expected status and reason.
+func HasStatusCondition(conditions []metav1.Condition, toCheck metav1.Condition) bool {
+	for _, c := range conditions {
+		if c.Type == toCheck.Type {
+			return c.Reason == toCheck.Reason && c.Status == toCheck.Status
+		}
+	}
+	return false
 }

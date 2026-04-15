@@ -23,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	// gwv1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -1157,7 +1156,9 @@ func TestUpsert(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil, nil)
+			gatekeeper := New(log, client, nil, client)
+
+			fmt.Print("Calling Upsert")
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
@@ -1409,8 +1410,9 @@ func TestDelete(t *testing.T) {
 
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
+
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil, nil)
+			gatekeeper := New(log, client, nil, client)
 
 			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)
@@ -1418,6 +1420,7 @@ func TestDelete(t *testing.T) {
 			require.NoError(t, validateResourcesAreDeleted(t, client, tc.initialResources))
 		})
 	}
+
 }
 
 func joinResources(resources resources) (objs []client.Object) {
@@ -1452,18 +1455,61 @@ func joinResources(resources resources) (objs []client.Object) {
 	return objs
 }
 
-func validateResourcesExist(t *testing.T, client client.Client, helmConfig common.HelmConfig, resources resources, ignoreTimestampOnService bool) error {
-	t.Helper()
+func normalizeDeployment(deployment *appsv1.Deployment) {
+	deployment.TypeMeta = metav1.TypeMeta{}
+	deployment.Status = appsv1.DeploymentStatus{}
 
+}
+
+func normalizeService(s *corev1.Service, ignoreTimestamp bool) {
+	s.TypeMeta = metav1.TypeMeta{}
+	s.Status = corev1.ServiceStatus{}
+
+	if ignoreTimestamp {
+		s.CreationTimestamp = metav1.Time{}
+	}
+}
+
+func normalizeSecret(s *corev1.Secret) {
+	s.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func normalizeServiceAccount(sa *corev1.ServiceAccount) {
+	sa.TypeMeta = metav1.TypeMeta{}
+
+}
+func normalizeRole(r *rbac.Role) {
+	r.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func normalizeRoleBinding(rb *rbac.RoleBinding) {
+	rb.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func validateResourcesExist(
+	t *testing.T,
+	client client.Client,
+	helmConfig common.HelmConfig,
+	resources resources,
+	ignoreTimestampOnService bool,
+) error {
+	t.Helper()
+	ctx := context.Background()
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := client.Get(ctx, types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
 		if err != nil {
 			return err
 		}
+
+		normalizeDeployment(expected)
+		normalizeDeployment(actual)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1539,6 +1585,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.secrets {
 		actual := &corev1.Secret{}
+		actual.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+		t.Logf("Actual secret received %+v", actual)
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1546,6 +1594,9 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+
+		normalizeSecret(expected)
+		normalizeSecret(actual)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1555,6 +1606,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.roles {
 		actual := &rbac.Role{}
+		actual.GetObjectKind().SetGroupVersionKind(rbac.SchemeGroupVersion.WithKind("Role"))
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1562,7 +1614,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
-
+		normalizeRole(expected)
+		normalizeRole(actual)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 
@@ -1571,6 +1624,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.roleBindings {
 		actual := &rbac.RoleBinding{}
+		actual.GetObjectKind().SetGroupVersionKind(rbac.SchemeGroupVersion.WithKind("RoleBinding"))
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1579,6 +1633,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 			return err
 		}
 
+		normalizeRoleBinding(expected)
+		normalizeRoleBinding(actual)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 
@@ -1594,7 +1650,12 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+		// https://github.com/kubernetes-sigs/controller-runtime/issues/3302
+		// get the gvk for actual and set it since fake client doesn't do this automatically and it causes the equality check to fail
+		//actual.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
 
+		normalizeService(expected, ignoreTimestampOnService)
+		normalizeService(actual, ignoreTimestampOnService)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 		actual.Spec.Selector[createdAtLabelKey] = createdAtLabelValue
@@ -1608,6 +1669,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.serviceAccounts {
 		actual := &corev1.ServiceAccount{}
+		actual.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ServiceAccount"))
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1615,6 +1677,9 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+
+		normalizeServiceAccount(expected)
+		normalizeServiceAccount(actual)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1764,7 +1829,7 @@ func configureSecret(name, namespace string, labels map[string]string, resourceV
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v",
+					APIVersion:         "gateway.networking.k8s.io/v1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),

@@ -11,8 +11,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	gatewaycommonocp "github.com/hashicorp/consul-k8s/control-plane/api-gateway-ocp/common"
-	gatewaycontrollersocp "github.com/hashicorp/consul-k8s/control-plane/api-gateway-ocp/controllers"
+	gatewaycommoncustom "github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/common"
+	gatewaycontrollerscustom "github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/controllers"
 	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	gatewaycontrollers "github.com/hashicorp/consul-k8s/control-plane/api-gateway/controllers"
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
@@ -105,39 +105,39 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 
 	// API Gateway Controllers
 	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
-		setupLog.Error(err, "unable to register field indexes for gateway.net controllers")
+		setupLog.Error(err, "unable to register field indexes for gateway.networking.k8s.io API")
 		return err
 	}
 
 	if c.flagEnableCustomGatewayCRDController {
 		// register field indexes for consul.hashicorp.com API controllers for custom
-		if err := gatewaycontrollersocp.RegisterFieldIndexes(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to register field indexes consul.hashicorp.com API controllers")
+		if err := gatewaycontrollerscustom.RegisterFieldIndexes(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to register field indexes for consul.hashicorp.com API ")
 			return err
 		}
 		// custom config controller
-		if err := (&gatewaycontrollersocp.OcpGatewayClassConfigController{
+		if err := (&gatewaycontrollerscustom.CustomGatewayClassConfigController{
 			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("ocp-gateways"),
+			Log:    ctrl.Log.WithName("controller").WithName("custom-gateways"),
 		}).SetupWithManager(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollersocp.OcpGatewayClassConfigController{})
+			setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollerscustom.CustomGatewayClassConfigController{})
 			return err
 		}
 
 		// custom gatewayclass controller
-		if err := (&gatewaycontrollersocp.OcpGatewayClassController{
-			ControllerName: gatewaycommonocp.GatewayClassControllerName,
+		if err := (&gatewaycontrollerscustom.CustomGatewayClassController{
+			ControllerName: gatewaycommoncustom.GatewayClassControllerName,
 			Client:         mgr.GetClient(),
-			Log:            ctrl.Log.WithName("controllers").WithName("OcpGatewayClass"),
+			Log:            ctrl.Log.WithName("controllers").WithName("CustomGatewayClass"),
 		}).SetupWithManager(ctx, mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "OcpGatewayClass")
+			setupLog.Error(err, "unable to create controller", "controller", "CustomGatewayClass")
 			return err
 		}
 
 		// custom gateway controller
-		ocpcache, ocpcleaner, err := gatewaycontrollersocp.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollersocp.OcpGatewayControllerConfig{
-			HelmConfig: gatewaycommonocp.HelmConfig{
-				ConsulConfig: gatewaycommonocp.ConsulConfig{
+		customcache, customcleaner, err := gatewaycontrollerscustom.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollerscustom.CustomGatewayControllerConfig{
+			HelmConfig: gatewaycommoncustom.HelmConfig{
+				ConsulConfig: gatewaycommoncustom.ConsulConfig{
 					Address:    c.consul.Addresses,
 					GRPCPort:   consulConfig.GRPCPort,
 					HTTPPort:   consulConfig.HTTPPort,
@@ -179,20 +179,15 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			return err
 		}
 
-		go ocpcache.Run(ctx)
-		go ocpcleaner.Run(ctx)
+		go customcache.Run(ctx)
+		go customcleaner.Run(ctx)
 
 		// wait for the cache to fill
-		setupLog.Info("waiting for Consul ocp cache sync")
-		ocpcache.WaitSynced(ctx)
-		setupLog.Info("Consul ocp cache synced")
+		setupLog.Info("waiting for Consul custom cache sync")
+		customcache.WaitSynced(ctx)
+		setupLog.Info("Consul custom cache synced")
 
 	}
-
-	// if err := gatewaycontrollersocp.RegisterFieldIndexes(ctx, mgr); err != nil {
-	// 		setupLog.Error(err, "unable to register field indexes consul.hashicorp.com API controllers")
-	// 		return err
-	// 	}
 
 	if err := (&gatewaycontrollers.GatewayClassConfigController{
 		Client: mgr.GetClient(),
@@ -202,14 +197,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 
-	// if err := (&gatewaycontrollersocp.OcpGatewayClassConfigController{
-	// 	Client: mgr.GetClient(),
-	// 	Log:    ctrl.Log.WithName("controller").WithName("ocp-gateways"),
-	// }).SetupWithManager(ctx, mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollersocp.OcpGatewayClassConfigController{})
-	// 	return err
-	// }
-
 	if err := (&gatewaycontrollers.GatewayClassController{
 		ControllerName: gatewaycommon.GatewayClassControllerName,
 		Client:         mgr.GetClient(),
@@ -218,15 +205,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
 		return err
 	}
-
-	// if err := (&gatewaycontrollersocp.OcpGatewayClassController{
-	// 	ControllerName: gatewaycommonocp.GatewayClassControllerName,
-	// 	Client:         mgr.GetClient(),
-	// 	Log:            ctrl.Log.WithName("controllers").WithName("OcpGatewayClass"),
-	// }).SetupWithManager(ctx, mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "OcpGatewayClass")
-	// 	return err
-	// }
 
 	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: gatewaycommon.HelmConfig{
@@ -280,58 +258,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	setupLog.Info("waiting for Consul cache sync")
 	cache.WaitSynced(ctx)
 	setupLog.Info("Consul cache synced")
-
-	// ocpcache, ocpcleaner, err := gatewaycontrollersocp.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollersocp.OcpGatewayControllerConfig{
-	// 	HelmConfig: gatewaycommonocp.HelmConfig{
-	// 		ConsulConfig: gatewaycommonocp.ConsulConfig{
-	// 			Address:    c.consul.Addresses,
-	// 			GRPCPort:   consulConfig.GRPCPort,
-	// 			HTTPPort:   consulConfig.HTTPPort,
-	// 			APITimeout: consulConfig.APITimeout,
-	// 		},
-	// 		ImageDataplane:              c.flagConsulDataplaneImage,
-	// 		ImageConsulK8S:              c.flagConsulK8sImage,
-	// 		ImagePullSecrets:            cfgFile.ImagePullSecrets,
-	// 		GlobalImagePullPolicy:       c.flagGlobalImagePullPolicy,
-	// 		ConsulDestinationNamespace:  c.flagConsulDestinationNamespace,
-	// 		NamespaceMirroringPrefix:    c.flagK8SNSMirroringPrefix,
-	// 		EnableNamespaces:            c.flagEnableNamespaces,
-	// 		PeeringEnabled:              c.flagEnablePeering,
-	// 		EnableOpenShift:             c.flagEnableOpenShift,
-	// 		EnableNamespaceMirroring:    c.flagEnableK8SNSMirroring,
-	// 		AuthMethod:                  c.consul.ConsulLogin.AuthMethod,
-	// 		LogLevel:                    c.flagLogLevel,
-	// 		LogJSON:                     c.flagLogJSON,
-	// 		TLSEnabled:                  c.consul.UseTLS,
-	// 		ConsulTLSServerName:         c.consul.TLSServerName,
-	// 		ConsulPartition:             c.consul.Partition,
-	// 		ConsulCACert:                string(c.caCertPem),
-	// 		EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
-	// 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
-	// 		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
-	// 		InitContainerResources:      &c.initContainerResources,
-	// 	},
-	// 	AllowK8sNamespacesSet:   allowK8sNamespaces,
-	// 	DenyK8sNamespacesSet:    denyK8sNamespaces,
-	// 	ConsulClientConfig:      consulConfig,
-	// 	ConsulServerConnMgr:     watcher,
-	// 	NamespacesEnabled:       c.flagEnableNamespaces,
-	// 	CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
-	// 	Partition:               c.consul.Partition,
-	// 	Datacenter:              c.consul.Datacenter,
-	// })
-	// if err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "Gateway")
-	// 	return err
-	// }
-
-	// go ocpcache.Run(ctx)
-	// go ocpcleaner.Run(ctx)
-
-	// // wait for the cache to fill
-	// setupLog.Info("waiting for Consul ocp cache sync")
-	// ocpcache.WaitSynced(ctx)
-	// setupLog.Info("Consul ocp cache synced")
 
 	configEntryReconciler := &controllers.ConfigEntryController{
 		ConsulClientConfig:         consulConfig,
@@ -432,6 +358,8 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		NamespacesEnabled:     c.flagEnableNamespaces,
 		PartitionsEnabled:     c.flagEnablePartitions,
 		Scheme:                mgr.GetScheme(),
+		ReleaseName:           c.flagReleaseName,
+		ReleaseNamespace:      c.flagReleaseNamespace,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.TerminatingGateway)
 		return err
@@ -657,6 +585,12 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	(&v1alpha1.GatewayPolicyWebhook{
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.GatewayPolicy),
+		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.CustomGatewayPolicyWebhook{
+		Client:     mgr.GetClient(),
+		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.CustomGatewayPolicy),
 		ConsulMeta: consulMeta,
 	}).SetupWithManager(mgr)
 

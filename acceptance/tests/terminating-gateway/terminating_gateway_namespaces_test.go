@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 )
 
 const testNamespace = "ns1"
@@ -116,7 +118,10 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
-			k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
+			retry.RunWith(&retry.Counter{Count: 30, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				logger.Log(r, "trying calls to terminating gateway")
+				k8s.CheckStaticServerConnectionSuccessful(t, nsK8SOptions, staticClientName, staticServerLocalAddress)
+			})
 		})
 	}
 }
@@ -240,6 +245,11 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				ctx := suite.Environment().DefaultContext(t)
 
+				externalServiceRegistrationPath := tc.externalServiceRegistrationConfig.path
+				if (cfg.EnableOpenshift || cfg.UseOpenshift) && tc.externalServiceRegistrationConfig.namespace == "default" {
+					externalServiceRegistrationPath = "../fixtures/cases/terminating-gateway-namespaces/external-service-default/external-service-registration"
+				}
+
 				// Install the Helm chart without the terminating gateway first
 				// so that we can create the namespace for it.
 				helmValues := map[string]string{
@@ -318,6 +328,10 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					KustomizeConfigPath: tc.externalServiceRegistrationConfig.path,
 				}
 
+				if cfg.EnableOpenshift || cfg.UseOpenshift {
+					k8sOpts.KustomizeConfigPath = externalServiceRegistrationPath
+				}
+
 				consulOpts := helpers.ConsulOptions{
 					ConsulClient:                    consulClient,
 					Namespace:                       tc.externalServiceRegistrationConfig.namespace,
@@ -335,15 +349,18 @@ func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
 					// via the static-server. It should fail to connect with the
 					// static-server pod because of intentions.
 					logger.Log(t, "testing intentions prevent connections through the terminating gateway")
-					k8s.CheckStaticServerConnectionFailing(t, staticClientNSOpts, staticClientName, staticServerLocalAddress)
-
+					retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+						k8s.CheckStaticServerConnectionFailing(t, staticClientNSOpts, staticClientName, staticServerLocalAddress)
+					})
 					logger.Log(t, "adding intentions to allow traffic from client ==> server")
 					AddIntention(t, consulClient, "", tc.staticClientConfig.namespace, staticClientName, tc.staticServerConfig.namespace, staticServerName)
 				}
 
 				// Test that we can make a call to the terminating gateway
 				logger.Log(t, "trying calls to terminating gateway")
-				k8s.CheckStaticServerConnectionSuccessful(t, staticClientNSOpts, staticClientName, staticServerLocalAddress)
+				retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+					k8s.CheckStaticServerConnectionSuccessful(t, staticClientNSOpts, staticClientName, staticServerLocalAddress)
+				})
 			})
 		}
 	}

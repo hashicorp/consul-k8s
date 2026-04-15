@@ -15,4 +15,3 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
 
-

@@ -1,0 +1,7 @@
+```release-note:security
+Updated AWS SDK dependencies and added CVE suppressions. Upgraded github.com/aws/aws-sdk-go from v1.38.63 to v1.55.8 in hack/aws-acceptance-test-cleanup utilities and suppressed CVEs:
+[GO-2022-0635](https://pkg.go.dev/vuln/GO-2022-0635) (AWS S3 Crypto SDK - in-band key negotiation issue)
+[GO-2022-0646](https://pkg.go.dev/vuln/GO-2022-0646) (AWS S3 Crypto SDK - CBC padding oracle issue)
+
+These vulnerabilities affect only test cleanup utilities in unused S3 crypto components. They do not impact production consul-k8s deployments.
+```

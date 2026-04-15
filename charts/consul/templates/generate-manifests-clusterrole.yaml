@@ -19,10 +19,12 @@ rules:
     - consul.hashicorp.com
     resources:
     - gatewayclassconfigs
+    - serviceintentions
     verbs:
     - get
     - update
     - create
+    - list
   - apiGroups:
     - gateway.networking.k8s.io
     resources:
@@ -46,7 +48,6 @@ rules:
     - get
     - list
     - watch
-    - delete
 {{- if .Values.global.enablePodSecurityPolicies }}
   - apiGroups: ["policy"]
     resources: ["podsecuritypolicies"]

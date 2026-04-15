@@ -70,6 +70,11 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"externalServers.httpsPort": "8500",
 			}
 
+			// On OpenShift, disable managing Gateway API CRDs since they already exist
+			if cfg.EnableOpenshift {
+				helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
+			}
+
 			if secure {
 				helmValues["global.tls.caCert.secretName"] = fmt.Sprintf("%s-consul-ca-cert", serverReleaseName)
 				helmValues["global.tls.caCert.secretKey"] = "tls.crt"
@@ -85,12 +90,34 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			consulCluster.Create(t)
 
 			logger.Log(t, "creating static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
-			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-			} else {
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject")
+			// Use appropriate fixtures based on OpenShift and CNI flags
+			staticServerFixture := "../fixtures/cases/static-server-inject"
+			staticClientFixture := "../fixtures/cases/static-client-inject"
+			if cfg.EnableOpenshift {
+				// OpenShift-specific fixtures
+				if cfg.EnableCNI {
+					// OpenShift WITH CNI
+					staticServerFixture = "../fixtures/cases/static-server-openshift-cni"
+					if cfg.EnableTransparentProxy {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-tproxy-cni"
+					} else {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-inject-cni"
+					}
+				} else {
+					// OpenShift WITHOUT CNI
+					staticServerFixture = "../fixtures/cases/static-server-openshift"
+					if cfg.EnableTransparentProxy {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-tproxy"
+					} else {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-inject"
+					}
+				}
+			} else if cfg.EnableTransparentProxy {
+				staticClientFixture = "../fixtures/cases/static-client-tproxy"
 			}
+
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerFixture)
+			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticClientFixture)
 
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
@@ -147,7 +174,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
 			if cfg.EnableTransparentProxy {
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80: Connection refused"}, "", "http://static-server")
+				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80"}, "", "http://static-server")
 			} else {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")
 			}

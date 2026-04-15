@@ -15,9 +15,9 @@ import (
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
 	cmdFetchServerRegion "github.com/hashicorp/consul-k8s/control-plane/subcommand/fetch-server-region"
 	cmdGatewayCleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup"
-	cmdGatewayCleanupOcp "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup-ocp"
+	cmdGatewayCleanupCustom "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-cleanup-custom"
 	cmdGatewayResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources"
-	cmdGatewayResourcesOcp "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources-ocp"
+	cmdGatewayResourcesCustom "github.com/hashicorp/consul-k8s/control-plane/subcommand/gateway-resources-custom"
 	cmdGenerateManifests "github.com/hashicorp/consul-k8s/control-plane/subcommand/generate-manifests"
 	cmdGetConsulClientCA "github.com/hashicorp/consul-k8s/control-plane/subcommand/get-consul-client-ca"
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
@@ -58,16 +58,16 @@ func init() {
 		"gateway-cleanup": func() (cli.Command, error) {
 			return &cmdGatewayCleanup.Command{UI: ui}, nil
 		},
-		"gateway-cleanup-ocp": func() (cli.Command, error) {
-			return &cmdGatewayCleanupOcp.Command{UI: ui}, nil
+		"gateway-cleanup-custom": func() (cli.Command, error) {
+			return &cmdGatewayCleanupCustom.Command{UI: ui}, nil
 		},
 
 		"gateway-resources": func() (cli.Command, error) {
 			return &cmdGatewayResources.Command{UI: ui}, nil
 		},
 
-		"gateway-resources-ocp": func() (cli.Command, error) {
-			return &cmdGatewayResourcesOcp.Command{UI: ui}, nil
+		"gateway-resources-custom": func() (cli.Command, error) {
+			return &cmdGatewayResourcesCustom.Command{UI: ui}, nil
 		},
 		"generate-manifests": func() (cli.Command, error) {
 			return &cmdGenerateManifests.Command{UI: ui}, nil
