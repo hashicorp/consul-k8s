@@ -392,7 +392,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 					}
 				} else {
 					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, h.cleanupDeleteOptions())
-					require.NoError(r, err)
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
 				}
 			}
 		}
@@ -652,7 +654,7 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 		if h.ACLToken != "" {
 			config.Token = h.ACLToken
 		} else {
-			retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+			retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
 				// Get the ACL token. First, attempt to read it from the bootstrap token (this will be true in primary Consul servers).
 				// If the bootstrap token doesn't exist, it means we are running against a secondary cluster
 				// and will try to read the replication token from the federation secret.
@@ -689,7 +691,10 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 
 // PodSecurityPolicies are removed from the kubernetes API in v1.25.
 // Thus using the Pod Security Admission Controller with a privileged policy is the recommended path forward for testing in clusters with Kubernetes v1.25 and above.
-
+// configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
+// and a role binding that binds the default service account in the helm installation namespace to the cluster role.
+// We bind the default service account for tests that are spinning up pods without a service account set so that
+// they will not be rejected by the kube pod security policy controller.
 func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	// Create a privileged Pod Security Admission policy for the helm installation namespace.
 	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
@@ -824,7 +829,7 @@ func defaultValues() map[string]string {
 }
 
 func CreateK8sSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace, secretName, secretKey, secret string) {
-	retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
 		_, err := client.CoreV1().Secrets(namespace).Get(context.Background(), secretName, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			_, err := client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
