@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	controllers "github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -206,6 +207,12 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 
+	isEnterpriseDistribution, err := consul.IsEnterpriseDistribution(consulConfig, watcher)
+	if err != nil {
+		setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; enterprise-only gateway scaling will remain disabled until a valid license is detected", "error", err)
+		isEnterpriseDistribution = false
+	}
+
 	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
 		HelmConfig: gatewaycommon.HelmConfig{
 			ConsulConfig: gatewaycommon.ConsulConfig{
@@ -232,14 +239,18 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			ConsulPartition:             c.consul.Partition,
 			ConsulCACert:                string(c.caCertPem),
 			EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+			EnableGatewayScaling:        c.flagEnableGatewayScaling,
 			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 			InitContainerResources:      &c.initContainerResources,
 		},
-		AllowK8sNamespacesSet:   allowK8sNamespaces,
-		DenyK8sNamespacesSet:    denyK8sNamespaces,
-		ConsulClientConfig:      consulConfig,
-		ConsulServerConnMgr:     watcher,
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+		ConsulClientConfig:    consulConfig,
+		ConsulServerConnMgr:   watcher,
+		ConsulMeta: apicommon.ConsulMeta{
+			IsEnterpriseDistribution: isEnterpriseDistribution,
+		},
 		NamespacesEnabled:       c.flagEnableNamespaces,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
@@ -494,12 +505,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{
-		PartitionsEnabled:    c.flagEnablePartitions,
-		Partition:            c.consul.Partition,
-		NamespacesEnabled:    c.flagEnableNamespaces,
-		DestinationNamespace: c.flagConsulDestinationNamespace,
-		Mirroring:            c.flagEnableK8SNSMirroring,
-		Prefix:               c.flagK8SNSMirroringPrefix,
+		IsEnterpriseDistribution: isEnterpriseDistribution,
+		PartitionsEnabled:        c.flagEnablePartitions,
+		Partition:                c.consul.Partition,
+		NamespacesEnabled:        c.flagEnableNamespaces,
+		DestinationNamespace:     c.flagConsulDestinationNamespace,
+		Mirroring:                c.flagEnableK8SNSMirroring,
+		Prefix:                   c.flagK8SNSMirroringPrefix,
 	}
 
 	// Note: The path here should be identical to the one on the kubebuilder
