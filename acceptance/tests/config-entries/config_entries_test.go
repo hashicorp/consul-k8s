@@ -30,6 +30,7 @@ const (
 	ServerRole               = "server"
 )
 
+// TestController
 func TestController(t *testing.T) {
 	cfg := suite.Config()
 	if cfg.EnableCNI {
@@ -39,8 +40,8 @@ func TestController(t *testing.T) {
 		secure   bool
 		useVault bool
 	}{
-		// {false, false},
-		// {true, false},
+		{false, false},
+		{true, false},
 		{false, true},
 		{true, true},
 	}
