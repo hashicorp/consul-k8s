@@ -257,9 +257,8 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
-	// Enable TCP watch. Keep the historical misspelled flag as a compatibility alias.
-	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enable-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
-	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Deprecated alias for --enable-tcp-route")
+	// enable TCP watch
+	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")
