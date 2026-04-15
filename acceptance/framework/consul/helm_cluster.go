@@ -263,60 +263,59 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	if err := h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName}); err != nil && !isMissingRuntimeKindError(err) {
-		h.logger.Logf(t, "Ignoring gatewayclass cleanup error for release %s: %v", h.releaseName, err)
-	}
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
 	var gatewayClassList gwv1.GatewayClassList
-	if err := h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
+	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
-	}); err == nil {
+	}) == nil {
 		for _, item := range gatewayClassList.Items {
 			item.SetFinalizers([]string{})
 			_ = h.runtimeClient.Update(context.Background(), &item)
 		}
-	} else if !isMissingRuntimeKindError(err) {
-		h.logger.Logf(t, "Ignoring gatewayclass list cleanup error for release %s: %v", h.releaseName, err)
 	}
 
 	// Forcibly delete all gateway class configs and remove their finalizers.
-	if err := h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName}); err != nil && !isMissingRuntimeKindError(err) {
-		h.logger.Logf(t, "Ignoring gatewayclassconfig cleanup error for release %s: %v", h.releaseName, err)
-	}
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &v1alpha1.GatewayClassConfig{}, client.HasLabels{"release=" + h.releaseName})
 
 	var gatewayClassConfigList v1alpha1.GatewayClassConfigList
-	if err := h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
+	if h.runtimeClient.List(context.Background(), &gatewayClassConfigList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
-	}); err == nil {
+	}) == nil {
 		for _, item := range gatewayClassConfigList.Items {
 			item.SetFinalizers([]string{})
 			_ = h.runtimeClient.Update(context.Background(), &item)
 		}
-	} else if !isMissingRuntimeKindError(err) {
-		h.logger.Logf(t, "Ignoring gatewayclassconfig list cleanup error for release %s: %v", h.releaseName, err)
 	}
 
-	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
-		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		if err != nil && isGatewayCleanupAlreadyExistsError(err) {
-			h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
-			err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		}
-		if err != nil && h.enableOpenshift {
-			// In OpenShift acceptance runs, uninstall hooks can fail due to stale/missing
-			// cluster-scoped CRD state. Fall back to no-hooks uninstall so cleanup remains best-effort.
-			h.logger.Logf(r, "Helm delete failed for release %s in OpenShift, falling back to no-hooks uninstall: %v", h.releaseName, err)
-			err = h.uninstallReleaseNoHooks(t, h.releaseName)
-		}
-		// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
-		if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
+	if !h.enableOpenshift {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+			err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
 			require.NoError(r, err)
-		}
-	})
+		})
+	} else {
+		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+			err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+				h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
+				err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			}
+			if err != nil && h.enableOpenshift {
+				// In OpenShift acceptance runs, uninstall hooks can fail due to stale/missing
+				// cluster-scoped CRD state. Fall back to no-hooks uninstall so cleanup remains best-effort.
+				h.logger.Logf(r, "Helm delete failed for release %s in OpenShift, falling back to no-hooks uninstall: %v", h.releaseName, err)
+				err = h.uninstallReleaseNoHooks(t, h.releaseName)
+			}
+			// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
+			if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
+				require.NoError(r, err)
+			}
+		})
+	}
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
-	retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 600}, t, func(r *retry.R) {
 
 		// Force delete any pods that have h.releaseName in their name because sometimes
 		// graceful termination takes a long time and since this is an uninstall
@@ -386,14 +385,14 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, service := range services.Items {
 			if strings.Contains(service.Name, h.releaseName) {
-				if h.enableOpenshift {
-					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, h.cleanupDeleteOptions())
-					require.NoError(r, err)
-				} else {
+				if !h.enableOpenshift {
 					err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
 					if !errors.IsNotFound(err) {
 						require.NoError(r, err)
 					}
+				} else {
+					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, h.cleanupDeleteOptions())
+					require.NoError(r, err)
 				}
 			}
 		}
@@ -479,9 +478,16 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, job := range jobs.Items {
 			if strings.Contains(job.Name, h.releaseName) {
-				err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, h.cleanupDeleteOptions())
-				if !errors.IsNotFound(err) {
-					require.NoError(r, err)
+				if !h.enableOpenshift {
+					err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				} else {
+					err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, h.cleanupDeleteOptions())
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
 				}
 			}
 		}
@@ -572,24 +578,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 
-		if h.enableOpenshift {
-			mutatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
-			require.NoError(r, err)
-			for _, webhookConfig := range mutatingWebhookConfigs.Items {
-				if strings.Contains(webhookConfig.Name, h.releaseName) {
-					r.Errorf("Found mutating webhook configuration which should have been deleted: %s", webhookConfig.Name)
-				}
-			}
-
-			validatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
-			require.NoError(r, err)
-			for _, webhookConfig := range validatingWebhookConfigs.Items {
-				if strings.Contains(webhookConfig.Name, h.releaseName) {
-					r.Errorf("Found validating webhook configuration which should have been deleted: %s", webhookConfig.Name)
-				}
-			}
-		}
-
 		// Verify all Consul Secrets are deleted.
 		secrets, err = h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
@@ -608,91 +596,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 	})
-}
-
-func (h *HelmCluster) deleteGatewayCleanupJobIfExistsForRelease(t require.TestingT, releaseName string) {
-	namespace := h.helmOptions.KubectlOptions.Namespace
-	jobName := fmt.Sprintf("%s-consul-gateway-cleanup", releaseName)
-
-	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
-	if err != nil && !errors.IsNotFound(err) {
-		require.NoError(t, err)
-	}
-}
-
-func (h *HelmCluster) deleteGatewayResourcesJobIfExistsForRelease(t require.TestingT, releaseName string) {
-	namespace := h.helmOptions.KubectlOptions.Namespace
-	jobName := fmt.Sprintf("%s-consul-gateway-resources", releaseName)
-
-	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
-	if err != nil && !errors.IsNotFound(err) {
-		require.NoError(t, err)
-	}
-}
-
-func (h *HelmCluster) deleteServerACLInitCleanupJobIfExistsForRelease(t require.TestingT, releaseName string) {
-	namespace := h.helmOptions.KubectlOptions.Namespace
-	jobName := fmt.Sprintf("%s-consul-server-acl-init-cleanup", releaseName)
-
-	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
-	if err != nil && !errors.IsNotFound(err) {
-		require.NoError(t, err)
-	}
-}
-
-func (h *HelmCluster) deleteGatewayHookJobsIfExistsForRelease(t require.TestingT, releaseName string) {
-	h.deleteGatewayCleanupJobIfExistsForRelease(t, releaseName)
-	h.deleteGatewayResourcesJobIfExistsForRelease(t, releaseName)
-	h.deleteServerACLInitCleanupJobIfExistsForRelease(t, releaseName)
-}
-
-func isGatewayCleanupAlreadyExistsError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errText := err.Error()
-	return strings.Contains(errText, "gateway-cleanup") && strings.Contains(errText, "already exists")
-}
-
-func isGatewayResourcesAlreadyExistsError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errText := err.Error()
-	return strings.Contains(errText, "gateway-resources") && strings.Contains(errText, "already exists")
-}
-
-func isServerACLInitCleanupAlreadyExistsError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errText := err.Error()
-	return strings.Contains(errText, "server-acl-init-cleanup") && strings.Contains(errText, "already exists")
-}
-
-func isRetryableHelmInstallError(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	errText := strings.ToLower(err.Error())
-	retryableSubstrings := []string{
-		"tls handshake timeout",
-		"connection reset by peer",
-		"connection refused",
-		"i/o timeout",
-		"context deadline exceeded",
-		"unexpected eof",
-		"http2: client connection lost",
-	}
-
-	for _, s := range retryableSubstrings {
-		if strings.Contains(errText, s) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {

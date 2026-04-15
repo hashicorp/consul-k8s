@@ -3,6 +3,7 @@ package consul
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -676,4 +677,89 @@ func staleSecretNamesForRelease(releaseName string) []string {
 		releaseName + "-consul-bootstrap-acl-token",
 		releaseName + "-consul-enterprise-license-acl-token",
 	}
+}
+
+func (h *HelmCluster) deleteGatewayCleanupJobIfExistsForRelease(t require.TestingT, releaseName string) {
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	jobName := fmt.Sprintf("%s-consul-gateway-cleanup", releaseName)
+
+	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+}
+
+func (h *HelmCluster) deleteGatewayResourcesJobIfExistsForRelease(t require.TestingT, releaseName string) {
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	jobName := fmt.Sprintf("%s-consul-gateway-resources", releaseName)
+
+	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+}
+
+func (h *HelmCluster) deleteServerACLInitCleanupJobIfExistsForRelease(t require.TestingT, releaseName string) {
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	jobName := fmt.Sprintf("%s-consul-server-acl-init-cleanup", releaseName)
+
+	err := h.kubernetesClient.BatchV1().Jobs(namespace).Delete(context.Background(), jobName, h.cleanupDeleteOptions())
+	if err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
+}
+
+func (h *HelmCluster) deleteGatewayHookJobsIfExistsForRelease(t require.TestingT, releaseName string) {
+	h.deleteGatewayCleanupJobIfExistsForRelease(t, releaseName)
+	h.deleteGatewayResourcesJobIfExistsForRelease(t, releaseName)
+	h.deleteServerACLInitCleanupJobIfExistsForRelease(t, releaseName)
+}
+
+func isGatewayCleanupAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "gateway-cleanup") && strings.Contains(errText, "already exists")
+}
+
+func isGatewayResourcesAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "gateway-resources") && strings.Contains(errText, "already exists")
+}
+
+func isServerACLInitCleanupAlreadyExistsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "server-acl-init-cleanup") && strings.Contains(errText, "already exists")
+}
+
+func isRetryableHelmInstallError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errText := strings.ToLower(err.Error())
+	retryableSubstrings := []string{
+		"tls handshake timeout",
+		"connection reset by peer",
+		"connection refused",
+		"i/o timeout",
+		"context deadline exceeded",
+		"unexpected eof",
+		"http2: client connection lost",
+	}
+
+	for _, s := range retryableSubstrings {
+		if strings.Contains(errText, s) {
+			return true
+		}
+	}
+
+	return false
 }
