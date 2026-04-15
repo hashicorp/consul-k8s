@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +39,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/gatekeeper"
+	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 )
@@ -47,6 +49,7 @@ type GatewayControllerConfig struct {
 	HelmConfig              common.HelmConfig
 	ConsulClientConfig      *consul.Config
 	ConsulServerConnMgr     consul.ServerConnectionManager
+	ConsulMeta              apicommon.ConsulMeta
 	NamespacesEnabled       bool
 	CrossNamespaceACLPolicy string
 	Partition               string
@@ -153,6 +156,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// add our current gateway even if it's not controlled by us so we
 	// can garbage collect any resources for it.
 	resources.ReferenceCountGateway(gateway)
+	effectiveHelmConfig := r.effectiveHelmConfig(log)
 
 	if err := r.fetchControlledGateways(ctx, resources); err != nil {
 		log.Error(err, "unable to fetch controlled gateways")
@@ -227,7 +231,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, err
 		}
 
-		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig)
+		err := r.updateGatekeeperResources(ctx, log, &gateway, updates.GatewayClassConfig, effectiveHelmConfig)
 		if err != nil {
 			if k8serrors.IsConflict(err) {
 				log.Info("error updating object when updating gateway resources, will try to re-reconcile")
@@ -444,6 +448,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		cache:                 c,
 		gatewayCache:          gwc,
 		ConsulConfig:          config.ConsulClientConfig,
+		ConsulMeta:            config.ConsulMeta,
 	}
 
 	cleaner := binding.Cleaner{
@@ -482,7 +487,16 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Watches(
 			&corev1.Endpoints{},
 			handler.EnqueueRequestsFromMapFunc(r.transformEndpoints),
-		).
+		)
+
+	if config.HelmConfig.EnableGatewayScaling && config.ConsulMeta.IsEnterpriseDistribution {
+		controllerBuilder = controllerBuilder.Watches(
+			&autoscalingv2.HorizontalPodAutoscaler{},
+			handler.EnqueueRequestsFromMapFunc(r.transformHPA),
+		)
+	}
+
+	return c, cleaner, controllerBuilder.
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),
@@ -556,6 +570,21 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 	}
 
 	return c, cleaner, nil
+}
+
+func (r *GatewayController) effectiveHelmConfig(log logr.Logger) common.HelmConfig {
+	config := r.HelmConfig
+	if !config.EnableGatewayScaling {
+		return config
+	}
+
+	if r.ConsulMeta.IsEnterpriseDistribution {
+		return config
+	}
+
+	log.Info("Ignoring Gateway scaling annotations because the connected Consul cluster does not report a valid enterprise license. Enable a valid Consul Enterprise license to allow annotation-driven scaling and HPA reconciliation.")
+	config.EnableGatewayScaling = false
+	return config
 }
 
 // transformGatewayClass will check the list of GatewayClass objects for a matching
@@ -779,6 +808,22 @@ func gatewayReferencesCertificate(certificateKey api.ResourceReference, gateway 
 		}
 	}
 	return false
+}
+
+func (r *GatewayController) transformHPA(_ context.Context, o client.Object) []reconcile.Request {
+	hpa := o.(*autoscalingv2.HorizontalPodAutoscaler)
+	if hpa.Spec.ScaleTargetRef.Kind != "Deployment" || hpa.Spec.ScaleTargetRef.Name == "" {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: hpa.Namespace,
+				Name:      hpa.Spec.ScaleTargetRef.Name,
+			},
+		},
+	}
 }
 
 func (r *GatewayController) transformPods(ctx context.Context, o client.Object) []reconcile.Request {
