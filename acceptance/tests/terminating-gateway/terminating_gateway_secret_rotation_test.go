@@ -74,6 +74,10 @@ func TestTerminatingGatewaySecretRotation(t *testing.T) {
 			logger.Log(t, "creating terminating gateway with linked secretRef")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/terminating-gateway-secret-rotation/terminating-gateway.yaml")
 
+			retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
+				waitForTerminatingGatewayEntry(r, consulClient, "tg")
+			})
+
 			logger.Log(t, "rotating terminating gateway secret first")
 			k8s.RunKubectl(t, ctx.KubectlOptions(t), "apply", "-f", "../fixtures/cases/terminating-gateway-secret-rotation/secret-rotated.yaml")
 
@@ -114,4 +118,12 @@ func readRotationTimestamp(t require.TestingT, consulClient *api.Client, gateway
 	require.NoError(t, parseErr)
 
 	return rotation
+}
+
+func waitForTerminatingGatewayEntry(t require.TestingT, consulClient *api.Client, gatewayName string) {
+	entry, _, err := consulClient.ConfigEntries().Get(api.TerminatingGateway, gatewayName, nil)
+	require.NoError(t, err)
+
+	_, ok := entry.(*api.TerminatingGatewayConfigEntry)
+	require.True(t, ok, "could not cast to TerminatingGatewayConfigEntry")
 }
