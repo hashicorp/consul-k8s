@@ -28,6 +28,7 @@ const (
 	ControlPlaneRequestLimit string = "controlplanerequestlimit"
 	RouteAuthFilter          string = "routeauthfilter"
 	GatewayPolicy            string = "gatewaypolicy"
+	CustomGatewayPolicy      string = "customgatewaypolicy"
 	Registration             string = "registration"
 
 	Global                 string = "global"

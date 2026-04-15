@@ -16,8 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -28,23 +27,23 @@ import (
 
 var (
 	// the list of kinds we can support by listener protocol.
-	supportedKindsForProtocol = map[gwv1beta1.ProtocolType][]gwv1beta1.RouteGroupKind{
-		gwv1beta1.HTTPProtocolType: {{
-			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
+	supportedKindsForProtocol = map[gwv1.ProtocolType][]gwv1.RouteGroupKind{
+		gwv1.HTTPProtocolType: {{
+			Group: (*gwv1.Group)(&gwv1.GroupVersion.Group),
 			Kind:  "HTTPRoute",
 		}},
-		gwv1beta1.HTTPSProtocolType: {{
-			Group: (*gwv1beta1.Group)(&gwv1beta1.GroupVersion.Group),
+		gwv1.HTTPSProtocolType: {{
+			Group: (*gwv1.Group)(&gwv1.GroupVersion.Group),
 			Kind:  "HTTPRoute",
 		}},
-		gwv1beta1.TCPProtocolType: {{
-			Group: (*gwv1alpha2.Group)(&gwv1alpha2.GroupVersion.Group),
+		gwv1.TCPProtocolType: {{
+			Group: (*gwv1.Group)(&gwv1.GroupVersion.Group),
 			Kind:  "TCPRoute",
 		}},
 	}
-	allSupportedRouteKinds = map[gwv1beta1.Kind]struct{}{
-		gwv1beta1.Kind("HTTPRoute"): {},
-		gwv1beta1.Kind("TCPRoute"):  {},
+	allSupportedRouteKinds = map[gwv1.Kind]struct{}{
+		gwv1.Kind("HTTPRoute"): {},
+		gwv1.Kind("TCPRoute"):  {},
 	}
 
 	allSupportedTLSVersions = map[string]struct{}{
@@ -89,7 +88,7 @@ var (
 
 // validateRefs validates backend references for a route, determining whether or
 // not they were found in the list of known connect-injected services.
-func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *common.ResourceMap) routeValidationResults {
+func validateRefs(route client.Object, refs []gwv1.BackendRef, resources *common.ResourceMap) routeValidationResults {
 	namespace := route.GetNamespace()
 
 	var result routeValidationResults
@@ -150,7 +149,7 @@ func validateRefs(route client.Object, refs []gwv1beta1.BackendRef, resources *c
 
 // validateGateway validates that a gateway is semantically valid given
 // the set of features that we support.
-func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway *api.APIGatewayConfigEntry) gatewayValidationResult {
+func validateGateway(gateway gwv1.Gateway, pods []corev1.Pod, consulGateway *api.APIGatewayConfigEntry) gatewayValidationResult {
 	var result gatewayValidationResult
 
 	if len(gateway.Spec.Addresses) > 0 {
@@ -166,14 +165,14 @@ func validateGateway(gateway gwv1beta1.Gateway, pods []corev1.Pod, consulGateway
 	return result
 }
 
-func stringOrEmtpy(s *gwv1beta1.SectionName) string {
+func stringOrEmtpy(s *gwv1.SectionName) string {
 	if s == nil {
 		return ""
 	}
 	return string(*s)
 }
 
-func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
+func validateGatewayPolicies(gateway gwv1.Gateway, policies []v1alpha1.GatewayPolicy, resources *common.ResourceMap) gatewayPolicyValidationResults {
 	results := make(gatewayPolicyValidationResults, 0, len(policies))
 
 	for _, policy := range policies {
@@ -218,13 +217,13 @@ func validateGatewayPolicies(gateway gwv1beta1.Gateway, policies []v1alpha1.Gate
 	return results
 }
 
-func listenerExistsForPolicy(gateway gwv1beta1.Gateway, policy v1alpha1.GatewayPolicy) bool {
+func listenerExistsForPolicy(gateway gwv1.Gateway, policy v1alpha1.GatewayPolicy) bool {
 	if policy.Spec.TargetRef.SectionName == nil {
 		return false
 	}
 
 	return gateway.Name == policy.Spec.TargetRef.Name &&
-		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1beta1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
+		slices.ContainsFunc(gateway.Spec.Listeners, func(l gwv1.Listener) bool { return l.Name == *policy.Spec.TargetRef.SectionName })
 }
 
 func errorForMissingListener(name, listenerName string) error {
@@ -247,7 +246,7 @@ func errorForMissingJWTProviders(names map[string]struct{}) error {
 // validate their conflicts.
 type mergedListener struct {
 	index    int
-	listener gwv1beta1.Listener
+	listener gwv1.Listener
 }
 
 // mergedListeners is a set of a listeners that are considered "merged"
@@ -257,7 +256,7 @@ type mergedListeners []mergedListener
 // validateProtocol validates that the protocols used across all merged
 // listeners are compatible.
 func (m mergedListeners) validateProtocol() error {
-	var protocol *gwv1beta1.ProtocolType
+	var protocol *gwv1.ProtocolType
 	for _, l := range m {
 		if protocol == nil {
 			protocol = common.PointerTo(l.listener.Protocol)
@@ -271,7 +270,7 @@ func (m mergedListeners) validateProtocol() error {
 
 // validateHostname validates that the merged listeners don't use the same
 // hostnames as per the spec.
-func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener) error {
+func (m mergedListeners) validateHostname(index int, listener gwv1.Listener) error {
 	for _, l := range m {
 		if l.index == index {
 			continue
@@ -285,7 +284,7 @@ func (m mergedListeners) validateHostname(index int, listener gwv1beta1.Listener
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, resources *common.ResourceMap) (error, error) {
+func validateTLS(gateway gwv1.Gateway, tls *gwv1.ListenerTLSConfig, resources *common.ResourceMap) (error, error) {
 	// If there's no TLS, there's nothing to validate
 	if tls == nil {
 		return nil, nil
@@ -295,7 +294,7 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 	// alongside any TLS configuration error that we find below.
 	refsErr := validateCertificateRefs(gateway, tls.CertificateRefs, resources)
 
-	if tls.Mode != nil && *tls.Mode == gwv1beta1.TLSModePassthrough {
+	if tls.Mode != nil && *tls.Mode == gwv1.TLSModePassthrough {
 		return errListenerNoTLSPassthrough, refsErr
 	}
 
@@ -306,7 +305,7 @@ func validateTLS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig, res
 	return nil, refsErr
 }
 
-func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *common.ResourceMap) error {
+func validateJWT(gateway gwv1.Gateway, listener gwv1.Listener, resources *common.ResourceMap) error {
 	policy, _ := resources.GetPolicyForGatewayListener(gateway, listener)
 	if policy == nil {
 		return nil
@@ -332,7 +331,7 @@ func validateJWT(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resourc
 	return nil
 }
 
-func validateCertificateRefs(gateway gwv1beta1.Gateway, refs []gwv1beta1.SecretObjectReference, resources *common.ResourceMap) error {
+func validateCertificateRefs(gateway gwv1.Gateway, refs []gwv1.SecretObjectReference, resources *common.ResourceMap) error {
 	for _, cert := range refs {
 		var mErr error
 		// Verify that the reference has a group and kind that we support
@@ -370,7 +369,7 @@ func validateCertificateRefs(gateway gwv1beta1.Gateway, refs []gwv1beta1.SecretO
 	return nil
 }
 
-func validateTLSOptions(options map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue) error {
+func validateTLSOptions(options map[gwv1.AnnotationKey]gwv1.AnnotationValue) error {
 	if options == nil {
 		return nil
 	}
@@ -429,9 +428,9 @@ func validateCertificateData(secret corev1.Secret) error {
 
 // validateListeners validates the given listeners both internally and with respect to each
 // other for purposes of setting "Conflicted" status conditions.
-func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener, resources *common.ResourceMap, gwcc *v1alpha1.GatewayClassConfig) listenerValidationResults {
+func validateListeners(gateway gwv1.Gateway, listeners []gwv1.Listener, resources *common.ResourceMap, gwcc *v1alpha1.GatewayClassConfig) listenerValidationResults {
 	var results listenerValidationResults
-	merged := make(map[gwv1beta1.PortNumber]mergedListeners)
+	merged := make(map[gwv1.PortNumber]mergedListeners)
 	for i, listener := range listeners {
 		merged[listener.Port] = append(merged[listener.Port], mergedListener{
 			index:    i,
@@ -493,7 +492,7 @@ func validateListeners(gateway gwv1beta1.Gateway, listeners []gwv1beta1.Listener
 	return results
 }
 
-func validateListenerAllowedRouteKinds(allowedRoutes *gwv1beta1.AllowedRoutes) error {
+func validateListenerAllowedRouteKinds(allowedRoutes *gwv1.AllowedRoutes) error {
 	if allowedRoutes == nil {
 		return nil
 	}
@@ -501,7 +500,7 @@ func validateListenerAllowedRouteKinds(allowedRoutes *gwv1beta1.AllowedRoutes) e
 		if _, ok := allSupportedRouteKinds[kind.Kind]; !ok {
 			return errListenerInvalidRouteKinds
 		}
-		if !common.NilOrEqual(kind.Group, gwv1beta1.GroupVersion.Group) {
+		if !common.NilOrEqual(kind.Group, gwv1.GroupVersion.Group) {
 			return errListenerInvalidRouteKinds
 		}
 	}
@@ -510,25 +509,25 @@ func validateListenerAllowedRouteKinds(allowedRoutes *gwv1beta1.AllowedRoutes) e
 
 // routeAllowedForListenerNamespaces determines whether the route is allowed
 // to bind to the Gateway based on the AllowedRoutes namespace selectors.
-func routeAllowedForListenerNamespaces(gatewayNamespace string, allowedRoutes *gwv1beta1.AllowedRoutes, namespace corev1.Namespace) bool {
-	var namespaceSelector *gwv1beta1.RouteNamespaces
+func routeAllowedForListenerNamespaces(gatewayNamespace string, allowedRoutes *gwv1.AllowedRoutes, namespace corev1.Namespace) bool {
+	var namespaceSelector *gwv1.RouteNamespaces
 	if allowedRoutes != nil {
 		// check gateway namespace
 		namespaceSelector = allowedRoutes.Namespaces
 	}
 
 	// set default if namespace selector is nil
-	from := gwv1beta1.NamespacesFromSame
+	from := gwv1.NamespacesFromSame
 	if namespaceSelector != nil && namespaceSelector.From != nil && *namespaceSelector.From != "" {
 		from = *namespaceSelector.From
 	}
 
 	switch from {
-	case gwv1beta1.NamespacesFromAll:
+	case gwv1.NamespacesFromAll:
 		return true
-	case gwv1beta1.NamespacesFromSame:
+	case gwv1.NamespacesFromSame:
 		return gatewayNamespace == namespace.Name
-	case gwv1beta1.NamespacesFromSelector:
+	case gwv1.NamespacesFromSelector:
 		namespaceSelector, err := metav1.LabelSelectorAsSelector(namespaceSelector.Selector)
 		if err != nil {
 			// log the error here, the label selector is invalid
@@ -543,7 +542,7 @@ func routeAllowedForListenerNamespaces(gatewayNamespace string, allowedRoutes *g
 
 // routeAllowedForListenerHostname checks that a hostname specified on a route and the hostname specified
 // on the gateway listener are compatible.
-func routeAllowedForListenerHostname(hostname *gwv1beta1.Hostname, hostnames []gwv1beta1.Hostname) bool {
+func routeAllowedForListenerHostname(hostname *gwv1.Hostname, hostnames []gwv1.Hostname) bool {
 	if hostname == nil || len(hostnames) == 0 {
 		return true
 	}
@@ -557,10 +556,10 @@ func routeAllowedForListenerHostname(hostname *gwv1beta1.Hostname, hostnames []g
 }
 
 // externalRefsOnRouteAllExist checks to make sure that all external filters referenced by the route exist in the resource map.
-func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.ResourceMap) bool {
+func externalRefsOnRouteAllExist(route *gwv1.HTTPRoute, resources *common.ResourceMap) bool {
 	for _, rule := range route.Spec.Rules {
 		for _, filter := range rule.Filters {
-			if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+			if filter.Type != gwv1.HTTPRouteFilterExtensionRef {
 				continue
 			}
 
@@ -572,7 +571,7 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 
 		for _, backendRef := range rule.BackendRefs {
 			for _, filter := range backendRef.Filters {
-				if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+				if filter.Type != gwv1.HTTPRouteFilterExtensionRef {
 					continue
 				}
 
@@ -586,8 +585,8 @@ func externalRefsOnRouteAllExist(route *gwv1beta1.HTTPRoute, resources *common.R
 	return true
 }
 
-func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resources *common.ResourceMap, namespace string, invalidFilters map[string]struct{}) {
-	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef {
+func checkIfReferencesMissingJWTProvider(filter gwv1.HTTPRouteFilter, resources *common.ResourceMap, namespace string, invalidFilters map[string]struct{}) {
+	if filter.Type != gwv1.HTTPRouteFilterExtensionRef {
 		return
 	}
 	externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
@@ -608,7 +607,7 @@ func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resou
 	}
 }
 
-func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) []string {
+func authFilterReferencesMissingJWTProvider(httproute *gwv1.HTTPRoute, resources *common.ResourceMap) []string {
 	invalidFilters := make(map[string]struct{})
 	for _, rule := range httproute.Spec.Rules {
 		for _, filter := range rule.Filters {
@@ -626,7 +625,7 @@ func authFilterReferencesMissingJWTProvider(httproute *gwv1beta1.HTTPRoute, reso
 }
 
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.
-func externalRefsKindAllowedOnRoute(route *gwv1beta1.HTTPRoute) bool {
+func externalRefsKindAllowedOnRoute(route *gwv1.HTTPRoute) bool {
 	for _, rule := range route.Spec.Rules {
 		if !filtersAllAllowedType(rule.Filters) {
 			return false
@@ -642,7 +641,7 @@ func externalRefsKindAllowedOnRoute(route *gwv1beta1.HTTPRoute) bool {
 	return true
 }
 
-func filtersAllAllowedType(filters []gwv1beta1.HTTPRouteFilter) bool {
+func filtersAllAllowedType(filters []gwv1.HTTPRouteFilter) bool {
 	for _, filter := range filters {
 		if filter.ExtensionRef == nil {
 			continue
@@ -657,7 +656,7 @@ func filtersAllAllowedType(filters []gwv1beta1.HTTPRouteFilter) bool {
 
 // hostnameMatch checks that an individual hostname matches another hostname for
 // compatibility.
-func hostnamesMatch(a gwv1alpha2.Hostname, b gwv1beta1.Hostname) bool {
+func hostnamesMatch(a gwv1.Hostname, b gwv1.Hostname) bool {
 	if a == "" || a == "*" || b == "" || b == "*" {
 		// any wildcard always matches
 		return true
@@ -681,7 +680,7 @@ func hostnamesMatch(a gwv1alpha2.Hostname, b gwv1beta1.Hostname) bool {
 }
 
 // routeKindIsAllowedForListener checks that the given route kind is present in the allowed set.
-func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.GroupKind) bool {
+func routeKindIsAllowedForListener(kinds []gwv1.RouteGroupKind, gk schema.GroupKind) bool {
 	if kinds == nil {
 		return true
 	}
@@ -697,7 +696,7 @@ func routeKindIsAllowedForListener(kinds []gwv1beta1.RouteGroupKind, gk schema.G
 
 // routeKindIsAllowedForListenerExplicit checks that a route is allowed by the kinds specified explicitly
 // on the listener.
-func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1alpha2.AllowedRoutes, gk schema.GroupKind) bool {
+func routeKindIsAllowedForListenerExplicit(allowedRoutes *gwv1.AllowedRoutes, gk schema.GroupKind) bool {
 	if allowedRoutes == nil {
 		return true
 	}

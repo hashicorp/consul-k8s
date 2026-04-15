@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // setter wraps the status setting logic for routes.
@@ -21,7 +21,7 @@ func newSetter(controllerName string) *setter {
 }
 
 // removeRouteReferences removes the given parent reference sections from a routes's status.
-func (s *setter) removeRouteReferences(route client.Object, refs []gwv1beta1.ParentReference) bool {
+func (s *setter) removeRouteReferences(route client.Object, refs []gwv1.ParentReference) bool {
 	modified := false
 	for _, parent := range refs {
 		parents, removed := s.removeParentStatus(getRouteParentsStatus(route), parent)
@@ -34,7 +34,7 @@ func (s *setter) removeRouteReferences(route client.Object, refs []gwv1beta1.Par
 }
 
 // setRouteCondition sets an route condition on its status with the given parent.
-func (s *setter) setRouteCondition(route client.Object, parent *gwv1beta1.ParentReference, condition metav1.Condition) bool {
+func (s *setter) setRouteCondition(route client.Object, parent *gwv1.ParentReference, condition metav1.Condition) bool {
 	condition.LastTransitionTime = timeFunc()
 	condition.ObservedGeneration = route.GetGeneration()
 
@@ -54,7 +54,7 @@ func (s *setter) setRouteConditionOnAllRefs(route client.Object, condition metav
 	condition.ObservedGeneration = route.GetGeneration()
 
 	parents := getRouteParentsStatus(route)
-	statuses := common.Filter(getRouteParentsStatus(route), func(status gwv1beta1.RouteParentStatus) bool {
+	statuses := common.Filter(getRouteParentsStatus(route), func(status gwv1.RouteParentStatus) bool {
 		return string(status.ControllerName) != s.controllerName
 	})
 
@@ -71,8 +71,8 @@ func (s *setter) setRouteConditionOnAllRefs(route client.Object, condition metav
 }
 
 // getParentStatus returns the section of a status referenced by the given parent reference.
-func (s *setter) getParentStatus(statuses []gwv1beta1.RouteParentStatus, parent *gwv1beta1.ParentReference) gwv1beta1.RouteParentStatus {
-	var parentRef gwv1beta1.ParentReference
+func (s *setter) getParentStatus(statuses []gwv1.RouteParentStatus, parent *gwv1.ParentReference) gwv1.RouteParentStatus {
+	var parentRef gwv1.ParentReference
 	if parent != nil {
 		parentRef = *parent
 	}
@@ -82,16 +82,16 @@ func (s *setter) getParentStatus(statuses []gwv1beta1.RouteParentStatus, parent 
 			return status
 		}
 	}
-	return gwv1beta1.RouteParentStatus{
+	return gwv1.RouteParentStatus{
 		ParentRef:      parentRef,
-		ControllerName: gwv1beta1.GatewayController(s.controllerName),
+		ControllerName: gwv1.GatewayController(s.controllerName),
 	}
 }
 
 // removeParentStatus removes the section of a status referenced by the given parent reference.
-func (s *setter) removeParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.ParentReference) ([]gwv1beta1.RouteParentStatus, bool) {
+func (s *setter) removeParentStatus(statuses []gwv1.RouteParentStatus, parent gwv1.ParentReference) ([]gwv1.RouteParentStatus, bool) {
 	found := false
-	filtered := []gwv1beta1.RouteParentStatus{}
+	filtered := []gwv1.RouteParentStatus{}
 	for _, status := range statuses {
 		if common.ParentsEqual(status.ParentRef, parent) && string(status.ControllerName) == s.controllerName {
 			found = true
@@ -121,7 +121,7 @@ func setCondition(conditions []metav1.Condition, condition metav1.Condition) ([]
 }
 
 // setParentStatus updates or inserts the set of parent statuses with the newly modified parent.
-func (s *setter) setParentStatus(statuses []gwv1beta1.RouteParentStatus, parent gwv1beta1.RouteParentStatus) []gwv1beta1.RouteParentStatus {
+func (s *setter) setParentStatus(statuses []gwv1.RouteParentStatus, parent gwv1.RouteParentStatus) []gwv1.RouteParentStatus {
 	for i, status := range statuses {
 		if common.ParentsEqual(status.ParentRef, parent.ParentRef) && status.ControllerName == parent.ControllerName {
 			statuses[i] = parent
