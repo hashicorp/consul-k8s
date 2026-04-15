@@ -310,7 +310,7 @@ spec:
                   (and (default false .Values.global.openshift.enabled)
                        (not (default false .Values.global.openshift.isOcpGreaterthan4_18))
                        (default false .Values.global.openshift.crds.enableTcpRoute))  }}
-                -enabe-tcp-route=true
+                -enable-tcp-route=true
                 {{- end }}
 
 

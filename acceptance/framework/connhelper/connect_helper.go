@@ -448,9 +448,10 @@ func (c *ConnectHelper) helmValues() map[string]string {
 	}
 
 	// On OpenShift, disable managing Gateway API CRDs since they already exist
-	if c.Cfg.EnableOpenshift {
+	if c.Cfg.UseOpenshift || c.Cfg.EnableOpenshift {
 		helmValues["global.openshift.crds.enableTcpRoute"] = "true"
 		helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
+		helmValues["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
 	}
 
 	helpers.MergeMaps(helmValues, c.HelmValues)
