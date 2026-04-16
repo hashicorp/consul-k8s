@@ -1,7 +1,20 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
+# This file defines the test packages and runners for the OpenShift acceptance tests. Each entry specifies which test package to run, the runner to use, and the mode (single-cluster or multi-cluster) for the tests. The cloud package is excluded from this suite as it is triggered from a non consul-k8s repository and requires HCP credentials.
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-- {runner: 1, test-packages: "metrics", mode: "single-cluster"}
-- {runner: 2, test-packages: "cli", mode: "multi-cluster"}
+- {runner: 1, test-packages: "cli", mode: "single-cluster"}
+- {runner: 2, test-packages: "metrics", mode: "single-cluster"}
 - {runner: 3, test-packages: "basic", mode: "single-cluster"}
-- {runner: 4, test-packages: "server", mode: "single-cluster"}
+- {runner: 4, test-packages: "peering", mode: "multi-cluster"}
+- {runner: 5, test-packages: "snapshot-agent", mode: "single-cluster"}
+- {runner: 6, test-packages: "wan-federation", mode: "multi-cluster"}
+- {runner: 7, test-packages: "partitions", mode: "multi-cluster"}
+- {runner: 8, test-packages: "metrics", mode: "single-cluster"}
+- {runner: 9, test-packages: "sync", mode: "single-cluster"}
+- {runner: 10, test-packages: "basic", mode: "single-cluster"}
+- {runner: 12, test-packages: "config-entries", mode: "single-cluster"}
+- {runner: 13, test-packages: "api-gateway", mode: "single-cluster"}
+- {runner: 14, test-packages: "custom-api-gateway", mode: "single-cluster"}
+- {runner: 15, test-packages: "terminating-gateway", mode: "single-cluster"}
+- {runner: 16, test-packages: "vault", mode: "multi-cluster"}
+- {runner: 17, test-packages: "server", mode: "single-cluster"}
