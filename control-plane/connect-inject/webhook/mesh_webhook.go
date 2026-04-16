@@ -648,16 +648,10 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 		pod.Annotations = make(map[string]string)
 	}
 
-	// Default service port is the first port exported in the container
+	// Default service ports are all ports exported in the first container.
 	if _, ok := pod.ObjectMeta.Annotations[constants.AnnotationPort]; !ok {
-		if cs := pod.Spec.Containers; len(cs) > 0 {
-			if ps := cs[0].Ports; len(ps) > 0 {
-				if ps[0].Name != "" {
-					pod.Annotations[constants.AnnotationPort] = ps[0].Name
-				} else {
-					pod.Annotations[constants.AnnotationPort] = strconv.Itoa(int(ps[0].ContainerPort))
-				}
-			}
+		if defaultPorts := defaultConnectServicePortsAnnotation(*pod); defaultPorts != "" {
+			pod.Annotations[constants.AnnotationPort] = defaultPorts
 		}
 	}
 	pod.Annotations[constants.AnnotationOriginalPod] = podJson
@@ -665,6 +659,29 @@ func (w *MeshWebhook) defaultAnnotations(pod *corev1.Pod, podJson string) error 
 	pod.Annotations[constants.AnnotationConsulK8sVersion] = version.GetHumanVersion()
 
 	return nil
+}
+
+func defaultConnectServicePortsAnnotation(pod corev1.Pod) string {
+	if len(pod.Spec.Containers) == 0 {
+		return ""
+	}
+
+	ports := pod.Spec.Containers[0].Ports
+	if len(ports) == 0 {
+		return ""
+	}
+
+	defaultPorts := make([]string, 0, len(ports))
+	for _, port := range ports {
+		switch {
+		case port.Name != "":
+			defaultPorts = append(defaultPorts, port.Name)
+		case port.ContainerPort > 0:
+			defaultPorts = append(defaultPorts, strconv.Itoa(int(port.ContainerPort)))
+		}
+	}
+
+	return strings.Join(defaultPorts, ",")
 }
 
 // prometheusAnnotations sets the Prometheus scraping configuration

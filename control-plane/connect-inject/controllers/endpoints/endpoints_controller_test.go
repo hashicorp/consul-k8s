@@ -205,6 +205,97 @@ func TestProcessUpstreams(t *testing.T) {
 			consulPartitionsEnabled: false,
 		},
 		{
+			name: "annotated labeled upstream with positional destination port",
+			pod: func() *corev1.Pod {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1.svc.ns1.ns.part1.ap:1234:http-route-a"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream1",
+					DestinationPartition: "part1",
+					DestinationNamespace: "ns1",
+					DestinationPort:      "http-route-a",
+					LocalBindPort:        1234,
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "annotated labeled upstream with destination port local bind address and mesh gateway options",
+			pod: func() *corev1.Pod {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1.svc.ns1.ns.part1.ap:1234:destination_port=http-route-a&local_bind_address=127.0.0.99&mesh_gateway_mode=remote"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream1",
+					DestinationPartition: "part1",
+					DestinationNamespace: "ns1",
+					DestinationPort:      "http-route-a",
+					LocalBindAddress:     "127.0.0.99",
+					LocalBindPort:        1234,
+					MeshGateway: api.MeshGatewayConfig{
+						Mode: api.MeshGatewayModeRemote,
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "annotated unlabeled upstream with datacenter and destination options",
+			pod: func() *corev1.Pod {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1.ns1.part1:1234:dc2?destination_port=http-route-b&local_bind_address=127.0.0.77&mesh_gateway_mode=local"
+				return pod1
+			},
+			expected: []api.Upstream{
+				{
+					DestinationType:      api.UpstreamDestTypeService,
+					DestinationName:      "upstream1",
+					DestinationNamespace: "ns1",
+					DestinationPartition: "part1",
+					Datacenter:           "dc2",
+					DestinationPort:      "http-route-b",
+					LocalBindAddress:     "127.0.0.77",
+					LocalBindPort:        1234,
+					MeshGateway: api.MeshGatewayConfig{
+						Mode: api.MeshGatewayModeLocal,
+					},
+				},
+			},
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
+			name: "annotated upstream error: invalid mesh gateway mode",
+			pod: func() *corev1.Pod {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[constants.AnnotationUpstreams] = "upstream1:1234:mesh_gateway_mode=invalid"
+				return pod1
+			},
+			expErr:                  "invalid upstream mesh gateway mode \"invalid\" in \"upstream1:1234:mesh_gateway_mode=invalid\"",
+			consulNamespacesEnabled: false,
+			consulPartitionsEnabled: false,
+		},
+		{
+			name: "annotated upstream error: invalid local bind port token",
+			pod: func() *corev1.Pod {
+				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
+				pod1.Annotations[constants.AnnotationUpstreams] = "multi-port-service.svc.default.ns.partition-k8s.ap:http-route-a"
+				return pod1
+			},
+			expErr:                  "invalid upstream local bind port \"http-route-a\" in \"multi-port-service.svc.default.ns.partition-k8s.ap:http-route-a\"",
+			consulNamespacesEnabled: true,
+			consulPartitionsEnabled: true,
+		},
+		{
 			name: "multiple annotated upstreams",
 			pod: func() *corev1.Pod {
 				pod1 := createServicePod("pod1", "1.2.3.4", true, true)
@@ -938,6 +1029,295 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateServiceRegistrations_SingleServiceMultiPort(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, serviceRegistration.Service.Port)
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: true},
+		{Name: "metrics", Port: 5051, Default: false},
+	}, serviceRegistration.Service.Ports)
+	require.Equal(t, "http:5050,metrics:5051", serviceRegistration.Service.Meta["ports"])
+	require.Equal(t, "5050", serviceRegistration.Service.Meta["port-http"])
+	require.Equal(t, "5051", serviceRegistration.Service.Meta["port-metrics"])
+
+	require.Empty(t, proxyServiceRegistration.Service.Proxy.LocalServiceAddress)
+	require.Zero(t, proxyServiceRegistration.Service.Proxy.LocalServicePort)
+	require.Nil(t, proxyServiceRegistration.Service.Proxy.Expose.Paths)
+}
+
+func TestCreateServiceRegistrations_SingleServiceMultiPort_FromEndpointsFallback(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	delete(pod.Annotations, constants.AnnotationPort)
+	pod.Annotations[constants.AnnotationService] = "service-response"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, 0, serviceRegistration.Service.Port)
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: true},
+		{Name: "metrics", Port: 5051, Default: false},
+	}, serviceRegistration.Service.Ports)
+	require.Equal(t, "http:5050,metrics:5051", serviceRegistration.Service.Meta["ports"])
+	require.Equal(t, "5050", serviceRegistration.Service.Meta["port-http"])
+	require.Equal(t, "5051", serviceRegistration.Service.Meta["port-metrics"])
+
+	require.Empty(t, proxyServiceRegistration.Service.Proxy.LocalServiceAddress)
+	require.Zero(t, proxyServiceRegistration.Service.Proxy.LocalServicePort)
+	require.Nil(t, proxyServiceRegistration.Service.Proxy.Expose.Paths)
+}
+
+func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation_ByName(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+	pod.Annotations[constants.AnnotationDefaultPort] = "metrics"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: false},
+		{Name: "metrics", Port: 5051, Default: true},
+	}, serviceRegistration.Service.Ports)
+}
+
+func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation_ByNumber_FromEndpointsFallback(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	delete(pod.Annotations, constants.AnnotationPort)
+	pod.Annotations[constants.AnnotationService] = "service-response"
+	pod.Annotations[constants.AnnotationDefaultPort] = "5051"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: false},
+		{Name: "metrics", Port: 5051, Default: true},
+	}, serviceRegistration.Service.Ports)
+}
+
+func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation_UnmatchedFallsBackToFirst(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+	pod.Annotations[constants.AnnotationDefaultPort] = "does-not-exist"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: true},
+		{Name: "metrics", Port: 5051, Default: false},
+	}, serviceRegistration.Service.Ports)
 }
 
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
