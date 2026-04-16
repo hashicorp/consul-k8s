@@ -80,7 +80,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	config := binding.BinderConfig{}
 	var gateway gwv1.Gateway
 
-	log := r.Log.V(1).WithValues("gateway-stable", req.NamespacedName)
+	log := r.Log.WithValues("gateway-stable", req.NamespacedName)
 	log.Info("Reconciling Gateway -  starting for stable API version")
 
 	// get the gateway
