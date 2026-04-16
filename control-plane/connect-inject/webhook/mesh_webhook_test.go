@@ -1586,6 +1586,43 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 		},
 
 		{
+			"basic pod, with multiple named ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 8080,
+								},
+								{
+									Name:          "metrics",
+									ContainerPort: 9090,
+								},
+								{
+									Name:          "admin",
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "http,metrics,admin",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080},{\"name\":\"metrics\",\"containerPort\":9090},{\"name\":\"admin\",\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
+
+		{
 			"basic pod, with unnamed ports",
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
@@ -1607,6 +1644,40 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			map[string]string{
 				constants.AnnotationPort:                   "8080",
 				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
+
+		{
+			"basic pod, with multiple unnamed ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 8080,
+								},
+								{
+									ContainerPort: 9090,
+								},
+								{
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "8080,9090,9292",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080},{\"containerPort\":9090},{\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},

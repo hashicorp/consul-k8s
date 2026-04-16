@@ -1855,7 +1855,7 @@ func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoint
 			return 0, nil, nil
 		}
 
-		defaultIdx := matchingIndexes[0]
+		defaultIdx := defaultEndpointPortIndexForRegistration(pod, endpointPorts, matchingIndexes)
 		servicePorts := make(api.ServicePorts, 0, len(matchingIndexes))
 		defaultPort := 0
 		seenNames := make(map[string]int)
@@ -1914,7 +1914,7 @@ func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoint
 		return 0, nil, nil
 	}
 
-	defaultIdx := matchingIndexes[0]
+	defaultIdx := defaultPortTokenIndexForRegistration(pod, portTokens, matchingIndexes)
 	servicePorts := make(api.ServicePorts, 0, len(matchingIndexes))
 	defaultPort := 0
 	seenNames := make(map[string]int)
@@ -1967,6 +1967,62 @@ func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoint
 	}
 
 	return defaultPort, servicePorts, nil
+}
+
+func defaultEndpointPortIndexForRegistration(pod corev1.Pod, endpointPorts []corev1.EndpointPort, matchingIndexes []int) int {
+	defaultIdx := matchingIndexes[0]
+	desiredDefault := strings.TrimSpace(pod.Annotations[constants.AnnotationDefaultPort])
+	if desiredDefault == "" {
+		return defaultIdx
+	}
+
+	desiredPort, desiredPortErr := strconv.Atoi(desiredDefault)
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(endpointPorts) {
+			continue
+		}
+
+		endpointPort := endpointPorts[idx]
+		if strings.TrimSpace(endpointPort.Name) == desiredDefault {
+			return idx
+		}
+		if desiredPortErr == nil && int(endpointPort.Port) == desiredPort {
+			return idx
+		}
+	}
+
+	return defaultIdx
+}
+
+func defaultPortTokenIndexForRegistration(pod corev1.Pod, portTokens []string, matchingIndexes []int) int {
+	defaultIdx := matchingIndexes[0]
+	desiredDefault := strings.TrimSpace(pod.Annotations[constants.AnnotationDefaultPort])
+	if desiredDefault == "" {
+		return defaultIdx
+	}
+
+	desiredPort, desiredPortErr := strconv.Atoi(desiredDefault)
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(portTokens) {
+			continue
+		}
+
+		token := strings.TrimSpace(portTokens[idx])
+		if token == "" {
+			continue
+		}
+		if token == desiredDefault {
+			return idx
+		}
+		if desiredPortErr == nil {
+			resolvedPort, err := common.PortValue(pod, token)
+			if err == nil && int(resolvedPort) == desiredPort {
+				return idx
+			}
+		}
+	}
+
+	return defaultIdx
 }
 
 func endpointPortsForRegistration(serviceEndpoints corev1.Endpoints) []corev1.EndpointPort {
