@@ -3,5 +3,6 @@
 # Triggering openshift acceptance tests with different test package and mode combinations. The test packages and modes are defined in the matrix strategy in the openshift.yml workflow file. Each combination of test package and mode will be run on a separate runner.
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
 - {runner: 1, test-packages: "metrics", mode: "single-cluster"}
-- {runner: 2, test-packages: "cli", mode: "single-cluster"}
-- {runner: 3, test-packages: "basic", mode: "multi-cluster"}
+- {runner: 2, test-packages: "cli", mode: "multi-cluster"}
+- {runner: 3, test-packages: "basic", mode: "single-cluster"}
+- {runner: 4, test-packages: "server", mode: "single-cluster"}
