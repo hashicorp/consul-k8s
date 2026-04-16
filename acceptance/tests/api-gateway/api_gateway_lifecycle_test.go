@@ -267,7 +267,6 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &gw)
 		require.NoError(r, err)
-		t.Logf("Gateway in the system: %+v", gw)
 
 		require.Len(r, gw.Finalizers, 0)
 	})
