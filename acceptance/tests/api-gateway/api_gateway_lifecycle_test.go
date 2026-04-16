@@ -19,7 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -263,14 +262,10 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// check that the Kubernetes gateway is cleaned up
 	logger.Log(t, "checking that gateway one is cleaned up in Kubernetes")
-	retryCheck(t, 120, func(r *retry.R) {
+	retryCheck(t, 60, func(r *retry.R) {
 		var gw gwv1.Gateway
 
-		cfg := ctrl.GetConfigOrDie()
-		uncachedClient, err := client.New(cfg, client.Options{
-			Scheme: k8sClient.Scheme(),
-		})
-		err = uncachedClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &gw)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &gw)
 		require.NoError(r, err)
 		t.Logf("Gateway in the system: %+v", gw)
 
