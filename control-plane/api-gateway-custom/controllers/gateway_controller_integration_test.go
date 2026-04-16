@@ -365,7 +365,7 @@ func createAllFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client
 			Name: "gatewayclass",
 		},
 		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: "consul.hashicorp.com/gateway-controller-custom",
+			ControllerName: common.GatewayClassControllerName,
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
 				Kind:  "GatewayClassConfig",
@@ -783,7 +783,7 @@ func minimalFieldsSetAPIGW(t *testing.T, ctx context.Context, k8sClient client.W
 			Name: "gatewayclass",
 		},
 		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: "consul.hashicorp.com/gateway-controller-custom",
+			ControllerName: common.GatewayClassControllerName,
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
 				Kind:  "GatewayClassConfig",
@@ -1049,7 +1049,7 @@ func createFunkyCasingFieldsAPIGW(t *testing.T, ctx context.Context, k8sClient c
 			Name: "gatewayclass",
 		},
 		Spec: gwv1beta1.GatewayClassSpec{
-			ControllerName: "consul.hashicorp.com/gateway-controller-custom",
+			ControllerName: common.GatewayClassControllerName,
 			ParametersRef: &gwv1beta1.ParametersReference{
 				Group: "consul.hashicorp.com",
 				Kind:  "GatewayClassConfig",
