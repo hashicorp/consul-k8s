@@ -524,7 +524,7 @@ func TestFailover_Connect(t *testing.T) {
 			// locality-aware routing will function in consul-k8s. In the future, this test will be expanded
 			// to test multi-cluster locality-based failover with sameness groups.
 			for _, v := range testClusters {
-				v.checkLocalities(t)
+				v.checkLocalities(t, isOpenShift)
 			}
 
 			// Verify all the failover Scenarios
@@ -723,8 +723,9 @@ func (c *cluster) dnsFailoverCheck(t *testing.T, cfg *config.TestConfig, release
 		// the context can be used to determine that failover occured to the expected kubernetes cluster
 		// hosting Consul
 		assert.Contains(r, logs, "ADDITIONAL SECTION:")
+		expectedName := failover.context.KubectlOptions(r).ContextName
 		if cfg.UseKind {
-			expectedName := strings.Replace(failover.context.KubectlOptions(r).ContextName, "kind-", "", -1)
+			expectedName = strings.Replace(expectedName, "kind-", "", -1)
 			assert.Contains(r, logs, expectedName)
 		}
 	})
@@ -845,7 +846,7 @@ func (c *cluster) getPeeringAcceptorSecret(t *testing.T, cfg *config.TestConfig,
 
 // checkLocalities checks the given cluster for `static-client` and `static-server` instances matching the locality
 // expected for the cluster.
-func (c *cluster) checkLocalities(t *testing.T) {
+func (c *cluster) checkLocalities(t *testing.T, isOpenShift bool) {
 	for ns, svcs := range map[string][]string{
 		staticClientNamespace: {
 			staticClientName,
@@ -857,10 +858,16 @@ func (c *cluster) checkLocalities(t *testing.T) {
 		},
 	} {
 		for _, svc := range svcs {
-			cs := c.getCatalogService(t, svc, ns, c.partition)
-			expectedLocality := c.expectedLocalityForService(t, svc, ns)
-			assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
-			assert.Equal(t, expectedLocality, *cs.ServiceLocality, "locality for service %s in %s did not match node locality", svc, c.name)
+			if isOpenShift {
+				cs := c.getCatalogService(t, svc, ns, c.partition)
+				expectedLocality := c.expectedLocalityForService(t, svc, ns)
+				assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
+				assert.Equal(t, expectedLocality, *cs.ServiceLocality, "locality for service %s in %s did not match node locality", svc, c.name)
+			} else {
+				cs := c.getCatalogService(t, svc, ns, c.partition)
+				assert.NotNil(t, cs.ServiceLocality, "service %s in %s did not have locality set", svc, c.name)
+				assert.Equal(t, c.locality, *cs.ServiceLocality, "locality for service %s in %s did not match expected", svc, c.name)
+			}
 		}
 	}
 }
@@ -999,10 +1006,18 @@ func dnsQuery(t testutil.TestingTB, cfg *config.TestConfig, releaseName string, 
 	var logs string
 
 	retry.RunWith(timer, t, func(r *retry.R) {
-		dnsNamespace := dnsServer.context.KubectlOptions(r).Namespace
-		args := []string{"exec", "-i",
-			staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.%s",
-				releaseName, dnsNamespace)}
+		var args []string
+		if cfg.UseOpenshift || cfg.EnableOpenshift {
+			dnsNamespace := dnsServer.context.KubectlOptions(r).Namespace
+			args = []string{"exec", "-i",
+				staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.%s",
+					releaseName, dnsNamespace)}
+		} else {
+			args = []string{"exec", "-i",
+				staticClientDeployment, "-c", staticClientName, "--", "dig", fmt.Sprintf("@%s-consul-dns.default",
+					releaseName), "ANY"}
+		}
+
 		args = append(args, dnsQuery...)
 		var err error
 		logs, err = k8s.RunKubectlAndGetOutputE(r, dnsServer.clientOpts, args...)
