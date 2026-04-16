@@ -49,7 +49,6 @@ func TestPartitions_Gateway(t *testing.T) {
 		"global.tls.httpsOnly": "true",
 
 		"global.acls.manageSystemACLs": "true",
-		"global.image":                 "hashicorp/consul:1.22.6",
 
 		"connectInject.enabled": "true",
 		// When mirroringK8S is set, this setting is ignored.
