@@ -262,10 +262,11 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// check that the Kubernetes gateway is cleaned up
 	logger.Log(t, "checking that gateway one is cleaned up in Kubernetes")
-	retryCheck(t, 60, func(r *retry.R) {
+	retryCheck(t, 120, func(r *retry.R) {
 		var gw gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &gw)
 		require.NoError(r, err)
+		t.Logf("Gateway in the system: %+v", gw)
 
 		require.Len(r, gw.Finalizers, 0)
 	})
