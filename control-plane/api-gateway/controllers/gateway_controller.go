@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -98,9 +99,15 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Info("gatewayclass(stable): " + fmt.Sprintf("%+v", gatewayClass))
 
-	if gatewayClass.Spec.ControllerName != common.GatewayClassControllerName {
+	isControlled := gatewayClass.Spec.ControllerName == common.GatewayClassControllerName
+	hasFinalizer := slices.Contains(gateway.Finalizers, common.GatewayFinalizer)
+	if !isControlled && !hasFinalizer {
 		log.Info("skipping reconciliation since controller name does not match", "expected", common.GatewayClassControllerName, "actual", gatewayClass.Spec.ControllerName)
 		return ctrl.Result{}, nil
+	}
+
+	if !isControlled && hasFinalizer {
+		log.Info("final cleanup for previously controlled gateway")
 	}
 
 	// get the gateway class config
