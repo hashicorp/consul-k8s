@@ -49,7 +49,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		"global.tls.httpsOnly": "true",
 
 		"global.acls.manageSystemACLs": "true",
-		"global.image":                 "docker.mirror.hashicorp.services/hashicorppreview/consul:1.22.0-dev",
+		"global.image":                 "hashicorp/consul:1.22.6",
 
 		"connectInject.enabled": "true",
 		// When mirroringK8S is set, this setting is ignored.
