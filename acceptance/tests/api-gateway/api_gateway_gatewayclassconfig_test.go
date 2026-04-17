@@ -230,33 +230,40 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 			require.NotNil(r, updatedDeployment.Spec.Replicas)
 		})
 
-		triggerGatewayReconcile := func() {
-			var gateway gwv1.Gateway
-			err = client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &gateway)
-			require.NoError(t, err)
-			if gateway.Annotations == nil {
-				gateway.Annotations = map[string]string{}
-			}
-			gateway.Annotations["acceptance.hashicorp.com/reconcile-trigger"] = time.Now().UTC().Format(time.RFC3339Nano)
-			err = client.Update(context.Background(), &gateway)
-			require.NoError(t, err)
-		}
-
-		triggerGatewayReconcile()
+		triggerGatewayReconcile(t, client, name, namespace)
 
 		// The gateway controller can observe the owned Deployment update before its cache
 		// reflects the new replica count. Trigger a second reconcile after a short delay so
 		// the clamp logic uses the latest Deployment state.
 		time.Sleep(15 * time.Second)
-		triggerGatewayReconcile()
+		triggerGatewayReconcile(t, client, name, namespace)
 	}
 
+}
+
+func triggerGatewayReconcile(t *testing.T, client client.Client, name, namespace string) {
+	gateway := &gwv1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"component": "api-gateway",
+			},
+		},
+	}
+	updateKubernetes(t, client, gateway, func(g *gwv1.Gateway) {
+		if g.Annotations == nil {
+			g.Annotations = map[string]string{}
+		}
+		g.Annotations["acceptance.hashicorp.com/reconcile-trigger"] = time.Now().UTC().Format(time.RFC3339Nano)
+	})
 }
 
 func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1.Gateway) {
 	t.Helper()
 
 	retryCheckWithWait(t, 40, 10*time.Second, func(r *retry.R) {
+		triggerGatewayReconcile(t, k8client, name, namespace)
 		logger.Log(t, "checking that gateway instances match defined gateway class config")
 		logger.Log(t, fmt.Sprintf("want: %d", *wantNumber))
 
