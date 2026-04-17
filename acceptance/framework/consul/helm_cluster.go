@@ -106,6 +106,14 @@ func NewHelmCluster(
 	helpers.MergeMaps(values, helmValues)
 
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		//Only installing custom gateway API CRDs in OpenShift for API Gateway tests.
+		//For other tests packages, we can rely on the standard Gateway API CRDs and avoid installing any custom CRDs.
+		if strings.HasPrefix(t.Name(), "TestAPIGateway") {
+			//To install custom gateway API CRDs in OpenShift for API Gateway tests,
+			//we need to enable the consulapi CRDs since the custom gateway API CRDs depend on some of the consulapi CRDs.
+			values["global.openshift.crds.consulapi.enabled"] = "true"
+		}
+
 		applyOpenShiftDefaults(values)
 	}
 

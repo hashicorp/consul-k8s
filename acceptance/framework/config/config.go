@@ -134,6 +134,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 
 	if t.EnableOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
+		//It will install the tcproute gateway.networking.k8s.io/v1alpha2 CRD
+		//& gateway controller will be watching for tcproutes in the cluster.
 		setIfNotEmpty(helmValues, "global.openshift.crds.enableTcpRoute", "true")
 	}
 
