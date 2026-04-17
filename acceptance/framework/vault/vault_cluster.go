@@ -5,7 +5,6 @@ package vault
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -35,7 +34,7 @@ import (
 
 const (
 	releaseLabel                 = "app.kubernetes.io/instance"
-	defaultVaultHelmChartVersion = "v0.32.0"
+	defaultVaultHelmChartVersion = "v0.21.0"
 )
 
 // VaultCluster represents a vault installation.
@@ -68,7 +67,8 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	entstr := "-ent"
 
 	values := defaultHelmValues(releaseName)
-	if cfg.EnableOpenshift || cfg.UseOpenshift {
+	isOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
+	if isOpenShift {
 		values["global.openshift"] = "true"
 	}
 	if cfg.EnablePodSecurityPolicies {
@@ -86,7 +86,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
-	if cfg.UseOpenshift || cfg.EnableOpenshift {
+	if isOpenShift {
 		values["server.image.repository"] = "docker.io/hashicorp/vault"
 		values["injector.image.repository"] = "docker.io/hashicorp/vault-k8s"
 		values["injector.agentImage.repository"] = "docker.io/hashicorp/vault"
@@ -99,7 +99,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
 
 			values["server.image.repository"] = "docker.mirror.hashicorp.services/hashicorp/vault-enterprise"
-			if cfg.UseOpenshift || cfg.EnableOpenshift {
+			if isOpenShift {
 				values["server.image.repository"] = "docker.io/hashicorp/vault-enterprise"
 				values["server.image.repository"] = "docker.io/hashicorp/vault-enterprise"
 				values["injector.agentImage.repository"] = "docker.io/hashicorp/vault-enterprise"
@@ -137,7 +137,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
-		isOpenShift:        cfg.UseOpenshift || cfg.EnableOpenshift,
+		isOpenShift:        isOpenShift,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		releaseName:        releaseName,
@@ -244,6 +244,46 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 // kubernetes host and auth path.
 // We need to take vaultClient here in case this Vault cluster does not have a server to run API commands against.
 func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Client, authPath, k8sHost, saName, saNS string) {
+	if v.isOpenShift {
+		v.OpenshiftConfigureAuthMethod(t, vaultClient, authPath, k8sHost, saName, saNS)
+		return
+	}
+	v.logger.Logf(t, "enabling kubernetes auth method on %s path", authPath)
+	err := vaultClient.Sys().EnableAuthWithOptions(authPath, &vapi.EnableAuthOptions{
+		Type: "kubernetes",
+	})
+	require.NoError(t, err)
+
+	// To configure the auth method, we need to read the token and the CA cert from the auth method's
+	// service account token. In Kube-1.24 and above the secret is not automatically generated so we
+	// rely on it being created prior to calling ConfigureAuthMethod.
+	// The JWT token and CA cert is what Vault server will use to validate service account token
+	// with the Kubernetes API.
+	secretName := saName
+	var sa *corev1.ServiceAccount
+	retry.Run(t, func(r *retry.R) {
+		sa, err = v.kubernetesClient.CoreV1().ServiceAccounts(saNS).Get(context.Background(), saName, metav1.GetOptions{})
+		require.NoError(r, err)
+		// In Kubernetes <1.24 the serviceAccount will have a secret automatically generated.
+		if len(sa.Secrets) != 0 {
+			secretName = sa.Secrets[0].Name
+		}
+	})
+	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
+	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+	require.NoError(t, err)
+	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
+		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
+		"kubernetes_ca_cert": string(tokenSecret.Data["ca.crt"]),
+		"kubernetes_host":    k8sHost,
+	})
+	require.NoError(t, err)
+}
+
+// ConfigureAuthMethod configures the auth method in Vault from the provided service account name and namespace,
+// kubernetes host and auth path.
+// We need to take vaultClient here in case this Vault cluster does not have a server to run API commands against.
+func (v *VaultCluster) OpenshiftConfigureAuthMethod(t *testing.T, vaultClient *vapi.Client, authPath, k8sHost, saName, saNS string) {
 	v.logger.Logf(t, "enabling kubernetes auth method on %s path", authPath)
 	err := vaultClient.Sys().EnableAuthWithOptions(authPath, &vapi.EnableAuthOptions{
 		Type: "kubernetes",
@@ -373,212 +413,6 @@ func (v *VaultCluster) Destroy(t *testing.T) {
 	}
 }
 
-func (v *VaultCluster) uninstallReleaseNoHooks(t *testing.T, releaseName string) error {
-	_, err := helm.RunHelmCommandAndGetOutputE(t, v.helmOptions,
-		"uninstall", releaseName,
-		"--no-hooks",
-		"--timeout", "30s",
-	)
-	return err
-}
-
-func (v *VaultCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
-	t.Helper()
-
-	namespace := v.helmOptions.KubectlOptions.Namespace
-	v.logger.Logf(t, "Cleaning stale Vault resources before install in OpenShift namespace %s", namespace)
-	v.cleanupBrokenInjectorWebhooks(t, namespace)
-	v.cleanupStaleVaultReleases(t)
-}
-
-func (v *VaultCluster) cleanupBrokenInjectorWebhooks(t *testing.T, namespace string) {
-	t.Helper()
-
-	client := v.kubernetesAPIClient(t)
-	webhookConfigs, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		v.logger.Logf(t, "Unable to list mutating webhook configurations during stale webhook cleanup: %v", err)
-		return
-	}
-
-	for _, cfg := range webhookConfigs.Items {
-		if !strings.Contains(cfg.Name, "consul-connect-injector") {
-			continue
-		}
-
-		shouldDelete := false
-		for _, wh := range cfg.Webhooks {
-			if wh.ClientConfig.Service == nil {
-				continue
-			}
-			if wh.ClientConfig.Service.Namespace != namespace {
-				continue
-			}
-
-			serviceName := wh.ClientConfig.Service.Name
-			_, svcErr := client.CoreV1().Services(namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
-			if k8serrors.IsNotFound(svcErr) {
-				v.logger.Logf(t, "Deleting stale mutating webhook configuration %s because target service %s/%s does not exist", cfg.Name, namespace, serviceName)
-				shouldDelete = true
-				break
-			}
-			if svcErr != nil {
-				v.logger.Logf(t, "Unable to validate webhook target service %s/%s for configuration %s: %v", namespace, serviceName, cfg.Name, svcErr)
-			}
-		}
-
-		if !shouldDelete {
-			continue
-		}
-
-		delErr := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), cfg.Name, metav1.DeleteOptions{})
-		if delErr != nil && !k8serrors.IsNotFound(delErr) {
-			require.NoError(t, delErr)
-		}
-	}
-}
-
-func (v *VaultCluster) cleanupOpenShiftResourcesByRelease(t *testing.T, releaseName string) {
-	t.Helper()
-
-	client := v.kubernetesAPIClient(t)
-	selector := v.releaseLabelSelectorFor(releaseName)
-	listOptions := metav1.ListOptions{LabelSelector: selector}
-
-	deleteList := func(err error) {
-		if err != nil && !k8serrors.IsNotFound(err) {
-			require.NoError(t, err)
-		}
-	}
-
-	var gracePeriod int64 = 0
-
-	pods, err := client.CoreV1().Pods("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, pod := range pods.Items {
-		err := client.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
-		deleteList(err)
-	}
-
-	statefulSets, err := client.AppsV1().StatefulSets("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, statefulSet := range statefulSets.Items {
-		err := client.AppsV1().StatefulSets(statefulSet.Namespace).Delete(context.Background(), statefulSet.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	deployments, err := client.AppsV1().Deployments("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, deployment := range deployments.Items {
-		err := client.AppsV1().Deployments(deployment.Namespace).Delete(context.Background(), deployment.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	replicaSets, err := client.AppsV1().ReplicaSets("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, replicaSet := range replicaSets.Items {
-		err := client.AppsV1().ReplicaSets(replicaSet.Namespace).Delete(context.Background(), replicaSet.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	persistentVolumeClaims, err := client.CoreV1().PersistentVolumeClaims("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, persistentVolumeClaim := range persistentVolumeClaims.Items {
-		err := client.CoreV1().PersistentVolumeClaims(persistentVolumeClaim.Namespace).Delete(context.Background(), persistentVolumeClaim.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	serviceAccounts, err := client.CoreV1().ServiceAccounts("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, serviceAccount := range serviceAccounts.Items {
-		err := client.CoreV1().ServiceAccounts(serviceAccount.Namespace).Delete(context.Background(), serviceAccount.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	roles, err := client.RbacV1().Roles("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, role := range roles.Items {
-		err := client.RbacV1().Roles(role.Namespace).Delete(context.Background(), role.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	roleBindings, err := client.RbacV1().RoleBindings("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, roleBinding := range roleBindings.Items {
-		err := client.RbacV1().RoleBindings(roleBinding.Namespace).Delete(context.Background(), roleBinding.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	services, err := client.CoreV1().Services("").List(context.Background(), listOptions)
-	deleteList(err)
-	for _, service := range services.Items {
-		err := client.CoreV1().Services(service.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	clusterRoleBindings, err := client.RbacV1().ClusterRoleBindings().List(context.Background(), listOptions)
-	deleteList(err)
-	for _, clusterRoleBinding := range clusterRoleBindings.Items {
-		err := client.RbacV1().ClusterRoleBindings().Delete(context.Background(), clusterRoleBinding.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	clusterRoles, err := client.RbacV1().ClusterRoles().List(context.Background(), listOptions)
-	deleteList(err)
-	for _, clusterRole := range clusterRoles.Items {
-		err := client.RbacV1().ClusterRoles().Delete(context.Background(), clusterRole.Name, metav1.DeleteOptions{})
-		deleteList(err)
-	}
-
-	for _, secretName := range []string{
-		certSecretName(releaseName),
-		CASecretName(releaseName),
-		fmt.Sprintf("%s-vault-root-token", releaseName),
-		fmt.Sprintf("%s-vault-token", releaseName),
-	} {
-		secrets, err := client.CoreV1().Secrets("").List(context.Background(), metav1.ListOptions{FieldSelector: fmt.Sprintf("metadata.name=%s", secretName)})
-		deleteList(err)
-		for _, secret := range secrets.Items {
-			err := client.CoreV1().Secrets(secret.Namespace).Delete(context.Background(), secret.Name, metav1.DeleteOptions{})
-			deleteList(err)
-		}
-	}
-}
-
-func (v *VaultCluster) cleanupStaleVaultReleases(t *testing.T) {
-	t.Helper()
-
-	helmListOutput, err := helm.RunHelmCommandAndGetOutputE(t, v.helmOptions, "list", "--output", "json")
-	if err != nil {
-		v.logger.Logf(t, "Unable to list Helm releases for stale Vault cleanup: %v", err)
-		return
-	}
-
-	var installedReleases []map[string]string
-	if err := json.Unmarshal([]byte(helmListOutput), &installedReleases); err != nil {
-		v.logger.Logf(t, "Unable to parse Helm release list for stale Vault cleanup: %v", err)
-		return
-	}
-
-	for _, release := range installedReleases {
-		// if !strings.Contains(release["chart"], "vault-") {
-		// 	continue
-		// }
-
-		releaseName := release["name"]
-		if releaseName == "" {
-			continue
-		}
-
-		v.logger.Logf(t, "Found stale Vault release %s (chart %s), uninstalling before fresh test install", releaseName, release["chart"])
-		if err := v.uninstallReleaseNoHooks(t, releaseName); err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
-			v.logger.Logf(t, "Unable to uninstall stale Vault release %s: %v", releaseName, err)
-		}
-
-		v.cleanupOpenShiftResourcesByRelease(t, releaseName)
-	}
-}
-
 func defaultHelmValues(releaseName string) map[string]string {
 	certSecret := certSecretName(releaseName)
 	caSecret := CASecretName(releaseName)
@@ -629,11 +463,7 @@ func (v *VaultCluster) Address() string {
 // releaseLabelSelector returns label selector that selects all pods
 // from a Vault installation.
 func (v *VaultCluster) releaseLabelSelector() string {
-	return v.releaseLabelSelectorFor(v.releaseName)
-}
-
-func (v *VaultCluster) releaseLabelSelectorFor(releaseName string) string {
-	return fmt.Sprintf("%s=%s", releaseLabel, releaseName)
+	return fmt.Sprintf("%s=%s", releaseLabel, v.releaseName)
 }
 
 // serverEnabled returns true if this Vault cluster has a server.
@@ -666,8 +496,6 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 		vaultService,
 		fmt.Sprintf("%s.%s", vaultService, namespace),
 		fmt.Sprintf("%s.%s.svc", vaultService, namespace),
-		fmt.Sprintf("%s.default", vaultService),
-		fmt.Sprintf("%s.default.svc", vaultService),
 	}
 	certPem, keyPem, err := cert.GenerateCert("Vault server", 24*time.Hour, caCertTmpl, signer, certSANs)
 	require.NoError(t, err)
