@@ -1,6 +1,6 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
-
+# This file defines the test packages and runners for the OpenShift acceptance tests. Each entry specifies which test package to run, the runner to use, and the mode (single-cluster or multi-cluster) for the tests. The cloud package is excluded from this suite as it is triggered from a non consul-k8s repository and requires HCP credentials.
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
 - {runner: 1, test-packages: "cli", mode: "single-cluster"}
 - {runner: 2, test-packages: "metrics", mode: "single-cluster"}
