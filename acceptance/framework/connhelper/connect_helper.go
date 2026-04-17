@@ -353,28 +353,47 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts) {
 		destinationNamespace = opts.DestinationNamespace
 	}
 
-	retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		intention := &api.ServiceIntentionsConfigEntry{
-			Kind: api.ServiceIntentions,
-			Name: StaticServerName,
-			Sources: []*api.SourceIntention{
-				{
-					Name:   client,
-					Action: api.IntentionActionAllow,
+	if c.Cfg.EnableOpenshift || c.Cfg.UseOpenshift {
+		retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+		retry.RunWith(retrier, t, func(r *retry.R) {
+			intention := &api.ServiceIntentionsConfigEntry{
+				Kind: api.ServiceIntentions,
+				Name: StaticServerName,
+				Sources: []*api.SourceIntention{
+					{
+						Name:   client,
+						Action: api.IntentionActionAllow,
+					},
 				},
-			},
-		}
+			}
 
-		// Only set namespace fields if Consul namespaces are enabled
-		if c.HelmValues["global.enableConsulNamespaces"] == "true" {
-			intention.Namespace = destinationNamespace
-			intention.Sources[0].Namespace = sourceNamespace
-		}
+			// Only set namespace fields if Consul namespaces are enabled
+			if c.HelmValues["global.enableConsulNamespaces"] == "true" {
+				intention.Namespace = destinationNamespace
+				intention.Sources[0].Namespace = sourceNamespace
+			}
 
-		_, _, err := c.ConsulClient.ConfigEntries().Set(intention, nil)
-		require.NoError(r, err)
-	})
+			_, _, err := c.ConsulClient.ConfigEntries().Set(intention, nil)
+			require.NoError(r, err)
+		})
+	} else {
+		retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+		retry.RunWith(retrier, t, func(r *retry.R) {
+			_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+				Kind:      api.ServiceIntentions,
+				Name:      StaticServerName,
+				Namespace: destinationNamespace,
+				Sources: []*api.SourceIntention{
+					{
+						Namespace: sourceNamespace,
+						Name:      client,
+						Action:    api.IntentionActionAllow,
+					},
+				},
+			}, nil)
+			require.NoError(r, err)
+		})
+	}
 }
 
 // TestConnectionSuccess ensures the static-server pod can connect to the
@@ -445,13 +464,6 @@ func (c *ConnectHelper) helmValues() map[string]string {
 		"global.acls.manageSystemACLs": strconv.FormatBool(c.Secure),
 		"dns.enabled":                  "true",
 		"dns.enableRedirection":        "true",
-	}
-
-	// On OpenShift, disable managing Gateway API CRDs since they already exist
-	if c.Cfg.UseOpenshift || c.Cfg.EnableOpenshift {
-		helmValues["global.openshift.crds.enableTcpRoute"] = "true"
-		helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
-		helmValues["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
 	}
 
 	helpers.MergeMaps(helmValues, c.HelmValues)

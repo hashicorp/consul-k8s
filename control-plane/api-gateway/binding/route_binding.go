@@ -364,6 +364,9 @@ func (r *Binder) mutateRouteWithBindingResults(snapshot *Snapshot, object client
 					if parents.Contains(parent) {
 						parents.Remove(parent)
 					}
+					if id, ok := normalized[parent]; ok {
+						parents.Remove(id)
+					}
 				}
 
 				// set the old parent states

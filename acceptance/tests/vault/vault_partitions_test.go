@@ -100,12 +100,14 @@ func TestVault_Partitions(t *testing.T) {
 			},
 		}, metav1.CreateOptions{})
 		require.NoError(t, err)
-		reviewerTokenTTLSeconds := int64(12 * 60 * 60)
-		tokenReq, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).CreateToken(context.Background(), authMethodRBACName, &authv1.TokenRequest{
-			Spec: authv1.TokenRequestSpec{ExpirationSeconds: &reviewerTokenTTLSeconds},
-		}, metav1.CreateOptions{})
-		require.NoError(t, err)
-		require.NotEmpty(t, tokenReq.Status.Token)
+		if cfg.UseOpenshift || cfg.EnableOpenshift {
+			reviewerTokenTTLSeconds := int64(12 * 60 * 60)
+			tokenReq, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).CreateToken(context.Background(), authMethodRBACName, &authv1.TokenRequest{
+				Spec: authv1.TokenRequestSpec{ExpirationSeconds: &reviewerTokenTTLSeconds},
+			}, metav1.CreateOptions{})
+			require.NoError(t, err)
+			require.NotEmpty(t, tokenReq.Status.Token)
+		}
 		// In Kubernetes 1.24+ the serviceAccount does not automatically populate secrets with permanent JWT tokens, use this instead.
 		// It will be cleaned up by Kubernetes automatically since it references the ServiceAccount.
 		if len(svcAcct.Secrets) == 0 {
@@ -283,8 +285,6 @@ func TestVault_Partitions(t *testing.T) {
 	adminPartitionsRole := "partition-init"
 	partitionInitServiceAccountName := fmt.Sprintf("%s-consul-%s", consulReleaseName, "partition-init")
 	prtAuthRoleConfigSecondary := &vault.KubernetesAuthRoleConfiguration{
-		// OpenShift projected service account tokens can be sensitive to SA naming
-		// drift during retries/re-installs in this multi-cluster flow.
 		ServiceAccountName:  partitionInitServiceAccountName,
 		KubernetesNamespace: ns,
 		AuthMethodPath:      fmt.Sprintf("kubernetes-%s", secondaryPartition),

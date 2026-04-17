@@ -117,32 +117,13 @@ terraform apply \
   -var 'secondary_additional_rosa_args=["--channel-group","stable"]'
 ```
 
-# Bootstrap script
-
+## Delete cluster
 ```bash
-terraform output -json rosa_cluster_bootstrap_scripts | jq -r '.rosa418' > rosa418-bootstrap.sh
-terraform output -json rosa_cluster_bootstrap_scripts | jq -r '.rosa419' > rosa419-bootstrap.sh
-chmod +x rosa418-bootstrap.sh rosa419-bootstrap.sh
+rosa delete cluster -c test-bed-east-tf -y
+rosa delete cluster -c test-bed-west-tf -y
 ```
 
-# Run to create rosa cluster
+## Terraform Destory (Once delete the cluster)
 ```bash
-bash rosa418-bootstrap.sh
-```
-
-# After bootstrap is successful, create admin credentials for ocp cluster
-```
-#Paste your doormat AWS cli credentials
-export AWS_ACCESS_KEY_ID=ASIAV3ZEV6MZ4BSCFGCM
-export AWS_SECRET_ACCESS_KEY=...
-export AWS_SESSION_TOKEN=...
-
-export AWS_REGION=us-west-2
-rosa login --use-auth-code
-
-rosa create admin -c test-bed-418-east
-#output: oc login <api-url> --username <username> --password <password>
-
-rosa create admin -c test-bed-418-west
-#output: oc login <api-url> --username <username> --password <password>
+terraform destroy
 ```

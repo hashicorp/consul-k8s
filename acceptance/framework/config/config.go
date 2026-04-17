@@ -132,9 +132,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		}
 	}
 
-	if t.EnableOpenshift {
+	if t.EnableOpenshift || t.UseOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
-		setIfNotEmpty(helmValues, "global.openshift.crds.enableTcpRoute", "true")
 	}
 
 	if t.EnablePodSecurityPolicies {
@@ -180,11 +179,6 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
-
-	if (t.UseOpenshift || t.EnableOpenshift) && t.IsOpenshiftGreaterThan4_18 {
-		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.18 and later.
-		setIfNotEmpty(helmValues, "global.openshift.isOcpGreaterthan4_18", "true")
-	}
 
 	return helmValues, nil
 }
