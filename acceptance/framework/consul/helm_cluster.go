@@ -106,15 +106,7 @@ func NewHelmCluster(
 	helpers.MergeMaps(values, helmValues)
 
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		//Only installing custom gateway API CRDs in OpenShift for API Gateway tests.
-		//For other tests packages, we can rely on the standard Gateway API CRDs and avoid installing any custom CRDs.
-		if strings.HasPrefix(t.Name(), "TestAPIGateway") {
-			//To install custom gateway API CRDs in OpenShift for API Gateway tests,
-			//we need to enable the consulapi CRDs since the custom gateway API CRDs depend on some of the consulapi CRDs.
-			values["global.openshift.crds.consulapi.enabled"] = "true"
-		}
-
-		applyOpenShiftDefaults(values)
+		applyOpenShiftDefaults(t, cfg, values)
 	}
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -150,7 +142,7 @@ func NewHelmCluster(
 	}
 }
 
-func applyOpenShiftDefaults(values map[string]string) {
+func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[string]string) {
 	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
 	// attempt to adopt or create them for per-test releases.
 	//4.18 either manageExternalCRDs or manageNonStandardCRDs will true with enableTcpRoute true
@@ -160,7 +152,22 @@ func applyOpenShiftDefaults(values map[string]string) {
 	values["global.openshift.enabled"] = "true"
 	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
 	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
+	//It will install the tcproute gateway.networking.k8s.io/v1alpha2 CRD
+	//& gateway controller will be watching for tcproutes in the cluster.
 	values["global.openshift.crds.enableTcpRoute"] = "true"
+
+	//Only installing custom gateway API CRDs in OpenShift for API Gateway tests.
+	//For other tests packages, we can rely on the standard Gateway API CRDs and avoid installing any custom CRDs.
+	if strings.HasPrefix(t.Name(), "TestAPIGateway") {
+		//To install custom gateway API CRDs in OpenShift for API Gateway tests,
+		//we need to enable the consulapi CRDs since the custom gateway API CRDs depend on some of the consulapi CRDs.
+		values["global.openshift.crds.consulapi.enabled"] = "true"
+	}
+
+	if cfg.IsOpenshiftGreaterThan4_18 {
+		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.18 and later.
+		values["global.openshift.isOcpGreaterthan4_18"] = "true"
+	}
 
 	// OpenShift's default security context constraints can cause issues with Helm test cleanup,
 	// so we set the affinity to null to allow the chart's default anti-affinity rules to take effect.

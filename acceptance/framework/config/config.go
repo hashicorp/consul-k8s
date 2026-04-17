@@ -132,11 +132,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		}
 	}
 
-	if t.EnableOpenshift {
+	if t.EnableOpenshift || t.UseOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
-		//It will install the tcproute gateway.networking.k8s.io/v1alpha2 CRD
-		//& gateway controller will be watching for tcproutes in the cluster.
-		setIfNotEmpty(helmValues, "global.openshift.crds.enableTcpRoute", "true")
 	}
 
 	if t.EnablePodSecurityPolicies {
@@ -182,11 +179,6 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 	setIfNotEmpty(helmValues, "global.imageK8S", t.ConsulK8SImage)
 	setIfNotEmpty(helmValues, "global.imageEnvoy", t.EnvoyImage)
 	setIfNotEmpty(helmValues, "global.imageConsulDataplane", t.ConsulDataplaneImage)
-
-	if t.UseOpenshift && t.IsOpenshiftGreaterThan4_18 {
-		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.18 and later.
-		setIfNotEmpty(helmValues, "global.openshift.isOcpGreaterthan4_18", "true")
-	}
 
 	return helmValues, nil
 }
