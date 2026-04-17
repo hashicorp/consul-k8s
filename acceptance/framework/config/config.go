@@ -48,13 +48,13 @@ func NewKubeTestConfigList(kubeConfigs, kubeContexts, kubeNamespaces []string) [
 	out := make([]KubeTestConfig, int(l))
 	for i := range out {
 		kenv := KubeTestConfig{}
-		if len(kubeConfigs) != 0 {
+		if i < len(kubeConfigs) {
 			kenv.KubeConfig = kubeConfigs[i]
 		}
-		if len(kubeContexts) != 0 {
+		if i < len(kubeContexts) {
 			kenv.KubeContext = kubeContexts[i]
 		}
-		if len(kubeNamespaces) != 0 {
+		if i < len(kubeNamespaces) {
 			kenv.KubeNamespace = kubeNamespaces[i]
 		}
 		out[i] = kenv
@@ -107,8 +107,9 @@ type TestConfig struct {
 	UseKind         bool
 	UseOpenshift    bool
 
-	helmChartPath string
-	DualStack     bool
+	helmChartPath              string
+	DualStack                  bool
+	IsOpenshiftGreaterThan4_18 bool
 }
 
 // HelmValuesFromConfig returns a map of Helm values
@@ -131,7 +132,7 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		}
 	}
 
-	if t.EnableOpenshift {
+	if t.EnableOpenshift || t.UseOpenshift {
 		setIfNotEmpty(helmValues, "global.openshift.enabled", "true")
 	}
 

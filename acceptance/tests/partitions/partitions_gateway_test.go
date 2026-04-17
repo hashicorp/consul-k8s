@@ -34,6 +34,10 @@ func TestPartitions_Gateway(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		t.Skipf("skipping this test because some gateway changes related to aws CSL-13250 is not yet merged into main branch and those changes are required to run peering tests on OpenShift")
+	}
+
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 
@@ -282,7 +286,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		}
 
 		logger.Log(t, "patching route to target server")
-		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 		logger.Log(t, "checking that the connection is not successful because there's no intention")
 		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, targetAddress)
@@ -342,7 +346,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		})
 
 		logger.Log(t, "patching route to target server")
-		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 		logger.Log(t, "checking that the connection is not successful because there's no intention")
 		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, targetAddress)

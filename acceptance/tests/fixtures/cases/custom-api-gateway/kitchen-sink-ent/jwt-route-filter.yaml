@@ -1,0 +1,15 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteAuthFilter
+metadata:
+  name: route-jwt-auth-filter
+spec:
+  jwt:
+    providers:
+    - name: "local"
+      verifyClaims:
+      - path:
+          - role
+        value: doctor
