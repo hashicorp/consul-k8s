@@ -29,7 +29,6 @@ import (
 
 	"github.com/mitchellh/cli"
 	"gopkg.in/yaml.v3"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,11 +80,7 @@ type Command struct {
 	once sync.Once
 	help string
 
-	nodeSelector       map[string]string
-	tolerations        []corev1.Toleration
-	serviceAnnotations []string
-	resources          corev1.ResourceRequirements
-	consulApiEnabled   bool
+	consulApiEnabled bool
 
 	ctx context.Context
 
