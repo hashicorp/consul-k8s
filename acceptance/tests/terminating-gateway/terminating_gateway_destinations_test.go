@@ -42,6 +42,8 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 		}`
 	)
 
+	hostnameDestinationSupported := !(cfg.EnableOpenshift || cfg.UseOpenshift)
+
 	cases := []struct {
 		secure bool
 	}{
@@ -114,7 +116,9 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 			// Create the service default declaring the external service (aka Destination)
 			logger.Log(t, "creating tcp-based service defaults")
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
-				CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
+				if hostnameDestinationSupported {
+					CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "", 443, staticServerServiceName)
+				}
 				CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "", 80, staticServerIP)
 			})
 
@@ -126,18 +130,27 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 				logger.Log(t, "testing intentions prevent connections through the terminating gateway")
 				retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
 					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
-					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
+					if hostnameDestinationSupported {
+						k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
+					}
 				})
 				logger.Log(t, "adding intentions to allow traffic from client ==> server")
-				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerHostnameID)
 				AddIntention(t, consulClient, "", "", staticClientName, "", staticServerIPID)
+				if hostnameDestinationSupported {
+					AddIntention(t, consulClient, "", "", staticClientName, "", staticServerHostnameID)
+				}
 			}
 
 			// Test that we can make a call to the terminating gateway.
 			logger.Log(t, "trying calls to terminating gateway")
+			if !hostnameDestinationSupported {
+				logger.Log(t, "skipping hostname destination check on OpenShift because DNS redirection does not resolve Kubernetes service DNS names in this test setup")
+			}
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
 				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
+				if hostnameDestinationSupported {
+					k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, "-k", staticServerHostnameURL)
+				}
 			})
 			// Try running some different scenarios
 			staticServerHostnameURL = fmt.Sprintf("http://%s", staticServerServiceName)
@@ -152,14 +165,18 @@ func TestTerminatingGatewayDestinations(t *testing.T) {
 
 			// You can't use TLS w/ protocol set to anything L7; Envoy can't snoop the traffic when the client encrypts it
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
-				CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerServiceName)
+				if hostnameDestinationSupported {
+					CreateServiceDefaultDestination(t, consulClient, "", staticServerHostnameID, "http", 80, staticServerServiceName)
+				}
 				CreateServiceDefaultDestination(t, consulClient, "", staticServerIPID, "http", 80, staticServerIP)
 			})
 
 			logger.Log(t, "trying calls to terminating gateway")
 			retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
 				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerIPURL)
-				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerHostnameURL)
+				if hostnameDestinationSupported {
+					k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), staticClientName, staticServerHostnameURL)
+				}
 			})
 		})
 	}
