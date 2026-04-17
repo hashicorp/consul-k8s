@@ -125,3 +125,71 @@ variable "rosa_create_timeout" {
   default     = "120m"
   description = "Timeout used by terraform while waiting for rosa cluster creation commands to finish."
 }
+
+variable "cluster_pairs" {
+  type = map(object({
+    primary_cluster_name           = string
+    secondary_cluster_name         = string
+    primary_vpc_cidr               = string
+    secondary_vpc_cidr             = string
+    primary_service_cidr           = string
+    secondary_service_cidr         = string
+    primary_pod_cidr               = string
+    secondary_pod_cidr             = string
+    openshift_version              = optional(string)
+    worker_instance_type           = optional(string)
+    worker_replicas                = optional(number)
+    az_count                       = optional(number)
+    host_prefix                    = optional(number)
+    primary_additional_rosa_args   = optional(list(string))
+    secondary_additional_rosa_args = optional(list(string))
+    tags                           = optional(map(string))
+  }))
+  default     = {}
+  description = "Optional map of independent primary/secondary ROSA cluster pairs. When set, Terraform creates one fully isolated peered VPC pair per entry. Regions remain controlled by primary_region and secondary_region for all pairs."
+
+  validation {
+    condition = alltrue([
+      for pair in values(var.cluster_pairs) : try(pair.az_count, 1) >= 1 && try(pair.az_count, 1) <= 3
+    ])
+    error_message = "Each cluster_pairs entry must use an az_count between 1 and 3."
+  }
+
+  validation {
+    condition = length(distinct(flatten([
+      for pair in values(var.cluster_pairs) : [
+        pair.primary_cluster_name,
+        pair.secondary_cluster_name,
+      ]
+      ]))) == length(flatten([
+      for pair in values(var.cluster_pairs) : [
+        pair.primary_cluster_name,
+        pair.secondary_cluster_name,
+      ]
+    ]))
+    error_message = "Each cluster name in cluster_pairs must be unique."
+  }
+
+  validation {
+    condition = length(distinct(flatten([
+      for pair in values(var.cluster_pairs) : [
+        pair.primary_vpc_cidr,
+        pair.secondary_vpc_cidr,
+        pair.primary_service_cidr,
+        pair.secondary_service_cidr,
+        pair.primary_pod_cidr,
+        pair.secondary_pod_cidr,
+      ]
+      ]))) == length(flatten([
+      for pair in values(var.cluster_pairs) : [
+        pair.primary_vpc_cidr,
+        pair.secondary_vpc_cidr,
+        pair.primary_service_cidr,
+        pair.secondary_service_cidr,
+        pair.primary_pod_cidr,
+        pair.secondary_pod_cidr,
+      ]
+    ]))
+    error_message = "cluster_pairs CIDR values must be unique across all pairs."
+  }
+}
