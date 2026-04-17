@@ -80,3 +80,14 @@ terraform apply \
   -var 'primary_additional_rosa_args=["--channel-group","stable"]' \
   -var 'secondary_additional_rosa_args=["--channel-group","stable"]'
 ```
+
+## Delete cluster
+```bash
+rosa delete cluster -c test-bed-east-tf -y
+rosa delete cluster -c test-bed-west-tf -y
+```
+
+## Terraform Destory (Once delete the cluster)
+```bash
+terraform destroy
+```
