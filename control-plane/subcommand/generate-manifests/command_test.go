@@ -383,7 +383,7 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-// test function for writeObjects to validate the output manifests are in the expected format and have the expected mutations
+// test function for writeObjects to validate the output manifests are in the expected format and have the expected mutations.
 func TestWriteObjects(t *testing.T) {
 	tmpDir := t.TempDir()
 	gatewayMap = map[string]bool{}

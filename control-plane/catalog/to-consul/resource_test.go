@@ -2563,7 +2563,7 @@ func TestServiceResource_addIngress(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create the ingress
-			ing, err := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
+			ing, _ := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
 			t.Logf("Created ingress: %v\n", ing)
 			ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{
 				{IP: "1.2.3.4"}, // This is the 'expectedAddress'
