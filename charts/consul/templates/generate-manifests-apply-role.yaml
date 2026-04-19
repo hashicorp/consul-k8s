@@ -23,6 +23,7 @@ rules:
     - consul.hashicorp.com
   resources:
     - gatewayclasses
+    - customgatewayclasses
     - gateways
     - httproutes
     - tcproutes

@@ -3,6 +3,8 @@ kind: Gateway
 metadata:
   name: api-gateway
   namespace: consul
+  labels:
+    component: api-gateway
 spec:
   gatewayClassName: consul
   listeners:

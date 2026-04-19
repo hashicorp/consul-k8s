@@ -65,7 +65,7 @@ func (v *GatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request
 	return admission.Allowed("gateway policy is valid")
 }
 
-// func to check the resource targetref.kind is Gateway
+// func to check the resource targetref.kind is Gateway.
 func (v *GatewayPolicyWebhook) isTargetRefKindGateway(resource GatewayPolicy) bool {
 	return resource.Spec.TargetRef.Kind == "Gateway"
 }

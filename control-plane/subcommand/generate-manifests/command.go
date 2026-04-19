@@ -29,7 +29,6 @@ import (
 
 	"github.com/mitchellh/cli"
 	"gopkg.in/yaml.v3"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,21 +44,23 @@ import (
 )
 
 const (
-	kindGateway                  = "Gateway"
-	kindHTTPRoute                = "HTTPRoute"
-	kindGRPCRoute                = "GRPCRoute"
-	kindReferenceGrant           = "ReferenceGrant"
-	kindTCPRoute                 = "TCPRoute"
-	kindTLSRoute                 = "TLSRoute"
-	kindUDPRoute                 = "UDPRoute"
-	consulAPIGroup               = "consul.hashicorp.com"
-	consulAPIVersionV1Beta1      = "v1beta1"
-	consulAPIVersionV1Alpha2     = "v1alpha2"
-	K8sGatewayAPIGroup           = "gateway.networking.k8s.io"
-	K8sGatewayAPIVersionV1       = "v1"
-	K8sGatewayAPIVersionV1Beta1  = "v1beta1"
-	K8sGatewayAPIVersionV1Alpha2 = "v1alpha2"
-	GatewayClassControllerName   = "consul.hashicorp.com/gateway-controller"
+	kindGatewayClass                 = "GatewayClass"
+	kindGateway                      = "Gateway"
+	kindHTTPRoute                    = "HTTPRoute"
+	kindGRPCRoute                    = "GRPCRoute"
+	kindReferenceGrant               = "ReferenceGrant"
+	kindTCPRoute                     = "TCPRoute"
+	kindTLSRoute                     = "TLSRoute"
+	kindUDPRoute                     = "UDPRoute"
+	consulAPIGroup                   = "consul.hashicorp.com"
+	consulAPIVersionV1Beta1          = "v1beta1"
+	consulAPIVersionV1Alpha2         = "v1alpha2"
+	K8sGatewayAPIGroup               = "gateway.networking.k8s.io"
+	K8sGatewayAPIVersionV1           = "v1"
+	K8sGatewayAPIVersionV1Beta1      = "v1beta1"
+	K8sGatewayAPIVersionV1Alpha2     = "v1alpha2"
+	GatewayClassControllerName       = "consul.hashicorp.com/gateway-controller"
+	CustomGatewayClassControllerName = "consul.hashicorp.com/gateway-controller-consul"
 )
 
 type Command struct {
@@ -81,11 +82,7 @@ type Command struct {
 	once sync.Once
 	help string
 
-	nodeSelector       map[string]string
-	tolerations        []corev1.Toleration
-	serviceAnnotations []string
-	resources          corev1.ResourceRequirements
-	consulApiEnabled   bool
+	consulApiEnabled bool
 
 	ctx context.Context
 
@@ -201,7 +198,7 @@ func (c *Command) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("Error dumping Gateway API objects: %s", err))
 		return 1
 	}
-	time.Sleep(20 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	c.UI.Info(fmt.Sprintf("✅ Gateway API objects dumped into: %s", c.flagManifestsGatewayAPIDir))
 	return 0
@@ -243,13 +240,13 @@ func (c *Command) dumpGatewayAPIObjects() error {
 	// Dump resources no gc is needed to set up
 	fmt.Printf("fetching gwclass\n")
 	fmt.Printf("TYPE: %T\n", &gwv1.GatewayClassList{})
-	// if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1.GatewayClassList{}); err != nil {
-	// 	fmt.Printf("Error dumping gatewayclasses from gateway.networking.k8s.io/v1: %v\n", err)
-	// 	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
-	// 		fmt.Printf("Error dumping gatewayclasses from gateway.networking.k8s.io/v1beta1: %v\n", err)
-	// 		c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
-	// 	}
-	// }
+	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1.GatewayClassList{}); err != nil {
+		fmt.Printf("Error dumping gatewayclasses from gateway.networking.k8s.io/v1: %v\n", err)
+		if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
+			fmt.Printf("Error dumping gatewayclasses from gateway.networking.k8s.io/v1beta1: %v\n", err)
+			c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
+		}
+	}
 	if err := c.dumpTypedList(ctx, "gateways", &gwv1.GatewayList{}); err != nil {
 		if err := c.dumpTypedList(ctx, "gateways", &gwv1beta1.GatewayList{}); err != nil {
 			c.UI.Info(fmt.Sprintf("Skipping Gateway dump: %v", err))
@@ -375,6 +372,14 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	// for gateway.networking.k8s.io/v1
 	case kindGateway:
 		raw["apiVersion"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
+		meta := getMetadata(raw)
+		// check if the gateway is controlled by consul, if yes then add the consul component label
+		key := gwKey(meta["namespace"].(string), meta["name"].(string))
+		if gatewayMap[key] {
+			meta["labels"] = map[string]interface{}{
+				"component": "api-gateway",
+			}
+		}
 
 	case kindHTTPRoute, kindGRPCRoute:
 		raw["apiVersion"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
@@ -389,6 +394,25 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	}
 }
 
+// TODO code: Creating the manifests for CustomGatewayclass but not using it at the moment.
+// Will be enabled for the 2.0 release.
+func convertToConsulGatewayClass(raw map[string]interface{}) {
+	raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
+	raw["kind"] = "CustomGatewayClass"
+	spec := getSpec(raw)
+	meta := getMetadata(raw)
+	if spec == nil {
+		return
+	}
+	if spec["controllerName"] != GatewayClassControllerName {
+		return
+	}
+	spec["controllerName"] = CustomGatewayClassControllerName
+	meta["name"] = meta["name"].(string) + "-custom"
+}
+
+// convertToConsulGateway updates the apiVersion to consul.hashicorp.com/v1beta1, updates the gatewayClassName to consul-custom,
+// and updates the parentref group to consul.hashicorp.com for the allowed routes in listeners.
 func convertToConsulGateway(raw map[string]interface{}) {
 	raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
 	spec := getSpec(raw)
@@ -396,8 +420,11 @@ func convertToConsulGateway(raw map[string]interface{}) {
 	if spec == nil {
 		return
 	}
-	spec["gatewayClassName"] = "consul-custom"
-	meta["name"] = meta["name"].(string) + "-custom"
+	spec["gatewayClassName"] = "consul-custom-class"
+	meta["name"] = meta["name"].(string) + "-consul"
+	meta["labels"] = map[string]interface{}{
+		"component": "api-gateway-consul",
+	}
 
 	// update listeners
 	listeners, ok := spec["listeners"].([]interface{})
@@ -453,7 +480,7 @@ func hasConsulParent(raw map[string]interface{}) bool {
 				gwNamespace = getMetadata(raw)["namespace"].(string)
 			}
 			if gatewayMap[gwKey(gwNamespace, gwName)] {
-				prMap["name"] = prMap["name"].(string) + "-custom"
+				prMap["name"] = prMap["name"].(string) + "-consul"
 				prMap["group"] = consulAPIGroup
 				found = true
 			}
@@ -472,7 +499,7 @@ func convertToConsulRoute(raw map[string]interface{}) {
 		raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Alpha2
 	}
 
-	meta["name"] = meta["name"].(string) + "-custom"
+	meta["name"] = meta["name"].(string) + "-consul"
 }
 
 func convertReferenceGrant(raw map[string]interface{}) {
@@ -495,7 +522,7 @@ func convertReferenceGrant(raw map[string]interface{}) {
 			}
 
 			if gatewayMap[gwKey(ns, name)] {
-				fm["name"] = name + "-custom"
+				fm["name"] = name + "-consul"
 				fm["group"] = consulAPIGroup
 
 			}
@@ -505,7 +532,7 @@ func convertReferenceGrant(raw map[string]interface{}) {
 	}
 
 	raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
-	meta["name"] = meta["name"].(string) + "-custom"
+	meta["name"] = meta["name"].(string) + "-consul"
 
 }
 
@@ -519,6 +546,9 @@ func enforceConsulApiVersion(raw map[string]interface{}) bool {
 
 	switch kind {
 
+	case kindGatewayClass:
+		convertToConsulGatewayClass(raw)
+		return true
 	case kindGateway:
 		key := gwKey(metadata["namespace"].(string), metadata["name"].(string))
 		if !gatewayMap[key] {
