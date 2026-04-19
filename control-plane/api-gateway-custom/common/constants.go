@@ -4,7 +4,7 @@
 package common
 
 const (
-	GatewayClassControllerName = "consul.hashicorp.com/gateway-controller-custom"
+	GatewayClassControllerName = "consul.hashicorp.com/gateway-controller-consul"
 
 	AnnotationGatewayClassConfig = "consul.hashicorp.com/gateway-class-config-custom"
 
