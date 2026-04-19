@@ -1431,14 +1431,14 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 
 	ctx := context.Background()
 	s := runtime.NewScheme()
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 	require.NoError(t, rbac.AddToScheme(s))
 	require.NoError(t, corev1.AddToScheme(s))
 	require.NoError(t, appsv1.AddToScheme(s))
 	require.NoError(t, autoscalingv2.AddToScheme(s))
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -1449,7 +1449,7 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 				AnnotationHPACPUTarget:   "70",
 			},
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			Listeners: listeners,
 		},
 	}
@@ -1477,7 +1477,7 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
 	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 
-	g := New(logrtest.New(t), client, nil)
+	g := New(logrtest.New(t), client, nil, client)
 
 	require.NoError(t, g.Upsert(ctx, gateway, gcc, helmConfig))
 
@@ -1524,14 +1524,14 @@ func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
 
 	ctx := context.Background()
 	s := runtime.NewScheme()
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 	require.NoError(t, rbac.AddToScheme(s))
 	require.NoError(t, corev1.AddToScheme(s))
 	require.NoError(t, appsv1.AddToScheme(s))
 	require.NoError(t, autoscalingv2.AddToScheme(s))
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -1542,7 +1542,7 @@ func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
 				AnnotationHPACPUTarget:   "70",
 			},
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			Listeners: listeners,
 		},
 	}
@@ -1569,7 +1569,7 @@ func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
 	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 
-	g := New(logrtest.New(t), client, nil)
+	g := New(logrtest.New(t), client, nil, client)
 
 	require.NoError(t, g.Upsert(ctx, gateway, gcc, helmConfig))
 
@@ -1626,19 +1626,19 @@ func TestUpsertPreservesManualScaleWithoutScalingAnnotations(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			ctx := context.Background()
 			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
 			require.NoError(t, autoscalingv2.AddToScheme(s))
 
-			gateway := gwv1beta1.Gateway{
+			gateway := gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			}
@@ -1651,7 +1651,7 @@ func TestUpsertPreservesManualScaleWithoutScalingAnnotations(t *testing.T) {
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &tc.gatewayClassConfig).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 
-			g := New(logrtest.New(t), client, nil)
+			g := New(logrtest.New(t), client, nil, client)
 			require.NoError(t, g.Upsert(ctx, gateway, tc.gatewayClassConfig, helmConfig))
 
 			deployment := &appsv1.Deployment{}
