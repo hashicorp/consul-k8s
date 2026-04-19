@@ -96,3 +96,32 @@ func NewClientFromConnMgr(config *Config, watcher ServerConnectionManager) (*cap
 	}
 	return consulClient, nil
 }
+
+func cloneConfig(config *Config) *Config {
+	if config == nil {
+		return nil
+	}
+
+	cloned := *config
+	if config.APIClientConfig != nil {
+		apiConfig := *config.APIClientConfig
+		cloned.APIClientConfig = &apiConfig
+	}
+	return &cloned
+}
+
+// IsEnterpriseDistribution returns true when the connected Consul cluster
+// reports a valid enterprise license.
+func IsEnterpriseDistribution(config *Config, watcher ServerConnectionManager) (bool, error) {
+	client, err := NewClientFromConnMgr(cloneConfig(config), watcher)
+	if err != nil {
+		return false, err
+	}
+
+	reply, err := client.Operator().LicenseGet(nil)
+	if err != nil {
+		return false, err
+	}
+
+	return reply != nil && reply.Valid, nil
+}
