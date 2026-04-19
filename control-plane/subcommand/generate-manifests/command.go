@@ -373,6 +373,9 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	case kindGateway:
 		raw["apiVersion"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
 		meta := getMetadata(raw)
+		if meta == nil || meta["namespace"] == nil || meta["name"] == nil {
+			return
+		}
 		// check if the gateway is controlled by consul, if yes then add the consul component label
 		key := gwKey(meta["namespace"].(string), meta["name"].(string))
 		if gatewayMap[key] {

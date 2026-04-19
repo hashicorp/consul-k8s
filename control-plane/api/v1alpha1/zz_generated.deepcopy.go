@@ -2459,7 +2459,7 @@ func (in *PeeringAcceptorStatus) DeepCopyInto(out *PeeringAcceptorStatus) {
 	*out = *in
 	if in.LatestPeeringVersion != nil {
 		in, out := &in.LatestPeeringVersion, &out.LatestPeeringVersion
-		*out = new(uint64)
+		*out = new(int64)
 		**out = **in
 	}
 	if in.SecretRef != nil {
@@ -2574,7 +2574,7 @@ func (in *PeeringDialerStatus) DeepCopyInto(out *PeeringDialerStatus) {
 	*out = *in
 	if in.LatestPeeringVersion != nil {
 		in, out := &in.LatestPeeringVersion, &out.LatestPeeringVersion
-		*out = new(uint64)
+		*out = new(int64)
 		**out = **in
 	}
 	if in.SecretRef != nil {
