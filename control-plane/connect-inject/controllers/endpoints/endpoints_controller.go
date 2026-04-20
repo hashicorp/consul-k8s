@@ -310,9 +310,6 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
 		}
-		r.Log.Info("created service registration objects",
-			"serviceRegistration", serviceRegistration,
-			"proxyServiceRegistration", proxyServiceRegistration)
 
 		// Register the service instance with Consul.
 		r.Log.Info("registering service with Consul", "name", serviceRegistration.Service.Service,
@@ -434,7 +431,6 @@ func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
 func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
-	r.Log.Info("creating service and proxy service registrations for pod", "pod", pod.Name, "namespace", pod.Namespace)
 
 	// Determine the default service port and optional multi-port definitions.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
@@ -442,8 +438,6 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	if err != nil {
 		return nil, nil, err
 	}
-
-	r.Log.Info("determined service ports for registration", "defaultPort", consulServicePort, "multiPorts", consulServicePorts)
 
 	var node corev1.Node
 	// Ignore errors because we don't want failures to block running services.
