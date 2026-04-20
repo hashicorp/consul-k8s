@@ -75,7 +75,7 @@ cloud-acceptance:
         repo: hashicorp/consul-k8s-workflows
         # ref: main
         # TODO: change ref to main after testing
-        ref: abhishek/eks-test-only-for-ocp
+        ref: shani/workflow-setup-for-minion-chat
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: >
           {
