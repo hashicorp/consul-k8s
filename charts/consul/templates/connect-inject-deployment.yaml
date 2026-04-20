@@ -193,6 +193,7 @@ spec:
                 -default-enable-metrics=false \
                 {{- end }}
                 -enable-gateway-metrics={{ .Values.global.metrics.enableGatewayMetrics }}  \
+                -enable-gateway-scaling={{ .Values.connectInject.apiGateway.managedGatewayClass.scaling.enabled }} \
                 -default-enable-metrics-merging={{ .Values.connectInject.metrics.defaultEnableMerging }}  \
                 -default-merged-metrics-port={{ .Values.connectInject.metrics.defaultMergedMetricsPort }} \
                 -default-prometheus-scrape-port={{ .Values.connectInject.metrics.defaultPrometheusScrapePort }} \
