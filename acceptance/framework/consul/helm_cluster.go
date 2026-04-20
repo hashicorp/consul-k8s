@@ -59,6 +59,7 @@ type HelmCluster struct {
 	noCleanupOnFailure bool
 	noCleanup          bool
 	debugDirectory     string
+	enableOpenshift    bool
 	logger             terratestLogger.TestLogger
 }
 
@@ -120,6 +121,7 @@ func NewHelmCluster(
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
+		enableOpenshift:    cfg.EnableOpenshift,
 		logger:             logger,
 	}
 }
@@ -327,6 +329,30 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 
+		if h.enableOpenshift {
+			mutatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range mutatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), webhookConfig.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				}
+			}
+
+			validatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range validatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.Background(), webhookConfig.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				}
+			}
+		}
+
 		// Delete any secrets that have h.releaseName in their name.
 		secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
@@ -434,6 +460,24 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		for _, roleBinding := range roleBindings.Items {
 			if strings.Contains(roleBinding.Name, h.releaseName) {
 				r.Errorf("Found role binding which should have been deleted: %s", roleBinding.Name)
+			}
+		}
+
+		if h.enableOpenshift {
+			mutatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range mutatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					r.Errorf("Found mutating webhook configuration which should have been deleted: %s", webhookConfig.Name)
+				}
+			}
+
+			validatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range validatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					r.Errorf("Found validating webhook configuration which should have been deleted: %s", webhookConfig.Name)
+				}
 			}
 		}
 

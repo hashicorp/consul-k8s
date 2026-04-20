@@ -8,3 +8,6 @@ metadata:
 spec:
   # In order for Gateways to work whether or not we're enforcing the "restricted" pod security policy, they must not used privileged ports
   mapPrivilegedContainerPorts: 8000
+  # On OpenShift, managed Gateways need an explicit SCC name so the controller can
+  # create namespaced RBAC without attempting to grant permissions for an empty SCC.
+  openshiftSCCName: restricted-v2
