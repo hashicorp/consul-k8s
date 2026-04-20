@@ -1855,6 +1855,10 @@ func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoint
 			return 0, nil, nil
 		}
 
+		if err := validateMultiPortProtocolConsistency(endpointPorts, matchingIndexes); err != nil {
+			return 0, nil, err
+		}
+
 		defaultIdx := defaultEndpointPortIndexForRegistration(pod, endpointPorts, matchingIndexes)
 		servicePorts := make(api.ServicePorts, 0, len(matchingIndexes))
 		defaultPort := 0
@@ -1912,6 +1916,10 @@ func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoint
 	r.Log.Info("determined matching service port indexes", "indexes", matchingIndexes)
 	if len(matchingIndexes) == 0 {
 		return 0, nil, nil
+	}
+
+	if err := validateMultiPortProtocolConsistency(endpointPortsForRegistration(serviceEndpoints), matchingIndexes); err != nil {
+		return 0, nil, err
 	}
 
 	defaultIdx := defaultPortTokenIndexForRegistration(pod, portTokens, matchingIndexes)
@@ -2031,6 +2039,38 @@ func endpointPortsForRegistration(serviceEndpoints corev1.Endpoints) []corev1.En
 		ports = append(ports, subset.Ports...)
 	}
 	return ports
+}
+
+func validateMultiPortProtocolConsistency(endpointPorts []corev1.EndpointPort, matchingIndexes []int) error {
+	if len(matchingIndexes) <= 1 {
+		return nil
+	}
+
+	var expectedProtocol corev1.Protocol
+	hasExpected := false
+
+	for _, idx := range matchingIndexes {
+		if idx < 0 || idx >= len(endpointPorts) {
+			continue
+		}
+
+		protocol := endpointPorts[idx].Protocol
+		if protocol == "" {
+			protocol = corev1.ProtocolTCP
+		}
+
+		if !hasExpected {
+			expectedProtocol = protocol
+			hasExpected = true
+			continue
+		}
+
+		if protocol != expectedProtocol {
+			return fmt.Errorf("multi-port service registration requires all ports to use the same protocol, found %q and %q", expectedProtocol, protocol)
+		}
+	}
+
+	return nil
 }
 
 func matchingServicePortIndexes(pod corev1.Pod, serviceEndpoints corev1.Endpoints, portCount int) []int {

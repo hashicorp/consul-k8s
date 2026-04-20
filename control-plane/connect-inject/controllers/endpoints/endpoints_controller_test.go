@@ -1320,6 +1320,104 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation
 	}, serviceRegistration.Service.Ports)
 }
 
+func TestCreateServiceRegistrations_SingleServiceMultiPort_MixedProtocolsFromAnnotation_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050, Protocol: corev1.ProtocolTCP},
+					{Name: "metrics", Port: 5051, Protocol: corev1.ProtocolUDP},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	_, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.EqualError(t, err, "multi-port service registration requires all ports to use the same protocol, found \"TCP\" and \"UDP\"")
+}
+
+func TestCreateServiceRegistrations_SingleServiceMultiPort_MixedProtocolsFromEndpointsFallback_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	delete(pod.Annotations, constants.AnnotationPort)
+	pod.Annotations[constants.AnnotationService] = "service-response"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050, Protocol: corev1.ProtocolTCP},
+					{Name: "metrics", Port: 5051, Protocol: corev1.ProtocolUDP},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	_, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.EqualError(t, err, "multi-port service registration requires all ports to use the same protocol, found \"TCP\" and \"UDP\"")
+}
+
 // TestReconcileCreateEndpoint tests the logic to create service instances in Consul from the addresses in the Endpoints
 // object. This test covers Controller.createServiceRegistrations and Controller.createGatewayRegistrations.
 // This test depends on a Consul binary being present on the host machine.
