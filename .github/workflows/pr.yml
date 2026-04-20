@@ -75,9 +75,15 @@ cloud-acceptance:
         repo: hashicorp/consul-k8s-workflows
         # ref: main
         # TODO: change ref to main after testing
-        ref: shani/workflow-setup-for-minion-chat
+        ref: abhishek/eks-test-only-for-ocp
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
+        inputs: >
+          {
+            "context": "${{ env.CONTEXT }}-${{ github.event.pull_request.number }}",
+            "repository": "${{ github.repository }}",
+            "branch": "${{ env.BRANCH }}",
+            "sha": "${{ github.sha }}"
+          }
 
 #  pass-required-checks-on-skip:
 #    needs: [ conditional-skip ]
