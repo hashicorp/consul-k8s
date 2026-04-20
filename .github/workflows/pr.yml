@@ -77,7 +77,7 @@ cloud-acceptance:
         # TODO: change ref to main after testing
         ref: shani/workflow-setup-for-minion-chat
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
 
 #  pass-required-checks-on-skip:
 #    needs: [ conditional-skip ]
