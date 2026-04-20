@@ -12,6 +12,9 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"math/big"
+	"os/exec"
+
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -19,15 +22,14 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
-	"math/big"
-	"os/exec"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/hashicorp/consul/api"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path"
 	"testing"
 	"time"
+
+	"github.com/hashicorp/consul/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -109,13 +111,13 @@ func TestOpenshift_APIGateway_Tenancy(t *testing.T) {
 
 			// patch the resources to reference each other
 			logger.Log(t, "patching gateway to certificate")
-			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateway", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
+			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateways.gateway.networking.k8s.io", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to target server")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproutes.gateway.networking.k8s.io", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to gateway")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproutes.gateway.networking.k8s.io", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
 
 			// Grab a kubernetes and consul client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.

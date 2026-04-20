@@ -25,13 +25,15 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	vapi "github.com/hashicorp/vault/api"
 	"github.com/stretchr/testify/require"
+	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
 const (
-	releaseLabel                 = "app.kubernetes.io/instance="
+	releaseLabel                 = "app.kubernetes.io/instance"
 	defaultVaultHelmChartVersion = "v0.21.0"
 )
 
@@ -49,6 +51,7 @@ type VaultCluster struct {
 
 	noCleanupOnFailure bool
 	noCleanup          bool
+	isOpenShift        bool
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 }
@@ -64,6 +67,10 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 	entstr := "-ent"
 
 	values := defaultHelmValues(releaseName)
+	isOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
+	if isOpenShift {
+		values["global.openshift"] = "true"
+	}
 	if cfg.EnablePodSecurityPolicies {
 		values["global.psp.enable"] = "true"
 	}
@@ -79,6 +86,11 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 	vaultEnterpriseLicense := os.Getenv("VAULT_LICENSE")
 
+	if isOpenShift {
+		values["server.image.repository"] = "docker.io/hashicorp/vault"
+		values["injector.image.repository"] = "docker.io/hashicorp/vault-k8s"
+		values["injector.agentImage.repository"] = "docker.io/hashicorp/vault"
+	}
 	if cfg.VaultServerVersion != "" {
 
 		if strings.Contains(cfg.VaultServerVersion, entstr) {
@@ -87,6 +99,11 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 			consul.CreateK8sSecret(t, k8sClient, cfg, ns, vaultLicenseSecretName, vaultLicenseSecretKey, vaultEnterpriseLicense)
 
 			values["server.image.repository"] = "docker.mirror.hashicorp.services/hashicorp/vault-enterprise"
+			if isOpenShift {
+				values["server.image.repository"] = "docker.io/hashicorp/vault-enterprise"
+				values["server.image.repository"] = "docker.io/hashicorp/vault-enterprise"
+				values["injector.agentImage.repository"] = "docker.io/hashicorp/vault-enterprise"
+			}
 			values["server.enterpriseLicense.secretName"] = vaultLicenseSecretName
 			values["server.enterpriseLicense.secretKey"] = vaultLicenseSecretKey
 		}
@@ -120,6 +137,7 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 		kubernetesClient:   ctx.KubernetesClient(t),
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
+		isOpenShift:        isOpenShift,
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		releaseName:        releaseName,
@@ -128,6 +146,11 @@ func NewVaultCluster(t *testing.T, ctx environment.TestContext, cfg *config.Test
 
 // VaultClient returns the vault client.
 func (v *VaultCluster) VaultClient(*testing.T) *vapi.Client { return v.vaultClient }
+
+func (v *VaultCluster) kubernetesAPIClient(t testutil.TestingTB) kubernetes.Interface {
+	t.Helper()
+	return environment.KubernetesClientFromOptions(t, v.kubectlOptions)
+}
 
 // SetupVaultClient sets up and returns a Vault Client.
 func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
@@ -141,7 +164,14 @@ func (v *VaultCluster) SetupVaultClient(t testutil.TestingTB) *vapi.Client {
 	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8200 // use non-secure by default
 
-	serverPod := fmt.Sprintf("%s-vault-0", v.releaseName)
+	var serverPod string
+	serverPod = fmt.Sprintf("%s-vault-0", v.releaseName)
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+		var err error
+		serverPod, err = v.serverPodName(r)
+		require.NoError(r, err)
+	})
+
 	tunnel := terratestk8s.NewTunnelWithLogger(
 		v.helmOptions.KubectlOptions,
 		terratestk8s.ResourceTypePod,
@@ -193,10 +223,11 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 	// needing to use it in ConfigureAuthMethod. Vault expects the user to create the secret manually for any
 	// Kube AuthMethod use.
 	retry.Run(t, func(r *retry.R) {
-		sa, err := v.kubernetesClient.CoreV1().ServiceAccounts(namespace).Get(context.Background(), vaultServerServiceAccountName, metav1.GetOptions{})
+		client := v.kubernetesAPIClient(r)
+		sa, err := client.CoreV1().ServiceAccounts(namespace).Get(context.Background(), vaultServerServiceAccountName, metav1.GetOptions{})
 		require.NoError(r, err)
 		if len(sa.Secrets) == 0 {
-			_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+			_, err = client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        vaultServerServiceAccountName,
 					Annotations: map[string]string{corev1.ServiceAccountNameKey: vaultServerServiceAccountName},
@@ -213,6 +244,10 @@ func (v *VaultCluster) bootstrap(t *testing.T, vaultNamespace string) {
 // kubernetes host and auth path.
 // We need to take vaultClient here in case this Vault cluster does not have a server to run API commands against.
 func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Client, authPath, k8sHost, saName, saNS string) {
+	if v.isOpenShift {
+		v.OpenshiftConfigureAuthMethod(t, vaultClient, authPath, k8sHost, saName, saNS)
+		return
+	}
 	v.logger.Logf(t, "enabling kubernetes auth method on %s path", authPath)
 	err := vaultClient.Sys().EnableAuthWithOptions(authPath, &vapi.EnableAuthOptions{
 		Type: "kubernetes",
@@ -245,6 +280,92 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 	require.NoError(t, err)
 }
 
+// ConfigureAuthMethod configures the auth method in Vault from the provided service account name and namespace,
+// kubernetes host and auth path.
+// We need to take vaultClient here in case this Vault cluster does not have a server to run API commands against.
+func (v *VaultCluster) OpenshiftConfigureAuthMethod(t *testing.T, vaultClient *vapi.Client, authPath, k8sHost, saName, saNS string) {
+	v.logger.Logf(t, "enabling kubernetes auth method on %s path", authPath)
+	err := vaultClient.Sys().EnableAuthWithOptions(authPath, &vapi.EnableAuthOptions{
+		Type: "kubernetes",
+	})
+	require.NoError(t, err)
+
+	// To configure the auth method, we need to read the token and the CA cert from the auth method's
+	// service account token. In Kube-1.24 and above the secret is not automatically generated so we
+	// rely on it being created prior to calling ConfigureAuthMethod.
+	// The JWT token and CA cert is what Vault server will use to validate service account token
+	// with the Kubernetes API.
+	secretName := saName
+	var tokenReviewerJWT string
+	var kubernetesCACert string
+	var sa *corev1.ServiceAccount
+
+	if configPath, configPathErr := v.kubectlOptions.GetConfigPath(t); configPathErr == nil {
+		if apiClientConfig, cfgErr := terratestk8s.LoadApiClientConfigE(configPath, v.kubectlOptions.ContextName); cfgErr == nil {
+			if len(apiClientConfig.CAData) > 0 {
+				kubernetesCACert = string(apiClientConfig.CAData)
+			} else if apiClientConfig.CAFile != "" {
+				if caBytes, readErr := os.ReadFile(apiClientConfig.CAFile); readErr == nil {
+					kubernetesCACert = string(caBytes)
+				}
+			}
+		}
+	}
+
+	reviewerTokenTTLSeconds := int64(12 * 60 * 60)
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		client := v.kubernetesAPIClient(r)
+		sa, err = client.CoreV1().ServiceAccounts(saNS).Get(context.Background(), saName, metav1.GetOptions{})
+		require.NoError(r, err)
+
+		tokenReq, tokenErr := client.CoreV1().ServiceAccounts(saNS).CreateToken(context.Background(), saName, &authv1.TokenRequest{
+			Spec: authv1.TokenRequestSpec{ExpirationSeconds: &reviewerTokenTTLSeconds},
+		}, metav1.CreateOptions{})
+		if tokenErr == nil && tokenReq != nil {
+			tokenReviewerJWT = tokenReq.Status.Token
+		}
+
+		caConfigMap, cmErr := client.CoreV1().ConfigMaps(saNS).Get(context.Background(), "kube-root-ca.crt", metav1.GetOptions{})
+		if kubernetesCACert == "" && cmErr == nil && caConfigMap != nil {
+			kubernetesCACert = caConfigMap.Data["ca.crt"]
+		}
+
+		// In Kubernetes <1.24 the serviceAccount will have a secret automatically generated.
+		if len(sa.Secrets) != 0 {
+			secretName = sa.Secrets[0].Name
+		}
+	})
+
+	client := v.kubernetesAPIClient(t)
+	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
+	if tokenReviewerJWT == "" || kubernetesCACert == "" {
+		var tokenSecret *corev1.Secret
+		retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+			tokenSecret, err = client.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+			require.NoError(r, err)
+			require.NotEmpty(r, tokenSecret.Data["token"], "service account token secret %q is missing token data", secretName)
+			require.NotEmpty(r, tokenSecret.Data["ca.crt"], "service account token secret %q is missing ca.crt data", secretName)
+
+			if tokenReviewerJWT == "" {
+				tokenReviewerJWT = string(tokenSecret.Data["token"])
+			}
+			if kubernetesCACert == "" {
+				kubernetesCACert = string(tokenSecret.Data["ca.crt"])
+			}
+		})
+	}
+
+	require.NotEmpty(t, tokenReviewerJWT, "service account token for %s/%s is empty", saNS, saName)
+	require.NotEmpty(t, kubernetesCACert, "kubernetes CA cert for %s/%s is empty", saNS, saName)
+
+	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
+		"token_reviewer_jwt": tokenReviewerJWT,
+		"kubernetes_ca_cert": kubernetesCACert,
+		"kubernetes_host":    k8sHost,
+	})
+	require.NoError(t, err)
+}
+
 // Create installs Vault via Helm and then calls bootstrap to initialize it.
 func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext, vaultNamespace string) {
 	t.Helper()
@@ -255,8 +376,12 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext, vaultNa
 		v.Destroy(t)
 	})
 
+	if v.isOpenShift {
+		v.cleanupOpenShiftBeforeInstall(t)
+	}
+
 	// Fail if there are any existing installations of the Helm chart.
-	helpers.CheckForPriorInstallations(t, v.kubernetesClient, v.helmOptions, "", v.releaseLabelSelector())
+	helpers.CheckForPriorInstallations(t, v.kubernetesAPIClient(t), v.helmOptions, "", v.releaseLabelSelector())
 
 	v.createTLSCerts(t)
 
@@ -266,7 +391,7 @@ func (v *VaultCluster) Create(t *testing.T, ctx environment.TestContext, vaultNa
 	v.initAndUnseal(t)
 
 	// Wait for the injector and vault server pods to become Ready.
-	k8s.WaitForAllPodsToBeReady(t, v.kubernetesClient, v.helmOptions.KubectlOptions.Namespace, v.releaseLabelSelector())
+	k8s.WaitForAllPodsToBeReady(t, v.kubernetesAPIClient(t), v.helmOptions.KubectlOptions.Namespace, v.releaseLabelSelector())
 
 	// Now call bootstrap().
 	v.bootstrap(t, vaultNamespace)
@@ -281,9 +406,11 @@ func (v *VaultCluster) Destroy(t *testing.T) {
 	// always idempotently clean up resources in the cluster.
 	_ = helm.DeleteE(t, v.helmOptions, v.releaseName, true)
 
-	err := v.kubernetesClient.CoreV1().PersistentVolumeClaims(v.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(),
+	err := v.kubernetesAPIClient(t).CoreV1().PersistentVolumeClaims(v.helmOptions.KubectlOptions.Namespace).DeleteCollection(context.Background(),
 		metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: v.releaseLabelSelector()})
-	require.NoError(t, err)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
 }
 
 func defaultHelmValues(releaseName string) map[string]string {
@@ -359,6 +486,7 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	v.logger.Logf(t, "generating Vault TLS certificates")
 
 	namespace := v.helmOptions.KubectlOptions.Namespace
+	client := v.kubernetesAPIClient(t)
 
 	// Generate CA and cert and create secrets for them.
 	signer, _, caPem, caCertTmpl, err := cert.GenerateCA("Vault CA")
@@ -366,8 +494,8 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	vaultService := fmt.Sprintf("%s-vault", v.releaseName)
 	certSANs := []string{
 		vaultService,
-		fmt.Sprintf("%s.default", vaultService),
-		fmt.Sprintf("%s.default.svc", vaultService),
+		fmt.Sprintf("%s.%s", vaultService, namespace),
+		fmt.Sprintf("%s.%s.svc", vaultService, namespace),
 	}
 	certPem, keyPem, err := cert.GenerateCert("Vault server", 24*time.Hour, caCertTmpl, signer, certSANs)
 	require.NoError(t, err)
@@ -375,12 +503,13 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	t.Cleanup(func() {
 		if !(v.noCleanupOnFailure || v.noCleanup) {
 			// We're ignoring error here because secret deletion is best-effort.
-			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), certSecretName(v.releaseName), metav1.DeleteOptions{})
-			_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), CASecretName(v.releaseName), metav1.DeleteOptions{})
+			cleanupClient := v.kubernetesAPIClient(t)
+			_ = cleanupClient.CoreV1().Secrets(namespace).Delete(context.Background(), certSecretName(v.releaseName), metav1.DeleteOptions{})
+			_ = cleanupClient.CoreV1().Secrets(namespace).Delete(context.Background(), CASecretName(v.releaseName), metav1.DeleteOptions{})
 		}
 	})
 
-	_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+	_, err = client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      certSecretName(v.releaseName),
@@ -393,7 +522,7 @@ func (v *VaultCluster) createTLSCerts(t *testing.T) {
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	_, err = v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+	_, err = client.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CASecretName(v.releaseName),
 			Namespace: namespace,
@@ -419,7 +548,10 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	retrier := &retry.Timer{Timeout: 4 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
 		// Wait for vault server pod to be running so that we can create Vault client without errors.
-		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
+		serverPodName, err := v.serverPodName(r)
+		require.NoError(r, err)
+
+		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), serverPodName, metav1.GetOptions{})
 		require.NoError(r, err)
 		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
 
@@ -447,9 +579,10 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 	v.logger.Logf(t, "saving Vault root token to %q Kubernetes secret", rootTokenSecret)
 
 	helpers.Cleanup(t, v.noCleanupOnFailure, v.noCleanup, func() {
-		_ = v.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), rootTokenSecret, metav1.DeleteOptions{})
+		cleanupClient := v.kubernetesAPIClient(t)
+		_ = cleanupClient.CoreV1().Secrets(namespace).Delete(context.Background(), rootTokenSecret, metav1.DeleteOptions{})
 	})
-	_, err := v.kubernetesClient.CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
+	_, err := v.kubernetesAPIClient(t).CoreV1().Secrets(namespace).Create(context.Background(), &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rootTokenSecret,
 			Namespace: namespace,
@@ -460,6 +593,28 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		Type: corev1.SecretTypeOpaque,
 	}, metav1.CreateOptions{})
 	require.NoError(t, err)
+}
+
+// serverPodName finds the Vault server pod for this release by labels.
+// Prefer ordinal 0 when present to keep behavior consistent across chart versions.
+func (v *VaultCluster) serverPodName(t testutil.TestingTB) (string, error) {
+	namespace := v.helmOptions.KubectlOptions.Namespace
+	labelSelector := fmt.Sprintf("app.kubernetes.io/instance=%s,app.kubernetes.io/name=vault,component=server", v.releaseName)
+	pods, err := v.kubernetesClient.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return "", err
+	}
+	if len(pods.Items) == 0 {
+		return "", fmt.Errorf("no Vault server pods found in namespace %q with selector %q", namespace, labelSelector)
+	}
+
+	for _, pod := range pods.Items {
+		if strings.HasSuffix(pod.Name, "-0") {
+			return pod.Name, nil
+		}
+	}
+
+	return pods.Items[0].Name, nil
 }
 
 // CreateNamespace creates a Vault namespace given the namespacePath.

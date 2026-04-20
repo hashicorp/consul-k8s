@@ -85,6 +85,10 @@ func NewCLICluster(
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
 
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		applyOpenShiftDefaults(t, cfg, values)
+	}
+
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)

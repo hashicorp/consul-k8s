@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1beta1
+kind: CustomGatewayClass
+metadata:
+  name: custom-gateway-class
+spec:
+  controllerName: "consul.hashicorp.com/gateway-controller-custom"
+  parametersRef:
+    group: consul.hashicorp.com
+    kind: GatewayClassConfig
+    name: gateway-class-config

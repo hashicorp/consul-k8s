@@ -5,6 +5,7 @@ package consuldns
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -60,6 +61,9 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	}
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+	if !cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(2) {
+		t.Skipf("skipping this test because it requires at least 2 clusters with -enable-multi-cluster and two kube contexts/configs")
 	}
 
 	cases := []dnsWithPartitionsTestCase{
@@ -318,8 +322,15 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	serverHelmValues := map[string]string{
-		"server.exposeGossipAndRPCPorts": "true",
-		"server.extraConfig":             `"{\"log_level\": \"TRACE\"}"`,
+		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
+	}
+
+	// OpenShift SCCs do not allow host ports by default, and
+	// server.exposeGossipAndRPCPorts configures hostPort bindings.
+	if !(cfg.UseOpenshift || cfg.EnableOpenshift) {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+	} else {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "false"
 	}
 
 	if cfg.UseKind {
@@ -420,6 +431,13 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 
 	consulClient, _ := defaultConsulCluster.SetupConsulClient(t, c.secure)
 
+	if c.secure && (cfg.UseOpenshift || cfg.EnableOpenshift) {
+		// On OpenShift, external API host certificates may not be signed by the same CA
+		// that is present in the auth-method service-account secret. Ensure the Consul
+		// component auth method uses the kubeconfig endpoint and CA bundle for tokenreviews.
+		reconcileComponentAuthMethodForOpenShift(t, consulClient, releaseName, secondaryPartition, secondaryClusterContext)
+	}
+
 	defaultPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: defaultPartition}
 	secondaryPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: secondaryPartition}
 
@@ -481,4 +499,52 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 
 	return releaseName, consulClient, defaultPartitionQueryOpts, secondaryPartitionQueryOpts, defaultConsulCluster
+}
+
+func reconcileComponentAuthMethodForOpenShift(t *testing.T, consulClient *api.Client, releaseName, secondaryPartition string, secondaryCtx environment.TestContext) {
+	t.Helper()
+
+	options := secondaryCtx.KubectlOptions(t)
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+
+	apiConfig, err := terratestk8s.LoadApiClientConfigE(configPath, options.ContextName)
+	require.NoError(t, err)
+
+	require.NotEmpty(t, apiConfig.Host)
+
+	caBundle := apiConfig.CAData
+	if len(caBundle) == 0 && apiConfig.CAFile != "" {
+		caBundle, err = os.ReadFile(apiConfig.CAFile)
+		require.NoError(t, err)
+	}
+	require.NotEmpty(t, caBundle, "kubeconfig CA bundle must be present for OpenShift auth-method override")
+
+	authMethodName := fmt.Sprintf("%s-consul-k8s-component-auth-method", releaseName)
+	partitions := []string{defaultPartition, secondaryPartition}
+
+	counter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
+	retry.RunWith(counter, t, func(r *retry.R) {
+		updatedAny := false
+		for _, partition := range partitions {
+			readOpts := &api.QueryOptions{Partition: partition}
+			authMethod, _, readErr := consulClient.ACL().AuthMethodRead(authMethodName, readOpts)
+			require.NoError(r, readErr)
+			if authMethod == nil {
+				continue
+			}
+
+			authMethod.Config["Host"] = apiConfig.Host
+			authMethod.Config["CACert"] = string(caBundle)
+
+			writeOpts := &api.WriteOptions{Partition: partition}
+			_, _, updateErr := consulClient.ACL().AuthMethodUpdate(authMethod, writeOpts)
+			require.NoError(r, updateErr)
+			updatedAny = true
+		}
+
+		if !updatedAny {
+			r.Errorf("waiting for auth method %q to exist before updating OpenShift Host/CACert", authMethodName)
+		}
+	})
 }

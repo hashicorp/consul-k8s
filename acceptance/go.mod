@@ -11,6 +11,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/gruntwork-io/terratest v0.46.7
 	github.com/hashicorp/consul-k8s/control-plane v0.0.0-20240821160356-557f7c37e108
+	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.6
 	github.com/hashicorp/consul/api v1.33.4
 	github.com/hashicorp/consul/sdk v0.17.2
 	github.com/hashicorp/go-multierror v1.1.1
@@ -68,7 +69,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gruntwork-io/go-commons v0.8.0 // indirect
-	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.6 // indirect
 	github.com/hashicorp/consul-k8s/version v0.0.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.11 // indirect
