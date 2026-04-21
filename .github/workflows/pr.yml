@@ -63,28 +63,28 @@ jobs:
 #        INPUT_OWNER: "hashicorp"
 
 
-cloud-acceptance:
-  name: cloud-acceptance
-  runs-on: ubuntu-24.04
+  cloud-acceptance:
+    name: cloud-acceptance
+    runs-on: ubuntu-24.04
 
-  steps:
-    - name: cloud
-      uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
-      with:
-        workflow: cloud.yml
-        repo: hashicorp/consul-k8s-workflows
-        # ref: main
-        # TODO: change ref to main after testing
-        ref: shani/workflow-setup-for-minion-chat
-        token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: >
-          {
-            "context": "${{ env.CONTEXT }}-${{ github.event.pull_request.number }}",
-            "repository": "${{ github.repository }}",
-            "branch": "${{ env.BRANCH }}",
-            "sha": "${{ env.SHA }}",
-            "token": "${{ secrets.ELEVATED_GITHUB_TOKEN }}"
-          }
+    steps:
+      - name: cloud
+        uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+        with:
+          workflow: cloud.yml
+          repo: hashicorp/consul-k8s-workflows
+          # ref: main
+          # TODO: change ref to main after testing
+          ref: shani/workflow-setup-for-minion-chat
+          token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          inputs: >
+            {
+              "context": "${{ env.CONTEXT }}-${{ github.event.pull_request.number }}",
+              "repository": "${{ github.repository }}",
+              "branch": "${{ env.BRANCH }}",
+              "sha": "${{ env.SHA }}",
+              "token": "${{ secrets.ELEVATED_GITHUB_TOKEN }}"
+            }
 
 #  pass-required-checks-on-skip:
 #    needs: [ conditional-skip ]
