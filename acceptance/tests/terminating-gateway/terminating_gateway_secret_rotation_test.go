@@ -44,13 +44,8 @@ func TestTerminatingGatewaySecretRotation(t *testing.T) {
 				"terminatingGateways.gateways[0].replicas":          "1",
 				"terminatingGateways.defaults.extraVolumes[0].type": "secret",
 				"terminatingGateways.defaults.extraVolumes[0].name": "tgw-rotation-secret",
-				"global.image":                        "hashicorp/consul-enterprise:local",
-				"global.imageK8S":                     "consul-k8s-control-plane:local",
-				"global.enterpriseLicense.secretName": "consul-hcl",
-				"global.enterpriseLicense.secretKey":  "consul.hclic",
-				//"global.imageConsulDataplane":  "consul-dataplane:local",
-				"global.acls.manageSystemACLs": strconv.FormatBool(tc.secure),
-				"global.tls.enabled":           strconv.FormatBool(tc.secure),
+				"global.acls.manageSystemACLs":                      strconv.FormatBool(tc.secure),
+				"global.tls.enabled":                                strconv.FormatBool(tc.secure),
 			}
 
 			logger.Log(t, "creating consul cluster")
