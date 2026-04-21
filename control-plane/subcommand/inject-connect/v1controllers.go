@@ -30,8 +30,6 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
 )
 
-const globalConfigACLTokenEnvVar = "CONSUL_GLOBAL_CONFIG_TOKEN"
-
 func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager, watcher *discovery.Watcher) error {
 	// Create Consul API config object.
 	consulConfig := c.consul.ConsulClientConfig()
@@ -206,7 +204,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}
 
 	globalConfigEntryReconciler := configEntryReconciler
-	if globalConfigToken := os.Getenv(globalConfigACLTokenEnvVar); globalConfigToken != "" {
+	if c.flagGlobalConfigACLToken != "" {
 		globalConfigEntryReconciler = &controllers.ConfigEntryController{
 			ConsulClientConfig:         consulConfig,
 			ConsulServerConnMgr:        watcher,
@@ -217,9 +215,9 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 			ConsulPartition:            c.consul.Partition,
 			CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
-			ACLTokenOverride:           globalConfigToken,
+			ACLTokenOverride:           c.flagGlobalConfigACLToken,
 		}
-		setupLog.Info("using dedicated ACL token for global config entry controllers", "envVar", globalConfigACLTokenEnvVar)
+		setupLog.Info("using dedicated ACL token for global config entry controllers")
 	}
 	if err := (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
@@ -543,9 +541,11 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(mgr)
 
 	(&v1alpha1.RateLimitWebhook{
-		Client:     mgr.GetClient(),
-		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.RateLimit),
-		ConsulMeta: consulMeta,
+		Client:                  mgr.GetClient(),
+		Logger:                  ctrl.Log.WithName("webhooks").WithName(apicommon.RateLimit),
+		ConsulMeta:              consulMeta,
+		EnablePartitions:        c.flagEnablePartitions,
+		HasGlobalConfigACLToken: c.flagGlobalConfigACLToken != "",
 	}).SetupWithManager(mgr)
 
 	(&v1alpha1.GatewayPolicyWebhook{

@@ -135,13 +135,6 @@ spec:
                   name: {{ .Values.connectInject.aclInjectToken.secretName }}
                   key: {{ .Values.connectInject.aclInjectToken.secretKey }}
             {{- end }}
-            {{- if (and .Values.connectInject.globalConfigACLToken.secretName .Values.connectInject.globalConfigACLToken.secretKey) }}
-            - name: CONSUL_GLOBAL_CONFIG_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.connectInject.globalConfigACLToken.secretName }}
-                  key: {{ .Values.connectInject.globalConfigACLToken.secretKey }}
-            {{- end }}
           command:
             - "/bin/sh"
             - "-ec"
@@ -205,6 +198,10 @@ spec:
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
                 {{- else if .Values.global.acls.manageSystemACLs }}
                 -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
+                {{- end }}
+                {{- if (and .Values.connectInject.globalConfigACLToken.secretName .Values.connectInject.globalConfigACLToken.secretKey) }}
+                -global-config-acl-token-secret-name={{ .Values.connectInject.globalConfigACLToken.secretName }} \
+                -global-config-acl-token-secret-key={{ .Values.connectInject.globalConfigACLToken.secretKey }} \
                 {{- end }}
                 {{- range $value := .Values.connectInject.k8sAllowNamespaces }}
                 -allow-k8s-namespace="{{ $value }}" \

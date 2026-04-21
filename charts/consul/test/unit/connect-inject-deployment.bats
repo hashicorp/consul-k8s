@@ -881,7 +881,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'connectInject.globalConfigACLToken.secretKey=bar' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_GLOBAL_CONFIG_TOKEN"))' | tee /dev/stderr)
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token-secret-name=")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -892,7 +892,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'connectInject.globalConfigACLToken.secretName=foo' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name] | any(contains("CONSUL_GLOBAL_CONFIG_TOKEN"))' | tee /dev/stderr)
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token-secret-key=")' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -904,15 +904,56 @@ load _helpers
       --set 'connectInject.globalConfigACLToken.secretName=foo' \
       --set 'connectInject.globalConfigACLToken.secretKey=bar' \
       . | tee /dev/stderr |
-      yq '[.spec.template.spec.containers[0].env[].name]' | tee /dev/stderr)
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
 
   local actual=$(echo $object |
-    yq 'any(contains("CONSUL_GLOBAL_CONFIG_TOKEN"))' | tee /dev/stderr)
+    yq 'contains("-global-config-acl-token-secret-name=foo")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
   local actual=$(echo $object |
-    yq 'map(select(test("CONSUL_GLOBAL_CONFIG_TOKEN"))) | length' | tee /dev/stderr)
-  [ "${actual}" = "1" ]
+    yq 'contains("-global-config-acl-token-secret-key=bar")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: -global-config-acl-token is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token=")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -global-config-acl-token is not set when globalConfigACLToken is configured" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token=")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: globalConfigACLToken secret reference flags are set when configured" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
+
+  local actual=$(echo $command |
+    yq 'contains("-global-config-acl-token-secret-name=foo")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command |
+    yq 'contains("-global-config-acl-token-secret-key=bar")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------

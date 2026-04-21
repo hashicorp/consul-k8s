@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -47,19 +48,22 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flagListen                string
-	flagCertDir               string // Directory with TLS certs for listening (PEM)
-	flagDefaultInject         bool   // True to inject by default
-	flagConfigFile            string // Path to a config file in JSON format
-	flagConsulImage           string // Docker image for Consul
-	flagConsulDataplaneImage  string // Docker image for Envoy
-	flagConsulK8sImage        string // Docker image for consul-k8s
-	flagGlobalImagePullPolicy string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
-	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
-	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
-	flagEnableWebhookCAUpdate bool
-	flagLogLevel              string
-	flagLogJSON               bool
+	flagListen                         string
+	flagCertDir                        string // Directory with TLS certs for listening (PEM)
+	flagDefaultInject                  bool   // True to inject by default
+	flagConfigFile                     string // Path to a config file in JSON format
+	flagConsulImage                    string // Docker image for Consul
+	flagConsulDataplaneImage           string // Docker image for Envoy
+	flagConsulK8sImage                 string // Docker image for consul-k8s
+	flagGlobalImagePullPolicy          string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
+	flagACLAuthMethod                  string // Auth Method to use for ACLs, if enabled
+	flagGlobalConfigACLToken           string // Optional ACL token used for global config entry reconciliations
+	flagGlobalConfigACLTokenSecretName string // Optional secret name containing ACL token for global config entry reconciliations
+	flagGlobalConfigACLTokenSecretKey  string // Optional secret key containing ACL token for global config entry reconciliations
+	flagEnvoyExtraArgs                 string // Extra envoy args when starting envoy
+	flagEnableWebhookCAUpdate          bool
+	flagLogLevel                       string
+	flagLogJSON                        bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -204,6 +208,12 @@ func (c *Command) init() {
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLToken, "global-config-acl-token", "",
+		"Optional ACL token used for global config entry reconciliations (for example, ControlPlaneRequestLimit and RateLimit).")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLTokenSecretName, "global-config-acl-token-secret-name", "",
+		"Optional Kubernetes Secret name containing the ACL token used for global config entry reconciliations.")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLTokenSecretKey, "global-config-acl-token-secret-key", "",
+		"Optional Kubernetes Secret key containing the ACL token used for global config entry reconciliations.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -375,6 +385,11 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancelFunc()
 
+	if err := c.loadGlobalConfigACLTokenFromSecret(ctx); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	// Start Consul server Connection manager.
 	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
 	if err != nil {
@@ -476,6 +491,16 @@ func (c *Command) validateFlags() error {
 		return errors.New("-default-envoy-proxy-concurrency must be >= 0 if set")
 	}
 
+	hasGlobalConfigTokenSecretName := c.flagGlobalConfigACLTokenSecretName != ""
+	hasGlobalConfigTokenSecretKey := c.flagGlobalConfigACLTokenSecretKey != ""
+	if hasGlobalConfigTokenSecretName != hasGlobalConfigTokenSecretKey {
+		return errors.New("-global-config-acl-token-secret-name and -global-config-acl-token-secret-key must both be set")
+	}
+
+	if c.flagGlobalConfigACLToken != "" && hasGlobalConfigTokenSecretName {
+		return errors.New("-global-config-acl-token cannot be set together with -global-config-acl-token-secret-name/-global-config-acl-token-secret-key")
+	}
+
 	// Validate ports in metrics flags.
 	err := common.ValidateUnprivilegedPort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
 	if err != nil {
@@ -486,6 +511,34 @@ func (c *Command) validateFlags() error {
 		return err
 	}
 
+	return nil
+}
+
+func (c *Command) loadGlobalConfigACLTokenFromSecret(ctx context.Context) error {
+	if c.flagGlobalConfigACLToken != "" {
+		return nil
+	}
+
+	if c.flagGlobalConfigACLTokenSecretName == "" || c.flagGlobalConfigACLTokenSecretKey == "" {
+		return nil
+	}
+
+	secret, err := c.clientset.CoreV1().Secrets(c.flagReleaseNamespace).Get(ctx, c.flagGlobalConfigACLTokenSecretName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("retrieving acl token secret %q in namespace %q: %w", c.flagGlobalConfigACLTokenSecretName, c.flagReleaseNamespace, err)
+	}
+
+	aclTokenBytes, ok := secret.Data[c.flagGlobalConfigACLTokenSecretKey]
+	if !ok {
+		return fmt.Errorf("secret %q does not contain key %q", c.flagGlobalConfigACLTokenSecretName, c.flagGlobalConfigACLTokenSecretKey)
+	}
+
+	aclToken := strings.TrimSpace(string(aclTokenBytes))
+	if aclToken == "" {
+		return fmt.Errorf("secret %q key %q is empty", c.flagGlobalConfigACLTokenSecretName, c.flagGlobalConfigACLTokenSecretKey)
+	}
+
+	c.flagGlobalConfigACLToken = aclToken
 	return nil
 }
 

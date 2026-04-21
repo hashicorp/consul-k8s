@@ -148,7 +148,6 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	}
 
 	consulEntry := configEntry.ToConsul(r.DatacenterName)
-
 	isSecretChange, _ := ctx.Value("isSecretChange").(bool)
 	if mutator, ok := crdCtrl.(Mutator); ok && isSecretChange {
 		if err := mutator.MutateConsulEntry(configEntry, consulEntry, req); err != nil {

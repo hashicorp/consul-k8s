@@ -26,13 +26,17 @@ func TestValidateRateLimit(t *testing.T) {
 	}
 
 	cases := map[string]struct {
-		existingResources []runtime.Object
-		newResource       *RateLimit
-		expAllow          bool
-		expErrMessage     string
+		existingResources       []runtime.Object
+		newResource             *RateLimit
+		enablePartitions        bool
+		hasGlobalConfigACLToken bool
+		expAllow                bool
+		expErrMessage           string
 	}{
 		"no duplicates, valid": {
-			existingResources: nil,
+			existingResources:       nil,
+			enablePartitions:        false,
+			hasGlobalConfigACLToken: false,
 			newResource: &RateLimit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
@@ -48,7 +52,9 @@ func TestValidateRateLimit(t *testing.T) {
 			expAllow: true,
 		},
 		"invalid resource name": {
-			existingResources: nil,
+			existingResources:       nil,
+			enablePartitions:        false,
+			hasGlobalConfigACLToken: false,
 			newResource: &RateLimit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "local",
@@ -79,11 +85,15 @@ func TestValidateRateLimit(t *testing.T) {
 					Config: GlobalRateLimitConfig{},
 				},
 			},
-			expAllow:      false,
-			expErrMessage: "ratelimit resource already defined - only one rate limit entry is supported",
+			enablePartitions:        false,
+			hasGlobalConfigACLToken: false,
+			expAllow:                false,
+			expErrMessage:           "ratelimit resource already defined - only one rate limit entry is supported",
 		},
 		"invalid config": {
-			existingResources: nil,
+			existingResources:       nil,
+			enablePartitions:        false,
+			hasGlobalConfigACLToken: false,
 			newResource: &RateLimit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
@@ -96,6 +106,35 @@ func TestValidateRateLimit(t *testing.T) {
 			},
 			expAllow:      false,
 			expErrMessage: `spec.config.readRate: Invalid value: -1: readRate must be non-negative`,
+		},
+		"admin partitions enabled without global config ACL token": {
+			existingResources:       nil,
+			enablePartitions:        true,
+			hasGlobalConfigACLToken: false,
+			newResource: &RateLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: RateLimitSpec{
+					Config: GlobalRateLimitConfig{},
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "connectInject.globalConfigACLToken must be configured when admin partitions are enabled before creating or updating RateLimit resources",
+		},
+		"admin partitions enabled with global config ACL token": {
+			existingResources:       nil,
+			enablePartitions:        true,
+			hasGlobalConfigACLToken: true,
+			newResource: &RateLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: RateLimitSpec{
+					Config: GlobalRateLimitConfig{},
+				},
+			},
+			expAllow: true,
 		},
 	}
 
@@ -111,9 +150,11 @@ func TestValidateRateLimit(t *testing.T) {
 			decoder := admission.NewDecoder(s)
 
 			validator := &RateLimitWebhook{
-				Client:  client,
-				Logger:  logrtest.New(t),
-				decoder: decoder,
+				Client:                  client,
+				Logger:                  logrtest.New(t),
+				decoder:                 decoder,
+				EnablePartitions:        c.enablePartitions,
+				HasGlobalConfigACLToken: c.hasGlobalConfigACLToken,
 			}
 
 			response := validator.Handle(ctx, admission.Request{
