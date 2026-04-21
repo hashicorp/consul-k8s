@@ -82,7 +82,8 @@ cloud-acceptance:
             "context": "${{ env.CONTEXT }}-${{ github.event.pull_request.number }}",
             "repository": "${{ github.repository }}",
             "branch": "${{ env.BRANCH }}",
-            "sha": "${{ github.sha }}"
+            "sha": "${{ env.SHA }}",
+            "token": "${{ secrets.ELEVATED_GITHUB_TOKEN }}"
           }
 
 #  pass-required-checks-on-skip:
