@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
@@ -26,6 +27,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -97,6 +99,7 @@ type Command struct {
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
 	flagEnableGatewayMetrics        bool
+	flagEnableGatewayScaling        bool
 	flagDefaultEnableMetricsMerging bool
 	flagDefaultMergedMetricsPort    string
 	flagDefaultPrometheusScrapePort string
@@ -266,6 +269,7 @@ func (c *Command) init() {
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
 	c.flagSet.BoolVar(&c.flagEnableGatewayMetrics, "enable-gateway-metrics", false, "Allows enabling Consul gateway metrics.")
+	c.flagSet.BoolVar(&c.flagEnableGatewayScaling, "enable-gateway-scaling", false, "[Enterprise Only] Enables API Gateway scaling annotations, controller-managed HPAs, and manual scaling preservation for the managed GatewayClass.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetricsMerging, "default-enable-metrics-merging", false, "Default for enabling merging of connect service metrics and envoy proxy metrics.")
 	c.flagSet.StringVar(&c.flagDefaultMergedMetricsPort, "default-merged-metrics-port", "20100", "Default port for merged metrics endpoint on the consul-sidecar.")
 	c.flagSet.StringVar(&c.flagDefaultPrometheusScrapePort, "default-prometheus-scrape-port", "20200", "Default port where Prometheus scrapes connect metrics from.")
@@ -396,12 +400,20 @@ func (c *Command) Run(args []string) int {
 
 	healthProbeBindAddress := constants.Getv4orv6Str("0.0.0.0:9445", "[::]:9445")
 	metricsServiceBindAddress := constants.Getv4orv6Str("0.0.0.0:9444", "[::]:9444")
+	cfg := ctrl.GetConfigOrDie()
+	cfg.Timeout = 90 * time.Second
+	cfg.QPS = 50
+	cfg.Burst = 100
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:           scheme,
-		LeaderElection:   true,
-		LeaderElectionID: "consul-controller-lock",
-		Logger:           zapLogger,
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:                  scheme,
+		LeaderElection:          true,
+		LeaderElectionID:        "consul-controller-lock",
+		Logger:                  zapLogger,
+		LeaderElectionNamespace: c.flagReleaseNamespace,
+		LeaseDuration:           ptr.To(90 * time.Second),
+		RenewDeadline:           ptr.To(60 * time.Second),
+		RetryPeriod:             ptr.To(15 * time.Second),
 		Metrics: metricsserver.Options{
 			BindAddress: metricsServiceBindAddress,
 		},

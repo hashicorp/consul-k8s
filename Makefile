@@ -15,7 +15,7 @@ GOTESTSUM_PATH?=$(shell command -v gotestsum)
 
 .PHONY: gen-helm-docs
 gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consul website. Usage: make gen-helm-docs consul=<path-to-consul-repo>.
-	@cd hack/helm-reference-gen; go run ./... $(consul)
+	@cd hack/helm-reference-gen; go run ./... $(docsRepo)
 
 .PHONY: copy-crds-to-chart
 copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
@@ -55,7 +55,7 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
        --build-arg 'GIT_DIRTY=$(GIT_DIRTY)' \
        --build-arg 'GIT_DESCRIBE=$(GIT_DESCRIBE)' \
-       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane
+       -f $(CURDIR)/control-plane/Dockerfile $(CURDIR)/control-plane --load
 
 .PHONY: control-plane-dev-skaffold
 # DANGER: this target is experimental and could be modified/removed at any time.
@@ -315,7 +315,7 @@ ifeq (, $(shell which copywrite))
 	@echo "Installing copywrite"
 	@go install github.com/hashicorp/copywrite@latest
 endif
-	@copywrite headers --spdx "MPL-2.0" 
+	@copywrite headers --spdx "MPL-2.0"
 
 ##@ CI Targets
 
