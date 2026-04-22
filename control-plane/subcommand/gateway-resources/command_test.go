@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -222,12 +222,12 @@ func TestRun(t *testing.T) {
 			existingGatewayClassConfig := &v1alpha1.GatewayClassConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			}
-			existingGatewayClass := &gwv1beta1.GatewayClass{
+			existingGatewayClass := &gwv1.GatewayClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			}
 
 			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			configFileName := gatewayConfigFilename
@@ -294,7 +294,7 @@ func TestRun_loadResourceConfig(t *testing.T) {
 	filename := createGatewayConfigFile(t, validResourceConfiguration, "resource.json")
 	// setup k8s client
 	s := runtime.NewScheme()
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	client := fake.NewClientBuilder().WithScheme(s).Build()
@@ -325,7 +325,7 @@ func TestRun_loadResourceConfigInvalidConfigFile(t *testing.T) {
 	filename := createGatewayConfigFile(t, invalidResourceConfiguration, "resource.json")
 	// setup k8s client
 	s := runtime.NewScheme()
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	client := fake.NewClientBuilder().WithScheme(s).Build()
@@ -343,7 +343,7 @@ func TestRun_loadResourceConfigInvalidConfigFile(t *testing.T) {
 func TestRun_loadResourceConfigFileWhenConfigFileDoesNotExist(t *testing.T) {
 	filename := "./consul/config/resources.json"
 	s := runtime.NewScheme()
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	client := fake.NewClientBuilder().WithScheme(s).Build()

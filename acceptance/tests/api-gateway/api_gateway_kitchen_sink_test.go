@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // Enabled everything possible, see if anything breaks.
@@ -219,7 +219,7 @@ func checkGatewayReady(t *testing.T, k8sClient client.Client, gatewayName, names
 
 	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails.
 	for i := 0; i < gatewayCounter.Count; i++ {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &gateway)
 		if err != nil {
 			logger.Log(t, fmt.Sprintf("Gateway check attempt %d: failed to get gateway: %v", i+1, err))
@@ -333,7 +333,7 @@ func waitForGatewayReady(t *testing.T, ctx environment.TestContext, k8sClient cl
 // checkHTTPRouteReady checks if the HTTPRoute resource is ready using existing retry logic.
 func checkHTTPRouteReady(t *testing.T, k8sClient client.Client, routeName, namespace string) bool {
 	var success bool
-	var httpRoute gwv1beta1.HTTPRoute
+	var httpRoute gwv1.HTTPRoute
 	httpRouteCounter := &retry.Counter{Count: 10, Wait: 6 * time.Second}
 
 	// Use a loop instead of retry.RunWith to avoid runtime.Goexit() issues when require fails.
