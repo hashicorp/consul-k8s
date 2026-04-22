@@ -808,7 +808,6 @@ func (c *Command) validateFlags() error {
 	if c.flagManifestsGatewayAPIDir == "" {
 		return errors.New("-manifests-gatewayapi-dir must be set")
 	}
-
 	return nil
 }
 
