@@ -395,9 +395,15 @@ func (r *Controller) registerGateway(apiClient *api.Client, pod corev1.Pod, podI
 // Changing the Consul service name via annotations is not supported for multi port services.
 func serviceName(pod corev1.Pod, serviceEndpoints corev1.Endpoints) string {
 	svcName := serviceEndpoints.Name
-	// If the annotation has a comma, it is a multi port Pod. In that case we always use the name of the endpoint.
-	if serviceNameFromAnnotation, ok := pod.Annotations[constants.AnnotationService]; ok && serviceNameFromAnnotation != "" && !strings.Contains(serviceNameFromAnnotation, ",") {
-		svcName = serviceNameFromAnnotation
+	if hasMultipleConnectServiceNames(pod) {
+		return svcName
+	}
+
+	for _, serviceNameFromAnnotation := range connectServiceAnnotationParts(pod) {
+		if serviceNameFromAnnotation != "" {
+			svcName = serviceNameFromAnnotation
+			break
+		}
 	}
 	return svcName
 }
@@ -1831,7 +1837,7 @@ func consulTags(pod corev1.Pod) []string {
 }
 
 func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
-	for i, name := range strings.Split(pod.Annotations[constants.AnnotationService], ",") {
+	for i, name := range connectServiceAnnotationParts(pod) {
 		if name == serviceName(pod, serviceEndpoints) {
 			return i
 		}
@@ -1839,7 +1845,71 @@ func getMultiPortIdx(pod corev1.Pod, serviceEndpoints corev1.Endpoints) int {
 	return -1
 }
 
+func connectServiceAnnotationParts(pod corev1.Pod) []string {
+	raw, ok := pod.Annotations[constants.AnnotationService]
+	if !ok {
+		return nil
+	}
+
+	parts := strings.Split(raw, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+
+	return parts
+}
+
+func hasMultipleConnectServiceNames(pod corev1.Pod) bool {
+	names := 0
+	for _, serviceName := range connectServiceAnnotationParts(pod) {
+		if serviceName != "" {
+			names++
+		}
+	}
+
+	return names > 1
+}
+
+func legacyServicePortForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (int, error) {
+	raw, ok := pod.Annotations[constants.AnnotationPort]
+	if !ok || strings.TrimSpace(raw) == "" {
+		return 0, nil
+	}
+
+	token := strings.TrimSpace(raw)
+	if portTokens := strings.Split(raw, ","); len(portTokens) > 1 {
+		idx := getMultiPortIdx(pod, serviceEndpoints)
+		if idx < 0 || idx >= len(portTokens) {
+			return 0, nil
+		}
+		token = strings.TrimSpace(portTokens[idx])
+	}
+
+	if token == "" {
+		return 0, nil
+	}
+
+	port, err := common.PortValue(pod, token)
+	if err != nil {
+		return 0, err
+	}
+	if port <= 0 {
+		return 0, nil
+	}
+
+	return int(port), nil
+}
+
 func (r *Controller) servicePortsForRegistration(pod corev1.Pod, serviceEndpoints corev1.Endpoints) (int, api.ServicePorts, error) {
+	if hasMultipleConnectServiceNames(pod) {
+		port, err := legacyServicePortForRegistration(pod, serviceEndpoints)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		return port, nil, nil
+	}
+
 	raw, ok := pod.Annotations[constants.AnnotationPort]
 	if !ok || strings.TrimSpace(raw) == "" {
 		endpointPorts := endpointPortsForRegistration(serviceEndpoints)

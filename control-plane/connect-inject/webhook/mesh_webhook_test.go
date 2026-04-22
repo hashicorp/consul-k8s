@@ -2481,17 +2481,17 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 		{
 			name:        "tproxy",
 			annotations: map[string]string{constants.KeyTransparentProxy: "true"},
-			expErr:      "multi port services are not compatible with transparent proxy",
+			expErr:      "multi protocol multi port services are not compatible with transparent proxy",
 		},
 		{
 			name:        "metrics",
 			annotations: map[string]string{constants.AnnotationEnableMetrics: "true"},
-			expErr:      "multi port services are not compatible with metrics",
+			expErr:      "multi protocol multi port services are not compatible with metrics",
 		},
 		{
 			name:        "metrics merging",
 			annotations: map[string]string{constants.AnnotationEnableMetricsMerging: "true"},
-			expErr:      "multi port services are not compatible with metrics merging",
+			expErr:      "multi protocol multi port services are not compatible with metrics merging",
 		},
 	}
 	for _, tt := range cases {

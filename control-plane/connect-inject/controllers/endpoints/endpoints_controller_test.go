@@ -1031,6 +1031,51 @@ func TestReconcileCreateEndpoint_MultiportService(t *testing.T) {
 	}
 }
 
+func TestCreateServiceRegistrations_LegacyMultiServiceFlow_WithSinglePortToken(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationService] = "web,web-admin"
+	pod.Annotations[constants.AnnotationPort] = "http"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "web-admin",
+			Namespace: "default",
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client: fakeClient,
+		Log:    logrtest.New(t),
+	}
+
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, "web-admin", serviceRegistration.Service.Service)
+	require.Equal(t, 5050, serviceRegistration.Service.Port)
+	require.Nil(t, serviceRegistration.Service.Ports)
+
+	require.Equal(t, "web-admin-sidecar-proxy", proxyServiceRegistration.Service.Service)
+	require.Equal(t, 5050, proxyServiceRegistration.Service.Proxy.LocalServicePort)
+	require.Nil(t, proxyServiceRegistration.Service.Ports)
+}
+
 func TestCreateServiceRegistrations_SingleServiceMultiPort(t *testing.T) {
 	t.Parallel()
 

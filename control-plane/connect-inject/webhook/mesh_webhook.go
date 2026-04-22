@@ -771,13 +771,13 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
 	}
 	if tproxyEnabled {
-		return fmt.Errorf("multi port services are not compatible with transparent proxy")
+		return fmt.Errorf("multi protocol multi port services are not compatible with transparent proxy")
 	}
 	if metricsEnabled {
-		return fmt.Errorf("multi port services are not compatible with metrics")
+		return fmt.Errorf("multi protocol multi port services are not compatible with metrics")
 	}
 	if metricsMergingEnabled {
-		return fmt.Errorf("multi port services are not compatible with metrics merging")
+		return fmt.Errorf("multi protocol multi port services are not compatible with metrics merging")
 	}
 	return nil
 }
