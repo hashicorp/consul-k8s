@@ -189,9 +189,9 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 			upstreamMetricsURL := "http://localhost:2234"
 			upstreamAdminURL := "http://localhost:3234"
 			if cfg.EnableTransparentProxy {
-				upstreamAPIURL = fmt.Sprintf("http://%s.virtual.default.ns.%s.ap.dc1.dc.consul:9090", multiportServiceName, defaultPartition)
-				upstreamMetricsURL = fmt.Sprintf("http://%s.virtual.default.ns.%s.ap.dc1.dc.consul:9091", multiportServiceName, defaultPartition)
-				upstreamAdminURL = fmt.Sprintf("http://%s.virtual.default.ns.%s.ap.dc1.dc.consul:9092", multiportServiceName, defaultPartition)
+				upstreamAPIURL = fmt.Sprintf("http://api-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
+				upstreamMetricsURL = fmt.Sprintf("http://metrics.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
+				upstreamAdminURL = fmt.Sprintf("http://admin-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
 			}
 
 			secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
