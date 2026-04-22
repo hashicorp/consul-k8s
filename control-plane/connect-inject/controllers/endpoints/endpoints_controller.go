@@ -2111,36 +2111,36 @@ func matchingServicePortIndexes(pod corev1.Pod, serviceEndpoints corev1.Endpoint
 }
 
 func servicePortNameForConsul(serviceEndpoints corev1.Endpoints, token string, port int, idx int, seenNames map[string]int) string {
-	name := ""
+	portName := ""
 	for _, subset := range serviceEndpoints.Subsets {
 		for _, endpointPort := range subset.Ports {
 			if int(endpointPort.Port) == port && endpointPort.Name != "" {
-				name = endpointPort.Name
+				portName = endpointPort.Name
 				break
 			}
 		}
-		if name != "" {
+		if portName != "" {
 			break
 		}
 	}
 
-	if name == "" {
+	if portName == "" {
 		if _, err := strconv.Atoi(token); err != nil {
-			name = token
+			portName = token
 		}
 	}
 
-	if name == "" {
-		name = fmt.Sprintf("port-%d", idx+1)
+	if portName == "" {
+		portName = fmt.Sprintf("port-%d", idx+1)
 	}
 
-	if seenNames[name] == 0 {
-		seenNames[name] = 1
-		return name
+	if seenNames[portName] == 0 {
+		seenNames[portName] = 1
+		return portName
 	}
 
-	seenNames[name]++
-	return fmt.Sprintf("%s-%d", name, seenNames[name])
+	seenNames[portName]++
+	return fmt.Sprintf("%s-%d", portName, seenNames[portName])
 }
 
 // deregister returns that the address is marked for deregistration if the map is nil or if the address is explicitly
