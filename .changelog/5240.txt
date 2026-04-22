@@ -1,0 +1,7 @@
+```release-note:security
+cli: upgrade helm.sh/helm/v3 to v3.20.2 to fix GHSA-hr2v-4r36-88hr
+```
+
+```release-note:security
+cli: upgrade google.golang.org/grpc to v1.79.3 to fix GHSA-p77j-4mvh-x3m3
+```
