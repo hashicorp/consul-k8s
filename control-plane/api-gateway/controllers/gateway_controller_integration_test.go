@@ -159,6 +159,10 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			resourceCache.WaitSynced(ctx)
 
 			// Subscribe to cache events (subscriptions are needed for cache to populate)
+			// NOTE: We discard the subscription objects and use require.Eventually for synchronization
+			// instead of event-based waiting. This is because controller-runtime's fake client has
+			// limited watch support for CRDs, making event-based synchronization unreliable in tests.
+			// The polling approach with require.Eventually is more robust for testing with fake clients.
 			_ = resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
 			_ = resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
 			_ = resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
