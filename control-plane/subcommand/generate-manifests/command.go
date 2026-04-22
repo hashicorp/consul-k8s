@@ -808,52 +808,7 @@ func (c *Command) validateFlags() error {
 	if c.flagManifestsGatewayAPIDir == "" {
 		return errors.New("-manifests-gatewayapi-dir must be set")
 	}
-
 	return nil
-}
-
-func deepCopyMap(in map[string]interface{}) map[string]interface{} {
-
-	out := make(map[string]interface{}, len(in))
-
-	for k, v := range in {
-
-		switch val := v.(type) {
-
-		case map[string]interface{}:
-			out[k] = deepCopyMap(val)
-
-		case []interface{}:
-			out[k] = deepCopySlice(val)
-
-		default:
-			out[k] = val
-		}
-	}
-
-	return out
-}
-
-func deepCopySlice(in []interface{}) []interface{} {
-
-	out := make([]interface{}, len(in))
-
-	for i, v := range in {
-
-		switch val := v.(type) {
-
-		case map[string]interface{}:
-			out[i] = deepCopyMap(val)
-
-		case []interface{}:
-			out[i] = deepCopySlice(val)
-
-		default:
-			out[i] = val
-		}
-	}
-
-	return out
 }
 
 func (c *Command) Synopsis() string { return synopsis }
