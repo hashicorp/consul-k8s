@@ -544,6 +544,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Client:                  mgr.GetClient(),
 		Logger:                  ctrl.Log.WithName("webhooks").WithName(apicommon.RateLimit),
 		ConsulMeta:              consulMeta,
+		EnableACLs:              c.flagACLAuthMethod != "",
 		EnablePartitions:        c.flagEnablePartitions,
 		HasGlobalConfigACLToken: c.flagGlobalConfigACLToken != "",
 	}).SetupWithManager(mgr)

@@ -28,6 +28,7 @@ func TestValidateRateLimit(t *testing.T) {
 	cases := map[string]struct {
 		existingResources       []runtime.Object
 		newResource             *RateLimit
+		enableACLs              bool
 		enablePartitions        bool
 		hasGlobalConfigACLToken bool
 		expAllow                bool
@@ -109,6 +110,7 @@ func TestValidateRateLimit(t *testing.T) {
 		},
 		"admin partitions enabled without global config ACL token": {
 			existingResources:       nil,
+			enableACLs:              true,
 			enablePartitions:        true,
 			hasGlobalConfigACLToken: false,
 			newResource: &RateLimit{
@@ -124,8 +126,24 @@ func TestValidateRateLimit(t *testing.T) {
 		},
 		"admin partitions enabled with global config ACL token": {
 			existingResources:       nil,
+			enableACLs:              true,
 			enablePartitions:        true,
 			hasGlobalConfigACLToken: true,
+			newResource: &RateLimit{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "global",
+				},
+				Spec: RateLimitSpec{
+					Config: GlobalRateLimitConfig{},
+				},
+			},
+			expAllow: true,
+		},
+		"admin partitions enabled without ACLs": {
+			existingResources:       nil,
+			enableACLs:              false,
+			enablePartitions:        true,
+			hasGlobalConfigACLToken: false,
 			newResource: &RateLimit{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "global",
@@ -153,6 +171,7 @@ func TestValidateRateLimit(t *testing.T) {
 				Client:                  client,
 				Logger:                  logrtest.New(t),
 				decoder:                 decoder,
+				EnableACLs:              c.enableACLs,
 				EnablePartitions:        c.enablePartitions,
 				HasGlobalConfigACLToken: c.hasGlobalConfigACLToken,
 			}
