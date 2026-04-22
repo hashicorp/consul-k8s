@@ -1,3 +1,36 @@
+## 1.9.6 (March 31, 2026)
+
+BUG FIXES:
+
+* api-gateway: Fix cross-namespace ACL resource collisions by keying policy/role/binding-rule caches with gatewayName + namespace. Managed resource names are now namespace-scoped to prevent one gateway from affecting another when deployed in different Kubernetes namespaces. [[GH-5140](https://github.com/hashicorp/consul-k8s/pull/5140)]
+
+SECURITY:
+
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+
+## 1.8.11 (March 31, 2026)
+
+BUG FIXES:
+
+* api-gateway: Fix cross-namespace ACL resource collisions by keying policy/role/binding-rule caches with gatewayName + namespace. Managed resource names are now namespace-scoped to prevent one gateway from affecting another when deployed in different Kubernetes namespaces. [[GH-5140](https://github.com/hashicorp/consul-k8s/pull/5140)]
+
+SECURITY:
+
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+
+## 1.7.13 (March 31, 2026)
+
+BUG FIXES:
+
+* api-gateway: Fix cross-namespace ACL resource collisions by keying policy/role/binding-rule caches with gatewayName + namespace. Managed resource names are now namespace-scoped to prevent one gateway from affecting another when deployed in different Kubernetes namespaces. [[GH-5140](https://github.com/hashicorp/consul-k8s/pull/5140)]
+
+SECURITY:
+
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+
 ## 1.9.5 (February 27, 2026)
 
 SECURITY:
