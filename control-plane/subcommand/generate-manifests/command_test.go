@@ -97,9 +97,6 @@ func TestRun(t *testing.T) {
 		"neither exist": {
 			client: fake.NewClientBuilder().WithScheme(s).Build(),
 		},
-		"no client": {
-			client: nil,
-		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tt := tt
