@@ -102,7 +102,7 @@ func NewHelmCluster(
 	extraArgs := map[string][]string{
 		"install": {"--timeout", "15m", "--debug", "--skip-crds"},
 		"upgrade": {"--timeout", "15m", "--debug", "--skip-crds"},
-		"delete":  {"--timeout", "15m", "--debug", "--skip-crds"},
+		"delete":  {"--timeout", "15m", "--debug"},
 	}
 
 	opts := &helm.Options{
