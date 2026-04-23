@@ -2378,7 +2378,7 @@ func TestServiceResource_addIngress(t *testing.T) {
 			expectedAddress:   "1.1.1.1",
 			expectedPort:      8080,
 		},
-		"ignores ingress if host != /": {
+		"ignores ingress if path != /": {
 			enableIngress:     true,
 			host:              "test.host.consul",
 			path:              "/foo",
@@ -2419,20 +2419,16 @@ func TestServiceResource_addIngress(t *testing.T) {
 			closer := controller.TestControllerRun(resource)
 			defer closer()
 
-			time.Sleep(500 * time.Millisecond)
-
 			// Trigger ingress processing for fake clients
-			if test.enableIngress && test.expectIngressSync {
+			if test.enableIngress {
 				ingressResource := &serviceIngressResource{
 					Service:             &serviceResource,
 					Ctx:                 context.Background(),
 					EnableIngress:       test.enableIngress,
 					SyncLoadBalancerIPs: test.syncIngressIP,
 				}
-				_ = ingressResource.Upsert(ing.Namespace+"/"+ing.Name, ing)
+				require.NoError(t, ingressResource.Upsert(ing.Namespace+"/"+ing.Name, ing))
 			}
-
-			time.Sleep(200 * time.Millisecond)
 
 			// Verify registrations
 			retry.Run(t, func(r *retry.R) {
