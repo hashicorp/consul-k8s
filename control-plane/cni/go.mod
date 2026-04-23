@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/control-plane/cni
 
-go 1.25.8
+go 1.26
 
 replace github.com/hashicorp/consul-k8s/version => ../../version
 
@@ -15,7 +15,7 @@ require (
 	k8s.io/client-go v0.29.8
 )
 
-require github.com/hashicorp/consul/sdk v0.17.3
+require github.com/hashicorp/consul/sdk v0.18.1
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
