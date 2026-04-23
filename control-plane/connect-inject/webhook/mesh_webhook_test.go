@@ -1704,7 +1704,41 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			if len(actual) == 0 {
 				actual = nil
 			}
-			require.Equal(t, tt.Expected, actual)
+
+			// The original pod annotation is stored as a JSON string. Compare it
+			// semantically to avoid flakes caused by equivalent JSON encodings.
+			expectedOriginal, expectedHasOriginal := tt.Expected[constants.AnnotationOriginalPod]
+			actualOriginal, actualHasOriginal := actual[constants.AnnotationOriginalPod]
+			require.Equal(t, expectedHasOriginal, actualHasOriginal)
+			if expectedHasOriginal {
+				normalizeOriginalPod := func(raw string) map[string]any {
+					var out map[string]any
+					require.NoError(t, json.Unmarshal([]byte(raw), &out))
+
+					if metadata, ok := out["metadata"].(map[string]any); ok {
+						if v, has := metadata["creationTimestamp"]; has && v == nil {
+							delete(metadata, "creationTimestamp")
+						}
+					}
+
+					return out
+				}
+
+				require.Equal(t, normalizeOriginalPod(expectedOriginal), normalizeOriginalPod(actualOriginal))
+			}
+
+			expectedCopy := make(map[string]string, len(tt.Expected))
+			for k, v := range tt.Expected {
+				expectedCopy[k] = v
+			}
+			actualCopy := make(map[string]string, len(actual))
+			for k, v := range actual {
+				actualCopy[k] = v
+			}
+			delete(expectedCopy, constants.AnnotationOriginalPod)
+			delete(actualCopy, constants.AnnotationOriginalPod)
+
+			require.Equal(t, expectedCopy, actualCopy)
 		})
 	}
 }

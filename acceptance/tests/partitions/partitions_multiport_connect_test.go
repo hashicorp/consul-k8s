@@ -41,8 +41,8 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 		name        string
 		aclsEnabled bool
 	}{
-		{name: "acls enabled", aclsEnabled: true},
 		{name: "acls disabled", aclsEnabled: false},
+		{name: "acls enabled", aclsEnabled: true},
 	}
 
 	meshGatewayModes := []struct {
@@ -56,6 +56,14 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 	for _, c := range aclCases {
 		for _, meshGatewayMode := range meshGatewayModes {
 			t.Run(fmt.Sprintf("%s mesh-gateway %s", c.name, meshGatewayMode.name), func(t *testing.T) {
+				if cfg.EnableTransparentProxy && !c.aclsEnabled {
+					t.Skipf("skipping this test because transparent proxy requires ACLs to be enabled")
+				}
+
+				if cfg.EnableCNI && !c.aclsEnabled {
+					t.Skipf("skipping because -enable-cni is set and ACLs are disabled")
+				}
+
 				defaultPartitionClusterContext := env.DefaultContext(t)
 				secondaryPartitionClusterContext := env.Context(t, 1)
 
