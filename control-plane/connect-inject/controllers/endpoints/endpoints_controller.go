@@ -48,6 +48,7 @@ const (
 	terminatingGateway = "terminating-gateway"
 	ingressGateway     = "ingress-gateway"
 	apiGateway         = "api-gateway"
+	apiGatewayConsul   = "api-gateway-consul"
 
 	envoyPrometheusBindAddr              = "envoy_prometheus_bind_addr"
 	envoyTelemetryCollectorBindSocketDir = "envoy_telemetry_collector_bind_socket_dir"
@@ -851,8 +852,11 @@ func (r *Controller) createGatewayRegistrations(pod corev1.Pod, podIP string, se
 	case apiGateway:
 		// Do nothing. This is only here so that API gateway pods have annotations
 		// consistent with other gateway types but don't return an error below.
+	case apiGatewayConsul:
+		// Do nothing. This is only here so that API gateway pods have annotations
+		// consistent with other gateway types but don't return an error below.
 	default:
-		return nil, fmt.Errorf("%s must be one of %s, %s, %s, or %s", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway)
+		return nil, fmt.Errorf("%s must be one of %s, %s, %s, %s, or %s ", constants.AnnotationGatewayKind, meshGateway, terminatingGateway, ingressGateway, apiGateway, apiGatewayConsul)
 	}
 
 	if r.MetricsConfig.DefaultEnableMetrics && r.MetricsConfig.EnableGatewayMetrics {

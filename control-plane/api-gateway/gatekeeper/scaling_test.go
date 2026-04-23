@@ -9,7 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -171,7 +171,7 @@ func TestParseScalingAnnotations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gateway := gwv1beta1.Gateway{
+			gateway := gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-gateway",
 					Namespace:   "default",
