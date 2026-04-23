@@ -205,12 +205,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 
 				secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
 
-				if c.aclsEnabled {
-					logger.Log(t, "checking that cross-partition connections fail before intentions are configured")
-					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAPIURL)
-					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamMetricsURL)
-					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAdminURL)
-
+				createMultiportIntention := func() {
 					logger.Logf(t, "creating intention for destination %s", multiportServiceName)
 					_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 						Kind:      api.ServiceIntentions,
@@ -231,6 +226,19 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 						_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, multiportServiceName, &api.WriteOptions{Partition: defaultPartition})
 						require.NoError(t, err)
 					})
+				}
+
+				if c.aclsEnabled {
+					logger.Log(t, "checking that cross-partition connections fail before intentions are configured")
+					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAPIURL)
+					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamMetricsURL)
+					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAdminURL)
+
+					createMultiportIntention()
+				} else if cfg.EnableTransparentProxy {
+					// In transparent proxy cross-partition mode we still need an explicit
+					// allow intention for the destination service to make the route active.
+					createMultiportIntention()
 				}
 
 				logger.Log(t, "checking cross-partition connectivity for all three ports")
