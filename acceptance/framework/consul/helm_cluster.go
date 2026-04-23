@@ -205,7 +205,10 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		require.NoError(r, err)
+		// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			require.NoError(r, err)
+		}
 	})
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
