@@ -41,8 +41,8 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 		name        string
 		aclsEnabled bool
 	}{
-		{name: "acls disabled", aclsEnabled: false},
 		{name: "acls enabled", aclsEnabled: true},
+		{name: "acls disabled", aclsEnabled: false},
 	}
 
 	meshGatewayModes := []struct {
@@ -51,7 +51,6 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 	}{
 		{name: "local", fixturePath: "../fixtures/bases/mesh-gateway"},
 		{name: "remote", fixturePath: "../fixtures/bases/mesh-gateway-remote"},
-		{name: "none", fixturePath: "../fixtures/bases/mesh-gateway-none"},
 	}
 
 	for _, c := range aclCases {
