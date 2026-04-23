@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -2281,8 +2282,175 @@ func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 	})
 }
 
+// testIngress creates an ingress for testing with customizable parameters.
+func testIngress(host, path string, tlsHosts []string, lbIP string) *networkingv1.Ingress {
+	ing := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-ingress"},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{{
+				Host: host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{{
+							Path: path,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: "test-service",
+									Port: networkingv1.ServiceBackendPort{Number: 8080},
+								},
+							},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	if len(tlsHosts) > 0 {
+		ing.Spec.TLS = []networkingv1.IngressTLS{{Hosts: tlsHosts, SecretName: "test-tls-secret"}}
+	}
+	if lbIP != "" {
+		ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: lbIP}}
+	}
+	return ing
+}
+
 // Test k8s namespace suffix is not appended
 // when the service name annotation is provided.
+func TestServiceResource_addIngress(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		enableIngress     bool
+		syncIngressIP     bool
+		host              string
+		path              string
+		tlsHosts          []string
+		lbIP              string
+		expectIngressSync bool
+		expectedAddress   string
+		expectedPort      int
+	}{
+		"enable ingress on port 80": {
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.other.consul"},
+			expectIngressSync: true,
+			expectedAddress:   "test.host.consul",
+			expectedPort:      80,
+		},
+		"enable ingress on port 443": {
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.host.consul"},
+			expectIngressSync: true,
+			expectedAddress:   "test.host.consul",
+			expectedPort:      443,
+		},
+		"enable ingress on port 80 with loadbalancer IP": {
+			enableIngress:     true,
+			syncIngressIP:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.other.consul"},
+			lbIP:              "1.2.3.4",
+			expectIngressSync: true,
+			expectedAddress:   "1.2.3.4",
+			expectedPort:      80,
+		},
+		"enable ingress on port 443 with loadbalancer IP": {
+			enableIngress:     true,
+			syncIngressIP:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.host.consul"},
+			lbIP:              "1.2.3.4",
+			expectIngressSync: true,
+			expectedAddress:   "1.2.3.4",
+			expectedPort:      443,
+		},
+		"ingress disabled": {
+			enableIngress:     false,
+			host:              "test.host.consul",
+			path:              "/",
+			expectIngressSync: false,
+			expectedAddress:   "1.1.1.1",
+			expectedPort:      8080,
+		},
+		"ignores ingress if path != /": {
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/foo",
+			expectIngressSync: false,
+			expectedAddress:   "1.1.1.1",
+			expectedPort:      8080,
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			client, informer := getinformer()
+			syncer := newTestSyncer()
+			serviceResource := defaultServiceResource(client, syncer)
+			serviceResource.ClusterIPSync = true
+			serviceResource.EnableIngress = test.enableIngress
+			serviceResource.SyncLoadBalancerIPs = test.syncIngressIP
+
+			resource := &testServiceResource{
+				ServiceResource: &serviceResource,
+				informer:        informer,
+			}
+
+			// Create service, ingress, and endpoint slices
+			svc := clusterIPService("test-service", metav1.NamespaceDefault)
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			ing := testIngress(test.host, test.path, test.tlsHosts, test.lbIP)
+			ing.Namespace = metav1.NamespaceDefault
+			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), ing, metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			createNodes(t, client)
+			createEndpointSlice(t, client, svc.Name, metav1.NamespaceDefault)
+
+			// Start controller
+			closer := controller.TestControllerRun(resource)
+			defer closer()
+
+			// Trigger ingress processing for fake clients
+			if test.enableIngress {
+				ingressResource := &serviceIngressResource{
+					Service:             &serviceResource,
+					Ctx:                 context.Background(),
+					EnableIngress:       test.enableIngress,
+					SyncLoadBalancerIPs: test.syncIngressIP,
+				}
+				require.NoError(t, ingressResource.Upsert(ing.Namespace+"/"+ing.Name, ing))
+			}
+
+			// Verify registrations
+			retry.Run(t, func(r *retry.R) {
+				syncer.Lock()
+				defer syncer.Unlock()
+				actual := syncer.Registrations
+
+				if test.expectIngressSync {
+					require.Len(r, actual, 1)
+					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
+					require.Equal(r, test.expectedPort, actual[0].Service.Port)
+				} else {
+					require.Len(r, actual, 3)
+					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
+					for _, a := range actual {
+						validateEndpointSliceServicePorts(r, a.Service)
+					}
+				}
+			})
+		})
+	}
+}
 
 // lbService returns a Kubernetes service of type LoadBalancer.
 func lbService(name, namespace, lbIP string) *corev1.Service {
