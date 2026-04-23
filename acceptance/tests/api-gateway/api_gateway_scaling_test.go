@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -96,7 +96,7 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing
 	consulCluster := installScalingCluster(t, true)
 	consulClient, _ := consulCluster.SetupConsulClient(t, false)
 	requireEnterpriseLicenseValid(t, consulClient)
-	
+
 	// Restart the API Gateway controller to ensure it detects the enterprise license.
 	// The controller checks IsEnterpriseDistribution at startup, so we need to restart
 	// it after the license is confirmed valid.
@@ -223,13 +223,13 @@ func createScalingGatewayClassResources(
 		require.NoError(t, client.IgnoreNotFound(k8sClient.Delete(context.Background(), gatewayClassConfig)))
 	})
 
-	createGatewayClass(t, k8sClient, gatewayClassName, gatewayClassControllerName, &gwv1beta1.ParametersReference{
-		Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
-		Kind:  gwv1beta1.Kind(v1alpha1.GatewayClassConfigKind),
+	createGatewayClass(t, k8sClient, gatewayClassName, gatewayClassControllerName, &gwv1.ParametersReference{
+		Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+		Kind:  gwv1.Kind(v1alpha1.GatewayClassConfigKind),
 		Name:  gatewayClassConfigName,
 	})
 	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
-		require.NoError(t, client.IgnoreNotFound(k8sClient.Delete(context.Background(), &gwv1beta1.GatewayClass{
+		require.NoError(t, client.IgnoreNotFound(k8sClient.Delete(context.Background(), &gwv1.GatewayClass{
 			ObjectMeta: metav1.ObjectMeta{Name: gatewayClassName},
 		})))
 	})
@@ -245,22 +245,22 @@ func createScalingGateway(
 	annotations map[string]string,
 	noCleanupOnFailure bool,
 	noCleanup bool,
-) *gwv1beta1.Gateway {
+) *gwv1.Gateway {
 	t.Helper()
 
-	gateway := &gwv1beta1.Gateway{
+	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        helpers.RandomName(),
 			Namespace:   namespace,
 			Annotations: annotations,
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			GatewayClassName: gwv1beta1.ObjectName(gatewayClassName),
-			Listeners: []gwv1beta1.Listener{
+		Spec: gwv1.GatewaySpec{
+			GatewayClassName: gwv1.ObjectName(gatewayClassName),
+			Listeners: []gwv1.Listener{
 				{
-					Name:     gwv1beta1.SectionName("http"),
+					Name:     gwv1.SectionName("http"),
 					Port:     8080,
-					Protocol: gwv1beta1.HTTPProtocolType,
+					Protocol: gwv1.HTTPProtocolType,
 				},
 			},
 		},
@@ -333,7 +333,7 @@ func scaleGatewayDeployment(t *testing.T, k8sClient client.Client, gatewayName, 
 func triggerGatewayReconcile(t *testing.T, k8sClient client.Client, gatewayName, namespace string) {
 	t.Helper()
 
-	var gateway gwv1beta1.Gateway
+	var gateway gwv1.Gateway
 	err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &gateway)
 	require.NoError(t, err)
 
