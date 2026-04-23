@@ -54,36 +54,36 @@ func TestPartitions_Connect(t *testing.T) {
 			false,
 			false,
 		},
-		// {
-		// 	"default destination namespace; ACLs enabled",
-		// 	defaultNamespace,
-		// 	false,
-		// 	true,
-		// },
-		// {
-		// 	"single destination namespace",
-		// 	staticServerNamespace,
-		// 	false,
-		// 	false,
-		// },
-		// {
-		// 	"single destination namespace; ACLs enabled",
-		// 	staticServerNamespace,
-		// 	false,
-		// 	true,
-		// },
-		// {
-		// 	"mirror k8s namespaces",
-		// 	staticServerNamespace,
-		// 	true,
-		// 	false,
-		// },
-		// {
-		// 	"mirror k8s namespaces; ACLs enabled",
-		// 	staticServerNamespace,
-		// 	true,
-		// 	true,
-		// },
+		{
+			"default destination namespace; ACLs enabled",
+			defaultNamespace,
+			false,
+			true,
+		},
+		{
+			"single destination namespace",
+			staticServerNamespace,
+			false,
+			false,
+		},
+		{
+			"single destination namespace; ACLs enabled",
+			staticServerNamespace,
+			false,
+			true,
+		},
+		{
+			"mirror k8s namespaces",
+			staticServerNamespace,
+			true,
+			false,
+		},
+		{
+			"mirror k8s namespaces; ACLs enabled",
+			staticServerNamespace,
+			true,
+			true,
+		},
 	}
 
 	for _, c := range cases {
