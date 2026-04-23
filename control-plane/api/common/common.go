@@ -29,6 +29,7 @@ const (
 	RouteAuthFilter          string = "routeauthfilter"
 	RouteTLSSDSFilter        string = "routetlssdsfilter"
 	GatewayPolicy            string = "gatewaypolicy"
+	CustomGatewayPolicy      string = "customgatewaypolicy"
 	Registration             string = "registration"
 
 	Global                 string = "global"

@@ -16,7 +16,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -62,7 +62,7 @@ type HPAConfig struct {
 }
 
 // ParseScalingAnnotations extracts and validates scaling configuration from Gateway annotations.
-func ParseScalingAnnotations(gateway gwv1beta1.Gateway, log logr.Logger) (*ScalingConfig, error) {
+func ParseScalingAnnotations(gateway gwv1.Gateway, log logr.Logger) (*ScalingConfig, error) {
 	annotations := gateway.Annotations
 	if annotations == nil {
 		return &ScalingConfig{Mode: "none"}, nil
@@ -166,7 +166,7 @@ func annotationValue(annotations map[string]string, keys ...string) (string, boo
 	return "", false
 }
 
-func scalingAnnotationsConfigured(gateway gwv1beta1.Gateway) bool {
+func scalingAnnotationsConfigured(gateway gwv1.Gateway) bool {
 	annotations := gateway.Annotations
 	if annotations == nil {
 		return false
@@ -182,7 +182,7 @@ func scalingAnnotationsConfigured(gateway gwv1beta1.Gateway) bool {
 	return false
 }
 
-func logScalingFeatureDisabled(log logr.Logger, gateway gwv1beta1.Gateway) {
+func logScalingFeatureDisabled(log logr.Logger, gateway gwv1.Gateway) {
 	if !scalingAnnotationsConfigured(gateway) {
 		return
 	}
@@ -193,7 +193,7 @@ func logScalingFeatureDisabled(log logr.Logger, gateway gwv1beta1.Gateway) {
 }
 
 // DetectUserManagedHPA checks if a user has created their own HPA for the gateway.
-func (g *Gatekeeper) DetectUserManagedHPA(ctx context.Context, gateway gwv1beta1.Gateway) (bool, error) {
+func (g *Gatekeeper) DetectUserManagedHPA(ctx context.Context, gateway gwv1.Gateway) (bool, error) {
 	hpaList := &autoscalingv2.HorizontalPodAutoscalerList{}
 	err := g.Client.List(ctx, hpaList, client.InNamespace(gateway.Namespace))
 	if err != nil {
@@ -224,7 +224,7 @@ func (g *Gatekeeper) DetectUserManagedHPA(ctx context.Context, gateway gwv1beta1
 }
 
 // UpsertHPA creates or updates an HPA resource for the gateway.
-func (g *Gatekeeper) UpsertHPA(ctx context.Context, gateway gwv1beta1.Gateway, config *HPAConfig) error {
+func (g *Gatekeeper) UpsertHPA(ctx context.Context, gateway gwv1.Gateway, config *HPAConfig) error {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-hpa", gateway.Name),
@@ -273,24 +273,24 @@ func (g *Gatekeeper) UpsertHPA(ctx context.Context, gateway gwv1beta1.Gateway, c
 }
 
 // DeleteHPA removes the controller-managed HPA for a gateway.
-func (g *Gatekeeper) DeleteHPA(ctx context.Context, gateway gwv1beta1.Gateway) error {
+func (g *Gatekeeper) DeleteHPA(ctx context.Context, gateway gwv1.Gateway) error {
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
 	hpaName := fmt.Sprintf("%s-hpa", gateway.Name)
-	
+
 	// First, fetch the HPA to check if it exists and if we own it
 	err := g.Client.Get(ctx, client.ObjectKey{
 		Name:      hpaName,
 		Namespace: gateway.Namespace,
 	}, hpa)
-	
+
 	if k8serrors.IsNotFound(err) {
 		return nil
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to get HPA: %w", err)
 	}
-	
+
 	// Verify that this controller owns the HPA before deleting
 	if !metav1.IsControlledBy(hpa, &gateway) {
 		g.Log.V(1).Info("HPA exists but is not controller-managed, skipping deletion",
@@ -327,7 +327,7 @@ func LogDeprecationWarnings(gcc v1alpha1.GatewayClassConfig, log logr.Logger) {
 }
 
 // DetermineScalingMode determines the final scaling mode considering all sources.
-func (g *Gatekeeper) DetermineScalingMode(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) (*ScalingConfig, error) {
+func (g *Gatekeeper) DetermineScalingMode(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig) (*ScalingConfig, error) {
 	// Log deprecation warnings for GCC fields
 	LogDeprecationWarnings(gcc, g.Log)
 
@@ -370,7 +370,7 @@ func (g *Gatekeeper) DetermineScalingMode(ctx context.Context, gateway gwv1beta1
 
 // ReconcileScaling handles the complete scaling reconciliation for a gateway
 // and returns the resolved scaling mode after HPA side effects are applied.
-func (g *Gatekeeper) ReconcileScaling(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) (*ScalingConfig, error) {
+func (g *Gatekeeper) ReconcileScaling(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig) (*ScalingConfig, error) {
 	scalingConfig, err := g.DetermineScalingMode(ctx, gateway, gcc)
 	if err != nil {
 		return nil, err

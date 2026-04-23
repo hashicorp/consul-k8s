@@ -12,7 +12,7 @@ import (
 	mapset "github.com/deckarep/golang-set"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
@@ -47,7 +47,7 @@ var (
 // on a given route status.
 type routeValidationResult struct {
 	namespace string
-	backend   gwv1beta1.BackendRef
+	backend   gwv1.BackendRef
 	err       error
 }
 
@@ -122,7 +122,7 @@ func (e routeValidationResults) Condition() metav1.Condition {
 // an error value here means that the route did not bind successfully, no error means that
 // the route should be considered bound.
 type bindResult struct {
-	section gwv1beta1.SectionName
+	section gwv1.SectionName
 	err     error
 }
 
@@ -208,7 +208,7 @@ func (b bindResults) Condition() metav1.Condition {
 
 // parentBindResult associates a binding result with the given parent reference.
 type parentBindResult struct {
-	parent  gwv1beta1.ParentReference
+	parent  gwv1.ParentReference
 	results bindResults
 }
 
@@ -633,6 +633,8 @@ func (g gatewayPolicyValidationResult) acceptedCondition(generation int64) metav
 
 func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) []metav1.Condition {
 	now := timeFunc()
+
+	// ✅ No errors → ResolvedRefs = True
 	if len(g.resolvedRefsErrs) == 0 {
 		return []metav1.Condition{
 			{
@@ -646,28 +648,26 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 		}
 	}
 
-	conditions := make([]metav1.Condition, 0, len(g.resolvedRefsErrs))
+	var conditions []metav1.Condition
+
 	for _, err := range g.resolvedRefsErrs {
+		reason := "InvalidRefs"
+
 		switch {
 		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingListenerReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
+			reason = "MissingListenerReference"
 		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingJWTProviderReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
+			reason = "MissingJWTProviderReference"
 		}
+
+		conditions = append(conditions, metav1.Condition{
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionFalse,
+			Reason:             reason,
+			ObservedGeneration: generation,
+			Message:            err.Error(),
+			LastTransitionTime: now,
+		})
 	}
 	return conditions
 }
