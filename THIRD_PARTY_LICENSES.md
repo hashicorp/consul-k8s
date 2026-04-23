@@ -11,13 +11,15 @@ License: Apache License 2.0
 
 A modified version of this project is included in:
 
-charts/consul/templates
+### charts/consul/templates
 
 Modifications:
 - Changed API group from gateway.networking.k8s.io to consul.hashicorp.com in the templates ( template version 0.6.x)
 
 The original license (Apache License 2.0) preserved in the control-plane/gateway07/gateway-api-0.7.1-custom.
-control-plane/gateway07/gateway-api-0.7.1-custom
+
+
+### control-plane/gateway07/gateway-api-0.7.1-custom
 
 Modifications:
 - Changed API group from gateway.networking.k8s.io to consul.hashicorp.com

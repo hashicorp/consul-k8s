@@ -33,10 +33,10 @@ metadata:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
   creationTimestamp: null
   labels:
-    # app: {{ template "consul.name" . }}
-    # chart: {{ template "consul.chart" . }}
-    # heritage: {{ .Release.Service }}
-    # release: {{ .Release.Name }}
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
     name: consul-custom-httproutes
     component: crd
   name: httproutes.consul.hashicorp.com
