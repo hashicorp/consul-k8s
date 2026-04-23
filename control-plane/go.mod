@@ -1,12 +1,12 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.25.8
+go 1.25.9
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.33.7
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.34.1
 
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17.3
 

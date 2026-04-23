@@ -571,13 +571,13 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Watches(
 			&v1alpha1.RouteAuthFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter),
-		)
-
-	if err := builder.Complete(r); err != nil {
-		return nil, cleaner, err
-	}
-
-	return c, cleaner, nil
+		).
+		Watches(
+			// Subscribe to changes in RouteTLSSDSFilter custom resources referenced by HTTPRoutes.
+			&v1alpha1.RouteTLSSDSFilter{},
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
+		).
+		Complete(r)
 }
 
 func (r *GatewayController) effectiveHelmConfig(log logr.Logger) common.HelmConfig {
@@ -726,6 +726,10 @@ func (r *GatewayController) transformRouteTimeoutFilter(ctx context.Context, o c
 
 func (r *GatewayController) transformRouteAuthFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteAuthFilterIndex, client.ObjectKeyFromObject(o).String())
+}
+
+func (r *GatewayController) transformRouteTLSSDSFilter(ctx context.Context, o client.Object) []reconcile.Request {
+	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTLSSDSFilterIndex, client.ObjectKeyFromObject(o).String())
 }
 
 func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
@@ -1033,6 +1037,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteTimeoutFilter{}
 		case v1alpha1.RouteAuthFilterKind:
 			externalFilter = &v1alpha1.RouteAuthFilter{}
+		case v1alpha1.RouteTLSSDSFilterKind:
+			externalFilter = &v1alpha1.RouteTLSSDSFilter{}
 		default:
 			continue
 		}
