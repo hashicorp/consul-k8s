@@ -1528,6 +1528,52 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	})
 }
 
+// Test that the proper registrations with health checks are generated for a NodePort type.
+func TestServiceResource_nodePort_healthCheck(t *testing.T) {
+	t.Parallel()
+	client := fake.NewSimpleClientset()
+	syncer := newTestSyncer()
+	serviceResource := defaultServiceResource(client, syncer)
+	serviceResource.NodePortSync = ExternalOnly
+
+	// Start the controller
+	closer := controller.TestControllerRun(&serviceResource)
+	defer closer()
+
+	createNodes(t, client)
+
+	// Insert the endpoint slice
+	createEndpointSlice(t, client, "foo", metav1.NamespaceDefault)
+
+	// Insert the service
+	svc := nodePortService("foo", metav1.NamespaceDefault)
+	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Verify what we got
+	retry.Run(t, func(r *retry.R) {
+		syncer.Lock()
+		defer syncer.Unlock()
+		actual := syncer.Registrations
+		require.Len(r, actual, 3)
+		// Ready=true
+		require.Equal(r, consulKubernetesCheckName, actual[0].Check.Name)
+		require.Equal(r, consulapi.HealthPassing, actual[0].Check.Status)
+		require.Equal(r, kubernetesSuccessReasonMsg, actual[0].Check.Output)
+		require.Equal(r, consulKubernetesCheckType, actual[0].Check.Type)
+		// Ready=nil (unknown, treated as not ready)
+		require.Equal(r, consulKubernetesCheckName, actual[1].Check.Name)
+		require.Equal(r, consulapi.HealthCritical, actual[1].Check.Status)
+		require.Equal(r, kubernetesFailureReasonMsg, actual[1].Check.Output)
+		require.Equal(r, consulKubernetesCheckType, actual[1].Check.Type)
+		// Ready=false
+		require.Equal(r, consulKubernetesCheckName, actual[2].Check.Name)
+		require.Equal(r, consulapi.HealthCritical, actual[2].Check.Status)
+		require.Equal(r, kubernetesFailureReasonMsg, actual[2].Check.Output)
+		require.Equal(r, consulKubernetesCheckType, actual[2].Check.Type)
+	})
+}
+
 // Test that the proper registrations are generated for a ClusterIP type.
 func TestServiceResource_clusterIP(t *testing.T) {
 	t.Parallel()

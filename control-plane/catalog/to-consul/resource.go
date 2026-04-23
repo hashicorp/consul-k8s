@@ -683,6 +683,20 @@ func (t *ServiceResource) generateRegistrations(key string) {
 							r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 							r.Service.Address = address.Address
 							r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
+							r.Check = &consulapi.AgentCheck{
+								CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, endpointAddr)),
+								Name:      consulKubernetesCheckName,
+								Namespace: baseService.Namespace,
+								Type:      consulKubernetesCheckType,
+								ServiceID: serviceID(r.Service.Service, endpointAddr),
+							}
+							if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
+								r.Check.Status = consulapi.HealthPassing
+								r.Check.Output = kubernetesSuccessReasonMsg
+							} else {
+								r.Check.Status = consulapi.HealthCritical
+								r.Check.Output = kubernetesFailureReasonMsg
+							}
 							t.consulMap[key] = append(t.consulMap[key], &r)
 							// Only consider the first address that matches. In some cases
 							// there will be multiple addresses like when using AWS CNI.
@@ -704,6 +718,20 @@ func (t *ServiceResource) generateRegistrations(key string) {
 								r.Service.ID = serviceID(r.Service.Service, endpointAddr)
 								r.Service.Address = address.Address
 								r.Service.Meta = updateServiceMeta(baseService.Meta, endpoint)
+								r.Check = &consulapi.AgentCheck{
+									CheckID:   consulHealthCheckID(endpointSlice.Namespace, serviceID(r.Service.Service, endpointAddr)),
+									Name:      consulKubernetesCheckName,
+									Namespace: baseService.Namespace,
+									Type:      consulKubernetesCheckType,
+									ServiceID: serviceID(r.Service.Service, endpointAddr),
+								}
+								if endpoint.Conditions.Ready != nil && *endpoint.Conditions.Ready {
+									r.Check.Status = consulapi.HealthPassing
+									r.Check.Output = kubernetesSuccessReasonMsg
+								} else {
+									r.Check.Status = consulapi.HealthCritical
+									r.Check.Output = kubernetesFailureReasonMsg
+								}
 								t.consulMap[key] = append(t.consulMap[key], &r)
 								// Only consider the first address that matches. In some cases
 								// there will be multiple addresses like when using AWS CNI.
