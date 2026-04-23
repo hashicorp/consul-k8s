@@ -46,6 +46,10 @@ func (v *RateLimitWebhook) Handle(ctx context.Context, req admission.Request) ad
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
+	if v.EnableACLs && v.EnablePartitions && !v.HasGlobalConfigACLToken {
+		return admission.Denied("connectInject.globalConfigACLToken must be configured when admin partitions are enabled before creating or updating RateLimit resources")
+	}
+
 	if req.Operation == admissionv1.Create {
 		v.Logger.Info("validate create", "name", limit.KubernetesName())
 
