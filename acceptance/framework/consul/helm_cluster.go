@@ -101,6 +101,7 @@ func NewHelmCluster(
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
 		"install": {"--timeout", "15m", "--debug", "--skip-crds"},
+		"upgrade": {"--timeout", "15m", "--debug", "--skip-crds"},
 		"delete":  {"--timeout", "15m", "--debug", "--skip-crds"},
 	}
 
