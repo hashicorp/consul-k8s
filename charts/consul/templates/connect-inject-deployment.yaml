@@ -186,6 +186,7 @@ spec:
                 -default-enable-metrics=false \
                 {{- end }}
                 -enable-gateway-metrics={{ .Values.global.metrics.enableGatewayMetrics }}  \
+                -enable-gateway-scaling={{ .Values.connectInject.apiGateway.managedGatewayClass.scaling.enabled }} \
                 -default-enable-metrics-merging={{ .Values.connectInject.metrics.defaultEnableMerging }}  \
                 -default-merged-metrics-port={{ .Values.connectInject.metrics.defaultMergedMetricsPort }} \
                 -default-prometheus-scrape-port={{ .Values.connectInject.metrics.defaultPrometheusScrapePort }} \
@@ -289,6 +290,30 @@ spec:
                 {{- else }}
                 -default-enable-consul-dataplane-as-sidecar=false \
                 {{- end }}
+                {{- if or (.Values.global.crds.consulapi.enabled) 
+                (and .Values.global.openshift.crds.consulapi.enabled .Values.global.openshift.enabled) 
+                (and
+                  (default false .Values.global.openshift.enabled)
+                  (default false .Values.global.openshift.upgradeTo419From418)
+                  (default false .Values.global.openshift.crds.enableTcpRoute)
+                  )
+                  (and 
+                  (default false .Values.global.openshift.enabled)
+                  (default false .Values.global.openshift.isOcpGreaterthan4_18)
+                  (default false .Values.global.openshift.crds.enableTcpRoute)
+
+                  )
+                }}
+                -enable-custom-gateway-crd-controller=true \
+                {{- end }}
+                {{- if or (and (not (default false .Values.global.openshift.enabled))
+                          (default false .Values.global.crds.enableTcpRoute))
+                  (and (default false .Values.global.openshift.enabled)
+                       (not (default false .Values.global.openshift.isOcpGreaterthan4_18))
+                       (default false .Values.global.openshift.crds.enableTcpRoute))  }}
+                -enabe-tcp-route=true
+                {{- end }}
+
 
           startupProbe:
             httpGet:
