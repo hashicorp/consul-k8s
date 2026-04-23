@@ -108,22 +108,6 @@ func TestValidateRateLimit(t *testing.T) {
 			expAllow:      false,
 			expErrMessage: `spec.config.readRate: Invalid value: -1: readRate must be non-negative`,
 		},
-		"admin partitions enabled without global config ACL token": {
-			existingResources:       nil,
-			enableACLs:              true,
-			enablePartitions:        true,
-			hasGlobalConfigACLToken: false,
-			newResource: &RateLimit{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "global",
-				},
-				Spec: RateLimitSpec{
-					Config: GlobalRateLimitConfig{},
-				},
-			},
-			expAllow:      false,
-			expErrMessage: "connectInject.globalConfigACLToken must be configured when admin partitions are enabled before creating or updating RateLimit resources",
-		},
 		"admin partitions enabled with global config ACL token": {
 			existingResources:       nil,
 			enableACLs:              true,

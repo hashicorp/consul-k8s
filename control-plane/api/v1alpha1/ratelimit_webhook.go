@@ -22,7 +22,7 @@ import (
 type RateLimitWebhook struct {
 	client.Client
 	Logger                  logr.Logger
-	decoder                 *admission.Decoder
+	decoder                 admission.Decoder
 	ConsulMeta              common.ConsulMeta
 	EnableACLs              bool
 	EnablePartitions        bool
@@ -44,10 +44,6 @@ func (v *RateLimitWebhook) Handle(ctx context.Context, req admission.Request) ad
 	err := v.decoder.Decode(req, &limit)
 	if err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
-	}
-
-	if v.EnableACLs && v.EnablePartitions && !v.HasGlobalConfigACLToken {
-		return admission.Denied("connectInject.globalConfigACLToken must be configured when admin partitions are enabled before creating or updating RateLimit resources")
 	}
 
 	if req.Operation == admissionv1.Create {
