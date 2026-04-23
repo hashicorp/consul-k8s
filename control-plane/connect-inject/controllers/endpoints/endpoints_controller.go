@@ -1524,7 +1524,7 @@ func (r *Controller) processUnlabeledUpstream(pod corev1.Pod, rawUpstream string
 // [service-name].svc.[service-namespace].ns.[service-datacenter].dc:[port].
 // Optional fields can be provided as a third segment:
 // [service-name].svc...:[port]:<destination-port>
-// [service-name].svc...:[port]:destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>
+// [service-name].svc...:[port]:destination_port=<name>&local_bind_address=<addr>&mesh_gateway_mode=<mode>.
 func (r *Controller) processLabeledUpstream(pod corev1.Pod, rawUpstream string) (api.Upstream, error) {
 	var datacenter, svcName, namespace, partition, peer string
 	var port int32
