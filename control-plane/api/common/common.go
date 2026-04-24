@@ -26,6 +26,7 @@ const (
 	SamenessGroup            string = "samenessgroup"
 	JWTProvider              string = "jwtprovider"
 	ControlPlaneRequestLimit string = "controlplanerequestlimit"
+	RateLimit                string = "ratelimit"
 	RouteAuthFilter          string = "routeauthfilter"
 	GatewayPolicy            string = "gatewaypolicy"
 	CustomGatewayPolicy      string = "customgatewaypolicy"
