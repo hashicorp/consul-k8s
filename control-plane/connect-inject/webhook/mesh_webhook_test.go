@@ -1586,6 +1586,43 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 		},
 
 		{
+			"basic pod, with multiple named ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 8080,
+								},
+								{
+									Name:          "metrics",
+									ContainerPort: 9090,
+								},
+								{
+									Name:          "admin",
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "http,metrics,admin",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080},{\"name\":\"metrics\",\"containerPort\":9090},{\"name\":\"admin\",\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
+
+		{
 			"basic pod, with unnamed ports",
 			&corev1.Pod{
 				Spec: corev1.PodSpec{
@@ -1612,6 +1649,40 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			"",
 		},
+
+		{
+			"basic pod, with multiple unnamed ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 8080,
+								},
+								{
+									ContainerPort: 9090,
+								},
+								{
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "8080,9090,9292",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080},{\"containerPort\":9090},{\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
 	}
 
 	for _, tt := range cases {
@@ -1633,7 +1704,41 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			if len(actual) == 0 {
 				actual = nil
 			}
-			require.Equal(t, tt.Expected, actual)
+
+			// The original pod annotation is stored as a JSON string. Compare it
+			// semantically to avoid flakes caused by equivalent JSON encodings.
+			expectedOriginal, expectedHasOriginal := tt.Expected[constants.AnnotationOriginalPod]
+			actualOriginal, actualHasOriginal := actual[constants.AnnotationOriginalPod]
+			require.Equal(t, expectedHasOriginal, actualHasOriginal)
+			if expectedHasOriginal {
+				normalizeOriginalPod := func(raw string) map[string]any {
+					var out map[string]any
+					require.NoError(t, json.Unmarshal([]byte(raw), &out))
+
+					if metadata, ok := out["metadata"].(map[string]any); ok {
+						if v, has := metadata["creationTimestamp"]; has && v == nil {
+							delete(metadata, "creationTimestamp")
+						}
+					}
+
+					return out
+				}
+
+				require.Equal(t, normalizeOriginalPod(expectedOriginal), normalizeOriginalPod(actualOriginal))
+			}
+
+			expectedCopy := make(map[string]string, len(tt.Expected))
+			for k, v := range tt.Expected {
+				expectedCopy[k] = v
+			}
+			actualCopy := make(map[string]string, len(actual))
+			for k, v := range actual {
+				actualCopy[k] = v
+			}
+			delete(expectedCopy, constants.AnnotationOriginalPod)
+			delete(actualCopy, constants.AnnotationOriginalPod)
+
+			require.Equal(t, expectedCopy, actualCopy)
 		})
 	}
 }
@@ -2410,17 +2515,17 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 		{
 			name:        "tproxy",
 			annotations: map[string]string{constants.KeyTransparentProxy: "true"},
-			expErr:      "multi port services are not compatible with transparent proxy",
+			expErr:      "multi protocol multi port services are not compatible with transparent proxy",
 		},
 		{
 			name:        "metrics",
 			annotations: map[string]string{constants.AnnotationEnableMetrics: "true"},
-			expErr:      "multi port services are not compatible with metrics",
+			expErr:      "multi protocol multi port services are not compatible with metrics",
 		},
 		{
 			name:        "metrics merging",
 			annotations: map[string]string{constants.AnnotationEnableMetricsMerging: "true"},
-			expErr:      "multi port services are not compatible with metrics merging",
+			expErr:      "multi protocol multi port services are not compatible with metrics merging",
 		},
 	}
 	for _, tt := range cases {
