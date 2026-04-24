@@ -72,6 +72,6 @@ jobs:
           repo: hashicorp/consul-k8s-workflows
           # ref: main
           # TODO: change ref to main after testing
-          ref: abhishek/fix-peering-test-for-eks
+          ref: abhishek/eks-test-only-for-ocp
           token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
           inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}" }'
