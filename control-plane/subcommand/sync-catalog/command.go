@@ -181,9 +181,9 @@ func (c *Command) init() {
 	c.flags.StringVar(&c.flagMetricsRetentionTime, "prometheus-retention-time", "1m", "configures the retention time for metrics in the Prometheus sink")
 
 	c.flags.BoolVar(&c.flagEnableIngress, "enable-ingress", false,
-		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
+		"Register services using the hostname from an ingress resource.")
 	c.flags.BoolVar(&c.flagLoadBalancerIPs, "loadBalancer-ips", false,
-		"[Enterprise Only] Enables namespaces, in either a single Consul namespace or mirrored.")
+		"Use the load balancer IP of an ingress resource instead of the hostname.")
 
 	c.consul = &flags.ConsulFlags{}
 	c.k8s = &flags.K8SFlags{}
