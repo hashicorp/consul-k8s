@@ -1,3 +1,13 @@
+## 1.9.7 (April 26, 2026)
+
+SECURITY:
+
+* go: upgrade go version to 1.25.9 
+
+IMPROVEMENTS:
+
+* envoy: Update Envoy version to 1.35.10
+
 ## 1.9.6 (March 23, 2026)
 
 BUG FIXES:
