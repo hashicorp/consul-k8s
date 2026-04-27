@@ -1,0 +1,3 @@
+```release-note:bug
+connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check called a non-existent API endpoint (`/v1/agent/version`) and used a nil map that was never populated, causing both FIPS warnings to fire unconditionally on every pod startup. The fix reads `state.DataplaneFeatures["DATAPLANE_FEATURES_FIPS"]` which is already populated by `consul-server-connection-manager` during initialization.
+```
