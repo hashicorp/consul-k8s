@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/acceptance
 
-go 1.26.2
+go 1.26
 
 // replace these so we always use the latest version of the control-plane types
 replace github.com/hashicorp/consul-k8s/version => ../version
@@ -45,7 +45,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.5 // indirect
 	github.com/go-openapi/jsonpointer v0.21.2 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/swag v0.24.1 // indirect
