@@ -166,12 +166,6 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			// which is independent of iptables interception.
 			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf", "http://localhost:1234"}
 
-			if cfg.EnableTransparentProxy {
-				args = append(args, "http://static-server")
-			} else {
-				args = append(args, "http://localhost:1234")
-			}
-
 			if gracePeriodSeconds > 0 {
 				// Ensure outbound requests are still successful during grace period.
 				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
