@@ -2958,6 +2958,21 @@ connectInject:
     # @type: string
     secretKey: null
 
+  # Refers to a Kubernetes secret that contains an ACL token with operator privileges
+  # for global config entry writes reconciled by connect-inject (for example, for writing
+  # RateLimit).
+  #
+  # This token is optional and only used when both secretName and secretKey
+  # are provided. When set, connect-inject passes only the secret name/key
+  # and reads the token from the Kubernetes Secret in code.
+  globalConfigACLToken:
+    # The name of the Kubernetes secret that holds the global config ACL token.
+    # @type: string
+    secretName: null
+    # The key within the Kubernetes secret that holds the global config ACL token.
+    # @type: string
+    secretKey: null
+
   sidecarProxy:
     # The number of worker threads to be used by the Envoy proxy.
     # By default the threading model of Envoy will use one thread per CPU core per envoy proxy. This
