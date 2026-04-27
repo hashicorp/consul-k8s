@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/ahmetb/gen-crd-api-reference-docs v0.3.0
