@@ -158,8 +158,13 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
 			require.NoError(t, err)
 
-			// Exec into terminating pod, not just any static-client pod
-			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
+			// Exec into terminating pod, not just any static-client pod.
+			// Always use localhost:1234 for the post-delete drain check because
+			// iptables/ip6tables redirect rules (used by transparent proxy) are not
+			// guaranteed to survive pod termination. The drain test verifies that
+			// Envoy's local upstream listener stays alive during the grace period,
+			// which is independent of iptables interception.
+			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf", "http://localhost:1234"}
 
 			if cfg.EnableTransparentProxy {
 				args = append(args, "http://static-server")
