@@ -46,24 +46,15 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 	}
 
 	meshGatewayModes := []struct {
-		name        string
-		fixturePath string
+		name string
 	}{
-		{name: "local", fixturePath: "../fixtures/bases/mesh-gateway"},
-		{name: "remote", fixturePath: "../fixtures/bases/mesh-gateway-remote"},
+		{name: "local"},
+		{name: "remote"},
 	}
 
 	for _, c := range aclCases {
 		for _, meshGatewayMode := range meshGatewayModes {
 			t.Run(fmt.Sprintf("%s mesh-gateway %s", c.name, meshGatewayMode.name), func(t *testing.T) {
-				if cfg.EnableTransparentProxy && !c.aclsEnabled {
-					t.Skipf("skipping this test because transparent proxy requires ACLs to be enabled")
-				}
-
-				if cfg.EnableCNI && !c.aclsEnabled {
-					t.Skipf("skipping because -enable-cni is set and ACLs are disabled")
-				}
-
 				defaultPartitionClusterContext := env.DefaultContext(t)
 				secondaryPartitionClusterContext := env.Context(t, 1)
 
@@ -151,22 +142,103 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 
 				consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.aclsEnabled)
 
-				logger.Logf(t, "creating proxy defaults with mesh gateway mode %s", meshGatewayMode.name)
-				k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
+				// Apply ProxyDefaults with http protocol and mesh gateway mode to both partitions.
+				// The http protocol must be set globally to ensure protocol consistency across
+				// the discovery chain (ProxyDefaults, ServiceDefaults, ServiceResolver).
+				logger.Logf(t, "creating proxy defaults with mesh gateway mode %s and protocol http", meshGatewayMode.name)
+				proxyDefaults := &api.ProxyConfigEntry{
+					Kind: api.ProxyDefaults,
+					Name: api.ProxyConfigGlobal,
+					Config: map[string]interface{}{
+						"protocol": "http",
+					},
+					MeshGateway: api.MeshGatewayConfig{
+						Mode: api.MeshGatewayMode(meshGatewayMode.name),
+					},
+				}
+				_, _, err := consulClient.ConfigEntries().Set(proxyDefaults, &api.WriteOptions{Partition: defaultPartition})
+				require.NoError(t, err)
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
+					_, err := consulClient.ConfigEntries().Delete(api.ProxyDefaults, api.ProxyConfigGlobal, &api.WriteOptions{Partition: defaultPartition})
+					require.NoError(t, err)
 				})
-				k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
+				_, _, err = consulClient.ConfigEntries().Set(proxyDefaults, &api.WriteOptions{Partition: secondaryPartition})
+				require.NoError(t, err)
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
+					_, err := consulClient.ConfigEntries().Delete(api.ProxyDefaults, api.ProxyConfigGlobal, &api.WriteOptions{Partition: secondaryPartition})
+					require.NoError(t, err)
 				})
 
+				// Create ServiceDefaults for the multiport service to set protocol and mesh gateway mode.
+				// The http protocol is required for multiport services so that L7 routing can
+				// select destination ports without generating port-qualified SNIs that mesh
+				// gateways cannot route.
+				logger.Log(t, "creating service defaults for multiport in default partition")
+				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceConfigEntry{
+					Kind:     api.ServiceDefaults,
+					Name:     multiportServiceName,
+					Protocol: "http",
+					MeshGateway: api.MeshGatewayConfig{
+						Mode: api.MeshGatewayMode(meshGatewayMode.name),
+					},
+				}, &api.WriteOptions{Partition: defaultPartition, Namespace: "default"})
+				require.NoError(t, err)
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					_, err := consulClient.ConfigEntries().Delete(api.ServiceDefaults, multiportServiceName, &api.WriteOptions{Partition: defaultPartition, Namespace: "default"})
+					require.NoError(t, err)
+				})
+
+				logger.Log(t, "creating service defaults for static-client in secondary partition")
+				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceConfigEntry{
+					Kind:     api.ServiceDefaults,
+					Name:     StaticClientName,
+					Protocol: "http",
+					MeshGateway: api.MeshGatewayConfig{
+						Mode: api.MeshGatewayMode(meshGatewayMode.name),
+					},
+				}, &api.WriteOptions{Partition: secondaryPartition, Namespace: "default"})
+				require.NoError(t, err)
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					_, err := consulClient.ConfigEntries().Delete(api.ServiceDefaults, StaticClientName, &api.WriteOptions{Partition: secondaryPartition, Namespace: "default"})
+					require.NoError(t, err)
+				})
+
+				// Create a ServiceResolver in the secondary partition that redirects the
+				// multiport service to the default partition. This allows transparent proxy
+				// clients to resolve the service locally while the actual instances live in
+				// the default partition.
+				logger.Log(t, "creating service resolver for multiport in secondary partition")
+				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceResolverConfigEntry{
+					Kind:      api.ServiceResolver,
+					Name:      multiportServiceName,
+					Namespace: "default",
+					Redirect: &api.ServiceResolverRedirect{
+						Service:   multiportServiceName,
+						Namespace: "default",
+						Partition: defaultPartition,
+					},
+				}, &api.WriteOptions{Partition: secondaryPartition, Namespace: "default"})
+				require.NoError(t, err)
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					_, err := consulClient.ConfigEntries().Delete(api.ServiceResolver, multiportServiceName, &api.WriteOptions{Partition: secondaryPartition, Namespace: "default"})
+					require.NoError(t, err)
+				})
+
+				// Deploy the multiport server. In transparent proxy mode the server needs
+				// tproxy enabled so it registers with virtual tagged addresses.
 				logger.Log(t, "deploying multi-port service in default partition cluster")
-				k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
+				if cfg.EnableTransparentProxy {
+					k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/multiport-single-service-tproxy")
+				} else {
+					k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
+				}
 
+				// Deploy the client. In transparent proxy mode the client uses virtual DNS
+				// addresses (e.g. api-port.multiport.virtual...) without explicit upstreams.
+				// In non-tproxy mode the client uses explicit upstreams with local bind ports.
 				logger.Log(t, "deploying client in secondary partition cluster")
 				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service-tproxy")
 				} else {
 					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
 				}
@@ -198,17 +270,25 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 
 				logger.Log(t, "exporting multi-port services from default partition to secondary partition")
 				k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
+				k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service")
 				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 					k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
+					k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service")
 				})
 
-				upstreamAPIURL := "http://localhost:1234"
-				upstreamMetricsURL := "http://localhost:2234"
-				upstreamAdminURL := "http://localhost:3234"
+				// In transparent proxy mode, use virtual DNS addresses to reach the
+				// multiport service. The ServiceResolver in the secondary partition
+				// redirects to the default partition where the service lives.
+				// In non-tproxy mode, use explicit upstream local bind ports.
+				var upstreamAPIURL, upstreamMetricsURL, upstreamAdminURL string
 				if cfg.EnableTransparentProxy {
-					upstreamAPIURL = fmt.Sprintf("http://api-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
-					upstreamMetricsURL = fmt.Sprintf("http://metrics.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
-					upstreamAdminURL = fmt.Sprintf("http://admin-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
+					upstreamAPIURL = fmt.Sprintf("http://api-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, secondaryPartition)
+					upstreamMetricsURL = fmt.Sprintf("http://metrics.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, secondaryPartition)
+					upstreamAdminURL = fmt.Sprintf("http://admin-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, secondaryPartition)
+				} else {
+					upstreamAPIURL = "http://localhost:1234"
+					upstreamMetricsURL = "http://localhost:2234"
+					upstreamAdminURL = "http://localhost:3234"
 				}
 
 				secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
@@ -244,8 +324,6 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 
 					createMultiportIntention()
 				} else if cfg.EnableTransparentProxy {
-					// In transparent proxy cross-partition mode we still need an explicit
-					// allow intention for the destination service to make the route active.
 					createMultiportIntention()
 				}
 
