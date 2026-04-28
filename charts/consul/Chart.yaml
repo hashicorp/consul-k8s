@@ -18,7 +18,7 @@ annotations:
     - name: consul
       image: hashicorp/consul:1.18.7
     - name: consul-k8s-control-plane
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.4.11-dev
+      image: hashicorp/consul-k8s-control-plane:1.4.10
     - name: consul-dataplane
       image: hashicorp/consul-dataplane:1.4.10
     - name: envoy
