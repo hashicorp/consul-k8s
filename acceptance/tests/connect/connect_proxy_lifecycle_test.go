@@ -108,36 +108,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				require.Len(r, peers, 1)
 			})
 
-			// When transparent proxy is enabled, deploy the static-client with
-			// an explicit upstream annotation (`static-server:1234`) so Envoy
-			// binds a local listener on localhost:1234. The post-delete drain
-			// check below curls localhost:1234 to verify Envoy stays alive
-			// during the grace period without depending on iptables redirect
-			// rules, which are not guaranteed to survive pod termination.
-			// For non-tproxy mode the standard static-client-inject fixture
-			// already declares the same upstream.
-			if cfg.EnableTransparentProxy {
-				connHelper.DeployServer(t)
-				// DeployClientAndServer registers an ACL-token cleanup for both
-				// static-server and static-client. DeployServer only covers the
-				// server, so when running secure mode in the tproxy branch we
-				// also need to assert the static-client token is cleaned up.
-				if testCfg.secure {
-					t.Cleanup(func() {
-						retrier := &retry.Timer{Timeout: 30 * time.Second, Wait: 100 * time.Millisecond}
-						retry.RunWith(retrier, t, func(r *retry.R) {
-							tokens, _, err := connHelper.ConsulClient.ACL().TokenList(nil)
-							require.NoError(r, err)
-							for _, token := range tokens {
-								require.NotContains(r, token.Description, connhelper.StaticClientName)
-							}
-						})
-					})
-				}
-				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy-with-upstream")
-			} else {
-				connHelper.DeployClientAndServer(t)
-			}
+			connHelper.DeployClientAndServer(t)
 
 			// TODO: should this move into connhelper.DeployClientAndServer?
 			logger.Log(t, "waiting for static-client and static-server to be registered with Consul")
@@ -187,13 +158,19 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
 			require.NoError(t, err)
 
-			// Exec into terminating pod, not just any static-client pod.
-			// Always use localhost:1234 for the post-delete drain check because
-			// iptables/ip6tables redirect rules (used by transparent proxy) are not
-			// guaranteed to survive pod termination. The drain test verifies that
-			// Envoy's local upstream listener stays alive during the grace period,
-			// which is independent of iptables interception.
-			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf", "http://localhost:1234"}
+			// Exec into the terminating pod and verify Envoy keeps serving
+			// traffic during the shutdown grace period. In transparent-proxy
+			// mode we curl `static-server` (intercepted by iptables and routed
+			// through Envoy's outbound listener); otherwise we curl the
+			// explicit local upstream listener bound by the
+			// connect-service-upstreams annotation in the static-client-inject
+			// fixture.
+			var args []string
+			if cfg.EnableTransparentProxy {
+				args = []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf", "http://static-server"}
+			} else {
+				args = []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf", "http://localhost:1234"}
+			}
 
 			if gracePeriodSeconds > 0 {
 				// Ensure outbound requests are still successful during grace period.
@@ -217,20 +194,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 							}, fmt.Sprintf("Error: %s", output))
 						})
 
-						// If listener draining is disabled, also verify the
-						// terminating pod's Envoy keeps serving traffic during
-						// the grace period. Re-using `args` (curl localhost:1234)
-						// keeps this independent of iptables redirect rules,
-						// which can be torn down before the grace period ends
-						// when transparent proxy is enabled.
+						// If listener draining is disabled, ensure inbound
+						// requests are accepted during grace period.
 						if !drainListenersEnabled {
-							retry.RunWith(&retry.Counter{Count: 3, Wait: 1 * time.Second}, t, func(r *retry.R) {
-								output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
-								require.NoError(r, err)
-								require.Condition(r, func() bool {
-									return !strings.Contains(output, "curl: (7) Failed to connect")
-								}, fmt.Sprintf("Error: %s", output))
-							})
+							connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
 						}
 						// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
 						// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
