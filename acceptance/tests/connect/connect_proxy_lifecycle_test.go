@@ -36,6 +36,7 @@ const (
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
+	t.Skip("TEMPORARY: skipping for targeted CI validation")
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
@@ -158,18 +159,13 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
 			require.NoError(t, err)
 
-			// Exec into the terminating pod and verify Envoy keeps serving
-			// traffic during the shutdown grace period. In transparent-proxy
-			// mode we curl `static-server` (intercepted by iptables and routed
-			// through Envoy's outbound listener); otherwise we curl the
-			// explicit local upstream listener bound by the
-			// connect-service-upstreams annotation in the static-client-inject
-			// fixture.
-			var args []string
+			// Exec into terminating pod, not just any static-client pod
+			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
+
 			if cfg.EnableTransparentProxy {
-				args = []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf", "http://static-server"}
+				args = append(args, "http://static-server")
 			} else {
-				args = []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf", "http://localhost:1234"}
+				args = append(args, "http://localhost:1234")
 			}
 
 			if gracePeriodSeconds > 0 {

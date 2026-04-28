@@ -53,7 +53,6 @@ func TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *t
 		MinInstances:     ptr.To(int32(1)),
 		MaxInstances:     ptr.To(int32(5)),
 	})
-	waitForGatewayClassAccepted(t, k8sClient, gatewayClassName)
 
 	gateway := createScalingGateway(t, k8sClient, ctx.KubectlOptions(t).Namespace, gatewayClassName, map[string]string{
 		annotationHPAEnabled:     "true",
@@ -82,7 +81,6 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas(t *testing.T) {
 	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	gatewayClassName := createScalingGatewayClassResources(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{})
-	waitForGatewayClassAccepted(t, k8sClient, gatewayClassName)
 
 	gateway := createScalingGateway(t, k8sClient, ctx.KubectlOptions(t).Namespace, gatewayClassName, map[string]string{
 		annotationDefaultReplicas: "4",
@@ -107,7 +105,6 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing
 	cfg := suite.Config()
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	gatewayClassName := createScalingGatewayClassResources(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{})
-	waitForGatewayClassAccepted(t, k8sClient, gatewayClassName)
 
 	gateway := createScalingGateway(t, k8sClient, ctx.KubectlOptions(t).Namespace, gatewayClassName, map[string]string{
 		annotationHPAEnabled:     "true",
@@ -115,6 +112,12 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing
 		annotationHPAMaxReplicas: "25",
 		annotationHPACPUTarget:   "70",
 	}, cfg.NoCleanupOnFailure, cfg.NoCleanup)
+
+	// Nudge the controller in case the Gateway CREATE event arrived before
+	// the controller-runtime manager finished syncing its watch caches after
+	// the restart. Mirrors the pattern used in
+	// TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale.
+	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	hpa := waitForGatewayHPA(t, k8sClient, gateway.Name, gateway.Namespace)
 	require.NotNil(t, hpa.Spec.MinReplicas)
@@ -148,7 +151,6 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(t *testing
 		MinInstances:     ptr.To(int32(1)),
 		MaxInstances:     ptr.To(int32(3)),
 	})
-	waitForGatewayClassAccepted(t, k8sClient, gatewayClassName)
 
 	gateway := createScalingGateway(t, k8sClient, ctx.KubectlOptions(t).Namespace, gatewayClassName, nil, cfg.NoCleanupOnFailure, cfg.NoCleanup)
 
@@ -283,17 +285,9 @@ func createScalingGateway(
 func waitForGatewayDeploymentReplicas(t *testing.T, k8sClient client.Client, gatewayName, namespace string, want int32) {
 	t.Helper()
 
-	reconcileTriggered := false
 	retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 		var deployment appsv1.Deployment
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &deployment)
-		if apierrors.IsNotFound(err) && !reconcileTriggered {
-			// Deployment not found — nudge the controller by triggering a reconcile
-			triggerGatewayReconcile(t, k8sClient, gatewayName, namespace)
-			reconcileTriggered = true
-			r.Errorf("deployment %s/%s not found, triggered reconcile", namespace, gatewayName)
-			return
-		}
 		require.NoError(r, err)
 		require.NotNil(r, deployment.Spec.Replicas)
 		require.Equal(r, want, *deployment.Spec.Replicas)
@@ -396,29 +390,5 @@ func restartAPIGatewayController(t *testing.T, ctx environment.TestContext) {
 			}
 		}
 		logger.Logf(t, "API Gateway controller restarted and ready")
-	})
-	// Wait for leader election and cache sync to complete.
-	// The controller needs time beyond pod readiness to acquire the leader
-	// lease and re-establish informer watches.
-	logger.Logf(t, "waiting for controller to complete leader election and cache sync")
-	time.Sleep(20 * time.Second)
-}
-
-func waitForGatewayClassAccepted(t *testing.T, k8sClient client.Client, gatewayClassName string) {
-	t.Helper()
-
-	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
-		var gc gwv1.GatewayClass
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassName}, &gc)
-		require.NoError(r, err)
-
-		for _, condition := range gc.Status.Conditions {
-			if condition.Type == string(gwv1.GatewayClassConditionStatusAccepted) {
-				require.Equal(r, metav1.ConditionTrue, condition.Status,
-					"GatewayClass %s not yet accepted", gatewayClassName)
-				return
-			}
-		}
-		require.Fail(r, "GatewayClass %s has no Accepted condition yet", gatewayClassName)
 	})
 }
