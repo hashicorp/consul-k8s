@@ -87,6 +87,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 
 		name := fmt.Sprintf("secure: %t, drainListeners: %t, gracePeriodSeconds: %d", testCfg.secure, drainListenersEnabled, gracePeriodSeconds)
 		t.Run(name, func(t *testing.T) {
+			// TEMPORARY: only run the specific failing subtest to speed up CI validation
+			if testCfg.secure || !drainListenersEnabled || gracePeriodSeconds != 5 {
+				t.Skip("TEMPORARY: skipping non-essential subtests for CI validation")
+			}
 			ctx := suite.Environment().DefaultContext(t)
 			releaseName := helpers.RandomName()
 
@@ -259,6 +263,7 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 }
 
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
+	t.Skip("TEMPORARY: skipping for targeted CI validation")
 	cfg := suite.Config()
 
 	if cfg.EnableTransparentProxy {

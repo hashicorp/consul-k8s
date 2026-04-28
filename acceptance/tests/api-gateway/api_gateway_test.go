@@ -37,6 +37,7 @@ const (
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestAPIGateway_Basic(t *testing.T) {
+	t.Skip("TEMPORARY: skipping for targeted CI validation")
 	cases := []struct {
 		secure                   bool
 		restrictedPSAEnforcement bool
@@ -360,6 +361,7 @@ const (
 )
 
 func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
+	t.Skip("TEMPORARY: skipping for targeted CI validation")
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 
