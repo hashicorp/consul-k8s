@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.5.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12.0"
+    }
   }
 }
 
@@ -99,4 +103,50 @@ resource "local_file" "kubeconfigs" {
   content         = azurerm_kubernetes_cluster.default[count.index].kube_config_raw
   filename        = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
   file_permission = "0600"
+}
+
+# Deploy IBM Uptycs EDR agent to each AKS cluster.
+provider "helm" {
+  alias = "cluster_0"
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.default[0].kube_config[0].host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.default[0].kube_config[0].client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.default[0].kube_config[0].client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.default[0].kube_config[0].cluster_ca_certificate)
+  }
+}
+
+resource "helm_release" "uptycs" {
+  count            = var.cluster_count
+  provider         = helm.cluster_0
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner = var.uptycs_owner
+    })
+  ]
+}
+
+resource "helm_release" "kubequery" {
+  count            = var.cluster_count
+  provider         = helm.cluster_0
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "uptycs"
+  create_namespace = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = azurerm_kubernetes_cluster.default[count.index].name
+  }
+
+  values = [
+    file("${path.module}/kubequery-values.yaml")
+  ]
 }

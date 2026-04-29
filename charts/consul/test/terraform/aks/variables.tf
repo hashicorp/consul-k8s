@@ -39,3 +39,8 @@ variable "tags" {
   default     = {}
   description = "Tags to attach to the created resources."
 }
+
+variable "uptycs_owner" {
+  default     = "hc-team-consul-dg@ibm.com"
+  description = "Owner email for Uptycs EDR agent tags."
+}
