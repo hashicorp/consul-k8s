@@ -31,8 +31,6 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     api-approved.kubernetes.io: https://github.com/kubernetes-sigs/gateway-api/pull/1538
-    consul.hashicorp.com/bundle-version: v0.6.2
-    consul.hashicorp.com/channel: experimental
   creationTimestamp: null
   labels:
     app: {{ template "consul.name" . }}
@@ -51,7 +49,7 @@ spec:
     listKind: GatewayList
     plural: gateways
     shortNames:
-      - ocgtw
+      - cgtw
     singular: gateway
   scope: Namespaced
   versions:
