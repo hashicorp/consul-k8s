@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/eks"
@@ -32,6 +33,10 @@ import (
 const (
 	// buildURLTag is a tag on AWS resources set by the acceptance tests.
 	buildURLTag = "build_url"
+
+	ec2ErrCodeInvalidInternetGatewayIDNotFound  = "InvalidInternetGatewayID.NotFound"
+	ec2ErrCodeInvalidNetworkInterfaceIDNotFound = "InvalidNetworkInterfaceID.NotFound"
+	ec2ErrCodeInvalidVpcIDNotFound              = "InvalidVpcID.NotFound"
 )
 
 var (
@@ -279,6 +284,10 @@ func realMain(ctx context.Context) error {
 				Name: cluster,
 			})
 			if err != nil {
+				if awsErrCodeIs(err, eks.ErrCodeResourceNotFoundException) {
+					fmt.Printf("EKS cluster: Not found (already deleted) [id=%s]\n", *cluster)
+					continue
+				}
 				return err
 			}
 			if _, ok := clusterData.Cluster.Tags[buildURLTag]; ok {
@@ -519,7 +528,7 @@ func realMain(ctx context.Context) error {
 					VpcId:             vpcID,
 				})
 				if err != nil {
-					if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidInternetGatewayIDNotFound) {
 						fmt.Printf("Internet gateway: Not found (already detached) [id=%s]\n", *igw.InternetGatewayId)
 						return nil
 					}
@@ -537,7 +546,7 @@ func realMain(ctx context.Context) error {
 				InternetGatewayId: igw.InternetGatewayId,
 			})
 			if err != nil {
-				if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+				if awsErrCodeIs(err, ec2ErrCodeInvalidInternetGatewayIDNotFound) {
 					fmt.Printf("Internet gateway: Not found (already destroyed) [id=%s]\n", *igw.InternetGatewayId)
 				} else {
 					return err
@@ -568,7 +577,7 @@ func realMain(ctx context.Context) error {
 					NetworkInterfaceId: networkInterface.NetworkInterfaceId,
 				})
 				if err != nil {
-					if strings.Contains(err.Error(), "InvalidNetworkInterfaceID.NotFound") {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidNetworkInterfaceIDNotFound) {
 						fmt.Printf("Network interface: Not found (already destroyed) [id=%s]\n", *networkInterface.NetworkInterfaceId)
 						return nil
 					}
@@ -715,8 +724,9 @@ func realMain(ctx context.Context) error {
 			})
 			if err == nil {
 				break
-			} else if strings.Contains(err.Error(), "InvalidVpcID.NotFound") {
+			} else if awsErrCodeIs(err, ec2ErrCodeInvalidVpcIDNotFound) {
 				fmt.Printf("VPC: Not found (already destroyed) [id=%s]\n", *vpcID)
+				err = nil
 				break
 			}
 			fmt.Printf("VPC: Destroy error... [id=%s,err=%q,retry=%d]\n", *vpcID, err, retryCount)
@@ -789,7 +799,7 @@ func destroyBackoff(ctx context.Context, resourceKind string, resourceID string,
 
 func cleanupIAMRoles(ctx context.Context, iamClient *iam.IAM) error {
 	var rolesToDelete []*iam.Role
-	rolesToDelete, err := filterIAMRolesWithPrefixes(ctx, iamClient, []string{"consul-k8s-", "terraform-"})
+	rolesToDelete, err := filterIAMRolesWithPrefix(ctx, iamClient, "consul-k8s-")
 	if err != nil {
 		return fmt.Errorf("failed to list roles: %w", err)
 	}
@@ -861,15 +871,28 @@ func cleanupIAMPolicies(ctx context.Context, iamClient *iam.IAM) error {
 		versions, err := iamClient.ListPolicyVersions(&iam.ListPolicyVersionsInput{
 			PolicyArn: policy.Arn,
 		})
-		if err == nil {
-			for _, version := range versions.Versions {
-				if !aws.BoolValue(version.IsDefaultVersion) {
-					_, _ = iamClient.DeletePolicyVersion(&iam.DeletePolicyVersionInput{
-						PolicyArn: policy.Arn,
-						VersionId: version.VersionId,
-					})
+		if err != nil {
+			fmt.Printf("Failed to list versions for policy %s: %v\n", policyName, err)
+			continue
+		}
+
+		canDeletePolicy := true
+		for _, version := range versions.Versions {
+			if !aws.BoolValue(version.IsDefaultVersion) {
+				_, err := iamClient.DeletePolicyVersion(&iam.DeletePolicyVersionInput{
+					PolicyArn: policy.Arn,
+					VersionId: version.VersionId,
+				})
+				if err != nil {
+					fmt.Printf("Failed to delete non-default policy version %s for policy %s: %v\n", aws.StringValue(version.VersionId), policyName, err)
+					canDeletePolicy = false
 				}
 			}
+		}
+
+		if !canDeletePolicy {
+			fmt.Printf("Skipping deletion of policy %s because one or more non-default versions could not be removed\n", policyName)
+			continue
 		}
 
 		_, err = iamClient.DeletePolicy(&iam.DeletePolicyInput{
@@ -885,25 +908,23 @@ func cleanupIAMPolicies(ctx context.Context, iamClient *iam.IAM) error {
 	return nil
 }
 
-// filterIAMRolesWithPrefixes is a callback function used with ListRolesPages.
-// It filters roles based on specified prefixes and appends matching roles to rolesToDelete.
+// filterIAMRolesWithPrefix is a callback function used with ListRolesPages.
+// It filters roles based on specified prefix and appends matching roles to rolesToDelete.
 //
 // Parameters:
-// - ctx: Context
-// - iamClient: The IAM service client
-// - prefixes: A slice of prefixes to filter roles by
-func filterIAMRolesWithPrefixes(ctx context.Context, iamClient *iam.IAM, prefixes []string) ([]*iam.Role, error) {
+// - page: A single page of IAM roles returned by the AWS API
+// - lastPage: A boolean indicating whether this is the last page of results
+// - rolesToDelete: A pointer to the slice where matching roles are accumulated
+// - rolePrefix: The prefix to filter roles by
+func filterIAMRolesWithPrefix(ctx context.Context, iamClient *iam.IAM, prefix string) ([]*iam.Role, error) {
 	var roles []*iam.Role
 
 	err := iamClient.ListRolesPagesWithContext(ctx, &iam.ListRolesInput{},
 		func(page *iam.ListRolesOutput, lastPage bool) bool {
 			for _, role := range page.Roles {
 				name := aws.StringValue(role.RoleName)
-				for _, prefix := range prefixes {
-					if strings.HasPrefix(name, prefix) {
-						roles = append(roles, role)
-						break
-					}
+				if strings.HasPrefix(name, prefix) {
+					roles = append(roles, role)
 				}
 			}
 
@@ -943,6 +964,7 @@ func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error 
 		return fmt.Errorf("roleName is nil")
 	}
 
+	var removeErr error
 	err := iamClient.ListInstanceProfilesForRolePages(&iam.ListInstanceProfilesForRoleInput{
 		RoleName: roleName,
 	}, func(page *iam.ListInstanceProfilesForRoleOutput, lastPage bool) bool {
@@ -953,6 +975,7 @@ func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error 
 			})
 			if err != nil {
 				fmt.Printf("Failed to remove role %s from instance profile %s: %v\n", *roleName, *profile.InstanceProfileName, err)
+				removeErr = err
 			} else {
 				fmt.Printf("Removed role %s from instance profile %s\n", *roleName, *profile.InstanceProfileName)
 			}
@@ -963,8 +986,19 @@ func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error 
 	if err != nil {
 		return err
 	}
+	if removeErr != nil {
+		return fmt.Errorf("failed to remove role %s from one or more instance profiles", *roleName)
+	}
 
 	return nil
+}
+
+func awsErrCodeIs(err error, code string) bool {
+	aerr, ok := err.(awserr.Error)
+	if !ok {
+		return false
+	}
+	return aerr.Code() == code
 }
 
 // detachPoliciesFromRole detaches all policies from a given role.
