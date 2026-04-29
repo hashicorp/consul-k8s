@@ -28,10 +28,12 @@ rules:
   - meshservices
   - samenessgroups
   - controlplanerequestlimits
+  - ratelimits
   - routeretryfilters
   - routetimeoutfilters
   - routeauthfilters
   - gatewaypolicies
+  - customgatewaypolicies
   - registrations
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors
@@ -62,6 +64,7 @@ rules:
   - terminatinggateways/status
   - samenessgroups/status
   - controlplanerequestlimits/status
+  - ratelimits/status
   - registrations/status
   {{- if .Values.global.peering.enabled }}
   - peeringacceptors/status
@@ -70,6 +73,7 @@ rules:
   - jwtproviders/status
   - routeauthfilters/status
   - gatewaypolicies/status
+  - customgatewaypolicies/status
   verbs:
   - get
   - patch
@@ -84,7 +88,7 @@ rules:
     - create
     - update
 - apiGroups: [ "" ]
-  resources: ["endpoints", "namespaces", "nodes"]
+  resources: ["endpoints", "namespaces", "nodes", "configmaps"]
   verbs:
   - get
   - list
@@ -144,8 +148,10 @@ rules:
   - use
 - apiGroups:
   - gateway.networking.k8s.io
+  - consul.hashicorp.com
   resources:
   - gatewayclasses
+  - customgatewayclasses
   - gateways
   - httproutes
   - tcproutes
@@ -160,8 +166,10 @@ rules:
   - watch
 - apiGroups:
   - gateway.networking.k8s.io
+  - consul.hashicorp.com
   resources:
   - gatewayclasses/finalizers
+  - customgatewayclasses/finalizers
   - gateways/finalizers
   - httproutes/finalizers
   - tcproutes/finalizers
@@ -169,8 +177,10 @@ rules:
   - update
 - apiGroups:
   - gateway.networking.k8s.io
+  - consul.hashicorp.com
   resources:
   - gatewayclasses/status
+  - customgatewayclasses/status
   - gateways/status
   - httproutes/status
   - tcproutes/status
@@ -190,6 +200,18 @@ rules:
     - watch
     - delete
 - apiGroups:
+    - autoscaling
+  resources:
+    - horizontalpodautoscalers
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
     - core
   resources:
     - services
@@ -208,7 +230,7 @@ rules:
   resources:
     - securitycontextconstraints
   resourceNames:
-    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName }}
+    - {{ .Values.connectInject.apiGateway.managedGatewayClass.openshiftSCCName | default "restricted-v2" }}
   verbs:
     - use
   {{- end }}

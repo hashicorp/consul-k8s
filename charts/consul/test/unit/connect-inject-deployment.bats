@@ -97,6 +97,33 @@ load _helpers
   [ "${actual}" = "true" ]
 }
 
+@test "connectInject/Deployment: defaults enable-gateway-scaling to false" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-enable-gateway-scaling=false"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: sets enable-gateway-scaling=true when managed gateway scaling is enabled" {
+  cd `chart_dir`
+  local cmd=$(helm template \
+      -s templates/connect-inject-deployment.yaml \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.apiGateway.managedGatewayClass.scaling.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.spec.template.spec.containers[0].command' | tee /dev/stderr)
+
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-enable-gateway-scaling=true"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "connectInject/Deployment: adds flag default-enable-metrics=true when global.metrics.enabled=true" {
   cd `chart_dir`
   local cmd=$(helm template \
@@ -845,6 +872,88 @@ load _helpers
   local actual=$(echo $object |
     yq 'map(select(test("CONSUL_ACL_TOKEN"))) | length' | tee /dev/stderr)
   [ "${actual}" = "1" ]
+}
+
+@test "connectInject/Deployment: globalConfigACLToken disabled when secretName is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token-secret-name=")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: globalConfigACLToken disabled when secretKey is missing" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token-secret-key=")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: globalConfigACLToken enabled when secretName and secretKey is provided" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
+
+  local actual=$(echo $object |
+    yq 'contains("-global-config-acl-token-secret-name=foo")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $object |
+    yq 'contains("-global-config-acl-token-secret-key=bar")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "connectInject/Deployment: -global-config-acl-token is not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token=")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: -global-config-acl-token is not set when globalConfigACLToken is configured" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ") | contains("-global-config-acl-token=")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "connectInject/Deployment: globalConfigACLToken secret reference flags are set when configured" {
+  cd `chart_dir`
+  local command=$(helm template \
+      -s templates/connect-inject-deployment.yaml  \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.globalConfigACLToken.secretName=foo' \
+      --set 'connectInject.globalConfigACLToken.secretKey=bar' \
+      . | tee /dev/stderr |
+      yq -c -r '.spec.template.spec.containers[0].command | join(" ")' | tee /dev/stderr)
+
+  local actual=$(echo $command |
+    yq 'contains("-global-config-acl-token-secret-name=foo")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+
+  local actual=$(echo $command |
+    yq 'contains("-global-config-acl-token-secret-key=bar")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 #--------------------------------------------------------------------
@@ -2470,271 +2579,4 @@ reservedNameTest() {
   local actual=$(echo "$env" |
     jq -r '. | select( .name == "CONSUL_SKIP_SERVER_WATCH").value' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-}
-
-#--------------------------------------------------------------------
-# global.cloud
-
-@test "connectInject/Deployment: fails when global.cloud.enabled is true and global.cloud.clientId.secretName is not set but global.cloud.clientSecret.secretName and global.cloud.resourceId.secretName is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'client.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.datacenter=dc-foo' \
-      --set 'global.domain=bar' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientSecret.secretName=client-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-id-key' \
-      --set 'global.cloud.resourceId.secretName=client-resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=client-resource-id-key' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.enabled is true and global.cloud.clientSecret.secretName is not set but global.cloud.clientId.secretName and global.cloud.resourceId.secretName is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/client-daemonset.yaml  \
-      --set 'client.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.datacenter=dc-foo' \
-      --set 'global.domain=bar' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.enabled is true and global.cloud.resourceId.secretName is not set but global.cloud.clientId.secretName and global.cloud.clientSecret.secretName is set" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When global.cloud.enabled is true, global.cloud.resourceId.secretName, global.cloud.clientId.secretName, and global.cloud.clientSecret.secretName must also be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.resourceId.secretName is set but global.cloud.resourceId.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      .
-  [ "$status" -eq 1 ]
-  [[ "$output" =~ "When either global.cloud.resourceId.secretName or global.cloud.resourceId.secretKey is defined, both must be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.authURL.secretName is set but global.cloud.authURL.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.authUrl.secretName=auth-url-name' \
-      .
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.authURL.secretKey is set but global.cloud.authURL.secretName is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.authUrl.secretKey=auth-url-key' \
-      .
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "When either global.cloud.authUrl.secretName or global.cloud.authUrl.secretKey is defined, both must be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.apiHost.secretName is set but global.cloud.apiHost.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.apiHost.secretName=auth-url-name' \
-      .
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.apiHost.secretKey is set but global.cloud.apiHost.secretName is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.apiHost.secretKey=auth-url-key' \
-      .
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "When either global.cloud.apiHost.secretName or global.cloud.apiHost.secretKey is defined, both must be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.scadaAddress.secretName is set but global.cloud.scadaAddress.secretKey is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.scadaAddress.secretName=scada-address-name' \
-      .
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
-}
-
-@test "connectInject/Deployment: fails when global.cloud.scadaAddress.secretKey is set but global.cloud.scadaAddress.secretName is not set." {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      --set 'global.cloud.scadaAddress.secretKey=scada-address-key' \
-      .
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "When either global.cloud.scadaAddress.secretName or global.cloud.scadaAddress.secretKey is defined, both must be set." ]]
-}
-
-@test "connectInject/Deployment: sets TLS server name if global.cloud.enabled is set" {
-  cd `chart_dir`
-  local actual=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-      . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
-  [ "${actual}" = "true" ]
-}
-
-@test "connectInject/Deployment: validates that externalServers.hosts is not set with an HCP-managed cluster's address" {
-  cd `chart_dir`
-  run helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'global.enabled=false' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'externalServers.enabled=true' \
-      --set 'externalServers.hosts[0]=abc.aws.hashicorp.cloud' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-     . > /dev/stderr
-
-  [ "$status" -eq 1 ]
-
-  [[ "$output" =~ "global.cloud.enabled cannot be used in combination with an HCP-managed cluster address in externalServers.hosts. global.cloud.enabled is for linked self-managed clusters." ]]
-}
-
-@test "connectInject/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {
-  cd `chart_dir`
-  local env=$(helm template \
-      -s templates/connect-inject-deployment.yaml  \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.enableAutoEncrypt=true' \
-      --set 'global.cloud.enabled=true' \
-      --set 'global.cloud.clientId.secretName=client-id-name' \
-      --set 'global.cloud.clientId.secretKey=client-id-key' \
-      --set 'global.cloud.clientSecret.secretName=client-secret-id-name' \
-      --set 'global.cloud.clientSecret.secretKey=client-secret-id-key' \
-      --set 'global.cloud.resourceId.secretName=resource-id-name' \
-      --set 'global.cloud.resourceId.secretKey=resource-id-key' \
-     . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
-
-  local actual=$(echo "$env" |
-    jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
-  [ "${actual}" = "server.dc1.consul" ]
 }

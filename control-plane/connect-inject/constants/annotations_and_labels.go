@@ -74,6 +74,11 @@ const (
 	// connections to.
 	AnnotationPort = "consul.hashicorp.com/connect-service-port"
 
+	// AnnotationDefaultPort is the name or value of the service port that should
+	// be marked as default in Consul service registration when multiple ports are
+	// registered.
+	AnnotationDefaultPort = "consul.hashicorp.com/connect-service-default-port"
+
 	// AnnotationProxyConfigMap allows for default values to be set in the opaque config map
 	// during proxy registration. The value for this annotation is expected to be valid json.
 	// Other annotations / configuration may overwrite the values in the map.
@@ -235,6 +240,10 @@ const (
 	AnnotationSidecarProbePeriodSeconds            = "consul.hashicorp.com/sidecar-probe-period-seconds"
 	AnnotationSidecarProbeFailureThreshold         = "consul.hashicorp.com/sidecar-probe-failure-threshold"
 	AnnotationSidecarProbeCheckTimeoutSeconds      = "consul.hashicorp.com/sidecar-probe-check-timeout-seconds"
+
+	// annotations for sidecar access volumes.
+	AnnotationConsulSidecarAccessLogEnabled = "consul.hashicorp.com/consul-sidecar-access-log-enabled"
+	AnnotationConsulSidecarAccessLogPath    = "consul.hashicorp.com/consul-sidecar-access-log-path"
 )
 
 // Annotations used by Prometheus.

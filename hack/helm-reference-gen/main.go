@@ -22,6 +22,7 @@ import (
 	"text/template"
 
 	"gopkg.in/yaml.v3"
+	"encoding/json"
 )
 
 const (
@@ -75,7 +76,7 @@ var (
 
 func main() {
 	validateFlag := flag.Bool("validate", false, "only validate that the markdown can be generated, don't actually generate anything")
-	consulRepoPath := "../../../consul"
+	docsRepoPath := "../../../web-unified-docs"
 	flag.Parse()
 
 	if len(os.Args) > 3 {
@@ -86,17 +87,17 @@ func main() {
 	if !*validateFlag {
 		// Only argument is path to Consul repo. If not set then we default.
 		if len(os.Args) < 2 {
-			abs, _ := filepath.Abs(consulRepoPath)
-			fmt.Printf("Defaulting to Consul repo path: %s\n", abs)
+			abs, _ := filepath.Abs(docsRepoPath)
+			fmt.Printf("Defaulting to docs repo path: %s\n", abs)
 		} else {
 			// Support absolute and relative paths to the Consul repo.
 			if filepath.IsAbs(os.Args[1]) {
-				consulRepoPath = os.Args[1]
+				docsRepoPath = os.Args[1]
 			} else {
-				consulRepoPath = filepath.Join("../..", os.Args[1])
+				docsRepoPath = filepath.Join("../..", os.Args[1])
 			}
-			abs, _ := filepath.Abs(consulRepoPath)
-			fmt.Printf("Using Consul repo path: %s\n", abs)
+			abs, _ := filepath.Abs(docsRepoPath)
+			fmt.Printf("Using docs repo path: %s\n", abs)
 		}
 	}
 
@@ -118,8 +119,54 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Otherwise we'll go on to write the changes to the helm docs.
-	helmReferenceFile := filepath.Join(consulRepoPath, "website/content/docs/reference/k8s/helm.mdx")
+	// Open the JSON file containing our list of Consul versions. If this doesn't
+	// exist, you'll need to generate it by running `npm run build --onlyVersionMetadata`
+	// in the web-unified-docs repo.
+	versionMetadataPath := filepath.Join(docsRepoPath, "app/api/versionMetadata.json")
+	versionMetadataBytes, err := os.ReadFile(versionMetadataPath)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	// Parse versionMetadata.json so we can choose a Consul docs version if desired
+	// Expected shape: { "consul": [{"version":"v1.22.x","releaseStage":"stable","isLatest":true}, ...], ... }
+	type ProductVersion struct {
+		Version      string `json:"version"`
+		ReleaseStage string `json:"releaseStage"`
+		IsLatest     bool   `json:"isLatest"`
+	}
+
+	// Fail early: require non-empty file, successful parse, and an explicit latest version.
+	if len(versionMetadataBytes) == 0 {
+		fmt.Printf("%s is empty: ", versionMetadataPath)
+		os.Exit(1)
+	}
+
+	var versionMap map[string][]ProductVersion
+	if err := json.Unmarshal(versionMetadataBytes, &versionMap); err != nil {
+		fmt.Printf("failed to parse %s: %v\n", versionMetadataPath, err.Error())
+		os.Exit(1)
+	}
+
+	consulList, ok := versionMap["consul"]
+	if !ok || len(consulList) == 0 {
+		fmt.Printf("no 'consul' key or versions in %s: \n", versionMetadataPath)
+		os.Exit(1)
+	}
+
+	var latestVersion string
+	for _, pv := range consulList {
+		if pv.IsLatest {
+			latestVersion = pv.Version
+			break
+		}
+	}
+	if latestVersion == "" {
+		fmt.Printf("no Consul version marked isLatest=true in %s; cannot continue: \n", versionMetadataPath)
+		os.Exit(1)
+	}
+	helmReferenceFile := filepath.Join(docsRepoPath, "content/consul", latestVersion, "content/docs/reference/k8s/helm.mdx")
 	helmReferenceBytes, err := os.ReadFile(helmReferenceFile)
 	if err != nil {
 		fmt.Println(err.Error())

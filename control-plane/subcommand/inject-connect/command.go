@@ -14,21 +14,27 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
+	gwv1alpha2exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	gwv1beta1exp "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/mitchellh/cli"
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -45,19 +51,22 @@ const (
 type Command struct {
 	UI cli.Ui
 
-	flagListen                string
-	flagCertDir               string // Directory with TLS certs for listening (PEM)
-	flagDefaultInject         bool   // True to inject by default
-	flagConfigFile            string // Path to a config file in JSON format
-	flagConsulImage           string // Docker image for Consul
-	flagConsulDataplaneImage  string // Docker image for Envoy
-	flagConsulK8sImage        string // Docker image for consul-k8s
-	flagGlobalImagePullPolicy string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
-	flagACLAuthMethod         string // Auth Method to use for ACLs, if enabled
-	flagEnvoyExtraArgs        string // Extra envoy args when starting envoy
-	flagEnableWebhookCAUpdate bool
-	flagLogLevel              string
-	flagLogJSON               bool
+	flagListen                         string
+	flagCertDir                        string // Directory with TLS certs for listening (PEM)
+	flagDefaultInject                  bool   // True to inject by default
+	flagConfigFile                     string // Path to a config file in JSON format
+	flagConsulImage                    string // Docker image for Consul
+	flagConsulDataplaneImage           string // Docker image for Envoy
+	flagConsulK8sImage                 string // Docker image for consul-k8s
+	flagGlobalImagePullPolicy          string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
+	flagACLAuthMethod                  string // Auth Method to use for ACLs, if enabled
+	flagGlobalConfigACLToken           string // Optional ACL token used for global config entry reconciliations
+	flagGlobalConfigACLTokenSecretName string // Optional secret name containing ACL token for global config entry reconciliations
+	flagGlobalConfigACLTokenSecretKey  string // Optional secret key containing ACL token for global config entry reconciliations
+	flagEnvoyExtraArgs                 string // Extra envoy args when starting envoy
+	flagEnableWebhookCAUpdate          bool
+	flagLogLevel                       string
+	flagLogJSON                        bool
 
 	flagAllowK8sNamespacesList []string // K8s namespaces to explicitly inject
 	flagDenyK8sNamespacesList  []string // K8s namespaces to deny injection (has precedence)
@@ -97,6 +106,7 @@ type Command struct {
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
 	flagEnableGatewayMetrics        bool
+	flagEnableGatewayScaling        bool
 	flagDefaultEnableMetricsMerging bool
 	flagDefaultMergedMetricsPort    string
 	flagDefaultPrometheusScrapePort string
@@ -160,6 +170,11 @@ type Command struct {
 	flagDefaultSidecarProbePeriodSeconds            int
 	flagDefaultSidecarProbeFailureThreshold         int
 	flagDefaultSidecarProbeCheckTimeoutSeconds      int
+
+	// enable custom crds controller flags
+	flagEnableCustomGatewayCRDController bool
+	//enable tcp routes
+	flagEnableTCPRoute bool
 }
 
 var (
@@ -173,8 +188,10 @@ func init() {
 	// We need v1alpha1 here to add the peering api to the scheme
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gwv1beta1.AddToScheme(scheme))
+	utilruntime.Must(gwv1.AddToScheme(scheme))
+	utilruntime.Must(gwv1beta1exp.AddToScheme(scheme))
+	utilruntime.Must(gwv1alpha2exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -201,6 +218,12 @@ func (c *Command) init() {
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLToken, "global-config-acl-token", "",
+		"Optional ACL token used for global config entry reconciliations (for example, ControlPlaneRequestLimit and RateLimit).")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLTokenSecretName, "global-config-acl-token-secret-name", "",
+		"Optional Kubernetes Secret name containing the ACL token used for global config entry reconciliations.")
+	c.flagSet.StringVar(&c.flagGlobalConfigACLTokenSecretKey, "global-config-acl-token-secret-key", "",
+		"Optional Kubernetes Secret key containing the ACL token used for global config entry reconciliations.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagAllowK8sNamespacesList), "allow-k8s-namespace",
 		"K8s namespaces to explicitly allow. May be specified multiple times.")
 	c.flagSet.Var((*flags.AppendSliceValue)(&c.flagDenyK8sNamespacesList), "deny-k8s-namespace",
@@ -245,6 +268,12 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagLogJSON, "log-json", false,
 		"Enable or disable JSON output format for logging.")
 
+	// enable TCP watch
+	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
+
+	// custom controller flags
+	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")
+
 	// Proxy sidecar resource setting flags.
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPURequest, "default-sidecar-proxy-cpu-request", "", "Default sidecar proxy CPU request.")
 	c.flagSet.StringVar(&c.flagDefaultSidecarProxyCPULimit, "default-sidecar-proxy-cpu-limit", "", "Default sidecar proxy CPU limit.")
@@ -266,6 +295,7 @@ func (c *Command) init() {
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
 	c.flagSet.BoolVar(&c.flagEnableGatewayMetrics, "enable-gateway-metrics", false, "Allows enabling Consul gateway metrics.")
+	c.flagSet.BoolVar(&c.flagEnableGatewayScaling, "enable-gateway-scaling", false, "[Enterprise Only] Enables API Gateway scaling annotations, controller-managed HPAs, and manual scaling preservation for the managed GatewayClass.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetricsMerging, "default-enable-metrics-merging", false, "Default for enabling merging of connect service metrics and envoy proxy metrics.")
 	c.flagSet.StringVar(&c.flagDefaultMergedMetricsPort, "default-merged-metrics-port", "20100", "Default port for merged metrics endpoint on the consul-sidecar.")
 	c.flagSet.StringVar(&c.flagDefaultPrometheusScrapePort, "default-prometheus-scrape-port", "20200", "Default port where Prometheus scrapes connect metrics from.")
@@ -284,6 +314,8 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbePeriodSeconds, "default-sidecar-probe-period-seconds", 1, "Default number of seconds for the k8s period between startup probe checks.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
+
+	// Enable custom crds controller flags.
 
 	c.consul = &flags.ConsulFlags{}
 
@@ -371,6 +403,11 @@ func (c *Command) Run(args []string) int {
 	ctx, cancelFunc := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancelFunc()
 
+	if err := c.loadGlobalConfigACLTokenFromSecret(ctx); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	// Start Consul server Connection manager.
 	serverConnMgrCfg, err := c.consul.ConsulServerConnMgrConfig()
 	if err != nil {
@@ -396,12 +433,20 @@ func (c *Command) Run(args []string) int {
 
 	healthProbeBindAddress := constants.Getv4orv6Str("0.0.0.0:9445", "[::]:9445")
 	metricsServiceBindAddress := constants.Getv4orv6Str("0.0.0.0:9444", "[::]:9444")
+	cfg := ctrl.GetConfigOrDie()
+	cfg.Timeout = 90 * time.Second
+	cfg.QPS = 50
+	cfg.Burst = 100
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:           scheme,
-		LeaderElection:   true,
-		LeaderElectionID: "consul-controller-lock",
-		Logger:           zapLogger,
+	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme:                  scheme,
+		LeaderElection:          true,
+		LeaderElectionID:        "consul-controller-lock",
+		Logger:                  zapLogger,
+		LeaderElectionNamespace: c.flagReleaseNamespace,
+		LeaseDuration:           ptr.To(90 * time.Second),
+		RenewDeadline:           ptr.To(60 * time.Second),
+		RetryPeriod:             ptr.To(15 * time.Second),
 		Metrics: metricsserver.Options{
 			BindAddress: metricsServiceBindAddress,
 		},
@@ -464,6 +509,16 @@ func (c *Command) validateFlags() error {
 		return errors.New("-default-envoy-proxy-concurrency must be >= 0 if set")
 	}
 
+	hasGlobalConfigTokenSecretName := c.flagGlobalConfigACLTokenSecretName != ""
+	hasGlobalConfigTokenSecretKey := c.flagGlobalConfigACLTokenSecretKey != ""
+	if hasGlobalConfigTokenSecretName != hasGlobalConfigTokenSecretKey {
+		return errors.New("-global-config-acl-token-secret-name and -global-config-acl-token-secret-key must both be set")
+	}
+
+	if c.flagGlobalConfigACLToken != "" && hasGlobalConfigTokenSecretName {
+		return errors.New("-global-config-acl-token cannot be set together with -global-config-acl-token-secret-name/-global-config-acl-token-secret-key")
+	}
+
 	// Validate ports in metrics flags.
 	err := common.ValidateUnprivilegedPort("-default-merged-metrics-port", c.flagDefaultMergedMetricsPort)
 	if err != nil {
@@ -474,6 +529,34 @@ func (c *Command) validateFlags() error {
 		return err
 	}
 
+	return nil
+}
+
+func (c *Command) loadGlobalConfigACLTokenFromSecret(ctx context.Context) error {
+	if c.flagGlobalConfigACLToken != "" {
+		return nil
+	}
+
+	if c.flagGlobalConfigACLTokenSecretName == "" || c.flagGlobalConfigACLTokenSecretKey == "" {
+		return nil
+	}
+
+	secret, err := c.clientset.CoreV1().Secrets(c.flagReleaseNamespace).Get(ctx, c.flagGlobalConfigACLTokenSecretName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("retrieving acl token secret %q in namespace %q: %w", c.flagGlobalConfigACLTokenSecretName, c.flagReleaseNamespace, err)
+	}
+
+	aclTokenBytes, ok := secret.Data[c.flagGlobalConfigACLTokenSecretKey]
+	if !ok {
+		return fmt.Errorf("secret %q does not contain key %q", c.flagGlobalConfigACLTokenSecretName, c.flagGlobalConfigACLTokenSecretKey)
+	}
+
+	aclToken := strings.TrimSpace(string(aclTokenBytes))
+	if aclToken == "" {
+		return fmt.Errorf("secret %q key %q is empty", c.flagGlobalConfigACLTokenSecretName, c.flagGlobalConfigACLTokenSecretKey)
+	}
+
+	c.flagGlobalConfigACLToken = aclToken
 	return nil
 }
 

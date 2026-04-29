@@ -1,8 +1,10 @@
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: api-gateway
   namespace: consul
+  labels:
+    component: api-gateway
 spec:
   gatewayClassName: consul
   listeners:

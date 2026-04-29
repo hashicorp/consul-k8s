@@ -6,6 +6,9 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,9 +32,19 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
+	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	"github.com/hashicorp/consul-k8s/version"
+	capi "github.com/hashicorp/consul/api"
 )
+
+type consulServerRespCfg struct {
+	hasProxyDefaults   bool
+	errOnProxyDefaults bool
+	accessLogEnabled   bool
+	fileLogSinkType    bool
+	fileLogPath        string
+}
 
 func TestHandlerHandle(t *testing.T) {
 	t.Parallel()
@@ -1484,7 +1497,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			"empty",
 			&corev1.Pod{},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":null},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1506,7 +1519,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1535,7 +1548,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				"consul.hashicorp.com/connect-service":     "foo",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1565,7 +1578,44 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "http",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
+
+		{
+			"basic pod, with multiple named ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          "http",
+									ContainerPort: 8080,
+								},
+								{
+									Name:          "metrics",
+									ContainerPort: 9090,
+								},
+								{
+									Name:          "admin",
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "http,metrics,admin",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080},{\"name\":\"metrics\",\"containerPort\":9090},{\"name\":\"admin\",\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1593,7 +1643,41 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "8080",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
+				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
+			},
+			"",
+		},
+
+		{
+			"basic pod, with multiple unnamed ports",
+			&corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "web",
+							Ports: []corev1.ContainerPort{
+								{
+									ContainerPort: 8080,
+								},
+								{
+									ContainerPort: 9090,
+								},
+								{
+									ContainerPort: 9292,
+								},
+							},
+						},
+						{
+							Name: "web-side",
+						},
+					},
+				},
+			},
+			map[string]string{
+				constants.AnnotationPort:                   "8080,9090,9292",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080},{\"containerPort\":9090},{\"containerPort\":9292}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1620,7 +1704,41 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			if len(actual) == 0 {
 				actual = nil
 			}
-			require.Equal(t, tt.Expected, actual)
+
+			// The original pod annotation is stored as a JSON string. Compare it
+			// semantically to avoid flakes caused by equivalent JSON encodings.
+			expectedOriginal, expectedHasOriginal := tt.Expected[constants.AnnotationOriginalPod]
+			actualOriginal, actualHasOriginal := actual[constants.AnnotationOriginalPod]
+			require.Equal(t, expectedHasOriginal, actualHasOriginal)
+			if expectedHasOriginal {
+				normalizeOriginalPod := func(raw string) map[string]any {
+					var out map[string]any
+					require.NoError(t, json.Unmarshal([]byte(raw), &out))
+
+					if metadata, ok := out["metadata"].(map[string]any); ok {
+						if v, has := metadata["creationTimestamp"]; has && v == nil {
+							delete(metadata, "creationTimestamp")
+						}
+					}
+
+					return out
+				}
+
+				require.Equal(t, normalizeOriginalPod(expectedOriginal), normalizeOriginalPod(actualOriginal))
+			}
+
+			expectedCopy := make(map[string]string, len(tt.Expected))
+			for k, v := range tt.Expected {
+				expectedCopy[k] = v
+			}
+			actualCopy := make(map[string]string, len(actual))
+			for k, v := range actual {
+				actualCopy[k] = v
+			}
+			delete(expectedCopy, constants.AnnotationOriginalPod)
+			delete(actualCopy, constants.AnnotationOriginalPod)
+
+			require.Equal(t, expectedCopy, actualCopy)
 		})
 	}
 }
@@ -2397,17 +2515,17 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 		{
 			name:        "tproxy",
 			annotations: map[string]string{constants.KeyTransparentProxy: "true"},
-			expErr:      "multi port services are not compatible with transparent proxy",
+			expErr:      "multi protocol multi port services are not compatible with transparent proxy",
 		},
 		{
 			name:        "metrics",
 			annotations: map[string]string{constants.AnnotationEnableMetrics: "true"},
-			expErr:      "multi port services are not compatible with metrics",
+			expErr:      "multi protocol multi port services are not compatible with metrics",
 		},
 		{
 			name:        "metrics merging",
 			annotations: map[string]string{constants.AnnotationEnableMetricsMerging: "true"},
-			expErr:      "multi port services are not compatible with metrics merging",
+			expErr:      "multi protocol multi port services are not compatible with metrics merging",
 		},
 	}
 	for _, tt := range cases {
@@ -2418,6 +2536,89 @@ func TestHandler_checkUnsupportedMultiPortCases(t *testing.T) {
 			err := w.checkUnsupportedMultiPortCases(corev1.Namespace{}, *pod)
 			require.Error(t, err)
 			require.Equal(t, tt.expErr, err.Error())
+		})
+	}
+}
+
+func TestHandler_mountAdditionalAccessLogVolumeMount(t *testing.T) {
+	cases := []struct {
+		Name              string
+		Webhook           MeshWebhook
+		srvResponseConfig consulServerRespCfg
+		WantErr           bool
+	}{
+		{
+			Name: "no proxy-defaults configured",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: false,
+			},
+		},
+		{
+			Name: "error fetching proxy-defaults",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults:   true,
+				errOnProxyDefaults: true,
+			},
+			WantErr: true,
+		},
+		{
+			Name: "access-logs enabled but sink is not file type",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  false,
+				fileLogPath:      "/var/log/access-log.txt",
+			},
+		},
+		{
+			Name: "file-type access-log enabled with path",
+			srvResponseConfig: consulServerRespCfg{
+				hasProxyDefaults: true,
+				accessLogEnabled: true,
+				fileLogSinkType:  true,
+				fileLogPath:      "/var/log/access-log.txt",
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.Name, func(t *testing.T) {
+			server, testClient := fakeConsulServer(t, tt.srvResponseConfig)
+			defer server.Close()
+
+			tt.Webhook.ConsulConfig = testClient.Cfg
+			tt.Webhook.ConsulServerConnMgr = testClient.Watcher
+
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-pod",
+					Annotations: map[string]string{},
+				},
+			}
+
+			err := tt.Webhook.mountAdditionalAccessLogVolume(pod)
+			if tt.WantErr {
+				require.Error(t, err)
+				require.Equal(t, 0, len(pod.Spec.Volumes))
+				require.Equal(t, 0, len(pod.Annotations))
+				return
+			}
+			require.NoError(t, err)
+			if tt.srvResponseConfig.fileLogSinkType {
+				require.Equal(t, 1, len(pod.Spec.Volumes))
+				require.Equal(t, accessLogVolumeName, pod.Spec.Volumes[0].Name)
+				require.Equal(t, 2, len(pod.Annotations))
+				require.Equal(t, "true", pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled])
+				require.Equal(t, tt.srvResponseConfig.fileLogPath, pod.Annotations[constants.AnnotationConsulSidecarAccessLogPath])
+
+			} else if tt.srvResponseConfig.accessLogEnabled {
+				require.Equal(t, 0, len(pod.Spec.Volumes))
+				require.Equal(t, 1, len(pod.Annotations))
+				require.Equal(t, "true", pod.Annotations[constants.AnnotationConsulSidecarAccessLogEnabled])
+			} else {
+				require.Equal(t, 0, len(pod.Spec.Volumes))
+				require.Equal(t, 0, len(pod.Annotations))
+			}
 		})
 	}
 }
@@ -2515,4 +2716,62 @@ func clientWithNamespace(name string) kubernetes.Interface {
 		},
 	}
 	return fake.NewSimpleClientset(&ns)
+}
+
+func fakeConsulServer(t *testing.T, srvResponseConfig consulServerRespCfg) (*httptest.Server, *test.TestServerClient) {
+	t.Helper()
+	mux := buildMux(t, srvResponseConfig)
+	consulServer := httptest.NewServer(mux)
+
+	parsedURL, err := url.Parse(consulServer.URL)
+	require.NoError(t, err)
+	host := strings.Split(parsedURL.Host, ":")[0]
+
+	port, err := strconv.Atoi(parsedURL.Port())
+	require.NoError(t, err)
+
+	cfg := &consul.Config{APIClientConfig: &capi.Config{Address: host}, HTTPPort: port}
+	cfg.APIClientConfig.Address = consulServer.URL
+
+	testClient := &test.TestServerClient{
+		Cfg:     cfg,
+		Watcher: test.MockConnMgrForIPAndPort(t, host, port, false),
+	}
+
+	return consulServer, testClient
+}
+
+func buildMux(t *testing.T, cfg consulServerRespCfg) http.Handler {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/config/proxy-defaults/"+capi.ProxyConfigGlobal, func(w http.ResponseWriter, r *http.Request) {
+		if cfg.errOnProxyDefaults {
+			w.WriteHeader(500)
+			return
+		}
+		if !cfg.hasProxyDefaults {
+			w.WriteHeader(404)
+			return
+		}
+		w.WriteHeader(200)
+		accessLogType := capi.DefaultLogSinkType
+		if cfg.fileLogSinkType {
+			accessLogType = capi.FileLogSinkType
+		}
+		proxyDefaults := capi.ProxyConfigEntry{
+			AccessLogs: &capi.AccessLogsConfig{
+				Enabled: cfg.accessLogEnabled,
+				Type:    accessLogType,
+				Path:    cfg.fileLogPath,
+			},
+		}
+		val, err := json.Marshal(proxyDefaults)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		w.Write(val)
+	})
+
+	return mux
 }

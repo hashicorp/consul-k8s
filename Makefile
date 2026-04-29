@@ -15,7 +15,7 @@ GOTESTSUM_PATH?=$(shell command -v gotestsum)
 
 .PHONY: gen-helm-docs
 gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consul website. Usage: make gen-helm-docs consul=<path-to-consul-repo>.
-	@cd hack/helm-reference-gen; go run ./... $(consul)
+	@cd hack/helm-reference-gen; go run ./... $(docsRepo)
 
 .PHONY: copy-crds-to-chart
 copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
@@ -315,7 +315,7 @@ ifeq (, $(shell which copywrite))
 	@echo "Installing copywrite"
 	@go install github.com/hashicorp/copywrite@latest
 endif
-	@copywrite headers --spdx "MPL-2.0" 
+	@copywrite headers --spdx "MPL-2.0"
 
 ##@ CI Targets
 

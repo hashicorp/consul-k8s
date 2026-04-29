@@ -168,9 +168,7 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Ensure the secret is created.
 	retry.RunWith(timer, t, func(r *retry.R) {
-		acceptorSecretName, err := k8s.RunKubectlAndGetOutputE(r, staticClientPeerClusterContext.KubectlOptions(r), "get", "peeringacceptor", "server", "-o", "jsonpath={.status.secret.name}")
-		require.NoError(r, err)
-		require.NotEmpty(r, acceptorSecretName)
+		helpers.EnsurePeeringAcceptorSecret(t, r, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 	})
 
 	// Copy secret from client peer to server peer.
@@ -249,8 +247,11 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 
 	logger.Log(t, "creating api-gateway resources in client peer")
-	out, err = k8s.RunKubectlAndGetOutputE(t, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
-	require.NoError(t, err, out)
+	// Apply api-gateway resources with retry logic to handle intermittent failures
+	retry.Run(t, func(r *retry.R) {
+		out, err := k8s.RunKubectlAndGetOutputE(r, staticClientOpts, "apply", "-k", "../fixtures/bases/api-gateway")
+		require.NoError(r, err, out)
+	})
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		// Ignore errors here because if the test ran as expected
 		// the custom resources will have been deleted.
@@ -284,6 +285,9 @@ func TestPeering_Gateway(t *testing.T) {
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, staticClientOpts, "../fixtures/cases/api-gateways/peer-resolver")
 	})
+
+	// Wait for the httproute to exist before patching, with delete/recreate fallback
+	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway")
 
 	logger.Log(t, "patching route to target server")
 	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")

@@ -1,4 +1,6 @@
 {{- if .Values.connectInject.enabled }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -61,24 +63,26 @@ spec:
                 properties:
                   defaultInstances:
                     default: 1
-                    description: Number of gateway instances that should be deployed
-                      by default
+                    description: |-
+                      Number of gateway instances that should be deployed by default
+                      DEPRECATED: Use Gateway annotations (consul.hashicorp.com/default-replicas) instead
                     format: int32
-                    maximum: 8
                     minimum: 1
                     type: integer
                   maxInstances:
                     default: 8
-                    description: Max allowed number of gateway instances
+                    description: |-
+                      Max allowed number of gateway instances
+                      DEPRECATED: Use HPA maxReplicas instead via Gateway annotations
                     format: int32
-                    maximum: 8
                     minimum: 1
                     type: integer
                   minInstances:
                     default: 1
-                    description: Minimum allowed number of gateway instances
+                    description: |-
+                      Minimum allowed number of gateway instances
+                      DEPRECATED: Use HPA minReplicas instead via Gateway annotations
                     format: int32
-                    maximum: 8
                     minimum: 1
                     type: integer
                   resources:
