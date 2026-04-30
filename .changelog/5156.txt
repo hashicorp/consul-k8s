@@ -1,2 +1,3 @@
 ```release-note:feature
 RateLimit: A new Custom Resource Definition (CRD) for the RateLimit kind in Consul on Kubernetes. The RateLimit CRD enables users to configure rate limiting policies for Consul services declaratively via Kubernetes resources.In admin-partitions + ACL environments, users must provide the dedicated "globalConfigACLToken.secretName" & "globalConfigACLToken.secretKey" with operator token for rate-limiter features; otherwise reconciliation may fail even though apply succeeds.
+```
