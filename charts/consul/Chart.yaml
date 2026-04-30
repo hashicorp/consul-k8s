@@ -3,7 +3,7 @@
 
 apiVersion: v2
 name: consul
-version: 1.8.12
+version: 1.8.13
 appVersion: 1.21.5
 kubeVersion: ">=1.22.0-0"
 description: Official HashiCorp Consul Chart
@@ -18,9 +18,9 @@ annotations:
     - name: consul
       image: hashicorp/consul:1.21.5
     - name: consul-k8s-control-plane
-      image: hashicorp/consul-k8s-control-plane:1.8.12
+      image: hashicorp/consul-k8s-control-plane:1.8.13
     - name: consul-dataplane
-      image: hashicorp/consul-dataplane:1.8.12
+      image: hashicorp/consul-dataplane:1.8.13
     - name: envoy
       image: envoyproxy/envoy:v1.34.13
   artifacthub.io/license: MPL-2.0
