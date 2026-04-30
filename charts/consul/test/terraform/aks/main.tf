@@ -116,7 +116,18 @@ provider "helm" {
   }
 }
 
-resource "helm_release" "uptycs" {
+provider "helm" {
+  alias = "cluster_1"
+  kubernetes {
+    host                   = var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].host : ""
+    client_certificate     = var.cluster_count > 1 ? base64decode(azurerm_kubernetes_cluster.default[1].kube_config[0].client_certificate) : ""
+    client_key             = var.cluster_count > 1 ? base64decode(azurerm_kubernetes_cluster.default[1].kube_config[0].client_key) : ""
+    cluster_ca_certificate = var.cluster_count > 1 ? base64decode(azurerm_kubernetes_cluster.default[1].kube_config[0].cluster_ca_certificate) : ""
+  }
+}
+
+# Cluster 0 EDR
+resource "helm_release" "uptycs_0" {
   provider         = helm.cluster_0
   name             = "k8sosquery"
   repository       = "https://uptycslabs.github.io/kspm-helm-charts"
@@ -132,8 +143,8 @@ resource "helm_release" "uptycs" {
   ]
 }
 
-resource "helm_release" "kubequery" {
-  depends_on       = [helm_release.uptycs]
+resource "helm_release" "kubequery_0" {
+  depends_on       = [helm_release.uptycs_0]
   provider         = helm.cluster_0
   name             = "kubequery"
   repository       = "https://uptycslabs.github.io/kspm-helm-charts"
@@ -144,6 +155,44 @@ resource "helm_release" "kubequery" {
   set {
     name  = "deployment.spec.hostname"
     value = azurerm_kubernetes_cluster.default[0].name
+  }
+
+  values = [
+    file("${path.module}/kubequery-values.yaml")
+  ]
+}
+
+# Cluster 1 EDR (only when cluster_count > 1)
+resource "helm_release" "uptycs_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  provider         = helm.cluster_1
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner = var.uptycs_owner
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  depends_on       = [helm_release.uptycs_1]
+  provider         = helm.cluster_1
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = azurerm_kubernetes_cluster.default[1].name
   }
 
   values = [
