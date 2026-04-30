@@ -1,0 +1,20 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: multiport
+spec:
+  selector:
+    app: multiport
+  ports:
+    - name: api-port
+      port: 9090
+      targetPort: 9090
+    - name: metrics
+      port: 9091
+      targetPort: 9091
+    - name: admin-port
+      port: 9092
+      targetPort: 9092

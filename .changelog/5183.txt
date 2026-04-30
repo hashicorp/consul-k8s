@@ -1,0 +1,4 @@
+```release-note:security
+- security: update go to 1.25.8
+- security: update google.golang.org/grpc to fix CVE-2026-33186
+```

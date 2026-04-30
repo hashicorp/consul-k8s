@@ -28,7 +28,7 @@ type GatewayPolicyWebhook struct {
 	// ConsulMeta contains metadata specific to the Consul installation.
 	ConsulMeta common.ConsulMeta
 
-	decoder *admission.Decoder
+	decoder admission.Decoder
 	client.Client
 }
 
@@ -51,6 +51,10 @@ func (v *GatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request
 		v.Logger.Error(err, "error getting list of policies referencing gateway")
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
+	// check if the service if the resource is Gateway
+	if !v.isTargetRefKindGateway(resource) {
+		return admission.Denied(fmt.Sprintf("policy targetRef kind %q is not supported, only Gateway is allowed", resource.Spec.TargetRef.Kind))
+	}
 
 	for _, policy := range list.Items {
 		if differentPolicySameTarget(resource, policy) {
@@ -59,6 +63,11 @@ func (v *GatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request
 	}
 
 	return admission.Allowed("gateway policy is valid")
+}
+
+// func to check the resource targetref.kind is Gateway.
+func (v *GatewayPolicyWebhook) isTargetRefKindGateway(resource GatewayPolicy) bool {
+	return resource.Spec.TargetRef.Kind == "Gateway"
 }
 
 func differentPolicySameTarget(resource, policy GatewayPolicy) bool {

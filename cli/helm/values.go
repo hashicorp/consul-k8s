@@ -577,15 +577,20 @@ type CopyAnnotations struct {
 	Service interface{} `yaml:"service"`
 }
 
+type ManagedGatewayClassScaling struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 type ManagedGatewayClass struct {
-	Enabled                     bool                      `yaml:"enabled"`
-	NodeSelector                interface{}               `yaml:"nodeSelector"`
-	ServiceType                 string                    `yaml:"serviceType"`
-	UseHostPorts                bool                      `yaml:"useHostPorts"`
-	CopyAnnotations             CopyAnnotations           `yaml:"copyAnnotations"`
-	OpenshiftSCCName            string                    `yaml:"openshiftSCCName"`
-	MapPrivilegedContainerPorts int                       `yaml:"mapPrivilegedContainerPorts"`
-	Probes                      ManagedGatewayClassProbes `yaml:"probes"`
+	Enabled                     bool                       `yaml:"enabled"`
+	NodeSelector                interface{}                `yaml:"nodeSelector"`
+	ServiceType                 string                     `yaml:"serviceType"`
+	UseHostPorts                bool                       `yaml:"useHostPorts"`
+	CopyAnnotations             CopyAnnotations            `yaml:"copyAnnotations"`
+	Scaling                     ManagedGatewayClassScaling `yaml:"scaling"`
+	OpenshiftSCCName            string                     `yaml:"openshiftSCCName"`
+	MapPrivilegedContainerPorts int                        `yaml:"mapPrivilegedContainerPorts"`
+	Probes                      ManagedGatewayClassProbes  `yaml:"probes"`
 }
 
 // ProbeHTTPGet models the HTTP GET action of a Kubernetes Probe.

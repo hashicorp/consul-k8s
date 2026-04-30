@@ -138,6 +138,26 @@ func TestRun_FlagValidation(t *testing.T) {
 			},
 			expErr: "-global-image-pull-policy must be `IfNotPresent`, `Always`, `Never`, or `` ",
 		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-global-config-acl-token-secret-name", "global-config-token",
+			},
+			expErr: "-global-config-acl-token-secret-name and -global-config-acl-token-secret-key must both be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-global-config-acl-token-secret-key", "token",
+			},
+			expErr: "-global-config-acl-token-secret-name and -global-config-acl-token-secret-key must both be set",
+		},
+		{
+			flags: []string{"-consul-k8s-image", "foo", "-consul-image", "foo", "-consul-dataplane-image", "consul-dataplane:1.14.0",
+				"-global-config-acl-token", "s.token",
+				"-global-config-acl-token-secret-name", "global-config-token",
+				"-global-config-acl-token-secret-key", "token",
+			},
+			expErr: "-global-config-acl-token cannot be set together with -global-config-acl-token-secret-name/-global-config-acl-token-secret-key",
+		},
 	}
 
 	for _, c := range cases {

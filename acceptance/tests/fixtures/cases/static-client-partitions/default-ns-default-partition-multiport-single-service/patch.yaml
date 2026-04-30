@@ -1,0 +1,13 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-client
+spec:
+  template:
+    metadata:
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service-upstreams": "multiport.svc.default.ns.default.ap:1234:destination_port=api-port,multiport.svc.default.ns.default.ap:2234:destination_port=metrics,multiport.svc.default.ns.default.ap:3234:destination_port=admin-port"

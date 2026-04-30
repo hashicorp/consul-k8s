@@ -18,6 +18,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
@@ -72,20 +73,20 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 						Finalizers:        []string{gatewayClassConfigFinalizer},
 					},
 				}
-				gatewayClass := gwv1beta1.GatewayClass{
+				gatewayClass := gwv1.GatewayClass{
 					TypeMeta: metav1.TypeMeta{},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "consul-api-gateway-class",
 					},
-					Spec: gwv1beta1.GatewayClassSpec{
-						ParametersRef: &gwv1beta1.ParametersReference{
-							Group:     gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
+					Spec: gwv1.GatewayClassSpec{
+						ParametersRef: &gwv1.ParametersReference{
+							Group:     gwv1.Group(v1alpha1.ConsulHashicorpGroup),
 							Kind:      v1alpha1.GatewayClassConfigKind,
 							Name:      gatewayClassConfig.ObjectMeta.Name,
 							Namespace: nil,
 						},
 					},
-					Status: gwv1beta1.GatewayClassStatus{},
+					Status: gwv1.GatewayClassStatus{},
 				}
 				return []runtime.Object{&gatewayClassConfig, &gatewayClass}
 			},
@@ -97,6 +98,7 @@ func TestGatewayClassConfigReconcile(t *testing.T) {
 			s := runtime.NewScheme()
 			require.NoError(t, clientgoscheme.AddToScheme(s))
 			require.NoError(t, gwv1alpha2.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, gwv1beta1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 

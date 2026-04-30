@@ -74,19 +74,19 @@ type GatewayClassConfigSpec struct {
 
 type DeploymentSpec struct {
 	// +kubebuilder:default:=1
-	// +kubebuilder:validation:Maximum=8
 	// +kubebuilder:validation:Minimum=1
 	// Number of gateway instances that should be deployed by default
+	// DEPRECATED: Use Gateway annotations (consul.hashicorp.com/default-replicas) instead
 	DefaultInstances *int32 `json:"defaultInstances,omitempty"`
 	// +kubebuilder:default:=8
-	// +kubebuilder:validation:Maximum=8
 	// +kubebuilder:validation:Minimum=1
 	// Max allowed number of gateway instances
+	// DEPRECATED: Use HPA maxReplicas instead via Gateway annotations
 	MaxInstances *int32 `json:"maxInstances,omitempty"`
 	// +kubebuilder:default:=1
-	// +kubebuilder:validation:Maximum=8
 	// +kubebuilder:validation:Minimum=1
 	// Minimum allowed number of gateway instances
+	// DEPRECATED: Use HPA minReplicas instead via Gateway annotations
 	MinInstances *int32 `json:"minInstances,omitempty"`
 
 	// Resources defines the resource requirements for the gateway.

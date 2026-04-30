@@ -14,8 +14,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
@@ -64,39 +64,39 @@ func TestReadCommandOutput(t *testing.T) {
 	gatewayName := "gateway-1"
 	routeName := "route-1"
 
-	fakeGatewayClass := &gwv1beta1.GatewayClass{
+	fakeGatewayClass := &gwv1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: gatewayClassName,
 		},
 	}
 
-	fakeGateway := &gwv1beta1.Gateway{
+	fakeGateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      gatewayName,
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			GatewayClassName: gwv1beta1.ObjectName(gatewayClassName),
+		Spec: gwv1.GatewaySpec{
+			GatewayClassName: gwv1.ObjectName(gatewayClassName),
 		},
 	}
 
-	fakeHTTPRoute := &gwv1beta1.HTTPRoute{
+	fakeHTTPRoute := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      routeName,
 		},
-		Spec: gwv1beta1.HTTPRouteSpec{
-			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-				ParentRefs: []gwv1beta1.ParentReference{
+		Spec: gwv1.HTTPRouteSpec{
+			CommonRouteSpec: gwv1.CommonRouteSpec{
+				ParentRefs: []gwv1.ParentReference{
 					{
-						Name: gwv1beta1.ObjectName(fakeGateway.Name),
+						Name: gwv1.ObjectName(fakeGateway.Name),
 					},
 				},
 			},
 		},
 	}
 
-	fakeUnattachedHTTPRoute := &gwv1beta1.HTTPRoute{
+	fakeUnattachedHTTPRoute := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "route-2",
@@ -107,8 +107,8 @@ func TestReadCommandOutput(t *testing.T) {
 	c := setupCommand(buf)
 
 	scheme := scheme.Scheme
-	gwv1beta1.AddToScheme(scheme)
-	gwv1alpha2.AddToScheme(scheme)
+	gwv1.Install(scheme)
+	gwv1alpha2.Install(scheme)
 
 	c.kubernetes = fake.NewClientBuilder().
 		WithScheme(scheme).
@@ -119,9 +119,9 @@ func TestReadCommandOutput(t *testing.T) {
 	require.Equal(t, 0, out)
 
 	gatewayWithRoutes := struct {
-		Gateway      gwv1beta1.Gateway      `json:"Gateway"`
-		GatewayClass gwv1beta1.GatewayClass `json:"GatewayClass"`
-		HTTPRoutes   []gwv1beta1.HTTPRoute  `json:"HTTPRoutes"`
+		Gateway      gwv1.Gateway      `json:"Gateway"`
+		GatewayClass gwv1.GatewayClass `json:"GatewayClass"`
+		HTTPRoutes   []gwv1.HTTPRoute  `json:"HTTPRoutes"`
 	}{}
 	require.NoErrorf(t, json.Unmarshal(buf.Bytes(), &gatewayWithRoutes), "failed to parse JSON output %s", buf.String())
 

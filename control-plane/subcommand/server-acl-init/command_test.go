@@ -2776,8 +2776,9 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 	// Create ServiceAccount for the kubernetes auth method if it doesn't exist,
 	// otherwise, do nothing.
 	serviceAccountName := resourcePrefix + "-auth-method"
-	sa, _ := k8s.CoreV1().ServiceAccounts(namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
-	if sa == nil {
+	_, err := k8s.CoreV1().ServiceAccounts(namespace).Get(context.Background(), serviceAccountName, metav1.GetOptions{})
+
+	if err != nil {
 		// Create a service account that references two secrets.
 		// The second secret is mimicking the behavior on Openshift,
 		// where two secrets are injected: one with SA token and one with docker config.
@@ -2836,15 +2837,21 @@ func setUpK8sServiceAccount(t *testing.T, k8s *fake.Clientset, namespace string)
 }
 
 func createOrUpdateSecret(t *testing.T, k8s *fake.Clientset, secret *v1.Secret, namespace string) {
-	existingSecret, _ := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secret.Name, metav1.GetOptions{})
-	var err error
-	if existingSecret == nil {
+	t.Helper()
+
+	existingSecret, err := k8s.CoreV1().Secrets(namespace).Get(context.Background(), secret.Name, metav1.GetOptions{})
+
+	if err != nil {
+		// ✅ Secret does NOT exist → create
 		_, err = k8s.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 		require.NoError(t, err)
-	} else {
-		_, err = k8s.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
-		require.NoError(t, err)
+		return
 	}
+
+	// ✅ Secret exists → update
+	secret.ResourceVersion = existingSecret.ResourceVersion // IMPORTANT for update
+	_, err = k8s.CoreV1().Secrets(namespace).Update(context.Background(), secret, metav1.UpdateOptions{})
+	require.NoError(t, err)
 }
 
 // policyExists asserts that policy with name exists. Returns the policy

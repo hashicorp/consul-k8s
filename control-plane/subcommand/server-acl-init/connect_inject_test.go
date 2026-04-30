@@ -52,8 +52,8 @@ func TestCommand_createAuthMethodTmpl_SecretNotFound(t *testing.T) {
 	secretName := resourcePrefix + "-connect-injector"
 
 	// Create a service account referencing secretName
-	sa, _ := k8s.CoreV1().ServiceAccounts(ns).Get(ctx, serviceAccountName, metav1.GetOptions{})
-	if sa == nil {
+	_, err = k8s.CoreV1().ServiceAccounts(ns).Get(ctx, serviceAccountName, metav1.GetOptions{})
+	if err != nil {
 		_, err := k8s.CoreV1().ServiceAccounts(ns).Create(
 			ctx,
 			&v1.ServiceAccount{

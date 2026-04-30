@@ -1,0 +1,35 @@
+{{- if .Values.connectInject.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-gateway-cleanup-custom
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: gateway-cleanup-custom
+rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    resources:
+    - gatewayclassconfigs
+    verbs:
+    - get
+    - delete
+  - apiGroups:
+    - consul.hashicorp.com
+    resources:
+    - customgatewayclasses
+    verbs:
+    - get
+    - delete
+{{- if .Values.global.enablePodSecurityPolicies }}
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies"]
+    resourceNames:
+      - {{ template "consul.fullname" . }}-gateway-cleanup-custom
+    verbs:
+      - use
+{{- end }}
+{{- end }}

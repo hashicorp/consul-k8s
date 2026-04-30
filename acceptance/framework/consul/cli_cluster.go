@@ -65,7 +65,7 @@ func NewCLICluster(
 	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, consulNS)
+		configurePSA(t, ctx.KubernetesClient(t), cfg, consulNS)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {

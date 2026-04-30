@@ -182,6 +182,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-v1alpha1-ratelimits
+  failurePolicy: Fail
+  name: mutate-ratelimits.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ratelimits
+  sideEffects: None
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-v1alpha1-samenessgroups
   failurePolicy: Fail
   name: mutate-samenessgroup.consul.hashicorp.com
@@ -326,8 +347,29 @@ webhooks:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: validating-webhook-configuration
+  name: validating-webhook-configuration-custom
 webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-v1alpha1-gatewaypolicy-custom
+  failurePolicy: Fail
+  name: validate-customgatewaypolicy.consul.hashicorp.com
+  rules:
+  - apiGroups:
+    - consul.hashicorp.com
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - customgatewaypolicies
+  sideEffects: None
 - admissionReviewVersions:
   - v1beta1
   - v1

@@ -230,3 +230,7 @@ func (c *Controller) informerDeleteHandler(queue workqueue.RateLimitingInterface
 		}
 	}
 }
+
+func (c *Controller) RunWithContext(ctx context.Context) {
+	c.Run(ctx.Done())
+}

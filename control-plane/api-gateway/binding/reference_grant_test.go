@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -64,15 +65,15 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 		canReference       bool
 		err                error
 		ctx                context.Context
-		gateway            gwv1beta1.Gateway
-		secret             gwv1beta1.SecretObjectReference
+		gateway            gwv1.Gateway
+		secret             gwv1.SecretObjectReference
 		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"gateway allowed to secret": {
 			canReference: true,
 			err:          nil,
 			ctx:          context.TODO(),
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       GatewayKind,
 					APIVersion: Group + V1Beta1,
@@ -141,15 +142,15 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 		canReference       bool
 		err                error
 		ctx                context.Context
-		httpRoute          gwv1beta1.HTTPRoute
-		backendRef         gwv1beta1.BackendRef
+		httpRoute          gwv1.HTTPRoute
+		backendRef         gwv1.BackendRef
 		k8sReferenceGrants []gwv1beta1.ReferenceGrant
 	}{
 		"httproute allowed to gateway": {
 			canReference: true,
 			err:          nil,
 			ctx:          context.TODO(),
-			httpRoute: gwv1beta1.HTTPRoute{
+			httpRoute: gwv1.HTTPRoute{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       HTTPRouteKind,
 					APIVersion: Group + V1Beta1,
@@ -266,7 +267,6 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 		})
 	}
 }
-
 func TestReferenceAllowed(t *testing.T) {
 	t.Parallel()
 

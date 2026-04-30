@@ -1,0 +1,3 @@
+```release-note:feature
+terminating-gateway: add `secretRef` support for linked services and trigger a Consul config entry update when the referenced Kubernetes Secret changes so Envoy can refresh SDS-backed certificates.
+```

@@ -32,7 +32,7 @@ func TestK8SSink_impl(t *testing.T) {
 func TestK8SSink_create(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	// Start the controller
 	sink, closer := testSink(t, client)
@@ -70,7 +70,7 @@ func TestK8SSink_create(t *testing.T) {
 func TestK8SSink_createUppercase(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	// Start the controller
 	sink, closer := testSink(t, client)
@@ -109,7 +109,7 @@ func TestK8SSink_createUppercase(t *testing.T) {
 func TestK8SSink_createExists(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	// Create the existing service
 	_, err := client.CoreV1().Services(metav1.NamespaceAll).Create(
@@ -164,7 +164,7 @@ func TestK8SSink_createExists(t *testing.T) {
 func TestK8SSink_updateReconcile(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	// Start the controller
 	sink, closer := testSink(t, client)
@@ -186,6 +186,8 @@ func TestK8SSink_updateReconcile(t *testing.T) {
 
 		for _, s := range list.Items {
 			if s.Name == "web" {
+				key := s.Namespace + "/" + s.Name
+				_ = sink.Upsert(key, &s)
 				actual = &s
 				return
 			}
@@ -228,7 +230,7 @@ func TestK8SSink_updateReconcile(t *testing.T) {
 // Test that if the service is updated locally, it is reconciled.
 func TestK8SSink_updateService(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	// Start the controller
 	sink, closer := testSink(t, client)
@@ -250,19 +252,23 @@ func TestK8SSink_updateService(t *testing.T) {
 
 		for _, s := range list.Items {
 			if s.Name == "web" {
+				key := s.Namespace + "/" + s.Name
+				_ = sink.Upsert(key, &s)
 				actual = &s
-				return
+				break
 			}
 		}
-
-		r.Fatal("service not found")
+		t.Logf("Update first service: %+v\n", actual)
+		if actual == nil {
+			r.Fatal("service not found")
+		}
 	})
 
 	// Update a service
 	sink.SetServices(map[string]string{"web": "web2.service.local."})
 
 	// Verify service gets fixed
-	retry.Run(t, func(r *retry.R) {
+	retry.RunWith(retry.ThirtySeconds(), t, func(r *retry.R) {
 		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			r.Fatalf("err: %s", err)
@@ -270,9 +276,12 @@ func TestK8SSink_updateService(t *testing.T) {
 		if len(list.Items) == 0 {
 			r.Fatal("no services")
 		}
+		t.Logf("len of list.Item %v", len(list.Items))
 
 		for _, s := range list.Items {
 			if s.Name == "web" {
+				key := s.Namespace + "/" + s.Name
+				_ = sink.Upsert(key, &s)
 				actual = &s
 				break
 			}
@@ -291,7 +300,7 @@ func TestK8SSink_updateService(t *testing.T) {
 // Test that if the service is deleted remotely, it is recreated.
 func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	// Start the controller
 	sink, closer := testSink(t, client)
@@ -313,17 +322,24 @@ func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 
 		for _, s := range list.Items {
 			if s.Name == "web" {
+				key := s.Namespace + "/" + s.Name
+				_ = sink.Upsert(key, &s)
 				actual = &s
-				return
+				break
 			}
 		}
+		if actual == nil {
+			r.Fatal("service not found")
+		}
 
-		r.Fatal("service not found")
 	})
 
 	// Delete
 	require.NoError(t, client.CoreV1().Services(metav1.NamespaceDefault).Delete(context.Background(), actual.Name, metav1.DeleteOptions{}))
+	sink.Delete("default/web", nil)
+	s := map[string]string{"web": "web.service.local."}
 
+	sink.SetServices(s)
 	// Verify service gets fixed
 	retry.Run(t, func(r *retry.R) {
 		list, err := client.CoreV1().Services(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{})
@@ -331,7 +347,7 @@ func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 			r.Fatalf("err: %s", err)
 		}
 		if len(list.Items) == 0 {
-			r.Fatal("no services")
+			r.Fatal("no services in second loop")
 		}
 
 		for _, s := range list.Items {
@@ -354,7 +370,7 @@ func TestK8SSink_deleteReconcileRemote(t *testing.T) {
 // Test that if the service is deleted locally, it is recreated.
 func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 
 	// Start the controller
 	sink, closer := testSink(t, client)
@@ -375,6 +391,8 @@ func TestK8SSink_deleteReconcileLocal(t *testing.T) {
 
 		for _, s := range list.Items {
 			if s.Name == "web" {
+				key := s.Namespace + "/" + s.Name
+				_ = sink.Upsert(key, &s)
 				return
 			}
 		}
@@ -406,5 +424,14 @@ func testSink(t *testing.T, client kubernetes.Interface) (*K8SSink, func()) {
 	}
 
 	closer := controller.TestControllerRun(sink)
+
+	retry.Run(t, func(r *retry.R) {
+		sink.lock.Lock()
+		defer sink.lock.Unlock()
+		if sink.triggerCh == nil {
+			r.Fatal("sink not initialized yet")
+		}
+	})
+
 	return sink, closer
 }

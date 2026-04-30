@@ -5,6 +5,7 @@ package gatekeeper
 
 import (
 	"context"
+
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 var (
@@ -25,7 +26,7 @@ var (
 	}
 )
 
-func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
+func (g *Gatekeeper) upsertService(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig) error {
 	if gcc.Spec.ServiceType == nil {
 		return g.deleteService(ctx, types.NamespacedName{Namespace: gateway.Namespace, Name: gateway.Name})
 	}
@@ -63,8 +64,8 @@ func (g *Gatekeeper) deleteService(ctx context.Context, gwName types.NamespacedN
 	return nil
 }
 
-func (g *Gatekeeper) service(gateway gwv1beta1.Gateway, gcc v1alpha1.GatewayClassConfig) *corev1.Service {
-	seenPorts := map[gwv1beta1.PortNumber]struct{}{}
+func (g *Gatekeeper) service(gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig) *corev1.Service {
+	seenPorts := map[gwv1.PortNumber]struct{}{}
 	ports := []corev1.ServicePort{}
 	for _, listener := range gateway.Spec.Listeners {
 		if _, seen := seenPorts[listener.Port]; seen {
@@ -168,7 +169,7 @@ func hasEqualPorts(a, b *corev1.Service) bool {
 	return true
 }
 
-func newServiceMutator(existing, desired *corev1.Service, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func newServiceMutator(existing, desired *corev1.Service, gateway gwv1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
 		mergeServiceInto(existing, desired)
 		return ctrl.SetControllerReference(&gateway, existing, scheme)

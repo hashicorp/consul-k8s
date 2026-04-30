@@ -19,17 +19,12 @@ import (
 func TestRun_FlagValidation(t *testing.T) {
 	t.Parallel()
 
-	ui := cli.NewMockUi()
-	cmd := Command{
-		UI: ui,
-	}
-
 	cases := map[string]struct {
 		args []string
 		err  string
 	}{
 		"missing node name": {
-			args: []string{},
+			args: []string{"-output-file", "output.json"},
 			err:  "-node-name is required",
 		},
 		"missing output-file": {
@@ -39,7 +34,10 @@ func TestRun_FlagValidation(t *testing.T) {
 	}
 
 	for n, c := range cases {
-		c := c
+		ui := cli.NewMockUi()
+		cmd := Command{
+			UI: ui,
+		}
 		t.Run(n, func(t *testing.T) {
 			responseCode := cmd.Run(c.args)
 			require.Equal(t, 1, responseCode, ui.ErrorWriter.String())

@@ -1,0 +1,61 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multiport
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multiport
+  template:
+    metadata:
+      name: multiport
+      labels:
+        app: multiport
+      annotations:
+        "consul.hashicorp.com/connect-inject": "true"
+        "consul.hashicorp.com/connect-service": "multiport"
+        "consul.hashicorp.com/transparent-proxy": "false"
+        "consul.hashicorp.com/enable-metrics": "false"
+        "consul.hashicorp.com/enable-metrics-merging": "false"
+    spec:
+      containers:
+        - name: multiport
+          image: docker.mirror.hashicorp.services/hashicorp/http-echo:alpine
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              /http-echo -text "Response from api-port 9090: Hello there!" -listen ":9090" &
+              /http-echo -text "Response from metrics port 9091: Hello again!" -listen ":9091" &
+              /http-echo -text "Response from admin port 9092: Hello once more!" -listen ":9092" &
+              wait -n
+          ports:
+            - containerPort: 9090
+              name: api-port
+            - containerPort: 9091
+              name: metrics
+            - containerPort: 9092
+              name: admin-port
+          livenessProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+          startupProbe:
+            httpGet:
+              port: 9090
+            initialDelaySeconds: 1
+            failureThreshold: 30
+            periodSeconds: 1
+          readinessProbe:
+            exec:
+              command: ['sh', '-c', 'test ! -f /tmp/unhealthy-multiport']
+            initialDelaySeconds: 1
+            failureThreshold: 1
+            periodSeconds: 1
+      serviceAccountName: multiport
+      terminationGracePeriodSeconds: 0 # so deletion is quick

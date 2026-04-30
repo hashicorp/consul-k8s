@@ -8,15 +8,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestSetter(t *testing.T) {
 	setter := newSetter("test")
-	parentRef := gwv1beta1.ParentReference{
+	parentRef := gwv1.ParentReference{
 		Name: "test",
 	}
-	parentRefDup := gwv1beta1.ParentReference{
+	parentRefDup := gwv1.ParentReference{
 		Name: "test",
 	}
 	condition := metav1.Condition{
@@ -25,10 +25,10 @@ func TestSetter(t *testing.T) {
 		Reason:  "Accepted",
 		Message: "route accepted",
 	}
-	route := &gwv1beta1.HTTPRoute{
-		Spec: gwv1beta1.HTTPRouteSpec{
-			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-				ParentRefs: []gwv1beta1.ParentReference{parentRef},
+	route := &gwv1.HTTPRoute{
+		Spec: gwv1.HTTPRouteSpec{
+			CommonRouteSpec: gwv1.CommonRouteSpec{
+				ParentRefs: []gwv1.ParentReference{parentRef},
 			},
 		},
 	}
