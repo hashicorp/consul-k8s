@@ -794,7 +794,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: hashicorp/consul-dataplane:2..0.0-rc1
+  imageConsulDataplane: hashicorp/consul-dataplane:2.0.0-rc1
 
   # Disable this once the manifests are generated and subsequent helm upgrades
   

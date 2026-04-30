@@ -1,17 +1,13 @@
 ## 2.0.0-rc1 (April 30, 2025)
 
-> NOTE: Consul K8s 2.0.x is compatible with Consul 2.0.x and Consul Dataplane 2..0.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
-
 BREAKING CHANGES:
 
 * api-gateway: upgrade the old-stable controller to use `gateway.networking.k8s.io` v1.5.1. [[GH-5181](https://github.com/hashicorp/consul-k8s/issues/5181)]
 
 SECURITY:
 
-* - security: update go to 1.25.8
-- security: update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/issues/5183)]
-* - security: update go to 1.26 [[GH-5269](https://github.com/hashicorp/consul-k8s/issues/5269)]
-* go: upgrade go version to 1.25.5 [[GH-5047](https://github.com/hashicorp/consul-k8s/issues/5047)]
+* security: update go to 1.26 [[GH-5269](https://github.com/hashicorp/consul-k8s/issues/5269)]
+* security: update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/issues/5183)]
 
 FEATURES:
 
