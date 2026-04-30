@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/eks"
@@ -32,6 +33,11 @@ import (
 const (
 	// buildURLTag is a tag on AWS resources set by the acceptance tests.
 	buildURLTag = "build_url"
+
+	// Known EC2 not-found codes treated as terminal success during cleanup races.
+	ec2ErrCodeInvalidInternetGatewayIDNotFound  = "InvalidInternetGatewayID.NotFound"
+	ec2ErrCodeInvalidNetworkInterfaceIDNotFound = "InvalidNetworkInterfaceID.NotFound"
+	ec2ErrCodeInvalidVpcIDNotFound              = "InvalidVpcID.NotFound"
 )
 
 var (
@@ -279,7 +285,8 @@ func realMain(ctx context.Context) error {
 				Name: cluster,
 			})
 			if err != nil {
-				if strings.Contains(err.Error(), eks.ErrCodeResourceNotFoundException) {
+				// Cluster can disappear between list/describe calls during concurrent cleanup.
+				if awsErrCodeIs(err, eks.ErrCodeResourceNotFoundException) {
 					fmt.Printf("EKS cluster: Not found (already deleted) [id=%s]\n", *cluster)
 					continue
 				}
@@ -523,7 +530,7 @@ func realMain(ctx context.Context) error {
 					VpcId:             vpcID,
 				})
 				if err != nil {
-					if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidInternetGatewayIDNotFound) {
 						fmt.Printf("Internet gateway: Not found (already detached) [id=%s]\n", *igw.InternetGatewayId)
 						return nil
 					}
@@ -541,7 +548,7 @@ func realMain(ctx context.Context) error {
 				InternetGatewayId: igw.InternetGatewayId,
 			})
 			if err != nil {
-				if strings.Contains(err.Error(), "InvalidInternetGatewayID.NotFound") {
+				if awsErrCodeIs(err, ec2ErrCodeInvalidInternetGatewayIDNotFound) {
 					fmt.Printf("Internet gateway: Not found (already destroyed) [id=%s]\n", *igw.InternetGatewayId)
 				} else {
 					return err
@@ -572,7 +579,7 @@ func realMain(ctx context.Context) error {
 					NetworkInterfaceId: networkInterface.NetworkInterfaceId,
 				})
 				if err != nil {
-					if strings.Contains(err.Error(), "InvalidNetworkInterfaceID.NotFound") {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidNetworkInterfaceIDNotFound) {
 						fmt.Printf("Network interface: Not found (already destroyed) [id=%s]\n", *networkInterface.NetworkInterfaceId)
 						return nil
 					}
@@ -719,8 +726,9 @@ func realMain(ctx context.Context) error {
 			})
 			if err == nil {
 				break
-			} else if strings.Contains(err.Error(), "InvalidVpcID.NotFound") {
+			} else if awsErrCodeIs(err, ec2ErrCodeInvalidVpcIDNotFound) {
 				fmt.Printf("VPC: Not found (already destroyed) [id=%s]\n", *vpcID)
+				err = nil
 				break
 			}
 			fmt.Printf("VPC: Destroy error... [id=%s,err=%q,retry=%d]\n", *vpcID, err, retryCount)
@@ -865,15 +873,30 @@ func cleanupIAMPolicies(ctx context.Context, iamClient *iam.IAM) error {
 		versions, err := iamClient.ListPolicyVersions(&iam.ListPolicyVersionsInput{
 			PolicyArn: policy.Arn,
 		})
-		if err == nil {
-			for _, version := range versions.Versions {
-				if !aws.BoolValue(version.IsDefaultVersion) {
-					_, _ = iamClient.DeletePolicyVersion(&iam.DeletePolicyVersionInput{
-						PolicyArn: policy.Arn,
-						VersionId: version.VersionId,
-					})
+		if err != nil {
+			fmt.Printf("Failed to list versions for policy %s: %v\n", policyName, err)
+			continue
+		}
+
+		// AWS IAM policy cannot be deleted while any non-default version still exists.
+		// So, skip deleting the policy in this run if any required version deletion fails.
+		canDeletePolicy := true
+		for _, version := range versions.Versions {
+			if !aws.BoolValue(version.IsDefaultVersion) {
+				_, err := iamClient.DeletePolicyVersion(&iam.DeletePolicyVersionInput{
+					PolicyArn: policy.Arn,
+					VersionId: version.VersionId,
+				})
+				if err != nil {
+					fmt.Printf("Failed to delete non-default policy version %s for policy %s: %v\n", aws.StringValue(version.VersionId), policyName, err)
+					canDeletePolicy = false
 				}
 			}
+		}
+
+		if !canDeletePolicy {
+			fmt.Printf("Skipping deletion of policy %s because one or more non-default versions could not be removed\n", policyName)
+			continue
 		}
 
 		_, err = iamClient.DeletePolicy(&iam.DeletePolicyInput{
@@ -945,6 +968,8 @@ func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error 
 		return fmt.Errorf("roleName is nil")
 	}
 
+	// Track per-profile removal failures so role deletion can be skipped safely.
+	var removeErr error
 	err := iamClient.ListInstanceProfilesForRolePages(&iam.ListInstanceProfilesForRoleInput{
 		RoleName: roleName,
 	}, func(page *iam.ListInstanceProfilesForRoleOutput, lastPage bool) bool {
@@ -955,6 +980,7 @@ func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error 
 			})
 			if err != nil {
 				fmt.Printf("Failed to remove role %s from instance profile %s: %v\n", *roleName, *profile.InstanceProfileName, err)
+				removeErr = err
 			} else {
 				fmt.Printf("Removed role %s from instance profile %s\n", *roleName, *profile.InstanceProfileName)
 			}
@@ -965,8 +991,20 @@ func removeRoleFromInstanceProfiles(iamClient *iam.IAM, roleName *string) error 
 	if err != nil {
 		return err
 	}
+	if removeErr != nil {
+		return fmt.Errorf("failed to remove role %s from one or more instance profiles", *roleName)
+	}
 
 	return nil
+}
+
+// awsErrCodeIs checks if the given error is an AWS error with the specified code.
+func awsErrCodeIs(err error, code string) bool {
+	aerr, ok := err.(awserr.Error)
+	if !ok {
+		return false
+	}
+	return aerr.Code() == code
 }
 
 // detachPoliciesFromRole detaches all policies from a given role.
