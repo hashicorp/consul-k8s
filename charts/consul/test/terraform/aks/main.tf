@@ -124,6 +124,7 @@ resource "helm_release" "uptycs" {
   chart            = "k8sosquery"
   namespace        = "uptycs"
   create_namespace = true
+  replace          = true
 
   values = [
     templatefile("${path.module}/k8sosquery-values.yaml", {
@@ -133,13 +134,15 @@ resource "helm_release" "uptycs" {
 }
 
 resource "helm_release" "kubequery" {
+  depends_on       = [helm_release.uptycs]
   count            = var.cluster_count
   provider         = helm.cluster_0
   name             = "kubequery"
   repository       = "https://uptycslabs.github.io/kspm-helm-charts"
   chart            = "kubequery"
-  namespace        = "uptycs"
+  namespace        = "kubequery"
   create_namespace = true
+  replace          = true
 
   set {
     name  = "deployment.spec.hostname"
