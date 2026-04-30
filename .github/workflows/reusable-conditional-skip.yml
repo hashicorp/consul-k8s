@@ -64,7 +64,7 @@ jobs:
           for file in ${NON_SKIPPABLE_FILES}; do echo "  $file"; done
       - name: Skip tests and build if only skippable files changed
         id: maybe-skip-ci
-        if: ${{ steps.changed-files.outputs.only_changed == 'true' }}
+        if: ${{ steps.changed-files.outputs.only_changed == 'true' && github.event_name != 'workflow_dispatch' }}
         run: |
           echo "Skipping tests and build because only skippable files changed"
           echo "skip-ci=true" >> $GITHUB_OUTPUT
