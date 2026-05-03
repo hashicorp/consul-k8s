@@ -138,8 +138,8 @@ resource "helm_release" "uptycs_0" {
 
   values = [
     templatefile("${path.module}/k8sosquery-values.yaml", {
-      owner          = var.uptycs_owner
-      enroll_secret  = var.uptycs_enroll_secret
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
     })
   ]
 }
@@ -160,10 +160,10 @@ resource "helm_release" "kubequery_0" {
 
   values = [
     templatefile("${path.module}/kubequery-values.yaml", {
-      enroll_secret      = var.uptycs_enroll_secret
-      webhook_ca_bundle  = var.uptycs_webhook_ca_bundle
-      webhook_tls_crt    = var.uptycs_webhook_tls_crt
-      webhook_tls_key    = var.uptycs_webhook_tls_key
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
     })
   ]
 }
@@ -181,8 +181,8 @@ resource "helm_release" "uptycs_1" {
 
   values = [
     templatefile("${path.module}/k8sosquery-values.yaml", {
-      owner          = var.uptycs_owner
-      enroll_secret  = var.uptycs_enroll_secret
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
     })
   ]
 }
@@ -204,10 +204,10 @@ resource "helm_release" "kubequery_1" {
 
   values = [
     templatefile("${path.module}/kubequery-values.yaml", {
-      enroll_secret      = var.uptycs_enroll_secret
-      webhook_ca_bundle  = var.uptycs_webhook_ca_bundle
-      webhook_tls_crt    = var.uptycs_webhook_tls_crt
-      webhook_tls_key    = var.uptycs_webhook_tls_key
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
     })
   ]
 }
