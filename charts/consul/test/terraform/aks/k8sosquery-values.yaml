@@ -95,7 +95,7 @@ configmap:
 # Nginx secret contains all the root CA's accepted by Uptycs cloud.
 secrets:
   createNginxSecret: true
-  enroll_secret: 5650968d-4e15-4a66-aac4-589343d4cfd9##8f845535-8f41-461c-98a4-37bc71cde776
+  enroll_secret: ${enroll_secret}
   nginx_secret: |-
     ##
     ## Bundle of CA Root Certificates
