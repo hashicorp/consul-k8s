@@ -119,10 +119,10 @@ provider "helm" {
 provider "helm" {
   alias = "cluster_1"
   kubernetes {
-    host                   = var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].host : ""
-    client_certificate     = var.cluster_count > 1 ? base64decode(azurerm_kubernetes_cluster.default[1].kube_config[0].client_certificate) : ""
-    client_key             = var.cluster_count > 1 ? base64decode(azurerm_kubernetes_cluster.default[1].kube_config[0].client_key) : ""
-    cluster_ca_certificate = var.cluster_count > 1 ? base64decode(azurerm_kubernetes_cluster.default[1].kube_config[0].cluster_ca_certificate) : ""
+    host                   = var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].host : azurerm_kubernetes_cluster.default[0].kube_config[0].host
+    client_certificate     = base64decode(var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].client_certificate : azurerm_kubernetes_cluster.default[0].kube_config[0].client_certificate)
+    client_key             = base64decode(var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].client_key : azurerm_kubernetes_cluster.default[0].kube_config[0].client_key)
+    cluster_ca_certificate = base64decode(var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].cluster_ca_certificate : azurerm_kubernetes_cluster.default[0].kube_config[0].cluster_ca_certificate)
   }
 }
 
