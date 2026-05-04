@@ -2,6 +2,7 @@ package openshift
 
 import (
 	"os/exec"
+	"sort"
 	"strconv"
 	"testing"
 
@@ -12,6 +13,10 @@ import (
 )
 
 func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespaceMirroring bool) {
+	newOpenshiftClusterWithHelmValues(t, cfg, secure, namespaceMirroring, nil)
+}
+
+func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, secure, namespaceMirroring bool, extraHelmValues map[string]string) {
 	// Cleanup of old consul secret
 	cmd := exec.Command("kubectl", "delete", "secret", "-n", "consul", "consul-ent-license")
 	_, _ = cmd.CombinedOutput()
@@ -61,25 +66,39 @@ func newOpenshiftCluster(t *testing.T, cfg *config.TestConfig, secure, namespace
 	})
 
 	chartPath := "../../../charts/consul"
-	cmd = exec.Command("helm", "upgrade", "--install", "consul", chartPath,
+	helmArgs := []string{"upgrade", "--install", "consul", chartPath,
 		"--namespace", "consul",
 		"--set", "global.name=consul",
 		"--set", "connectInject.enabled=true",
 		"--set", "connectInject.transparentProxy.defaultEnabled=false",
 		"--set", "connectInject.apiGateway.managedGatewayClass.mapPrivilegedContainerPorts=8000",
-		"--set", "global.acls.manageSystemACLs="+strconv.FormatBool(secure),
-		"--set", "global.tls.enabled="+strconv.FormatBool(secure),
-		"--set", "global.tls.enableAutoEncrypt="+strconv.FormatBool(secure),
-		"--set", "global.enableConsulNamespaces="+strconv.FormatBool(namespaceMirroring),
-		"--set", "global.consulNamespaces.mirroringK8S="+strconv.FormatBool(namespaceMirroring),
+		"--set", "global.acls.manageSystemACLs=" + strconv.FormatBool(secure),
+		"--set", "global.tls.enabled=" + strconv.FormatBool(secure),
+		"--set", "global.tls.enableAutoEncrypt=" + strconv.FormatBool(secure),
+		"--set", "global.enableConsulNamespaces=" + strconv.FormatBool(namespaceMirroring),
+		"--set", "global.consulNamespaces.mirroringK8S=" + strconv.FormatBool(namespaceMirroring),
 		"--set", "global.openshift.enabled=true",
-		"--set", "global.image="+cfg.ConsulImage,
-		"--set", "global.imageK8S="+cfg.ConsulK8SImage,
-		"--set", "global.imageConsulDataplane="+cfg.ConsulDataplaneImage,
+		"--set", "global.image=" + cfg.ConsulImage,
+		"--set", "global.imageK8S=" + cfg.ConsulK8SImage,
+		"--set", "global.imageConsulDataplane=" + cfg.ConsulDataplaneImage,
 		"--set", "global.enterpriseLicense.secretName=consul-ent-license",
 		"--set", "global.enterpriseLicense.secretKey=key",
 		"--set", "connectInject.apiGateway.manageExternalCRDs=true",
-	)
+	}
+
+	if len(extraHelmValues) > 0 {
+		keys := make([]string, 0, len(extraHelmValues))
+		for key := range extraHelmValues {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			helmArgs = append(helmArgs, "--set", key+"="+extraHelmValues[key])
+		}
+	}
+
+	cmd = exec.Command("helm", helmArgs...)
 
 	output, err = cmd.CombinedOutput()
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
