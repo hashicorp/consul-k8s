@@ -1,14 +1,14 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.25.9
+go 1.26
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.34.1
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.34.2
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.17.3
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.18.1
 
 replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260112121053-7ee7c79b61f0
 
@@ -28,8 +28,8 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.6
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.12
-	github.com/hashicorp/consul/api v1.33.7
-	github.com/hashicorp/consul/sdk v0.17.3
+	github.com/hashicorp/consul/api v1.34.2
+	github.com/hashicorp/consul/sdk v0.18.1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v1.1.0
 	github.com/hashicorp/go-hclog v1.6.3
@@ -113,7 +113,7 @@ require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.5 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.2 // indirect
