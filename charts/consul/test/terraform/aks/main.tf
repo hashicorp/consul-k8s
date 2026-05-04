@@ -152,6 +152,7 @@ resource "helm_release" "kubequery_0" {
   chart            = "kubequery"
   namespace        = "kubequery"
   create_namespace = true
+  cleanup_on_fail  = true
 
   set {
     name  = "deployment.spec.hostname"
@@ -196,6 +197,7 @@ resource "helm_release" "kubequery_1" {
   chart            = "kubequery"
   namespace        = "kubequery"
   create_namespace = true
+  cleanup_on_fail  = true
 
   set {
     name  = "deployment.spec.hostname"
