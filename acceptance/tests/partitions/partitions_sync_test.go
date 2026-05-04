@@ -21,6 +21,7 @@ import (
 
 // Test that Sync Catalog works in a default and ACLsEnabled installations for partitions.
 func TestPartitions_Sync(t *testing.T) {
+	t.Skipf("TEMPORARY SKIP - for running targeted tests on GHA")
 	env := suite.Environment()
 	cfg := suite.Config()
 

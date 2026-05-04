@@ -6,6 +6,8 @@ package partitions
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 
@@ -247,6 +249,54 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 					// In transparent proxy cross-partition mode we still need an explicit
 					// allow intention for the destination service to make the route active.
 					createMultiportIntention()
+				}
+
+				// Collect debug information to help diagnose EKS-specific mesh-gateway remote failures.
+				// Captures envoy cluster config from the sidecar and direct reachability to the default
+				// partition mesh gateway, both of which differ between local and remote gateway modes.
+				{
+					staticClientPodName := staticClientPods.Items[0].Name
+					staticClientPodNS := staticClientPods.Items[0].Namespace
+
+					// 1. Envoy config_dump from the consul-dataplane sidecar in the static-client pod.
+					// This reveals which clusters and SNI/ALPN values the sidecar has programmed for
+					// cross-partition multiport upstreams, which differ between local and remote modes.
+					logger.Logf(t, "debug: collecting envoy config_dump from static-client pod %s (container: consul-dataplane)", staticClientPodName)
+					configDump, configDumpErr := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterContext.KubectlOptions(t),
+						"exec", "-n", staticClientPodNS, staticClientPodName, "-c", "consul-dataplane", "--",
+						"curl", "-s", "http://localhost:19000/config_dump")
+					if configDumpErr != nil {
+						logger.Logf(t, "debug: envoy config_dump error: %v", configDumpErr)
+					} else {
+						logger.Logf(t, "debug: static-client envoy config_dump:\n%s", configDump)
+					}
+					if cfg.DebugDirectory != "" {
+						debugContent := configDump
+						if configDumpErr != nil {
+							debugContent = fmt.Sprintf("error: %v", configDumpErr)
+						}
+						_ = os.MkdirAll(cfg.DebugDirectory, 0755)
+						debugPath := filepath.Join(cfg.DebugDirectory, fmt.Sprintf("static-client-envoy-configdump-%s.json", meshGatewayMode.name))
+						_ = os.WriteFile(debugPath, []byte(debugContent), 0600)
+					}
+
+					// 2. Test direct connectivity from the static-client to the default partition mesh
+					// gateway LoadBalancer. In remote mode the sidecar reaches the remote MGW directly,
+					// so any NLB/routing issue on EKS manifests here even before Envoy SNI matching.
+					defaultMGWSvcName := fmt.Sprintf("%s-consul-mesh-gateway", releaseName)
+					defaultMGWHost := k8s.ServiceHost(t, cfg, defaultPartitionClusterContext, defaultMGWSvcName)
+					mgwTarget := fmt.Sprintf("https://%s:8443", defaultMGWHost)
+					logger.Logf(t, "debug: testing mesh gateway connectivity from static-client %s to %s", staticClientPodName, mgwTarget)
+					mgwOutput, mgwErr := k8s.RunKubectlAndGetOutputE(t, secondaryPartitionClusterContext.KubectlOptions(t),
+						"exec", "-n", staticClientPodNS, staticClientPodName, "-c", "static-client", "--",
+						"sh", "-c", fmt.Sprintf("curl -vvv --connect-timeout 5 %s 2>&1", mgwTarget))
+					logger.Logf(t, "debug: mesh gateway connectivity result (err=%v):\n%s", mgwErr, mgwOutput)
+					if cfg.DebugDirectory != "" {
+						_ = os.MkdirAll(cfg.DebugDirectory, 0755)
+						debugContent := fmt.Sprintf("Target: %s\nError: %v\nOutput:\n%s", mgwTarget, mgwErr, mgwOutput)
+						debugPath := filepath.Join(cfg.DebugDirectory, fmt.Sprintf("static-client-mgw-connectivity-%s.txt", meshGatewayMode.name))
+						_ = os.WriteFile(debugPath, []byte(debugContent), 0600)
+					}
 				}
 
 				logger.Log(t, "checking cross-partition connectivity for all three ports")
