@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/consul/api"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // EffectiveTLSSDSConfig captures resolved listener SDS settings after applying
@@ -17,19 +17,19 @@ type EffectiveTLSSDSConfig struct {
 	Configured bool
 }
 
-func ResolveListenerTLSSDSConfig(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, _ *ResourceMap) EffectiveTLSSDSConfig {
-	var tls *gwv1beta1.GatewayTLSConfig
+func ResolveListenerTLSSDSConfig(gateway gwv1.Gateway, listener gwv1.Listener, _ *ResourceMap) EffectiveTLSSDSConfig {
+	var tls *gwv1.ListenerTLSConfig
 	tls = listener.TLS
 
 	clusterName, clusterSet := stringValueFromAnnotations(gateway.Annotations, TLSSDSClusterNameAnnotationKey)
 	certResource, certSet := stringValueFromAnnotations(gateway.Annotations, TLSSDSCertResourceAnnotationKey)
 
 	if tls != nil {
-		if value, ok := tls.Options[gwv1beta1.AnnotationKey(TLSSDSClusterNameAnnotationKey)]; ok {
+		if value, ok := tls.Options[gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey)]; ok {
 			clusterName = strings.TrimSpace(string(value))
 			clusterSet = true
 		}
-		if value, ok := tls.Options[gwv1beta1.AnnotationKey(TLSSDSCertResourceAnnotationKey)]; ok {
+		if value, ok := tls.Options[gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey)]; ok {
 			certResource = strings.TrimSpace(string(value))
 			certSet = true
 		}
@@ -53,8 +53,8 @@ func ResolveListenerTLSSDSConfig(gateway gwv1beta1.Gateway, listener gwv1beta1.L
 	}
 }
 
-func ListenerUsesTLSSDS(gateway gwv1beta1.Gateway, tls *gwv1beta1.GatewayTLSConfig) bool {
-	listener := gwv1beta1.Listener{TLS: tls}
+func ListenerUsesTLSSDS(gateway gwv1.Gateway, tls *gwv1.ListenerTLSConfig) bool {
+	listener := gwv1.Listener{TLS: tls}
 	return ResolveListenerTLSSDSConfig(gateway, listener, nil).Config != nil
 }
 

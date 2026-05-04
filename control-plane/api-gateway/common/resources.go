@@ -116,7 +116,7 @@ type ResourceMap struct {
 	tcpRouteGateways      map[api.ResourceReference]*tcpRoute
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
-	gateways              map[api.ResourceReference]gwv1beta1.Gateway
+	gateways              map[api.ResourceReference]gwv1.Gateway
 	externalFilters       map[corev1.ObjectReference]client.Object
 	gatewayPolicies       map[api.ResourceReference]*v1alpha1.GatewayPolicy
 
@@ -144,7 +144,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
-		gateways:              make(map[api.ResourceReference]gwv1beta1.Gateway),
+		gateways:              make(map[api.ResourceReference]gwv1.Gateway),
 		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
 		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
@@ -249,11 +249,11 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1.Gateway) {
 
 // InheritedTLSSDSClusterForHTTPRoute returns a single unambiguous listener-level
 // SDS cluster name inherited through a route's Gateway parent refs.
-func (s *ResourceMap) InheritedTLSSDSClusterForHTTPRoute(route gwv1beta1.HTTPRoute) (string, bool) {
+func (s *ResourceMap) InheritedTLSSDSClusterForHTTPRoute(route gwv1.HTTPRoute) (string, bool) {
 	clusters := make(map[string]struct{})
 
 	for _, parent := range route.Spec.ParentRefs {
-		if !NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) || !NilOrEqual(parent.Kind, KindGateway) {
+		if !NilOrEqual(parent.Group, gwv1.GroupVersion.Group) || !NilOrEqual(parent.Kind, KindGateway) {
 			continue
 		}
 
@@ -508,7 +508,7 @@ func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.Gat
 	return value, exists
 }
 
-func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1.Gateway, gatewayListener gwv1.Listener) (*v1alpha1.GatewayPolicy, bool) {
 	kind := gateway.Kind
 	if kind == "" {
 		kind = KindGateway

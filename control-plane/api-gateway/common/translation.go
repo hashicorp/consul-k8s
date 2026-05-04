@@ -383,7 +383,7 @@ func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1.HTTPQueryParamMat
 	}
 }
 
-func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string, route *gwv1beta1.HTTPRoute) (api.HTTPFilters, api.HTTPResponseFilters, *api.GatewayServiceTLSConfig) {
+func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter, resourceMap *ResourceMap, namespace string, route *gwv1.HTTPRoute) (api.HTTPFilters, api.HTTPResponseFilters, *api.GatewayServiceTLSConfig) {
 	var (
 		urlRewrite            *api.URLRewrite
 		retryFilter           *api.RetryFilter

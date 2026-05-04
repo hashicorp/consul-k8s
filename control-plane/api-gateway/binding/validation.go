@@ -284,7 +284,7 @@ func (m mergedListeners) validateHostname(index int, listener gwv1.Listener) err
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-func validateTLS(gateway gwv1beta1.Gateway, listener gwv1beta1.Listener, resources *common.ResourceMap) (error, error) {
+func validateTLS(gateway gwv1.Gateway, listener gwv1.Listener, resources *common.ResourceMap) (error, error) {
 	tls := listener.TLS
 	// If there's no TLS, there's nothing to validate
 	if tls == nil {
@@ -632,12 +632,12 @@ func authFilterReferencesMissingJWTProvider(httproute *gwv1.HTTPRoute, resources
 	return maps.Keys(invalidFilters)
 }
 
-func routeTLSSDSFiltersInvalid(httproute *gwv1beta1.HTTPRoute, resources *common.ResourceMap) []string {
+func routeTLSSDSFiltersInvalid(httproute *gwv1.HTTPRoute, resources *common.ResourceMap) []string {
 	invalidFilters := make(map[string]struct{})
 
 	for _, rule := range httproute.Spec.Rules {
 		for _, filter := range rule.Filters {
-			if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+			if filter.Type != gwv1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
 				continue
 			}
 			if string(filter.ExtensionRef.Kind) == v1alpha1.RouteTLSSDSFilterKind {
@@ -658,8 +658,8 @@ func routeTLSSDSFiltersInvalid(httproute *gwv1beta1.HTTPRoute, resources *common
 	return maps.Keys(invalidFilters)
 }
 
-func routeTLSSDSFilterIsInvalid(filter gwv1beta1.HTTPRouteFilter, route *gwv1beta1.HTTPRoute, resources *common.ResourceMap, namespace string) bool {
-	if filter.Type != gwv1beta1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+func routeTLSSDSFilterIsInvalid(filter gwv1.HTTPRouteFilter, route *gwv1.HTTPRoute, resources *common.ResourceMap, namespace string) bool {
+	if filter.Type != gwv1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
 		return false
 	}
 

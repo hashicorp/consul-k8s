@@ -576,8 +576,12 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			// Subscribe to changes in RouteTLSSDSFilter custom resources referenced by HTTPRoutes.
 			&v1alpha1.RouteTLSSDSFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
-		).
-		Complete(r)
+		)
+
+	if err := builder.Complete(r); err != nil {
+		return nil, binding.Cleaner{}, err
+	}
+	return c, cleaner, nil
 }
 
 func (r *GatewayController) effectiveHelmConfig(log logr.Logger) common.HelmConfig {

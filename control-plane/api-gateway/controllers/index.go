@@ -155,7 +155,7 @@ var indexes = []index{
 	},
 	{
 		name:        HTTPRoute_RouteTLSSDSFilterIndex,
-		target:      &gwv1beta1.HTTPRoute{},
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
 	{
@@ -205,7 +205,7 @@ func gatewayForSecret(o client.Object) []string {
 	gateway := o.(*gwv1.Gateway)
 	var secretReferences []string
 	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
+		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1.TLSModeTerminate) {
 			continue
 		}
 		for _, cert := range listener.TLS.CertificateRefs {
