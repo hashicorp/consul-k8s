@@ -46,6 +46,7 @@ variable "uptycs_owner" {
 }
 
 variable "uptycs_enroll_secret" {
+  default     = ""
   description = "Uptycs enroll secret containing customer identifiers."
   sensitive   = true
 }
