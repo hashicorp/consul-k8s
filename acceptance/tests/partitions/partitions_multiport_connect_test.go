@@ -167,7 +167,12 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
 
 				logger.Log(t, "deploying client in secondary partition cluster")
-				if cfg.EnableTransparentProxy {
+				// In remote mesh-gateway mode the sidecar connects directly to the remote partition's
+				// mesh gateway LB. On EKS that LB has a DNS hostname rather than an IP; Envoy EDS
+				// rejects hostname endpoints, leaving the clusters permanently empty. Use explicit
+				// upstream annotations (localhost ports) instead of tproxy virtual DNS in this case
+				// so the upstream cluster type is resolved through the discovery chain, not via EDS.
+				if cfg.EnableTransparentProxy && meshGatewayMode.name != "remote" {
 					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
 					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
@@ -207,7 +212,9 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				upstreamAPIURL := "http://localhost:1234"
 				upstreamMetricsURL := "http://localhost:2234"
 				upstreamAdminURL := "http://localhost:3234"
-				if cfg.EnableTransparentProxy {
+				// Remote mesh-gateway mode uses explicit upstream ports (see client fixture comment above);
+				// keep localhost URLs in that case even when tproxy is globally enabled.
+				if cfg.EnableTransparentProxy && meshGatewayMode.name != "remote" {
 					upstreamAPIURL = fmt.Sprintf("http://api-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
 					upstreamMetricsURL = fmt.Sprintf("http://metrics.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
 					upstreamAdminURL = fmt.Sprintf("http://admin-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
