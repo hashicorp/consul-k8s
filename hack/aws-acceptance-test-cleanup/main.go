@@ -41,6 +41,7 @@ const (
 	iamErrCodeNoSuchEntity              = "NoSuchEntity"
 	eksErrCodeResourceNotFoundException = "ResourceNotFoundException"
 	elbErrCodeAccessPointNotFound       = "AccessPointNotFound"
+	elbErrCodeLoadBalancerNotFound      = "LoadBalancerNotFound"
 
 	// Known EC2 not-found codes treated as terminal success during cleanup races.
 	ec2ErrCodeInvalidAllocationIDNotFound       = "InvalidAllocationID.NotFound"
@@ -462,7 +463,7 @@ func realMain(ctx context.Context) error {
 				LoadBalancerName: lb.LoadBalancerName,
 			})
 			if err != nil {
-				if awsErrCodeIs(err, elbErrCodeAccessPointNotFound) {
+				if awsErrCodeIs(err, elbErrCodeAccessPointNotFound) || awsErrCodeIs(err, elbErrCodeLoadBalancerNotFound) {
 					fmt.Printf("ELB: Not found (already destroyed) [id=%s]\n", lbName)
 					continue
 				}
@@ -474,8 +475,8 @@ func realMain(ctx context.Context) error {
 					LoadBalancerNames: []string{lbName},
 				})
 				if err != nil {
-					// "AccessPointNotFound" is the error code for a deleted classic ELB.
-					if awsErrCodeIs(err, elbErrCodeAccessPointNotFound) {
+					// Classic ELB returns either code when the LB is gone.
+					if awsErrCodeIs(err, elbErrCodeAccessPointNotFound) || awsErrCodeIs(err, elbErrCodeLoadBalancerNotFound) {
 						return nil
 					}
 					return err
