@@ -19,6 +19,7 @@ import (
 )
 
 func TestConnectInject_PermissiveMTLS(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if !cfg.EnableTransparentProxy {
 		t.Skipf("skipping this because -enable-transparent-proxy is not set")

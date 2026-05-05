@@ -37,6 +37,7 @@ const (
 )
 
 func TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *testing.T) {
+	t.Parallel()
 	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
@@ -64,6 +65,7 @@ func TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *t
 }
 
 func TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas(t *testing.T) {
+	t.Parallel()
 	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
@@ -88,6 +90,7 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas(t *testing.T) {
 }
 
 func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing.T) {
+	t.Parallel()
 	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
@@ -165,6 +168,7 @@ func TestAPIGateway_Scaling_AnnotatedGatewayBeforeUpgradeReconcilesAfterUpgrade(
 }
 
 func TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(t *testing.T) {
+	t.Parallel()
 	skipUnlessEnterpriseLicenseConfigured(t)
 
 	ctx := suite.Environment().DefaultContext(t)
