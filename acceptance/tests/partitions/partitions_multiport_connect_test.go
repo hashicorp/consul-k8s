@@ -46,16 +46,16 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 		defaultPartitionConfigPath   string
 		secondaryPartitionConfigPath string
 	}{
-		// {
-		// 	name:                         "local",
-		// 	defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-local",
-		// 	secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-local",
-		// },
-		// {
-		// 	name:                         "remote",
-		// 	defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-remote",
-		// 	secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-remote",
-		// },
+		{
+			name:                         "local",
+			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-local",
+			secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-local",
+		},
+		{
+			name:                         "remote",
+			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-remote",
+			secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-remote",
+		},
 		{
 			name:                         "none",
 			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-none",
