@@ -37,9 +37,21 @@ const (
 	// buildURLTag is a tag on AWS resources set by the acceptance tests.
 	buildURLTag = "build_url"
 
+	// Generic not-found codes across services.
+	iamErrCodeNoSuchEntity              = "NoSuchEntity"
+	eksErrCodeResourceNotFoundException = "ResourceNotFoundException"
+	elbErrCodeAccessPointNotFound       = "AccessPointNotFound"
+
 	// Known EC2 not-found codes treated as terminal success during cleanup races.
+	ec2ErrCodeInvalidAllocationIDNotFound       = "InvalidAllocationID.NotFound"
 	ec2ErrCodeInvalidInternetGatewayIDNotFound  = "InvalidInternetGatewayID.NotFound"
+	ec2ErrCodeInvalidNatGatewayIDNotFound       = "InvalidNatGatewayID.NotFound"
 	ec2ErrCodeInvalidNetworkInterfaceIDNotFound = "InvalidNetworkInterfaceID.NotFound"
+	ec2ErrCodeInvalidRouteTableIDNotFound       = "InvalidRouteTableID.NotFound"
+	ec2ErrCodeInvalidSubnetIDNotFound           = "InvalidSubnetID.NotFound"
+	ec2ErrCodeInvalidGroupNotFound              = "InvalidGroup.NotFound"
+	ec2ErrCodeInvalidVolumeNotFound             = "InvalidVolume.NotFound"
+	ec2ErrCodeInvalidVpcPeeringConnNotFound     = "InvalidVpcPeeringConnectionID.NotFound"
 	ec2ErrCodeInvalidVpcIDNotFound              = "InvalidVpcID.NotFound"
 )
 
@@ -154,6 +166,10 @@ func realMain(ctx context.Context) error {
 				OpenIDConnectProviderArn: aws.String(p.arn),
 			})
 			if err != nil {
+				if awsErrCodeIs(err, iamErrCodeNoSuchEntity) {
+					fmt.Printf("OIDC provider: Not found (already destroyed) [id=%s]\n", p.arn)
+					continue
+				}
 				return err
 			}
 		}
@@ -218,12 +234,14 @@ func realMain(ctx context.Context) error {
 			})
 			if err != nil {
 				// Cluster can disappear between list/describe calls during concurrent cleanup.
-				var nfe *ekstypes.ResourceNotFoundException
-				if errors.As(err, &nfe) {
+				if awsErrCodeIs(err, eksErrCodeResourceNotFoundException) {
 					fmt.Printf("EKS cluster: Not found (already deleted) [id=%s]\n", clusterName)
 					continue
 				}
 				return err
+			}
+			if clusterData.Cluster == nil {
+				continue
 			}
 			if _, ok := clusterData.Cluster.Tags[buildURLTag]; ok {
 				toDeleteClusters[clusterName] = *clusterData.Cluster
@@ -250,16 +268,23 @@ func realMain(ctx context.Context) error {
 			for ngPaginator.HasMorePages() {
 				page, err := ngPaginator.NextPage(ctx)
 				if err != nil {
+					if awsErrCodeIs(err, eksErrCodeResourceNotFoundException) {
+						fmt.Printf("EKS cluster: Not found while listing node groups (already deleted) [id=%s]\n", aws.ToString(cluster.Name))
+						break
+					}
 					return err
 				}
 				for _, groupID := range page.Nodegroups {
-					groupID := groupID // capture for closure
 					fmt.Printf("Node group: Destroying... [id=%s]\n", groupID)
 					_, err = eksClient.DeleteNodegroup(ctx, &eks.DeleteNodegroupInput{
 						ClusterName:   cluster.Name,
 						NodegroupName: aws.String(groupID),
 					})
 					if err != nil {
+						if awsErrCodeIs(err, eksErrCodeResourceNotFoundException) {
+							fmt.Printf("Node group: Not found (already destroyed) [id=%s]\n", groupID)
+							continue
+						}
 						return err
 					}
 
@@ -269,6 +294,10 @@ func realMain(ctx context.Context) error {
 							ClusterName: cluster.Name,
 						})
 						if err != nil {
+							if awsErrCodeIs(err, eksErrCodeResourceNotFoundException) {
+								// Cluster is already gone, so node groups are gone too.
+								return nil
+							}
 							return err
 						}
 						for _, ng := range out.Nodegroups {
@@ -288,36 +317,43 @@ func realMain(ctx context.Context) error {
 			clusterName := aws.ToString(cluster.Name)
 			fmt.Printf("EKS cluster: Destroying... [id=%s]\n", clusterName)
 			_, err = eksClient.DeleteCluster(ctx, &eks.DeleteClusterInput{Name: cluster.Name})
-			if err != nil {
+			switch {
+			case awsErrCodeIs(err, eksErrCodeResourceNotFoundException):
+				fmt.Printf("EKS cluster: Not found (already destroyed) [id=%s]\n", clusterName)
+			case err != nil:
 				return err
-			}
-			if err := destroyBackoff(ctx, "EKS cluster", clusterName, func() error {
-				out, err := eksClient.ListClusters(ctx, &eks.ListClustersInput{})
-				if err != nil {
+			default:
+				if err := destroyBackoff(ctx, "EKS cluster", clusterName, func() error {
+					out, err := eksClient.ListClusters(ctx, &eks.ListClustersInput{})
+					if err != nil {
+						return err
+					}
+					for _, c := range out.Clusters {
+						if c == clusterName {
+							return errNotDestroyed
+						}
+					}
+					return nil
+				}); err != nil {
 					return err
 				}
-				for _, c := range out.Clusters {
-					if c == clusterName {
-						return errNotDestroyed
-					}
-				}
-				return nil
-			}); err != nil {
-				return err
+				fmt.Printf("EKS cluster: Destroyed [id=%s]\n", clusterName)
 			}
-			fmt.Printf("EKS cluster: Destroyed [id=%s]\n", clusterName)
 		}
 
 		// Collect VPC peering connections to delete.
 		var vpcPeeringConnsToDelete []ec2types.VpcPeeringConnection
 		for _, filterName := range []string{"accepter-vpc-info.vpc-id", "requester-vpc-info.vpc-id"} {
-			filterName := filterName // capture for closure
 			out, err := ec2Client.DescribeVpcPeeringConnections(ctx, &ec2.DescribeVpcPeeringConnectionsInput{
 				Filters: []ec2types.Filter{
 					{Name: aws.String(filterName), Values: []string{vpcIDStr}},
 				},
 			})
 			if err != nil {
+				if awsErrCodeIs(err, ec2ErrCodeInvalidVpcIDNotFound) {
+					fmt.Printf("VPC peering connections: VPC not found (already destroyed) [id=%s]\n", vpcIDStr)
+					continue
+				}
 				return err
 			}
 			vpcPeeringConnsToDelete = append(vpcPeeringConnsToDelete, out.VpcPeeringConnections...)
@@ -335,11 +371,40 @@ func realMain(ctx context.Context) error {
 
 		for _, gateway := range natGWsOut.NatGateways {
 			gwID := aws.ToString(gateway.NatGatewayId)
+
+			// releaseEIPs releases any Elastic IPs allocated to this NAT gateway.
+			// Run regardless of whether the NAT gateway itself was already gone, since
+			// we still have the address list from the earlier DescribeNatGateways call.
+			releaseEIPs := func() error {
+				for _, address := range gateway.NatGatewayAddresses {
+					if address.AllocationId == nil {
+						continue
+					}
+					allocID := aws.ToString(address.AllocationId)
+					fmt.Printf("NAT gateway: Releasing Elastic IP... [id=%s]\n", allocID)
+					_, err := ec2Client.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{
+						AllocationId: address.AllocationId,
+					})
+					if err != nil && !awsErrCodeIs(err, ec2ErrCodeInvalidAllocationIDNotFound) {
+						return err
+					}
+					fmt.Printf("NAT gateway: Elastic IP released [id=%s]\n", allocID)
+				}
+				return nil
+			}
+
 			fmt.Printf("NAT gateway: Destroying... [id=%s]\n", gwID)
 			_, err = ec2Client.DeleteNatGateway(ctx, &ec2.DeleteNatGatewayInput{
 				NatGatewayId: gateway.NatGatewayId,
 			})
 			if err != nil {
+				if awsErrCodeIs(err, ec2ErrCodeInvalidNatGatewayIDNotFound) {
+					fmt.Printf("NAT gateway: Not found (already destroyed) [id=%s]\n", gwID)
+					if err := releaseEIPs(); err != nil {
+						return err
+					}
+					continue
+				}
 				return err
 			}
 
@@ -363,6 +428,9 @@ func realMain(ctx context.Context) error {
 					},
 				})
 				if err != nil {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidNatGatewayIDNotFound) {
+						return nil
+					}
 					return err
 				}
 				if len(out.NatGateways) > 0 {
@@ -374,19 +442,8 @@ func realMain(ctx context.Context) error {
 			}
 			fmt.Printf("NAT gateway: Destroyed [id=%s]\n", gwID)
 
-			// Release Elastic IPs associated with the NAT gateway (if any).
-			for _, address := range gateway.NatGatewayAddresses {
-				if address.AllocationId != nil {
-					allocID := aws.ToString(address.AllocationId)
-					fmt.Printf("NAT gateway: Releasing Elastic IP... [id=%s]\n", allocID)
-					_, err := ec2Client.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{
-						AllocationId: address.AllocationId,
-					})
-					if err != nil && !awsErrCodeIs(err, "InvalidAllocationID.NotFound") {
-						return err
-					}
-					fmt.Printf("NAT gateway: Elastic IP released [id=%s]\n", allocID)
-				}
+			if err := releaseEIPs(); err != nil {
+				return err
 			}
 		}
 
@@ -405,6 +462,10 @@ func realMain(ctx context.Context) error {
 				LoadBalancerName: lb.LoadBalancerName,
 			})
 			if err != nil {
+				if awsErrCodeIs(err, elbErrCodeAccessPointNotFound) {
+					fmt.Printf("ELB: Not found (already destroyed) [id=%s]\n", lbName)
+					continue
+				}
 				return err
 			}
 
@@ -414,7 +475,7 @@ func realMain(ctx context.Context) error {
 				})
 				if err != nil {
 					// "AccessPointNotFound" is the error code for a deleted classic ELB.
-					if awsErrCodeIs(err, "AccessPointNotFound") {
+					if awsErrCodeIs(err, elbErrCodeAccessPointNotFound) {
 						return nil
 					}
 					return err
@@ -442,6 +503,7 @@ func realMain(ctx context.Context) error {
 		for _, igw := range igwsOut.InternetGateways {
 			igwID := aws.ToString(igw.InternetGatewayId)
 			fmt.Printf("Internet gateway: Detaching from VPC... [id=%s]\n", igwID)
+			detached := true
 			if err := destroyBackoff(ctx, "Internet Gateway", igwID, func() error {
 				_, err := ec2Client.DetachInternetGateway(ctx, &ec2.DetachInternetGatewayInput{
 					InternetGatewayId: igw.InternetGatewayId,
@@ -450,6 +512,7 @@ func realMain(ctx context.Context) error {
 				if err != nil {
 					if awsErrCodeIs(err, ec2ErrCodeInvalidInternetGatewayIDNotFound) {
 						fmt.Printf("Internet gateway: Not found (already detached) [id=%s]\n", igwID)
+						detached = false
 						return nil
 					}
 					return err
@@ -458,19 +521,20 @@ func realMain(ctx context.Context) error {
 			}); err != nil {
 				return err
 			}
-			fmt.Printf("Internet gateway: Detached [id=%s]\n", igwID)
+			if detached {
+				fmt.Printf("Internet gateway: Detached [id=%s]\n", igwID)
+			}
 
 			fmt.Printf("Internet gateway: Destroying... [id=%s]\n", igwID)
 			_, err = ec2Client.DeleteInternetGateway(ctx, &ec2.DeleteInternetGatewayInput{
 				InternetGatewayId: igw.InternetGatewayId,
 			})
-			if err != nil {
-				if awsErrCodeIs(err, ec2ErrCodeInvalidInternetGatewayIDNotFound) {
-					fmt.Printf("Internet gateway: Not found (already destroyed) [id=%s]\n", igwID)
-				} else {
-					return err
-				}
-			} else {
+			switch {
+			case awsErrCodeIs(err, ec2ErrCodeInvalidInternetGatewayIDNotFound):
+				fmt.Printf("Internet gateway: Not found (already destroyed) [id=%s]\n", igwID)
+			case err != nil:
+				return err
+			default:
 				fmt.Printf("Internet gateway: Destroyed [id=%s]\n", igwID)
 			}
 		}
@@ -523,7 +587,14 @@ func realMain(ctx context.Context) error {
 				_, err := ec2Client.DeleteSubnet(ctx, &ec2.DeleteSubnetInput{
 					SubnetId: subnet.SubnetId,
 				})
-				return err
+				if err != nil {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidSubnetIDNotFound) {
+						fmt.Printf("Subnet: Not found (already destroyed) [id=%s]\n", subnetID)
+						return nil
+					}
+					return err
+				}
+				return nil
 			}); err != nil {
 				return err
 			}
@@ -554,10 +625,19 @@ func realMain(ctx context.Context) error {
 				continue
 			}
 			fmt.Printf("Route table: Destroying... [id=%s]\n", rtID)
-			_, err := ec2Client.DeleteRouteTable(ctx, &ec2.DeleteRouteTableInput{
-				RouteTableId: rt.RouteTableId,
-			})
-			if err != nil {
+			if err := destroyBackoff(ctx, "Route table", rtID, func() error {
+				_, err := ec2Client.DeleteRouteTable(ctx, &ec2.DeleteRouteTableInput{
+					RouteTableId: rt.RouteTableId,
+				})
+				if err != nil {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidRouteTableIDNotFound) {
+						fmt.Printf("Route table: Not found (already destroyed) [id=%s]\n", rtID)
+						return nil
+					}
+					return err
+				}
+				return nil
+			}); err != nil {
 				return err
 			}
 			fmt.Printf("Route table: Destroyed [id=%s]\n", rtID)
@@ -582,6 +662,10 @@ func realMain(ctx context.Context) error {
 					IpPermissions: sg.IpPermissions,
 				})
 				if err != nil {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidGroupNotFound) {
+						fmt.Printf("Security group: Not found while removing rules (already destroyed) [id=%s]\n", sgID)
+						continue
+					}
 					return err
 				}
 				fmt.Printf("Security group: Removed security group rules [id=%s]\n", sgID)
@@ -595,10 +679,19 @@ func realMain(ctx context.Context) error {
 			}
 			sgID := aws.ToString(sg.GroupId)
 			fmt.Printf("Security group: Destroying... [id=%s]\n", sgID)
-			_, err = ec2Client.DeleteSecurityGroup(ctx, &ec2.DeleteSecurityGroupInput{
-				GroupId: sg.GroupId,
-			})
-			if err != nil {
+			if err := destroyBackoff(ctx, "Security group", sgID, func() error {
+				_, err := ec2Client.DeleteSecurityGroup(ctx, &ec2.DeleteSecurityGroupInput{
+					GroupId: sg.GroupId,
+				})
+				if err != nil {
+					if awsErrCodeIs(err, ec2ErrCodeInvalidGroupNotFound) {
+						fmt.Printf("Security group: Not found (already destroyed) [id=%s]\n", sgID)
+						return nil
+					}
+					return err
+				}
+				return nil
+			}); err != nil {
 				return err
 			}
 			fmt.Printf("Security group: Destroyed [id=%s]\n", sgID)
@@ -611,6 +704,10 @@ func realMain(ctx context.Context) error {
 				VpcPeeringConnectionId: conn.VpcPeeringConnectionId,
 			})
 			if err != nil {
+				if awsErrCodeIs(err, ec2ErrCodeInvalidVpcPeeringConnNotFound) {
+					fmt.Printf("VPC PeeringConnection: Not found (already destroyed) [id=%s]\n", connID)
+					continue
+				}
 				return err
 			}
 			fmt.Printf("VPC PeeringConnection: Destroyed [id=%s]\n", connID)
@@ -632,7 +729,11 @@ func realMain(ctx context.Context) error {
 				break
 			}
 			fmt.Printf("VPC: Destroy error... [id=%s,err=%q,retry=%d]\n", vpcIDStr, deleteVPCErr, retryCount)
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(5 * time.Second):
+			}
 		}
 		if deleteVPCErr != nil {
 			return errors.New("reached max retry count deleting VPC")
@@ -709,7 +810,7 @@ func destroyBackoff(ctx context.Context, resourceKind, resourceID string, destro
 		err := destroyF()
 		if err != nil {
 			errLog := ""
-			if err != errNotDestroyed {
+			if !errors.Is(err, errNotDestroyed) {
 				errLog = fmt.Sprintf(" err=%q,", err)
 			}
 			fmt.Printf("%s: Still destroying... [id=%s,%s %s elapsed]\n", resourceKind, resourceID, errLog, time.Since(start).Round(time.Second))
@@ -742,7 +843,11 @@ func cleanupIAMRoles(ctx context.Context, iamClient *iam.Client) error {
 		}
 		_, err = iamClient.DeleteRole(ctx, &iam.DeleteRoleInput{RoleName: role.RoleName})
 		if err != nil {
-			fmt.Printf("Failed to delete role %s: %v\n", roleName, err)
+			if awsErrCodeIs(err, iamErrCodeNoSuchEntity) {
+				fmt.Printf("Role: Not found (already destroyed) [id=%s]\n", roleName)
+			} else {
+				fmt.Printf("Failed to delete role %s: %v\n", roleName, err)
+			}
 		} else {
 			fmt.Printf("Deleted role: %s\n", roleName)
 		}
@@ -797,8 +902,12 @@ func cleanupIAMPolicies(ctx context.Context, iamClient *iam.Client) error {
 					VersionId: version.VersionId,
 				})
 				if err != nil {
-					fmt.Printf("Failed to delete non-default policy version %s for policy %s: %v\n", aws.ToString(version.VersionId), policyName, err)
-					canDelete = false
+					if awsErrCodeIs(err, iamErrCodeNoSuchEntity) {
+						fmt.Printf("Policy version: Not found (already destroyed) [policy=%s,version=%s]\n", policyName, aws.ToString(version.VersionId))
+					} else {
+						fmt.Printf("Failed to delete non-default policy version %s for policy %s: %v\n", aws.ToString(version.VersionId), policyName, err)
+						canDelete = false
+					}
 				}
 			}
 		}
@@ -810,7 +919,11 @@ func cleanupIAMPolicies(ctx context.Context, iamClient *iam.Client) error {
 
 		_, err = iamClient.DeletePolicy(ctx, &iam.DeletePolicyInput{PolicyArn: policy.Arn})
 		if err != nil {
-			fmt.Printf("Failed to delete policy %s: %v\n", policyName, err)
+			if awsErrCodeIs(err, iamErrCodeNoSuchEntity) {
+				fmt.Printf("Policy: Not found (already destroyed) [id=%s]\n", policyName)
+			} else {
+				fmt.Printf("Failed to delete policy %s: %v\n", policyName, err)
+			}
 		} else {
 			fmt.Printf("Deleted policy: %s\n", policyName)
 		}
@@ -884,6 +997,10 @@ func removeRoleFromInstanceProfiles(ctx context.Context, iamClient *iam.Client, 
 				RoleName:            roleName,
 			})
 			if err != nil {
+				if awsErrCodeIs(err, iamErrCodeNoSuchEntity) {
+					fmt.Printf("Instance profile/role link not found (already removed) [role=%s,profile=%s]\n", aws.ToString(roleName), aws.ToString(profile.InstanceProfileName))
+					continue
+				}
 				fmt.Printf("Failed to remove role %s from instance profile %s: %v\n", aws.ToString(roleName), aws.ToString(profile.InstanceProfileName), err)
 				removeErr = err
 			} else {
@@ -892,7 +1009,7 @@ func removeRoleFromInstanceProfiles(ctx context.Context, iamClient *iam.Client, 
 		}
 	}
 	if removeErr != nil {
-		return fmt.Errorf("failed to remove role %s from one or more instance profiles", aws.ToString(roleName))
+		return fmt.Errorf("failed to remove role %s from one or more instance profiles: %w", aws.ToString(roleName), removeErr)
 	}
 	return nil
 }
@@ -931,7 +1048,11 @@ func cleanupPersistentVolumes(ctx context.Context, ec2Client *ec2.Client) error 
 			fmt.Printf("Deleting volume %s\n", volumeID)
 			_, err := ec2Client.DeleteVolume(ctx, &ec2.DeleteVolumeInput{VolumeId: volume.VolumeId})
 			if err != nil {
-				fmt.Printf("Failed to delete volume %s: %s\n", volumeID, err)
+				if awsErrCodeIs(err, ec2ErrCodeInvalidVolumeNotFound) {
+					fmt.Printf("Volume: Not found (already destroyed) [id=%s]\n", volumeID)
+				} else {
+					fmt.Printf("Failed to delete volume %s: %s\n", volumeID, err)
+				}
 			} else {
 				fmt.Printf("Successfully deleted volume %s\n", volumeID)
 			}
