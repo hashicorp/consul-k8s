@@ -195,12 +195,22 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
 			}
 
-			// Deploy the client. When transparent proxy is enabled, deploy without
-			// explicit upstreams and use virtual DNS URLs. When transparent proxy is
-			// disabled, deploy with explicit upstreams targeting each port of the
-			// multiport service in the default partition.
+			// Deploy the client.
+			// CNI + tproxy + mode "none" requires explicit upstream annotations.
+			// With CNI, iptables are set up by the DaemonSet at pod-creation time,
+			// before consul-dataplane starts. The initial xDS snapshot therefore
+			// does not include the cross-partition EDS push for direct-connect
+			// mode "none" endpoints, leaving the outbound listener with only
+			// original-destination. Envoy forwards to the unroutable 240.0.0.x
+			// virtual IP and returns 503.
+			// Without CNI the init-container runs before consul-dataplane, which
+			// causes a later xDS sync that correctly includes the cross-partition
+			// cluster, so virtual-DNS tproxy works in that path.
+			// Explicit upstream annotations guarantee the cluster is present in
+			// xDS regardless of when the dataplane's initial snapshot is taken.
+			useTproxyClient := cfg.EnableTransparentProxy && !(cfg.EnableCNI && meshGatewayMode.name == "none")
 			logger.Log(t, "deploying client in secondary partition cluster")
-			if cfg.EnableTransparentProxy {
+			if useTproxyClient {
 				k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service-tproxy")
 			} else {
 				k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
@@ -231,8 +241,9 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				require.Len(r, legacyAdminServices, 0)
 			})
 
+			// Use virtual-DNS URLs only when the tproxy client fixture is deployed.
 			var upstreamAPIURL, upstreamMetricsURL, upstreamAdminURL string
-			if cfg.EnableTransparentProxy {
+			if useTproxyClient {
 				upstreamAPIURL = "http://api-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
 				upstreamMetricsURL = "http://metrics.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
 				upstreamAdminURL = "http://admin-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
