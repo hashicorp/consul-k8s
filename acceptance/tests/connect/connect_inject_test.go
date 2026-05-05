@@ -24,6 +24,7 @@ import (
 
 // TestConnectInject tests that Connect works in a default and a secure installation using Helm CLI.
 func TestConnectInject(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		secure bool
 	}{
@@ -63,6 +64,7 @@ func TestConnectInject(t *testing.T) {
 
 // TestConnectInject_VirtualIPFailover ensures that KubeDNS entries are saved to the virtual IP address table in Consul.
 func TestConnectInject_VirtualIPFailover(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if !cfg.EnableTransparentProxy {
 		// This can only be tested in transparent proxy mode.
@@ -92,6 +94,7 @@ func TestConnectInject_VirtualIPFailover(t *testing.T) {
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_CleanupKilledPods(t *testing.T) {
+	t.Parallel()
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
@@ -193,6 +196,7 @@ const multiportAdmin = "multiport-admin"
 // two ports. This tests inbound connections to each port of the multiport app, and outbound connections from the
 // multiport app to static-server.
 func TestConnectInject_MultiportServices(t *testing.T) {
+	t.Parallel()
 	for _, secure := range []bool{false, true} {
 		name := fmt.Sprintf("secure: %t", secure)
 		t.Run(name, func(t *testing.T) {
