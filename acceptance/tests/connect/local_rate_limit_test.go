@@ -21,6 +21,7 @@ import (
 
 // TestConnectInject_LocalRateLimiting tests that local rate limiting works as expected between services.
 func TestConnectInject_LocalRateLimiting(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 
 	if !cfg.EnableEnterprise {

@@ -27,6 +27,7 @@ import (
 
 // Enabled everything possible, see if anything breaks.
 func TestAPIGateway_KitchenSink(t *testing.T) {
+	t.Parallel()
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 

@@ -13,7 +13,9 @@
 - {runner: 8, test-packages: "metrics"}
 - {runner: 9, test-packages: "server"}
 - {runner: 10, test-packages: "api-gateway"}
+- {runner: 11, test-packages: "connect-lifecycle"}
 - {runner: 12, test-packages: "sync"}
+- {runner: 18, test-packages: "api-gateway-external"}
 - {runner: 13, test-packages: "example"}
 - {runner: 14, test-packages: "consul-dns"}
 - {runner: 15, test-packages: "config-entries"}
