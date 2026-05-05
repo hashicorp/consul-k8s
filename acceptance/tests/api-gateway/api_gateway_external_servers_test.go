@@ -1,7 +1,7 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package apigatewayexternal
+package apigateway
 
 import (
 	"context"
@@ -25,7 +25,6 @@ import (
 // It sets up an external Consul server in the same cluster but a different Helm installation
 // and then treats this server as external.
 func TestAPIGateway_ExternalServers(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 
