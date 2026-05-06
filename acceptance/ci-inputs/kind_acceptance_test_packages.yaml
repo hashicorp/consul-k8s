@@ -12,7 +12,9 @@
 - {runner: 4, test-packages: "snapshot-agent"}
 - {runner: 5, test-packages: "wan-federation"}
 - {runner: 6, test-packages: "cli"}
-- {runner: 7, test-packages: "vault"}
+- {runner: 7, test-packages: "vault", run-filter: "^TestVault_WANFederationViaGateways"}
+- {runner: 25, test-packages: "vault", run-filter: "^TestVault$|^TestVault_Partitions"}
+- {runner: 26, test-packages: "vault", run-filter: "^TestVault_TLSAutoReload|^TestVault_VaultNamespace"}
 - {runner: 8, test-packages: "metrics"}
 - {runner: 9, test-packages: "server"}
 - {runner: 10, test-packages: "api-gateway", run-filter: "TestAPIGateway_KitchenSink"}

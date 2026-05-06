@@ -25,5 +25,7 @@
 - {runner: 19, test-packages: "api-gateway-external"}
 - {runner: 14, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGatewaySingleNamespace|^TestTerminatingGatewayNamespaceMirroring"}
 - {runner: 23, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGateway$|^TestTerminatingGatewayDestinations|^TestTerminatingGatewaySecretRotation"}
-- {runner: 15, test-packages: "vault"}
+- {runner: 15, test-packages: "vault", run-filter: "^TestVault_WANFederationViaGateways"}
+- {runner: 25, test-packages: "vault", run-filter: "^TestVault$|^TestVault_Partitions"}
+- {runner: 26, test-packages: "vault", run-filter: "^TestVault_TLSAutoReload|^TestVault_VaultNamespace"}
 - {runner: 16, test-packages: "server"}
