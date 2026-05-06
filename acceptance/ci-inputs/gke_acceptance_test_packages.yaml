@@ -22,6 +22,7 @@
 - {runner: 17, test-packages: "connect-lifecycle"}
 - {runner: 18, test-packages: "connect-external"}
 - {runner: 19, test-packages: "api-gateway-external"}
-- {runner: 14, test-packages: "terminating-gateway"}
+- {runner: 14, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGatewaySingleNamespace|^TestTerminatingGatewayNamespaceMirroring"}
+- {runner: 23, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGateway$|^TestTerminatingGatewayDestinations|^TestTerminatingGatewaySecretRotation"}
 - {runner: 15, test-packages: "vault"}
 - {runner: 16, test-packages: "server"}

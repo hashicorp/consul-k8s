@@ -23,5 +23,6 @@
 - {runner: 13, test-packages: "example"}
 - {runner: 14, test-packages: "consul-dns"}
 - {runner: 15, test-packages: "config-entries"}
-- {runner: 16, test-packages: "terminating-gateway"}
+- {runner: 16, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGatewaySingleNamespace|^TestTerminatingGatewayNamespaceMirroring"}
+- {runner: 23, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGateway$|^TestTerminatingGatewayDestinations|^TestTerminatingGatewaySecretRotation"}
 - {runner: 17, test-packages: "basic"}
