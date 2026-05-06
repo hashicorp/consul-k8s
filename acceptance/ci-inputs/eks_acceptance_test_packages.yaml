@@ -9,7 +9,8 @@
 - {runner: 3, test-packages: "wan-federation"}
 - {runner: 4, test-packages: "consul-dns"}
 - {runner: 5, test-packages: "example"}
-- {runner: 6, test-packages: "partitions"}
+- {runner: 6, test-packages: "partitions", run-filter: "^TestPartitions_Connect$"}
+- {runner: 22, test-packages: "partitions", run-filter: "^TestPartitions_Gateway|^TestPartitions_Sync|^TestPartitions_Connect_MultiportServices"}
 - {runner: 7, test-packages: "metrics"}
 - {runner: 8, test-packages: "sync"}
 - {runner: 9, test-packages: "basic"}
