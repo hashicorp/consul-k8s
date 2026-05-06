@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-- {runner: 0, test-packages: "connect"}
+- {runner: 0, test-packages: "connect", run-filter: "^TestConnectInject$|^TestConnectInject_VirtualIPFailover|^TestConnectInject_CleanupKilledPods|^TestConnectInject_MultiportServices"}
+- {runner: 21, test-packages: "connect", run-filter: "^TestConnectInjectNamespaces|^TestConnectInject_LocalRateLimiting|^TestConnectInject_PermissiveMTLS"}
 - {runner: 1, test-packages: "peering"}
 - {runner: 2, test-packages: "snapshot-agent"}
 - {runner: 3, test-packages: "wan-federation"}
@@ -14,7 +15,8 @@
 - {runner: 9, test-packages: "basic"}
 - {runner: 10, test-packages: "cli"}
 - {runner: 11, test-packages: "config-entries"}
-- {runner: 12, test-packages: "api-gateway"}
+- {runner: 12, test-packages: "api-gateway", run-filter: "TestAPIGateway_KitchenSink"}
+- {runner: 20, test-packages: "api-gateway", run-filter: "TestAPIGateway_Basic|TestAPIGateway_JWTAuth|TestAPIGateway_Lifecycle|TestAPIGateway_Tenancy|TestAPIGateway_GatewayClassConfig|TestAPIGateway_Scaling"}
 - {runner: 13, test-packages: "ingress-gateway"}
 - {runner: 17, test-packages: "connect-lifecycle"}
 - {runner: 18, test-packages: "connect-external"}

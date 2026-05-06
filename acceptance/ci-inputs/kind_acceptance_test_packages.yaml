@@ -5,14 +5,16 @@
 - {runner: 0, test-packages: "partitions"}
 - {runner: 1, test-packages: "peering"}
 - {runner: 2, test-packages: "sameness"}
-- {runner: 3, test-packages: "connect"}
+- {runner: 3, test-packages: "connect", run-filter: "^TestConnectInject$|^TestConnectInject_VirtualIPFailover|^TestConnectInject_CleanupKilledPods|^TestConnectInject_MultiportServices"}
+- {runner: 21, test-packages: "connect", run-filter: "^TestConnectInjectNamespaces|^TestConnectInject_LocalRateLimiting|^TestConnectInject_PermissiveMTLS"}
 - {runner: 4, test-packages: "snapshot-agent"}
 - {runner: 5, test-packages: "wan-federation"}
 - {runner: 6, test-packages: "cli"}
 - {runner: 7, test-packages: "vault"}
 - {runner: 8, test-packages: "metrics"}
 - {runner: 9, test-packages: "server"}
-- {runner: 10, test-packages: "api-gateway"}
+- {runner: 10, test-packages: "api-gateway", run-filter: "TestAPIGateway_KitchenSink"}
+- {runner: 20, test-packages: "api-gateway", run-filter: "TestAPIGateway_Basic|TestAPIGateway_JWTAuth|TestAPIGateway_Lifecycle|TestAPIGateway_Tenancy|TestAPIGateway_GatewayClassConfig|TestAPIGateway_Scaling"}
 - {runner: 11, test-packages: "connect-lifecycle"}
 - {runner: 12, test-packages: "sync"}
 - {runner: 18, test-packages: "connect-external"}
