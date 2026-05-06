@@ -4,7 +4,8 @@
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
 - {runner: 0, test-packages: "partitions", run-filter: "^TestPartitions_Connect$"}
 - {runner: 22, test-packages: "partitions", run-filter: "^TestPartitions_Gateway|^TestPartitions_Sync|^TestPartitions_Connect_MultiportServices"}
-- {runner: 1, test-packages: "peering"}
+- {runner: 1, test-packages: "peering", run-filter: "^TestPeering_Connect$"}
+- {runner: 24, test-packages: "peering", run-filter: "^TestPeering_Gateway|^TestPeering_ConnectNamespaces"}
 - {runner: 2, test-packages: "sameness"}
 - {runner: 3, test-packages: "connect", run-filter: "^TestConnectInject$|^TestConnectInject_VirtualIPFailover|^TestConnectInject_CleanupKilledPods|^TestConnectInject_MultiportServices"}
 - {runner: 21, test-packages: "connect", run-filter: "^TestConnectInjectNamespaces|^TestConnectInject_LocalRateLimiting|^TestConnectInject_PermissiveMTLS"}
