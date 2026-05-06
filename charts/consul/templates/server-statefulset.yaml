@@ -356,7 +356,6 @@ spec:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
           {{ template "consul.imagePullPolicy" . }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
