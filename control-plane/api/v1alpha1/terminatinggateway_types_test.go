@@ -88,6 +88,27 @@ func TestTerminatingGateway_MatchesConsul(t *testing.T) {
 			},
 			Matches: true,
 		},
+		"linked service namespace defaulted by consul matches": {
+			Ours: TerminatingGateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: TerminatingGatewaySpec{
+					Services: []LinkedService{{
+						Name: "name",
+					}},
+				},
+			},
+			Theirs: &capi.TerminatingGatewayConfigEntry{
+				Kind: capi.TerminatingGateway,
+				Name: "name",
+				Services: []capi.LinkedService{{
+					Name:      "name",
+					Namespace: "default",
+				}},
+			},
+			Matches: true,
+		},
 		"different types does not match": {
 			Ours: TerminatingGateway{
 				ObjectMeta: metav1.ObjectMeta{
