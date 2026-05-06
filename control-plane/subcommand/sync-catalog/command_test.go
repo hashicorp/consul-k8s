@@ -38,21 +38,31 @@ func (nopRegisterer) Register(prom.Collector) error  { return nil }
 func (nopRegisterer) MustRegister(...prom.Collector) {}
 func (nopRegisterer) Unregister(prom.Collector) bool { return true }
 
-// TestMain sets up test-environment overrides that must not affect production:
-//  1. Replaces prometheus.DefaultRegisterer with a no-op so that recordMetrics()
-//     can be called once per test without duplicate-registration errors.
-//  2. Disables the WatchListClient feature gate so that SharedIndexInformers
-//     backed by the fake k8s client can sync their cache (the fake client never
-//     sends the required SendInitialEvents bookmark).
-func TestMain(m *testing.M) {
-	prom.DefaultRegisterer = nopRegisterer{}
+// settableGates is implemented by the feature-gate object returned by
+// clientfeatures.FeatureGates() when the gate supports programmatic overrides in tests
+type settableGates interface {
+	Set(feature clientfeatures.Feature, value bool) error
+}
 
-	type settableGates interface {
-		Set(feature clientfeatures.Feature, value bool) error
-	}
+// disableWatchListClient turns off the WatchListClient feature gate so that
+// SharedIndexInformers backed by the fake k8s client can sync their cache.
+// The fake client never sends the required SendInitialEvents bookmark that the
+// feature requires.
+func configureFeatureGates() {
 	if fg, ok := clientfeatures.FeatureGates().(settableGates); ok {
 		_ = fg.Set(clientfeatures.WatchListClient, false)
 	}
+}
+
+// TestMain sets up test-environment overrides that must not affect production.
+// It Replaces prometheus.DefaultRegisterer with a no-op so that recordMetrics()
+// can be called once per test without duplicate-registration errors.
+// Also,Disables the WatchListClient feature gate so that SharedIndexInformers
+// backed by the fake k8s client can sync their cache (the fake client never
+// sends the required SendInitialEvents bookmark).
+func TestMain(m *testing.M) {
+	prom.DefaultRegisterer = nopRegisterer{}
+	configureFeatureGates()
 	os.Exit(m.Run())
 }
 
