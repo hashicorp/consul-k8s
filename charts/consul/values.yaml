@@ -6,6 +6,10 @@
 # Holds values that affect multiple components of the chart.
 global:
   installK8sNetworkingCRDs: true
+  # If true, CRDs will be installed as part of the Helm chart. Set to false when
+  # managing CRDs externally (e.g. GitOps pipelines, multi-tenant clusters where
+  # a platform team pre-applies CRDs cluster-wide).
+  installCRDs: true
   # The main enabled/disabled setting. If true, servers,
   # clients, Consul DNS and the Consul UI will be enabled. Each component can override
   # this default via its component-specific "enabled" config. If false, no components
