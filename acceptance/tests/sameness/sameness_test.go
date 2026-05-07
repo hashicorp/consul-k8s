@@ -63,7 +63,6 @@ const (
 )
 
 func TestFailover_Connect(t *testing.T) {
-	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 

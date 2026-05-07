@@ -26,7 +26,6 @@ import (
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestOpenshift_Basic(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	newOpenshiftCluster(t, cfg, true, false)
 

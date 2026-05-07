@@ -25,7 +25,6 @@ import (
 // It then gets certs for https and rpc on the server. It then waits for the certs to rotate and checks
 // that certs have different expirations.
 func TestVault_TLSAutoReload(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 	ns := ctx.KubectlOptions(t).Namespace

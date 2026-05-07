@@ -16,7 +16,6 @@ import (
 // TestConnectInjectOnUpgrade tests that Connect works before and after an
 // upgrade is performed on the cluster.
 func TestUpgrade(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 

@@ -19,7 +19,6 @@ import (
 
 // Test that when servers are restarted, they don't lose leadership.
 func TestServerRestart(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	if cfg.EnableCNI || cfg.EnableTransparentProxy {
 		t.Skipf("skipping because -enable-cni or -enable-transparent-proxy is set and server restart " +

@@ -24,7 +24,6 @@ import (
 // - clients enabled and joining the alpha segment.
 // - static client can communicate with static server.
 func TestSegments_MeshWithAgentfulClients(t *testing.T) {
-	t.Parallel()
 	cases := map[string]struct {
 		secure bool
 	}{
@@ -91,7 +90,6 @@ func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 // - clients enabled on another cluster and joining the alpha segment.
 // - static client can communicate with static server.
 func TestSegments_MeshWithAgentfulClientsMultiCluster(t *testing.T) {
-	t.Parallel()
 	cases := map[string]struct {
 		secure bool
 	}{

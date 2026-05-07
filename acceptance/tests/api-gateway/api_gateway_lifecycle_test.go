@@ -24,7 +24,6 @@ import (
 )
 
 func TestAPIGateway_Lifecycle(t *testing.T) {
-	t.Parallel()
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 	helmValues := map[string]string{

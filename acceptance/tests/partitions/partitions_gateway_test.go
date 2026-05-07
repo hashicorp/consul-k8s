@@ -27,7 +27,6 @@ import (
 
 // Test that Gateway works in a default and ACLsEnabled installations for X-Partition and in-partition networking.
 func TestPartitions_Gateway(t *testing.T) {
-	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 

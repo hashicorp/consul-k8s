@@ -41,7 +41,6 @@ const (
 // Test that Connect and wan federation over mesh gateways work in a default installation
 // i.e. without ACLs because TLS is required for WAN federation over mesh gateways.
 func TestWANFederation(t *testing.T) {
-	t.Parallel()
 	cases := []struct {
 		name   string
 		secure bool
@@ -210,7 +209,6 @@ func TestWANFederation(t *testing.T) {
 	dc1-static-client -- failover --> dc1-static-server in namespace ns2
 */
 func TestWANFederationFailover(t *testing.T) {
-	t.Parallel()
 	cases := []struct {
 		name   string
 		secure bool

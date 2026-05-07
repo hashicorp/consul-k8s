@@ -32,7 +32,6 @@ import (
 // secondary cluster via a Kubernetes service. We then only need to deploy Vault agent injector
 // in the secondary that will treat the Vault server in the primary as an external server.
 func TestVault_WANFederationViaGateways(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 
 	if cfg.UseKind {

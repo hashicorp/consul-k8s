@@ -36,7 +36,6 @@ const (
 
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
@@ -261,7 +260,6 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 }
 
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 
 	if cfg.EnableTransparentProxy {
