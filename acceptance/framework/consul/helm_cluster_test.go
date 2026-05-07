@@ -31,9 +31,10 @@ func TestNewHelmCluster(t *testing.T) {
 			name:       "defaults are used when no helmValues are set",
 			helmValues: map[string]string{},
 			want: map[string]string{
-				"global.image":    "test-config-image",
-				"global.logLevel": "debug",
-				"server.replicas": "1",
+				"global.image":       "test-config-image",
+				"global.logLevel":    "debug",
+				"global.installCRDs": "false",
+				"server.replicas":    "1",
 				"connectInject.transparentProxy.defaultEnabled":                          "false",
 				"connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds": "1",
 				"dns.enabled":        "false",
@@ -58,6 +59,7 @@ func TestNewHelmCluster(t *testing.T) {
 			want: map[string]string{
 				"global.image":           "test-image",
 				"global.logLevel":        "debug",
+				"global.installCRDs":     "false",
 				"server.bootstrapExpect": "3",
 				"server.replicas":        "3",
 				"connectInject.transparentProxy.defaultEnabled":                          "true",
