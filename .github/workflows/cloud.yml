@@ -1,0 +1,28 @@
+# Dispatch to the consul-k8s-workflows when a PR is created and on merges to main/release*
+name: cloud
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main
+      - "release/**"
+
+# these should be the only settings that you will ever need to change
+env:
+  BRANCH: ${{ github.head_ref || github.ref_name }}
+  CONTEXT: "pr"
+  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  cloud-acceptance:
+    name: cloud-acceptance
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
+        name: cloud
+        with:
+          workflow: cloud.yml
+          repo: hashicorp/consul-k8s-workflows
+          ref: shashank/multiport-tests
+          token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ github.sha }}"}'
