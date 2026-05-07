@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -35,16 +36,13 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 	cmd = exec.Command("kubectl", "delete", "namespace", "consul")
 	_, _ = cmd.CombinedOutput()
 
-	// Ensure GatewayClassConfig CRD is not stuck in terminating from previous runs.
-	cmd = exec.Command("kubectl", "delete", "crd", "gatewayclassconfigs.consul.hashicorp.com", "--ignore-not-found=true", "--wait=false")
-	_, _ = cmd.CombinedOutput()
-	cmd = exec.Command("kubectl", "patch", "crd", "gatewayclassconfigs.consul.hashicorp.com", "--type=merge", "-p", `{"metadata":{"finalizers":[]}}`)
-	_, _ = cmd.CombinedOutput()
-	cmd = exec.Command("kubectl", "wait", "--for=delete", "--timeout=180s", "crd/gatewayclassconfigs.consul.hashicorp.com")
-	output, err := cmd.CombinedOutput()
-	if err != nil && !strings.Contains(string(output), "not found") {
-		require.NoErrorf(t, err, "failed waiting for GatewayClassConfig CRD deletion: %s", string(output))
-	}
+	// Ensure resources from prior runs are not stuck in Terminating.
+	helpers.ForceCleanupTerminatingResources(t, []helpers.ResourceToCleanup{
+		{Type: "crd", Name: "gatewayclassconfigs.consul.hashicorp.com"},
+	}, 180*time.Second)
+
+	var output []byte
+	var err error
 
 	// Add the hashicorp helm repo
 	cmd = exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")

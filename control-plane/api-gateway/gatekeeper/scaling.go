@@ -115,46 +115,39 @@ func parseHPAAnnotations(annotations map[string]string, log logr.Logger) (*HPACo
 	// Parse min replicas
 	if minStr, ok := annotationValue(annotations, AnnotationHPAMinReplicas); ok {
 		min, err := strconv.ParseInt(minStr, 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid %s: %w", AnnotationHPAMinReplicas, err)
+		if err == nil && min >= 1 {
+			config.MinReplicas = int32(min)
+		} else {
+			return nil, fmt.Errorf("invalid %s: expected integer value greater than or equal to 1", AnnotationHPAMinReplicas)
 		}
-		if min < 1 {
-			return nil, fmt.Errorf("%s must be at least 1, got %d", AnnotationHPAMinReplicas, min)
-		}
-		config.MinReplicas = int32(min)
 	}
 
 	// Parse max replicas
 	if maxStr, ok := annotationValue(annotations, AnnotationHPAMaxReplicas); ok {
 		max, err := strconv.ParseInt(maxStr, 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid %s: %w", AnnotationHPAMaxReplicas, err)
+		if err == nil && max >= 1 {
+			config.MaxReplicas = int32(max)
+		} else {
+			return nil, fmt.Errorf("invalid %s: expected integer value greater than or equal to 1", AnnotationHPAMaxReplicas)
 		}
-		if max < 1 {
-			return nil, fmt.Errorf("%s must be at least 1, got %d", AnnotationHPAMaxReplicas, max)
-		}
-		config.MaxReplicas = int32(max)
 	}
 
-	// Validate min <= max
-	if config.MinReplicas > config.MaxReplicas {
-		return nil, fmt.Errorf("%s (%d) cannot be greater than %s (%d)",
-			AnnotationHPAMinReplicas, config.MinReplicas, AnnotationHPAMaxReplicas, config.MaxReplicas)
+	// Validate min/max relationship
+	if config.MinReplicas <= config.MaxReplicas {
+		// Parse CPU target
+		if cpuStr, ok := annotationValue(annotations, AnnotationHPACPUTarget, annotationHPACPUTargetUS); ok {
+			cpu, err := strconv.ParseInt(cpuStr, 10, 32)
+			if err == nil && cpu >= 1 && cpu <= 100 {
+				config.CPUTargetValue = int32(cpu)
+			} else {
+				return nil, fmt.Errorf("invalid %s: expected value between 1 and 100", AnnotationHPACPUTarget)
+			}
+		}
+		return config, nil
 	}
 
-	// Parse CPU target
-	if cpuStr, ok := annotationValue(annotations, AnnotationHPACPUTarget, annotationHPACPUTargetUS); ok {
-		cpu, err := strconv.ParseInt(cpuStr, 10, 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid %s: %w", AnnotationHPACPUTarget, err)
-		}
-		if cpu < 1 || cpu > 100 {
-			return nil, fmt.Errorf("%s must be between 1 and 100, got %d", AnnotationHPACPUTarget, cpu)
-		}
-		config.CPUTargetValue = int32(cpu)
-	}
-
-	return config, nil
+	return nil, fmt.Errorf("invalid HPA replica range: expected %s <= %s",
+		AnnotationHPAMinReplicas, AnnotationHPAMaxReplicas)
 }
 
 func annotationValue(annotations map[string]string, keys ...string) (string, bool) {
