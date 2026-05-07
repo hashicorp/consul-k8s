@@ -22,6 +22,7 @@ import (
 )
 
 func TestVault_Partitions(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 	serverClusterCtx := env.DefaultContext(t)

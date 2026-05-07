@@ -16,6 +16,7 @@ import (
 
 // Test that terminating gateways work in a default and secure installations.
 func TestTerminatingGateway(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		secure bool
 	}{

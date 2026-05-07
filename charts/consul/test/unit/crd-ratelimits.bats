@@ -24,3 +24,11 @@ load _helpers
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
+
+@test "ratelimit/CustomResourceDefinitions: disabled with global.installCRDs=false" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/crd-ratelimits.yaml \
+      --set 'global.installCRDs=false' \
+      .
+}

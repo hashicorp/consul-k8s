@@ -16,6 +16,7 @@ import (
 )
 
 func TestExample(t *testing.T) {
+	t.Parallel()
 	// Get test configuration.
 	cfg := suite.Config()
 

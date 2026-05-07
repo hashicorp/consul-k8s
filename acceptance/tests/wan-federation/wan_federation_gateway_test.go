@@ -26,6 +26,7 @@ import (
 )
 
 func TestWANFederation_Gateway(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 

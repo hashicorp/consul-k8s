@@ -19,6 +19,7 @@ import (
 )
 
 func TestTerminatingGatewaySecretRotation(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		secure bool
 	}{

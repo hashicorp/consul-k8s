@@ -22,6 +22,7 @@ import (
 // servers and clients, works by creating a kv entry
 // and subsequently reading it from Consul.
 func TestBasicInstallation(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and installing CNI is not a basic installation")

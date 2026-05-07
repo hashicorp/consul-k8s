@@ -25,6 +25,7 @@ import (
 // It then configures Consul to use vault as the backend and checks that it works
 // with the vault namespace. Namespace is added in this via global.secretsBackend.vault.vaultNamespace.
 func TestVault_VaultNamespace(t *testing.T) {
+	t.Parallel()
 	t.Skipf("TODO(flaky): NET-5682")
 
 	cfg := suite.Config()
