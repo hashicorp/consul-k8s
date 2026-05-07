@@ -225,29 +225,32 @@ resource "kubernetes_storage_class" "ebs_gp3_cluster1" {
 # The following resources are only applied when cluster_count=2 to set up vpc peering and the appropriate routes and
 # security groups so traffic between VPCs is allowed. There is validation to ensure cluster_count can be 1 or 2.
 
-# Each EKS cluster needs to allow ingress traffic from the other VPC's public subnets.
-# Traffic routes via NAT Gateway through public subnets (no private peering routes),
-# so source IPs arrive from the public subnet CIDRs of the remote VPC.
+# Each EKS cluster needs to allow ingress traffic from the other VPC.
+# For mesh-gateway (local/remote) modes, traffic enters via NLB/NAT Gateway and the source IP
+# is the remote VPC's NAT Gateway IP (a public subnet IP). For mesh-gateway mode "none",
+# sidecars connect directly pod-to-pod: the source IP is the remote pod's IP, which comes
+# from the private subnet range (AWS VPC CNI assigns pod IPs from the VPC CIDR directly).
+# Allowing the full remote VPC CIDR covers both cases.
 resource "aws_security_group_rule" "allowingressfrom1-0" {
-  count             = var.cluster_count > 1 ? length(module.vpc[1].public_subnets_cidr_blocks) : 0
+  count             = var.cluster_count > 1 ? 1 : 0
   type              = "ingress"
   from_port         = 0
   to_port           = 0
   protocol          = "-1"
-  cidr_blocks       = [module.vpc[1].public_subnets_cidr_blocks[count.index]]
+  cidr_blocks       = [module.vpc[1].vpc_cidr_block]
   security_group_id = module.eks[0].worker_security_group_id
-  description       = "Allow node traffic from cluster 1 public subnet ${count.index}"
+  description       = "Allow all traffic from cluster 1 VPC"
 }
 
 resource "aws_security_group_rule" "allowingressfrom0-1" {
-  count             = var.cluster_count > 1 ? length(module.vpc[0].public_subnets_cidr_blocks) : 0
+  count             = var.cluster_count > 1 ? 1 : 0
   type              = "ingress"
   from_port         = 0
   to_port           = 0
   protocol          = "-1"
-  cidr_blocks       = [module.vpc[0].public_subnets_cidr_blocks[count.index]]
+  cidr_blocks       = [module.vpc[0].vpc_cidr_block]
   security_group_id = module.eks[1].worker_security_group_id
-  description       = "Allow node traffic from cluster 0 public subnet ${count.index}"
+  description       = "Allow all traffic from cluster 0 VPC"
 }
 
 # Create a peering connection. This is the requester's side of the connection.
@@ -276,6 +279,8 @@ resource "aws_vpc_peering_connection_accepter" "peer" {
 }
 
 # Add routes to public route tables in VPC 0 to route traffic to VPC 1 through the peering connection.
+# Required for mesh-gateway (local/remote) modes where traffic from one cluster's NLB reaches the
+# other cluster's NLB via the public internet path (through NAT Gateway).
 resource "aws_route" "peering_public_0" {
   count                     = var.cluster_count > 1 ? length(module.vpc[0].public_route_table_ids) : 0
   route_table_id            = module.vpc[0].public_route_table_ids[count.index]
@@ -287,6 +292,26 @@ resource "aws_route" "peering_public_0" {
 resource "aws_route" "peering_public_1" {
   count                     = var.cluster_count > 1 ? length(module.vpc[1].public_route_table_ids) : 0
   route_table_id            = module.vpc[1].public_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[0].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Add routes to private route tables in VPC 0 to route pod-to-pod traffic to VPC 1.
+# Required for mesh-gateway mode "none" where sidecars connect directly to each other
+# without going through mesh gateways. EKS pods run on private subnets and their IPs
+# are assigned from the VPC private subnet CIDRs (AWS VPC CNI). Without private route
+# table entries, pods in cluster 0 cannot reach pods in cluster 1 even with VPC peering.
+resource "aws_route" "peering_private_0" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[0].private_route_table_ids) : 0
+  route_table_id            = module.vpc[0].private_route_table_ids[count.index]
+  destination_cidr_block    = module.vpc[1].vpc_cidr_block
+  vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Add routes to private route tables in VPC 1 to route pod-to-pod traffic to VPC 0.
+resource "aws_route" "peering_private_1" {
+  count                     = var.cluster_count > 1 ? length(module.vpc[1].private_route_table_ids) : 0
+  route_table_id            = module.vpc[1].private_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[0].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
 }
