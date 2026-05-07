@@ -36,3 +36,11 @@ load _helpers
       --set 'connectInject.enabled=false' \
       .
 }
+
+@test "ingressGateway/CustomResourceDefinitions: disabled with global.installCRDs=false" {
+  cd `chart_dir`
+  assert_empty helm template \
+      -s templates/crd-ingressgateways.yaml \
+      --set 'global.installCRDs=false' \
+      .
+}

@@ -22,6 +22,7 @@ const testNamespace = "ns1"
 // Test we can connect through the terminating gateway when both
 // the terminating gateway and the connect service are in the same namespace.
 func TestTerminatingGatewaySingleNamespace(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
@@ -129,6 +130,7 @@ func TestTerminatingGatewaySingleNamespace(t *testing.T) {
 // Test we can connect through the terminating gateway when the terminating gateway,
 // the external service, and the connect service are in different combinations of namespaces.
 func TestTerminatingGatewayNamespaceMirroring(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")

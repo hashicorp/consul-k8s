@@ -22,6 +22,7 @@ import (
 // Test that egress Destinations route through terminating gateways.
 // Destinations are only valid when operating in transparent mode.
 func TestTerminatingGatewayDestinations(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if !cfg.EnableTransparentProxy {
 		t.Skipf("skipping this test because -enable-transparent-proxy is not set")

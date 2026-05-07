@@ -34,6 +34,7 @@ import (
 // the test case.  The test validates that the DNS queries are resolved when querying
 // for .consul services in secure and non-secure modes.
 func TestConsulDNS(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set")

@@ -21,6 +21,7 @@ import (
 
 // Test that Sync Catalog works in a default and ACLsEnabled installations for partitions.
 func TestPartitions_Sync(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 

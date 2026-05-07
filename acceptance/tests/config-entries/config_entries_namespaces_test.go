@@ -35,6 +35,7 @@ const (
 // because in the case of namespaces there isn't a significant distinction in code between auto-encrypt
 // and non-auto-encrypt secure installations, so testing just one is enough.
 func TestControllerNamespaces(t *testing.T) {
+	t.Parallel()
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and controller is already tested with regular tproxy")

@@ -32,6 +32,7 @@ const (
 //
 // Method: DogstatsD + Unix Domain Socket.
 func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
@@ -100,6 +101,7 @@ func TestDatadogDogstatsDUnixDomainSocket(t *testing.T) {
 //
 // Method: DogstatsD + UDP to Kube Service DNS name on port 8125.
 func TestDatadogDogstatsDUDP(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
@@ -169,6 +171,7 @@ func TestDatadogDogstatsDUDP(t *testing.T) {
 //
 // Method: Consul Integrated Datadog Checks.
 func TestDatadogConsulChecks(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)
@@ -236,6 +239,7 @@ func TestDatadogConsulChecks(t *testing.T) {
 //
 // Method: Datadog Openmetrics Prometheus Metrics Collection.
 func TestDatadogOpenmetrics(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 	ctx := env.DefaultContext(t)

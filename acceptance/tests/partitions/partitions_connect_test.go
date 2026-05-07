@@ -27,6 +27,7 @@ const StaticClientNamespace = "ns2"
 
 // Test that Connect works in a default and ACLsEnabled installations for X-Partition and in-partition networking.
 func TestPartitions_Connect(t *testing.T) {
+	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 
