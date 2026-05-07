@@ -90,8 +90,13 @@ func installCRDs(cfg *config.TestConfig) error {
 	// Enable every feature flag that gates a CRD template. global.tls.enabled and
 	// meshGateway.enabled are required by helm's validation when peering is on;
 	// they do not affect which CRD documents are emitted.
+	// Use "consul"/"consul" as release/namespace so the Helm ownership labels
+	// on the pre-installed CRDs match what `consul-k8s install` expects.
+	// HelmCluster tests are unaffected because they set installCRDs=false and
+	// never attempt to claim CRD ownership via Helm.
 	helmArgs := []string{
-		"template", "crd-pre-install", config.HelmChartPath,
+		"template", "consul", config.HelmChartPath,
+		"--namespace", "consul",
 		"--set", "global.installCRDs=true",
 		"--set", "connectInject.enabled=true",
 		"--set", "global.peering.enabled=true",
