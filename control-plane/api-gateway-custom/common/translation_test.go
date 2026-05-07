@@ -1402,11 +1402,11 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 							Namespace: "k8s-ns",
 						},
 						Spec: v1alpha1.RouteAuthFilterSpec{
-							JWTCustom: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "test-jwt-provider",
-										VerifyClaims: []*v1alpha1.CustomGatewayJWTClaimVerification{
+										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
 											{
 												Path:  []string{"/okta"},
 												Value: "okta",
@@ -1783,11 +1783,11 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 							SectionName: newSectionNamePtr("test-listener"),
 						},
 						Override: &v1alpha1.CustomGatewayPolicyConfig{
-							JWT: &v1alpha1.CustomGatewayJWTRequirement{
-								Providers: []*v1alpha1.CustomGatewayJWTProvider{
+							JWT: &v1alpha1.GatewayJWTRequirement{
+								Providers: []*v1alpha1.GatewayJWTProvider{
 									{
 										Name: "override-provider",
-										VerifyClaims: []*v1alpha1.CustomGatewayJWTClaimVerification{
+										VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
 											{
 												Path:  []string{"path"},
 												Value: "value",
@@ -1797,11 +1797,11 @@ func TestResourceTranslator_toAPIGatewayListener(t *testing.T) {
 								},
 							},
 						},
-						Default: &v1alpha1.CustomGatewayPolicyConfig{JWT: &v1alpha1.CustomGatewayJWTRequirement{
-							Providers: []*v1alpha1.CustomGatewayJWTProvider{
+						Default: &v1alpha1.CustomGatewayPolicyConfig{JWT: &v1alpha1.GatewayJWTRequirement{
+							Providers: []*v1alpha1.GatewayJWTProvider{
 								{
 									Name: "default-provider",
-									VerifyClaims: []*v1alpha1.CustomGatewayJWTClaimVerification{
+									VerifyClaims: []*v1alpha1.GatewayJWTClaimVerification{
 										{
 											Path:  []string{"path"},
 											Value: "value",

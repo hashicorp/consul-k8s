@@ -132,22 +132,9 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			k8sClient := ctx.ControllerRuntimeClient(t)
 			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
 
-			// check if there are any reference grants and if there are any then log the content of the objects for debugging
-			logger.Log(t, "checking for reference grants")
-			var referenceGrants gwv1beta.ReferenceGrantList
-			err := k8sClient.List(context.Background(), &referenceGrants)
-			require.NoError(t, err)
-			// instead describe each reference grant and log it for debugging purposes
-			if len(referenceGrants.Items) > 0 {
-				logger.Logf(t, "found %d reference grants", len(referenceGrants.Items))
-				for i, rg := range referenceGrants.Items {
-					logger.Logf(t, "refeerence grant %d: %+v", i, rg)
-				}
-			}
-
 			// log the gateway and route for debugging purposes
 			var gateway gwv1.Gateway
-			err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
+			err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 			require.NoError(t, err)
 			logger.Logf(t, "gateway: %+v", gateway)
 

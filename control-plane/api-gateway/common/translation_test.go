@@ -1537,6 +1537,119 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 	}
 }
 
+func TestTranslator_ToTCPRoute(t *testing.T) {
+	t.Parallel()
+	type args struct {
+		k8sRoute     gwv1alpha2.TCPRoute
+		services     []types.NamespacedName
+		meshServices []v1alpha1.MeshService
+	}
+	tests := map[string]struct {
+		args args
+		want api.TCPRouteConfigEntry
+	}{
+		"base test": {
+			args: args{
+				k8sRoute: gwv1alpha2.TCPRoute{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-route",
+						Namespace: "k8s-ns",
+					},
+					Spec: gwv1alpha2.TCPRouteSpec{
+						Rules: []gwv1alpha2.TCPRouteRule{
+							{
+								BackendRefs: []gwv1alpha2.BackendRef{
+									{
+										BackendObjectReference: gwv1alpha2.BackendObjectReference{
+											Name:      "some-service",
+											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+										},
+										Weight: new(int32),
+									},
+								},
+							},
+							{
+								BackendRefs: []gwv1alpha2.BackendRef{
+									{
+										BackendObjectReference: gwv1alpha2.BackendObjectReference{
+											Name:      "some-service-part-two",
+											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+										},
+										Weight: new(int32),
+									},
+									{
+										BackendObjectReference: gwv1alpha2.BackendObjectReference{
+											Group:     PointerTo(gwv1alpha2.Group(v1alpha1.ConsulHashicorpGroup)),
+											Kind:      PointerTo(gwv1alpha2.Kind(v1alpha1.MeshServiceKind)),
+											Name:      "some-service-part-three",
+											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+										},
+										Weight: new(int32),
+									},
+								},
+							},
+						},
+					},
+				},
+				services: []types.NamespacedName{
+					{Name: "some-service", Namespace: "svc-ns"},
+					{Name: "some-service-part-two", Namespace: "svc-ns"},
+				},
+				meshServices: []v1alpha1.MeshService{
+					{ObjectMeta: metav1.ObjectMeta{Name: "some-service-part-three", Namespace: "svc-ns"}, Spec: v1alpha1.MeshServiceSpec{Name: "some-override"}},
+				},
+			},
+			want: api.TCPRouteConfigEntry{
+				Kind:      api.TCPRoute,
+				Name:      "tcp-route",
+				Namespace: "k8s-ns",
+				Services: []api.TCPService{
+					{
+						Name:      "some-service",
+						Partition: "",
+						Namespace: "svc-ns",
+					},
+					{
+						Name:      "some-service-part-two",
+						Partition: "",
+						Namespace: "svc-ns",
+					},
+					{
+						Name:      "some-override",
+						Partition: "",
+						Namespace: "svc-ns",
+					},
+				},
+				Meta: map[string]string{
+					constants.MetaKeyKubeNS:   "k8s-ns",
+					constants.MetaKeyKubeName: "tcp-route",
+				},
+			},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tr := ResourceTranslator{
+				EnableConsulNamespaces: true,
+				EnableK8sMirroring:     true,
+			}
+
+			resources := NewResourceMap(tr, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+			for _, service := range tt.args.services {
+				resources.AddService(service, service.Name)
+			}
+			for _, service := range tt.args.meshServices {
+				resources.AddMeshService(service)
+			}
+
+			got := tr.ToTCPRoute(tt.args.k8sRoute, resources)
+			if diff := cmp.Diff(&tt.want, got); diff != "" {
+				t.Errorf("Translator.TCPRouteToTCPRoute() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func generateTestCertificate(t *testing.T, namespace, name string) corev1.Secret {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	require.NoError(t, err)

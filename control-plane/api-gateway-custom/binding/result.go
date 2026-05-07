@@ -632,6 +632,8 @@ func (g gatewayPolicyValidationResult) acceptedCondition(generation int64) metav
 
 func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) []metav1.Condition {
 	now := timeFunc()
+
+	// ✅ No errors → ResolvedRefs = True
 	if len(g.resolvedRefsErrs) == 0 {
 		return []metav1.Condition{
 			{
@@ -645,28 +647,27 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 		}
 	}
 
-	conditions := make([]metav1.Condition, 0, len(g.resolvedRefsErrs))
+	var conditions []metav1.Condition
+
 	for _, err := range g.resolvedRefsErrs {
+		reason := "InvalidRefs"
+
 		switch {
 		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingListenerReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
+			reason = "MissingListenerReference"
 		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
-			conditions = append(conditions, metav1.Condition{
-				Type:               "ResolvedRefs",
-				Status:             metav1.ConditionFalse,
-				Reason:             "MissingJWTProviderReference",
-				ObservedGeneration: generation,
-				Message:            err.Error(),
-				LastTransitionTime: now,
-			})
+			reason = "MissingJWTProviderReference"
 		}
+
+		conditions = append(conditions, metav1.Condition{
+
+			Type:               "ResolvedRefs",
+			Status:             metav1.ConditionFalse,
+			Reason:             reason,
+			ObservedGeneration: generation,
+			Message:            err.Error(),
+			LastTransitionTime: now,
+		})
 	}
 	return conditions
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -89,7 +90,6 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 
 	}
-	log.Info("Gateway found: " + fmt.Sprintf("%+v", gateway))
 
 	// get the gateway class
 	gatewayClass, err := r.getGatewayClassForGateway(ctx, gateway)
@@ -97,7 +97,18 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Error(err, "unable to get GatewayClass")
 		return ctrl.Result{}, err
 	}
+	log.Info("gatewayclass(custom): " + fmt.Sprintf("%+v", gatewayClass))
 
+	isControlled := gatewayClass != nil && gatewayClass.Spec.ControllerName == common.GatewayClassControllerName
+	hasFinalizer := slices.Contains(gateway.Finalizers, common.GatewayFinalizer)
+	if !isControlled && !hasFinalizer {
+		log.Info("skipping reconciliation since controller name does not match", "expected", common.GatewayClassControllerName)
+		return ctrl.Result{}, nil
+	}
+
+	if !isControlled && hasFinalizer {
+		log.Info("final cleanup for previously controlled gateway")
+	}
 	// get the gateway class config
 	gatewayClassConfig, err := r.getConfigForGatewayClass(ctx, gatewayClass)
 	if err != nil {
@@ -181,6 +192,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// get all jwt providers referencing this gateway
 	_, err = r.getJWTProviders(ctx, resources)
 	if err != nil {
 		log.Error(err, "unable to list JWT providers")
@@ -389,23 +401,6 @@ func (r *GatewayController) updateGatekeeperResources(ctx context.Context, log l
 	return nil
 }
 
-func mapToCustomGateway(obj client.Object) []reconcile.Request {
-	for _, owner := range obj.GetOwnerReferences() {
-		if owner.Controller != nil && *owner.Controller &&
-			owner.Kind == "Gateway" &&
-			owner.APIVersion == "consul.hashicorp.com/v1beta1" {
-
-			return []reconcile.Request{{
-				NamespacedName: types.NamespacedName{
-					Name:      owner.Name,
-					Namespace: obj.GetNamespace(),
-				},
-			}}
-		}
-	}
-	return nil
-}
-
 // SetupWithGatewayControllerManager registers the controller with the given manager.
 func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, config CustomGatewayControllerConfig) (*cache.Cache, binding.Cleaner, error) {
 	cacheConfig := cache.Config{
@@ -419,10 +414,15 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	c := cache.New(cacheConfig)
 	gwc := cache.NewGatewayCache(ctx, cacheConfig)
 
-	predicate, _ := predicate.LabelSelectorPredicate(
+	podPredicate, _ := predicate.LabelSelectorPredicate(
 		*metav1.SetAsLabelSelector(map[string]string{
-			common.ManagedLabel:  "true",
-			common.NameLabelTest: "api-gateway-custom",
+			common.ManagedLabel:   "true",
+			common.ComponentLabel: "api-gateway-consul",
+		}),
+	)
+	gwPredicate, _ := predicate.LabelSelectorPredicate(
+		*metav1.SetAsLabelSelector(map[string]string{
+			common.ComponentLabel: "api-gateway-consul",
 		}),
 	)
 
@@ -454,8 +454,8 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 	}
 
 	return c, cleaner, ctrl.NewControllerManagedBy(mgr).
-		Named("gateway-custom").
-		For(&gwv1beta1.Gateway{}).
+		Named("gateway-consul").
+		For(&gwv1beta1.Gateway{}, builder.WithPredicates(gwPredicate)).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
@@ -490,7 +490,7 @@ func SetupGatewayControllerWithManager(ctx context.Context, mgr ctrl.Manager, co
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestsFromMapFunc(r.transformPods),
-			builder.WithPredicates(predicate),
+			builder.WithPredicates(podPredicate),
 		).
 		WatchesRawSource(
 			source.Channel(
@@ -644,7 +644,7 @@ func (r *GatewayController) transformConsulHTTPRoute(ctx context.Context) func(e
 
 // transformGatewayPolicy will return a list of all gateways that need to be reconcilled.
 func (r *GatewayController) transformGatewayPolicy(ctx context.Context, o client.Object) []reconcile.Request {
-	gatewayPolicy := o.(*v1alpha1.GatewayPolicy)
+	gatewayPolicy := o.(*v1alpha1.CustomGatewayPolicy)
 	gwNamespace := gatewayPolicy.Spec.TargetRef.Namespace
 	if gwNamespace == "" {
 		gwNamespace = gatewayPolicy.Namespace

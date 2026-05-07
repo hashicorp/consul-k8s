@@ -3,44 +3,18 @@
 
 package generatemanifests
 
-// currently we are generating manifests for all, better to look for helm release name in the future to only generate for specific releases.
-// There is a high chance that all the manifests generated might not have the helm release name, because the applications httproutes can be a
+// Currently we are generating manifests.
+// 1. We generate all the manifests for the gateway API obkects under API version gateway.networking.k8s.io, update the version from v1beta1 to v1
+// for gateways, httproutes; we retain v1beta1 to referencegrants and v1alpha2 tcproutes and dump them into the output dir.
+// 2. We also generate manifests for consul.hashicorp.com API group when the user opts for it.
+
+// NOTE:There is a high chance that all the manifests generated might not have the helm release name, because the applications httproutes can be a
 // separate helm release and the gateway can be a separate helm release.
 // OR the httproutes or any obj is a direct install with kubectl and not managed by helm at all.
 
-// Thus the way to identify the relevant manifests it to look for the parentref of the obj, then get the gatewayclass of the gateway referred
+// TODO: Thus the way to identify the relevant manifests it to look for the parentref of the obj, then get the gatewayclass of the gateway referred
 // then get the helm release name from the gatewayclass labels, and only dump the manifests for the objects which have the same helm release name as the flag provided by user.
 // labels to look for: release: <release-name-flag>
-
-/*
-#Sample:
-k get gc -A -o yaml
-apiVersion: v1
-items:
-- apiVersion: gateway.networking.k8s.io/v1
-  kind: GatewayClass
-  metadata:
-    creationTimestamp: "2026-03-08T17:10:10Z"
-    finalizers:
-    - gateway-exists-finalizer.consul.hashicorp.com
-    generation: 1
-    labels:
-      app: consul
-      chart: consul-helm
-      component: api-gateway
-      heritage: Helm
-      release: consul
-    name: consul
-    resourceVersion: "8051"
-    uid: e3250842-ed7c-49fc-b111-7bcf0153c1bc
-  spec:
-    controllerName: consul.hashicorp.com/gateway-controller
-    parametersRef:
-      group: consul.hashicorp.com
-      kind: GatewayClassConfig
-      name: consul-api-gateway
-
-*/
 
 import (
 	"context"
@@ -55,7 +29,6 @@ import (
 
 	"github.com/mitchellh/cli"
 	"gopkg.in/yaml.v3"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,21 +44,23 @@ import (
 )
 
 const (
-	kindGatewayClass             = "GatewayClass"
-	kindGateway                  = "Gateway"
-	kindHTTPRoute                = "HTTPRoute"
-	kindGRPCRoute                = "GRPCRoute"
-	kindReferenceGrant           = "ReferenceGrant"
-	kindTCPRoute                 = "TCPRoute"
-	kindTLSRoute                 = "TLSRoute"
-	kindUDPRoute                 = "UDPRoute"
-	consulAPIGroup               = "consul.hashicorp.com"
-	consulAPIVersionV1Beta1      = "v1beta1"
-	consulAPIVersionV1Alpha2     = "v1alpha2"
-	K8sGatewayAPIGroup           = "gateway.networking.k8s.io"
-	K8sGatewayAPIVersionV1       = "v1"
-	K8sGatewayAPIVersionV1Beta1  = "v1beta1"
-	K8sGatewayAPIVersionV1Alpha2 = "v1alpha2"
+	kindGatewayClass                 = "GatewayClass"
+	kindGateway                      = "Gateway"
+	kindHTTPRoute                    = "HTTPRoute"
+	kindGRPCRoute                    = "GRPCRoute"
+	kindReferenceGrant               = "ReferenceGrant"
+	kindTCPRoute                     = "TCPRoute"
+	kindTLSRoute                     = "TLSRoute"
+	kindUDPRoute                     = "UDPRoute"
+	consulAPIGroup                   = "consul.hashicorp.com"
+	consulAPIVersionV1Beta1          = "v1beta1"
+	consulAPIVersionV1Alpha2         = "v1alpha2"
+	K8sGatewayAPIGroup               = "gateway.networking.k8s.io"
+	K8sGatewayAPIVersionV1           = "v1"
+	K8sGatewayAPIVersionV1Beta1      = "v1beta1"
+	K8sGatewayAPIVersionV1Alpha2     = "v1alpha2"
+	GatewayClassControllerName       = "consul.hashicorp.com/gateway-controller"
+	CustomGatewayClassControllerName = "consul.hashicorp.com/gateway-controller-consul"
 )
 
 type Command struct {
@@ -107,17 +82,16 @@ type Command struct {
 	once sync.Once
 	help string
 
-	nodeSelector       map[string]string
-	tolerations        []corev1.Toleration
-	serviceAnnotations []string
-	resources          corev1.ResourceRequirements
-	consulApiEnabled   bool
+	consulApiEnabled bool
 
 	ctx context.Context
 
 	// // For test injection
 	// AddToSchemeFunc func(*runtime.Scheme) error
 }
+
+var gatewayClassMap = map[string]bool{}
+var gatewayMap = map[string]bool{}
 
 func (c *Command) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
@@ -212,17 +186,40 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	}
+
+	// update the gatewayclass map
+	c.buildMaps()
+
+	fmt.Print("Updated the gwclass map\n")
+	fmt.Printf("Update gatewayclass map %+v\n", gatewayClassMap)
+	fmt.Printf("Update gateway map %+v\n", gatewayMap)
 	// Fetch all the resources using the gateway.networking.k8s.io API in the cluster
 	if err := c.dumpGatewayAPIObjects(); err != nil {
 		c.UI.Error(fmt.Sprintf("Error dumping Gateway API objects: %s", err))
 		return 1
 	}
-	time.Sleep(20 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	c.UI.Info(fmt.Sprintf("✅ Gateway API objects dumped into: %s", c.flagManifestsGatewayAPIDir))
 	return 0
 
 }
+
+/*
+
+Lets do as below:
+Lets get the gatewayclasses in the cluster and create a map of gatewayclass name to controller name, then
+get the gateways in the cluster, then for each gateway get the gatewayclass,
+then check the controller name in the gatewayclass if it is controlled by consul.
+Lets create a map of gatewayname and bool for whether it is controlled by consul or not.
+
+Then we get the other resources like httproutes, grpcroutes, referencegrants, tcproutes, tlsroutes, udproutes
+and check their parentref for the gateway, then check if the gateway is in the map and if it is controlled by consul or not.
+ If it is controlled by consul then we en force the consulApiVersion and agatewayApiVersion and dump the manifests.
+ If not controlled by consul we only enforce the gatewayApiVersion and dump the manifests.
+
+
+*/
 
 func (c *Command) dumpGatewayAPIObjects() error {
 	if c.k8sClient == nil {
@@ -240,12 +237,16 @@ func (c *Command) dumpGatewayAPIObjects() error {
 		ctx = context.Background()
 	}
 
-	// // Dump resources no gc is needed to set up
-	// if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1.GatewayClassList{}); err != nil {
-	// 	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
-	// 		c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
-	// 	}
-	// }
+	// Dump resources no gc is needed to set up
+	fmt.Printf("fetching gwclass\n")
+	fmt.Printf("TYPE: %T\n", &gwv1.GatewayClassList{})
+	if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1.GatewayClassList{}); err != nil {
+		fmt.Printf("Error dumping gatewayclasses from gateway.networking.k8s.io/v1: %v\n", err)
+		if err := c.dumpTypedList(ctx, "gatewayclasses", &gwv1beta1.GatewayClassList{}); err != nil {
+			fmt.Printf("Error dumping gatewayclasses from gateway.networking.k8s.io/v1beta1: %v\n", err)
+			c.UI.Info(fmt.Sprintf("Skipping GatewayClass dump: %v", err))
+		}
+	}
 	if err := c.dumpTypedList(ctx, "gateways", &gwv1.GatewayList{}); err != nil {
 		if err := c.dumpTypedList(ctx, "gateways", &gwv1beta1.GatewayList{}); err != nil {
 			c.UI.Info(fmt.Sprintf("Skipping Gateway dump: %v", err))
@@ -299,6 +300,67 @@ func (c *Command) dumpTypedList(ctx context.Context, kindDir string, list client
 	return c.writeObjects(kindDir, items)
 
 }
+
+func gwKey(ns, name string) string {
+	return ns + "/" + name
+}
+
+func getKind(raw map[string]interface{}) string {
+	k, _ := raw["kind"].(string)
+	return k
+}
+
+func getMetadata(raw map[string]interface{}) map[string]interface{} {
+	m, _ := raw["metadata"].(map[string]interface{})
+	return m
+}
+
+func getSpec(raw map[string]interface{}) map[string]interface{} {
+	s, ok := raw["spec"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	return s
+}
+
+func (c *Command) buildMaps() {
+	// gateway class map
+	gwcV1 := gwv1.GatewayClassList{}
+	if err := c.k8sClient.List(c.ctx, &gwcV1); err == nil {
+		for _, gwc := range gwcV1.Items {
+			gatewayClassMap[gwc.Name] = gwc.Spec.ControllerName == GatewayClassControllerName
+		}
+	} else {
+		gwcV1Beta1 := gwv1beta1.GatewayClassList{}
+		if err := c.k8sClient.List(c.ctx, &gwcV1Beta1); err == nil {
+			for _, gwc := range gwcV1Beta1.Items {
+				gatewayClassMap[gwc.Name] = gwc.Spec.ControllerName == GatewayClassControllerName
+			}
+		}
+	}
+
+	// gateway map
+	gwV1 := gwv1.GatewayList{}
+	if err := c.k8sClient.List(c.ctx, &gwV1); err == nil {
+		for _, gw := range gwV1.Items {
+			key := gwKey(gw.Namespace, gw.Name)
+			class := string(gw.Spec.GatewayClassName)
+			gatewayMap[key] = gatewayClassMap[class]
+		}
+	} else {
+		gwV1Beta1 := gwv1beta1.GatewayList{}
+		if err := c.k8sClient.List(c.ctx, &gwV1Beta1); err == nil {
+			for _, gw := range gwV1Beta1.Items {
+				key := gwKey(gw.Namespace, gw.Name)
+				class := string(gw.Spec.GatewayClassName)
+				gatewayMap[key] = gatewayClassMap[class]
+			}
+
+		}
+	}
+
+}
+
 func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	kind, _ := raw["kind"].(string)
 	if kind == "" {
@@ -308,7 +370,21 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	switch kind {
 	// by default
 	// for gateway.networking.k8s.io/v1
-	case kindGateway, kindHTTPRoute, kindGRPCRoute:
+	case kindGateway:
+		raw["apiVersion"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
+		meta := getMetadata(raw)
+		if meta == nil || meta["namespace"] == nil || meta["name"] == nil {
+			return
+		}
+		// check if the gateway is controlled by consul, if yes then add the consul component label
+		key := gwKey(meta["namespace"].(string), meta["name"].(string))
+		if gatewayMap[key] {
+			meta["labels"] = map[string]interface{}{
+				"component": "api-gateway",
+			}
+		}
+
+	case kindHTTPRoute, kindGRPCRoute:
 		raw["apiVersion"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
 
 	// ReferenceGrant -> v1beta1
@@ -321,102 +397,198 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	}
 }
 
-func enforceConsulApiVersion(raw map[string]interface{}) {
-	kind, _ := raw["kind"].(string)
-	if kind == "" {
+// TODO code: Creating the manifests for CustomGatewayclass but not using it at the moment.
+// Will be enabled for the 2.0 release.
+func convertToConsulGatewayClass(raw map[string]interface{}) {
+	raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
+	raw["kind"] = "CustomGatewayClass"
+	spec := getSpec(raw)
+	meta := getMetadata(raw)
+	if spec == nil {
 		return
 	}
+	if spec["controllerName"] != GatewayClassControllerName {
+		return
+	}
+	spec["controllerName"] = CustomGatewayClassControllerName
+	meta["name"] = meta["name"].(string) + "-custom"
+}
 
-	switch kind {
-
-	case kindGateway, kindHTTPRoute, kindGRPCRoute, kindReferenceGrant:
-		raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
-	case kindUDPRoute, kindTLSRoute, kindTCPRoute:
-		raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Alpha2
-
+// convertToConsulGateway updates the apiVersion to consul.hashicorp.com/v1beta1, updates the gatewayClassName to consul-custom,
+// and updates the parentref group to consul.hashicorp.com for the allowed routes in listeners.
+func convertToConsulGateway(raw map[string]interface{}) {
+	raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
+	spec := getSpec(raw)
+	meta := getMetadata(raw)
+	if spec == nil {
+		return
+	}
+	spec["gatewayClassName"] = "consul-custom-class"
+	meta["name"] = meta["name"].(string) + "-consul"
+	meta["labels"] = map[string]interface{}{
+		"component": "api-gateway-consul",
 	}
 
-	// route parentRef conversion
-	//
-	switch kind {
-	case kindHTTPRoute, kindGRPCRoute, kindUDPRoute, kindTLSRoute, kindTCPRoute:
-		// change the name
-		metadata, ok := raw["metadata"].(map[string]interface{})
+	// update listeners
+	listeners, ok := spec["listeners"].([]interface{})
+	if !ok {
+		return
+	}
+	for _, listener := range listeners {
+		listenerMap, ok := listener.(map[string]interface{})
 		if !ok {
-			return
+			continue
 		}
-		metadata["name"] = metadata["name"].(string) + "-custom"
-
-		spec, ok := raw["spec"].(map[string]interface{})
+		allowedRoutes, ok := listenerMap["allowedRoutes"].(map[string]interface{})
 		if !ok {
-			return
+			continue
 		}
-		parentRefs, ok := spec["parentRefs"].([]interface{})
+		kinds, ok := allowedRoutes["kinds"].([]interface{})
 		if !ok {
-			return
+			continue
 		}
-		for _, pr := range parentRefs {
-			prMap, ok := pr.(map[string]interface{})
+		for _, kind := range kinds {
+			kindMap, ok := kind.(map[string]interface{})
 			if !ok {
 				continue
 			}
-			group, _ := prMap["group"].(string)
-			if group == K8sGatewayAPIGroup {
-				prMap["group"] = consulAPIGroup
-				prMap["name"] = prMap["name"].(string) + "-custom"
-
-			}
-
-		}
-	}
-	// update referenceGrant to point to consul.hashicorp.com
-	if kind == kindReferenceGrant {
-		// change the name
-		metadata, ok := raw["metadata"].(map[string]interface{})
-		if !ok {
-			return
-		}
-		metadata["name"] = metadata["name"].(string) + "-custom"
-
-		spec, ok := raw["spec"].(map[string]interface{})
-		if !ok {
-			return
-		}
-		from, ok := spec["from"].([]interface{})
-		if !ok {
-			return
-		}
-		for _, f := range from {
-			fMap, ok := f.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			group, _ := fMap["group"].(string)
-			if group == K8sGatewayAPIGroup {
-				fMap["group"] = consulAPIGroup
+			if kindMap["group"] == K8sGatewayAPIGroup {
+				kindMap["group"] = consulAPIGroup
 			}
 		}
-	}
 
-	// for gateway, update spec.gatewayClassName to "consul-ocp"
-	if kind == kindGateway {
-		spec, ok := raw["spec"].(map[string]interface{})
-		if !ok {
-			return
-		}
-		spec["gatewayClassName"] = "consul-custom"
-		// update metadata.name to "api-gateway-custom"
-		metadata, ok := raw["metadata"].(map[string]interface{})
-		if !ok {
-			return
-		}
-		metadata["name"] = metadata["name"].(string) + "-custom"
 	}
 
 }
 
+func hasConsulParent(raw map[string]interface{}) bool {
+	spec := getSpec(raw)
+	if spec == nil {
+		return false
+	}
+	parentRefs, ok := spec["parentRefs"].([]interface{})
+	if !ok {
+		return false
+	}
+	found := false
+	for _, pr := range parentRefs {
+		prMap, ok := pr.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if prMap["kind"] == "Gateway" {
+			gwName := prMap["name"].(string)
+			gwNamespace, ok := prMap["namespace"].(string)
+			if !ok || gwNamespace == "" {
+				gwNamespace = getMetadata(raw)["namespace"].(string)
+			}
+			if gatewayMap[gwKey(gwNamespace, gwName)] {
+				prMap["name"] = prMap["name"].(string) + "-consul"
+				prMap["group"] = consulAPIGroup
+				found = true
+			}
+		}
+	}
+	return found
+}
+
+func convertToConsulRoute(raw map[string]interface{}) {
+	kind := getKind(raw)
+	meta := getMetadata(raw)
+
+	if kind == kindHTTPRoute {
+		raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
+	} else {
+		raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Alpha2
+	}
+
+	meta["name"] = meta["name"].(string) + "-consul"
+}
+
+func convertReferenceGrant(raw map[string]interface{}) {
+	meta := getMetadata(raw)
+	spec := getSpec(raw)
+
+	from, ok := spec["from"].([]interface{})
+	if !ok {
+		return
+	}
+
+	for _, f := range from {
+		fm := f.(map[string]interface{})
+
+		if fm["kind"] == "Gateway" {
+			name := fm["name"].(string)
+			ns, ok := fm["namespace"].(string)
+			if !ok || ns == "" {
+				ns = meta["namespace"].(string)
+			}
+
+			if gatewayMap[gwKey(ns, name)] {
+				fm["name"] = name + "-consul"
+				fm["group"] = consulAPIGroup
+
+			}
+		} else if fm["group"] == K8sGatewayAPIGroup {
+			fm["group"] = consulAPIGroup
+		}
+	}
+
+	raw["apiVersion"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
+	meta["name"] = meta["name"].(string) + "-consul"
+
+}
+
+func enforceConsulApiVersion(raw map[string]interface{}) bool {
+	fmt.Printf("gatewayMap %+v", gatewayMap)
+	kind := getKind(raw)
+	metadata := getMetadata(raw)
+	if kind == "" {
+		return false
+	}
+
+	switch kind {
+
+	case kindGatewayClass:
+		convertToConsulGatewayClass(raw)
+		return true
+	case kindGateway:
+		key := gwKey(metadata["namespace"].(string), metadata["name"].(string))
+		if !gatewayMap[key] {
+			return false
+		}
+		convertToConsulGateway(raw)
+		return true
+
+	case kindHTTPRoute, kindGRPCRoute, kindUDPRoute, kindTLSRoute, kindTCPRoute:
+		if !hasConsulParent(raw) {
+			return false
+		}
+		convertToConsulRoute(raw)
+
+	case kindReferenceGrant:
+		convertReferenceGrant(raw)
+
+	}
+	return true
+}
+
 func extractItems(list client.ObjectList) ([]client.Object, error) {
 	switch v := list.(type) {
+
+	case *gwv1.GatewayClassList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
+
+	case *gwv1beta1.GatewayClassList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
 
 	case *gwv1.GatewayList:
 		out := make([]client.Object, 0, len(v.Items))
@@ -551,7 +723,9 @@ func (c *Command) writeConsulObjects(directory string, objs []client.Object) err
 
 		sanitizeUnstructured(raw)
 
-		enforceConsulApiVersion(raw)
+		if !enforceConsulApiVersion(raw) {
+			continue
+		}
 
 		yml, err := yaml.Marshal(raw)
 		if err != nil {
@@ -634,52 +808,7 @@ func (c *Command) validateFlags() error {
 	if c.flagManifestsGatewayAPIDir == "" {
 		return errors.New("-manifests-gatewayapi-dir must be set")
 	}
-
 	return nil
-}
-
-func deepCopyMap(in map[string]interface{}) map[string]interface{} {
-
-	out := make(map[string]interface{}, len(in))
-
-	for k, v := range in {
-
-		switch val := v.(type) {
-
-		case map[string]interface{}:
-			out[k] = deepCopyMap(val)
-
-		case []interface{}:
-			out[k] = deepCopySlice(val)
-
-		default:
-			out[k] = val
-		}
-	}
-
-	return out
-}
-
-func deepCopySlice(in []interface{}) []interface{} {
-
-	out := make([]interface{}, len(in))
-
-	for i, v := range in {
-
-		switch val := v.(type) {
-
-		case map[string]interface{}:
-			out[i] = deepCopyMap(val)
-
-		case []interface{}:
-			out[i] = deepCopySlice(val)
-
-		default:
-			out[i] = val
-		}
-	}
-
-	return out
 }
 
 func (c *Command) Synopsis() string { return synopsis }

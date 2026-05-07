@@ -102,6 +102,7 @@ type Command struct {
 	// Metrics settings.
 	flagDefaultEnableMetrics        bool
 	flagEnableGatewayMetrics        bool
+	flagEnableGatewayScaling        bool
 	flagDefaultEnableMetricsMerging bool
 	flagDefaultMergedMetricsPort    string
 	flagDefaultPrometheusScrapePort string
@@ -178,7 +179,6 @@ var (
 )
 
 func init() {
-	fmt.Printf("adding to the scheme in the inject-connect command\n")
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	// We need v1alpha1 here to add the peering api to the scheme
@@ -188,7 +188,6 @@ func init() {
 	utilruntime.Must(gwv1beta1exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2exp.AddToScheme(scheme))
 	utilruntime.Must(gwv1alpha2.AddToScheme(scheme))
-	fmt.Printf("added to the scheme")
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -286,6 +285,7 @@ func (c *Command) init() {
 	// Metrics setting flags.
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetrics, "default-enable-metrics", false, "Default for enabling connect service metrics.")
 	c.flagSet.BoolVar(&c.flagEnableGatewayMetrics, "enable-gateway-metrics", false, "Allows enabling Consul gateway metrics.")
+	c.flagSet.BoolVar(&c.flagEnableGatewayScaling, "enable-gateway-scaling", false, "[Enterprise Only] Enables API Gateway scaling annotations, controller-managed HPAs, and manual scaling preservation for the managed GatewayClass.")
 	c.flagSet.BoolVar(&c.flagDefaultEnableMetricsMerging, "default-enable-metrics-merging", false, "Default for enabling merging of connect service metrics and envoy proxy metrics.")
 	c.flagSet.StringVar(&c.flagDefaultMergedMetricsPort, "default-merged-metrics-port", "20100", "Default port for merged metrics endpoint on the consul-sidecar.")
 	c.flagSet.StringVar(&c.flagDefaultPrometheusScrapePort, "default-prometheus-scrape-port", "20200", "Default port where Prometheus scrapes connect metrics from.")
@@ -305,7 +305,7 @@ func (c *Command) init() {
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeFailureThreshold, "default-sidecar-probe-failure-threshold", 10, "Default number of consecutive failures for the k8s startup probe before the consul-dataplane sidecar container is restarted.")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckTimeoutSeconds, "default-sidecar-probe-check-timeout-seconds", 5, "Default number of seconds for the k8s timeout for the startup probe checks.")
 
-	// enable custom crds controller flags
+	// Enable custom crds controller flags.
 
 	c.consul = &flags.ConsulFlags{}
 
@@ -448,7 +448,6 @@ func (c *Command) Run(args []string) int {
 	}
 
 	err = c.configureControllers(ctx, mgr, watcher)
-
 	if err != nil {
 		setupLog.Error(err, fmt.Sprintf("could not configure controllers: %s", err.Error()))
 		return 1

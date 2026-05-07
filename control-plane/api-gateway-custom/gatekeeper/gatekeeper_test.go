@@ -45,7 +45,7 @@ var (
 	namespace           = "default"
 
 	labels = map[string]string{
-		"component":                              "api-gateway-custom",
+		"component":                              "api-gateway-consul",
 		"gateway.consul.hashicorp.com/name":      name,
 		"gateway.consul.hashicorp.com/namespace": namespace,
 		createdAtLabelKey:                        createdAtLabelValue,
@@ -1763,7 +1763,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 					Annotations: map[string]string{
 						constants.AnnotationInject:                   "false",
 						constants.AnnotationGatewayConsulServiceName: name,
-						constants.AnnotationGatewayKind:              "api-gateway-custom",
+						constants.AnnotationGatewayKind:              "api-gateway-consul",
 					},
 				},
 				Spec: corev1.PodSpec{

@@ -32,7 +32,7 @@ type CustomGatewayPolicyWebhook struct {
 	client.Client
 }
 
-// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-customgatewaypolicy,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=customgatewaypolicies,versions=v1alpha1,name=validate-customgatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
+// +kubebuilder:webhook:verbs=create;update,path=/validate-v1alpha1-gatewaypolicy-custom,mutating=false,failurePolicy=fail,groups=consul.hashicorp.com,resources=customgatewaypolicies,versions=v1alpha1,name=validate-customgatewaypolicy.consul.hashicorp.com,sideEffects=None,admissionReviewVersions=v1beta1;v1
 
 func (v *CustomGatewayPolicyWebhook) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var resource CustomGatewayPolicy
@@ -52,6 +52,11 @@ func (v *CustomGatewayPolicyWebhook) Handle(ctx context.Context, req admission.R
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
+	// check if the service if the resource is Gateway
+	if !v.isTargetRefKindGateway(resource) {
+		return admission.Denied(fmt.Sprintf("policy targetRef kind %q is not supported, only Gateway is allowed", resource.Spec.TargetRef.Kind))
+	}
+
 	for _, policy := range list.Items {
 		if differentCustomPolicySameTarget(resource, policy) {
 			return admission.Denied(fmt.Sprintf("policy targets gateway listener %q that is already the target of an existing policy %q", DerefStringOr(resource.Spec.TargetRef.SectionName, ""), policy.Name))
@@ -59,6 +64,11 @@ func (v *CustomGatewayPolicyWebhook) Handle(ctx context.Context, req admission.R
 	}
 
 	return admission.Allowed("gateway policy is valid")
+}
+
+// func to check the resource targetref.kind is Gateway.
+func (v *CustomGatewayPolicyWebhook) isTargetRefKindGateway(resource CustomGatewayPolicy) bool {
+	return resource.Spec.TargetRef.Kind == "Gateway"
 }
 
 func differentCustomPolicySameTarget(resource, policy CustomGatewayPolicy) bool {
@@ -72,7 +82,7 @@ func differentCustomPolicySameTarget(resource, policy CustomGatewayPolicy) bool 
 
 func (v *CustomGatewayPolicyWebhook) SetupWithManager(mgr ctrl.Manager) {
 	v.decoder = admission.NewDecoder(mgr.GetScheme())
-	mgr.GetWebhookServer().Register("/validate-v1alpha1-customgatewaypolicy", &admission.Webhook{Handler: v})
+	mgr.GetWebhookServer().Register("/validate-v1alpha1-gatewaypolicy-custom", &admission.Webhook{Handler: v})
 }
 
 // func DerefStringOr[T ~string, U ~string](v *T, val U) string {

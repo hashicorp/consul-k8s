@@ -15,11 +15,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type gatewayClassConfigSnapshot struct {
-	Config     v1alpha1.GatewayClassConfig `json:"config"`
-	Generation int64                       `json:"generation"`
-}
-
 func serializeGatewayClassConfig(gw *gwv1.Gateway, gwcc *v1alpha1.GatewayClassConfig) (*v1alpha1.GatewayClassConfig, bool) {
 	var log = ctrl.Log.WithName("serialize-gatewayclassconfig-standard")
 	if gwcc == nil {

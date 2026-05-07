@@ -4,7 +4,6 @@
 package generatemanifests
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,9 +96,6 @@ func TestRun(t *testing.T) {
 		},
 		"neither exist": {
 			client: fake.NewClientBuilder().WithScheme(s).Build(),
-		},
-		"no client": {
-			client: nil,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -228,30 +224,154 @@ func TestEnforceGatewayAPIVersion(t *testing.T) {
 }
 
 func TestEnforceConsulAPIVersion(t *testing.T) {
+
 	cases := []struct {
-		name      string
-		kind      string
-		APIGroup  string
-		wantGroup string
+		name               string
+		kind               string
+		setupGateway       bool
+		setupParent        bool
+		wantGroup          string
+		isConsulControlled bool
 	}{
+		// ======================
+		// Gateway
+		// ======================
+		{
+			name:               "Gateway - consul controlled",
+			kind:               "Gateway",
+			setupGateway:       true,
+			wantGroup:          "consul.hashicorp.com/v1beta1",
+			isConsulControlled: true,
+		},
+		{
+			name:               "Gateway - NOT consul controlled",
+			kind:               "Gateway",
+			setupGateway:       false,
+			wantGroup:          "", // no change
+			isConsulControlled: false,
+		},
 
-		{"Gateway", "Gateway", "gateway.networking.k8s.io/v1beta1", "consul.hashicorp.com/v1beta1"},
-		{"HTTPRoute", "HTTPRoute", "gateway.networking.k8s.io/v1beta1", "consul.hashicorp.com/v1beta1"},
-		{"GRPCRoute", "GRPCRoute", "gateway.networking.k8s.io/v1beta1", "consul.hashicorp.com/v1beta1"},
-		{"ReferenceGrant", "ReferenceGrant", "gateway.networking.k8s.io/v1beta1", "consul.hashicorp.com/v1beta1"},
-		{"UDPRoute", "UDPRoute", "gateway.networking.k8s.io/v1alpha2", "consul.hashicorp.com/v1alpha2"},
-		{"TLSRoute", "TLSRoute", "gateway.networking.k8s.io/v1alpha2", "consul.hashicorp.com/v1alpha2"},
-		{"TCPRoute", "TCPRoute", "gateway.networking.k8s.io/v1alpha2", "consul.hashicorp.com/v1alpha2"},
+		// ======================
+		// Routes
+		// ======================
+		{
+			name:               "HTTPRoute - consul parent",
+			kind:               "HTTPRoute",
+			setupGateway:       true,
+			setupParent:        true,
+			wantGroup:          "consul.hashicorp.com/v1beta1",
+			isConsulControlled: true,
+		},
+		{
+			name:               "HTTPRoute - no consul parent",
+			kind:               "HTTPRoute",
+			setupGateway:       false,
+			setupParent:        true,
+			wantGroup:          "",
+			isConsulControlled: false,
+		},
 
-		{"EmptyKind", "", "", ""},
+		{
+			name:               "GRPCRoute - consul parent",
+			kind:               "GRPCRoute",
+			setupGateway:       true,
+			setupParent:        true,
+			wantGroup:          "consul.hashicorp.com/v1alpha2",
+			isConsulControlled: true,
+		},
+
+		{
+			name:               "TCPRoute - consul parent",
+			kind:               "TCPRoute",
+			setupGateway:       true,
+			setupParent:        true,
+			wantGroup:          "consul.hashicorp.com/v1alpha2",
+			isConsulControlled: true,
+		},
+
+		// ======================
+		// ReferenceGrant
+		// ======================
+		{
+			name:         "ReferenceGrant - gateway consul",
+			kind:         "ReferenceGrant",
+			setupGateway: true,
+			setupParent:  true,
+			wantGroup:    "consul.hashicorp.com/v1beta1",
+		},
+		{
+			name:         "ReferenceGrant - no gateway but group rewrite",
+			kind:         "ReferenceGrant",
+			setupGateway: false,
+			setupParent:  false,
+			wantGroup:    "consul.hashicorp.com/v1beta1", // your intentional logic
+			// but you don't consider this consul controlled
+		},
+
+		{
+			name:      "EmptyKind",
+			kind:      "",
+			wantGroup: "",
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			raw := map[string]interface{}{"kind": tc.kind}
+
+			// Reset global maps (IMPORTANT)
+			gatewayMap = map[string]bool{}
+
+			// Setup gatewayMap if needed
+			if tc.setupGateway {
+				gatewayMap["default/test"] = true
+			}
+
+			// Base object
+			raw := map[string]interface{}{
+				"kind": tc.kind,
+				"metadata": map[string]interface{}{
+					"name":      "test",
+					"namespace": "default",
+				},
+				"apiVersion": "gateway.networking.k8s.io/v1beta1",
+			}
+
+			// Add spec if needed
+			if tc.setupParent {
+				raw["spec"] = map[string]interface{}{
+					"parentRefs": []interface{}{
+						map[string]interface{}{
+							"kind":      "Gateway",
+							"name":      "test",
+							"namespace": "default",
+						},
+					},
+				}
+			}
+
+			// Special case for ReferenceGrant
+			if tc.kind == "ReferenceGrant" {
+				raw["spec"] = map[string]interface{}{
+					"from": []interface{}{
+						map[string]interface{}{
+							"kind":      "Gateway",
+							"name":      "test",
+							"namespace": "default",
+							"group":     "gateway.networking.k8s.io",
+						},
+					},
+				}
+			}
+
 			enforceConsulApiVersion(raw)
+
 			got, _ := raw["apiVersion"].(string)
-			require.Equal(t, tc.wantGroup, got)
+			t.Logf("Resulting apiVersion: %s", got)
+			if tc.isConsulControlled || tc.kind == "ReferenceGrant" {
+				require.Equal(t, tc.wantGroup, got)
+			} else {
+				require.Equal(t, "gateway.networking.k8s.io/v1beta1", got) // no change expected
+			}
 		})
 	}
 }
@@ -260,291 +380,14 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func TestEnforceConsulApiVersion(t *testing.T) {
-	// gw
-	gw := gwv1.Gateway{}
-	gw.APIVersion = "gateway.networking.k8s.io/v1beta1"
-	gw.Kind = "Gateway"
-	gw.ObjectMeta.Name = "api-gateway"
-	gw.Spec.GatewayClassName = "test"
-	from := gwv1.NamespacesFromAll
-	gw.Spec.Listeners = []gwv1.Listener{
-		{
-			Name:     "http",
-			Port:     80,
-			Protocol: gwv1.HTTPProtocolType, // better than string
-			AllowedRoutes: &gwv1.AllowedRoutes{
-				Namespaces: &gwv1.RouteNamespaces{
-					From: &from,
-				},
-			},
-		},
-	}
-
-	// httproute
-	httproute := gwv1.HTTPRoute{}
-	httproute.APIVersion = "gateway.networking.k8s.io/v1beta1"
-	httproute.Kind = "HTTPRoute"
-	httproute.ObjectMeta.Name = "http-route"
-	gwKind := gwv1.Kind("Gateway")
-	group := gwv1.Group("gateway.networking.k8s.io")
-
-	httproute.Spec.ParentRefs = []gwv1.ParentReference{
-		{
-			Group: &group,
-			Kind:  &gwKind,
-			Name:  "api-gateway",
-		},
-	}
-	ruleType := gwv1.PathMatchExact
-	httproute.Spec.Rules = []gwv1.HTTPRouteRule{
-		{
-			Matches: []gwv1.HTTPRouteMatch{
-				{
-					Path: &gwv1.HTTPPathMatch{
-						Type:  &ruleType,
-						Value: ptr("/api"),
-					},
-				},
-			},
-			BackendRefs: []gwv1.HTTPBackendRef{
-				{
-					BackendRef: gwv1.BackendRef{
-						BackendObjectReference: gwv1.BackendObjectReference{
-							Kind:      ptr(gwv1.Kind("Service")),
-							Name:      gwv1.ObjectName("public-api"),
-							Namespace: ptr(gwv1.Namespace("default")),
-							Port:      ptr(gwv1.PortNumber(8080)),
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// grpcroute
-	grpcRoute := gwv1.GRPCRoute{}
-	grpcRoute.APIVersion = "gateway.networking.k8s.io/v1beta1"
-	grpcRoute.Kind = "GRPCRoute"
-	grpcRoute.ObjectMeta.Name = "grpc-route"
-	grpcRoute.Spec.ParentRefs = []gwv1.ParentReference{
-		{
-			Group: &group,
-			Kind:  &gwKind,
-			Name:  "api-gateway",
-		},
-	}
-
-	// tcproute
-	tcpRoute := gwv1alpha2.TCPRoute{}
-	tcpRoute.APIVersion = "gateway.networking.k8s.io/v1alpha2"
-	tcpRoute.Kind = "TCPRoute"
-	tcpRoute.ObjectMeta.Name = "tcp-route"
-	tcpRoute.Spec.ParentRefs = []gwv1alpha2.ParentReference{
-		{
-			Group: &group,
-			Kind:  &gwKind,
-			Name:  "api-gateway",
-		},
-	}
-	// reference grant
-	rg := gwv1beta1.ReferenceGrant{}
-	rg.APIVersion = "gateway.networking.k8s.io/v1beta1"
-	rg.Kind = "ReferenceGrant"
-	rg.ObjectMeta.Name = "reference-grant"
-	rg.ObjectMeta.Namespace = "default"
-	rg.Spec.From = []gwv1beta1.ReferenceGrantFrom{
-		{
-			Group:     "gateway.networking.k8s.io",
-			Kind:      "HttpRoute",
-			Namespace: "consul",
-		}}
-	rg.Spec.To = []gwv1beta1.ReferenceGrantTo{
-		{
-			Group: "",
-			Kind:  "Service",
-		},
-	}
-
-	cases := []struct {
-		name     string
-		input    any
-		validate func(t *testing.T, raw map[string]interface{})
-	}{
-		{
-			name:  "Gateway",
-			input: &gw,
-			validate: func(t *testing.T, raw map[string]interface{}) {
-				require.Equal(t, "consul.hashicorp.com/v1beta1", raw["apiVersion"])
-
-				md := raw["metadata"].(map[string]interface{})
-				require.Equal(t, "api-gateway-custom", md["name"])
-
-				spec := raw["spec"].(map[string]interface{})
-				require.Equal(t, "consul-custom", spec["gatewayClassName"])
-			},
-		},
-		{
-
-			name:  "HTTPRoute",
-			input: &httproute,
-			validate: func(t *testing.T, raw map[string]interface{}) {
-				require.Equal(t, "consul.hashicorp.com/v1beta1", raw["apiVersion"])
-
-				// metadata validation
-				md := raw["metadata"].(map[string]interface{})
-				require.Equal(t, "http-route-custom", md["name"])
-
-				// parentRefs validation
-				spec := raw["spec"].(map[string]interface{})
-				parentRefs := spec["parentRefs"].([]interface{})
-				require.Len(t, parentRefs, 1)
-
-				pr := parentRefs[0].(map[string]interface{})
-				require.Equal(t, "consul.hashicorp.com", pr["group"])
-				require.Equal(t, "api-gateway-custom", pr["name"])
-
-				// rules validation
-				rules := spec["rules"].([]interface{})
-				require.Len(t, rules, 1)
-
-				rule := rules[0].(map[string]interface{})
-
-				// matches validation
-				matches := rule["matches"].([]interface{})
-				require.Len(t, matches, 1)
-
-				match := matches[0].(map[string]interface{})
-				path := match["path"].(map[string]interface{})
-
-				require.Equal(t, "Exact", path["type"])
-				require.Equal(t, "/api", path["value"])
-
-				// backendRefs validation
-				backendRefs := rule["backendRefs"].([]interface{})
-				require.Len(t, backendRefs, 1)
-
-				br := backendRefs[0].(map[string]interface{})
-
-				require.Equal(t, "Service", br["kind"])
-				require.Equal(t, "public-api", br["name"])
-				require.Equal(t, "default", br["namespace"])
-				require.EqualValues(t, 8080, br["port"])
-			},
-		},
-		{
-			name:  "GRPCRoute",
-			input: &grpcRoute,
-			validate: func(t *testing.T, raw map[string]interface{}) {
-				require.Equal(t, "consul.hashicorp.com/v1beta1", raw["apiVersion"])
-
-				md := raw["metadata"].(map[string]interface{})
-				require.Equal(t, "grpc-route-custom", md["name"])
-
-				spec := raw["spec"].(map[string]interface{})
-				parentRefs := spec["parentRefs"].([]interface{})
-				require.Len(t, parentRefs, 1)
-				pr := parentRefs[0].(map[string]interface{})
-				require.Equal(t, "consul.hashicorp.com", pr["group"])
-				require.Equal(t, "api-gateway-custom", pr["name"])
-			},
-		},
-		{
-			name:  "TCPRoute",
-			input: &tcpRoute,
-			validate: func(t *testing.T, raw map[string]interface{}) {
-				require.Equal(t, "consul.hashicorp.com/v1alpha2", raw["apiVersion"])
-
-				md := raw["metadata"].(map[string]interface{})
-				require.Equal(t, "tcp-route-custom", md["name"])
-
-				spec := raw["spec"].(map[string]interface{})
-				parentRefs := spec["parentRefs"].([]interface{})
-				require.Len(t, parentRefs, 1)
-				pr := parentRefs[0].(map[string]interface{})
-				require.Equal(t, "consul.hashicorp.com", pr["group"])
-				require.Equal(t, "api-gateway-custom", pr["name"])
-			},
-		},
-		{
-			name:  "ReferenceGrant",
-			input: &rg,
-			validate: func(t *testing.T, raw map[string]interface{}) {
-				require.Equal(t, "consul.hashicorp.com/v1beta1", raw["apiVersion"])
-
-				md := raw["metadata"].(map[string]interface{})
-				require.Equal(t, "reference-grant-custom", md["name"])
-				require.Equal(t, "default", md["namespace"])
-
-				spec := raw["spec"].(map[string]interface{})
-				from := spec["from"].([]interface{})
-				require.Len(t, from, 1)
-				f := from[0].(map[string]interface{})
-				require.Equal(t, "consul.hashicorp.com", f["group"])
-				require.Equal(t, "HttpRoute", f["kind"])
-				require.Equal(t, "consul", f["namespace"])
-
-				to := spec["to"].([]interface{})
-				require.Len(t, to, 1)
-				toservice := to[0].(map[string]interface{})
-				require.Equal(t, "", toservice["group"])
-				require.Equal(t, "Service", toservice["kind"])
-			},
-		},
-	}
-
-	logJSON := func(t *testing.T, label string, obj interface{}) {
-		b, _ := json.MarshalIndent(obj, "", "  ")
-		t.Logf("%s:\n%s", label, string(b))
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			raw, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.input)
-			require.NoError(t, err)
-
-			// ✅ Ensure kind is present
-			if _, ok := raw["kind"]; !ok {
-				// fallback if converter didn't set it
-				switch tc.input.(type) {
-				case gwv1.GatewayClass:
-					raw["kind"] = "GatewayClass"
-				case gwv1.Gateway:
-					raw["kind"] = "Gateway"
-				case gwv1.HTTPRoute:
-					raw["kind"] = "HTTPRoute"
-				case gwv1.GRPCRoute:
-					raw["kind"] = "GRPCRoute"
-				case gwv1beta1.ReferenceGrant:
-					raw["kind"] = "ReferenceGrant"
-				case gwv1alpha2.UDPRoute:
-					raw["kind"] = "UDPRoute"
-				case gwv1alpha2.TLSRoute:
-					raw["kind"] = "TLSRoute"
-				case gwv1alpha2.TCPRoute:
-					raw["kind"] = "TCPRoute"
-				default:
-					require.Fail(t, "unexpected type for test case input")
-				}
-
-			}
-
-			logJSON(t, "Before", raw)
-
-			require.NotPanics(t, func() {
-				enforceConsulApiVersion(raw)
-			})
-
-			logJSON(t, "After", raw)
-
-			tc.validate(t, raw)
-		})
-	}
-}
-
-// test function for writeObjects to validate the output manifests are in the expected format and have the expected mutations
+// test function for writeObjects to validate the output manifests are in the expected format and have the expected mutations.
 func TestWriteObjects(t *testing.T) {
 	tmpDir := t.TempDir()
+	gatewayMap = map[string]bool{}
+
+	// Setup gatewayMap if needed
+
+	gatewayMap["default/test-gw"] = true
 
 	cmd := &Command{
 		flagManifestsGatewayAPIDir: filepath.Join(tmpDir, "gateway"),
@@ -633,7 +476,7 @@ func TestWriteObjects(t *testing.T) {
 	require.Equal(t, "consul.hashicorp.com/v1beta1", consulObj["apiVersion"])
 
 	md := consulObj["metadata"].(map[string]interface{})
-	require.Equal(t, "api-gateway-custom", md["name"])
+	require.Equal(t, "test-gw-consul", md["name"])
 	spec := consulObj["spec"].(map[string]interface{})
 	listeners := spec["listeners"].([]interface{})
 	require.Len(t, listeners, 2)
@@ -650,5 +493,5 @@ func TestWriteObjects(t *testing.T) {
 	l2 := listeners[1].(map[string]interface{})
 	require.EqualValues(t, 443, l2["port"])
 	require.Equal(t, "https", l2["name"])
-	require.Equal(t, "consul-custom", spec["gatewayClassName"])
+	require.Equal(t, "consul-custom-class", spec["gatewayClassName"])
 }
