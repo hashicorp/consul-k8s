@@ -353,24 +353,23 @@ kubectl-version: ## print kubectl version
 
 .PHONY: kind-test-packages
 kind-test-packages: ## kind test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/kind_acceptance_test_packages.yaml"
+	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py kind
 
 .PHONY: gke-test-packages
 gke-test-packages: ## gke test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/gke_acceptance_test_packages.yaml"
+	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py gke
 
 .PHONY: eks-test-packages
 eks-test-packages: ## eks test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/eks_acceptance_test_packages.yaml"
+	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py eks
 
 .PHONY: aks-test-packages
 aks-test-packages: ## aks test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
-
+	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py aks
 
 .PHONY: openshift-test-packages
 openshift-test-packages: ## openshift test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/openshift_acceptance_test_packages.yaml"
+	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py openshift
 
 .PHONY: go-mod-tidy
 go-mod-tidy: ## Recursively run go mod tidy on all subdirectories

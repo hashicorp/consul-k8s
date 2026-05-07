@@ -1,0 +1,42 @@
+{
+  "_comment": "Per-test durations in seconds (max observed across CI variants). Updated automatically by the 'update-test-timings' CI job after each successful run. Missing tests get DEFAULT_TEST_SECONDS in the matrix generator.",
+  "api-gateway": {
+    "TestAPIGateway_Tenancy": 804,
+    "TestAPIGateway_Basic": 802,
+    "TestAPIGateway_JWTAuth_Basic": 223,
+    "TestAPIGateway_Lifecycle": 217,
+    "TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale": 193,
+    "TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas": 192,
+    "TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA": 183,
+    "TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations": 163,
+    "TestAPIGateway_GatewayClassConfig": 138
+  },
+  "connect": {
+    "TestConnectInjectNamespaces": 850,
+    "TestConnectInjectNamespaces_CleanupController": 694,
+    "TestConnectInject_PermissiveMTLS": 196,
+    "TestConnectInject_LocalRateLimiting": 178
+  },
+  "consul-dns": {
+    "TestConsulDNSProxy_WithPartitionsAndCatalogSync": 2057,
+    "TestConsulDNS": 1364
+  },
+  "partitions": {
+    "TestPartitions_Connect": 3318,
+    "TestPartitions_Connect_MultiportServices": 1802,
+    "TestPartitions_Sync": 1300,
+    "TestPartitions_Gateway": 385
+  },
+  "peering": {
+    "TestPeering_ConnectNamespaces": 1753,
+    "TestPeering_Gateway": 365
+  },
+  "terminating-gateway": {
+    "TestTerminatingGatewayNamespaceMirroring": 1792,
+    "TestTerminatingGatewaySingleNamespace": 360
+  },
+  "wan-federation": {
+    "TestWANFederationFailover": 1372,
+    "TestWANFederation": 815
+  }
+}
