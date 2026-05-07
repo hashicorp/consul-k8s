@@ -1,3 +1,0 @@
-```release-note:bug
-connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used.
-```
