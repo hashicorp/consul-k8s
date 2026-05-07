@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -20,6 +21,14 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
+
+const StaticClientName = "static-client"
+
+func retryCheck(t *testing.T, count int, fn func(r *retry.R)) {
+	t.Helper()
+	counter := &retry.Counter{Count: count, Wait: 2 * time.Second}
+	retry.RunWith(counter, t, fn)
+}
 
 // TestAPIGateway_ExternalServers tests that connect works when using external servers.
 // It sets up an external Consul server in the same cluster but a different Helm installation
