@@ -1,4 +1,5 @@
 {{- if and
+    .Values.global.installCRDs
     .Values.connectInject.enabled 
     (or 
         .Values.connectInject.apiGateway.manageExternalCRDs 

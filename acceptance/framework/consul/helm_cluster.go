@@ -93,6 +93,12 @@ func NewHelmCluster(
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
+	// CRDs are pre-applied once by the test suite before any Helm install runs.
+	// Setting installCRDs=false prevents ownership annotation conflicts when
+	// multiple releases are installed on the same cluster in parallel.
+	helpers.MergeMaps(values, map[string]string{
+		"global.installCRDs": "false",
+	})
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
