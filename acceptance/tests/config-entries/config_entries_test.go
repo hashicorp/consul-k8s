@@ -31,7 +31,6 @@ const (
 )
 
 func TestController(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and controller is already tested with regular tproxy")

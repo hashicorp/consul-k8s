@@ -37,7 +37,6 @@ const (
 
 // Test that api gateway basic functionality works in a default installation and a secure installation.
 func TestAPIGateway_Basic(t *testing.T) {
-	t.Parallel()
 	cases := []struct {
 		secure                   bool
 		restrictedPSAEnforcement bool
@@ -361,7 +360,6 @@ const (
 )
 
 func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
-	t.Parallel()
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
 

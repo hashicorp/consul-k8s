@@ -49,7 +49,6 @@ var (
 )
 
 func TestAPIGateway_Tenancy(t *testing.T) {
-	t.Parallel()
 	cases := []struct {
 		secure             bool
 		namespaceMirroring bool

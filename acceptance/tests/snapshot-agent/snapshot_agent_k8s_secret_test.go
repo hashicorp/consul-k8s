@@ -30,7 +30,6 @@ import (
 // bug that does not recognize the token for snapshot command being configured via
 // a command line arg or an environment variable.
 func TestSnapshotAgent_K8sSecret(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and snapshot agent is already tested with regular tproxy")

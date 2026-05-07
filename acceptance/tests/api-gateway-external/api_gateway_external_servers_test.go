@@ -34,7 +34,6 @@ func retryCheck(t *testing.T, count int, fn func(r *retry.R)) {
 // It sets up an external Consul server in the same cluster but a different Helm installation
 // and then treats this server as external.
 func TestAPIGateway_ExternalServers(t *testing.T) {
-	t.Parallel()
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 

@@ -52,7 +52,6 @@ const nonPrivilegedPort = "8053"
 // - properly not resolving DNS for unexported services when ACLs are enabled.
 // - properly resolving DNS for exported services when ACLs are enabled.
 func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
-	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 

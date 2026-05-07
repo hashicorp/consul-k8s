@@ -25,7 +25,6 @@ const multiportAdminServiceName = "multiport-admin"
 // TestPartitions_Connect_MultiportServices validates cross-partition connectivity to
 // three ports exposed by a single Consul service registered from a multi-port workload.
 func TestPartitions_Connect_MultiportServices(t *testing.T) {
-	t.Parallel()
 	env := suite.Environment()
 	cfg := suite.Config()
 
