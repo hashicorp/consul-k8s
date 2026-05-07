@@ -4,6 +4,7 @@ import (
 	"os/exec"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -22,7 +23,7 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 	_, _ = cmd.CombinedOutput()
 
 	// Cleanup of old consul helm installtion and namespace
-	cmd = exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
+	cmd = exec.Command("helm", "uninstall", "consul", "--namespace", "consul", "--no-hooks")
 	_, _ = cmd.CombinedOutput()
 
 	// Bypass finalizers for the consul namespace deletion.
@@ -34,9 +35,20 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 	cmd = exec.Command("kubectl", "delete", "namespace", "consul")
 	_, _ = cmd.CombinedOutput()
 
+	// Ensure GatewayClassConfig CRD is not stuck in terminating from previous runs.
+	cmd = exec.Command("kubectl", "delete", "crd", "gatewayclassconfigs.consul.hashicorp.com", "--ignore-not-found=true", "--wait=false")
+	_, _ = cmd.CombinedOutput()
+	cmd = exec.Command("kubectl", "patch", "crd", "gatewayclassconfigs.consul.hashicorp.com", "--type=merge", "-p", `{"metadata":{"finalizers":[]}}`)
+	_, _ = cmd.CombinedOutput()
+	cmd = exec.Command("kubectl", "wait", "--for=delete", "--timeout=180s", "crd/gatewayclassconfigs.consul.hashicorp.com")
+	output, err := cmd.CombinedOutput()
+	if err != nil && !strings.Contains(string(output), "not found") {
+		require.NoErrorf(t, err, "failed waiting for GatewayClassConfig CRD deletion: %s", string(output))
+	}
+
 	// Add the hashicorp helm repo
 	cmd = exec.Command("helm", "repo", "add", "hashicorp", "https://helm.releases.hashicorp.com")
-	output, err := cmd.CombinedOutput()
+	output, err = cmd.CombinedOutput()
 	require.NoErrorf(t, err, "failed to add hashicorp helm repo: %s", string(output))
 
 	// FUTURE for some reason NewHelmCluster creates a consul server pod that runs as root which
@@ -65,6 +77,26 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 		assert.NoErrorf(t, err, "failed to delete secret: %s", string(output))
 	})
 
+	// Create CRD explicitly and let Helm treat it as externally managed to avoid
+	// CRD delete/recreate races across tests.
+	cmd = exec.Command("kubectl", "apply", "-f", "../../../control-plane/config/crd/bases/consul.hashicorp.com_gatewayclassconfigs.yaml")
+	output, err = cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to apply GatewayClassConfig CRD: %s", string(output))
+	cmd = exec.Command("kubectl", "wait", "--for=condition=Established", "--timeout=120s", "crd/gatewayclassconfigs.consul.hashicorp.com")
+	output, err = cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed waiting for GatewayClassConfig CRD to be established: %s", string(output))
+	cmd = exec.Command("kubectl", "label", "crd", "gatewayclassconfigs.consul.hashicorp.com", "app.kubernetes.io/managed-by=Helm", "--overwrite")
+	output, err = cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to label GatewayClassConfig CRD for Helm ownership: %s", string(output))
+	cmd = exec.Command("kubectl", "annotate", "crd", "gatewayclassconfigs.consul.hashicorp.com", "meta.helm.sh/release-name=consul", "meta.helm.sh/release-namespace=consul", "--overwrite")
+	output, err = cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to annotate GatewayClassConfig CRD for Helm ownership: %s", string(output))
+	// Normalize ownership metadata on existing Consul CRDs. Prior local runs may
+	// leave these tied to a different Helm release/namespace and block install.
+	cmd = exec.Command("bash", "-c", `for crd in $(kubectl get crd -o name | grep '\.consul\.hashicorp\.com$'); do kubectl label "$crd" app.kubernetes.io/managed-by=Helm --overwrite >/dev/null 2>&1 || true; kubectl annotate "$crd" meta.helm.sh/release-name=consul meta.helm.sh/release-namespace=consul --overwrite >/dev/null 2>&1 || true; done`)
+	output, err = cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to normalize Consul CRD ownership metadata: %s", string(output))
+
 	chartPath := "../../../charts/consul"
 	helmArgs := []string{"upgrade", "--install", "consul", chartPath,
 		"--namespace", "consul",
@@ -83,7 +115,7 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 		"--set", "global.imageConsulDataplane=" + cfg.ConsulDataplaneImage,
 		"--set", "global.enterpriseLicense.secretName=consul-ent-license",
 		"--set", "global.enterpriseLicense.secretKey=key",
-		"--set", "connectInject.apiGateway.manageExternalCRDs=true",
+		"--set", "connectInject.apiGateway.manageExternalCRDs=false",
 	}
 
 	if len(extraHelmValues) > 0 {
@@ -102,9 +134,11 @@ func newOpenshiftClusterWithHelmValues(t *testing.T, cfg *config.TestConfig, sec
 
 	output, err = cmd.CombinedOutput()
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		cmd := exec.Command("helm", "uninstall", "consul", "--namespace", "consul")
+		cmd := exec.Command("helm", "uninstall", "consul", "--namespace", "consul", "--no-hooks")
 		output, err := cmd.CombinedOutput()
-		require.NoErrorf(t, err, "failed to uninstall consul: %s", string(output))
+		if err != nil && !strings.Contains(string(output), "release: not found") {
+			require.NoErrorf(t, err, "failed to uninstall consul: %s", string(output))
+		}
 	})
 
 	require.NoErrorf(t, err, "failed to install consul: %s", string(output))

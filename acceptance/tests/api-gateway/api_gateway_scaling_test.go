@@ -253,6 +253,9 @@ func createScalingGateway(
 			Name:        helpers.RandomName(),
 			Namespace:   namespace,
 			Annotations: annotations,
+			Labels: map[string]string{
+				"component": "api-gateway",
+			},
 		},
 		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1.ObjectName(gatewayClassName),

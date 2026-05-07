@@ -20,17 +20,22 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
+	scalingAnnotationDefaultReplicas = "consul.hashicorp.com/default-replicas"
 	scalingAnnotationHPAEnabled     = "consul.hashicorp.com/hpa-enabled"
 	scalingAnnotationHPAMinReplicas = "consul.hashicorp.com/hpa-minimum-replicas"
 	scalingAnnotationHPAMaxReplicas = "consul.hashicorp.com/hpa-maximum-replicas"
 	scalingAnnotationHPACPUTarget   = "consul.hashicorp.com/hpa-cpu-utilisation-target"
+
+	scalingTestReconcileAnnotation = "test.hashicorp.com/reconcile-nonce"
 )
 
 func TestOpenshift_APIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing.T) {
@@ -73,6 +78,109 @@ func TestOpenshift_APIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(
 	require.Equal(t, int32(70), *hpa.Spec.Metrics[0].Resource.Target.AverageUtilization)
 
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 3)
+}
+
+func TestOpenshift_APIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *testing.T) {
+	skipUnlessEnterpriseLicenseConfiguredOCP(t)
+
+	cfg := suite.Config()
+	ctx := suite.Environment().DefaultContext(t)
+
+	newOpenshiftClusterWithHelmValues(t, cfg, false, false, map[string]string{
+		"connectInject.apiGateway.enabled":                             "true",
+		"connectInject.apiGateway.managedGatewayClass.scaling.enabled": "false",
+		"global.logLevel":                                              "debug",
+	})
+
+	consulCluster := consul.NewHelmCluster(t, map[string]string{}, ctx, cfg, "")
+	consulCluster.SetNamespace("consul")
+
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	requireEnterpriseLicenseValidOCP(t, consulClient)
+
+	k8sClient := ctx.ControllerRuntimeClient(t)
+	gatewayNamespace, _ := createNamespace(t, ctx, cfg)
+	gatewayClassName := createScalingGatewayClassResourcesOCP(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{
+		DefaultInstances: ptr.To(int32(3)),
+		MinInstances:     ptr.To(int32(1)),
+		MaxInstances:     ptr.To(int32(5)),
+	})
+
+	gateway := createScalingGatewayOCP(t, k8sClient, gatewayNamespace, gatewayClassName, map[string]string{
+		scalingAnnotationHPAEnabled:     "true",
+		scalingAnnotationHPAMinReplicas: "2",
+		scalingAnnotationHPAMaxReplicas: "10",
+		scalingAnnotationHPACPUTarget:   "70",
+	}, cfg.NoCleanupOnFailure, cfg.NoCleanup)
+
+	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 3)
+	waitForGatewayHPAAbsentOCP(t, k8sClient, gateway.Name, gateway.Namespace)
+}
+
+func TestOpenshift_APIGateway_Scaling_EnterpriseGateEnabledStaticReplicas(t *testing.T) {
+	skipUnlessEnterpriseLicenseConfiguredOCP(t)
+
+	cfg := suite.Config()
+	ctx := suite.Environment().DefaultContext(t)
+
+	newOpenshiftClusterWithHelmValues(t, cfg, false, false, map[string]string{
+		"connectInject.apiGateway.enabled":                             "true",
+		"connectInject.apiGateway.managedGatewayClass.scaling.enabled": "true",
+		"global.logLevel":                                              "debug",
+	})
+
+	consulCluster := consul.NewHelmCluster(t, map[string]string{}, ctx, cfg, "")
+	consulCluster.SetNamespace("consul")
+
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	requireEnterpriseLicenseValidOCP(t, consulClient)
+	restartAPIGatewayControllerOCP(t, ctx)
+
+	k8sClient := ctx.ControllerRuntimeClient(t)
+	gatewayNamespace, _ := createNamespace(t, ctx, cfg)
+	gatewayClassName := createScalingGatewayClassResourcesOCP(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{})
+
+	gateway := createScalingGatewayOCP(t, k8sClient, gatewayNamespace, gatewayClassName, map[string]string{
+		scalingAnnotationDefaultReplicas: "4",
+	}, cfg.NoCleanupOnFailure, cfg.NoCleanup)
+
+	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 4)
+}
+
+func TestOpenshift_APIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(t *testing.T) {
+	skipUnlessEnterpriseLicenseConfiguredOCP(t)
+
+	cfg := suite.Config()
+	ctx := suite.Environment().DefaultContext(t)
+
+	newOpenshiftClusterWithHelmValues(t, cfg, false, false, map[string]string{
+		"connectInject.apiGateway.enabled":                             "true",
+		"connectInject.apiGateway.managedGatewayClass.scaling.enabled": "true",
+		"global.logLevel":                                              "debug",
+	})
+
+	consulCluster := consul.NewHelmCluster(t, map[string]string{}, ctx, cfg, "")
+	consulCluster.SetNamespace("consul")
+
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+	requireEnterpriseLicenseValidOCP(t, consulClient)
+	restartAPIGatewayControllerOCP(t, ctx)
+
+	k8sClient := ctx.ControllerRuntimeClient(t)
+	gatewayNamespace, _ := createNamespace(t, ctx, cfg)
+	gatewayClassName := createScalingGatewayClassResourcesOCP(t, k8sClient, cfg.NoCleanupOnFailure, cfg.NoCleanup, v1alpha1.DeploymentSpec{
+		DefaultInstances: ptr.To(int32(2)),
+		MinInstances:     ptr.To(int32(1)),
+		MaxInstances:     ptr.To(int32(3)),
+	})
+
+	gateway := createScalingGatewayOCP(t, k8sClient, gatewayNamespace, gatewayClassName, nil, cfg.NoCleanupOnFailure, cfg.NoCleanup)
+
+	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 2)
+	scaleGatewayDeploymentOCP(t, k8sClient, gateway.Name, gateway.Namespace, 5)
+	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 5)
+	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
+	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 5)
 }
 
 func skipUnlessEnterpriseLicenseConfiguredOCP(t *testing.T) {
@@ -164,6 +272,9 @@ func createScalingGatewayOCP(
 			Name:        helpers.RandomName(),
 			Namespace:   namespace,
 			Annotations: annotations,
+			Labels: map[string]string{
+				"component": "api-gateway",
+			},
 		},
 		Spec: gwv1.GatewaySpec{
 			GatewayClassName: gwv1.ObjectName(gatewayClassName),
@@ -212,6 +323,55 @@ func waitForGatewayHPAOCP(t *testing.T, k8sClient client.Client, gatewayName, na
 	})
 
 	return hpa
+}
+
+func waitForGatewayHPAAbsentOCP(t *testing.T, k8sClient client.Client, gatewayName, namespace string) {
+	t.Helper()
+
+	retry.RunWith(&retry.Timer{Timeout: 1 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		err := k8sClient.Get(context.Background(), types.NamespacedName{
+			Name:      fmt.Sprintf("%s-hpa", gatewayName),
+			Namespace: namespace,
+		}, &autoscalingv2.HorizontalPodAutoscaler{})
+		require.Error(r, err)
+		require.True(r, apierrors.IsNotFound(err), "expected HPA to be absent, got %v", err)
+	})
+}
+
+func scaleGatewayDeploymentOCP(t *testing.T, k8sClient client.Client, gatewayName, namespace string, replicas int32) {
+	t.Helper()
+
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		var deployment appsv1.Deployment
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &deployment)
+		require.NoError(r, err)
+
+		deployment.Spec.Replicas = ptr.To(replicas)
+		err = k8sClient.Update(context.Background(), &deployment)
+		require.NoError(r, err)
+	})
+
+	logger.Logf(t, "manually scaled deployment %s/%s to %d replicas", namespace, gatewayName, replicas)
+}
+
+func triggerGatewayReconcileOCP(t *testing.T, k8sClient client.Client, gatewayName, namespace string) {
+	t.Helper()
+
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		var gateway gwv1.Gateway
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &gateway)
+		require.NoError(r, err)
+
+		if gateway.Annotations == nil {
+			gateway.Annotations = map[string]string{}
+		}
+		gateway.Annotations[scalingTestReconcileAnnotation] = fmt.Sprintf("%d", time.Now().UnixNano())
+
+		err = k8sClient.Update(context.Background(), &gateway)
+		require.NoError(r, err)
+	})
+
+	logger.Logf(t, "triggered reconcile for gateway %s/%s", namespace, gatewayName)
 }
 
 func restartAPIGatewayControllerOCP(t *testing.T, ctx environment.TestContext) {
