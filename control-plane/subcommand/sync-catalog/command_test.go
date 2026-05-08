@@ -39,7 +39,7 @@ func (nopRegisterer) MustRegister(...prom.Collector) {}
 func (nopRegisterer) Unregister(prom.Collector) bool { return true }
 
 // settableGates is implemented by the feature-gate object returned by
-// clientfeatures.FeatureGates() when the gate supports programmatic overrides in tests
+// clientfeatures.FeatureGates() when the gate supports programmatic overrides in tests.
 type settableGates interface {
 	Set(feature clientfeatures.Feature, value bool) error
 }
