@@ -45,13 +45,10 @@ const defaultNamespace = "default"
 const privilegedPort = "53"
 const nonPrivilegedPort = "8053"
 
-// TestConsulDNSProxy_WithPartitionsAndCatalogSync verifies DNS queries for services across partitions
-// when DNS proxy is enabled. It configures CoreDNS to use configure consul domain queries to
-// be forwarded to the Consul DNS Proxy.  The test validates:
-// - returning the local partition's service when tenancy is not included in the DNS question.
-// - properly not resolving DNS for unexported services when ACLs are enabled.
-// - properly resolving DNS for exported services when ACLs are enabled.
-func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
+// runConsulDNSProxyWithPartitions verifies DNS queries for services across partitions
+// when DNS proxy is enabled for a single secure/port combination.
+func runConsulDNSProxyWithPartitions(t *testing.T, c dnsWithPartitionsTestCase) {
+	t.Helper()
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -62,76 +59,65 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
-	cases := []dnsWithPartitionsTestCase{
-		{
-			name:   "not secure - ACLs and auto-encrypt not enabled",
-			secure: false,
-			port:   privilegedPort,
-		},
-		{
-			name:   "secure - ACLs and auto-encrypt enabled",
-			secure: true,
-			port:   privilegedPort,
-		},
-		{
-			name:   "not secure - ACLs and auto-encrypt not enabled",
-			secure: false,
-			port:   nonPrivilegedPort,
-		},
-		{
-			name:   "secure - ACLs and auto-encrypt enabled",
-			secure: true,
-			port:   nonPrivilegedPort,
-		},
+	defaultClusterContext := env.DefaultContext(t)
+	secondaryClusterContext := env.Context(t, 1)
+
+	// Setup the clusters and the static service.
+	releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
+		defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
+		defaultPartition, c.port)
+
+	// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
+	updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true, c.port)
+	updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true, c.port)
+
+	if c.port == privilegedPort {
+		// Validate DNS proxy privileged port configuration.
+		validateDNSProxyPrivilegedPort(t, defaultClusterContext, releaseName)
+		validateDNSProxyPrivilegedPort(t, secondaryClusterContext, releaseName)
+	}
+	podLabelSelector := "app=static-server"
+	// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
+	dnsUtilsPodIndex := 0
+
+	// When ACLs are enabled, the unexported service should not resolve.
+	shouldResolveUnexportedCrossPartitionDNSRecord := true
+	if c.secure {
+		shouldResolveUnexportedCrossPartitionDNSRecord = false
 	}
 
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			defaultClusterContext := env.DefaultContext(t)
-			secondaryClusterContext := env.Context(t, 1)
+	// Verify that the service is in the catalog under each partition.
+	verifyServiceInCatalog(t, consulClient, defaultPartitionOpts)
+	verifyServiceInCatalog(t, consulClient, secondaryPartitionQueryOpts)
 
-			// Setup the clusters and the static service.
-			releaseName, consulClient, defaultPartitionOpts, secondaryPartitionQueryOpts, defaultConsulCluster := setupClustersAndStaticService(t, cfg,
-				defaultClusterContext, secondaryClusterContext, c, secondaryPartition,
-				defaultPartition, c.port)
-
-			// Update CoreDNS to use the Consul domain and forward queries to the Consul DNS Service or Proxy.
-			updateCoreDNSWithConsulDomain(t, defaultClusterContext, releaseName, true, c.port)
-			updateCoreDNSWithConsulDomain(t, secondaryClusterContext, releaseName, true, c.port)
-
-			if c.port == privilegedPort {
-				// Validate DNS proxy privileged port configuration.
-				validateDNSProxyPrivilegedPort(t, defaultClusterContext, releaseName)
-				validateDNSProxyPrivilegedPort(t, secondaryClusterContext, releaseName)
+	logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
+	for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
+		shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster, c.port) {
+		t.Run(v.name, func(t *testing.T) {
+			if v.preProcessingFunc != nil {
+				v.preProcessingFunc(t)
 			}
-			podLabelSelector := "app=static-server"
-			// The index of the dnsUtils pod to use for the DNS queries so that the pod name can be unique.
-			dnsUtilsPodIndex := 0
-
-			// When ACLs are enabled, the unexported service should not resolve.
-			shouldResolveUnexportedCrossPartitionDNSRecord := true
-			if c.secure {
-				shouldResolveUnexportedCrossPartitionDNSRecord = false
-			}
-
-			// Verify that the service is in the catalog under each partition.
-			verifyServiceInCatalog(t, consulClient, defaultPartitionOpts)
-			verifyServiceInCatalog(t, consulClient, secondaryPartitionQueryOpts)
-
-			logger.Log(t, "verify the service via DNS in the default partition of the Consul catalog.")
-			for _, v := range getVerifications(defaultClusterContext, secondaryClusterContext,
-				shouldResolveUnexportedCrossPartitionDNSRecord, cfg, releaseName, defaultConsulCluster, c.port) {
-				t.Run(v.name, func(t *testing.T) {
-					if v.preProcessingFunc != nil {
-						v.preProcessingFunc(t)
-					}
-					verifyDNS(t, cfg, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
-						podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
-					dnsUtilsPodIndex++
-				})
-			}
+			verifyDNS(t, cfg, releaseName, staticServerNamespace, v.requestingCtx, v.svcContext,
+				podLabelSelector, v.svcName, v.shouldResolveDNS, dnsUtilsPodIndex)
+			dnsUtilsPodIndex++
 		})
 	}
+}
+
+func TestConsulDNSProxy_WithPartitionsAndCatalogSync_NotSecure_PrivilegedPort(t *testing.T) {
+	runConsulDNSProxyWithPartitions(t, dnsWithPartitionsTestCase{secure: false, port: privilegedPort})
+}
+
+func TestConsulDNSProxy_WithPartitionsAndCatalogSync_Secure_PrivilegedPort(t *testing.T) {
+	runConsulDNSProxyWithPartitions(t, dnsWithPartitionsTestCase{secure: true, port: privilegedPort})
+}
+
+func TestConsulDNSProxy_WithPartitionsAndCatalogSync_NotSecure_NonPrivilegedPort(t *testing.T) {
+	runConsulDNSProxyWithPartitions(t, dnsWithPartitionsTestCase{secure: false, port: nonPrivilegedPort})
+}
+
+func TestConsulDNSProxy_WithPartitionsAndCatalogSync_Secure_NonPrivilegedPort(t *testing.T) {
+	runConsulDNSProxyWithPartitions(t, dnsWithPartitionsTestCase{secure: true, port: nonPrivilegedPort})
 }
 
 func getVerifications(defaultClusterContext environment.TestContext, secondaryClusterContext environment.TestContext,
