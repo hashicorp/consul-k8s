@@ -8,7 +8,11 @@ SECURITY:
 
 * security: update go to 1.26 [[GH-5269](https://github.com/hashicorp/consul-k8s/issues/5269)]
 * security: update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/issues/5183)]
+<<<<<<< security/fix-tornado-GHSA-7cx3-6m66-7c5m
 * security: upgrade tornado 6.3.2 -> 6.5.1 to fix GHSA-7cx3-6m66-7c5m (CVE-2025-47287) [[GH-5299](https://github.com/hashicorp/consul-k8s/pull/5299)]
+=======
+* security: upgrade tornado 6.3.2 -> 6.5.5 to fix GHSA-fqwm-6jpj-5wxc (CVE-2026-35536): cookie attribute injection via `.RequestHandler.set_cookie` [[GH-5297](https://github.com/hashicorp/consul-k8s/pull/5297)]
+>>>>>>> main
 
 FEATURES:
 

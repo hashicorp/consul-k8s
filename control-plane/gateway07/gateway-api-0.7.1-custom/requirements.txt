@@ -19,4 +19,8 @@ Pygments==2.15.1
 pymdown-extensions==10.0
 PyYAML==6.0
 six==1.16.0
+<<<<<<< security/fix-tornado-GHSA-7cx3-6m66-7c5m
 tornado==6.5.1
+=======
+tornado==6.5.5
+>>>>>>> main
