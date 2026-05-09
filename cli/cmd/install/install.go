@@ -6,7 +6,6 @@ package install
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -75,8 +74,6 @@ type Command struct {
 	kubernetes kubernetes.Interface
 
 	helmActionsRunner helm.HelmActionsRunner
-
-	httpClient *http.Client
 
 	set *flag.Sets
 

@@ -222,7 +222,7 @@ func startHttpServerForEnvoyStats(port int, jsonResponse string) *http.Server {
 	return srv
 }
 
-// pods for k8s clientset fake testing
+// pods for k8s clientset fake testing.
 var pods = []v1.Pod{
 	{
 		ObjectMeta: metav1.ObjectMeta{

@@ -39,10 +39,10 @@ const (
 	flagNameKubeContext = "context"
 	flagNameCapture     = "capture"
 
-	// minimum duration for log capture should be atleast 10seconds
+	// minimum duration for log capture should be atleast 10seconds.
 	minimumCaptureDuration = 10 * time.Second
 
-	// permission to be used when creating files and directories
+	// permission to be used when creating files and directories.
 	filePermission = 0644
 	dirPermission  = 0755
 )
@@ -310,7 +310,7 @@ func (l *LogLevelCommand) fetchOrSetLogLevels(adminPorts map[string]int, logLeve
 	return loggers, nil
 }
 
-// captureLogsAndResetLogLevels - captures the logs from the given pod at given logLevels for the given duration and writes it to a file
+// captureLogsAndResetLogLevels - captures the logs from the given pod at given logLevels for the given duration and writes it to a file.
 func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int, logLevels string) error {
 	// if no new log level is provided, just capture logs at existing log levels.
 	if logLevels == "" {
@@ -367,7 +367,7 @@ func (l *LogLevelCommand) captureLogsAndResetLogLevels(adminPorts map[string]int
 }
 
 // resetLogLevels - converts the 'existing logger map' to logLevel parameter string
-// and reset the log levels back for EACH admin ports
+// and reset the log levels back for EACH admin ports.
 func (l *LogLevelCommand) resetLogLevels(existingLogger map[string]LoggerConfig, adminPorts map[string]int) error {
 	// Use a fresh context for resetting log levels as
 	// l.Ctx might be cancelled during log capture DUE TO user interrupt
@@ -416,7 +416,7 @@ func (l *LogLevelCommand) captureLogs() error {
 	return nil
 }
 
-// fetchPodLogs - captures the logs from the given pod for the given duration and writes it to a file
+// fetchPodLogs - captures the logs from the given pod for the given duration and writes it to a file.
 func (l *LogLevelCommand) fetchPodLogs() error {
 	sinceSeconds := int64(l.capture.Seconds())
 	pod, err := l.kubernetes.CoreV1().Pods(l.namespace).Get(l.Ctx, l.podName, metav1.GetOptions{})

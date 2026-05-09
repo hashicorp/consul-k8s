@@ -65,7 +65,7 @@ type EnvoyProxyCapture struct {
 
 // captureEnvoyProxyData -
 // captures consul-k8s Envoy admin endpoint data (/stats, /clusters, /listeners, /config_dump)
-// for ALL proxy pods in ALL namespaces and writes it to /proxy dir within debug bundle
+// for ALL proxy pods in ALL namespaces and writes it to /proxy dir within debug bundle.
 func (e *EnvoyProxyCapture) captureEnvoyProxyData() error {
 	// get all proxy pods
 	err := e.getEnvoyProxyPodsList()
@@ -267,7 +267,7 @@ func (e *EnvoyProxyCapture) captureEnvoyProxyPodData(proxyPod proxyPodData) erro
 	return errs
 }
 
-// captureEnvoyStats - captures envoy stats for a given pod (by opening a portforwarder the Envoy admin API)
+// captureEnvoyStats - captures envoy stats for a given pod (by opening a portforwarder the Envoy admin API).
 func (e *EnvoyProxyCapture) captureEnvoyStats(endpoint string, proxyPod proxyPodData) error {
 
 	resp, err := http.Get(fmt.Sprintf("http://%s/stats?format=json", endpoint))

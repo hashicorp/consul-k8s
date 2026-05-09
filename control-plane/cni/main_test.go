@@ -242,7 +242,7 @@ clusters:
 	return path
 }
 
-// TestResolveKubeconfigPath tests the resolveKubeconfigPath function
+// TestResolveKubeconfigPath tests the resolveKubeconfigPath function.
 func TestResolveKubeconfigPath(t *testing.T) {
 	tests := []struct {
 		name                  string

@@ -682,7 +682,7 @@ func createFakeCR(name, namespace string) *unstructured.Unstructured {
 	}
 }
 
-// Helper to convert a slice of concrete pods to a slice of runtime.Object
+// Helper to convert a slice of concrete pods to a slice of runtime.Object.
 func convertPodsToRuntimeObjects(pods []corev1.Pod) []runtime.Object {
 	objects := make([]runtime.Object, len(pods))
 	for i := range pods {
