@@ -39,3 +39,32 @@ variable "tags" {
   default     = {}
   description = "Tags to attach to the created resources."
 }
+
+variable "uptycs_owner" {
+  default     = "hc-team-consul-dg@ibm.com"
+  description = "Owner email for Uptycs EDR agent tags."
+}
+
+variable "uptycs_enroll_secret" {
+  default     = ""
+  description = "Uptycs enroll secret containing customer identifiers."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_ca_bundle" {
+  default     = ""
+  description = "Base64-encoded CA bundle for kubequery webhook."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_tls_crt" {
+  default     = ""
+  description = "Base64-encoded TLS certificate for kubequery webhook server."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_tls_key" {
+  default     = ""
+  description = "Base64-encoded TLS private key for kubequery webhook server."
+  sensitive   = true
+}
