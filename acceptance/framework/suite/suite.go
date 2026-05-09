@@ -124,18 +124,38 @@ func installCRDs(cfg *config.TestConfig) error {
 	// secondary clusters. The gateway-resources post-upgrade hook job runs on
 	// whichever cluster helm installs to, so each cluster needs the CRDs.
 	for _, env := range cfg.KubeEnvs {
-		kubectlArgs := []string{"apply", "--server-side", "--force-conflicts", "-f", "-"}
+		ctxArgs := []string{}
 		if env.KubeConfig != "" {
-			kubectlArgs = append([]string{"--kubeconfig", env.KubeConfig}, kubectlArgs...)
+			ctxArgs = append(ctxArgs, "--kubeconfig", env.KubeConfig)
 		}
 		if env.KubeContext != "" {
-			kubectlArgs = append([]string{"--context", env.KubeContext}, kubectlArgs...)
+			ctxArgs = append(ctxArgs, "--context", env.KubeContext)
 		}
 
-		kubectl := exec.Command("kubectl", kubectlArgs...)
+		kubectl := exec.Command("kubectl", append(ctxArgs, "apply", "--server-side", "--force-conflicts", "-f", "-")...)
 		kubectl.Stdin = bytes.NewReader(crdOnly)
 		if out, err := kubectl.CombinedOutput(); err != nil {
 			return fmt.Errorf("kubectl apply CRDs to context %s: %w\n%s", env.KubeContext, err, out)
+		}
+
+		// helm template does not emit app.kubernetes.io/managed-by or the
+		// meta.helm.sh/* annotations. Add them so that consul-k8s install
+		// (CLI tests) and helm install/upgrade can adopt the pre-installed CRDs
+		// without "invalid ownership metadata" errors.
+		sel := "release=consul,component=crd"
+		label := exec.Command("kubectl", append(ctxArgs,
+			"label", "--overwrite", "crds", "-l", sel,
+			"app.kubernetes.io/managed-by=Helm")...)
+		if out, err := label.CombinedOutput(); err != nil {
+			return fmt.Errorf("kubectl label CRDs in context %s: %w\n%s", env.KubeContext, err, out)
+		}
+
+		annotate := exec.Command("kubectl", append(ctxArgs,
+			"annotate", "--overwrite", "crds", "-l", sel,
+			"meta.helm.sh/release-name=consul",
+			"meta.helm.sh/release-namespace=consul")...)
+		if out, err := annotate.CombinedOutput(); err != nil {
+			return fmt.Errorf("kubectl annotate CRDs in context %s: %w\n%s", env.KubeContext, err, out)
 		}
 	}
 
