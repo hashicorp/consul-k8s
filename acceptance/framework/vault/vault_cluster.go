@@ -416,15 +416,16 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 
 	v.logger.Logf(t, "initializing and unsealing Vault")
 	namespace := v.helmOptions.KubectlOptions.Namespace
-
-	// Establish the port-forward tunnel once, bound to the test lifetime (t).
-	// Passing r (a retry.R) would register tunnel.Close() on each retry attempt,
-	// so every failed Init/Unseal call would close the tunnel, causing the next
-	// attempt to fail with "connection refused" even though Vault is running.
-	v.vaultClient = v.SetupVaultClient(t)
-
 	retrier := &retry.Timer{Timeout: 4 * time.Minute, Wait: 1 * time.Second}
 	retry.RunWith(retrier, t, func(r *retry.R) {
+		// Wait for vault server pod to be running so that we can create Vault client without errors.
+		serverPod, err := v.kubernetesClient.CoreV1().Pods(namespace).Get(context.Background(), fmt.Sprintf("%s-vault-0", v.releaseName), metav1.GetOptions{})
+		require.NoError(r, err)
+		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
+
+		// Set up the client so that we can make API calls to initialize and unseal.
+		v.vaultClient = v.SetupVaultClient(r)
+
 		// Initialize Vault with 1 secret share. We don't need to
 		// more key shares for this test installation.
 		initResp, err := v.vaultClient.Sys().Init(&vapi.InitRequest{
