@@ -423,7 +423,12 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		require.NoError(r, err)
 		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
 
-		// Set up the client so that we can make API calls to initialize and unseal.
+		// Reset the client on each attempt so SetupVaultClient always creates a
+		// fresh portforward tunnel. The goroutine dies if Vault is not yet
+		// listening on port 8200 when the tunnel is established; without this
+		// reset, the nil-guard in SetupVaultClient returns the dead client on
+		// all subsequent retries.
+		v.vaultClient = nil
 		v.vaultClient = v.SetupVaultClient(r)
 
 		// Initialize Vault with 1 secret share. We don't need to
