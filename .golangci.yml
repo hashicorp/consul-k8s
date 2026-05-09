@@ -12,6 +12,7 @@ linters:
         - shadow
         - unusedwrite
         - printf
+        - inline
       enable-all: true
   exclusions:
     generated: lax
@@ -30,7 +31,10 @@ linters:
         text: result \d+ \(bool\) is always false
       - linters:
           - errcheck
-        text: Error return value of `fmt.Fprintf` is not checked
+        text: Error return value of `fmt\.(Fprintf|Fprint|Fprintln|Sscanf)` is not checked
+      - linters:
+          - errcheck
+        text: Error return value of `.*(Close|Flush)` is not checked
     paths:
       - third_party$
       - builtin$

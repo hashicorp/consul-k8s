@@ -248,7 +248,7 @@ func (c *Command) printComponentStatus(tbl *terminal.Table, err error, component
 }
 
 // getConsulClientsTable returns the table instance with the Consul Clients
-// and their ready status (number of pods ready/desired)
+// and their ready status (number of pods ready/desired).
 func (c *Command) getConsulClientsTable(namespace string) (*terminal.Table, error) {
 	clients, err := c.kubernetes.AppsV1().DaemonSets(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=client"})
 	if err != nil {
@@ -280,7 +280,7 @@ func (c *Command) getConsulClientsTable(namespace string) (*terminal.Table, erro
 }
 
 // getConsulServersTable returns the table instance with the Consul Servers
-// and their ready status (number of pods ready/desired),
+// and their ready status (number of pods ready/desired).
 func (c *Command) getConsulServersTable(namespace string) (*terminal.Table, error) {
 	servers, err := c.kubernetes.AppsV1().StatefulSets(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm,component=server"})
 	if err != nil {
@@ -312,7 +312,7 @@ func (c *Command) getConsulServersTable(namespace string) (*terminal.Table, erro
 }
 
 // getConsulDeploymentsTable returns the table instance with the Consul Deployed Deployments
-// and their ready status (number of pods ready/desired),
+// and their ready status (number of pods ready/desired).
 func (c *Command) getConsulDeploymentsTable(namespace string) (*terminal.Table, error) {
 	deployments, err := c.kubernetes.AppsV1().Deployments(namespace).List(c.Ctx, metav1.ListOptions{LabelSelector: "app=consul,chart=consul-helm"})
 	if err != nil {

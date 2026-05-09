@@ -187,9 +187,9 @@ func TestWANFederation_Secure(t *testing.T)    { runWANFederation(t, wanFederati
 func TestWANFederation_NotSecure(t *testing.T) { runWANFederation(t, wanFederationCase{secure: false}) }
 
 /*
-dc1-static-client -- nominal -- > dc1-static-server in namespace ns1
-dc1-static-client -- failover --> dc2-static-server in namespace ns1
-dc1-static-client -- failover --> dc1-static-server in namespace ns2
+dc1-static-client -- nominal -- > dc1-static-server in namespace ns1.
+dc1-static-client -- failover --> dc2-static-server in namespace ns1.
+dc1-static-client -- failover --> dc1-static-server in namespace ns2.
 */
 func runWANFederationFailover(t *testing.T, c wanFederationCase) {
 	t.Helper()

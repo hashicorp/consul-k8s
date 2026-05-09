@@ -44,28 +44,28 @@ const (
 	// is used.
 	timeDateFormat = "2006-01-02T15-04-05Z0700"
 
-	// debugDuration is the total time that debug runs before being shut down
+	// debugDuration is the total time that debug runs before being shut down.
 	debugDuration = 5 * time.Minute
 
 	// debugMinDuration is the minimum a user can configure the duration
-	// to ensure that all information can be collected in time
+	// to ensure that all information can be collected in time.
 	debugMinDuration = 10 * time.Second
 	debugLeastSince  = 10 * time.Second
 
 	debugGraceDuration = 2 * time.Second
 
-	// debugArchiveExtension is the extension for archive files
+	// debugArchiveExtension is the extension for archive files.
 	debugArchiveExtension = ".tar.gz"
 
-	// permissions to be used when creating files and directories
+	// permissions to be used when creating files and directories.
 	filePerm = 0644
 	dirPerm  = 0755
 
-	// global flag names
+	// global flag names.
 	flagNameKubeConfig  = "kubeconfig"
 	flagNameKubeContext = "kubecontext"
 
-	// command flag names
+	// command flag names.
 	flagNameNamespace = "namespace"
 	flagDuration      = "duration"
 	flagSince         = "since"
@@ -80,9 +80,9 @@ const (
 	targetLogs        = "logs"
 	targetProxy       = "proxy"
 
-	// constant filenames for various debug info files
+	// constant filenames for various debug info files.
 	// Please Note, some filenames cannot be constants like log/proxy captures files
-	// as they will be fetched dynamically based on pods/containers found
+	// as they will be fetched dynamically based on pods/containers found.
 	helmConfigFileName         = "helm-config.json"
 	crdResourcesFileName       = "CRDsResources.json"
 	crdResourcesErrorsFileName = "CRDsResourcesErrors.txt"
@@ -91,16 +91,16 @@ const (
 )
 
 var (
-	// Predefined errors - helpful for comparing returned errors
+	// Predefined errors - helpful for comparing returned errors.
 	errNotFound        = errors.New("not found")
 	errSignalInterrupt = errors.New("signal interrupt received")
 
 	// ErrMultipleErrorsOccuredAndWritten is returned to stricly indicate that one or more errors occurred
-	// during a single capture task and they (multiple errors) are written successfully to debug bundle,
-	// In case if errors are not written, whole error would be printed on terminal
+	// during a single capture task and they (multiple errors) are written successfully to debug bundle.
+	// In case if errors are not written, whole error would be printed on terminal.
 	errMultipleErrorsOccuredAndWritten = errors.New("one or more errors occurred during capture for this target \n\tplease check the respective error file within the debug bundle for details")
 
-	// defaultTargets specifies the list of targets that will be captured by default
+	// defaultTargets specifies the list of targets that will be captured by default.
 	defaultTargets = []string{
 		targetHelmConfig,
 		targetCRDs,
@@ -120,8 +120,8 @@ type debugIndex struct {
 	Timestamp string   `json:"timestamp"`
 }
 
-// captureTask defines a single capture task to be performed by the debugger
-// takes target identifier, the function to call to perform the capture
+// captureTask defines a single capture task to be performed by the debugger.
+// takes target identifier, the function to call to perform the capture.
 type captureTask struct {
 	target     string
 	captureFxn func() error
@@ -387,7 +387,7 @@ func (c *DebugCommand) initKubernetes() (err error) {
 	return nil
 }
 
-// debugger is the main function that orchestrate the debug process
+// debugger is the main function that orchestrate the debug process.
 func (c *DebugCommand) debugger() int {
 	archiveName := c.output
 	if c.archive {
@@ -470,7 +470,7 @@ func (c *DebugCommand) debugger() int {
 }
 
 // archiveDebugBundleAndReturn - creates archive if requested and
-// returns appropriate exit code based on errorsOccuredDuringCapture flag
+// returns appropriate exit code based on errorsOccuredDuringCapture flag.
 func (c *DebugCommand) archiveDebugBundleAndReturn(archiveName string, errorsOccuredDuringCapture bool) int {
 	if !c.archive {
 		c.UI.Output(fmt.Sprintf("Saved debug directory: %s", archiveName))
@@ -495,7 +495,7 @@ func (c *DebugCommand) archiveDebugBundleAndReturn(archiveName string, errorsOcc
 }
 
 // cleanup - cleans up partial debug capture
-// and sends cleanup completed signal to main to stop waiting and exit gracefully
+// and sends cleanup completed signal to main to stop waiting and exit gracefully.
 func (c *DebugCommand) cleanup() {
 	// send cleanup completed signal to main to stop waiting and exit gracefully
 	defer func() { c.CleanupReqAndCompleted <- true }()
@@ -527,7 +527,7 @@ func (c *DebugCommand) cleanup() {
 // and it executed the given the capture function for each task.
 // Handles errors and output messages and returns exit codes accordingly.
 // If signal interrupt is received during capture, it calls cleanup
-// and returns 1 (to exit debugger with correct exit code)
+// and returns 1 (to exit debugger with correct exit code).
 func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 	captureName := task.target
 	captureName = strings.ToUpper(captureName[:1]) + captureName[1:] // capitalize first letter for output
@@ -556,7 +556,7 @@ func (c *DebugCommand) runCapture(task captureTask, errorsOccured *bool) int {
 }
 
 // captureHelmConfig - captures consul-k8s Helm configuration and
-// write it to helm-config.json file within debug archive
+// write it to helm-config.json file within debug archive.
 func (c *DebugCommand) captureHelmConfig() error {
 	// Setup logger to stream Helm library logs.
 	var uiLogger = func(s string, args ...interface{}) {
@@ -605,7 +605,7 @@ func (c *DebugCommand) getHelmRelease(settings *helmCLI.EnvSettings, uiLogger ac
 }
 
 // captureCRDResources - captures consul-k8s CRDs and their instances
-// and write it to CRDsResources.json file within debug archive
+// and write it to CRDsResources.json file within debug archive.
 func (c *DebugCommand) captureCRDResources() error {
 	crdResources, listCRDError := c.listCRDResources()
 
@@ -775,7 +775,7 @@ func (c *DebugCommand) captureSidecarPods() error {
 	return nil
 }
 
-// captureIndex - captures debug run metadata and writes to file at the root of the debug archive
+// captureIndex - captures debug run metadata and writes to file at the root of the debug archive.
 func (c *DebugCommand) captureIndex() error {
 	var index debugIndex
 	if c.captureTarget(targetLogs) {
@@ -836,7 +836,7 @@ func fileWriter(filename string, content []byte) error {
 }
 
 // createArchive walks the files in the temporary directory
-// and creates a tar file that is gzipped with the contents
+// and creates a tar file that is gzipped with the contents.
 func (c *DebugCommand) createArchive() error {
 	path := c.output + debugArchiveExtension
 

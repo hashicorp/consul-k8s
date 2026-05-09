@@ -56,7 +56,7 @@ const (
 	// iptables rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
-	// annotationDualStack stores if pod need to run in dualstack mode
+	// annotationDualStack stores if pod need to run in dualstack mode.
 	annotationDualStack = "consul.hashicorp.com/dual-stack"
 )
 
@@ -317,7 +317,7 @@ func resolveKubeconfigPath(dir, base string) (string, error) {
 
 // createK8sClient configures the command's Kubernetes API client if it doesn't
 // already exist.
-// TODO: remove logger for auth provider details
+// TODO: remove logger for auth provider details.
 func (c *Command) createK8sClient(cfg *PluginConf, logger hclog.Logger) error {
 	dir := cfg.CNINetDir
 	base := cfg.Kubeconfig

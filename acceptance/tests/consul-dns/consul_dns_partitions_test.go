@@ -25,7 +25,6 @@ const staticServerName = "static-server"
 const staticServerNamespace = "ns1"
 
 type dnsWithPartitionsTestCase struct {
-	name   string
 	secure bool
 	port   string
 }

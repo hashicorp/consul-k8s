@@ -28,7 +28,7 @@ import (
 const (
 	logCaptureAuditFileHeader = "WORKLOAD-KIND\tWORKLOAD-NAME\tPOD-NAME\tCONTAINER-NAME\tSTATUS\tDETAILS"
 
-	// file names
+	// file names.
 	logCaptureAuditFileName  = "logCaptureAudit.txt"
 	logCaptureErrorsFileName = "logCaptureErrors.txt"
 )
@@ -166,7 +166,7 @@ func (l *LogCapture) getComponentsWorkload() error {
 	return allErrors
 }
 
-// pushWorkloadContainers - pushes all containers of all pods of all workload items to containersChan
+// pushWorkloadContainers - pushes all containers of all pods of all workload items to containersChan.
 func (l *LogCapture) pushWorkloadContainers() {
 	for _, workload := range l.workloads {
 		if workload.podsList == nil || len(workload.podsList.Items) == 0 {
@@ -349,7 +349,7 @@ func (l *LogCapture) resultCollectorAndAuditor(w *tabwriter.Writer) error {
 	}
 }
 
-// getContainerLogAndUpdateResult - is a worker to fetch logs for a container from containersChan and write its status to resultsChan
+// getContainerLogAndUpdateResult - is a worker to fetch logs for a container from containersChan and write its status to resultsChan.
 func (l *LogCapture) getContainerLogAndUpdateResult() {
 	for cd := range l.containersChan {
 		logErr := l.getContainerLogs(cd)

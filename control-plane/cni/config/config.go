@@ -42,7 +42,7 @@ type CNIConfig struct {
 	Multus bool `json:"multus"      mapstructure:"multus"`
 }
 
-// NewDefaultCNIConfig is testing utility
+// NewDefaultCNIConfig is a testing utility.
 func NewDefaultCNIConfig() *CNIConfig {
 	return &CNIConfig{
 		Name:             DefaultPluginName,
