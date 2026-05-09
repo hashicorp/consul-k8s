@@ -234,6 +234,22 @@ func createScalingGatewayClassResources(
 		})))
 	})
 
+	// Wait for the controller to accept the GatewayClass before returning.
+	// Creating a Gateway before the GatewayClass is accepted causes the controller
+	// to skip reconciliation, so the Deployment is never created.
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		var gc gwv1.GatewayClass
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayClassName}, &gc)
+		require.NoError(r, err)
+		for _, cond := range gc.Status.Conditions {
+			if cond.Type == string(gwv1.GatewayClassConditionStatusAccepted) {
+				require.Equal(r, metav1.ConditionTrue, cond.Status, "GatewayClass %q not yet accepted: %s", gatewayClassName, cond.Message)
+				return
+			}
+		}
+		r.Fatalf("GatewayClass %q: accepted condition not yet set", gatewayClassName)
+	})
+
 	return gatewayClassName
 }
 
