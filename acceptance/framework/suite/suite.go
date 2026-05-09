@@ -119,19 +119,24 @@ func installCRDs(cfg *config.TestConfig) error {
 	// Deployments, ServiceAccounts, etc. that we must not apply to the cluster.
 	crdOnly := filterCRDs(helmOut)
 
-	kubectlArgs := []string{"apply", "--server-side", "--force-conflicts", "-f", "-"}
-	primaryEnv := cfg.GetPrimaryKubeEnv()
-	if primaryEnv.KubeConfig != "" {
-		kubectlArgs = append([]string{"--kubeconfig", primaryEnv.KubeConfig}, kubectlArgs...)
-	}
-	if primaryEnv.KubeContext != "" {
-		kubectlArgs = append([]string{"--context", primaryEnv.KubeContext}, kubectlArgs...)
-	}
+	// Apply CRDs to every configured cluster context so that multi-cluster
+	// tests (partitions, peering, wan-federation) have CRDs available on all
+	// secondary clusters. The gateway-resources post-upgrade hook job runs on
+	// whichever cluster helm installs to, so each cluster needs the CRDs.
+	for _, env := range cfg.KubeEnvs {
+		kubectlArgs := []string{"apply", "--server-side", "--force-conflicts", "-f", "-"}
+		if env.KubeConfig != "" {
+			kubectlArgs = append([]string{"--kubeconfig", env.KubeConfig}, kubectlArgs...)
+		}
+		if env.KubeContext != "" {
+			kubectlArgs = append([]string{"--context", env.KubeContext}, kubectlArgs...)
+		}
 
-	kubectl := exec.Command("kubectl", kubectlArgs...)
-	kubectl.Stdin = bytes.NewReader(crdOnly)
-	if out, err := kubectl.CombinedOutput(); err != nil {
-		return fmt.Errorf("kubectl apply CRDs: %w\n%s", err, out)
+		kubectl := exec.Command("kubectl", kubectlArgs...)
+		kubectl.Stdin = bytes.NewReader(crdOnly)
+		if out, err := kubectl.CombinedOutput(); err != nil {
+			return fmt.Errorf("kubectl apply CRDs to context %s: %w\n%s", env.KubeContext, err, out)
+		}
 	}
 
 	return nil
