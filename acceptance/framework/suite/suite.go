@@ -142,20 +142,22 @@ func installCRDs(cfg *config.TestConfig) error {
 		// meta.helm.sh/* annotations. Add them so that consul-k8s install
 		// (CLI tests) and helm install/upgrade can adopt the pre-installed CRDs
 		// without "invalid ownership metadata" errors.
-		sel := "release=consul,component=crd"
-		label := exec.Command("kubectl", append(ctxArgs,
-			"label", "--overwrite", "crds", "-l", sel,
-			"app.kubernetes.io/managed-by=Helm")...)
-		if out, err := label.CombinedOutput(); err != nil {
-			return fmt.Errorf("kubectl label CRDs in context %s: %w\n%s", env.KubeContext, err, out)
-		}
+		// Use explicit CRD names rather than a label selector so that external
+		// CRDs (e.g. gateway.networking.k8s.io) — which carry different labels
+		// than consul-specific CRDs — also receive the required ownership metadata.
+		crdNames := extractCRDNames(crdOnly)
+		if len(crdNames) > 0 {
+			labelArgs := append(append(ctxArgs, "label", "--overwrite", "crd"), crdNames...)
+			labelArgs = append(labelArgs, "app.kubernetes.io/managed-by=Helm")
+			if out, err := exec.Command("kubectl", labelArgs...).CombinedOutput(); err != nil {
+				return fmt.Errorf("kubectl label CRDs in context %s: %w\n%s", env.KubeContext, err, out)
+			}
 
-		annotate := exec.Command("kubectl", append(ctxArgs,
-			"annotate", "--overwrite", "crds", "-l", sel,
-			"meta.helm.sh/release-name=consul",
-			"meta.helm.sh/release-namespace=consul")...)
-		if out, err := annotate.CombinedOutput(); err != nil {
-			return fmt.Errorf("kubectl annotate CRDs in context %s: %w\n%s", env.KubeContext, err, out)
+			annotateArgs := append(append(ctxArgs, "annotate", "--overwrite", "crd"), crdNames...)
+			annotateArgs = append(annotateArgs, "meta.helm.sh/release-name=consul", "meta.helm.sh/release-namespace=consul")
+			if out, err := exec.Command("kubectl", annotateArgs...).CombinedOutput(); err != nil {
+				return fmt.Errorf("kubectl annotate CRDs in context %s: %w\n%s", env.KubeContext, err, out)
+			}
 		}
 	}
 
@@ -171,4 +173,30 @@ func filterCRDs(manifest []byte) []byte {
 		}
 	}
 	return []byte(strings.Join(crds, "\n---"))
+}
+
+// extractCRDNames returns the metadata.name value from each CRD document.
+func extractCRDNames(manifest []byte) []string {
+	var names []string
+	for _, doc := range strings.Split(string(manifest), "\n---") {
+		if !strings.Contains(doc, "kind: CustomResourceDefinition") {
+			continue
+		}
+		inMetadata := false
+		for _, line := range strings.Split(doc, "\n") {
+			if strings.TrimRight(line, " ") == "metadata:" {
+				inMetadata = true
+				continue
+			}
+			if inMetadata && strings.HasPrefix(line, "  name:") {
+				names = append(names, strings.TrimSpace(strings.TrimPrefix(line, "  name:")))
+				break
+			}
+			// A non-indented line after metadata: means we've passed it.
+			if inMetadata && len(line) > 0 && line[0] != ' ' {
+				inMetadata = false
+			}
+		}
+	}
+	return names
 }
