@@ -250,8 +250,11 @@ func createScalingGateway(
 
 	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        helpers.RandomName(),
-			Namespace:   namespace,
+			Name:      helpers.RandomName(),
+			Namespace: namespace,
+			Labels: map[string]string{
+				"component": "api-gateway",
+			},
 			Annotations: annotations,
 		},
 		Spec: gwv1.GatewaySpec{
