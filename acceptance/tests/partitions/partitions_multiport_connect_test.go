@@ -322,7 +322,8 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 //     This ensures traffic traverses both CPs in both directions, avoiding
 //     asymmetric routing that causes kube-proxy's KUBE-FORWARD chain to drop
 //     SYN-ACK packets as INVALID (conntrack never saw the original SYN).
-//  4. Adds iptables rules to prevent masquerading of cross-cluster pod traffic.
+//  4. Adds iptables/ip6tables rules to prevent masquerading of cross-cluster
+//     pod traffic.
 func setupFlatNetworkForKindClusters(t *testing.T, defaultCtx, secondaryCtx environment.TestContext) {
 	t.Helper()
 
@@ -339,16 +340,82 @@ func setupFlatNetworkForKindClusters(t *testing.T, defaultCtx, secondaryCtx envi
 
 	logger.Logf(t, "setting up flat network routing between Kind clusters %q and %q", defaultClusterName, secondaryClusterName)
 
-	// Get Docker IPs of control-plane nodes.
-	defaultCPIP := dockerInspectIP(t, defaultCPNode)
-	secondaryCPIP := dockerInspectIP(t, secondaryCPNode)
-
 	// Get cluster-level pod CIDRs (covering all nodes).
 	defaultPodCIDR := getKindClusterPodCIDR(t, defaultCtx)
 	secondaryPodCIDR := getKindClusterPodCIDR(t, secondaryCtx)
 
+	// Detect address family from the pod CIDRs.
+	isIPv6 := strings.Contains(defaultPodCIDR, ":")
+
+	// Choose the correct Docker IP for each control-plane node.
+	// For IPv6 pod CIDRs the gateway must also be an IPv6 address; the Docker
+	// 'kind' network is dual-stack so every node container has both IPv4 and
+	// IPv6 addresses.  Using an IPv4 gateway for an IPv6 route causes:
+	//   "Error: inet6 address is expected rather than 172.18.x.x"
+	var defaultCPIP, secondaryCPIP string
+	if isIPv6 {
+		defaultCPIP = dockerInspectIPv6(t, defaultCPNode)
+		secondaryCPIP = dockerInspectIPv6(t, secondaryCPNode)
+	} else {
+		defaultCPIP = dockerInspectIP(t, defaultCPNode)
+		secondaryCPIP = dockerInspectIP(t, secondaryCPNode)
+	}
+
 	logger.Logf(t, "default cluster: node=%s ip=%s podCIDR=%s", defaultCPNode, defaultCPIP, defaultPodCIDR)
 	logger.Logf(t, "secondary cluster: node=%s ip=%s podCIDR=%s", secondaryCPNode, secondaryCPIP, secondaryPodCIDR)
+
+	// Fail fast when both clusters share the same pod CIDR.  If the CIDRs
+	// overlap, Calico's (or kindnet's) per-block host routes take precedence
+	// over the /24 cross-cluster route we add below, causing traffic destined
+	// for the remote cluster to be silently delivered to a local pod (or
+	// dropped) → Envoy 503 after 17 minutes of retrying.
+	// Fix: re-create the clusters with per-cluster pod subnets, e.g. by
+	// running 'make kind-cni' or 'make kind' which now use kind-{2,3,4}.config
+	// with non-overlapping ranges.
+	if defaultPodCIDR == secondaryPodCIDR {
+		t.Fatalf("both Kind clusters share the same pod CIDR %s; flat-network "+
+			"routing for mesh-gateway mode 'none' requires distinct pod CIDRs per "+
+			"cluster. Re-create the clusters with non-overlapping pod subnets "+
+			"(e.g. 'make kind-cni' uses kind.config / kind-2.config with "+
+			"192.168.0.0/16 and 192.169.0.0/16 respectively).", defaultPodCIDR)
+	}
+
+	// routeCmd returns the ip command (and any extra flags) for adding a route.
+	// For IPv6 pod CIDRs, 'ip -6 route replace' must be used.
+	routeArgs := func(dest, via string) []string {
+		if isIPv6 {
+			return []string{"ip", "-6", "route", "replace", dest, "via", via}
+		}
+		return []string{"ip", "route", "replace", dest, "via", via}
+	}
+
+	// masqShellCmd builds a shell snippet that inserts a RETURN rule into the
+	// appropriate masquerade chain so that cross-cluster pod traffic is not
+	// SNAT'd.  Different CNI plugins use different chains and tools:
+	//   - kindnet (IPv4):  KIND-MASQ-AGENT in iptables
+	//   - Calico (IPv4):   cali-nat-outgoing in iptables
+	//   - kindnet (IPv6):  KIND-MASQ-AGENT in ip6tables
+	//   - Calico (IPv6):   cali6-nat-outgoing in ip6tables
+	iptablesBin := "iptables"
+	caliChain := "cali-nat-outgoing"
+	if isIPv6 {
+		iptablesBin = "ip6tables"
+		caliChain = "cali6-nat-outgoing"
+	}
+	masqShellCmd := func(cidr string) string {
+		return fmt.Sprintf(
+			"if %s -t nat -L KIND-MASQ-AGENT >/dev/null 2>&1; then "+
+				"%s -t nat -C KIND-MASQ-AGENT -d %s -j RETURN 2>/dev/null || %s -t nat -I KIND-MASQ-AGENT 2 -d %s -j RETURN; "+
+				"elif %s -t nat -L %s >/dev/null 2>&1; then "+
+				"%s -t nat -C %s -d %s -j RETURN 2>/dev/null || %s -t nat -I %s 1 -d %s -j RETURN; "+
+				"else echo 'WARNING: no known masquerade chain found; cross-cluster SNAT may apply'; fi",
+			// KIND-MASQ-AGENT branch
+			iptablesBin,
+			iptablesBin, cidr, iptablesBin, cidr,
+			// Calico branch
+			iptablesBin, caliChain,
+			iptablesBin, caliChain, cidr, iptablesBin, caliChain, cidr)
+	}
 
 	// Add routes on default cluster nodes to reach secondary pod subnet.
 	// Use symmetric routing: worker nodes go via own CP, CP goes via peer CP.
@@ -357,15 +424,12 @@ func setupFlatNetworkForKindClusters(t *testing.T, defaultCtx, secondaryCtx envi
 	for _, node := range defaultNodes {
 		if node == defaultCPNode {
 			// CP routes via peer CP.
-			dockerExec(t, node, "ip", "route", "replace", secondaryPodCIDR, "via", secondaryCPIP)
+			dockerExec(t, node, routeArgs(secondaryPodCIDR, secondaryCPIP)...)
 		} else {
 			// Workers route via own CP.
-			dockerExec(t, node, "ip", "route", "replace", secondaryPodCIDR, "via", defaultCPIP)
+			dockerExec(t, node, routeArgs(secondaryPodCIDR, defaultCPIP)...)
 		}
-		// Prevent masquerading of traffic to the other cluster's pods.
-		dockerExecShell(t, node, fmt.Sprintf(
-			"iptables -t nat -C KIND-MASQ-AGENT -d %s -j RETURN 2>/dev/null || iptables -t nat -I KIND-MASQ-AGENT 2 -d %s -j RETURN",
-			secondaryPodCIDR, secondaryPodCIDR))
+		dockerExecShell(t, node, masqShellCmd(secondaryPodCIDR))
 	}
 
 	// Add routes on secondary cluster nodes to reach default pod subnet.
@@ -374,35 +438,46 @@ func setupFlatNetworkForKindClusters(t *testing.T, defaultCtx, secondaryCtx envi
 	for _, node := range secondaryNodes {
 		if node == secondaryCPNode {
 			// CP routes via peer CP.
-			dockerExec(t, node, "ip", "route", "replace", defaultPodCIDR, "via", defaultCPIP)
+			dockerExec(t, node, routeArgs(defaultPodCIDR, defaultCPIP)...)
 		} else {
 			// Workers route via own CP.
-			dockerExec(t, node, "ip", "route", "replace", defaultPodCIDR, "via", secondaryCPIP)
+			dockerExec(t, node, routeArgs(defaultPodCIDR, secondaryCPIP)...)
 		}
-		// Prevent masquerading of traffic to the other cluster's pods.
-		dockerExecShell(t, node, fmt.Sprintf(
-			"iptables -t nat -C KIND-MASQ-AGENT -d %s -j RETURN 2>/dev/null || iptables -t nat -I KIND-MASQ-AGENT 2 -d %s -j RETURN",
-			defaultPodCIDR, defaultPodCIDR))
+		dockerExecShell(t, node, masqShellCmd(defaultPodCIDR))
 	}
 
 	logger.Log(t, "flat network routing configured between Kind clusters")
 }
 
-// dockerInspectIP returns the Docker container IP address for a given container name.
+// dockerInspectIP returns the Docker container IPv4 address for a given container name.
 func dockerInspectIP(t *testing.T, containerName string) string {
 	t.Helper()
 	out, err := exec.Command("docker", "inspect", "-f",
 		"{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", containerName).CombinedOutput()
 	require.NoError(t, err, "docker inspect %s failed: %s", containerName, string(out))
 	ip := strings.TrimSpace(string(out))
-	require.NotEmpty(t, ip, "no IP found for container %s", containerName)
+	require.NotEmpty(t, ip, "no IPv4 address found for container %s", containerName)
+	return ip
+}
+
+// dockerInspectIPv6 returns the Docker container IPv6 address for a given container name.
+// The Docker 'kind' network is dual-stack, so every Kind node container has both
+// an IPv4 (IPAddress) and an IPv6 (GlobalIPv6Address) address.  Use this function
+// when the pod CIDR is IPv6 so that 'ip -6 route' can accept the gateway address.
+func dockerInspectIPv6(t *testing.T, containerName string) string {
+	t.Helper()
+	out, err := exec.Command("docker", "inspect", "-f",
+		"{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}", containerName).CombinedOutput()
+	require.NoError(t, err, "docker inspect %s failed: %s", containerName, string(out))
+	ip := strings.TrimSpace(string(out))
+	require.NotEmpty(t, ip, "no IPv6 address found for container %s; ensure the Docker 'kind' network is dual-stack", containerName)
 	return ip
 }
 
 // getKindClusterPodCIDR retrieves the cluster-level pod CIDR by computing the
 // minimal CIDR that covers all node pod CIDRs. In multi-node Kind clusters,
-// each node gets a /24 slice of the broader cluster CIDR (e.g. 10.244.0.0/16).
-// Using a single node's /24 would miss pods on other nodes.
+// each node gets a /24 (IPv4) or /80 (IPv6) slice of the broader cluster CIDR.
+// Using a single node's prefix would miss pods on other nodes.
 func getKindClusterPodCIDR(t *testing.T, ctx environment.TestContext) string {
 	t.Helper()
 	opts := ctx.KubectlOptions(t)
@@ -419,7 +494,19 @@ func getKindClusterPodCIDR(t *testing.T, ctx environment.TestContext) string {
 		return cidrs[0]
 	}
 
-	// Parse all CIDRs to find the common prefix and compute the covering CIDR.
+	// For IPv6 CIDRs, return the first one directly — Kind single-node IPv6
+	// clusters only have one node CIDR, and multi-node IPv6 is not a current
+	// test configuration. The IPv4 widening logic below doesn't apply to IPv6.
+	if strings.Contains(cidrs[0], ":") {
+		// Return the first CIDR; all node CIDRs belong to the same /16 pool
+		// configured in the cluster's kind config, so the pool itself is the
+		// correct cross-cluster route destination.
+		_, ipNet, err := net.ParseCIDR(cidrs[0])
+		require.NoError(t, err, "failed to parse CIDR %s", cidrs[0])
+		return ipNet.String()
+	}
+
+	// Parse all IPv4 CIDRs to find the common prefix and compute the covering CIDR.
 	// For Kind clusters, all node CIDRs are slices of the same cluster CIDR,
 	// so we widen the mask to cover all of them.
 	firstIP, firstNet, err := net.ParseCIDR(cidrs[0])
