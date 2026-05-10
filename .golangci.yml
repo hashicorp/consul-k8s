@@ -12,7 +12,6 @@ linters:
         - shadow
         - unusedwrite
         - printf
-        - inline
       enable-all: true
   exclusions:
     generated: lax
