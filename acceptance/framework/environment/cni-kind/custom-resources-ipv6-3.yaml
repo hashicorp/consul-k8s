@@ -1,0 +1,25 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Calico installation for dc3 – IPv6 IPAM pool fd00:10:246::/64
+# Must match the podSubnet in kind-ipv6-3.config.
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  calicoNetwork:
+    ipPools:
+    - blockSize: 122
+      cidr: fd00:10:246::/64
+      encapsulation: VXLANCrossSubnet
+      natOutgoing: Enabled
+      nodeSelector: all()
+
+---
+
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}
