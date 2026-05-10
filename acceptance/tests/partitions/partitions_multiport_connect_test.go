@@ -474,14 +474,52 @@ func dockerInspectIPv6(t *testing.T, containerName string) string {
 	return ip
 }
 
-// getKindClusterPodCIDR retrieves the cluster-level pod CIDR by computing the
-// minimal CIDR that covers all node pod CIDRs. In multi-node Kind clusters,
-// each node gets a /24 (IPv4) or /80 (IPv6) slice of the broader cluster CIDR.
-// Using a single node's prefix would miss pods on other nodes.
+// getKindClusterPodCIDR retrieves the cluster-level pod CIDR for a Kind cluster.
+//
+// Reading spec.podCIDR on nodes gives only the per-node /24 slice allocated by
+// kube-controller-manager — not the full /16 pool configured in the Kind file.
+// With Calico CNI, pods can span /26 blocks across the entire /16 pool, so
+// routing only the first /24 would miss pods on later blocks.  More critically,
+// when two clusters are accidentally created with the same podSubnet (e.g. both
+// using the default kind.config before per-cluster configs were added), both
+// nodes get spec.podCIDR = 192.168.0.0/24 and the overlap cannot be detected
+// at the /16 level.
+//
+// Instead, read the podSubnet directly from the kubeadm-config ConfigMap, which
+// records the exact podSubnet value from the Kind config file — e.g.
+// 192.168.0.0/16 for dc1 or 192.169.0.0/16 for dc2.  This gives:
+//  1. Accurate overlap detection (compares /16 vs /16, not /24 vs /24).
+//  2. Routes covering ALL pods in the cluster, not just the first node's /24.
+//
+// Falls back to computing a covering CIDR from node spec.podCIDR values when
+// kubeadm-config is unavailable (non-Kind or non-kubeadm clusters).
 func getKindClusterPodCIDR(t *testing.T, ctx environment.TestContext) string {
 	t.Helper()
 	opts := ctx.KubectlOptions(t)
 
+	// Primary: read the cluster-level CIDR from the kubeadm configuration.
+	// Kind always bootstraps with kubeadm, so this ConfigMap is always present.
+	kubeadmOutput, err := k8s.RunKubectlAndGetOutputE(t, opts,
+		"-n", "kube-system", "get", "cm", "kubeadm-config",
+		"-o", "jsonpath={.data.ClusterConfiguration}")
+	if err == nil {
+		for _, line := range strings.Split(kubeadmOutput, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "podSubnet:") {
+				cidr := strings.TrimSpace(strings.TrimPrefix(line, "podSubnet:"))
+				// Strip surrounding quotes that Kind may add for IPv6 values.
+				cidr = strings.Trim(cidr, `"'`)
+				_, ipNet, parseErr := net.ParseCIDR(cidr)
+				if parseErr == nil {
+					return ipNet.String()
+				}
+				// Return as-is if ParseCIDR cannot normalise (shouldn't happen).
+				return cidr
+			}
+		}
+	}
+
+	// Fallback: compute a covering CIDR from each node's spec.podCIDR.
 	// Get all node pod CIDRs.
 	output, err := k8s.RunKubectlAndGetOutputE(t, opts, "get", "nodes", "-o",
 		"jsonpath={.items[*].spec.podCIDR}")
@@ -494,13 +532,10 @@ func getKindClusterPodCIDR(t *testing.T, ctx environment.TestContext) string {
 		return cidrs[0]
 	}
 
-	// For IPv6 CIDRs, return the first one directly — Kind single-node IPv6
-	// clusters only have one node CIDR, and multi-node IPv6 is not a current
-	// test configuration. The IPv4 widening logic below doesn't apply to IPv6.
+	// For IPv6 CIDRs, return the first node's network address — multi-node IPv6
+	// is not a current test configuration and the IPv4 widening logic below does
+	// not apply to IPv6.
 	if strings.Contains(cidrs[0], ":") {
-		// Return the first CIDR; all node CIDRs belong to the same /16 pool
-		// configured in the cluster's kind config, so the pool itself is the
-		// correct cross-cluster route destination.
 		_, ipNet, err := net.ParseCIDR(cidrs[0])
 		require.NoError(t, err, "failed to parse CIDR %s", cidrs[0])
 		return ipNet.String()
