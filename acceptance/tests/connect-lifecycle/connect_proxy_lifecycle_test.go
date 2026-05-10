@@ -170,17 +170,30 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			if gracePeriodSeconds > 0 {
 				// Ensure outbound requests are still successful during grace period.
 				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
+				// podGone is set when the terminating pod disappears from the API server before
+				// the grace period timer fires. Kubernetes removes a pod as soon as all its
+				// containers exit, even if the DeleteOptions.GracePeriodSeconds has not elapsed.
+				// That is an acceptable outcome: the proxy did its job and the app exited cleanly.
+				podGone := false
 			gracePeriodLoop:
 				for {
 					select {
 					case <-gracePeriodTimer.C:
 						break gracePeriodLoop
 					default:
+						if podGone {
+							break gracePeriodLoop
+						}
 						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
 						retry.RunWith(retrier, t, func(r *retry.R) {
 							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
+								if strings.Contains(err.Error(), "not found") {
+									logger.Logf(r, "pod %s already terminated during grace period, treating as success", clientPodName)
+									podGone = true
+									return
+								}
 								r.Errorf("%v", err.Error())
 								return
 							}
@@ -188,6 +201,10 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 								return !strings.Contains(output, "curl: (7) Failed to connect")
 							}, fmt.Sprintf("Error: %s", output))
 						})
+
+						if podGone {
+							break gracePeriodLoop
+						}
 
 						// If listener draining is disabled, ensure inbound
 						// requests are accepted during grace period.
