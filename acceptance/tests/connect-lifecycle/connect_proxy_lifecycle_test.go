@@ -189,7 +189,9 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
-								if strings.Contains(err.Error(), "not found") {
+								// kubectl writes "Error from server (NotFound)" to stderr (captured in output),
+								// while err.Error() is just "exit status 1".
+								if strings.Contains(err.Error(), "not found") || strings.Contains(output, "not found") || strings.Contains(output, "NotFound") {
 									logger.Logf(r, "pod %s already terminated during grace period, treating as success", clientPodName)
 									podGone = true
 									return
