@@ -109,11 +109,15 @@ def main() -> None:
         pkg = entry["test-packages"]
         pkg_timings = timings.get(pkg)  # None if package has no recorded data
 
+        # Pass through any extra fields (e.g. num-clusters) to every shard for this package.
+        # Excludes the canonical fields that the generator controls itself.
+        extra = {k: v for k, v in entry.items() if k not in ("runner", "test-packages", "run-filter")}
+
         discovered = discover_tests(pkg)
 
         # No timing data at all → single unfiltered shard, no change in behaviour
         if not pkg_timings or not discovered:
-            matrix.append({"runner": runner_idx, "test-packages": pkg})
+            matrix.append({"runner": runner_idx, "test-packages": pkg, **extra})
             runner_idx += 1
             continue
 
@@ -126,7 +130,7 @@ def main() -> None:
 
         if len(shards) <= 1:
             # Bin-packing produced a single shard — no filter needed
-            matrix.append({"runner": runner_idx, "test-packages": pkg})
+            matrix.append({"runner": runner_idx, "test-packages": pkg, **extra})
             runner_idx += 1
         else:
             for shard_tests in shards:
@@ -136,6 +140,7 @@ def main() -> None:
                         "runner": runner_idx,
                         "test-packages": pkg,
                         "run-filter": run_filter,
+                        **extra,
                     }
                 )
                 runner_idx += 1

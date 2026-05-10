@@ -7,7 +7,7 @@
 - {runner: 2, test-packages: "sameness"}
 - {runner: 3, test-packages: "connect"}
 - {runner: 4, test-packages: "snapshot-agent"}
-- {runner: 5, test-packages: "wan-federation"}
+- {runner: 5, test-packages: "wan-federation", num-clusters: "2"}
 - {runner: 6, test-packages: "cli"}
 - {runner: 7, test-packages: "vault"}
 - {runner: 8, test-packages: "metrics"}
