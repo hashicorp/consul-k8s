@@ -43,8 +43,16 @@
     "TestPartitions_Connect_SingleNamespaceACLs": 553,
     "TestPartitions_Connect_MirroredNamespaces": 553,
     "TestPartitions_Connect_MirroredNamespacesACLs": 553,
-    "TestPartitions_Connect_MultiportServices": 1802,
-    "TestPartitions_Sync": 1300,
+    "TestPartitions_Connect_MultiportServices_ACLsDisabled_LocalGateway": 450,
+    "TestPartitions_Connect_MultiportServices_ACLsDisabled_RemoteGateway": 450,
+    "TestPartitions_Connect_MultiportServices_ACLsEnabled_LocalGateway": 450,
+    "TestPartitions_Connect_MultiportServices_ACLsEnabled_RemoteGateway": 450,
+    "TestPartitions_Sync_DefaultNamespace": 217,
+    "TestPartitions_Sync_DefaultNamespaceACLs": 217,
+    "TestPartitions_Sync_SingleNamespace": 217,
+    "TestPartitions_Sync_SingleNamespaceACLs": 217,
+    "TestPartitions_Sync_MirrorK8S": 217,
+    "TestPartitions_Sync_MirrorK8SACLs": 217,
     "TestPartitions_Gateway": 385
   },
   "peering": {
