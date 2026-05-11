@@ -361,13 +361,19 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			go func() {
 				// reconcile multiple times with no changes to be sure
 				for i := 0; i < 5; i++ {
-					_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
+					// Use a local variable to avoid a data race with the outer `err`
+					// that is also written inside the require.Eventually closure below.
+					_, reconcileErr := gwCtrl.Reconcile(ctx, reconcile.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: k8sGWObj.Namespace,
 							Name:      k8sGWObj.Name,
 						},
 					})
-					require.NoError(t, err)
+					// Ignore errors caused by test-cleanup cancelling the context.
+					if reconcileErr != nil && ctx.Err() == nil {
+						t.Errorf("reconcile returned unexpected error (iteration %d): %v", i, reconcileErr)
+						return
+					}
 				}
 			}()
 
@@ -410,8 +416,9 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 					certChanged = curCertModifyIndex != newCertEntry.GetModifyIndex() || curCertResourceVersion != newCertResourceVersion
 				}
 
-				// Return true if ANY resource changed (indicating infinite reconciliation)
-				return gwChanged || httpRouteChanged || tcpRouteChanged || certChanged
+				// Return true if NO resource changed (indicating stable reconciliation - no infinite loop).
+				// If any resource keeps changing, this condition will never be satisfied and the test will fail.
+				return !gwChanged && !httpRouteChanged && !tcpRouteChanged && !certChanged
 			}, time.Duration(2*time.Second), time.Duration(500*time.Millisecond), "Resources should not change during reconciliation (infinite reconciliation detected)",
 			)
 		})
