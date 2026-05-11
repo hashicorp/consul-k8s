@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	// gwv1beta1 replaced by gwv1
+	// gwv1beta1 replaced by gwv1.
 
 	"github.com/hashicorp/consul/api"
 
