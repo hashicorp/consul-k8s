@@ -76,10 +76,12 @@ resource "azurerm_kubernetes_cluster" "default" {
   // communication is tested, the connections goes through the appropriate gateway
   // rather than directly from pod to pod.
   network_profile {
-    network_plugin = "kubenet"
-    service_cidr   = "10.0.0.0/16"
-    dns_service_ip = "10.0.0.10"
-    pod_cidr       = "10.244.0.0/16"
+    network_plugin      = "azure"
+    network_plugin_mode = "overlay"
+    network_policy      = "calico"
+    service_cidr        = "10.0.0.0/16"
+    dns_service_ip      = "10.0.0.10"
+    pod_cidr            = "10.244.0.0/16"
   }
 
   default_node_pool {
@@ -90,9 +92,8 @@ resource "azurerm_kubernetes_cluster" "default" {
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
   }
 
-  service_principal {
-    client_id     = var.client_id
-    client_secret = var.client_secret
+  identity {
+    type = "SystemAssigned"
   }
 
   tags = var.tags

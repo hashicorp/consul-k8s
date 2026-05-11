@@ -14,7 +14,7 @@
 # - {runner: 9, test-packages: "basic"}
 # - {runner: 10, test-packages: "cli"}
 # - {runner: 11, test-packages: "config-entries"}
-# - {runner: 12, test-packages: "api-gateway"}
+- {runner: 12, test-packages: "api-gateway"}
 # - {runner: 13, test-packages: "ingress-gateway"}
 # - {runner: 14, test-packages: "terminating-gateway"}
 - {runner: 15, test-packages: "vault"}
