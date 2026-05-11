@@ -163,10 +163,10 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			// instead of event-based waiting. This is because controller-runtime's fake client has
 			// limited watch support for CRDs, making event-based synchronization unreliable in tests.
 			// The polling approach with require.Eventually is more robust for testing with fake clients.
-			_ = resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
-			_ = resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
-			_ = resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
-			_ = resourceCache.Subscribe(ctx, api.FileSystemCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
+			gwSub := resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
+			httpRouteSub := resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
+			tcpRouteSub := resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
+			fileSystemCertSub := resourceCache.Subscribe(ctx, api.FileSystemCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
 
 			// ✅ Create resources AFTER subscriptions are set up
 			cert := tc.certFn(t, ctx, k8sClient, tc.namespace)
@@ -293,7 +293,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			}
 			drainUntilIdle(250 * time.Millisecond)
 
-			gwNamespaceName := types.NamespacedName{
+			gwNamespaceName = types.NamespacedName{
 				Name:      k8sGWObj.Name,
 				Namespace: k8sGWObj.Namespace,
 			}

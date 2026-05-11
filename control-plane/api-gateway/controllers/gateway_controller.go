@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -475,7 +474,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
 		Watches(
-			&gwv1beta1.ReferenceGrant{},
+			&gwv1.ReferenceGrant{},
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
 		).
 		Watches(
@@ -630,7 +629,7 @@ func (r *GatewayController) transformTCPRoute(ctx context.Context, o client.Obje
 	route := o.(*gwv1alpha2.TCPRoute)
 
 	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
-	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1.RouteParentStatus) gwv1.ParentReference {
 		return parentStatus.ParentRef
 	})))
 	return append(refs, statusRefs...)
@@ -946,8 +945,8 @@ func (c *GatewayController) getNamespaces(ctx context.Context) (map[string]corev
 	return namespaces, nil
 }
 
-func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1beta1.ReferenceGrant, error) {
-	var list gwv1beta1.ReferenceGrantList
+func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1.ReferenceGrant, error) {
+	var list gwv1.ReferenceGrantList
 
 	if err := c.Client.List(ctx, &list); err != nil {
 		return nil, err

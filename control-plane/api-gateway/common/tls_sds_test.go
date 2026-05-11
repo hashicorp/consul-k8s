@@ -8,15 +8,15 @@ import (
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestResolveListenerTLSSDSConfig(t *testing.T) {
 	t.Parallel()
 
 	for name, tc := range map[string]struct {
-		gateway        gwv1beta1.Gateway
-		listener       gwv1beta1.Listener
+		gateway        gwv1.Gateway
+		listener       gwv1.Listener
 		resources      *ResourceMap
 		expectConfig   bool
 		expectResolved string
@@ -24,29 +24,29 @@ func TestResolveListenerTLSSDSConfig(t *testing.T) {
 		expectSet      bool
 	}{
 		"not configured": {
-			gateway:   gwv1beta1.Gateway{},
-			listener:  gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{}},
+			gateway:   gwv1.Gateway{},
+			listener:  gwv1.Listener{TLS: &gwv1.ListenerTLSConfig{}},
 			expectSet: false,
 		},
 		"gateway defaults": {
-			gateway: gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			gateway: gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 				TLSSDSClusterNameAnnotationKey:  "sds-cluster",
 				TLSSDSCertResourceAnnotationKey: "default-cert",
 			}}},
-			listener:       gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{}},
+			listener:       gwv1.Listener{TLS: &gwv1.ListenerTLSConfig{}},
 			expectConfig:   true,
 			expectResolved: "sds-cluster",
 			expectResource: "default-cert",
 			expectSet:      true,
 		},
 		"listener override": {
-			gateway: gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			gateway: gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 				TLSSDSClusterNameAnnotationKey:  "sds-cluster",
 				TLSSDSCertResourceAnnotationKey: "default-cert",
 			}}},
-			listener: gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
-				gwv1beta1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "listener-cluster",
-				gwv1beta1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
+			listener: gwv1.Listener{TLS: &gwv1.ListenerTLSConfig{Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+				gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "listener-cluster",
+				gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
 			}}},
 			expectConfig:   true,
 			expectResolved: "listener-cluster",
@@ -54,10 +54,10 @@ func TestResolveListenerTLSSDSConfig(t *testing.T) {
 			expectSet:      true,
 		},
 		"partial config": {
-			gateway: gwv1beta1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			gateway: gwv1.Gateway{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 				TLSSDSClusterNameAnnotationKey: "sds-cluster",
 			}}},
-			listener:  gwv1beta1.Listener{TLS: &gwv1beta1.GatewayTLSConfig{}},
+			listener:  gwv1.Listener{TLS: &gwv1.ListenerTLSConfig{}},
 			expectSet: true,
 		},
 	} {

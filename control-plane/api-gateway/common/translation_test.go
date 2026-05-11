@@ -363,7 +363,7 @@ func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
 		EnableK8sMirroring:     true,
 	}
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "api-gateway",
 			Namespace: "default",
@@ -372,21 +372,21 @@ func TestTranslator_ToAPIGateway_TLSWithSDS(t *testing.T) {
 				TLSSDSCertResourceAnnotationKey: "default-cert",
 			},
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			Listeners: []gwv1beta1.Listener{
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{
 				{
 					Name:     "gateway-default-sds",
 					Port:     8443,
-					Protocol: gwv1beta1.HTTPSProtocolType,
-					TLS:      &gwv1beta1.GatewayTLSConfig{},
+					Protocol: gwv1.HTTPSProtocolType,
+					TLS:      &gwv1.ListenerTLSConfig{},
 				},
 				{
 					Name:     "listener-override-sds",
 					Port:     9443,
-					Protocol: gwv1beta1.HTTPSProtocolType,
-					TLS: &gwv1beta1.GatewayTLSConfig{Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
-						gwv1beta1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "listener-sds",
-						gwv1beta1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
+					Protocol: gwv1.HTTPSProtocolType,
+					TLS: &gwv1.ListenerTLSConfig{Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+						gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "listener-sds",
+						gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
 					}},
 				},
 			},
@@ -1826,17 +1826,17 @@ func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter(t *testing.T) {
 		},
 	})
 
-	route := gwv1beta1.HTTPRoute{
+	route := gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
-		Spec: gwv1beta1.HTTPRouteSpec{
-			Rules: []gwv1beta1.HTTPRouteRule{{
-				BackendRefs: []gwv1beta1.HTTPBackendRef{{
-					BackendRef: gwv1beta1.BackendRef{BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "backend"}},
-					Filters: []gwv1beta1.HTTPRouteFilter{{
-						Type: gwv1beta1.HTTPRouteFilterExtensionRef,
-						ExtensionRef: &gwv1beta1.LocalObjectReference{
-							Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
-							Kind:  gwv1beta1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+		Spec: gwv1.HTTPRouteSpec{
+			Rules: []gwv1.HTTPRouteRule{{
+				BackendRefs: []gwv1.HTTPBackendRef{{
+					BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "backend"}},
+					Filters: []gwv1.HTTPRouteFilter{{
+						Type: gwv1.HTTPRouteFilterExtensionRef,
+						ExtensionRef: &gwv1.LocalObjectReference{
+							Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+							Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
 							Name:  "backend-sds",
 						},
 					}},
@@ -1860,7 +1860,7 @@ func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter_InheritsCluster(t *testing.T
 	translator := ResourceTranslator{EnableConsulNamespaces: true, EnableK8sMirroring: true}
 	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sds-gateway",
@@ -1870,12 +1870,12 @@ func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter_InheritsCluster(t *testing.T
 				TLSSDSCertResourceAnnotationKey: "listener-cert",
 			},
 		},
-		Spec: gwv1beta1.GatewaySpec{
-			Listeners: []gwv1beta1.Listener{{
+		Spec: gwv1.GatewaySpec{
+			Listeners: []gwv1.Listener{{
 				Name:     "https",
 				Port:     8443,
-				Protocol: gwv1beta1.HTTPSProtocolType,
-				TLS:      &gwv1beta1.GatewayTLSConfig{},
+				Protocol: gwv1.HTTPSProtocolType,
+				TLS:      &gwv1.ListenerTLSConfig{},
 			}},
 		},
 	}
@@ -1895,24 +1895,24 @@ func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter_InheritsCluster(t *testing.T
 		},
 	})
 
-	httpsSection := gwv1beta1.SectionName("https")
-	route := gwv1beta1.HTTPRoute{
+	httpsSection := gwv1.SectionName("https")
+	route := gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
-		Spec: gwv1beta1.HTTPRouteSpec{
-			CommonRouteSpec: gwv1beta1.CommonRouteSpec{
-				ParentRefs: []gwv1beta1.ParentReference{{
-					Name:        gwv1beta1.ObjectName("sds-gateway"),
+		Spec: gwv1.HTTPRouteSpec{
+			CommonRouteSpec: gwv1.CommonRouteSpec{
+				ParentRefs: []gwv1.ParentReference{{
+					Name:        gwv1.ObjectName("sds-gateway"),
 					SectionName: &httpsSection,
 				}},
 			},
-			Rules: []gwv1beta1.HTTPRouteRule{{
-				BackendRefs: []gwv1beta1.HTTPBackendRef{{
-					BackendRef: gwv1beta1.BackendRef{BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "backend"}},
-					Filters: []gwv1beta1.HTTPRouteFilter{{
-						Type: gwv1beta1.HTTPRouteFilterExtensionRef,
-						ExtensionRef: &gwv1beta1.LocalObjectReference{
-							Group: gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup),
-							Kind:  gwv1beta1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+			Rules: []gwv1.HTTPRouteRule{{
+				BackendRefs: []gwv1.HTTPBackendRef{{
+					BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "backend"}},
+					Filters: []gwv1.HTTPRouteFilter{{
+						Type: gwv1.HTTPRouteFilterExtensionRef,
+						ExtensionRef: &gwv1.LocalObjectReference{
+							Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+							Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
 							Name:  "backend-sds",
 						},
 					}},
@@ -1937,12 +1937,12 @@ func TestTranslator_ToHTTPRoute_NoBackendTLSSDSFilter(t *testing.T) {
 	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
 	resources.AddService(types.NamespacedName{Namespace: "default", Name: "backend"}, "backend")
 
-	route := gwv1beta1.HTTPRoute{
+	route := gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
-		Spec: gwv1beta1.HTTPRouteSpec{
-			Rules: []gwv1beta1.HTTPRouteRule{{
-				BackendRefs: []gwv1beta1.HTTPBackendRef{{
-					BackendRef: gwv1beta1.BackendRef{BackendObjectReference: gwv1beta1.BackendObjectReference{Name: "backend"}},
+		Spec: gwv1.HTTPRouteSpec{
+			Rules: []gwv1.HTTPRouteRule{{
+				BackendRefs: []gwv1.HTTPBackendRef{{
+					BackendRef: gwv1.BackendRef{BackendObjectReference: gwv1.BackendObjectReference{Name: "backend"}},
 				}},
 			}},
 		},
@@ -1955,8 +1955,8 @@ func TestTranslator_ToHTTPRoute_NoBackendTLSSDSFilter(t *testing.T) {
 	require.Nil(t, out.Rules[0].Services[0].TLS)
 }
 
-func newSectionNamePtr(s string) *gwv1beta1.SectionName {
-	sectionName := gwv1beta1.SectionName(s)
+func newSectionNamePtr(s string) *gwv1.SectionName {
+	sectionName := gwv1.SectionName(s)
 	return &sectionName
 }
 
@@ -2114,7 +2114,7 @@ func TestResourceTranslator_toAPIGatewayListener_WithSDSAndCertificateRefs(t *te
 	resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
 	resources.ReferenceCountCertificate(generateTestCertificate(t, "default", "gw-cert"))
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "gw",
@@ -2122,18 +2122,18 @@ func TestResourceTranslator_toAPIGatewayListener_WithSDSAndCertificateRefs(t *te
 		},
 	}
 
-	listener := gwv1beta1.Listener{
+	listener := gwv1.Listener{
 		Name:     "https",
 		Port:     8443,
-		Protocol: gwv1beta1.HTTPSProtocolType,
-		TLS: &gwv1beta1.GatewayTLSConfig{
-			Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
-				gwv1beta1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "sds-cluster",
-				gwv1beta1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
+		Protocol: gwv1.HTTPSProtocolType,
+		TLS: &gwv1.ListenerTLSConfig{
+			Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+				gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "sds-cluster",
+				gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "listener-cert",
 			},
-			CertificateRefs: []gwv1beta1.SecretObjectReference{{
+			CertificateRefs: []gwv1.SecretObjectReference{{
 				Name:      "gw-cert",
-				Namespace: PointerTo(gwv1beta1.Namespace("default")),
+				Namespace: PointerTo(gwv1.Namespace("default")),
 			}},
 		},
 	}
