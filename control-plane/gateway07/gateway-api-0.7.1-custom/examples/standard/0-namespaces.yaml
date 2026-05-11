@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 # These namespaces can be used for examples without recreating them each time.
 ---
 apiVersion: v1

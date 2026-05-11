@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 # This file contains the base resources that most conformance tests will rely
 # on. This includes 3 namespaces along with Gateways, Services and Deployments
 # that can be used as backends for routing traffic. The most important
