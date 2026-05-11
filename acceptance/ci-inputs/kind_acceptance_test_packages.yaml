@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-- {runner: 0, test-packages: "partitions"}
+- {runner: 0, test-packages: "partitions", num-clusters: "2"}
 - {runner: 1, test-packages: "peering"}
 - {runner: 2, test-packages: "sameness"}
 - {runner: 3, test-packages: "connect"}
