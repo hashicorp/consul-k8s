@@ -24,11 +24,16 @@ container {
 
   triage {
     suppress {
-      vulnerabilities = [
-        "CVE-2024-58251",  # busybox@1.37.0-r19 - Alpine Linux security issue
-        "CVE-2025-46394",  # busybox@1.37.0-r19 - Alpine Linux security issue
-        "CVE-2025-47268",  # iputils@20240905-r0 - Alpine Linux security issue
-        "CVE-2025-48964"   # iputils@20240905-r0 - Alpine Linux security issue
+      vulnerabilites = []
+      paths = [
+        // The OSV scanner will trip on several packages that are included in the
+        // the UBI images. This is due to RHEL using the same base version in the
+        // package name for the life of the distro regardless of whether or not
+        // that version has been patched for security. Rather than enumate ever
+        // single CVE that the OSV scanner will find (several tens) we'll ignore
+        // the base UBI packages.
+        "usr/lib/sysimage/rpm/*",
+        "var/lib/rpm/*",
       ]
     }
   }
@@ -44,10 +49,7 @@ binary {
 
   triage {
     suppress {
-      vulnerabilities = [
-        "GO-2022-0635",
-        "GO-2022-0646"
-      ]
+      vulnerabilities = []
     }
   }
 }
@@ -58,10 +60,7 @@ repository {
 
   triage {
     suppress {
-      vulnerabilities = [
-        "GO-2022-0635",
-        "GO-2022-0646"
-      ]
+      vulnerabilities = []
     }
   }
 }
