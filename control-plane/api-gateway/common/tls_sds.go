@@ -50,13 +50,11 @@ func ResolveListenerTLSSDSConfig(gateway gwv1.Gateway, listener gwv1.Listener, _
 				},
 				Configured: true,
 			}
-		}
-
-		// Only one listener key is set (partial listener SDS).  Per the RFC,
-		// tls.Options must supply BOTH keys or neither.  A partial set is always
-		// invalid — we do NOT fall back to gateway annotations because mixing
-		// values from two different sources would produce an undefined SDS pair.
-		if listenerClusterSet || listenerCertSet {
+		} else if listenerClusterSet || listenerCertSet {
+			// Only one listener key is set (partial listener SDS). Per the RFC,
+			// tls.Options must supply BOTH keys or neither. A partial set is always
+			// invalid — we do NOT fall back to gateway annotations because mixing
+			// values from two different sources would produce an undefined SDS pair.
 			return EffectiveTLSSDSConfig{Configured: true}
 		}
 	}
