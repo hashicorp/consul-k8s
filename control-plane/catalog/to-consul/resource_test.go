@@ -2314,8 +2314,8 @@ func testIngress(host, path string, tlsHosts []string, lbIP string) *networkingv
 	return ing
 }
 
-// Test k8s namespace suffix is not appended
-// when the service name annotation is provided.
+// Test addIngress handles ingress sync settings and derives
+// the expected address and port from ingress configuration.
 func TestServiceResource_addIngress(t *testing.T) {
 	t.Parallel()
 
