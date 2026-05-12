@@ -553,6 +553,72 @@ func TestValidateTLS(t *testing.T) {
 			certificates:        nil,
 			expectedAcceptedErr: errListenerUnsupportedTLSMinVersion,
 		},
+		// RFC: listener tls.Options must supply BOTH SDS keys or neither.
+		// Setting only the cluster name is invalid.
+		"partial listener SDS - only cluster name - invalid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSClusterNameAnnotationKey): "listener-cluster",
+					// cert resource intentionally omitted
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSSDSIncomplete,
+		},
+		// RFC: listener tls.Options must supply BOTH SDS keys or neither.
+		// Setting only the cert resource is invalid.
+		"partial listener SDS - only cert resource - invalid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSCertResourceAnnotationKey): "listener-cert",
+					// cluster name intentionally omitted
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSSDSIncomplete,
+		},
+		// RFC: no listener tls.Options SDS keys → gateway annotations are used; valid.
+		"no listener SDS options - gateway provides both - valid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls:                 &gwv1.ListenerTLSConfig{},
+			certificates:        nil,
+			expectedAcceptedErr: nil,
+		},
+		// RFC: both listener tls.Options SDS keys set → listener wins; valid.
+		"both listener SDS options set - valid": {
+			gateway: gwv1.Gateway{},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSClusterNameAnnotationKey):  "listener-cluster",
+					gwv1.AnnotationKey(common.TLSSDSCertResourceAnnotationKey): "listener-cert",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: nil,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			resources := common.NewResourceMap(common.ResourceTranslator{}, NewReferenceValidator(tt.grants), logrtest.NewTestLogger(t))
