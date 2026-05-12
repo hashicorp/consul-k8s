@@ -20,6 +20,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -474,7 +476,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
 		Watches(
-			&gwv1.ReferenceGrant{},
+			&gwv1beta1.ReferenceGrant{},
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
 		).
 		Watches(
@@ -948,11 +950,57 @@ func (c *GatewayController) getNamespaces(ctx context.Context) (map[string]corev
 func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1.ReferenceGrant, error) {
 	var list gwv1.ReferenceGrantList
 
-	if err := c.Client.List(ctx, &list); err != nil {
+	if err := c.Client.List(ctx, &list); err == nil {
+		return list.Items, nil
+	} else if !meta.IsNoMatchError(err) {
 		return nil, err
 	}
 
-	return list.Items, nil
+	var betaList gwv1beta1.ReferenceGrantList
+	if err := c.Client.List(ctx, &betaList); err != nil {
+		return nil, err
+	}
+
+	grants := make([]gwv1.ReferenceGrant, 0, len(betaList.Items))
+	for _, grant := range betaList.Items {
+		grants = append(grants, referenceGrantV1beta1ToV1(grant))
+	}
+
+	return grants, nil
+}
+
+func referenceGrantV1beta1ToV1(grant gwv1beta1.ReferenceGrant) gwv1.ReferenceGrant {
+	from := make([]gwv1.ReferenceGrantFrom, 0, len(grant.Spec.From))
+	for _, f := range grant.Spec.From {
+		from = append(from, gwv1.ReferenceGrantFrom{
+			Group:     gwv1.Group(f.Group),
+			Kind:      gwv1.Kind(f.Kind),
+			Namespace: gwv1.Namespace(f.Namespace),
+		})
+	}
+
+	to := make([]gwv1.ReferenceGrantTo, 0, len(grant.Spec.To))
+	for _, t := range grant.Spec.To {
+		var name *gwv1.ObjectName
+		if t.Name != nil {
+			n := gwv1.ObjectName(*t.Name)
+			name = &n
+		}
+
+		to = append(to, gwv1.ReferenceGrantTo{
+			Group: gwv1.Group(t.Group),
+			Kind:  gwv1.Kind(t.Kind),
+			Name:  name,
+		})
+	}
+
+	return gwv1.ReferenceGrant{
+		ObjectMeta: grant.ObjectMeta,
+		Spec: gwv1.ReferenceGrantSpec{
+			From: from,
+			To:   to,
+		},
+	}
 }
 
 func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gateway types.NamespacedName) (*corev1.Service, error) {
