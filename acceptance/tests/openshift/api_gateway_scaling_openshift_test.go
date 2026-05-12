@@ -35,7 +35,6 @@ const (
 	scalingAnnotationHPAMaxReplicas  = "consul.hashicorp.com/hpa-maximum-replicas"
 	scalingAnnotationHPACPUTarget    = "consul.hashicorp.com/hpa-cpu-utilisation-target"
 
-	scalingTestReconcileAnnotation = "test.hashicorp.com/reconcile-nonce"
 )
 
 func TestOpenshift_APIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing.T) {
@@ -179,7 +178,6 @@ func TestOpenshift_APIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 2)
 	scaleGatewayDeploymentOCP(t, k8sClient, gateway.Name, gateway.Namespace, 5)
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 5)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 5)
 }
 
@@ -216,7 +214,6 @@ func TestOpenshift_APIGateway_Scaling_UserManagedHPATakesPrecedenceOverAnnotatio
 	waitForGatewayHPAOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	createUserManagedHPAOCP(t, k8sClient, gateway.Name, gateway.Namespace, 4, 12, 60, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	waitForGatewayHPAAbsentOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 	requireUserHPAUnchangedOCP(t, k8sClient, gateway.Name, gateway.Namespace, 4, 12, 60)
@@ -254,7 +251,6 @@ func TestOpenshift_APIGateway_Scaling_UserManagedHPAPreservesManualScale(t *test
 
 	createUserManagedHPAOCP(t, k8sClient, gateway.Name, gateway.Namespace, 1, 10, 80, cfg.NoCleanupOnFailure, cfg.NoCleanup)
 	scaleGatewayDeploymentOCP(t, k8sClient, gateway.Name, gateway.Namespace, 6)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 6)
 	waitForGatewayHPAAbsentOCP(t, k8sClient, gateway.Name, gateway.Namespace)
@@ -294,11 +290,9 @@ func TestOpenshift_APIGateway_Scaling_UserManagedHPARemovedRestoresControllerHPA
 	waitForGatewayHPAOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	userHPAName := createUserManagedHPAOCP(t, k8sClient, gateway.Name, gateway.Namespace, 3, 9, 65, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayHPAAbsentOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	deleteUserManagedHPAOCP(t, k8sClient, userHPAName, gateway.Namespace)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	hpa := waitForGatewayHPAOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 	require.NotNil(t, hpa.Spec.MinReplicas)
@@ -336,17 +330,14 @@ func TestOpenshift_APIGateway_Scaling_UserManagedHPAUpdatesDriveReplicaChanges(t
 	gateway := createScalingGatewayOCP(t, k8sClient, gatewayNamespace, gatewayClassName, nil, cfg.NoCleanupOnFailure, cfg.NoCleanup)
 
 	hpaName := createUserManagedHPAOCP(t, k8sClient, gateway.Name, gateway.Namespace, 1, 10, 80, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	waitForGatewayHPAAbsentOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 1)
 
 	updateUserManagedHPAReplicaBoundsOCP(t, k8sClient, hpaName, gateway.Namespace, 4, 10)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 4)
 
 	updateUserManagedHPAReplicaBoundsOCP(t, k8sClient, hpaName, gateway.Namespace, 6, 10)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayDeploymentReplicasOCP(t, k8sClient, gateway.Name, gateway.Namespace, 6)
 
 	waitForGatewayHPAAbsentOCP(t, k8sClient, gateway.Name, gateway.Namespace)
@@ -379,7 +370,6 @@ func TestOpenshift_APIGateway_Scaling_DanglingUserHPABeforeGatewayTakesPrecedenc
 	hpaName := createUserManagedHPAForTargetOCP(t, k8sClient, "dangling-user-hpa", gatewayNamespace, gatewayName, 3, 9, 65, cfg.NoCleanupOnFailure, cfg.NoCleanup)
 
 	gateway := createScalingGatewayWithNameOCP(t, k8sClient, gatewayName, gatewayNamespace, gatewayClassName, nil, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcileOCP(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	waitForGatewayPodsReadyOCP(t, k8sClient, gateway.Name, gateway.Namespace, 1)
 	waitForGatewayHPAAbsentOCP(t, k8sClient, gateway.Name, gateway.Namespace)
@@ -613,26 +603,6 @@ func scaleGatewayDeploymentOCP(t *testing.T, k8sClient client.Client, gatewayNam
 	logger.Logf(t, "manually scaled deployment %s/%s to %d replicas", namespace, gatewayName, replicas)
 }
 
-func triggerGatewayReconcileOCP(t *testing.T, k8sClient client.Client, gatewayName, namespace string) {
-	t.Helper()
-
-	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
-		var gateway gwv1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &gateway)
-		require.NoError(r, err)
-
-		if gateway.Annotations == nil {
-			gateway.Annotations = map[string]string{}
-		}
-		gateway.Annotations[scalingTestReconcileAnnotation] = fmt.Sprintf("%d", time.Now().UnixNano())
-
-		err = k8sClient.Update(context.Background(), &gateway)
-		require.NoError(r, err)
-	})
-
-	logger.Logf(t, "triggered reconcile for gateway %s/%s", namespace, gatewayName)
-}
-
 func restartAPIGatewayControllerOCP(t *testing.T, ctx environment.TestContext) {
 	t.Helper()
 
@@ -860,7 +830,6 @@ func gatewayAnnotationsOCP(annotations map[string]string) string {
 		scalingAnnotationHPAMinReplicas,
 		scalingAnnotationHPAMaxReplicas,
 		scalingAnnotationHPACPUTarget,
-		scalingTestReconcileAnnotation,
 	}
 
 	result := ""

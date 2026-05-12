@@ -35,7 +35,6 @@ const (
 	annotationHPAMaxReplicas  = "consul.hashicorp.com/hpa-maximum-replicas"
 	annotationHPACPUTarget    = "consul.hashicorp.com/hpa-cpu-utilisation-target"
 
-	testReconcileAnnotation = "test.hashicorp.com/reconcile-nonce"
 )
 
 func TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *testing.T) {
@@ -191,7 +190,6 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale(t *testing
 
 	waitForGatewayDeploymentReplicas(t, k8sClient, gateway.Name, gateway.Namespace, 2)
 	scaleGatewayDeployment(t, k8sClient, gateway.Name, gateway.Namespace, 5)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayDeploymentReplicas(t, k8sClient, gateway.Name, gateway.Namespace, 5)
 }
 
@@ -222,7 +220,6 @@ func TestAPIGateway_Scaling_UserManagedHPATakesPrecedenceOverAnnotations(t *test
 
 	// User now creates their own HPA targeting the gateway deployment.
 	createUserManagedHPA(t, k8sClient, gateway.Name, gateway.Namespace, 4, 12, 60, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	// Controller-managed HPA must be removed; user HPA must remain untouched.
 	waitForGatewayHPAAbsent(t, k8sClient, gateway.Name, gateway.Namespace)
@@ -257,7 +254,6 @@ func TestAPIGateway_Scaling_UserManagedHPAPreservesManualScale(t *testing.T) {
 	// Add a user-managed HPA, then manually scale the deployment.
 	createUserManagedHPA(t, k8sClient, gateway.Name, gateway.Namespace, 1, 10, 80, cfg.NoCleanupOnFailure, cfg.NoCleanup)
 	scaleGatewayDeployment(t, k8sClient, gateway.Name, gateway.Namespace, 6)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	// Controller must not overwrite replicas while a user-managed HPA exists.
 	waitForGatewayDeploymentReplicas(t, k8sClient, gateway.Name, gateway.Namespace, 6)
@@ -292,12 +288,10 @@ func TestAPIGateway_Scaling_UserManagedHPARemovedRestoresControllerHPA(t *testin
 
 	// User adds their own HPA; controller HPA must disappear.
 	userHPAName := createUserManagedHPA(t, k8sClient, gateway.Name, gateway.Namespace, 3, 9, 65, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayHPAAbsent(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	// User deletes their HPA; controller-managed HPA must come back from annotations.
 	deleteUserManagedHPA(t, k8sClient, userHPAName, gateway.Namespace)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	hpa := waitForGatewayHPA(t, k8sClient, gateway.Name, gateway.Namespace)
 	require.NotNil(t, hpa.Spec.MinReplicas)
@@ -329,7 +323,6 @@ func TestAPIGateway_Scaling_UserManagedHPAUpdatesDriveReplicaChanges(t *testing.
 	// Create the user-managed HPA with a low minReplicas so the deployment
 	// initially settles at that floor.
 	hpaName := createUserManagedHPA(t, k8sClient, gateway.Name, gateway.Namespace, 1, 10, 80, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	// Controller must yield the deployment to the user HPA.
 	waitForGatewayHPAAbsent(t, k8sClient, gateway.Name, gateway.Namespace)
@@ -339,12 +332,10 @@ func TestAPIGateway_Scaling_UserManagedHPAUpdatesDriveReplicaChanges(t *testing.
 	// deployment up to the new floor, and the consul controller must not
 	// interfere.
 	updateUserManagedHPAReplicaBounds(t, k8sClient, hpaName, gateway.Namespace, 4, 10)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayDeploymentReplicas(t, k8sClient, gateway.Name, gateway.Namespace, 4)
 
 	// User raises minReplicas further; deployment must follow.
 	updateUserManagedHPAReplicaBounds(t, k8sClient, hpaName, gateway.Namespace, 6, 10)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 	waitForGatewayDeploymentReplicas(t, k8sClient, gateway.Name, gateway.Namespace, 6)
 
 	// Controller-managed HPA must remain absent throughout.
@@ -370,7 +361,6 @@ func TestAPIGateway_Scaling_DanglingUserHPABeforeGatewayTakesPrecedence(t *testi
 	hpaName := createUserManagedHPAForTarget(t, k8sClient, "dangling-user-hpa", namespace, gatewayName, 3, 9, 65, cfg.NoCleanupOnFailure, cfg.NoCleanup)
 
 	gateway := createScalingGatewayWithName(t, k8sClient, gatewayName, namespace, gatewayClassName, nil, cfg.NoCleanupOnFailure, cfg.NoCleanup)
-	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
 
 	waitForGatewayPodsReady(t, k8sClient, gateway.Name, gateway.Namespace, 1)
 	waitForGatewayHPAAbsent(t, k8sClient, gateway.Name, gateway.Namespace)
@@ -612,24 +602,6 @@ func scaleGatewayDeployment(t *testing.T, k8sClient client.Client, gatewayName, 
 	logger.Logf(t, "manually scaled deployment %s/%s to %d replicas", namespace, gatewayName, replicas)
 }
 
-func triggerGatewayReconcile(t *testing.T, k8sClient client.Client, gatewayName, namespace string) {
-	t.Helper()
-
-	var gateway gwv1.Gateway
-	err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &gateway)
-	require.NoError(t, err)
-
-	if gateway.Annotations == nil {
-		gateway.Annotations = map[string]string{}
-	}
-	gateway.Annotations[testReconcileAnnotation] = fmt.Sprintf("%d", time.Now().UnixNano())
-
-	err = k8sClient.Update(context.Background(), &gateway)
-	require.NoError(t, err)
-
-	logger.Logf(t, "triggered reconcile for gateway %s/%s", namespace, gatewayName)
-}
-
 func restartAPIGatewayController(t *testing.T, ctx environment.TestContext) {
 	t.Helper()
 
@@ -860,7 +832,6 @@ func gatewayAnnotations(annotations map[string]string) string {
 		annotationHPAMinReplicas,
 		annotationHPAMaxReplicas,
 		annotationHPACPUTarget,
-		testReconcileAnnotation,
 	}
 
 	result := ""
