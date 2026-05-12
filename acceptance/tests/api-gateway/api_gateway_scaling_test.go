@@ -34,7 +34,6 @@ const (
 	annotationHPAMinReplicas  = "consul.hashicorp.com/hpa-minimum-replicas"
 	annotationHPAMaxReplicas  = "consul.hashicorp.com/hpa-maximum-replicas"
 	annotationHPACPUTarget    = "consul.hashicorp.com/hpa-cpu-utilisation-target"
-
 )
 
 func TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations(t *testing.T) {
@@ -706,27 +705,6 @@ func createUserManagedHPAForTarget(
 
 	logger.Logf(t, "TEST INPUT: user-managed HPA %s/%s spec=%s owners=%s", namespace, hpaName, hpaSpec(hpa), hpaOwnerReferences(hpa.OwnerReferences))
 	return hpaName
-}
-
-func retargetUserManagedHPA(t *testing.T, k8sClient client.Client, hpaName, namespace, targetName string) {
-	t.Helper()
-
-	retry.RunWith(&retry.Timer{Timeout: 30 * time.Second, Wait: 1 * time.Second}, t, func(r *retry.R) {
-		var hpa autoscalingv2.HorizontalPodAutoscaler
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: hpaName, Namespace: namespace}, &hpa)
-		require.NoError(r, err)
-
-		hpa.Spec.ScaleTargetRef = autoscalingv2.CrossVersionObjectReference{
-			APIVersion: "apps/v1",
-			Kind:       "Deployment",
-			Name:       targetName,
-		}
-
-		err = k8sClient.Update(context.Background(), &hpa)
-		require.NoError(r, err)
-	})
-
-	logger.Logf(t, "TEST ACTION: retargeted existing user-managed HPA %s/%s to Deployment/%s", namespace, hpaName, targetName)
 }
 
 // updateUserManagedHPAReplicaBounds updates the min/max replicas on an existing
