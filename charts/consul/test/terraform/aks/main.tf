@@ -92,7 +92,6 @@ resource "azurerm_kubernetes_cluster" "default" {
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
   }
 
-  oidc_issuer_enabled = true
   identity {
     type = "SystemAssigned"
   }

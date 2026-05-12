@@ -7,7 +7,7 @@ variable "location" {
 }
 
 variable "kubernetes_version" {
-  default     = "1.35"
+  default     = "1.32"
   description = "Kubernetes version supported on AKS"
 }
 
@@ -22,7 +22,7 @@ variable "client_secret" {
 }
 
 variable "cluster_count" {
-  default     = 2
+  default     = 1
   description = "The number of Kubernetes clusters to create."
 
   // We currently cannot support more than 2 clusters
