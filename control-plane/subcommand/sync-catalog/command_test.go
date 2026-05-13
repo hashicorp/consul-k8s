@@ -7,25 +7,64 @@ import (
 	"context"
 	"os"
 	"strconv"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
 
-	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
+	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
+
+// nopRegisterer is a prometheus.Registerer that silently accepts duplicate
+// metric registrations. This is needed in tests because Run() calls
+// recordMetrics() on every invocation, and multiple tests in the same process
+// would otherwise fail with "duplicate metrics collector registration" against
+// the global Prometheus registry.
+type nopRegisterer struct{}
+
+func (nopRegisterer) Register(prom.Collector) error  { return nil }
+func (nopRegisterer) MustRegister(...prom.Collector) {}
+func (nopRegisterer) Unregister(prom.Collector) bool { return true }
+
+// settableGates is implemented by the feature-gate object returned by
+// clientfeatures.FeatureGates() when the gate supports programmatic overrides in tests.
+type settableGates interface {
+	Set(feature clientfeatures.Feature, value bool) error
+}
+
+// disableWatchListClient turns off the WatchListClient feature gate so that
+// SharedIndexInformers backed by the fake k8s client can sync their cache.
+// The fake client never sends the required SendInitialEvents bookmark that the
+// feature requires.
+func configureFeatureGates() {
+	if fg, ok := clientfeatures.FeatureGates().(settableGates); ok {
+		_ = fg.Set(clientfeatures.WatchListClient, false)
+	}
+}
+
+// TestMain sets up test-environment overrides that must not affect production.
+// It Replaces prometheus.DefaultRegisterer with a no-op so that recordMetrics()
+// can be called once per test without duplicate-registration errors.
+// Also,Disables the WatchListClient feature gate so that SharedIndexInformers
+// backed by the fake k8s client can sync their cache (the fake client never
+// sends the required SendInitialEvents bookmark).
+func TestMain(m *testing.M) {
+	prom.DefaultRegisterer = nopRegisterer{}
+	configureFeatureGates()
+	os.Exit(m.Run())
+}
 
 // Test flag validation.
 func TestRun_FlagValidation(t *testing.T) {
@@ -585,16 +624,12 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 			// Create a mock reader to simulate user input
 			// Run the command.
 			ui := cli.NewMockUi()
-			cmd := Command{
-				UI:        ui,
-				clientset: k8s,
-				logger: hclog.New(&hclog.LoggerOptions{
-					Name:  t.Name(),
-					Level: hclog.Debug,
-				}),
-				flagAllowK8sNamespacesList: []string{"*"},
-				connMgr:                    testClient.Watcher,
-			}
+			logger := hclog.New(&hclog.LoggerOptions{
+				Name:  t.Name(),
+				Level: hclog.Debug,
+			})
+			cmd := NewTestCommand(t, ui, k8s, logger, testClient.Watcher)
+			cmd.flagAllowK8sNamespacesList = []string{"*"}
 
 			_, err = consulClient.Catalog().Register(
 				&api.CatalogRegistration{
@@ -637,7 +672,7 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 			_, err = k8s.CoreV1().Services("baz").Create(context.Background(), lbService("foo", "2.2.2.2"), metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			longRunningChan := runCommandAsynchronously(&cmd, []string{
+			longRunningChan := runCommandAsynchronously(cmd, []string{
 				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-consul-write-interval", "100ms",
@@ -657,15 +692,15 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 				require.Equal(r, "2.2.2.2", svc[0].ServiceAddress)
 			})
 
-			defer stopCommand(t, &cmd, longRunningChan)
+			defer stopCommand(t, cmd, longRunningChan)
 
-			exitChan := runCommandAsynchronously(&cmd, []string{
+			exitChan := runCommandAsynchronously(cmd, []string{
 				"-addresses", "127.0.0.1",
 				"-http-port", strconv.Itoa(testClient.Cfg.HTTPPort),
 				"-purge-k8s-services-from-node=true",
 				"-consul-node-name", tc.nodeToDeregisterName,
 			})
-			stopCommand(t, &cmd, exitChan)
+			stopCommand(t, cmd, exitChan)
 
 			retry.Run(t, func(r *retry.R) {
 				serviceList, _, err := consulClient.Catalog().NodeServiceList(tc.nodeToDeregisterName, &api.QueryOptions{AllowStale: false})
@@ -682,7 +717,7 @@ func TestRemoveAllK8SServicesFromConsul(t *testing.T) {
 
 // Set up test consul agent and fake kubernetes cluster client.
 func completeSetup(t *testing.T) (*fake.Clientset, *test.TestServerClient) {
-	k8s := fake.NewSimpleClientset()
+	k8s := fake.NewClientset()
 
 	testClient := test.TestServerWithMockConnMgrWatcher(t, nil)
 
@@ -740,29 +775,12 @@ func lbService(name, lbIP string) *apiv1.Service {
 	}
 }
 
-var (
-	prometheusSinkOnce sync.Once
-	prometheusSink     *prometheus.PrometheusSink
-)
-
-func getPrometheusSink(t *testing.T) *prometheus.PrometheusSink {
-	var err error
-	prometheusSinkOnce.Do(func() {
-		prometheusSink, err = prometheus.NewPrometheusSinkFrom(prometheus.PrometheusOpts{})
-		require.NoError(t, err)
-	})
-
-	return prometheusSink
-}
-
 func NewTestCommand(t *testing.T, ui *cli.MockUi, client kubernetes.Interface, logger hclog.Logger, connMgr consul.ServerConnectionManager) *Command {
-	sink := getPrometheusSink(t)
 	return &Command{
 		UI:                       ui,
 		clientset:                client,
 		logger:                   logger,
 		connMgr:                  connMgr,
 		flagMetricsRetentionTime: "1m",
-		prometheusSink:           sink,
 	}
 }
