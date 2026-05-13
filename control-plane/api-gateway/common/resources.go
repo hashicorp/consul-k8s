@@ -4,6 +4,8 @@
 package common
 
 import (
+	"strings"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -266,10 +268,7 @@ func (s *ResourceMap) InheritedTLSSDSClusterForHTTPRoute(route gwv1.HTTPRoute) (
 		}
 
 		for _, listener := range gateway.Spec.Listeners {
-			if parent.SectionName != nil && listener.Name != *parent.SectionName {
-				continue
-			}
-			if listener.TLS == nil {
+			if !httpRouteCanInheritFromListener(route, gateway, parent, listener) {
 				continue
 			}
 
@@ -289,6 +288,98 @@ func (s *ResourceMap) InheritedTLSSDSClusterForHTTPRoute(route gwv1.HTTPRoute) (
 	}
 
 	return "", false
+}
+
+func httpRouteCanInheritFromListener(route gwv1.HTTPRoute, gateway gwv1.Gateway, parent gwv1.ParentReference, listener gwv1.Listener) bool {
+	if parent.SectionName != nil && listener.Name != *parent.SectionName {
+		return false
+	}
+	if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1.TLSModeTerminate) {
+		return false
+	}
+	if listener.Protocol != gwv1.HTTPProtocolType && listener.Protocol != gwv1.HTTPSProtocolType {
+		return false
+	}
+	if !httpRouteKindAllowedForListener(listener.AllowedRoutes) {
+		return false
+	}
+	if !httpRouteNamespaceAllowedForListener(gateway.Namespace, route.Namespace, listener.AllowedRoutes) {
+		return false
+	}
+	if !routeAllowedForListenerHostname(listener.Hostname, route.Spec.Hostnames) {
+		return false
+	}
+
+	return true
+}
+
+func httpRouteKindAllowedForListener(allowed *gwv1.AllowedRoutes) bool {
+	if allowed == nil || allowed.Kinds == nil {
+		return true
+	}
+
+	for _, kind := range allowed.Kinds {
+		if NilOrEqual(kind.Group, gwv1.GroupVersion.Group) && kind.Kind == gwv1.Kind("HTTPRoute") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func httpRouteNamespaceAllowedForListener(gatewayNamespace, routeNamespace string, allowed *gwv1.AllowedRoutes) bool {
+	if allowed == nil || allowed.Namespaces == nil || allowed.Namespaces.From == nil {
+		return true
+	}
+
+	switch *allowed.Namespaces.From {
+	case gwv1.NamespacesFromAll:
+		return true
+	case gwv1.NamespacesFromSame:
+		return gatewayNamespace == routeNamespace
+	case gwv1.NamespacesFromSelector:
+		// Namespace labels are not available in this helper, so do not exclude.
+		return true
+	default:
+		return false
+	}
+}
+
+func routeAllowedForListenerHostname(hostname *gwv1.Hostname, hostnames []gwv1.Hostname) bool {
+	if hostname == nil || len(hostnames) == 0 {
+		return true
+	}
+
+	for _, name := range hostnames {
+		if hostnamesMatch(name, *hostname) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hostnamesMatch(a gwv1.Hostname, b gwv1.Hostname) bool {
+	if a == "" || a == "*" || b == "" || b == "*" {
+		return true
+	}
+
+	if strings.HasPrefix(string(a), "*.") || strings.HasPrefix(string(b), "*.") {
+		aLabels, bLabels := strings.Split(string(a), "."), strings.Split(string(b), ".")
+		if len(aLabels) != len(bLabels) {
+			return false
+		}
+
+		for i := 1; i < len(aLabels); i++ {
+			if !strings.EqualFold(aLabels[i], bLabels[i]) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	return string(a) == string(b)
 }
 
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
