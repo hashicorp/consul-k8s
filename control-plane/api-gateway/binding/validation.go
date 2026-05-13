@@ -284,10 +284,18 @@ func (m mergedListeners) validateHostname(index int, listener gwv1.Listener) err
 
 // validateTLS validates that the TLS configuration for a given listener is valid and that
 // the certificates that it references exist.
-func validateTLS(gateway gwv1.Gateway, tls *gwv1.ListenerTLSConfig, resources *common.ResourceMap) (error, error) {
+func validateTLS(gateway gwv1.Gateway, listener gwv1.Listener, resources *common.ResourceMap) (error, error) {
+	tls := listener.TLS
 	// If there's no TLS, there's nothing to validate
 	if tls == nil {
 		return nil, nil
+	}
+
+	effectiveSDS := common.ResolveListenerTLSSDSConfig(gateway, listener, resources)
+	if effectiveSDS.Configured {
+		if effectiveSDS.Config == nil {
+			return errListenerTLSSDSIncomplete, nil
+		}
 	}
 
 	// Validate the certificate references and then return any error
@@ -449,7 +457,7 @@ func validateListeners(gateway gwv1.Gateway, listeners []gwv1.Listener, resource
 	for i, listener := range listeners {
 		var result listenerValidationResult
 
-		err, refErr := validateTLS(gateway, listener.TLS, resources)
+		err, refErr := validateTLS(gateway, listener, resources)
 		if refErr != nil {
 			result.refErrs = append(result.refErrs, refErr)
 		}
@@ -622,6 +630,70 @@ func authFilterReferencesMissingJWTProvider(httproute *gwv1.HTTPRoute, resources
 	}
 
 	return maps.Keys(invalidFilters)
+}
+
+func routeTLSSDSFiltersInvalid(httproute *gwv1.HTTPRoute, resources *common.ResourceMap) []string {
+	invalidFilters := make(map[string]struct{})
+
+	for _, rule := range httproute.Spec.Rules {
+		for _, filter := range rule.Filters {
+			if filter.Type != gwv1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+				continue
+			}
+			if string(filter.ExtensionRef.Kind) == v1alpha1.RouteTLSSDSFilterKind {
+				invalidFilters[fmt.Sprintf("%s/%s", httproute.Namespace, filter.ExtensionRef.Name)] = struct{}{}
+			}
+		}
+
+		for _, backendRef := range rule.BackendRefs {
+			for _, filter := range backendRef.Filters {
+				if !routeTLSSDSFilterIsInvalid(filter, httproute, resources, httproute.Namespace) {
+					continue
+				}
+				invalidFilters[fmt.Sprintf("%s/%s", httproute.Namespace, filter.ExtensionRef.Name)] = struct{}{}
+			}
+		}
+	}
+
+	return maps.Keys(invalidFilters)
+}
+
+func routeTLSSDSFilterIsInvalid(filter gwv1.HTTPRouteFilter, route *gwv1.HTTPRoute, resources *common.ResourceMap, namespace string) bool {
+	if filter.Type != gwv1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+		return false
+	}
+
+	if string(filter.ExtensionRef.Kind) != v1alpha1.RouteTLSSDSFilterKind {
+		return false
+	}
+
+	externalFilter, ok := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+	if !ok {
+		return true
+	}
+
+	tlsFilter, ok := externalFilter.(*v1alpha1.RouteTLSSDSFilter)
+	if !ok || tlsFilter.Spec.SDS == nil {
+		return true
+	}
+
+	clusterName := strings.TrimSpace(tlsFilter.Spec.SDS.ClusterName)
+	certResource := strings.TrimSpace(tlsFilter.Spec.SDS.CertResource)
+
+	if certResource == "" {
+		return true
+	}
+
+	if clusterName != "" {
+		return false
+	}
+
+	if route == nil || resources == nil {
+		return true
+	}
+
+	inheritedCluster, inherited := resources.InheritedTLSSDSClusterForHTTPRoute(*route)
+	return !inherited || strings.TrimSpace(inheritedCluster) == ""
 }
 
 // externalRefsKindAllowedOnRoute makes sure that all externalRefs reference a kind supported by gatewaycontroller.

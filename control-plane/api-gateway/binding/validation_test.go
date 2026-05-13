@@ -16,8 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -28,7 +26,7 @@ func TestValidateRefs(t *testing.T) {
 	for name, tt := range map[string]struct {
 		route           client.Object
 		services        map[types.NamespacedName]corev1.Service
-		referenceGrants []gwv1beta1.ReferenceGrant
+		referenceGrants []gwv1.ReferenceGrant
 		meshServices    []v1alpha1.MeshService
 		expectedErrors  []error
 	}{
@@ -56,12 +54,12 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRefNotPermitted, errRefNotPermitted},
 		},
 		"all pass namespaces": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Service"},
 					},
 				}},
@@ -92,12 +90,12 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRefNotPermitted, nil},
 		},
 		"all pass mixed": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Service"},
 					},
 				}},
@@ -115,12 +113,12 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{nil, nil},
 		},
 		"all fail mixed": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Service"},
 					},
 				}},
@@ -345,7 +343,7 @@ func TestValidateTLS(t *testing.T) {
 
 	for name, tt := range map[string]struct {
 		gateway                 gwv1.Gateway
-		grants                  []gwv1beta1.ReferenceGrant
+		grants                  []gwv1.ReferenceGrant
 		tls                     *gwv1.ListenerTLSConfig
 		certificates            []corev1.Secret
 		expectedResolvedRefsErr error
@@ -389,12 +387,12 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"not found certificate": {
-			grants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			grants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
@@ -414,12 +412,12 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"not found certificate mismatched namespace": {
-			grants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			grants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
@@ -448,28 +446,28 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     errListenerNoTLSPassthrough,
 		},
 		"valid targeted namespace": {
-			grants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "1", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			grants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "1", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "2", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "2", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "3", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "3", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
@@ -555,6 +553,72 @@ func TestValidateTLS(t *testing.T) {
 			certificates:        nil,
 			expectedAcceptedErr: errListenerUnsupportedTLSMinVersion,
 		},
+		// RFC: listener tls.Options must supply BOTH SDS keys or neither.
+		// Setting only the cluster name is invalid.
+		"partial listener SDS - only cluster name - invalid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSClusterNameAnnotationKey): "listener-cluster",
+					// cert resource intentionally omitted
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSSDSIncomplete,
+		},
+		// RFC: listener tls.Options must supply BOTH SDS keys or neither.
+		// Setting only the cert resource is invalid.
+		"partial listener SDS - only cert resource - invalid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSCertResourceAnnotationKey): "listener-cert",
+					// cluster name intentionally omitted
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSSDSIncomplete,
+		},
+		// RFC: no listener tls.Options SDS keys → gateway annotations are used; valid.
+		"no listener SDS options - gateway provides both - valid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls:                 &gwv1.ListenerTLSConfig{},
+			certificates:        nil,
+			expectedAcceptedErr: nil,
+		},
+		// RFC: both listener tls.Options SDS keys set → listener wins; valid.
+		"both listener SDS options set - valid": {
+			gateway: gwv1.Gateway{},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSClusterNameAnnotationKey):  "listener-cluster",
+					gwv1.AnnotationKey(common.TLSSDSCertResourceAnnotationKey): "listener-cert",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: nil,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			resources := common.NewResourceMap(common.ResourceTranslator{}, NewReferenceValidator(tt.grants), logrtest.NewTestLogger(t))
@@ -564,7 +628,7 @@ func TestValidateTLS(t *testing.T) {
 				resources.ReferenceCountCertificate(certificate)
 			}
 
-			actualAcceptedError, actualResolvedRefsError := validateTLS(tt.gateway, tt.tls, resources)
+			actualAcceptedError, actualResolvedRefsError := validateTLS(tt.gateway, gwv1.Listener{TLS: tt.tls}, resources)
 			require.ErrorIs(t, actualResolvedRefsError, tt.expectedResolvedRefsErr)
 			require.ErrorIs(t, actualAcceptedError, tt.expectedAcceptedErr)
 		})
@@ -1572,4 +1636,90 @@ func TestValidateAuthFilters(t *testing.T) {
 			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
 		})
 	}
+}
+
+func TestRouteTLSSDSFilterIsInvalid_ClusterInheritance(t *testing.T) {
+	t.Parallel()
+
+	resources := common.NewResourceMap(common.ResourceTranslator{}, nil, logrtest.NewTestLogger(t))
+	resources.ReferenceCountGateway(gwv1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: common.KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: "default",
+			Annotations: map[string]string{
+				common.TLSSDSClusterNameAnnotationKey:  "inherited-cluster",
+				common.TLSSDSCertResourceAnnotationKey: "listener-cert",
+			},
+		},
+		Spec: gwv1.GatewaySpec{Listeners: []gwv1.Listener{{
+			Name:     "https",
+			Port:     8443,
+			Protocol: gwv1.HTTPSProtocolType,
+			TLS:      &gwv1.ListenerTLSConfig{},
+		}}},
+	})
+
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta:   metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{Name: "route-sds", Namespace: "default"},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{SDS: &v1alpha1.GatewayTLSSDSConfig{
+			ClusterName:  "",
+			CertResource: "backend-cert",
+		}},
+	})
+
+	httpsSection := gwv1.SectionName("https")
+	route := &gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{CommonRouteSpec: gwv1.CommonRouteSpec{ParentRefs: []gwv1.ParentReference{{
+			Name:        "gw",
+			SectionName: &httpsSection,
+		}}}},
+	}
+
+	filter := gwv1.HTTPRouteFilter{
+		Type: gwv1.HTTPRouteFilterExtensionRef,
+		ExtensionRef: &gwv1.LocalObjectReference{
+			Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+			Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+			Name:  "route-sds",
+		},
+	}
+
+	require.False(t, routeTLSSDSFilterIsInvalid(filter, route, resources, route.Namespace))
+}
+
+func TestRouteTLSSDSFilterIsInvalid_ClusterInheritanceMissing(t *testing.T) {
+	t.Parallel()
+
+	resources := common.NewResourceMap(common.ResourceTranslator{}, nil, logrtest.NewTestLogger(t))
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta:   metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{Name: "route-sds", Namespace: "default"},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{SDS: &v1alpha1.GatewayTLSSDSConfig{
+			ClusterName:  "",
+			CertResource: "backend-cert",
+		}},
+	})
+
+	httpsSection := gwv1.SectionName("https")
+	route := &gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{CommonRouteSpec: gwv1.CommonRouteSpec{ParentRefs: []gwv1.ParentReference{{
+			Name:        "gw",
+			SectionName: &httpsSection,
+		}}}},
+	}
+
+	filter := gwv1.HTTPRouteFilter{
+		Type: gwv1.HTTPRouteFilterExtensionRef,
+		ExtensionRef: &gwv1.LocalObjectReference{
+			Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+			Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+			Name:  "route-sds",
+		},
+	}
+
+	require.True(t, routeTLSSDSFilterIsInvalid(filter, route, resources, route.Namespace))
 }
