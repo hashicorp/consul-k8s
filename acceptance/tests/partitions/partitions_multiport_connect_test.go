@@ -87,17 +87,6 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				"connectInject.consulNamespaces.consulDestinationNamespace": "default",
 				"connectInject.consulNamespaces.mirroringK8S":               "false",
 
-				// Raise the consul-cni DaemonSet memory limits above the default
-				// 100Mi. On Kind the install-cni container copies the CNI binary
-				// twice (once immediately, and once after a 100-second grace
-				// period), which pushes memory usage above 100Mi and triggers an
-				// OOMKill before the ZZZ-consul-cni-kubeconfig file and the
-				// chained conflist entry can be written to /etc/cni/net.d/.
-				// Without those files kubelet never invokes the consul-cni plugin,
-				// so pods created on that node receive no tproxy iptables rules.
-				"connectInject.cni.resources.limits.memory":   "200Mi",
-				"connectInject.cni.resources.requests.memory": "150Mi",
-
 				"meshGateway.enabled":  "true",
 				"meshGateway.replicas": "1",
 
