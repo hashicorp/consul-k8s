@@ -437,3 +437,167 @@ func TestResolvedDeploymentReplicas(t *testing.T) {
 func int32Ptr(i int32) *int32 {
 	return &i
 }
+
+func TestScalingAnnotationsConfigured(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			name:        "nil annotations returns false",
+			annotations: nil,
+			expected:    false,
+		},
+		{
+			name:        "empty annotations returns false",
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			name: "default-replicas annotation is recognized",
+			annotations: map[string]string{
+				AnnotationDefaultReplicas: "5",
+			},
+			expected: true,
+		},
+		{
+			name: "hpa-enabled annotation is recognized",
+			annotations: map[string]string{
+				AnnotationHPAEnabled: "true",
+			},
+			expected: true,
+		},
+		{
+			name: "hpa-minimum-replicas annotation is recognized",
+			annotations: map[string]string{
+				AnnotationHPAMinReplicas: "2",
+			},
+			expected: true,
+		},
+		{
+			name: "hpa-maximum-replicas annotation is recognized",
+			annotations: map[string]string{
+				AnnotationHPAMaxReplicas: "20",
+			},
+			expected: true,
+		},
+		{
+			name: "hpa-cpu-utilisation-target annotation is recognized",
+			annotations: map[string]string{
+				AnnotationHPACPUTarget: "80",
+			},
+			expected: true,
+		},
+		{
+			name: "legacy hyphenated hpa-cpu-utilization-target annotation is recognized",
+			annotations: map[string]string{
+				annotationHPACPUTargetUS: "70",
+			},
+			expected: true,
+		},
+		{
+			name: "unrelated annotation returns false",
+			annotations: map[string]string{
+				"some.other/annotation": "value",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gateway := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-gateway",
+					Namespace:   "default",
+					Annotations: tt.annotations,
+				},
+			}
+			require.Equal(t, tt.expected, scalingAnnotationsConfigured(gateway))
+		})
+	}
+}
+
+func TestResolvedDeploymentReplicas_EdgeCases(t *testing.T) {
+	gcc := v1alpha1.GatewayClassConfig{
+		Spec: v1alpha1.GatewayClassConfigSpec{
+			DeploymentSpec: v1alpha1.DeploymentSpec{
+				DefaultInstances: int32Ptr(3),
+				MaxInstances:     int32Ptr(8),
+				MinInstances:     int32Ptr(1),
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		scalingConfig   *ScalingConfig
+		currentReplicas *int32
+		expected        int32
+	}{
+		{
+			name:            "nil scalingConfig falls back to deploymentReplicas with gcc default",
+			scalingConfig:   nil,
+			currentReplicas: nil,
+			expected:        3,
+		},
+		{
+			name:          "nil scalingConfig with current replicas above gcc max clamps to max",
+			scalingConfig: nil,
+			// currentReplicas is above gcc.MaxInstances=8 so deploymentReplicas clamps to 8
+			currentReplicas: int32Ptr(15),
+			expected:        8,
+		},
+		{
+			name: "hpa-user mode with nil currentReplicas seeds at default 1",
+			scalingConfig: &ScalingConfig{
+				Mode: "hpa-user",
+			},
+			currentReplicas: nil,
+			expected:        1,
+		},
+		{
+			name: "hpa-user mode preserves current replicas regardless of gcc bounds",
+			scalingConfig: &ScalingConfig{
+				Mode: "hpa-user",
+			},
+			currentReplicas: int32Ptr(20),
+			expected:        20,
+		},
+		{
+			name: "static mode with nil StaticReplicas and no fallback seeds at default 1",
+			scalingConfig: &ScalingConfig{
+				Mode:           "static",
+				StaticReplicas: nil,
+			},
+			currentReplicas: nil,
+			expected:        1,
+		},
+		{
+			name: "static annotation allows replicas well beyond the previous hard limit of 8",
+			scalingConfig: &ScalingConfig{
+				Mode:           "static",
+				StaticReplicas: int32Ptr(16),
+			},
+			currentReplicas: nil,
+			expected:        16,
+		},
+		{
+			name: "unknown mode falls back to default 1",
+			scalingConfig: &ScalingConfig{
+				Mode: "unknown-mode",
+			},
+			currentReplicas: nil,
+			expected:        1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			replicas := resolvedDeploymentReplicas(tt.scalingConfig, gcc, tt.currentReplicas)
+			require.NotNil(t, replicas)
+			require.Equal(t, tt.expected, *replicas)
+		})
+	}
+}
