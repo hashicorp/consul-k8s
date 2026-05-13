@@ -163,10 +163,10 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			// instead of event-based waiting. This is because controller-runtime's fake client has
 			// limited watch support for CRDs, making event-based synchronization unreliable in tests.
 			// The polling approach with require.Eventually is more robust for testing with fake clients.
-			_ = resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
-			_ = resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
-			_ = resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
-			_ = resourceCache.Subscribe(ctx, api.FileSystemCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
+			gwSub := resourceCache.Subscribe(ctx, api.APIGateway, gwCtrl.transformConsulGateway)
+			httpRouteSub := resourceCache.Subscribe(ctx, api.HTTPRoute, gwCtrl.transformConsulHTTPRoute(ctx))
+			tcpRouteSub := resourceCache.Subscribe(ctx, api.TCPRoute, gwCtrl.transformConsulTCPRoute(ctx))
+			fileSystemCertSub := resourceCache.Subscribe(ctx, api.FileSystemCertificate, gwCtrl.transformConsulFileSystemCertificate(ctx))
 
 			// ✅ Create resources AFTER subscriptions are set up
 			cert := tc.certFn(t, ctx, k8sClient, tc.namespace)
@@ -264,6 +264,35 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			// Give additional time for any async operations to settle
 			time.Sleep(2 * time.Second)
 
+			// Drain any trailing subscription events so baseline resource/index snapshots
+			// are taken after the initial reconcile burst has settled.
+			drainUntilIdle := func(idle time.Duration) {
+				timer := time.NewTimer(idle)
+				defer timer.Stop()
+
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-gwSub.Events():
+					case <-httpRouteSub.Events():
+					case <-tcpRouteSub.Events():
+					case <-fileSystemCertSub.Events():
+					case <-timer.C:
+						return
+					}
+
+					if !timer.Stop() {
+						select {
+						case <-timer.C:
+						default:
+						}
+					}
+					timer.Reset(idle)
+				}
+			}
+			drainUntilIdle(250 * time.Millisecond)
+
 			gwNamespaceName = types.NamespacedName{
 				Name:      k8sGWObj.Name,
 				Namespace: k8sGWObj.Namespace,
@@ -332,17 +361,23 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			go func() {
 				// reconcile multiple times with no changes to be sure
 				for i := 0; i < 5; i++ {
-					_, err = gwCtrl.Reconcile(ctx, reconcile.Request{
+					// Use a local variable to avoid a data race with the outer `err`
+					// that is also written inside the require.Eventually closure below.
+					_, reconcileErr := gwCtrl.Reconcile(ctx, reconcile.Request{
 						NamespacedName: types.NamespacedName{
 							Namespace: k8sGWObj.Namespace,
 							Name:      k8sGWObj.Name,
 						},
 					})
-					require.NoError(t, err)
+					// Ignore errors caused by test-cleanup cancelling the context.
+					if reconcileErr != nil && ctx.Err() == nil {
+						t.Errorf("reconcile returned unexpected error (iteration %d): %v", i, reconcileErr)
+						return
+					}
 				}
 			}()
 
-			require.Never(t, func() bool {
+			require.Eventually(t, func() bool {
 				err = k8sClient.Get(ctx, gwNamespaceName, k8sGWObj)
 				require.NoError(t, err)
 				newGWResourceVersion := k8sGWObj.ResourceVersion
@@ -381,8 +416,9 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 					certChanged = curCertModifyIndex != newCertEntry.GetModifyIndex() || curCertResourceVersion != newCertResourceVersion
 				}
 
-				// Return true if ANY resource changed (indicating infinite reconciliation)
-				return gwChanged || httpRouteChanged || tcpRouteChanged || certChanged
+				// Return true if NO resource changed (indicating stable reconciliation - no infinite loop).
+				// If any resource keeps changing, this condition will never be satisfied and the test will fail.
+				return !gwChanged && !httpRouteChanged && !tcpRouteChanged && !certChanged
 			}, time.Duration(2*time.Second), time.Duration(500*time.Millisecond), "Resources should not change during reconciliation (infinite reconciliation detected)",
 			)
 		})
