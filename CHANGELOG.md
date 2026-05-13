@@ -1,4 +1,4 @@
-## 2.0.0-rc1 (April 30, 2025)
+## 2.0.0-rc1 (April 30, 2026)
 
 BREAKING CHANGES:
 
