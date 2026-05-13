@@ -157,6 +157,17 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 			// namespace it must be run in a different privileged namespace.
 			setIfNotEmpty(helmValues, "connectInject.cni.namespace", "kube-system")
 		}
+
+		if t.UseKind {
+			// On Kind the install-cni container copies the CNI binary twice: once immediately
+			// at startup and once after a ~100-second grace period. With dual-stack enabled
+			// this pushes memory above the default 100Mi limit, triggering an OOMKill before
+			// the ZZZ-consul-cni-kubeconfig file and the chained conflist entry are written to
+			// /etc/cni/net.d/. Without those files kubelet never invokes the consul-cni plugin,
+			// so pods on that node get stuck in ContainerCreating indefinitely.
+			setIfNotEmpty(helmValues, "connectInject.cni.resources.limits.memory", "200Mi")
+			setIfNotEmpty(helmValues, "connectInject.cni.resources.requests.memory", "150Mi")
+		}
 	}
 
 	if t.DualStack {
