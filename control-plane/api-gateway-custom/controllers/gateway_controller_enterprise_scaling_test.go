@@ -1,0 +1,29 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+package controllers
+
+import (
+	"testing"
+
+	"github.com/go-logr/logr/testr"
+	"github.com/hashicorp/consul-k8s/control-plane/api-gateway-custom/common"
+	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
+	"github.com/stretchr/testify/require"
+)
+
+func TestCustomGatewayControllerEffectiveHelmConfig(t *testing.T) {
+	t.Parallel()
+
+	controller := GatewayController{
+		HelmConfig: common.HelmConfig{
+			EnableGatewayScaling: true,
+		},
+		ConsulMeta: apicommon.ConsulMeta{},
+	}
+
+	require.False(t, controller.effectiveHelmConfig(testr.New(t)).EnableGatewayScaling)
+
+	controller.ConsulMeta.IsEnterpriseDistribution = true
+	require.True(t, controller.effectiveHelmConfig(testr.New(t)).EnableGatewayScaling)
+}
