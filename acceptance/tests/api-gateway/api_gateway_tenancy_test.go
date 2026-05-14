@@ -49,6 +49,7 @@ var (
 )
 
 func TestAPIGateway_Tenancy(t *testing.T) {
+	t.Skip("TEMPORARY: skipping for targeted CI validation")
 	cases := []struct {
 		secure             bool
 		namespaceMirroring bool

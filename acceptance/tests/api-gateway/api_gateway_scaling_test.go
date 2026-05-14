@@ -111,6 +111,12 @@ func TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA(t *testing
 		annotationHPACPUTarget:   "70",
 	}, cfg.NoCleanupOnFailure, cfg.NoCleanup)
 
+	// Nudge the controller in case the Gateway CREATE event arrived before
+	// the controller-runtime manager finished syncing its watch caches after
+	// the restart. Mirrors the pattern used in
+	// TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale.
+	triggerGatewayReconcile(t, k8sClient, gateway.Name, gateway.Namespace)
+
 	hpa := waitForGatewayHPA(t, k8sClient, gateway.Name, gateway.Namespace)
 	require.NotNil(t, hpa.Spec.MinReplicas)
 	require.Equal(t, int32(3), *hpa.Spec.MinReplicas)
