@@ -1,0 +1,3 @@
+```release-note:improvement
+test: Fix flaky test by refactoring repeated ingress setup and manually triggering ingress upsert for fake clients, since fake Kubernetes informers don’t emit nested watch events like production.
+```
