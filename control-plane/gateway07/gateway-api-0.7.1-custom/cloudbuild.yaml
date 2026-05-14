@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 # See https://cloud.google.com/cloud-build/docs/build-config
 
 # this must be specified in seconds. If omitted, defaults to 600s (10 mins)

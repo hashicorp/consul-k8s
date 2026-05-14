@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 site_name: Kubernetes Gateway API
 repo_url: https://github.com/kubernetes-sigs/gateway-api
 repo_name: kubernetes-sigs/gateway-api
