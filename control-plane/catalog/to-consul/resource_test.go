@@ -2282,261 +2282,106 @@ func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 	})
 }
 
-// Test k8s namespace suffix is not appended
-// when the service name annotation is provided.
+// testIngress creates an ingress for testing with customizable parameters.
+func testIngress(host, path string, tlsHosts []string, lbIP string) *networkingv1.Ingress {
+	ing := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-ingress"},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{{
+				Host: host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{{
+							Path: path,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: "test-service",
+									Port: networkingv1.ServiceBackendPort{Number: 8080},
+								},
+							},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	if len(tlsHosts) > 0 {
+		ing.Spec.TLS = []networkingv1.IngressTLS{{Hosts: tlsHosts, SecretName: "test-tls-secret"}}
+	}
+	if lbIP != "" {
+		ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: lbIP}}
+	}
+	return ing
+}
+
+// Test addIngress handles ingress sync settings and derives
+// the expected address and port from ingress configuration.
 func TestServiceResource_addIngress(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
 		enableIngress     bool
 		syncIngressIP     bool
-		ingress           *networkingv1.Ingress
+		host              string
+		path              string
+		tlsHosts          []string
+		lbIP              string
 		expectIngressSync bool
 		expectedAddress   string
 		expectedPort      int
 	}{
 		"enable ingress on port 80": {
-			enableIngress: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.other.consul"},
-							SecretName: "test-other-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.other.consul"},
 			expectIngressSync: true,
 			expectedAddress:   "test.host.consul",
 			expectedPort:      80,
 		},
 		"enable ingress on port 443": {
-			enableIngress: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.host.consul"},
-							SecretName: "test-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.host.consul"},
 			expectIngressSync: true,
 			expectedAddress:   "test.host.consul",
 			expectedPort:      443,
 		},
 		"enable ingress on port 80 with loadbalancer IP": {
-			enableIngress: true,
-			syncIngressIP: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.other.consul"},
-							SecretName: "test-other-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Status: networkingv1.IngressStatus{
-					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
-						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
-					},
-				},
-			},
+			enableIngress:     true,
+			syncIngressIP:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.other.consul"},
+			lbIP:              "1.2.3.4",
 			expectIngressSync: true,
 			expectedAddress:   "1.2.3.4",
 			expectedPort:      80,
 		},
 		"enable ingress on port 443 with loadbalancer IP": {
-			enableIngress: true,
-			syncIngressIP: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.host.consul"},
-							SecretName: "test-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Status: networkingv1.IngressStatus{
-					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
-						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
-					},
-				},
-			},
+			enableIngress:     true,
+			syncIngressIP:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.host.consul"},
+			lbIP:              "1.2.3.4",
 			expectIngressSync: true,
 			expectedAddress:   "1.2.3.4",
 			expectedPort:      443,
 		},
 		"ingress disabled": {
-			enableIngress: false,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			enableIngress:     false,
+			host:              "test.host.consul",
+			path:              "/",
 			expectIngressSync: false,
 			expectedAddress:   "1.1.1.1",
 			expectedPort:      8080,
 		},
-		"ignores ingress if host != /": {
-			enableIngress: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/foo",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+		"ignores ingress if path != /": {
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/foo",
 			expectIngressSync: false,
 			expectedAddress:   "1.1.1.1",
 			expectedPort:      8080,
@@ -2545,7 +2390,6 @@ func TestServiceResource_addIngress(t *testing.T) {
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
-			// client := fake.NewSimpleClientset()
 			client, informer := getinformer()
 			syncer := newTestSyncer()
 			serviceResource := defaultServiceResource(client, syncer)
@@ -2558,45 +2402,35 @@ func TestServiceResource_addIngress(t *testing.T) {
 				informer:        informer,
 			}
 
-			// Create the service
-			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), clusterIPService("test-service", metav1.NamespaceDefault), metav1.CreateOptions{})
+			// Create service, ingress, and endpoint slices
+			svc := clusterIPService("test-service", metav1.NamespaceDefault)
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			// Create the ingress
-			ing, _ := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
-			t.Logf("Created ingress: %v\n", ing)
-			ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{
-				{IP: "1.2.3.4"}, // This is the 'expectedAddress'
-			}
-			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).UpdateStatus(context.Background(), ing, metav1.UpdateOptions{})
-
+			ing := testIngress(test.host, test.path, test.tlsHosts, test.lbIP)
+			ing.Namespace = metav1.NamespaceDefault
+			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), ing, metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			// get the ingress to verify it was updated
-			ingress, err := client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Get(context.Background(), "test-ingress", metav1.GetOptions{})
-			require.NoError(t, err)
-			t.Logf("Ingress in the cluster: %v\n", ingress)
+			createNodes(t, client)
+			createEndpointSlice(t, client, svc.Name, metav1.NamespaceDefault)
 
-			// Start the controller
+			// Start controller
 			closer := controller.TestControllerRun(resource)
-			time.Sleep(1000 * time.Millisecond)
 			defer closer()
 
-			createEndpointSlice(t, client, "test-service", metav1.NamespaceDefault)
+			// Trigger ingress processing for fake clients
+			if test.enableIngress {
+				ingressResource := &serviceIngressResource{
+					Service:             &serviceResource,
+					Ctx:                 context.Background(),
+					EnableIngress:       test.enableIngress,
+					SyncLoadBalancerIPs: test.syncIngressIP,
+				}
+				require.NoError(t, ingressResource.Upsert(ing.Namespace+"/"+ing.Name, ing))
+			}
 
-			// get the service and endpoints related to service
-			services, err := client.CoreV1().Services(metav1.NamespaceDefault).Get(context.Background(), "test-service", metav1.GetOptions{})
-
-			require.NoError(t, err)
-			t.Logf("Service in the cluster: %v\n", services)
-			// get the endpoints related to service
-			endpointsList, err := client.DiscoveryV1().EndpointSlices("default").List(context.Background(), metav1.ListOptions{})
-
-			require.NoError(t, err)
-
-			t.Logf("Endpoints: %v\n", endpointsList)
-
-			// Verify that the service name annotation is preferred
+			// Verify registrations
 			retry.Run(t, func(r *retry.R) {
 				syncer.Lock()
 				defer syncer.Unlock()
@@ -2609,12 +2443,10 @@ func TestServiceResource_addIngress(t *testing.T) {
 				} else {
 					require.Len(r, actual, 3)
 					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
-
 					for _, a := range actual {
 						validateEndpointSliceServicePorts(r, a.Service)
 					}
 				}
-
 			})
 		})
 	}
