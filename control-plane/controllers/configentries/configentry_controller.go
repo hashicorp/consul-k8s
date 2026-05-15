@@ -176,7 +176,8 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			if err != nil {
 				return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError, err)
 			}
-			return r.syncSuccessful(ctx, crdCtrl, configEntry)
+			logger.Info("secret metadata sync completed")
+			return ctrl.Result{}, nil
 		}
 	}
 
