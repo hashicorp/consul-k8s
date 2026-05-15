@@ -222,9 +222,12 @@ func (r *TerminatingGatewayController) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, deployErr
 	}
 
-	termGW.SetSyncedCondition(corev1.ConditionTrue, "DeploymentReady", "Deployment ready")
-	if err := r.UpdateStatus(ctx, termGW); err != nil {
-		return ctrl.Result{}, err
+	status, reason, message := termGW.SyncedCondition()
+	if status != corev1.ConditionTrue || reason != "DeploymentReady" || message != "Deployment ready" {
+		termGW.SetSyncedCondition(corev1.ConditionTrue, "DeploymentReady", "Deployment ready")
+		if err := r.UpdateStatus(ctx, termGW); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	return result, nil

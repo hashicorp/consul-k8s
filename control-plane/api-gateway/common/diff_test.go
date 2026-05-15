@@ -10,6 +10,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestEntryComparator_APIGatewayListenerTLSConfigurationsEqual_SDS(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.APIGatewayTLSConfiguration{
+		SDS: &api.GatewayTLSSDSConfig{ClusterName: "sds", CertResource: "cert"},
+	}
+
+	require.True(t, comparator.apiGatewayListenerTLSConfigurationsEqual(base, base))
+
+	differentResource := base
+	differentResource.SDS = &api.GatewayTLSSDSConfig{ClusterName: "sds", CertResource: "different-cert"}
+	require.False(t, comparator.apiGatewayListenerTLSConfigurationsEqual(base, differentResource))
+
+	noSDS := base
+	noSDS.SDS = nil
+	require.False(t, comparator.apiGatewayListenerTLSConfigurationsEqual(base, noSDS))
+}
+
 func TestEntriesEqual(t *testing.T) {
 	testCases := map[string]struct {
 		a              api.ConfigEntry

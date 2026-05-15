@@ -195,6 +195,17 @@ func (r *Binder) bindRoute(route client.Object, boundCount map[gwv1.SectionName]
 				})
 			}
 
+			if invalidFilterNames := routeTLSSDSFiltersInvalid(httproute, r.config.Resources); len(invalidFilterNames) > 0 {
+				results = append(results, parentBindResult{
+					parent: ref,
+					results: []bindResult{
+						{
+							err: fmt.Errorf("%w: %s", errFilterInvalid, strings.Join(invalidFilterNames, ",")),
+						},
+					},
+				})
+			}
+
 			if !externalRefsKindAllowedOnRoute(httproute) {
 				results = append(results, parentBindResult{
 					parent: ref,
