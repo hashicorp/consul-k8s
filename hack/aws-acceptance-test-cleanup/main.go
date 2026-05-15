@@ -779,6 +779,9 @@ func oidcOlderThanEightHours(ctx context.Context, iamClient *iam.Client, oidcArn
 		OpenIDConnectProviderArn: oidcArn,
 	})
 	if err != nil {
+		if awsErrCodeIs(err, iamErrCodeNoSuchEntity) {
+			return false, nil
+		}
 		return false, err
 	}
 	if out.CreateDate != nil && time.Since(*out.CreateDate).Hours() > 8 {
@@ -1003,7 +1006,7 @@ func removeRoleFromInstanceProfiles(ctx context.Context, iamClient *iam.Client, 
 					continue
 				}
 				fmt.Printf("Failed to remove role %s from instance profile %s: %v\n", aws.ToString(roleName), aws.ToString(profile.InstanceProfileName), err)
-				removeErr = err
+				removeErr = errors.Join(removeErr, err)
 			} else {
 				fmt.Printf("Removed role %s from instance profile %s\n", aws.ToString(roleName), aws.ToString(profile.InstanceProfileName))
 			}
