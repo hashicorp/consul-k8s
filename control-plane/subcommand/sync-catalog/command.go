@@ -488,13 +488,13 @@ func (c *Command) Help() string {
 
 // // interrupt sends os.Interrupt signal to the command
 // // so it can exit gracefully. This function is needed for tests.
-// func (c *Command) interrupt() {
-// 	c.sendSignal(syscall.SIGINT)
-// }
+func (c *Command) interrupt() {
+	c.sendSignal(syscall.SIGINT)
+}
 
-// func (c *Command) sendSignal(sig os.Signal) {
-// 	c.sigCh <- sig
-// }
+func (c *Command) sendSignal(sig os.Signal) {
+	c.sigCh <- sig
+}
 
 func (c *Command) validateFlags() error {
 	// For the Consul node name to be discoverable via DNS, it must contain only
