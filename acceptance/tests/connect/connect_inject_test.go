@@ -107,6 +107,11 @@ func TestConnectInject_CleanupKilledPods(t *testing.T) {
 				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 			}
 
+			// On OpenShift, disable managing Gateway API CRDs since they already exist
+			if cfg.EnableOpenshift {
+				helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
+			}
+
 			releaseName := helpers.RandomName()
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
@@ -208,6 +213,11 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 
 				"global.tls.enabled":           strconv.FormatBool(secure),
 				"global.acls.manageSystemACLs": strconv.FormatBool(secure),
+			}
+
+			// On OpenShift, disable managing Gateway API CRDs since they already exist
+			if cfg.EnableOpenshift {
+				helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
 			}
 
 			releaseName := helpers.RandomName()
