@@ -223,11 +223,11 @@ kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
 		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6-2.config --name dc2 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6-2.yaml; \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6-3.config --name dc3 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6-3.yaml; \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6-4.config --name dc4 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6-4.yaml; \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
 	else \
 		echo "Creating IPv4 clusters with non-overlapping pod subnets..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
@@ -245,11 +245,11 @@ kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 # so that mesh-gateway mode "none" flat-network routing works correctly.
 kind: kind-delete ## Helper target for doing local acceptance testing (works in all cases)
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
-		echo "Creating IPv6 clusters with non-overlapping pod subnets..."; \
+		echo "Creating IPv6 clusters..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6-2.config --name dc2 --image $(KIND_NODE_IMAGE); \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6-3.config --name dc3 --image $(KIND_NODE_IMAGE); \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6-4.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
 	else \
 		echo "Creating IPv4 clusters with non-overlapping pod subnets..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
