@@ -189,19 +189,19 @@ acceptance-lint: ## Run linter in the control-plane directory.
 
 .PHONY: kind-cni-calico
 # For CNI acceptance tests, the calico CNI plugin needs to be installed on Kind. Our consul-cni plugin will not work
-# without another plugin installed first
-kind-cni-calico: ## install cni plugin on kind
+# without another plugin installed first.
+# Pass CALICO_RESOURCES=<filename> to select the per-cluster Calico IPPool config
+# (default: custom-resources.yaml for dc1 / 192.168.0.0/16).
+# Each cluster must use a different IPAM pool so that cross-cluster pod IPs are
+# unambiguous; see custom-resources-{2,3,4}.yaml and custom-resources-ipv6-{2,3,4}.yaml.
+CALICO_RESOURCES ?= custom-resources.yaml
+kind-cni-calico: ## install cni plugin on kind (set CALICO_RESOURCES for per-cluster IPAM pool)
 	kubectl create namespace calico-system || true
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
-	@if [ "$(DUAL_STACK)" = "true" ]; then \
-		echo "Adding IPv6 config..."; \
-		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources-ipv6.yaml; \
-	else \
-		echo "Adding IPv4 config..."; \
-		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml; \
-	fi
+	@echo "Adding Calico config ($(CALICO_RESOURCES))..."
+	@kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/$(CALICO_RESOURCES)
 	@sleep 20
 
 .PHONY: kind-delete
@@ -212,30 +212,37 @@ kind-delete:
 	kind delete cluster --name dc4
 
 .PHONY: kind-cni
+# Each cluster uses a distinct per-cluster Kind config and a matching per-cluster
+# Calico IPPool config so that pod subnets are non-overlapping across clusters.
+# Non-overlapping subnets are required for mesh-gateway mode "none" flat-network
+# routing to be unambiguous (overlapping subnets cause Calico host-routes to take
+# precedence over the cross-cluster route, silently delivering traffic to a local pod).
 kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
-		echo "Creating IPv6 clusters..."; \
+		echo "Creating IPv6 clusters with non-overlapping pod subnets..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc1 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc2 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6-2.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6-3.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-ipv6-4.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-ipv6.yaml; \
 	else \
-		echo "Creating IPv4 clusters..."; \
+		echo "Creating IPv4 clusters with non-overlapping pod subnets..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE); \
-		make kind-cni-calico; \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources.yaml; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-2.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-2.yaml; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-3.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-3.yaml; \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind-4.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		make kind-cni-calico CALICO_RESOURCES=custom-resources-4.yaml; \
 	fi
 
 .PHONY: kind
+# Each cluster uses a distinct per-cluster Kind config with non-overlapping pod subnets
+# so that mesh-gateway mode "none" flat-network routing works correctly.
 kind: kind-delete ## Helper target for doing local acceptance testing (works in all cases)
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
 		echo "Creating IPv6 clusters..."; \
@@ -244,11 +251,11 @@ kind: kind-delete ## Helper target for doing local acceptance testing (works in 
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc3 --image $(KIND_NODE_IMAGE); \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-ipv6.config --name dc4 --image $(KIND_NODE_IMAGE); \
 	else \
-		echo "Creating IPv4 clusters..."; \
+		echo "Creating IPv4 clusters with non-overlapping pod subnets..."; \
 		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE); \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE); \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc3 --image $(KIND_NODE_IMAGE); \
-		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-2.config --name dc2 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-3.config --name dc3 --image $(KIND_NODE_IMAGE); \
+		kind create cluster --config=$(CURDIR)/acceptance/framework/environment/kind/kind-4.config --name dc4 --image $(KIND_NODE_IMAGE); \
 	fi
 
 

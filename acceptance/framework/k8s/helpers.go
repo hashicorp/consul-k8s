@@ -58,6 +58,19 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 		for _, pod := range pods.Items {
 			if !IsReady(pod) {
 				notReadyPods = append(notReadyPods, pod.Name)
+				// Log the pod phase and per-container waiting reason so failures
+				// are diagnosable without kubectl access (e.g. in CI log output).
+				for _, cs := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
+					if !cs.Ready {
+						if w := cs.State.Waiting; w != nil {
+							logger.Logf(t, "pod %s container %s not ready: phase=%s reason=%s message=%s",
+								pod.Name, cs.Name, pod.Status.Phase, w.Reason, w.Message)
+						} else if term := cs.State.Terminated; term != nil {
+							logger.Logf(t, "pod %s container %s terminated: phase=%s reason=%s exitCode=%d message=%s",
+								pod.Name, cs.Name, pod.Status.Phase, term.Reason, term.ExitCode, term.Message)
+						}
+					}
+				}
 			}
 		}
 		if len(notReadyPods) > 0 {

@@ -6,10 +6,14 @@ package partitions
 import (
 	"context"
 	"fmt"
+	"net"
+	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -37,234 +41,586 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 
-	aclCases := []struct {
-		name        string
-		aclsEnabled bool
-	}{
-		{name: "acls disabled", aclsEnabled: false},
-		{name: "acls enabled", aclsEnabled: true},
-	}
-
 	meshGatewayModes := []struct {
-		name        string
-		fixturePath string
+		name                         string
+		defaultPartitionConfigPath   string
+		secondaryPartitionConfigPath string
 	}{
-		{name: "local", fixturePath: "../fixtures/bases/mesh-gateway"},
-		{name: "remote", fixturePath: "../fixtures/bases/mesh-gateway-remote"},
+		{
+			name:                         "local",
+			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-local",
+			secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-local",
+		},
+		{
+			name:                         "remote",
+			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-remote",
+			secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-remote",
+		},
+		{
+			name:                         "none",
+			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-none",
+			secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-none",
+		},
 	}
 
-	for _, c := range aclCases {
-		for _, meshGatewayMode := range meshGatewayModes {
-			t.Run(fmt.Sprintf("%s mesh-gateway %s", c.name, meshGatewayMode.name), func(t *testing.T) {
-				if cfg.EnableTransparentProxy && !c.aclsEnabled {
-					t.Skipf("skipping this test because transparent proxy requires ACLs to be enabled")
-				}
-
-				if cfg.EnableCNI && !c.aclsEnabled {
-					t.Skipf("skipping because -enable-cni is set and ACLs are disabled")
-				}
-
-				defaultPartitionClusterContext := env.DefaultContext(t)
-				secondaryPartitionClusterContext := env.Context(t, 1)
-
-				commonHelmValues := map[string]string{
-					"global.adminPartitions.enabled": "true",
-					"global.enableConsulNamespaces":  "true",
-					"global.logLevel":                "debug",
-
-					"global.tls.enabled":   "true",
-					"global.tls.httpsOnly": strconv.FormatBool(c.aclsEnabled),
-
-					"global.acls.manageSystemACLs": strconv.FormatBool(c.aclsEnabled),
-
-					"connectInject.enabled": "true",
-					"connectInject.consulNamespaces.consulDestinationNamespace": "default",
-					"connectInject.consulNamespaces.mirroringK8S":               "false",
-					"connectInject.transparentProxy.defaultEnabled":             strconv.FormatBool(cfg.EnableTransparentProxy),
-
-					"meshGateway.enabled":  "true",
-					"meshGateway.replicas": "1",
-
-					"dns.enabled":           "true",
-					"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
-				}
-
-				defaultPartitionHelmValues := make(map[string]string)
-				if cfg.UseKind {
-					defaultPartitionHelmValues["meshGateway.service.type"] = "NodePort"
-					defaultPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
-					defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
-					defaultPartitionHelmValues["server.exposeService.nodePort.https"] = "30000"
-					defaultPartitionHelmValues["server.exposeService.nodePort.grpc"] = "30100"
-				}
-
-				releaseName := helpers.RandomName()
-				helpers.MergeMaps(defaultPartitionHelmValues, commonHelmValues)
-
-				serverConsulCluster := consul.NewHelmCluster(t, defaultPartitionHelmValues, defaultPartitionClusterContext, cfg, releaseName)
-				serverConsulCluster.Create(t)
-
-				caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
-				logger.Logf(t, "copying CA cert secret %s to secondary cluster", caCertSecretName)
-				k8s.CopySecret(t, defaultPartitionClusterContext, secondaryPartitionClusterContext, caCertSecretName)
-
-				partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
-				if c.aclsEnabled {
-					logger.Logf(t, "copying partition ACL token secret %s to secondary cluster", partitionToken)
-					k8s.CopySecret(t, defaultPartitionClusterContext, secondaryPartitionClusterContext, partitionToken)
-				}
-
-				partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
-				partitionSvcAddress := k8s.ServiceHost(t, cfg, defaultPartitionClusterContext, partitionServiceName)
-				k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryPartitionClusterContext)
-
-				secondaryPartitionHelmValues := map[string]string{
-					"global.enabled": "false",
-
-					"global.adminPartitions.name": secondaryPartition,
-
-					"global.tls.caCert.secretName": caCertSecretName,
-					"global.tls.caCert.secretKey":  "tls.crt",
-
-					"externalServers.enabled":       "true",
-					"externalServers.hosts[0]":      partitionSvcAddress,
-					"externalServers.tlsServerName": "server.dc1.consul",
-				}
-
-				if c.aclsEnabled {
-					secondaryPartitionHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
-					secondaryPartitionHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
-					secondaryPartitionHelmValues["externalServers.k8sAuthMethodHost"] = k8sAuthMethodHost
-				}
-
-				if cfg.UseKind {
-					secondaryPartitionHelmValues["externalServers.httpsPort"] = "30000"
-					secondaryPartitionHelmValues["externalServers.grpcPort"] = "30100"
-					secondaryPartitionHelmValues["meshGateway.service.type"] = "NodePort"
-					secondaryPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
-				}
-
-				helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
-
-				clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
-				clientConsulCluster.Create(t)
-
-				consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.aclsEnabled)
-
-				logger.Logf(t, "creating proxy defaults with mesh gateway mode %s", meshGatewayMode.name)
-				k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
-				})
-				k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), meshGatewayMode.fixturePath)
-				})
-
-				logger.Log(t, "deploying multi-port service in default partition cluster")
-				k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
-
-				logger.Log(t, "deploying client in secondary partition cluster")
-				if cfg.EnableTransparentProxy {
-					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
-				} else {
-					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
-				}
-
-				multiportPods, err := defaultPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=multiport"})
-				require.NoError(t, err)
-				require.Len(t, multiportPods.Items, 1)
-				require.Len(t, multiportPods.Items[0].Spec.Containers, 2)
-
-				staticClientPods, err := secondaryPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
-				require.NoError(t, err)
-				require.Len(t, staticClientPods.Items, 1)
-				require.Len(t, staticClientPods.Items[0].Spec.Containers, 2)
-
-				consulDefaultQueryOpts := &api.QueryOptions{Partition: defaultPartition, Namespace: "default"}
-				retry.Run(t, func(r *retry.R) {
-					services, _, err := consulClient.Catalog().Service(multiportServiceName, "", consulDefaultQueryOpts)
-					require.NoError(r, err)
-					require.Len(r, services, 1)
-					require.Equal(r, "api-port:9090,metrics:9091,admin-port:9092", services[0].ServiceMeta["ports"])
-					require.Equal(r, "9090", services[0].ServiceMeta["port-api-port"])
-					require.Equal(r, "9091", services[0].ServiceMeta["port-metrics"])
-					require.Equal(r, "9092", services[0].ServiceMeta["port-admin-port"])
-
-					legacyAdminServices, _, err := consulClient.Catalog().Service(multiportAdminServiceName, "", consulDefaultQueryOpts)
-					require.NoError(r, err)
-					require.Len(r, legacyAdminServices, 0)
-				})
-
-				logger.Log(t, "exporting multi-port services from default partition to secondary partition")
-				k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
-				})
-
-				upstreamAPIURL := "http://localhost:1234"
-				upstreamMetricsURL := "http://localhost:2234"
-				upstreamAdminURL := "http://localhost:3234"
-				if cfg.EnableTransparentProxy {
-					upstreamAPIURL = fmt.Sprintf("http://api-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
-					upstreamMetricsURL = fmt.Sprintf("http://metrics.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
-					upstreamAdminURL = fmt.Sprintf("http://admin-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
-				}
-
-				secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
-
-				createMultiportIntention := func() {
-					logger.Logf(t, "creating intention for destination %s", multiportServiceName)
-					_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-						Kind:      api.ServiceIntentions,
-						Name:      multiportServiceName,
-						Namespace: "default",
-						Sources: []*api.SourceIntention{
-							{
-								Name:      StaticClientName,
-								Namespace: "default",
-								Partition: secondaryPartition,
-								Action:    api.IntentionActionAllow,
-							},
-						},
-					}, &api.WriteOptions{Partition: defaultPartition})
-					require.NoError(t, err)
-
-					helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-						_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, multiportServiceName, &api.WriteOptions{Partition: defaultPartition})
-						require.NoError(t, err)
-					})
-				}
-
-				if c.aclsEnabled {
-					logger.Log(t, "checking that cross-partition connections fail before intentions are configured")
-					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAPIURL)
-					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamMetricsURL)
-					k8s.CheckStaticServerConnectionFailing(t, secondaryClientOpts, StaticClientName, upstreamAdminURL)
-
-					createMultiportIntention()
-				} else if cfg.EnableTransparentProxy {
-					// In transparent proxy cross-partition mode we still need an explicit
-					// allow intention for the destination service to make the route active.
-					createMultiportIntention()
-				}
-
-				logger.Log(t, "checking cross-partition connectivity for all three ports")
-				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from api-port 9090: Hello there!", upstreamAPIURL)
-				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from metrics port 9091: Hello again!", upstreamMetricsURL)
-				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from admin port 9092: Hello once more!", upstreamAdminURL)
-
-				logger.Log(t, "marking multi-port workload unhealthy")
-				k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "exec", "deploy/"+multiportServiceName, "-c", multiportServiceName, "--", "touch", "/tmp/unhealthy-multiport")
-
-				failureMessages := []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}
-				if cfg.EnableTransparentProxy {
-					failureMessages = append(failureMessages, "curl: (7) Failed to connect")
-				}
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamAPIURL)
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamMetricsURL)
-				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamAdminURL)
-			})
+	for _, meshGatewayMode := range meshGatewayModes {
+		if meshGatewayMode.name == "none" && cfg.UseEKS {
+			t.Skipf("skipping mesh gateway mode 'none' on EKS because flat network routing between clusters is not configured")
 		}
+
+		t.Run(fmt.Sprintf("/mesh-gateway %s", meshGatewayMode.name), func(t *testing.T) {
+			defaultPartitionClusterContext := env.DefaultContext(t)
+			secondaryPartitionClusterContext := env.Context(t, 1)
+
+			commonHelmValues := map[string]string{
+				"global.adminPartitions.enabled": "true",
+				"global.enableConsulNamespaces":  "true",
+				"global.logLevel":                "debug",
+
+				"global.tls.enabled":   "true",
+				"global.tls.httpsOnly": "true",
+
+				"global.acls.manageSystemACLs": "true",
+
+				"connectInject.enabled":                                     "true",
+				"connectInject.transparentProxy.defaultEnabled":             strconv.FormatBool(cfg.EnableTransparentProxy),
+				"connectInject.consulNamespaces.consulDestinationNamespace": "default",
+				"connectInject.consulNamespaces.mirroringK8S":               "false",
+
+				"meshGateway.enabled":  "true",
+				"meshGateway.replicas": "1",
+
+				"dns.enabled":           "true",
+				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
+			}
+
+			defaultPartitionHelmValues := make(map[string]string)
+			if cfg.UseKind {
+				defaultPartitionHelmValues["meshGateway.service.type"] = "NodePort"
+				defaultPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
+				defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
+				defaultPartitionHelmValues["server.exposeService.nodePort.https"] = "30000"
+				defaultPartitionHelmValues["server.exposeService.nodePort.grpc"] = "30100"
+			}
+
+			releaseName := helpers.RandomName()
+			helpers.MergeMaps(defaultPartitionHelmValues, commonHelmValues)
+
+			serverConsulCluster := consul.NewHelmCluster(t, defaultPartitionHelmValues, defaultPartitionClusterContext, cfg, releaseName)
+			serverConsulCluster.Create(t)
+
+			caCertSecretName := fmt.Sprintf("%s-consul-ca-cert", releaseName)
+			logger.Logf(t, "copying CA cert secret %s to secondary cluster", caCertSecretName)
+			k8s.CopySecret(t, defaultPartitionClusterContext, secondaryPartitionClusterContext, caCertSecretName)
+
+			partitionToken := fmt.Sprintf("%s-consul-partitions-acl-token", releaseName)
+
+			logger.Logf(t, "retrieving partition token secret %s from the server cluster and applying to the client cluster", partitionToken)
+			k8s.CopySecret(t, defaultPartitionClusterContext, secondaryPartitionClusterContext, partitionToken)
+
+			partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", releaseName)
+			partitionSvcAddress := k8s.ServiceHost(t, cfg, defaultPartitionClusterContext, partitionServiceName)
+			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryPartitionClusterContext)
+
+			secondaryPartitionHelmValues := map[string]string{
+				"global.enabled": "false",
+
+				"global.adminPartitions.name": secondaryPartition,
+
+				"global.tls.caCert.secretName": caCertSecretName,
+				"global.tls.caCert.secretKey":  "tls.crt",
+
+				"externalServers.enabled":       "true",
+				"externalServers.hosts[0]":      partitionSvcAddress,
+				"externalServers.tlsServerName": "server.dc1.consul",
+			}
+
+			secondaryPartitionHelmValues["global.acls.bootstrapToken.secretName"] = partitionToken
+			secondaryPartitionHelmValues["global.acls.bootstrapToken.secretKey"] = "token"
+			secondaryPartitionHelmValues["externalServers.k8sAuthMethodHost"] = k8sAuthMethodHost
+
+			if cfg.UseKind {
+				secondaryPartitionHelmValues["externalServers.httpsPort"] = "30000"
+				secondaryPartitionHelmValues["externalServers.grpcPort"] = "30100"
+				secondaryPartitionHelmValues["meshGateway.service.type"] = "NodePort"
+				secondaryPartitionHelmValues["meshGateway.service.nodePort"] = "30200"
+			}
+
+			helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
+
+			clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
+			clientConsulCluster.Create(t)
+
+			// For mesh gateway mode "none", sidecars connect directly to each
+			// other without going through mesh gateways. This requires flat
+			// network routing between the two Kind clusters' pod subnets.
+			if meshGatewayMode.name == "none" && cfg.UseKind {
+				setupFlatNetworkForKindClusters(t, defaultPartitionClusterContext, secondaryPartitionClusterContext)
+			}
+
+			consulClient, _ := serverConsulCluster.SetupConsulClient(t, true)
+
+			// Apply config entries (ProxyDefaults, ServiceDefaults, ServiceResolver) as CRDs
+			// in each cluster. The connect-injector syncs CRDs to Consul. Using CRDs
+			// (rather than the Consul API) ensures the secondary partition's controller
+			// properly manages the config entries.
+			logger.Logf(t, "applying config entries with mesh gateway mode %s and protocol http to default partition cluster", meshGatewayMode.name)
+			k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), meshGatewayMode.defaultPartitionConfigPath)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), meshGatewayMode.defaultPartitionConfigPath)
+			})
+
+			logger.Logf(t, "applying config entries with mesh gateway mode %s, protocol http, and service resolver to secondary partition cluster", meshGatewayMode.name)
+			k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), meshGatewayMode.secondaryPartitionConfigPath)
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), meshGatewayMode.secondaryPartitionConfigPath)
+			})
+
+			// Apply ExportedServices before deploying workloads so mesh gateways
+			// are configured to export multiport before the service registers.
+			logger.Log(t, "exporting multi-port services from default partition to secondary partition")
+			k8s.KubectlApplyK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
+			k8s.KubectlApplyK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.KubectlDeleteK(t, defaultPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service")
+				k8s.KubectlDeleteK(t, secondaryPartitionClusterContext.KubectlOptions(t), "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service")
+			})
+
+			// Deploy the multiport server. The base fixture has transparent-proxy
+			// explicitly set to "false", so we must use the tproxy overlay when:
+			// - cfg.EnableTransparentProxy is true (to honour the test flag), or
+			// - mesh gateway mode is "none" (sidecars connect directly to app
+			//   ports, which need iptables redirect to the Envoy inbound listener
+			//   because Consul xDS returns app ports, not the proxy port 20000).
+			logger.Log(t, "deploying multi-port service in default partition cluster")
+			if cfg.EnableTransparentProxy {
+				k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/multiport-single-service-app-tproxy")
+			} else {
+				k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
+			}
+
+			// Deploy the client.
+			// CNI + tproxy + mode "none" requires explicit upstream annotations.
+			// With CNI, iptables are set up by the DaemonSet at pod-creation time,
+			// before consul-dataplane starts. The initial xDS snapshot therefore
+			// does not include the cross-partition EDS push for direct-connect
+			// mode "none" endpoints, leaving the outbound listener with only
+			// original-destination. Envoy forwards to the unroutable 240.0.0.x
+			// virtual IP and returns 503.
+			// Without CNI the init-container runs before consul-dataplane, which
+			// causes a later xDS sync that correctly includes the cross-partition
+			// cluster, so virtual-DNS tproxy works in that path.
+			// Explicit upstream annotations guarantee the cluster is present in
+			// xDS regardless of when the dataplane's initial snapshot is taken.
+			useTproxyClient := cfg.EnableTransparentProxy && !(cfg.EnableCNI && meshGatewayMode.name == "none")
+			logger.Log(t, "deploying client in secondary partition cluster")
+			if useTproxyClient {
+				k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service-tproxy")
+			} else {
+				k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
+			}
+
+			multiportPods, err := defaultPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=multiport"})
+			require.NoError(t, err)
+			require.Len(t, multiportPods.Items, 1)
+			require.Len(t, multiportPods.Items[0].Spec.Containers, 2)
+
+			staticClientPods, err := secondaryPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
+			require.NoError(t, err)
+			require.Len(t, staticClientPods.Items, 1)
+			require.Len(t, staticClientPods.Items[0].Spec.Containers, 2)
+
+			consulDefaultQueryOpts := &api.QueryOptions{Partition: defaultPartition, Namespace: "default"}
+			retry.Run(t, func(r *retry.R) {
+				services, _, err := consulClient.Catalog().Service(multiportServiceName, "", consulDefaultQueryOpts)
+				require.NoError(r, err)
+				require.Len(r, services, 1)
+				require.Equal(r, "api-port:9090,metrics:9091,admin-port:9092", services[0].ServiceMeta["ports"])
+				require.Equal(r, "9090", services[0].ServiceMeta["port-api-port"])
+				require.Equal(r, "9091", services[0].ServiceMeta["port-metrics"])
+				require.Equal(r, "9092", services[0].ServiceMeta["port-admin-port"])
+
+				legacyAdminServices, _, err := consulClient.Catalog().Service(multiportAdminServiceName, "", consulDefaultQueryOpts)
+				require.NoError(r, err)
+				require.Len(r, legacyAdminServices, 0)
+			})
+
+			// Use virtual-DNS URLs only when the tproxy client fixture is deployed.
+			var upstreamAPIURL, upstreamMetricsURL, upstreamAdminURL string
+			if useTproxyClient {
+				upstreamAPIURL = "http://api-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+				upstreamMetricsURL = "http://metrics.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+				upstreamAdminURL = "http://admin-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+			} else {
+				upstreamAPIURL = "http://localhost:1234"
+				upstreamMetricsURL = "http://localhost:2234"
+				upstreamAdminURL = "http://localhost:3234"
+			}
+
+			secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
+
+			// Create intention to allow cross-partition traffic.
+			logger.Logf(t, "creating intention for destination %s", multiportServiceName)
+			_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+				Kind:      api.ServiceIntentions,
+				Name:      multiportServiceName,
+				Namespace: "default",
+				Sources: []*api.SourceIntention{
+					{
+						Name:      StaticClientName,
+						Namespace: "default",
+						Partition: secondaryPartition,
+						Action:    api.IntentionActionAllow,
+					},
+				},
+			}, &api.WriteOptions{Partition: defaultPartition})
+			require.NoError(t, err)
+
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, multiportServiceName, &api.WriteOptions{Partition: defaultPartition})
+				require.NoError(t, err)
+			})
+
+			logger.Log(t, "checking cross-partition connectivity for all three ports")
+			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from api-port 9090: Hello there!", upstreamAPIURL)
+			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from metrics port 9091: Hello again!", upstreamMetricsURL)
+			k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from admin port 9092: Hello once more!", upstreamAdminURL)
+
+			logger.Log(t, "marking multi-port workload unhealthy")
+			k8s.RunKubectl(t, defaultPartitionClusterContext.KubectlOptions(t), "exec", "deploy/"+multiportServiceName, "-c", multiportServiceName, "--", "touch", "/tmp/unhealthy-multiport")
+
+			failureMessages := []string{
+				"curl: (56) Recv failure: Connection reset by peer",
+				"curl: (52) Empty reply from server",
+				"curl: (22) The requested URL returned error: 503",
+			}
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamAPIURL)
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamMetricsURL)
+			k8s.CheckStaticServerConnectionMultipleFailureMessages(t, secondaryClientOpts, StaticClientName, false, failureMessages, "", upstreamAdminURL)
+		})
+	}
+}
+
+// setupFlatNetworkForKindClusters establishes flat network routing between two
+// Kind clusters so that pods in one cluster can directly reach pods in the other.
+// This is required for mesh gateway mode "none" where sidecars connect directly
+// to upstream sidecars without routing through a mesh gateway.
+//
+// It performs the following:
+//  1. Discovers the Docker IP of each cluster's control-plane node.
+//  2. Discovers the pod CIDR of each cluster.
+//  3. Adds routes using symmetric routing through both control-plane nodes:
+//     - Worker nodes route via their OWN cluster's control-plane.
+//     - Control-plane nodes route via the PEER cluster's control-plane.
+//     This ensures traffic traverses both CPs in both directions, avoiding
+//     asymmetric routing that causes kube-proxy's KUBE-FORWARD chain to drop
+//     SYN-ACK packets as INVALID (conntrack never saw the original SYN).
+//  4. Adds iptables/ip6tables rules to prevent masquerading of cross-cluster
+//     pod traffic.
+func setupFlatNetworkForKindClusters(t *testing.T, defaultCtx, secondaryCtx environment.TestContext) {
+	t.Helper()
+
+	// Derive Kind cluster names from the kube context names.
+	// Context names are "kind-<cluster-name>" (e.g., "kind-kind", "kind-kind-2").
+	defaultContextName := environment.KubernetesContextFromOptions(t, defaultCtx.KubectlOptions(t))
+	secondaryContextName := environment.KubernetesContextFromOptions(t, secondaryCtx.KubectlOptions(t))
+
+	defaultClusterName := strings.TrimPrefix(defaultContextName, "kind-")
+	secondaryClusterName := strings.TrimPrefix(secondaryContextName, "kind-")
+
+	defaultCPNode := defaultClusterName + "-control-plane"
+	secondaryCPNode := secondaryClusterName + "-control-plane"
+
+	logger.Logf(t, "setting up flat network routing between Kind clusters %q and %q", defaultClusterName, secondaryClusterName)
+
+	// Get cluster-level pod CIDRs (covering all nodes).
+	defaultPodCIDR := getKindClusterPodCIDR(t, defaultCtx)
+	secondaryPodCIDR := getKindClusterPodCIDR(t, secondaryCtx)
+
+	// Detect address family from the pod CIDRs.
+	isIPv6 := strings.Contains(defaultPodCIDR, ":")
+
+	// Choose the correct Docker IP for each control-plane node.
+	// For IPv6 pod CIDRs the gateway must also be an IPv6 address; the Docker
+	// 'kind' network is dual-stack so every node container has both IPv4 and
+	// IPv6 addresses.  Using an IPv4 gateway for an IPv6 route causes:
+	//   "Error: inet6 address is expected rather than 172.18.x.x"
+	var defaultCPIP, secondaryCPIP string
+	if isIPv6 {
+		defaultCPIP = dockerInspectIPv6(t, defaultCPNode)
+		secondaryCPIP = dockerInspectIPv6(t, secondaryCPNode)
+	} else {
+		defaultCPIP = dockerInspectIP(t, defaultCPNode)
+		secondaryCPIP = dockerInspectIP(t, secondaryCPNode)
+	}
+
+	logger.Logf(t, "default cluster: node=%s ip=%s podCIDR=%s", defaultCPNode, defaultCPIP, defaultPodCIDR)
+	logger.Logf(t, "secondary cluster: node=%s ip=%s podCIDR=%s", secondaryCPNode, secondaryCPIP, secondaryPodCIDR)
+
+	// Fail fast when both clusters share the same pod CIDR.  If the CIDRs
+	// overlap, Calico's (or kindnet's) per-block host routes take precedence
+	// over the /24 cross-cluster route we add below, causing traffic destined
+	// for the remote cluster to be silently delivered to a local pod (or
+	// dropped) → Envoy 503 after 17 minutes of retrying.
+	// Fix: re-create the clusters with per-cluster pod subnets, e.g. by
+	// running 'make kind-cni' or 'make kind' which now use kind-{2,3,4}.config
+	// with non-overlapping ranges.
+	if defaultPodCIDR == secondaryPodCIDR {
+		logger.Logf(t, "SKIP: both Kind clusters share the same pod CIDR %s; flat-network "+
+			"routing for mesh-gateway mode 'none' requires distinct pod CIDRs per cluster. "+
+			"Re-create the clusters with non-overlapping pod subnets "+
+			"(e.g. 'make kind-cni' uses kind.config / kind-2.config with "+
+			"192.168.0.0/16 and 192.169.0.0/16 respectively).", defaultPodCIDR)
+		t.Skipf("both Kind clusters share the same pod CIDR %s; re-create clusters with non-overlapping subnets", defaultPodCIDR)
+	}
+
+	// routeCmd returns the ip command (and any extra flags) for adding a route.
+	// For IPv6 pod CIDRs, 'ip -6 route replace' must be used.
+	routeArgs := func(dest, via string) []string {
+		if isIPv6 {
+			return []string{"ip", "-6", "route", "replace", dest, "via", via}
+		}
+		return []string{"ip", "route", "replace", dest, "via", via}
+	}
+
+	// masqShellCmd builds a shell snippet that inserts a RETURN rule into the
+	// appropriate masquerade chain so that cross-cluster pod traffic is not
+	// SNAT'd.  Different CNI plugins use different chains and tools:
+	//   - kindnet (IPv4):  KIND-MASQ-AGENT in iptables
+	//   - Calico (IPv4):   cali-nat-outgoing in iptables
+	//   - kindnet (IPv6):  KIND-MASQ-AGENT in ip6tables
+	//   - Calico (IPv6):   cali6-nat-outgoing in ip6tables
+	iptablesBin := "iptables"
+	caliChain := "cali-nat-outgoing"
+	if isIPv6 {
+		iptablesBin = "ip6tables"
+		caliChain = "cali6-nat-outgoing"
+	}
+	masqShellCmd := func(cidr string) string {
+		return fmt.Sprintf(
+			"if %s -t nat -L KIND-MASQ-AGENT >/dev/null 2>&1; then "+
+				"%s -t nat -C KIND-MASQ-AGENT -d %s -j RETURN 2>/dev/null || %s -t nat -I KIND-MASQ-AGENT 2 -d %s -j RETURN; "+
+				"elif %s -t nat -L %s >/dev/null 2>&1; then "+
+				"%s -t nat -C %s -d %s -j RETURN 2>/dev/null || %s -t nat -I %s 1 -d %s -j RETURN; "+
+				"else echo 'WARNING: no known masquerade chain found; cross-cluster SNAT may apply'; fi",
+			// KIND-MASQ-AGENT branch
+			iptablesBin,
+			iptablesBin, cidr, iptablesBin, cidr,
+			// Calico branch
+			iptablesBin, caliChain,
+			iptablesBin, caliChain, cidr, iptablesBin, caliChain, cidr)
+	}
+
+	// Add routes on default cluster nodes to reach secondary pod subnet.
+	// Use symmetric routing: worker nodes go via own CP, CP goes via peer CP.
+	// Full path: default-worker → defaultCP → secondaryCP → secondary-worker
+	defaultNodes := kindGetNodes(t, defaultClusterName)
+	for _, node := range defaultNodes {
+		if node == defaultCPNode {
+			// CP routes via peer CP.
+			dockerExec(t, node, routeArgs(secondaryPodCIDR, secondaryCPIP)...)
+		} else {
+			// Workers route via own CP.
+			dockerExec(t, node, routeArgs(secondaryPodCIDR, defaultCPIP)...)
+		}
+		dockerExecShell(t, node, masqShellCmd(secondaryPodCIDR))
+	}
+
+	// Add routes on secondary cluster nodes to reach default pod subnet.
+	// Full path: secondary-worker → secondaryCP → defaultCP → default-worker
+	secondaryNodes := kindGetNodes(t, secondaryClusterName)
+	for _, node := range secondaryNodes {
+		if node == secondaryCPNode {
+			// CP routes via peer CP.
+			dockerExec(t, node, routeArgs(defaultPodCIDR, defaultCPIP)...)
+		} else {
+			// Workers route via own CP.
+			dockerExec(t, node, routeArgs(defaultPodCIDR, secondaryCPIP)...)
+		}
+		dockerExecShell(t, node, masqShellCmd(defaultPodCIDR))
+	}
+
+	logger.Log(t, "flat network routing configured between Kind clusters")
+}
+
+// dockerInspectIP returns the Docker container IPv4 address for a given container name.
+func dockerInspectIP(t *testing.T, containerName string) string {
+	t.Helper()
+	out, err := exec.Command("docker", "inspect", "-f",
+		"{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", containerName).CombinedOutput()
+	require.NoError(t, err, "docker inspect %s failed: %s", containerName, string(out))
+	ip := strings.TrimSpace(string(out))
+	require.NotEmpty(t, ip, "no IPv4 address found for container %s", containerName)
+	return ip
+}
+
+// dockerInspectIPv6 returns the Docker container IPv6 address for a given container name.
+// The Docker 'kind' network is dual-stack, so every Kind node container has both
+// an IPv4 (IPAddress) and an IPv6 (GlobalIPv6Address) address.  Use this function
+// when the pod CIDR is IPv6 so that 'ip -6 route' can accept the gateway address.
+func dockerInspectIPv6(t *testing.T, containerName string) string {
+	t.Helper()
+	out, err := exec.Command("docker", "inspect", "-f",
+		"{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}", containerName).CombinedOutput()
+	require.NoError(t, err, "docker inspect %s failed: %s", containerName, string(out))
+	ip := strings.TrimSpace(string(out))
+	require.NotEmpty(t, ip, "no IPv6 address found for container %s; ensure the Docker 'kind' network is dual-stack", containerName)
+	return ip
+}
+
+// getKindClusterPodCIDR retrieves the cluster-level pod CIDR for a Kind cluster.
+//
+// Reading spec.podCIDR on nodes gives only the per-node /24 slice allocated by
+// kube-controller-manager — not the full /16 pool configured in the Kind file.
+// With Calico CNI, pods can span /26 blocks across the entire /16 pool, so
+// routing only the first /24 would miss pods on later blocks.  More critically,
+// when two clusters are accidentally created with the same podSubnet (e.g. both
+// using the default kind.config before per-cluster configs were added), both
+// nodes get spec.podCIDR = 192.168.0.0/24 and the overlap cannot be detected
+// at the /16 level.
+//
+// Instead, read the podSubnet directly from the kubeadm-config ConfigMap, which
+// records the exact podSubnet value from the Kind config file — e.g.
+// 192.168.0.0/16 for dc1 or 192.169.0.0/16 for dc2.  This gives:
+//  1. Accurate overlap detection (compares /16 vs /16, not /24 vs /24).
+//  2. Routes covering ALL pods in the cluster, not just the first node's /24.
+//
+// Falls back to computing a covering CIDR from node spec.podCIDR values when
+// kubeadm-config is unavailable (non-Kind or non-kubeadm clusters).
+func getKindClusterPodCIDR(t *testing.T, ctx environment.TestContext) string {
+	t.Helper()
+	opts := ctx.KubectlOptions(t)
+
+	// Primary: read the cluster-level CIDR from the kubeadm configuration.
+	// Kind always bootstraps with kubeadm, so this ConfigMap is always present.
+	kubeadmOutput, err := k8s.RunKubectlAndGetOutputE(t, opts,
+		"-n", "kube-system", "get", "cm", "kubeadm-config",
+		"-o", "jsonpath={.data.ClusterConfiguration}")
+	if err == nil {
+		for _, line := range strings.Split(kubeadmOutput, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "podSubnet:") {
+				cidr := strings.TrimSpace(strings.TrimPrefix(line, "podSubnet:"))
+				// Strip surrounding quotes that Kind may add for IPv6 values.
+				cidr = strings.Trim(cidr, `"'`)
+				_, ipNet, parseErr := net.ParseCIDR(cidr)
+				if parseErr == nil {
+					return ipNet.String()
+				}
+				// Return as-is if ParseCIDR cannot normalise (shouldn't happen).
+				return cidr
+			}
+		}
+	}
+
+	// Fallback: compute a covering CIDR from each node's spec.podCIDR.
+	// Get all node pod CIDRs.
+	output, err := k8s.RunKubectlAndGetOutputE(t, opts, "get", "nodes", "-o",
+		"jsonpath={.items[*].spec.podCIDR}")
+	require.NoError(t, err, "failed to get podCIDRs")
+
+	cidrs := strings.Fields(strings.TrimSpace(output))
+	require.NotEmpty(t, cidrs, "no podCIDRs found")
+
+	if len(cidrs) == 1 {
+		return cidrs[0]
+	}
+
+	// For IPv6 CIDRs, return the first node's network address — multi-node IPv6
+	// is not a current test configuration and the IPv4 widening logic below does
+	// not apply to IPv6.
+	if strings.Contains(cidrs[0], ":") {
+		_, ipNet, err := net.ParseCIDR(cidrs[0])
+		require.NoError(t, err, "failed to parse CIDR %s", cidrs[0])
+		return ipNet.String()
+	}
+
+	// Parse all IPv4 CIDRs to find the common prefix and compute the covering CIDR.
+	// For Kind clusters, all node CIDRs are slices of the same cluster CIDR,
+	// so we widen the mask to cover all of them.
+	firstIP, firstNet, err := net.ParseCIDR(cidrs[0])
+	require.NoError(t, err, "failed to parse CIDR %s", cidrs[0])
+
+	// Start with the first CIDR's network IP as a 32-bit value.
+	firstIPv4 := firstIP.Mask(firstNet.Mask).To4()
+	require.NotNil(t, firstIPv4, "expected IPv4 CIDR")
+
+	minIP := ipToUint32(firstIPv4)
+	maxIP := minIP
+	for _, cidr := range cidrs[1:] {
+		ip, ipNet, err := net.ParseCIDR(cidr)
+		require.NoError(t, err, "failed to parse CIDR %s", cidr)
+		ipv4 := ip.Mask(ipNet.Mask).To4()
+		require.NotNil(t, ipv4, "expected IPv4 CIDR")
+
+		val := ipToUint32(ipv4)
+		if val < minIP {
+			minIP = val
+		}
+		// Compute the broadcast (last IP) of this node's CIDR.
+		ones, _ := ipNet.Mask.Size()
+		broadcast := val | (0xFFFFFFFF >> uint(ones))
+		if broadcast > maxIP {
+			maxIP = broadcast
+		}
+	}
+
+	// Find the prefix length that covers minIP..maxIP.
+	diff := minIP ^ maxIP
+	prefixLen := 32
+	for diff > 0 {
+		diff >>= 1
+		prefixLen--
+	}
+
+	// Mask minIP to the covering prefix.
+	mask := uint32(0xFFFFFFFF) << uint(32-prefixLen)
+	baseIP := minIP & mask
+
+	return fmt.Sprintf("%s/%d", uint32ToIP(baseIP).String(), prefixLen)
+}
+
+func ipToUint32(ip net.IP) uint32 {
+	ip = ip.To4()
+	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+}
+
+func uint32ToIP(val uint32) net.IP {
+	return net.IPv4(byte(val>>24), byte(val>>16&0xFF), byte(val>>8&0xFF), byte(val&0xFF))
+}
+
+// kindGetNodes returns the list of Docker container names for nodes in a Kind cluster.
+func kindGetNodes(t *testing.T, clusterName string) []string {
+	t.Helper()
+	out, err := exec.Command("kind", "get", "nodes", "--name", clusterName).CombinedOutput()
+	require.NoError(t, err, "kind get nodes --name %s failed: %s", clusterName, string(out))
+	var nodes []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			nodes = append(nodes, line)
+		}
+	}
+	require.NotEmpty(t, nodes, "no nodes found for Kind cluster %s", clusterName)
+	return nodes
+}
+
+// dockerExec runs a command inside a Docker container.
+func dockerExec(t *testing.T, container string, args ...string) {
+	t.Helper()
+	cmdArgs := append([]string{"exec", container}, args...)
+	out, err := exec.Command("docker", cmdArgs...).CombinedOutput()
+	// Ignore errors from "ip route replace" if route already exists.
+	if err != nil {
+		logger.Logf(t, "docker exec %s %v: %s (err: %v)", container, args, string(out), err)
+	}
+}
+
+// dockerExecShell runs a shell command inside a Docker container.
+func dockerExecShell(t *testing.T, container, shellCmd string) {
+	t.Helper()
+	out, err := exec.Command("docker", "exec", container, "sh", "-c", shellCmd).CombinedOutput()
+	if err != nil {
+		logger.Logf(t, "docker exec %s sh -c %q: %s (err: %v)", container, shellCmd, string(out), err)
 	}
 }
