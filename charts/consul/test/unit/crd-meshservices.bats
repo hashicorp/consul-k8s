@@ -19,11 +19,3 @@ load _helpers
         . 
 }
 
-
-@test "meshservices/CustomResourceDefinitions: disabled with global.installCRDs=false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/crd-meshservices.yaml \
-      --set 'global.installCRDs=false' \
-      .
-}

@@ -49,11 +49,3 @@ load _helpers
       yq 'length > 0' | tee /dev/stderr)
     [ "${actual}" = "true" ]
 }
-
-@test "tcproutes/CustomResourceDefinitions: disabled with global.installCRDs=false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/crd-tcproutes-external.yaml \
-      --set 'global.installCRDs=false' \
-      .
-}

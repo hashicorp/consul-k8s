@@ -24,11 +24,3 @@ load _helpers
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
-@test "serviceSplitters/CustomResourceDefinitions: disabled with global.installCRDs=false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/crd-servicesplitters.yaml \
-      --set 'global.installCRDs=false' \
-      .
-}

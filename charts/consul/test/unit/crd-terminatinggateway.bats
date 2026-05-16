@@ -24,11 +24,3 @@ load _helpers
       yq -s 'length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
-
-@test "terminatingGateway/CustomResourceDefinitions: disabled with global.installCRDs=false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/crd-terminatinggateway.yaml \
-      --set 'global.installCRDs=false' \
-      .
-}

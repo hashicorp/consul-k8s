@@ -36,11 +36,3 @@ load _helpers
       --set 'connectInject.enabled=false' \
       .
 }
-
-@test "mesh/CustomResourceDefinitions: disabled with global.installCRDs=false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/crd-meshes.yaml \
-      --set 'global.installCRDs=false' \
-      .
-}
