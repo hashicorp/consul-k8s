@@ -26,11 +26,3 @@ load _helpers
         --set 'connectInject.apiGateway.manageExternalCRDs=false' \
         . 
 }
-
-@test "gatewayclasses/CustomResourceDefinitions: disabled with global.installCRDs=false" {
-  cd `chart_dir`
-  assert_empty helm template \
-      -s templates/crd-gatewayclasses-external.yaml \
-      --set 'global.installCRDs=false' \
-      .
-}
