@@ -29,6 +29,7 @@ type Command struct {
 
 	set *flag.Sets
 
+	flagGatewayKind      string
 	flagGatewayNamespace string
 	flagKubeConfig       string
 	flagKubeContext      string
@@ -49,7 +50,7 @@ func (c *Command) Synopsis() string {
 	return "Inspect the configuration for a given Gateway."
 }
 
-// init establishes the flags for Command.
+// init establishes the flags for Command
 func (c *Command) init() {
 	c.set = flag.NewSets()
 
@@ -84,7 +85,7 @@ func (c *Command) init() {
 	c.help = c.set.Help()
 }
 
-// Run runs the command.
+// Run runs the command
 func (c *Command) Run(args []string) int {
 	c.initOnce.Do(c.init)
 	c.Log.ResetNamed("read")

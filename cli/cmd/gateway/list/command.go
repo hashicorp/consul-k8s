@@ -30,6 +30,7 @@ type Command struct {
 	set *flag.Sets
 
 	flagAllNamespaces    bool
+	flagGatewayKind      string
 	flagGatewayNamespace string
 	flagKubeConfig       string
 	flagKubeContext      string
@@ -48,7 +49,7 @@ func (c *Command) Synopsis() string {
 	return "Inspect the configuration for all Gateways in the Kubernetes cluster or a given Kubernetes namespace."
 }
 
-// init establishes the flags for Command.
+// init establishes the flags for Command
 func (c *Command) init() {
 	c.set = flag.NewSets()
 
@@ -90,7 +91,7 @@ func (c *Command) init() {
 	c.help = c.set.Help()
 }
 
-// Run runs the command.
+// Run runs the command
 func (c *Command) Run(args []string) int {
 	c.initOnce.Do(c.init)
 	c.Log.ResetNamed("read")
