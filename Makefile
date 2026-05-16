@@ -353,23 +353,23 @@ kubectl-version: ## print kubectl version
 
 .PHONY: kind-test-packages
 kind-test-packages: ## kind test packages
-	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py kind
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix kind
 
 .PHONY: gke-test-packages
 gke-test-packages: ## gke test packages
-	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py gke
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix gke
 
 .PHONY: eks-test-packages
 eks-test-packages: ## eks test packages
-	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py eks
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix eks
 
 .PHONY: aks-test-packages
 aks-test-packages: ## aks test packages
-	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py aks
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix aks
 
 .PHONY: openshift-test-packages
 openshift-test-packages: ## openshift test packages
-	@python3 ./control-plane/build-support/scripts/generate_test_matrix.py openshift
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix openshift
 
 .PHONY: go-mod-tidy
 go-mod-tidy: ## Recursively run go mod tidy on all subdirectories
