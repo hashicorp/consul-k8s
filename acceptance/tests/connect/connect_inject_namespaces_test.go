@@ -83,6 +83,11 @@ func TestConnectInjectNamespaces(t *testing.T) {
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
 			}
 
+			// On OpenShift, disable managing Gateway API CRDs since they already exist
+			if cfg.EnableOpenshift {
+				helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
+			}
+
 			releaseName := helpers.RandomName()
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 
@@ -296,6 +301,11 @@ func TestConnectInjectNamespaces_CleanupController(t *testing.T) {
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
 				"global.tls.enabled":           strconv.FormatBool(c.secure),
+			}
+
+			// On OpenShift, disable managing Gateway API CRDs since they already exist
+			if cfg.EnableOpenshift {
+				helmValues["connectInject.apiGateway.manageExternalCRDs"] = "false"
 			}
 
 			releaseName := helpers.RandomName()
