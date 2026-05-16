@@ -30,19 +30,16 @@ const (
 	ServerRole               = "server"
 )
 
-func TestController(t *testing.T) {
+func TestController_NotSecure_NoVault(t *testing.T) { runController(t, false, false) }
+func TestController_Secure_NoVault(t *testing.T)    { runController(t, true, false) }
+func TestController_NotSecure_Vault(t *testing.T)   { runController(t, false, true) }
+func TestController_Secure_Vault(t *testing.T)      { runController(t, true, true) }
+
+func runController(t *testing.T, secure, useVault bool) {
+	t.Helper()
 	cfg := suite.Config()
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and controller is already tested with regular tproxy")
-	}
-	cases := []struct {
-		secure   bool
-		useVault bool
-	}{
-		{false, false},
-		{true, false},
-		{false, true},
-		{true, true},
 	}
 
 	// The name of a service intention in consul is
@@ -50,472 +47,467 @@ func TestController(t *testing.T) {
 	// the same as the kube name of the resource.
 	const IntentionName = "svc1"
 
-	for _, c := range cases {
-		name := fmt.Sprintf("secure: %t, vault: %t", c.secure, c.useVault)
-		t.Run(name, func(t *testing.T) {
-			ctx := suite.Environment().DefaultContext(t)
+	ctx := suite.Environment().DefaultContext(t)
 
-			helmValues := map[string]string{
-				"connectInject.enabled":        "true",
-				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
+	helmValues := map[string]string{
+		"connectInject.enabled":        "true",
+		"global.tls.enabled":           strconv.FormatBool(secure),
+		"global.acls.manageSystemACLs": strconv.FormatBool(secure),
 
-				"terminatingGateways.enabled":              "true",
-				"terminatingGateways.gateways[0].name":     "terminating-gateway",
-				"terminatingGateways.gateways[0].replicas": "1",
+		"terminatingGateways.enabled":              "true",
+		"terminatingGateways.gateways[0].name":     "terminating-gateway",
+		"terminatingGateways.gateways[0].replicas": "1",
+	}
+
+	releaseName := helpers.RandomName()
+
+	var bootstrapToken string
+	var helmConsulValues map[string]string
+	if useVault {
+		helmConsulValues, bootstrapToken = configureAndGetVaultHelmValues(t, ctx, cfg, releaseName, secure)
+		helpers.MergeMaps(helmConsulValues, helmValues)
+	}
+	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+
+	consulCluster.Create(t)
+	consulClient, _ := consulCluster.SetupConsulClient(t, secure)
+
+	if useVault {
+		consulCluster.ACLToken = bootstrapToken
+	}
+
+	// Test creation.
+	{
+		logger.Log(t, "creating custom resources")
+		retry.Run(t, func(r *retry.R) {
+			// Retry the kubectl apply because we've seen sporadic
+			// "connection refused" errors where the mutating webhook
+			// endpoint fails initially.
+			out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/crds-oss")
+			require.NoError(r, err, out)
+		})
+		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+			// Ignore errors here because if the test ran as expected
+			// the custom resources will have been deleted.
+			k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/crds-oss")
+		})
+
+		// On startup, the controller can take upwards of 1m to perform
+		// leader election so we may need to wait a long time for
+		// the reconcile loop to run (hence the 2m timeout here).
+		counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+		retry.RunWith(counter, t, func(r *retry.R) {
+			// service-defaults
+			entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
+			require.NoError(r, err)
+			svcDefaultEntry, ok := entry.(*api.ServiceConfigEntry)
+			require.True(r, ok, "could not cast to ServiceConfigEntry")
+			require.Equal(r, "http", svcDefaultEntry.Protocol)
+			require.Equal(r, 1234, svcDefaultEntry.RateLimits.InstanceLevel.RequestsPerSecond)
+
+			// service-resolver
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
+			require.NoError(r, err)
+			svcResolverEntry, ok := entry.(*api.ServiceResolverConfigEntry)
+			require.True(r, ok, "could not cast to ServiceResolverConfigEntry")
+			require.Equal(r, "bar", svcResolverEntry.Redirect.Service)
+
+			// proxy-defaults
+			entry, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
+			require.NoError(r, err)
+			proxyDefaultEntry, ok := entry.(*api.ProxyConfigEntry)
+			require.True(r, ok, "could not cast to ProxyConfigEntry")
+			require.Equal(r, api.MeshGatewayModeLocal, proxyDefaultEntry.MeshGateway.Mode)
+			require.Equal(r, "tcp", proxyDefaultEntry.Config["protocol"])
+			require.Equal(r, float64(3), proxyDefaultEntry.Config["number"])
+			require.Equal(r, true, proxyDefaultEntry.Config["bool"])
+			require.Equal(r, []interface{}{"item1", "item2"}, proxyDefaultEntry.Config["array"])
+			require.Equal(r, map[string]interface{}{"key": "value"}, proxyDefaultEntry.Config["map"])
+			require.Equal(r, "/health", proxyDefaultEntry.Expose.Paths[0].Path)
+			require.Equal(r, 22000, proxyDefaultEntry.Expose.Paths[0].ListenerPort)
+			require.Equal(r, 8080, proxyDefaultEntry.Expose.Paths[0].LocalPathPort)
+
+			// mesh
+			entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", nil)
+			require.NoError(r, err)
+			meshConfigEntry, ok := entry.(*api.MeshConfigEntry)
+			require.True(r, ok, "could not cast to MeshConfigEntry")
+			require.True(r, meshConfigEntry.TransparentProxy.MeshDestinationsOnly)
+
+			// service-router
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", nil)
+			require.NoError(r, err)
+			svcRouterEntry, ok := entry.(*api.ServiceRouterConfigEntry)
+			require.True(r, ok, "could not cast to ServiceRouterConfigEntry")
+			require.Equal(r, "/foo", svcRouterEntry.Routes[0].Match.HTTP.PathPrefix)
+
+			// service-splitter
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", nil)
+			require.NoError(r, err)
+			svcSplitterEntry, ok := entry.(*api.ServiceSplitterConfigEntry)
+			require.True(r, ok, "could not cast to ServiceSplitterConfigEntry")
+			require.Equal(r, float32(100), svcSplitterEntry.Splits[0].Weight)
+
+			// service-intentions
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceIntentions, IntentionName, nil)
+			require.NoError(r, err)
+			svcIntentionsEntry, ok := entry.(*api.ServiceIntentionsConfigEntry)
+			require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
+			require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[0].Action)
+			require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[1].Permissions[0].Action)
+
+			// ingress-gateway
+			entry, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
+			require.NoError(r, err)
+			ingressGatewayEntry, ok := entry.(*api.IngressGatewayConfigEntry)
+			require.True(r, ok, "could not cast to IngressGatewayConfigEntry")
+			require.Len(r, ingressGatewayEntry.Listeners, 1)
+			require.Equal(r, "tcp", ingressGatewayEntry.Listeners[0].Protocol)
+			require.Equal(r, 8080, ingressGatewayEntry.Listeners[0].Port)
+			require.Len(r, ingressGatewayEntry.Listeners[0].Services, 1)
+			require.Equal(r, "foo", ingressGatewayEntry.Listeners[0].Services[0].Name)
+
+			// terminating-gateway
+			entry, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+			require.NoError(r, err)
+			terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
+			require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
+			require.Len(r, terminatingGatewayEntry.Services, 1)
+			require.Equal(r, "name", terminatingGatewayEntry.Services[0].Name)
+			require.Equal(r, "caFile", terminatingGatewayEntry.Services[0].CAFile)
+			require.Equal(r, "certFile", terminatingGatewayEntry.Services[0].CertFile)
+			require.Equal(r, "keyFile", terminatingGatewayEntry.Services[0].KeyFile)
+			require.Equal(r, "sni", terminatingGatewayEntry.Services[0].SNI)
+
+			// jwt-provider
+			entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+			require.NoError(r, err)
+			jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+			require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+			require.Equal(r, "jwks.txt", jwtProviderConfigEntry.JSONWebKeySet.Local.Filename)
+			require.Equal(r, "test-issuer", jwtProviderConfigEntry.Issuer)
+			require.ElementsMatch(r, []string{"aud1", "aud2"}, jwtProviderConfigEntry.Audiences)
+			require.Equal(r, "x-jwt-header", jwtProviderConfigEntry.Locations[0].Header.Name)
+			require.Equal(r, "x-query-param", jwtProviderConfigEntry.Locations[1].QueryParam.Name)
+			require.Equal(r, "session-id", jwtProviderConfigEntry.Locations[2].Cookie.Name)
+			require.Equal(r, "x-forwarded-jwt", jwtProviderConfigEntry.Forwarding.HeaderName)
+			require.True(r, jwtProviderConfigEntry.Forwarding.PadForwardPayloadHeader)
+			require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
+			require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig.Size)
+
+			// exported-services
+			entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+			require.NoError(r, err)
+			exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+			require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+			require.Equal(r, "frontend", exportedServicesConfigEntry.Services[0].Name)
+			require.Equal(r, "peerName", exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
+			require.Equal(r, "groupName", exportedServicesConfigEntry.Services[0].Consumers[1].SamenessGroup)
+
+			// control-plane-request-limit
+			entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
+			require.NoError(r, err)
+			rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
+			require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+			require.Equal(r, "permissive", rateLimitIPConfigEntry.Mode)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.ACL.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.ACL.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Catalog.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Catalog.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.ConfigEntry.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.ConfigEntry.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.ConnectCA.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.ConnectCA.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Coordinate.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Coordinate.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.DiscoveryChain.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.DiscoveryChain.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Health.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Health.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Intention.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Intention.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)
+			require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.WriteRate)
+
+			// rate-limit
+			entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
+			require.NoError(r, err)
+			rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+			require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+			require.NotNil(r, rateLimitConfigEntry.Config)
+			require.NotNil(r, rateLimitConfigEntry.Config.WriteRate)
+			require.NotNil(r, rateLimitConfigEntry.Config.ReadRate)
+			require.Equal(r, 100.0, *rateLimitConfigEntry.Config.WriteRate)
+			require.Equal(r, 100.0, *rateLimitConfigEntry.Config.ReadRate)
+			require.True(r, rateLimitConfigEntry.Config.Priority)
+			if len(rateLimitConfigEntry.Config.ExcludeEndpoints) > 0 {
+				require.ElementsMatch(r, []string{"Health.Check", "ConfigEntry.Apply"}, rateLimitConfigEntry.Config.ExcludeEndpoints)
 			}
-
-			releaseName := helpers.RandomName()
-
-			var bootstrapToken string
-			var helmConsulValues map[string]string
-			if c.useVault {
-				helmConsulValues, bootstrapToken = configureAndGetVaultHelmValues(t, ctx, cfg, releaseName, c.secure)
-				helpers.MergeMaps(helmConsulValues, helmValues)
-			}
-			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
-
-			consulCluster.Create(t)
-			consulClient, _ := consulCluster.SetupConsulClient(t, c.secure)
-
-			if c.useVault {
-				consulCluster.ACLToken = bootstrapToken
-			}
-
-			// Test creation.
-			{
-				logger.Log(t, "creating custom resources")
-				retry.Run(t, func(r *retry.R) {
-					// Retry the kubectl apply because we've seen sporadic
-					// "connection refused" errors where the mutating webhook
-					// endpoint fails initially.
-					out, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "apply", "-k", "../fixtures/bases/crds-oss")
-					require.NoError(r, err, out)
-				})
-				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-					// Ignore errors here because if the test ran as expected
-					// the custom resources will have been deleted.
-					k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-k", "../fixtures/bases/crds-oss")
-				})
-
-				// On startup, the controller can take upwards of 1m to perform
-				// leader election so we may need to wait a long time for
-				// the reconcile loop to run (hence the 2m timeout here).
-				counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
-				retry.RunWith(counter, t, func(r *retry.R) {
-					// service-defaults
-					entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
-					require.NoError(r, err)
-					svcDefaultEntry, ok := entry.(*api.ServiceConfigEntry)
-					require.True(r, ok, "could not cast to ServiceConfigEntry")
-					require.Equal(r, "http", svcDefaultEntry.Protocol)
-					require.Equal(r, 1234, svcDefaultEntry.RateLimits.InstanceLevel.RequestsPerSecond)
-
-					// service-resolver
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
-					require.NoError(r, err)
-					svcResolverEntry, ok := entry.(*api.ServiceResolverConfigEntry)
-					require.True(r, ok, "could not cast to ServiceResolverConfigEntry")
-					require.Equal(r, "bar", svcResolverEntry.Redirect.Service)
-
-					// proxy-defaults
-					entry, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
-					require.NoError(r, err)
-					proxyDefaultEntry, ok := entry.(*api.ProxyConfigEntry)
-					require.True(r, ok, "could not cast to ProxyConfigEntry")
-					require.Equal(r, api.MeshGatewayModeLocal, proxyDefaultEntry.MeshGateway.Mode)
-					require.Equal(r, "tcp", proxyDefaultEntry.Config["protocol"])
-					require.Equal(r, float64(3), proxyDefaultEntry.Config["number"])
-					require.Equal(r, true, proxyDefaultEntry.Config["bool"])
-					require.Equal(r, []interface{}{"item1", "item2"}, proxyDefaultEntry.Config["array"])
-					require.Equal(r, map[string]interface{}{"key": "value"}, proxyDefaultEntry.Config["map"])
-					require.Equal(r, "/health", proxyDefaultEntry.Expose.Paths[0].Path)
-					require.Equal(r, 22000, proxyDefaultEntry.Expose.Paths[0].ListenerPort)
-					require.Equal(r, 8080, proxyDefaultEntry.Expose.Paths[0].LocalPathPort)
-
-					// mesh
-					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", nil)
-					require.NoError(r, err)
-					meshConfigEntry, ok := entry.(*api.MeshConfigEntry)
-					require.True(r, ok, "could not cast to MeshConfigEntry")
-					require.True(r, meshConfigEntry.TransparentProxy.MeshDestinationsOnly)
-
-					// service-router
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", nil)
-					require.NoError(r, err)
-					svcRouterEntry, ok := entry.(*api.ServiceRouterConfigEntry)
-					require.True(r, ok, "could not cast to ServiceRouterConfigEntry")
-					require.Equal(r, "/foo", svcRouterEntry.Routes[0].Match.HTTP.PathPrefix)
-
-					// service-splitter
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", nil)
-					require.NoError(r, err)
-					svcSplitterEntry, ok := entry.(*api.ServiceSplitterConfigEntry)
-					require.True(r, ok, "could not cast to ServiceSplitterConfigEntry")
-					require.Equal(r, float32(100), svcSplitterEntry.Splits[0].Weight)
-
-					// service-intentions
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceIntentions, IntentionName, nil)
-					require.NoError(r, err)
-					svcIntentionsEntry, ok := entry.(*api.ServiceIntentionsConfigEntry)
-					require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
-					require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[0].Action)
-					require.Equal(r, api.IntentionActionAllow, svcIntentionsEntry.Sources[1].Permissions[0].Action)
-
-					// ingress-gateway
-					entry, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
-					require.NoError(r, err)
-					ingressGatewayEntry, ok := entry.(*api.IngressGatewayConfigEntry)
-					require.True(r, ok, "could not cast to IngressGatewayConfigEntry")
-					require.Len(r, ingressGatewayEntry.Listeners, 1)
-					require.Equal(r, "tcp", ingressGatewayEntry.Listeners[0].Protocol)
-					require.Equal(r, 8080, ingressGatewayEntry.Listeners[0].Port)
-					require.Len(r, ingressGatewayEntry.Listeners[0].Services, 1)
-					require.Equal(r, "foo", ingressGatewayEntry.Listeners[0].Services[0].Name)
-
-					// terminating-gateway
-					entry, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
-					require.NoError(r, err)
-					terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
-					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
-					require.Len(r, terminatingGatewayEntry.Services, 1)
-					require.Equal(r, "name", terminatingGatewayEntry.Services[0].Name)
-					require.Equal(r, "caFile", terminatingGatewayEntry.Services[0].CAFile)
-					require.Equal(r, "certFile", terminatingGatewayEntry.Services[0].CertFile)
-					require.Equal(r, "keyFile", terminatingGatewayEntry.Services[0].KeyFile)
-					require.Equal(r, "sni", terminatingGatewayEntry.Services[0].SNI)
-
-					// jwt-provider
-					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
-					require.NoError(r, err)
-					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
-					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
-					require.Equal(r, "jwks.txt", jwtProviderConfigEntry.JSONWebKeySet.Local.Filename)
-					require.Equal(r, "test-issuer", jwtProviderConfigEntry.Issuer)
-					require.ElementsMatch(r, []string{"aud1", "aud2"}, jwtProviderConfigEntry.Audiences)
-					require.Equal(r, "x-jwt-header", jwtProviderConfigEntry.Locations[0].Header.Name)
-					require.Equal(r, "x-query-param", jwtProviderConfigEntry.Locations[1].QueryParam.Name)
-					require.Equal(r, "session-id", jwtProviderConfigEntry.Locations[2].Cookie.Name)
-					require.Equal(r, "x-forwarded-jwt", jwtProviderConfigEntry.Forwarding.HeaderName)
-					require.True(r, jwtProviderConfigEntry.Forwarding.PadForwardPayloadHeader)
-					require.Equal(r, 45, jwtProviderConfigEntry.ClockSkewSeconds)
-					require.Equal(r, 15, jwtProviderConfigEntry.CacheConfig.Size)
-
-					// exported-services
-					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
-					require.NoError(r, err)
-					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
-					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
-					require.Equal(r, "frontend", exportedServicesConfigEntry.Services[0].Name)
-					require.Equal(r, "peerName", exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
-					require.Equal(r, "groupName", exportedServicesConfigEntry.Services[0].Consumers[1].SamenessGroup)
-
-					// control-plane-request-limit
-					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
-					require.NoError(r, err)
-					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
-					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
-					require.Equal(r, "permissive", rateLimitIPConfigEntry.Mode)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.ACL.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.ACL.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Catalog.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Catalog.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConfigEntry.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConfigEntry.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConnectCA.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.ConnectCA.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Coordinate.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Coordinate.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.DiscoveryChain.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.DiscoveryChain.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Health.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Health.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Intention.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Intention.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.KV.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Tenancy.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Session.WriteRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.ReadRate)
-					require.Equal(r, 100.0, rateLimitIPConfigEntry.Txn.WriteRate)
-
-					// rate-limit
-					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
-					require.NoError(r, err)
-					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
-					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
-					require.NotNil(r, rateLimitConfigEntry.Config)
-					require.NotNil(r, rateLimitConfigEntry.Config.WriteRate)
-					require.NotNil(r, rateLimitConfigEntry.Config.ReadRate)
-					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.WriteRate)
-					require.Equal(r, 100.0, *rateLimitConfigEntry.Config.ReadRate)
-					require.True(r, rateLimitConfigEntry.Config.Priority)
-					if len(rateLimitConfigEntry.Config.ExcludeEndpoints) > 0 {
-						require.ElementsMatch(r, []string{"Health.Check", "ConfigEntry.Apply"}, rateLimitConfigEntry.Config.ExcludeEndpoints)
-					}
-				})
-			}
-
-			// Test updates.
-			{
-				logger.Log(t, "patching service-defaults custom resource")
-				patchProtocol := "tcp"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicedefaults", "defaults", "-p", fmt.Sprintf(`{"spec":{"protocol":"%s"}}`, patchProtocol), "--type=merge")
-
-				logger.Log(t, "patching service-resolver custom resource")
-				patchRedirectSvc := "baz"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
-
-				logger.Log(t, "patching proxy-defaults custom resource")
-				patchMeshGatewayMode := "remote"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
-
-				logger.Log(t, "patching mesh custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"meshDestinationsOnly": %t}}}`, false), "--type=merge")
-
-				logger.Log(t, "patching service-router custom resource")
-				patchPathPrefix := "/baz"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicerouter", "router", "-p", fmt.Sprintf(`{"spec":{"routes":[{"match":{"http":{"pathPrefix":"%s"}}}]}}`, patchPathPrefix), "--type=merge")
-
-				logger.Log(t, "patching service-splitter custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicesplitter", "splitter", "-p", `{"spec": {"splits": [{"weight": 50}, {"weight": 50, "service": "other-splitter"}]}}`, "--type=merge")
-
-				logger.Log(t, "patching service-intentions custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceintentions", "intentions", "-p", `{"spec": {"sources": [{"name": "svc2", "action": "deny"}, {"name": "svc3", "permissions": [{"action": "deny", "http": {"pathExact": "/foo", "methods": ["GET", "PUT"]}}]}]}}`, "--type=merge")
-
-				logger.Log(t, "patching ingress-gateway custom resource")
-				patchPort := 9090
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ingressgateway", "ingress-gateway", "-p", fmt.Sprintf(`{"spec": {"listeners": [{"port": %d, "protocol": "tcp", "services": [{"name": "foo"}]}]}}`, patchPort), "--type=merge")
-
-				logger.Log(t, "patching terminating-gateway custom resource")
-				patchSNI := "patch-sni"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
-
-				logger.Log(t, "patching JWTProvider custom resource")
-				patchIssuer := "other-issuer"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "jwtprovider", "jwt-provider", "-p", fmt.Sprintf(`{"spec": {"issuer": "%s"}}`, patchIssuer), "--type=merge")
-
-				logger.Log(t, "patching ExportedServices custom resource")
-				patchPeer := "destination"
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "exportedservices", "default", "-p", fmt.Sprintf(`{"spec": {"services": [{"name": "frontend", "consumers":  [{"peer":  "%s"}, {"samenessGroup":  "groupName"}]}]}}`, patchPeer), "--type=merge")
-
-				logger.Log(t, "patching control-plane-request-limit custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
-
-				logger.Log(t, "patching rate-limit custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
-
-				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
-				retry.RunWith(counter, t, func(r *retry.R) {
-					// service-defaults
-					entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
-					require.NoError(r, err)
-					svcDefaultEntry, ok := entry.(*api.ServiceConfigEntry)
-					require.True(r, ok, "could not cast to ServiceConfigEntry")
-					require.Equal(r, patchProtocol, svcDefaultEntry.Protocol)
-
-					// service-resolver
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
-					require.NoError(r, err)
-					svcResolverEntry, ok := entry.(*api.ServiceResolverConfigEntry)
-					require.True(r, ok, "could not cast to ServiceResolverConfigEntry")
-					require.Equal(r, patchRedirectSvc, svcResolverEntry.Redirect.Service)
-
-					// proxy-defaults
-					entry, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
-					require.NoError(r, err)
-					proxyDefaultsEntry, ok := entry.(*api.ProxyConfigEntry)
-					require.True(r, ok, "could not cast to ProxyConfigEntry")
-					require.Equal(r, api.MeshGatewayModeRemote, proxyDefaultsEntry.MeshGateway.Mode)
-
-					// mesh
-					entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", nil)
-					require.NoError(r, err)
-					meshEntry, ok := entry.(*api.MeshConfigEntry)
-					require.True(r, ok, "could not cast to MeshConfigEntry")
-					require.False(r, meshEntry.TransparentProxy.MeshDestinationsOnly)
-
-					// service-router
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", nil)
-					require.NoError(r, err)
-					svcRouterEntry, ok := entry.(*api.ServiceRouterConfigEntry)
-					require.True(r, ok, "could not cast to ServiceRouterConfigEntry")
-					require.Equal(r, patchPathPrefix, svcRouterEntry.Routes[0].Match.HTTP.PathPrefix)
-
-					// service-splitter
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", nil)
-					require.NoError(r, err)
-					svcSplitter, ok := entry.(*api.ServiceSplitterConfigEntry)
-					require.True(r, ok, "could not cast to ServiceSplitterConfigEntry")
-					require.Equal(r, float32(50), svcSplitter.Splits[0].Weight)
-					require.Equal(r, float32(50), svcSplitter.Splits[1].Weight)
-					require.Equal(r, "other-splitter", svcSplitter.Splits[1].Service)
-
-					// service-intentions
-					entry, _, err = consulClient.ConfigEntries().Get(api.ServiceIntentions, IntentionName, nil)
-					require.NoError(r, err)
-					svcIntentions, ok := entry.(*api.ServiceIntentionsConfigEntry)
-					require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
-					require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[0].Action)
-					require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[1].Permissions[0].Action)
-
-					// ingress-gateway
-					entry, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
-					require.NoError(r, err)
-					ingressGatewayEntry, ok := entry.(*api.IngressGatewayConfigEntry)
-					require.True(r, ok, "could not cast to IngressGatewayConfigEntry")
-					require.Equal(r, patchPort, ingressGatewayEntry.Listeners[0].Port)
-
-					// terminating-gateway
-					entry, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
-					require.NoError(r, err)
-					terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
-					require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
-					require.Equal(r, patchSNI, terminatingGatewayEntry.Services[0].SNI)
-
-					// jwt-provider
-					entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
-					require.NoError(r, err)
-					jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
-					require.True(r, ok, "could not cast to JWTProviderConfigEntry")
-					require.Equal(r, patchIssuer, jwtProviderConfigEntry.Issuer)
-
-					// exported-services
-					entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
-					require.NoError(r, err)
-					exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
-					require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
-					require.Equal(r, patchPeer, exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
-
-					// control-plane-request-limit
-					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
-					require.NoError(r, err)
-					rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
-					require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
-					require.Equal(r, rateLimitIPConfigEntry.Mode, "disabled")
-
-					// rate-limit
-					entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
-					require.NoError(r, err)
-					rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
-					require.True(r, ok, "could not cast to RateLimitConfigEntry")
-					require.Equal(r, rateLimitConfigEntry.Config.Priority, false)
-				})
-			}
-
-			// Test a delete.
-			{
-				logger.Log(t, "deleting service-defaults custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "servicedefaults", "defaults")
-
-				logger.Log(t, "deleting service-resolver custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceresolver", "resolver")
-
-				logger.Log(t, "deleting proxy-defaults custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "proxydefaults", "global")
-
-				logger.Log(t, "deleting mesh custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "mesh", "mesh")
-
-				logger.Log(t, "deleting service-router custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "servicerouter", "router")
-
-				logger.Log(t, "deleting service-splitter custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "servicesplitter", "splitter")
-
-				logger.Log(t, "deleting service-intentions custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceintentions", "intentions")
-
-				logger.Log(t, "deleting ingress-gateway custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ingressgateway", "ingress-gateway")
-
-				logger.Log(t, "deleting terminating-gateway custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "terminatinggateway", "terminating-gateway")
-
-				logger.Log(t, "deleting jwt-provider custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "jwtprovider", "jwt-provider")
-
-				logger.Log(t, "deleting exported-services custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "exportedservices", "default")
-
-				logger.Log(t, "deleting control-plane-request-limit custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "controlplanerequestlimit", "controlplanerequestlimit")
-
-				logger.Log(t, "deleting rate-limit custom resource")
-				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ratelimit", "global")
-
-				counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
-				retry.RunWith(counter, t, func(r *retry.R) {
-					// service-defaults
-					_, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// service-resolver
-					_, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// proxy-defaults
-					_, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// mesh
-					_, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// service-router
-					_, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// service-splitter
-					_, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// service-intentions
-					_, _, err = consulClient.ConfigEntries().Get(api.ServiceIntentions, IntentionName, nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// ingress-gateway
-					_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// terminating-gateway
-					_, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// jwt-provider
-					_, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// exported-services
-					_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// control-plane-request-limit
-					_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-
-					// rate-limit
-					_, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
-					require.Error(r, err)
-					require.Contains(r, err.Error(), "404 (Config entry not found")
-				})
-			}
+		})
+	}
+
+	// Test updates.
+	{
+		logger.Log(t, "patching service-defaults custom resource")
+		patchProtocol := "tcp"
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicedefaults", "defaults", "-p", fmt.Sprintf(`{"spec":{"protocol":"%s"}}`, patchProtocol), "--type=merge")
+
+		logger.Log(t, "patching service-resolver custom resource")
+		patchRedirectSvc := "baz"
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceresolver", "resolver", "-p", fmt.Sprintf(`{"spec":{"redirect":{"service": "%s"}}}`, patchRedirectSvc), "--type=merge")
+
+		logger.Log(t, "patching proxy-defaults custom resource")
+		patchMeshGatewayMode := "remote"
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "proxydefaults", "global", "-p", fmt.Sprintf(`{"spec":{"meshGateway":{"mode": "%s"}}}`, patchMeshGatewayMode), "--type=merge")
+
+		logger.Log(t, "patching mesh custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "mesh", "mesh", "-p", fmt.Sprintf(`{"spec":{"transparentProxy":{"meshDestinationsOnly": %t}}}`, false), "--type=merge")
+
+		logger.Log(t, "patching service-router custom resource")
+		patchPathPrefix := "/baz"
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicerouter", "router", "-p", fmt.Sprintf(`{"spec":{"routes":[{"match":{"http":{"pathPrefix":"%s"}}}]}}`, patchPathPrefix), "--type=merge")
+
+		logger.Log(t, "patching service-splitter custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "servicesplitter", "splitter", "-p", `{"spec": {"splits": [{"weight": 50}, {"weight": 50, "service": "other-splitter"}]}}`, "--type=merge")
+
+		logger.Log(t, "patching service-intentions custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "serviceintentions", "intentions", "-p", `{"spec": {"sources": [{"name": "svc2", "action": "deny"}, {"name": "svc3", "permissions": [{"action": "deny", "http": {"pathExact": "/foo", "methods": ["GET", "PUT"]}}]}]}}`, "--type=merge")
+
+		logger.Log(t, "patching ingress-gateway custom resource")
+		patchPort := 9090
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ingressgateway", "ingress-gateway", "-p", fmt.Sprintf(`{"spec": {"listeners": [{"port": %d, "protocol": "tcp", "services": [{"name": "foo"}]}]}}`, patchPort), "--type=merge")
+
+		logger.Log(t, "patching terminating-gateway custom resource")
+		patchSNI := "patch-sni"
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "terminatinggateway", "terminating-gateway", "-p", fmt.Sprintf(`{"spec": {"services": [{"name":"name","caFile":"caFile","certFile":"certFile","keyFile":"keyFile","sni":"%s"}]}}`, patchSNI), "--type=merge")
+
+		logger.Log(t, "patching JWTProvider custom resource")
+		patchIssuer := "other-issuer"
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "jwtprovider", "jwt-provider", "-p", fmt.Sprintf(`{"spec": {"issuer": "%s"}}`, patchIssuer), "--type=merge")
+
+		logger.Log(t, "patching ExportedServices custom resource")
+		patchPeer := "destination"
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "exportedservices", "default", "-p", fmt.Sprintf(`{"spec": {"services": [{"name": "frontend", "consumers":  [{"peer":  "%s"}, {"samenessGroup":  "groupName"}]}]}}`, patchPeer), "--type=merge")
+
+		logger.Log(t, "patching control-plane-request-limit custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "controlplanerequestlimit", "controlplanerequestlimit", "-p", `{"spec": {"mode": "disabled"}}`, "--type=merge")
+
+		logger.Log(t, "patching rate-limit custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
+
+		counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
+		retry.RunWith(counter, t, func(r *retry.R) {
+			// service-defaults
+			entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
+			require.NoError(r, err)
+			svcDefaultEntry, ok := entry.(*api.ServiceConfigEntry)
+			require.True(r, ok, "could not cast to ServiceConfigEntry")
+			require.Equal(r, patchProtocol, svcDefaultEntry.Protocol)
+
+			// service-resolver
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
+			require.NoError(r, err)
+			svcResolverEntry, ok := entry.(*api.ServiceResolverConfigEntry)
+			require.True(r, ok, "could not cast to ServiceResolverConfigEntry")
+			require.Equal(r, patchRedirectSvc, svcResolverEntry.Redirect.Service)
+
+			// proxy-defaults
+			entry, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
+			require.NoError(r, err)
+			proxyDefaultsEntry, ok := entry.(*api.ProxyConfigEntry)
+			require.True(r, ok, "could not cast to ProxyConfigEntry")
+			require.Equal(r, api.MeshGatewayModeRemote, proxyDefaultsEntry.MeshGateway.Mode)
+
+			// mesh
+			entry, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", nil)
+			require.NoError(r, err)
+			meshEntry, ok := entry.(*api.MeshConfigEntry)
+			require.True(r, ok, "could not cast to MeshConfigEntry")
+			require.False(r, meshEntry.TransparentProxy.MeshDestinationsOnly)
+
+			// service-router
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", nil)
+			require.NoError(r, err)
+			svcRouterEntry, ok := entry.(*api.ServiceRouterConfigEntry)
+			require.True(r, ok, "could not cast to ServiceRouterConfigEntry")
+			require.Equal(r, patchPathPrefix, svcRouterEntry.Routes[0].Match.HTTP.PathPrefix)
+
+			// service-splitter
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", nil)
+			require.NoError(r, err)
+			svcSplitter, ok := entry.(*api.ServiceSplitterConfigEntry)
+			require.True(r, ok, "could not cast to ServiceSplitterConfigEntry")
+			require.Equal(r, float32(50), svcSplitter.Splits[0].Weight)
+			require.Equal(r, float32(50), svcSplitter.Splits[1].Weight)
+			require.Equal(r, "other-splitter", svcSplitter.Splits[1].Service)
+
+			// service-intentions
+			entry, _, err = consulClient.ConfigEntries().Get(api.ServiceIntentions, IntentionName, nil)
+			require.NoError(r, err)
+			svcIntentions, ok := entry.(*api.ServiceIntentionsConfigEntry)
+			require.True(r, ok, "could not cast to ServiceIntentionsConfigEntry")
+			require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[0].Action)
+			require.Equal(r, api.IntentionActionDeny, svcIntentions.Sources[1].Permissions[0].Action)
+
+			// ingress-gateway
+			entry, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
+			require.NoError(r, err)
+			ingressGatewayEntry, ok := entry.(*api.IngressGatewayConfigEntry)
+			require.True(r, ok, "could not cast to IngressGatewayConfigEntry")
+			require.Equal(r, patchPort, ingressGatewayEntry.Listeners[0].Port)
+
+			// terminating-gateway
+			entry, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+			require.NoError(r, err)
+			terminatingGatewayEntry, ok := entry.(*api.TerminatingGatewayConfigEntry)
+			require.True(r, ok, "could not cast to TerminatingGatewayConfigEntry")
+			require.Equal(r, patchSNI, terminatingGatewayEntry.Services[0].SNI)
+
+			// jwt-provider
+			entry, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+			require.NoError(r, err)
+			jwtProviderConfigEntry, ok := entry.(*api.JWTProviderConfigEntry)
+			require.True(r, ok, "could not cast to JWTProviderConfigEntry")
+			require.Equal(r, patchIssuer, jwtProviderConfigEntry.Issuer)
+
+			// exported-services
+			entry, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+			require.NoError(r, err)
+			exportedServicesConfigEntry, ok := entry.(*api.ExportedServicesConfigEntry)
+			require.True(r, ok, "could not cast to ExportedServicesConfigEntry")
+			require.Equal(r, patchPeer, exportedServicesConfigEntry.Services[0].Consumers[0].Peer)
+
+			// control-plane-request-limit
+			entry, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
+			require.NoError(r, err)
+			rateLimitIPConfigEntry, ok := entry.(*api.RateLimitIPConfigEntry)
+			require.True(r, ok, "could not cast to RateLimitIPConfigEntry")
+			require.Equal(r, rateLimitIPConfigEntry.Mode, "disabled")
+
+			// rate-limit
+			entry, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
+			require.NoError(r, err)
+			rateLimitConfigEntry, ok := entry.(*api.GlobalRateLimitConfigEntry)
+			require.True(r, ok, "could not cast to RateLimitConfigEntry")
+			require.Equal(r, rateLimitConfigEntry.Config.Priority, false)
+		})
+	}
+
+	// Test a delete.
+	{
+		logger.Log(t, "deleting service-defaults custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "servicedefaults", "defaults")
+
+		logger.Log(t, "deleting service-resolver custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceresolver", "resolver")
+
+		logger.Log(t, "deleting proxy-defaults custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "proxydefaults", "global")
+
+		logger.Log(t, "deleting mesh custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "mesh", "mesh")
+
+		logger.Log(t, "deleting service-router custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "servicerouter", "router")
+
+		logger.Log(t, "deleting service-splitter custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "servicesplitter", "splitter")
+
+		logger.Log(t, "deleting service-intentions custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "serviceintentions", "intentions")
+
+		logger.Log(t, "deleting ingress-gateway custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ingressgateway", "ingress-gateway")
+
+		logger.Log(t, "deleting terminating-gateway custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "terminatinggateway", "terminating-gateway")
+
+		logger.Log(t, "deleting jwt-provider custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "jwtprovider", "jwt-provider")
+
+		logger.Log(t, "deleting exported-services custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "exportedservices", "default")
+
+		logger.Log(t, "deleting control-plane-request-limit custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "controlplanerequestlimit", "controlplanerequestlimit")
+
+		logger.Log(t, "deleting rate-limit custom resource")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ratelimit", "global")
+
+		counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
+		retry.RunWith(counter, t, func(r *retry.R) {
+			// service-defaults
+			_, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// service-resolver
+			_, _, err = consulClient.ConfigEntries().Get(api.ServiceResolver, "resolver", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// proxy-defaults
+			_, _, err = consulClient.ConfigEntries().Get(api.ProxyDefaults, "global", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// mesh
+			_, _, err = consulClient.ConfigEntries().Get(api.MeshConfig, "mesh", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// service-router
+			_, _, err = consulClient.ConfigEntries().Get(api.ServiceRouter, "router", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// service-splitter
+			_, _, err = consulClient.ConfigEntries().Get(api.ServiceSplitter, "splitter", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// service-intentions
+			_, _, err = consulClient.ConfigEntries().Get(api.ServiceIntentions, IntentionName, nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// ingress-gateway
+			_, _, err = consulClient.ConfigEntries().Get(api.IngressGateway, "ingress-gateway", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// terminating-gateway
+			_, _, err = consulClient.ConfigEntries().Get(api.TerminatingGateway, "terminating-gateway", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// jwt-provider
+			_, _, err = consulClient.ConfigEntries().Get(api.JWTProvider, "jwt-provider", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// exported-services
+			_, _, err = consulClient.ConfigEntries().Get(api.ExportedServices, "default", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// control-plane-request-limit
+			_, _, err = consulClient.ConfigEntries().Get(api.RateLimitIPConfig, "controlplanerequestlimit", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
+
+			// rate-limit
+			_, _, err = consulClient.ConfigEntries().Get(api.RateLimit, "global", nil)
+			require.Error(r, err)
+			require.Contains(r, err.Error(), "404 (Config entry not found")
 		})
 	}
 }

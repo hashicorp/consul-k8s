@@ -157,10 +157,22 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 
-	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 3}, t, func(r *retry.R) {
+	// Retry only transient cleanup-race errors (e.g. NodePort still allocated by previous
+	// test). For all other errors fail immediately so we don't retry a fundamentally broken
+	// deployment for minutes.
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 15}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
-		require.NoError(r, err)
+		if err == nil {
+			return
+		}
+		errStr := err.Error()
+		if strings.Contains(errStr, "already allocated") ||
+			strings.Contains(errStr, "object is being deleted") ||
+			strings.Contains(errStr, "already exists") {
+			r.Errorf("helm install transient conflict (retrying): %v", err)
+			return
+		}
+		require.NoError(t, err)
 	})
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))

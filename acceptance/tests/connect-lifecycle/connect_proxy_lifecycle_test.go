@@ -35,247 +35,261 @@ const (
 )
 
 // Test the endpoints controller cleans up force-killed pods.
-func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
+
+func TestConnectInject_ProxyLifecycleShutdown_NotSecure_DrainListeners_GracePeriod5(t *testing.T) {
+	runProxyLifecycleShutdown(t, LifecycleShutdownConfig{secure: false, helmValues: map[string]string{
+		helmDrainListenersKey:     "true",
+		helmGracePeriodSecondsKey: "5",
+	}})
+}
+
+func TestConnectInject_ProxyLifecycleShutdown_Secure_DrainListeners_GracePeriod5(t *testing.T) {
+	runProxyLifecycleShutdown(t, LifecycleShutdownConfig{secure: true, helmValues: map[string]string{
+		helmDrainListenersKey:     "true",
+		helmGracePeriodSecondsKey: "5",
+	}})
+}
+
+func TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod5(t *testing.T) {
+	runProxyLifecycleShutdown(t, LifecycleShutdownConfig{secure: false, helmValues: map[string]string{
+		helmDrainListenersKey:     "false",
+		helmGracePeriodSecondsKey: "5",
+	}})
+}
+
+func TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod5(t *testing.T) {
+	runProxyLifecycleShutdown(t, LifecycleShutdownConfig{secure: true, helmValues: map[string]string{
+		helmDrainListenersKey:     "false",
+		helmGracePeriodSecondsKey: "5",
+	}})
+}
+
+func TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod0(t *testing.T) {
+	runProxyLifecycleShutdown(t, LifecycleShutdownConfig{secure: false, helmValues: map[string]string{
+		helmDrainListenersKey:     "false",
+		helmGracePeriodSecondsKey: "0",
+	}})
+}
+
+func TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod0(t *testing.T) {
+	runProxyLifecycleShutdown(t, LifecycleShutdownConfig{secure: true, helmValues: map[string]string{
+		helmDrainListenersKey:     "false",
+		helmGracePeriodSecondsKey: "0",
+	}})
+}
+
+func runProxyLifecycleShutdown(t *testing.T, testCfg LifecycleShutdownConfig) {
+	t.Helper()
 	cfg := suite.Config()
 	cfg.SkipWhenOpenshiftAndCNI(t)
 
-	for _, testCfg := range []LifecycleShutdownConfig{
-		{secure: false, helmValues: map[string]string{
-			helmDrainListenersKey:     "true",
-			helmGracePeriodSecondsKey: "5",
-		}},
-		{secure: true, helmValues: map[string]string{
-			helmDrainListenersKey:     "true",
-			helmGracePeriodSecondsKey: "5",
-		}},
-		{secure: false, helmValues: map[string]string{
-			helmDrainListenersKey:     "false",
-			helmGracePeriodSecondsKey: "5",
-		}},
-		{secure: true, helmValues: map[string]string{
-			helmDrainListenersKey:     "false",
-			helmGracePeriodSecondsKey: "5",
-		}},
-		{secure: false, helmValues: map[string]string{
-			helmDrainListenersKey:     "false",
-			helmGracePeriodSecondsKey: "0",
-		}},
-		{secure: true, helmValues: map[string]string{
-			helmDrainListenersKey:     "false",
-			helmGracePeriodSecondsKey: "0",
-		}},
-	} {
-		// Determine if listeners should be expected to drain inbound connections
-		var drainListenersEnabled bool
-		var err error
-		val, ok := testCfg.helmValues[helmDrainListenersKey]
-		if ok {
-			drainListenersEnabled, err = strconv.ParseBool(val)
-			require.NoError(t, err)
+	// Determine if listeners should be expected to drain inbound connections
+	var drainListenersEnabled bool
+	var err error
+	val, ok := testCfg.helmValues[helmDrainListenersKey]
+	if ok {
+		drainListenersEnabled, err = strconv.ParseBool(val)
+		require.NoError(t, err)
+	}
+
+	// Determine expected shutdown grace period
+	var gracePeriodSeconds int64
+	val, ok = testCfg.helmValues[helmGracePeriodSecondsKey]
+	if ok {
+		gracePeriodSeconds, err = strconv.ParseInt(val, 10, 64)
+		require.NoError(t, err)
+	} else {
+		// 5s should be a good amount of time to confirm the pod doesn't terminate
+		gracePeriodSeconds = 5
+	}
+
+	ctx := suite.Environment().DefaultContext(t)
+	releaseName := helpers.RandomName()
+
+	connHelper := connhelper.ConnectHelper{
+		ClusterKind: consul.Helm,
+		Secure:      testCfg.secure,
+		ReleaseName: releaseName,
+		Ctx:         ctx,
+		Cfg:         cfg,
+		HelmValues:  testCfg.helmValues,
+	}
+
+	connHelper.Setup(t)
+	connHelper.Install(t)
+
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		peers, err := connHelper.ConsulClient.Status().Peers()
+		require.NoError(r, err)
+		require.Len(r, peers, 1)
+	})
+
+	connHelper.DeployClientAndServer(t)
+
+	// TODO: should this move into connhelper.DeployClientAndServer?
+	logger.Log(t, "waiting for static-client and static-server to be registered with Consul")
+	retry.Run(t, func(r *retry.R) {
+		for _, name := range []string{
+			"static-client",
+			"static-client-sidecar-proxy",
+			"static-server",
+			"static-server-sidecar-proxy",
+		} {
+			logger.Logf(r, "checking for %s service in Consul catalog", name)
+			instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
+			r.Check(err)
+
+			if len(instances) != 1 {
+				r.Errorf("expected 1 instance of %s", name)
+			}
 		}
+	})
 
-		// Determine expected shutdown grace period
-		var gracePeriodSeconds int64
-		val, ok = testCfg.helmValues[helmGracePeriodSecondsKey]
-		if ok {
-			gracePeriodSeconds, err = strconv.ParseInt(val, 10, 64)
-			require.NoError(t, err)
-		} else {
-			// 5s should be a good amount of time to confirm the pod doesn't terminate
-			gracePeriodSeconds = 5
-		}
+	if testCfg.secure {
+		connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
+		connHelper.CreateIntention(t, connhelper.IntentionOpts{})
+	}
 
-		name := fmt.Sprintf("secure: %t, drainListeners: %t, gracePeriodSeconds: %d", testCfg.secure, drainListenersEnabled, gracePeriodSeconds)
-		t.Run(name, func(t *testing.T) {
-			ctx := suite.Environment().DefaultContext(t)
-			releaseName := helpers.RandomName()
+	connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+	var pods *corev1.PodList
+	var ns string
+	var err error
+	retry.Run(t, func(r *retry.R) {
+		// Get static-client pod name
+		ns = ctx.KubectlOptions(r).Namespace
+		pods, err = ctx.KubernetesClient(r).CoreV1().Pods(ns).List(
+			context.Background(),
+			metav1.ListOptions{
+				LabelSelector: "app=static-client",
+			},
+		)
+		require.NoError(r, err)
+		require.Len(r, pods.Items, 1)
+	})
+	clientPodName := pods.Items[0].Name
 
-			connHelper := connhelper.ConnectHelper{
-				ClusterKind: consul.Helm,
-				Secure:      testCfg.secure,
-				ReleaseName: releaseName,
-				Ctx:         ctx,
-				Cfg:         cfg,
-				HelmValues:  testCfg.helmValues,
-			}
+	// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
+	var terminationGracePeriod int64 = 6
+	logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
+	err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
+	require.NoError(t, err)
 
-			connHelper.Setup(t)
-			connHelper.Install(t)
+	// Exec into terminating pod, not just any static-client pod
+	args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
 
-			retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
-				peers, err := connHelper.ConsulClient.Status().Peers()
-				require.NoError(r, err)
-				require.Len(r, peers, 1)
-			})
+	if cfg.EnableTransparentProxy {
+		args = append(args, "http://static-server")
+	} else {
+		args = append(args, "http://localhost:1234")
+	}
 
-			connHelper.DeployClientAndServer(t)
-
-			// TODO: should this move into connhelper.DeployClientAndServer?
-			logger.Log(t, "waiting for static-client and static-server to be registered with Consul")
-			retry.Run(t, func(r *retry.R) {
-				for _, name := range []string{
-					"static-client",
-					"static-client-sidecar-proxy",
-					"static-server",
-					"static-server-sidecar-proxy",
-				} {
-					logger.Logf(r, "checking for %s service in Consul catalog", name)
-					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
-					r.Check(err)
-
-					if len(instances) != 1 {
-						r.Errorf("expected 1 instance of %s", name)
-					}
+	if gracePeriodSeconds > 0 {
+		// Ensure outbound requests are still successful during grace period.
+		gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
+		// podGone is set when the terminating pod disappears from the API server before
+		// the grace period timer fires. Kubernetes removes a pod as soon as all its
+		// containers exit, even if the DeleteOptions.GracePeriodSeconds has not elapsed.
+		// That is an acceptable outcome: the proxy did its job and the app exited cleanly.
+		podGone := false
+	gracePeriodLoop:
+		for {
+			select {
+			case <-gracePeriodTimer.C:
+				break gracePeriodLoop
+			default:
+				if podGone {
+					break gracePeriodLoop
 				}
-			})
-
-			if testCfg.secure {
-				connHelper.TestConnectionFailureWithoutIntention(t, connhelper.ConnHelperOpts{})
-				connHelper.CreateIntention(t, connhelper.IntentionOpts{})
-			}
-
-			connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
-			var pods *corev1.PodList
-			var ns string
-			var err error
-			retry.Run(t, func(r *retry.R) {
-				// Get static-client pod name
-				ns = ctx.KubectlOptions(r).Namespace
-				pods, err = ctx.KubernetesClient(r).CoreV1().Pods(ns).List(
-					context.Background(),
-					metav1.ListOptions{
-						LabelSelector: "app=static-client",
-					},
-				)
-				require.NoError(r, err)
-				require.Len(r, pods.Items, 1)
-			})
-			clientPodName := pods.Items[0].Name
-
-			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
-			var terminationGracePeriod int64 = 6
-			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
-			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
-			require.NoError(t, err)
-
-			// Exec into terminating pod, not just any static-client pod
-			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
-
-			if cfg.EnableTransparentProxy {
-				args = append(args, "http://static-server")
-			} else {
-				args = append(args, "http://localhost:1234")
-			}
-
-			if gracePeriodSeconds > 0 {
-				// Ensure outbound requests are still successful during grace period.
-				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
-				// podGone is set when the terminating pod disappears from the API server before
-				// the grace period timer fires. Kubernetes removes a pod as soon as all its
-				// containers exit, even if the DeleteOptions.GracePeriodSeconds has not elapsed.
-				// That is an acceptable outcome: the proxy did its job and the app exited cleanly.
-				podGone := false
-			gracePeriodLoop:
-				for {
-					select {
-					case <-gracePeriodTimer.C:
-						break gracePeriodLoop
-					default:
-						if podGone {
-							break gracePeriodLoop
+				retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
+				retry.RunWith(retrier, t, func(r *retry.R) {
+					logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
+					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
+					if err != nil {
+						// kubectl writes "Error from server (NotFound)" to stderr (captured in output),
+						// while err.Error() is just "exit status 1".
+						if strings.Contains(err.Error(), "not found") || strings.Contains(output, "not found") || strings.Contains(output, "NotFound") {
+							logger.Logf(r, "pod %s already terminated during grace period, treating as success", clientPodName)
+							podGone = true
+							return
 						}
-						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
-						retry.RunWith(retrier, t, func(r *retry.R) {
-							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
-							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
-							if err != nil {
-								// kubectl writes "Error from server (NotFound)" to stderr (captured in output),
-								// while err.Error() is just "exit status 1".
-								if strings.Contains(err.Error(), "not found") || strings.Contains(output, "not found") || strings.Contains(output, "NotFound") {
-									logger.Logf(r, "pod %s already terminated during grace period, treating as success", clientPodName)
-									podGone = true
-									return
-								}
-								r.Errorf("%v", err.Error())
-								return
-							}
-							require.Condition(r, func() bool {
-								return !strings.Contains(output, "curl: (7) Failed to connect")
-							}, fmt.Sprintf("Error: %s", output))
-						})
-
-						if podGone {
-							break gracePeriodLoop
-						}
-
-						// If listener draining is disabled, ensure inbound
-						// requests are accepted during grace period.
-						if !drainListenersEnabled {
-							connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
-						}
-						// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
-						// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
-
-						time.Sleep(2 * time.Second)
-					}
-				}
-			} else {
-				// Ensure outbound requests fail because proxy has terminated
-				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
-					require.Error(r, err)
-					require.Condition(r, func() bool {
-						exists := false
-						if strings.Contains(output, "curl: (7) Failed to connect") {
-							exists = true
-						}
-						return exists
-					})
-				})
-			}
-
-			// Checks are done, now ensure the pod is fully removed from k8s and Consul.
-			logger.Logf(t, "scaling down the static-client deployment to 0 replicas to clean up the terminating pod %q", clientPodName)
-			k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
-
-			// Wait for the pod to be fully deleted
-			// This ensures that the ACL token associated with pod had also been cleaned up
-			retrier := &retry.Counter{Count: 60, Wait: 2 * time.Second}
-			retry.RunWith(retrier, t, func(r *retry.R) {
-				err = ctx.KubernetesClient(r).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{})
-				if err != nil {
-					if strings.Contains(err.Error(), "not found") {
-						logger.Logf(r, "pod %q successfully deleted", clientPodName)
+						r.Errorf("%v", err.Error())
 						return
 					}
-					r.Errorf("error deleting pod %q: %v", clientPodName, err)
-				} else {
-					r.Errorf("pod %q still exists", clientPodName)
-				}
-			})
+					require.Condition(r, func() bool {
+						return !strings.Contains(output, "curl: (7) Failed to connect")
+					}, fmt.Sprintf("Error: %s", output))
+				})
 
-			logger.Log(t, "ensuring pod is deregistered after termination")
-			// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
-			// This can cause the re-queued reconcile used to come back and clean up the service registration to be re-re-queued at
-			// 2-3X the intended grace period.
-			retry.RunWith(&retry.Timer{Timeout: time.Duration(30) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
-				for _, name := range []string{
-					"static-client",
-					"static-client-sidecar-proxy",
-				} {
-					logger.Logf(r, "checking for %s service in Consul catalog", name)
-					instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
-					r.Check(err)
-
-					for _, instance := range instances {
-						if strings.Contains(instance.ServiceID, clientPodName) {
-							r.Errorf("%s is still registered", instance.ServiceID)
-						}
-					}
+				if podGone {
+					break gracePeriodLoop
 				}
+
+				// If listener draining is disabled, ensure inbound
+				// requests are accepted during grace period.
+				if !drainListenersEnabled {
+					connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+				}
+				// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
+				// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
+
+				time.Sleep(2 * time.Second)
+			}
+		}
+	} else {
+		// Ensure outbound requests fail because proxy has terminated
+		retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+			output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
+			require.Error(r, err)
+			require.Condition(r, func() bool {
+				exists := false
+				if strings.Contains(output, "curl: (7) Failed to connect") {
+					exists = true
+				}
+				return exists
 			})
 		})
 	}
+
+	// Checks are done, now ensure the pod is fully removed from k8s and Consul.
+	logger.Logf(t, "scaling down the static-client deployment to 0 replicas to clean up the terminating pod %q", clientPodName)
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "scale", "deploy/static-client", "--replicas=0")
+
+	// Wait for the pod to be fully deleted
+	// This ensures that the ACL token associated with pod had also been cleaned up
+	retrier := &retry.Counter{Count: 60, Wait: 2 * time.Second}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		err = ctx.KubernetesClient(r).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{})
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				logger.Logf(r, "pod %q successfully deleted", clientPodName)
+				return
+			}
+			r.Errorf("error deleting pod %q: %v", clientPodName, err)
+		} else {
+			r.Errorf("pod %q still exists", clientPodName)
+		}
+	})
+
+	logger.Log(t, "ensuring pod is deregistered after termination")
+	// We wait an arbitrarily long time here. With the deployment rollout creating additional endpoints reconciles,
+	// This can cause the re-queued reconcile used to come back and clean up the service registration to be re-re-queued at
+	// 2-3X the intended grace period.
+	retry.RunWith(&retry.Timer{Timeout: time.Duration(30) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		for _, name := range []string{
+			"static-client",
+			"static-client-sidecar-proxy",
+		} {
+			logger.Logf(r, "checking for %s service in Consul catalog", name)
+			instances, _, err := connHelper.ConsulClient.Catalog().Service(name, "", nil)
+			r.Check(err)
+
+			for _, instance := range instances {
+				if strings.Contains(instance.ServiceID, clientPodName) {
+					r.Errorf("%s is still registered", instance.ServiceID)
+				}
+			}
+		}
+	})
 }
 
 func TestConnectInject_ProxyLifecycleShutdownJob(t *testing.T) {

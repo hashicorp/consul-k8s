@@ -80,5 +80,23 @@
     "TestWANFederation_Secure": 408,
     "TestWANFederationFailover_NotSecure": 686,
     "TestWANFederationFailover_Secure": 686
+  },
+  "config-entries": {
+    "TestController_NotSecure_NoVault": 540,
+    "TestController_Secure_NoVault": 540,
+    "TestController_NotSecure_Vault": 540,
+    "TestController_Secure_Vault": 540
+  },
+  "connect-lifecycle": {
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_DrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_DrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod0": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod0": 370
+  },
+  "sameness": {
+    "TestFailover_Connect_DefaultFailover": 1080,
+    "TestFailover_Connect_SecureFailover": 1080
   }
 }
