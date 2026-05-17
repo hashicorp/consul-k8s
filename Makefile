@@ -201,6 +201,8 @@ kind-cni-calico: ## install cni plugin on kind
 		echo "Adding IPv4 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml; \
 	fi
+	timeout 120 bash -c 'until kubectl get daemonset calico-node -n calico-system 2>/dev/null; do sleep 3; done'
+	kubectl rollout status daemonset/calico-node -n calico-system --timeout=180s
 
 .PHONY: kind-delete
 kind-delete:
