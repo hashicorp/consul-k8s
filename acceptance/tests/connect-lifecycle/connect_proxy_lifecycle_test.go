@@ -153,7 +153,6 @@ func runProxyLifecycleShutdown(t *testing.T, testCfg LifecycleShutdownConfig) {
 	connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
 	var pods *corev1.PodList
 	var ns string
-	var err error
 	retry.Run(t, func(r *retry.R) {
 		// Get static-client pod name
 		ns = ctx.KubectlOptions(r).Namespace
