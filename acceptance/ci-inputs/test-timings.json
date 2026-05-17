@@ -1,0 +1,102 @@
+{
+  "_comment": "Per-test durations in seconds (max observed across CI variants). Updated automatically by the 'update-test-timings' CI job after each successful run. Missing tests get DEFAULT_TEST_SECONDS in the matrix generator.",
+  "api-gateway": {
+    "TestAPIGateway_Tenancy": 804,
+    "TestAPIGateway_Basic": 802,
+    "TestAPIGateway_JWTAuth_Basic": 223,
+    "TestAPIGateway_Lifecycle": 217,
+    "TestAPIGateway_Scaling_EnterpriseGateEnabledPreservesManualScale": 193,
+    "TestAPIGateway_Scaling_EnterpriseGateEnabledStaticReplicas": 192,
+    "TestAPIGateway_Scaling_EnterpriseGateEnabledControllerManagedHPA": 183,
+    "TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations": 163,
+    "TestAPIGateway_GatewayClassConfig": 138
+  },
+  "connect": {
+    "TestConnectInjectNamespaces_SingleNamespace": 213,
+    "TestConnectInjectNamespaces_SingleNamespaceSecure": 213,
+    "TestConnectInjectNamespaces_MirroredNamespaces": 213,
+    "TestConnectInjectNamespaces_MirroredNamespacesSecure": 213,
+    "TestConnectInjectNamespaces_CleanupController": 694,
+    "TestConnectInject_PermissiveMTLS": 196,
+    "TestConnectInject_LocalRateLimiting": 178
+  },
+  "consul-dns": {
+    "TestConsulDNSProxy_WithPartitionsAndCatalogSync_NotSecure_PrivilegedPort": 514,
+    "TestConsulDNSProxy_WithPartitionsAndCatalogSync_Secure_PrivilegedPort": 514,
+    "TestConsulDNSProxy_WithPartitionsAndCatalogSync_NotSecure_NonPrivilegedPort": 514,
+    "TestConsulDNSProxy_WithPartitionsAndCatalogSync_Secure_NonPrivilegedPort": 514,
+    "TestConsulDNS_NoTLSNoProxy_PrivilegedPort": 136,
+    "TestConsulDNS_NoTLSDNSProxy_PrivilegedPort": 136,
+    "TestConsulDNS_SecureNoProxy_PrivilegedPort": 136,
+    "TestConsulDNS_SecureDNSProxy_PrivilegedPort": 136,
+    "TestConsulDNS_SecureNoInjectDNSProxy_PrivilegedPort": 136,
+    "TestConsulDNS_NoTLSNoProxy_NonPrivilegedPort": 136,
+    "TestConsulDNS_NoTLSDNSProxy_NonPrivilegedPort": 136,
+    "TestConsulDNS_SecureNoProxy_NonPrivilegedPort": 136,
+    "TestConsulDNS_SecureDNSProxy_NonPrivilegedPort": 136,
+    "TestConsulDNS_SecureNoInjectDNSProxy_NonPrivilegedPort": 136
+  },
+  "partitions": {
+    "TestPartitions_Connect_DefaultNamespace": 553,
+    "TestPartitions_Connect_DefaultNamespaceACLs": 553,
+    "TestPartitions_Connect_SingleNamespace": 553,
+    "TestPartitions_Connect_SingleNamespaceACLs": 553,
+    "TestPartitions_Connect_MirroredNamespaces": 553,
+    "TestPartitions_Connect_MirroredNamespacesACLs": 553,
+    "TestPartitions_Connect_MultiportServices_ACLsDisabled_LocalGateway": 450,
+    "TestPartitions_Connect_MultiportServices_ACLsDisabled_RemoteGateway": 450,
+    "TestPartitions_Connect_MultiportServices_ACLsEnabled_LocalGateway": 450,
+    "TestPartitions_Connect_MultiportServices_ACLsEnabled_RemoteGateway": 450,
+    "TestPartitions_Sync_DefaultNamespace": 217,
+    "TestPartitions_Sync_DefaultNamespaceACLs": 217,
+    "TestPartitions_Sync_SingleNamespace": 217,
+    "TestPartitions_Sync_SingleNamespaceACLs": 217,
+    "TestPartitions_Sync_MirrorK8S": 217,
+    "TestPartitions_Sync_MirrorK8SACLs": 217,
+    "TestPartitions_Gateway": 385
+  },
+  "peering": {
+    "TestPeering_ConnectNamespaces_DefaultNamespace": 292,
+    "TestPeering_ConnectNamespaces_SingleNamespace": 292,
+    "TestPeering_ConnectNamespaces_MirroredNamespaces": 292,
+    "TestPeering_ConnectNamespaces_DefaultNamespaceSecure": 292,
+    "TestPeering_ConnectNamespaces_SingleNamespaceSecure": 292,
+    "TestPeering_ConnectNamespaces_MirroredNamespacesSecure": 292,
+    "TestPeering_Gateway": 365
+  },
+  "terminating-gateway": {
+    "TestTerminatingGatewayNamespaceMirroring_AllDefault_NotSecure": 224,
+    "TestTerminatingGatewayNamespaceMirroring_AllDefault_Secure": 224,
+    "TestTerminatingGatewayNamespaceMirroring_AllNonDefault_NotSecure": 224,
+    "TestTerminatingGatewayNamespaceMirroring_AllNonDefault_Secure": 224,
+    "TestTerminatingGatewayNamespaceMirroring_MeshDefaultOthersNonDefault_NotSecure": 224,
+    "TestTerminatingGatewayNamespaceMirroring_MeshDefaultOthersNonDefault_Secure": 224,
+    "TestTerminatingGatewayNamespaceMirroring_ExternalDefaultOthersNonDefault_NotSecure": 224,
+    "TestTerminatingGatewayNamespaceMirroring_ExternalDefaultOthersNonDefault_Secure": 224,
+    "TestTerminatingGatewaySingleNamespace": 360
+  },
+  "wan-federation": {
+    "TestWANFederation_NotSecure": 408,
+    "TestWANFederation_Secure": 408,
+    "TestWANFederationFailover_NotSecure": 686,
+    "TestWANFederationFailover_Secure": 686
+  },
+  "config-entries": {
+    "TestController_NotSecure_NoVault": 540,
+    "TestController_Secure_NoVault": 540,
+    "TestController_NotSecure_Vault": 540,
+    "TestController_Secure_Vault": 540
+  },
+  "connect-lifecycle": {
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_DrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_DrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod0": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod0": 370
+  },
+  "sameness": {
+    "TestFailover_Connect_DefaultFailover": 1080,
+    "TestFailover_Connect_SecureFailover": 1080
+  }
+}

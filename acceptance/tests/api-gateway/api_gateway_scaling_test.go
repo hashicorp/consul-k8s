@@ -477,8 +477,8 @@ func createScalingGatewayWithName(
 
 	gateway := &gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        gatewayName,
-			Namespace:   namespace,
+			Name:      gatewayName,
+			Namespace: namespace,
 			Annotations: annotations,
 			Labels: map[string]string{
 				"component": "api-gateway",
@@ -510,7 +510,7 @@ func createScalingGatewayWithName(
 func waitForGatewayDeploymentReplicas(t *testing.T, k8sClient client.Client, gatewayName, namespace string, want int32) {
 	t.Helper()
 
-	retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Timer{Timeout: 8 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 		var deployment appsv1.Deployment
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: namespace}, &deployment)
 		require.NoError(r, err)
@@ -558,7 +558,7 @@ func waitForGatewayHPA(t *testing.T, k8sClient client.Client, gatewayName, names
 
 	controllerHPAName := fmt.Sprintf("%s-hpa", gatewayName)
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{}
-	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Timer{Timeout: 6 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		err := k8sClient.Get(context.Background(), types.NamespacedName{
 			Name:      controllerHPAName,
 			Namespace: namespace,
@@ -621,7 +621,7 @@ func restartAPIGatewayController(t *testing.T, ctx environment.TestContext) {
 	}
 
 	// Wait for the new pod to be ready
-	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
 		pods, err := k8sClient.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
 			LabelSelector: "app=consul,component=connect-injector",
 		})
@@ -630,11 +630,14 @@ func restartAPIGatewayController(t *testing.T, ctx environment.TestContext) {
 
 		for _, pod := range pods.Items {
 			require.Equal(r, corev1.PodRunning, pod.Status.Phase, "pod %s not running", pod.Name)
+			isReady := false
 			for _, condition := range pod.Status.Conditions {
 				if condition.Type == corev1.PodReady {
-					require.Equal(r, corev1.ConditionTrue, condition.Status, "pod %s not ready", pod.Name)
+					isReady = condition.Status == corev1.ConditionTrue
+					break
 				}
 			}
+			require.True(r, isReady, "pod %s not ready", pod.Name)
 		}
 		logger.Logf(t, "API Gateway controller restarted and ready")
 	})

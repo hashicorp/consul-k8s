@@ -193,8 +193,7 @@ acceptance-lint: ## Run linter in the control-plane directory.
 kind-cni-calico: ## install cni plugin on kind
 	kubectl create namespace calico-system || true
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
-	# Sleeps are needed as installs can happen too quickly for Kind to handle it
-	@sleep 30
+	kubectl wait --for=condition=Available deployment/tigera-operator -n tigera-operator --timeout=120s
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
 		echo "Adding IPv6 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources-ipv6.yaml; \
@@ -202,7 +201,8 @@ kind-cni-calico: ## install cni plugin on kind
 		echo "Adding IPv4 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml; \
 	fi
-	@sleep 20
+	timeout 120 bash -c 'until kubectl get daemonset calico-node -n calico-system 2>/dev/null; do sleep 3; done'
+	kubectl rollout status daemonset/calico-node -n calico-system --timeout=180s
 
 .PHONY: kind-delete
 kind-delete:
@@ -353,24 +353,23 @@ kubectl-version: ## print kubectl version
 
 .PHONY: kind-test-packages
 kind-test-packages: ## kind test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/kind_acceptance_test_packages.yaml"
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix kind
 
 .PHONY: gke-test-packages
 gke-test-packages: ## gke test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/gke_acceptance_test_packages.yaml"
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix gke
 
 .PHONY: eks-test-packages
 eks-test-packages: ## eks test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/eks_acceptance_test_packages.yaml"
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix eks
 
 .PHONY: aks-test-packages
 aks-test-packages: ## aks test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/aks_acceptance_test_packages.yaml"
-
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix aks
 
 .PHONY: openshift-test-packages
 openshift-test-packages: ## openshift test packages
-	@./control-plane/build-support/scripts/set_test_package_matrix.sh "acceptance/ci-inputs/openshift_acceptance_test_packages.yaml"
+	@cd control-plane && go run ./build-support/scripts/generate_test_matrix openshift
 
 .PHONY: go-mod-tidy
 go-mod-tidy: ## Recursively run go mod tidy on all subdirectories
