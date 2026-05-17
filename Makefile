@@ -193,8 +193,7 @@ acceptance-lint: ## Run linter in the control-plane directory.
 kind-cni-calico: ## install cni plugin on kind
 	kubectl create namespace calico-system || true
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
-	# Sleeps are needed as installs can happen too quickly for Kind to handle it
-	@sleep 30
+	kubectl wait --for=condition=Available deployment/tigera-operator -n tigera-operator --timeout=120s
 	@if [ "$(DUAL_STACK)" = "true" ]; then \
 		echo "Adding IPv6 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources-ipv6.yaml; \
@@ -202,7 +201,6 @@ kind-cni-calico: ## install cni plugin on kind
 		echo "Adding IPv4 config..."; \
 		kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/custom-resources.yaml; \
 	fi
-	@sleep 20
 
 .PHONY: kind-delete
 kind-delete:

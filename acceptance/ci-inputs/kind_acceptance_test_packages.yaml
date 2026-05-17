@@ -3,7 +3,7 @@
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
 - {runner: 0, test-packages: "partitions", num-clusters: "2"}
-- {runner: 1, test-packages: "peering"}
+- {runner: 1, test-packages: "peering", num-clusters: "2"}
 - {runner: 2, test-packages: "sameness"}
 - {runner: 3, test-packages: "connect"}
 - {runner: 4, test-packages: "snapshot-agent"}
@@ -12,7 +12,7 @@
 - {runner: 7, test-packages: "vault"}
 - {runner: 8, test-packages: "metrics"}
 - {runner: 9, test-packages: "server"}
-- {runner: 10, test-packages: "api-gateway"}
+- {runner: 10, test-packages: "api-gateway", num-clusters: "1"}
 - {runner: 11, test-packages: "connect-lifecycle"}
 - {runner: 12, test-packages: "sync"}
 - {runner: 18, test-packages: "api-gateway-external"}
