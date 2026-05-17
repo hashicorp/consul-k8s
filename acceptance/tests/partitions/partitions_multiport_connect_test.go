@@ -6,6 +6,7 @@ package partitions
 import (
 	"context"
 	"fmt"
+	"net"
 	"strconv"
 	"testing"
 
@@ -149,6 +150,23 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 				clientConsulCluster.Create(t)
 
+				// Resolve the default partition mesh gateway address now that both clusters are up.
+				// On AWS EKS the mesh gateway LoadBalancer exposes a DNS hostname rather than an IP.
+				// Envoy EDS only accepts IP address endpoints; hostname endpoints are rejected with
+				// "malformed IP address", leaving the upstream clusters permanently empty/warming.
+				// In remote mesh-gateway mode the client sidecar connects directly to the remote
+				// partition's mesh gateway, so any hostname endpoint triggers this bug.
+				// Skip that combination until Consul's xDS server emits LOGICAL_DNS cluster type
+				// for hostname-addressed mesh gateways (tracked in hashicorp/consul).
+				defaultMGWSvcName := fmt.Sprintf("%s-consul-mesh-gateway", releaseName)
+				defaultMGWHost := k8s.ServiceHost(t, cfg, defaultPartitionClusterContext, defaultMGWSvcName)
+				if meshGatewayMode.name == "remote" && net.ParseIP(defaultMGWHost) == nil {
+					t.Skipf("skipping remote mesh-gateway mode: mesh gateway address %q is a DNS hostname; "+
+						"Envoy EDS requires IP address endpoints. "+
+						"Consul xDS must emit LOGICAL_DNS cluster type for hostname endpoints (tracked in hashicorp/consul)",
+						defaultMGWHost)
+				}
+
 				consulClient, _ := serverConsulCluster.SetupConsulClient(t, c.aclsEnabled)
 
 				logger.Logf(t, "creating proxy defaults with mesh gateway mode %s", meshGatewayMode.name)
@@ -165,6 +183,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
 
 				logger.Log(t, "deploying client in secondary partition cluster")
+
 				if cfg.EnableTransparentProxy {
 					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
 				} else {
@@ -205,6 +224,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				upstreamAPIURL := "http://localhost:1234"
 				upstreamMetricsURL := "http://localhost:2234"
 				upstreamAdminURL := "http://localhost:3234"
+
 				if cfg.EnableTransparentProxy {
 					upstreamAPIURL = fmt.Sprintf("http://api-port.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
 					upstreamMetricsURL = fmt.Sprintf("http://metrics.%s.virtual.default.ns.%s.ap.dc1.dc.consul", multiportServiceName, defaultPartition)
