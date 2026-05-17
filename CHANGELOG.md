@@ -1,3 +1,19 @@
+## 2.0.0-rc2 (May 17, 2026)
+
+SECURITY:
+
+* Upgrade to use `x/net` 0.53.0.
+This resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918) [[GH-5308](https://github.com/hashicorp/consul-k8s/issues/5308)]
+
+FEATURES:
+
+* api-gateway: add TLS SDS support for Kubernetes API Gateway listeners via listener `tls.options` (with gateway-level defaults) and per-backend `RouteTLSSDSFilter` overrides; this includes validation for incomplete SDS config and SDS inheritance behavior so route-level overrides can inherit clusterName from listener/global defaults. [[GH-5186](https://github.com/hashicorp/consul-k8s/issues/5186)]
+
+BUG FIXES:
+
+* connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check queried `/v1/agent/version` with a non-pointer map, so the response was never decoded and both FIPS warnings fired on every pod startup. The fix decodes the endpoint response correctly and checks the returned `FIPS` value. [[GH-5252](https://github.com/hashicorp/consul-k8s/issues/5252)]
+* helm-chart: remove redundant template crd-gatewaypolicies-custom.yaml from helm chart templates. [[GH-5307](https://github.com/hashicorp/consul-k8s/issues/5307)]
+
 ## 2.0.0-rc1 (April 30, 2026)
 
 BREAKING CHANGES:
