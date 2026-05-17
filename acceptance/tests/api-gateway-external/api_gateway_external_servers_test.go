@@ -1,13 +1,14 @@
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
-package apigateway
+package apigatewayexternal
 
 import (
 	"context"
 	"fmt"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
@@ -20,6 +21,13 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
+
+const staticClientName = "static-client"
+
+func retryCheck(t *testing.T, count int, fn func(r *retry.R)) {
+	t.Helper()
+	retry.RunWith(&retry.Counter{Count: count, Wait: 2 * time.Second}, t, fn)
+}
 
 // TestAPIGateway_ExternalServers tests that connect works when using external servers.
 // It sets up an external Consul server in the same cluster but a different Helm installation
@@ -137,7 +145,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
 
 	// check that intentions keep our connection from happening
-	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)
+	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, staticClientName, targetAddress)
 
 	// Now we create the allow intention.
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
@@ -155,5 +163,5 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	// Test that we can make a call to the api gateway
 	// via the static-client pod. It should route to the static-server pod.
 	logger.Log(t, "trying calls to api gateway")
-	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, StaticClientName, targetAddress)
+	k8s.CheckStaticServerConnectionSuccessful(t, k8sOptions, staticClientName, targetAddress)
 }
