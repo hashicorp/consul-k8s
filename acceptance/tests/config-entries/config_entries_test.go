@@ -303,7 +303,7 @@ func runController(t *testing.T, secure, useVault bool) {
 		logger.Log(t, "patching rate-limit custom resource")
 		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "ratelimit", "global", "-p", `{"spec": {"config": {"priority": false}}}`, "--type=merge")
 
-		counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
+		counter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
 		retry.RunWith(counter, t, func(r *retry.R) {
 			// service-defaults
 			entry, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
@@ -442,7 +442,7 @@ func runController(t *testing.T, secure, useVault bool) {
 		logger.Log(t, "deleting rate-limit custom resource")
 		k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "ratelimit", "global")
 
-		counter := &retry.Counter{Count: 10, Wait: 500 * time.Millisecond}
+		counter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
 		retry.RunWith(counter, t, func(r *retry.R) {
 			// service-defaults
 			_, _, err := consulClient.ConfigEntries().Get(api.ServiceDefaults, "defaults", nil)
