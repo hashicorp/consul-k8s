@@ -158,12 +158,139 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
-		require.NoError(r, err)
-	})
+	// Each attempt can take up to 15m (helm --timeout); keep the retry count low
+	// so a genuinely broken install fails fast instead of looping for hours.
+	const maxInstallAttempts = 3
+	installStart := time.Now()
+	logger.Logf(t, "[helm-install] release=%s namespace=%s chart=%s starting helm upgrade --install (max %d attempts, --timeout 15m each)",
+		h.releaseName, h.helmOptions.KubectlOptions.Namespace, chartName, maxInstallAttempts)
 
+	var lastErr error
+	for installAttempt := 1; installAttempt <= maxInstallAttempts; installAttempt++ {
+		attemptStart := time.Now()
+		logger.Logf(t, "[helm-install] release=%s attempt %d/%d starting at %s (elapsed since first attempt: %s)",
+			h.releaseName, installAttempt, maxInstallAttempts, attemptStart.Format(time.RFC3339), time.Since(installStart))
+
+		lastErr = helm.UpgradeE(t, h.helmOptions, chartName, h.releaseName)
+		if lastErr == nil {
+			logger.Logf(t, "[helm-install] release=%s attempt %d/%d SUCCEEDED after %s (total elapsed: %s)",
+				h.releaseName, installAttempt, maxInstallAttempts, time.Since(attemptStart), time.Since(installStart))
+			break
+		}
+
+		logger.Logf(t, "[helm-install] release=%s attempt %d/%d FAILED after %s: %v",
+			h.releaseName, installAttempt, maxInstallAttempts, time.Since(attemptStart), lastErr)
+
+		// Always dump cluster status on a failed attempt so we can see why helm timed out.
+		h.dumpClusterStatus(t, fmt.Sprintf("after failed install attempt %d/%d", installAttempt, maxInstallAttempts))
+
+		if installAttempt < maxInstallAttempts {
+			logger.Logf(t, "[helm-install] release=%s sleeping 5s before retry", h.releaseName)
+			time.Sleep(5 * time.Second)
+		}
+	}
+	if lastErr != nil {
+		logger.Logf(t, "[helm-install] release=%s exhausted all %d attempts after %s; failing test",
+			h.releaseName, maxInstallAttempts, time.Since(installStart))
+		require.NoErrorf(t, lastErr, "helm upgrade --install failed after %d attempts (total elapsed %s)",
+			maxInstallAttempts, time.Since(installStart))
+	}
+
+	logger.Logf(t, "[helm-install] release=%s waiting for all pods (selector release=%s) to be ready",
+		h.releaseName, h.releaseName)
+	waitStart := time.Now()
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
+	logger.Logf(t, "[helm-install] release=%s all pods ready after %s (total Create() elapsed: %s)",
+		h.releaseName, time.Since(waitStart), time.Since(installStart))
+}
+
+// dumpClusterStatus logs a snapshot of nodes, pods, and recent events in the
+// helm install namespace so that helm timeouts in CI logs are diagnosable.
+// All errors are swallowed because this is best-effort diagnostic output.
+func (h *HelmCluster) dumpClusterStatus(t *testing.T, reason string) {
+	t.Helper()
+	ns := h.helmOptions.KubectlOptions.Namespace
+	logger.Logf(t, "[cluster-status] === BEGIN cluster status (%s) namespace=%s release=%s ===", reason, ns, h.releaseName)
+
+	// Nodes: capacity, allocatable, conditions.
+	nodes, err := h.kubernetesClient.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Logf(t, "[cluster-status] failed to list nodes: %v", err)
+	} else {
+		for _, n := range nodes.Items {
+			ready := "Unknown"
+			for _, c := range n.Status.Conditions {
+				if c.Type == corev1.NodeReady {
+					ready = string(c.Status)
+					break
+				}
+			}
+			logger.Logf(t, "[cluster-status] node=%s ready=%s allocatable.cpu=%s allocatable.memory=%s instance-type=%s",
+				n.Name, ready,
+				n.Status.Allocatable.Cpu().String(),
+				n.Status.Allocatable.Memory().String(),
+				n.Labels["node.kubernetes.io/instance-type"])
+		}
+	}
+
+	// Pods in this release's namespace: phase, readiness, restarts, node, reason/message.
+	pods, err := h.kubernetesClient.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Logf(t, "[cluster-status] failed to list pods in namespace %s: %v", ns, err)
+	} else {
+		logger.Logf(t, "[cluster-status] %d pod(s) in namespace %s", len(pods.Items), ns)
+		for _, p := range pods.Items {
+			ready, total := 0, len(p.Spec.Containers)
+			restarts := int32(0)
+			waitingReasons := []string{}
+			for _, cs := range p.Status.ContainerStatuses {
+				if cs.Ready {
+					ready++
+				}
+				restarts += cs.RestartCount
+				if cs.State.Waiting != nil {
+					waitingReasons = append(waitingReasons, fmt.Sprintf("%s=%s:%s", cs.Name, cs.State.Waiting.Reason, cs.State.Waiting.Message))
+				}
+			}
+			node := p.Spec.NodeName
+			if node == "" {
+				node = "<unscheduled>"
+			}
+			logger.Logf(t, "[cluster-status] pod=%s phase=%s ready=%d/%d restarts=%d node=%s reason=%q",
+				p.Name, p.Status.Phase, ready, total, restarts, node, p.Status.Reason)
+			if p.Status.Message != "" {
+				logger.Logf(t, "[cluster-status]   message: %s", p.Status.Message)
+			}
+			for _, w := range waitingReasons {
+				logger.Logf(t, "[cluster-status]   waiting: %s", w)
+			}
+			// Print Pod conditions to surface "Unschedulable" with reason like "Insufficient cpu".
+			for _, c := range p.Status.Conditions {
+				if c.Status != corev1.ConditionTrue && c.Message != "" {
+					logger.Logf(t, "[cluster-status]   condition %s=%s reason=%s msg=%s", c.Type, c.Status, c.Reason, c.Message)
+				}
+			}
+		}
+	}
+
+	// Warning events: very helpful for FailedScheduling / FailedMount / ImagePullBackOff etc.
+	events, err := h.kubernetesClient.CoreV1().Events(ns).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Logf(t, "[cluster-status] failed to list events in namespace %s: %v", ns, err)
+	} else {
+		warnCount := 0
+		for _, e := range events.Items {
+			if e.Type != corev1.EventTypeWarning {
+				continue
+			}
+			warnCount++
+			logger.Logf(t, "[cluster-status] event WARN obj=%s/%s reason=%s count=%d msg=%s",
+				e.InvolvedObject.Kind, e.InvolvedObject.Name, e.Reason, e.Count, e.Message)
+		}
+		logger.Logf(t, "[cluster-status] %d warning event(s) in namespace %s", warnCount, ns)
+	}
+
+	logger.Logf(t, "[cluster-status] === END cluster status (%s) ===", reason)
 }
 
 func (h *HelmCluster) Destroy(t *testing.T) {
@@ -204,8 +331,23 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
+	deleteAttempt := 0
+	deleteStart := time.Now()
+	logger.Logf(t, "[helm-delete] release=%s namespace=%s starting helm delete (max 30 attempts)",
+		h.releaseName, h.helmOptions.KubectlOptions.Namespace)
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+		deleteAttempt++
+		attemptStart := time.Now()
+		logger.Logf(t, "[helm-delete] release=%s attempt %d/30 starting (elapsed: %s)",
+			h.releaseName, deleteAttempt, time.Since(deleteStart))
 		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+		if err != nil {
+			logger.Logf(t, "[helm-delete] release=%s attempt %d/30 FAILED after %s: %v",
+				h.releaseName, deleteAttempt, time.Since(attemptStart), err)
+		} else {
+			logger.Logf(t, "[helm-delete] release=%s attempt %d/30 SUCCEEDED after %s",
+				h.releaseName, deleteAttempt, time.Since(attemptStart))
+		}
 		require.NoError(r, err)
 	})
 
