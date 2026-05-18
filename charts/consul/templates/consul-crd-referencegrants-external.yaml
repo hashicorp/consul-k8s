@@ -39,7 +39,7 @@ metadata:
     release: {{ .Release.Name }}
     name: consul-custom-referencegrants
     component: crd
-  name: referencegrants.consul.hashicorp.com
+  name: creferencegrants.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -47,10 +47,8 @@ spec:
       - gateway-api
     kind: ReferenceGrant
     listKind: ReferenceGrantList
-    plural: referencegrants
-    shortNames:
-      - ocrefgrant
-    singular: referencegrant
+    plural: creferencegrants
+    singular: creferencegrant
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
