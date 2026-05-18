@@ -219,7 +219,7 @@ type ExtraEnvironmentVars struct {
 }
 
 type Server struct {
-	Enabled                   string                   `yaml:"enabled"`
+	Enabled                   interface{}              `yaml:"enabled"`
 	Image                     interface{}              `yaml:"image"`
 	Replicas                  int                      `yaml:"replicas"`
 	BootstrapExpect           interface{}              `yaml:"bootstrapExpect"`
@@ -284,7 +284,7 @@ type SnapshotAgent struct {
 }
 
 type Client struct {
-	Enabled                  string                         `yaml:"enabled"`
+	Enabled                  interface{}                    `yaml:"enabled"`
 	Image                    interface{}                    `yaml:"image"`
 	Join                     interface{}                    `yaml:"join"`
 	DataDirectoryHostPath    interface{}                    `yaml:"dataDirectoryHostPath"`
@@ -312,8 +312,8 @@ type Client struct {
 }
 
 type DNS struct {
-	Enabled           string      `yaml:"enabled"`
-	EnableRedirection bool        `yaml:"enableRedirection"`
+	Enabled           interface{} `yaml:"enabled"`
+	EnableRedirection interface{} `yaml:"enableRedirection"`
 	Type              string      `yaml:"type"`
 	ClusterIP         interface{} `yaml:"clusterIP"`
 	Annotations       interface{} `yaml:"annotations"`
@@ -348,7 +348,7 @@ type Ingress struct {
 }
 
 type UIMetrics struct {
-	Enabled  string `yaml:"enabled"`
+	Enabled  interface{} `yaml:"enabled"`
 	Provider string `yaml:"provider"`
 	BaseURL  string `yaml:"baseURL"`
 }
@@ -358,7 +358,7 @@ type DashboardURLTemplates struct {
 }
 
 type UI struct {
-	Enabled               string                `yaml:"enabled"`
+	Enabled               interface{}           `yaml:"enabled"`
 	Service               UIService             `yaml:"service"`
 	Ingress               Ingress               `yaml:"ingress"`
 	Metrics               UIMetrics             `yaml:"metrics"`
@@ -411,7 +411,7 @@ type TransparentProxy struct {
 }
 
 type Metrics struct {
-	DefaultEnabled              bool   `yaml:"defaultEnabled"`
+	DefaultEnabled              interface{}   `yaml:"defaultEnabled"`
 	DefaultEnableMerging        bool   `yaml:"defaultEnableMerging"`
 	DefaultMergedMetricsPort    int    `yaml:"defaultMergedMetricsPort"`
 	DefaultPrometheusScrapePort int    `yaml:"defaultPrometheusScrapePort"`
