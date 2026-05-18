@@ -12,7 +12,7 @@
 - {runner: 7, test-packages: "vault"}
 - {runner: 8, test-packages: "metrics"}
 - {runner: 9, test-packages: "server"}
-- {runner: 10, test-packages: "api-gateway", num-clusters: "1"}
+- {runner: 10, test-packages: "api-gateway", num-clusters: "2"}
 - {runner: 11, test-packages: "connect-lifecycle"}
 - {runner: 12, test-packages: "sync"}
 - {runner: 18, test-packages: "api-gateway-external"}
