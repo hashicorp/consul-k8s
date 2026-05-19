@@ -14,8 +14,12 @@ spec:
       - gateway-api
     kind: HTTPRoute
     listKind: HTTPRouteList
+    shortNames:
+      - httproutes
     plural: httproutes
     singular: httproute
+    shortNames:
+      - httproutes
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
