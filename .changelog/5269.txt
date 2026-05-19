@@ -1,0 +1,3 @@
+```release-note:security
+- security: update go to 1.26
+```

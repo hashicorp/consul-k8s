@@ -1,0 +1,4 @@
+```release-note:feature
+api-gateway: add TLS SDS support for Kubernetes API Gateway listeners via listener `tls.options` (with gateway-level defaults) and per-backend `RouteTLSSDSFilter` overrides; this includes validation for incomplete SDS config and SDS inheritance behavior so route-level overrides can inherit clusterName from listener/global defaults.
+```
+

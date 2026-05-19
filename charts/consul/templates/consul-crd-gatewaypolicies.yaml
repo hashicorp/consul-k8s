@@ -45,6 +45,8 @@ spec:
     listKind: CustomGatewayPolicyList
     plural: customgatewaypolicies
     singular: customgatewaypolicy
+    shortNames:
+    - cgp
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

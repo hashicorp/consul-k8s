@@ -18,7 +18,7 @@
 # either).
 ARG GOLANG_VERSION
 FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
-RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@fe618ff0bb1c6adbcdff76bdfd9e850ee0193c47
+RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@02bc47fc98440860b5615a96300b95a065add1f2
 
 # dev copies the binary from a local build
 # -----------------------------------

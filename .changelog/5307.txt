@@ -1,0 +1,3 @@
+```release-note:bug
+helm-chart: remove redundant template crd-gatewaypolicies-custom.yaml from helm chart templates.
+```

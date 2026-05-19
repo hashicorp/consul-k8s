@@ -10,19 +10,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 )
 
 type referenceValidator struct {
-	grants map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant
+	grants map[string]map[types.NamespacedName]gwv1.ReferenceGrant
 }
 
-func NewReferenceValidator(grants []gwv1beta1.ReferenceGrant) common.ReferenceValidator {
-	byNamespace := make(map[string]map[types.NamespacedName]gwv1beta1.ReferenceGrant)
+func NewReferenceValidator(grants []gwv1.ReferenceGrant) common.ReferenceValidator {
+	byNamespace := make(map[string]map[types.NamespacedName]gwv1.ReferenceGrant)
 	for _, grant := range grants {
 		grantsForNamespace, ok := byNamespace[grant.Namespace]
 		if !ok {
-			grantsForNamespace = make(map[types.NamespacedName]gwv1beta1.ReferenceGrant)
+			grantsForNamespace = make(map[types.NamespacedName]gwv1.ReferenceGrant)
 		}
 		grantsForNamespace[client.ObjectKeyFromObject(&grant)] = grant
 		byNamespace[grant.Namespace] = grantsForNamespace
@@ -60,7 +59,7 @@ func (rv *referenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRo
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
 }
 
-func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool {
+func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1.BackendRef) bool {
 	fromNS := tcpRoute.GetNamespace()
 	fromGK := metav1.GroupKind{
 		Group: tcpRoute.GroupVersionKind().Group,
@@ -74,7 +73,7 @@ func (rv *referenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TC
 	return rv.referenceAllowed(fromGK, fromNS, toGK, toNS, string(backendRef.Name))
 }
 
-func createValuesFromRef(ns *gwv1beta1.Namespace, group *gwv1beta1.Group, kind *gwv1beta1.Kind, defaultGroup, defaultKind string) (string, metav1.GroupKind) {
+func createValuesFromRef(ns *gwv1.Namespace, group *gwv1.Group, kind *gwv1.Kind, defaultGroup, defaultKind string) (string, metav1.GroupKind) {
 	toNS := ""
 	if ns != nil {
 		toNS = string(*ns)
@@ -135,7 +134,7 @@ func (rv *referenceValidator) referenceAllowed(fromGK metav1.GroupKind, fromName
 					return true
 				}
 
-				if gwv1beta1.ObjectName(toName) == *to.Name {
+				if gwv1.ObjectName(toName) == *to.Name {
 					// The ReferenceGrant specifically targets this object
 					return true
 				}

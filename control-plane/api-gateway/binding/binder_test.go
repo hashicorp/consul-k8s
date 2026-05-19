@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	// gwv1beta1 replaced by gwv1.
 
 	"github.com/hashicorp/consul/api"
 
@@ -56,7 +56,7 @@ var (
 )
 
 type resourceMapResources struct {
-	grants                       []gwv1beta1.ReferenceGrant
+	grants                       []gwv1.ReferenceGrant
 	secrets                      []corev1.Secret
 	gateways                     []gwv1.Gateway
 	httpRoutes                   []gwv1.HTTPRoute
@@ -1857,7 +1857,7 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 	for name, tt := range map[string]struct {
 		httpRoute             *gwv1.HTTPRoute
 		tcpRoute              *gwv1alpha2.TCPRoute
-		referenceGrants       []gwv1beta1.ReferenceGrant
+		referenceGrants       []gwv1.ReferenceGrant
 		expectedStatusUpdates []client.Object
 	}{
 		"untargeted http route same namespace": {
@@ -1978,12 +1978,12 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					Namespace: defaultNamespacePointer,
 				},
 			}),
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("other")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Group: gwv1.GroupName, Kind: "Gateway"},
 					},
 				}},
@@ -2180,12 +2180,12 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		},
 		"targeted http route different namespace": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Group: gwv1.GroupName, Kind: "Gateway"},
 					},
 				}},
@@ -2493,12 +2493,12 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 					Namespace: defaultNamespacePointer,
 				},
 			}),
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "TCPRoute", Namespace: gwv1.Namespace("other")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Group: gwv1.GroupName, Kind: "Gateway"},
 					},
 				}},
@@ -2695,12 +2695,12 @@ func TestBinder_BindingRulesKitchenSink(t *testing.T) {
 			},
 		},
 		"targeted tcp route different namespace": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
 						{Group: gwv1.GroupName, Kind: "TCPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Group: gwv1.GroupName, Kind: "Gateway"},
 					},
 				}},

@@ -20,6 +20,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -571,12 +572,16 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Watches(
 			&v1alpha1.RouteAuthFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteAuthFilter),
+		).
+		Watches(
+			// Subscribe to changes in RouteTLSSDSFilter custom resources referenced by HTTPRoutes.
+			&v1alpha1.RouteTLSSDSFilter{},
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
 		)
 
 	if err := builder.Complete(r); err != nil {
-		return nil, cleaner, err
+		return nil, binding.Cleaner{}, err
 	}
-
 	return c, cleaner, nil
 }
 
@@ -626,7 +631,7 @@ func (r *GatewayController) transformTCPRoute(ctx context.Context, o client.Obje
 	route := o.(*gwv1alpha2.TCPRoute)
 
 	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
-	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1beta1.RouteParentStatus) gwv1beta1.ParentReference {
+	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1.RouteParentStatus) gwv1.ParentReference {
 		return parentStatus.ParentRef
 	})))
 	return append(refs, statusRefs...)
@@ -726,6 +731,10 @@ func (r *GatewayController) transformRouteTimeoutFilter(ctx context.Context, o c
 
 func (r *GatewayController) transformRouteAuthFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteAuthFilterIndex, client.ObjectKeyFromObject(o).String())
+}
+
+func (r *GatewayController) transformRouteTLSSDSFilter(ctx context.Context, o client.Object) []reconcile.Request {
+	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTLSSDSFilterIndex, client.ObjectKeyFromObject(o).String())
 }
 
 func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
@@ -938,14 +947,60 @@ func (c *GatewayController) getNamespaces(ctx context.Context) (map[string]corev
 	return namespaces, nil
 }
 
-func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1beta1.ReferenceGrant, error) {
-	var list gwv1beta1.ReferenceGrantList
+func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1.ReferenceGrant, error) {
+	var list gwv1.ReferenceGrantList
 
-	if err := c.Client.List(ctx, &list); err != nil {
+	if err := c.Client.List(ctx, &list); err == nil {
+		return list.Items, nil
+	} else if !meta.IsNoMatchError(err) {
 		return nil, err
 	}
 
-	return list.Items, nil
+	var betaList gwv1beta1.ReferenceGrantList
+	if err := c.Client.List(ctx, &betaList); err != nil {
+		return nil, err
+	}
+
+	grants := make([]gwv1.ReferenceGrant, 0, len(betaList.Items))
+	for _, grant := range betaList.Items {
+		grants = append(grants, referenceGrantV1beta1ToV1(grant))
+	}
+
+	return grants, nil
+}
+
+func referenceGrantV1beta1ToV1(grant gwv1beta1.ReferenceGrant) gwv1.ReferenceGrant {
+	from := make([]gwv1.ReferenceGrantFrom, 0, len(grant.Spec.From))
+	for _, f := range grant.Spec.From {
+		from = append(from, gwv1.ReferenceGrantFrom{
+			Group:     gwv1.Group(f.Group),
+			Kind:      gwv1.Kind(f.Kind),
+			Namespace: gwv1.Namespace(f.Namespace),
+		})
+	}
+
+	to := make([]gwv1.ReferenceGrantTo, 0, len(grant.Spec.To))
+	for _, t := range grant.Spec.To {
+		var name *gwv1.ObjectName
+		if t.Name != nil {
+			n := gwv1.ObjectName(*t.Name)
+			name = &n
+		}
+
+		to = append(to, gwv1.ReferenceGrantTo{
+			Group: gwv1.Group(t.Group),
+			Kind:  gwv1.Kind(t.Kind),
+			Name:  name,
+		})
+	}
+
+	return gwv1.ReferenceGrant{
+		ObjectMeta: grant.ObjectMeta,
+		Spec: gwv1.ReferenceGrantSpec{
+			From: from,
+			To:   to,
+		},
+	}
 }
 
 func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gateway types.NamespacedName) (*corev1.Service, error) {
@@ -1033,6 +1088,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteTimeoutFilter{}
 		case v1alpha1.RouteAuthFilterKind:
 			externalFilter = &v1alpha1.RouteAuthFilter{}
+		case v1alpha1.RouteTLSSDSFilterKind:
+			externalFilter = &v1alpha1.RouteTLSSDSFilter{}
 		default:
 			continue
 		}

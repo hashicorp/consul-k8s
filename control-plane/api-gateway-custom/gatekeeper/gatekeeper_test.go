@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1149,6 +1150,7 @@ func TestUpsert(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, autoscalingv2.AddToScheme(s))
 
 			log := logrtest.New(t)
 
@@ -1402,6 +1404,7 @@ func TestDelete(t *testing.T) {
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
+			require.NoError(t, autoscalingv2.AddToScheme(s))
 
 			log := logrtest.New(t)
 

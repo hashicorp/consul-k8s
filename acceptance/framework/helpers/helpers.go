@@ -166,6 +166,55 @@ type K8sOptions struct {
 	KustomizeConfigPath string
 }
 
+// ResourceToCleanup describes a Kubernetes resource that may need forced finalizer cleanup.
+type ResourceToCleanup struct {
+	// Type is the kubectl resource type, for example "crd", "namespace", "pod".
+	Type string
+	// Name is the resource name.
+	Name string
+	// Namespace is optional; leave empty for cluster-scoped resources.
+	Namespace string
+}
+
+// ForceCleanupTerminatingResources force-removes finalizers from resources that may be
+// stuck in Terminating from prior test runs, then waits for deletion.
+func ForceCleanupTerminatingResources(t *testing.T, resources []ResourceToCleanup, timeout time.Duration) {
+	t.Helper()
+
+	for _, resource := range resources {
+		if resource.Type == "" || resource.Name == "" {
+			t.Fatalf("resource type and name are required, got type=%q name=%q", resource.Type, resource.Name)
+		}
+
+		resourceRef := fmt.Sprintf("%s/%s", resource.Type, resource.Name)
+		timeoutArg := fmt.Sprintf("--timeout=%s", timeout)
+
+		// Attempt deletion first without waiting so we can patch finalizers if needed.
+		deleteArgs := []string{"delete", resource.Type, resource.Name, "--ignore-not-found=true", "--wait=false"}
+		if resource.Namespace != "" {
+			deleteArgs = append(deleteArgs, "-n", resource.Namespace)
+		}
+		_, _ = exec.Command("kubectl", deleteArgs...).CombinedOutput()
+
+		// Best-effort patch to strip finalizers; this is safe if the resource no longer exists.
+		patchArgs := []string{"patch", resource.Type, resource.Name, "--type=merge", "-p", `{"metadata":{"finalizers":[]}}`}
+		if resource.Namespace != "" {
+			patchArgs = append(patchArgs, "-n", resource.Namespace)
+		}
+		_, _ = exec.Command("kubectl", patchArgs...).CombinedOutput()
+
+		waitArgs := []string{"wait", "--for=delete", timeoutArg, resourceRef}
+		if resource.Namespace != "" {
+			waitArgs = append(waitArgs, "-n", resource.Namespace)
+		}
+
+		output, err := exec.Command("kubectl", waitArgs...).CombinedOutput()
+		if err != nil && !strings.Contains(string(output), "not found") {
+			require.NoErrorf(t, err, "failed waiting for %s deletion: %s", resourceRef, string(output))
+		}
+	}
+}
+
 type ConsulOptions struct {
 	ConsulClient                    *api.Client
 	Namespace                       string

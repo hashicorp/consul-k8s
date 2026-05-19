@@ -42,6 +42,104 @@ func TestResourceMap_JWTProvider(t *testing.T) {
 	require.Equal(t, resourceMap.jwtProviders[key], provider)
 }
 
+func TestInheritedTLSSDSClusterForHTTPRoute_OmittedSectionUsesCompatibleListener(t *testing.T) {
+	resourceMap := NewResourceMap(ResourceTranslator{}, mockReferenceValidator{}, logrtest.New(t))
+
+	resourceMap.ReferenceCountGateway(gwv1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: "default",
+		},
+		Spec: gwv1.GatewaySpec{Listeners: []gwv1.Listener{
+			{
+				Name:     "foo",
+				Protocol: gwv1.HTTPSProtocolType,
+				TLS: &gwv1.ListenerTLSConfig{Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "cluster-foo",
+					gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "cert-foo",
+				}},
+				Hostname: PointerTo(gwv1.Hostname("foo.example.com")),
+			},
+			{
+				Name:     "bar",
+				Protocol: gwv1.HTTPSProtocolType,
+				TLS: &gwv1.ListenerTLSConfig{Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "cluster-bar",
+					gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "cert-bar",
+				}},
+				Hostname: PointerTo(gwv1.Hostname("bar.example.com")),
+			},
+		}},
+	})
+
+	route := gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{
+			Hostnames: []gwv1.Hostname{"foo.example.com"},
+			CommonRouteSpec: gwv1.CommonRouteSpec{ParentRefs: []gwv1.ParentReference{{
+				Name: "gw",
+			}}},
+		},
+	}
+
+	cluster, inherited := resourceMap.InheritedTLSSDSClusterForHTTPRoute(route)
+	require.True(t, inherited)
+	require.Equal(t, "cluster-foo", cluster)
+}
+
+func TestInheritedTLSSDSClusterForHTTPRoute_IgnoresNonTerminateTLSListener(t *testing.T) {
+	resourceMap := NewResourceMap(ResourceTranslator{}, mockReferenceValidator{}, logrtest.New(t))
+
+	resourceMap.ReferenceCountGateway(gwv1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: "default",
+		},
+		Spec: gwv1.GatewaySpec{Listeners: []gwv1.Listener{
+			{
+				Name:     "terminate",
+				Protocol: gwv1.HTTPSProtocolType,
+				TLS: &gwv1.ListenerTLSConfig{
+					Mode: PointerTo(gwv1.TLSModeTerminate),
+					Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+						gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "cluster-terminate",
+						gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "cert-terminate",
+					},
+				},
+				Hostname: PointerTo(gwv1.Hostname("app.example.com")),
+			},
+			{
+				Name:     "passthrough",
+				Protocol: gwv1.HTTPSProtocolType,
+				TLS: &gwv1.ListenerTLSConfig{
+					Mode: PointerTo(gwv1.TLSModePassthrough),
+					Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+						gwv1.AnnotationKey(TLSSDSClusterNameAnnotationKey):  "cluster-passthrough",
+						gwv1.AnnotationKey(TLSSDSCertResourceAnnotationKey): "cert-passthrough",
+					},
+				},
+				Hostname: PointerTo(gwv1.Hostname("app.example.com")),
+			},
+		}},
+	})
+
+	route := gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{
+			Hostnames: []gwv1.Hostname{"app.example.com"},
+			CommonRouteSpec: gwv1.CommonRouteSpec{ParentRefs: []gwv1.ParentReference{{
+				Name: "gw",
+			}}},
+		},
+	}
+
+	cluster, inherited := resourceMap.InheritedTLSSDSClusterForHTTPRoute(route)
+	require.True(t, inherited)
+	require.Equal(t, "cluster-terminate", cluster)
+}
+
 type mockReferenceValidator struct{}
 
 func (m mockReferenceValidator) GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1.SecretObjectReference) bool {

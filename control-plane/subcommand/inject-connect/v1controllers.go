@@ -110,6 +110,12 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 
+	isEnterpriseDistribution, err := consul.IsEnterpriseDistribution(consulConfig, watcher)
+	if err != nil {
+		setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; enterprise-only gateway scaling will remain disabled until a valid license is detected", "error", err)
+		isEnterpriseDistribution = false
+	}
+
 	if c.flagEnableCustomGatewayCRDController {
 		// register field indexes for consul.hashicorp.com API controllers for custom
 		if err := gatewaycontrollerscustom.RegisterFieldIndexes(ctx, mgr); err != nil {
@@ -162,14 +168,18 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 				ConsulPartition:             c.consul.Partition,
 				ConsulCACert:                string(c.caCertPem),
 				EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+				EnableGatewayScaling:        c.flagEnableGatewayScaling,
 				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 				InitContainerResources:      &c.initContainerResources,
 			},
-			AllowK8sNamespacesSet:   allowK8sNamespaces,
-			DenyK8sNamespacesSet:    denyK8sNamespaces,
-			ConsulClientConfig:      consulConfig,
-			ConsulServerConnMgr:     watcher,
+			AllowK8sNamespacesSet: allowK8sNamespaces,
+			DenyK8sNamespacesSet:  denyK8sNamespaces,
+			ConsulClientConfig:    consulConfig,
+			ConsulServerConnMgr:   watcher,
+			ConsulMeta: apicommon.ConsulMeta{
+				IsEnterpriseDistribution: isEnterpriseDistribution,
+			},
 			NamespacesEnabled:       c.flagEnableNamespaces,
 			CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 			Partition:               c.consul.Partition,
@@ -205,12 +215,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "GatewayClass")
 		return err
-	}
-
-	isEnterpriseDistribution, err := consul.IsEnterpriseDistribution(consulConfig, watcher)
-	if err != nil {
-		setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; enterprise-only gateway scaling will remain disabled until a valid license is detected", "error", err)
-		isEnterpriseDistribution = false
 	}
 
 	cache, cleaner, err := gatewaycontrollers.SetupGatewayControllerWithManager(ctx, mgr, gatewaycontrollers.GatewayControllerConfig{
