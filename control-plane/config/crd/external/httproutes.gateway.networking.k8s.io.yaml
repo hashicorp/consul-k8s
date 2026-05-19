@@ -18,8 +18,6 @@ spec:
       - httproutes
     plural: httproutes
     singular: httproute
-    shortNames:
-      - httproutes
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
