@@ -73,6 +73,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
+
+	isEnterpriseDistribution, err := consul.IsEnterpriseDistribution(consulConfig, watcher)
+	if err != nil {
+		setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; multi-port service registrations will remain disabled until a valid license is detected", "error", err)
+		isEnterpriseDistribution = false
+	}
+
 	if err := (&endpoints.Controller{
 		Client:                     mgr.GetClient(),
 		ConsulClientConfig:         consulConfig,
@@ -98,6 +105,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ReleaseNamespace:           c.flagReleaseNamespace,
 		EnableAutoEncrypt:          c.flagEnableAutoEncrypt,
 		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
+		IsEnterpriseDistribution:   isEnterpriseDistribution,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
@@ -108,12 +116,6 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	if err := gatewaycontrollers.RegisterFieldIndexes(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to register field indexes for gateway.networking.k8s.io API")
 		return err
-	}
-
-	isEnterpriseDistribution, err := consul.IsEnterpriseDistribution(consulConfig, watcher)
-	if err != nil {
-		setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; enterprise-only gateway scaling will remain disabled until a valid license is detected", "error", err)
-		isEnterpriseDistribution = false
 	}
 
 	if c.flagEnableCustomGatewayCRDController {
