@@ -11,14 +11,39 @@
     "TestAPIGateway_Scaling_EnterpriseGateDisabledIgnoresGatewayAnnotations": 163,
     "TestAPIGateway_GatewayClassConfig": 138
   },
+  "api-gateway-external": {
+    "TestAPIGateway_ExternalServers": 205.74
+  },
+  "basic": {
+    "TestBasicInstallation": 243.23
+  },
+  "cli": {
+    "TestInstall": 372.82,
+    "TestUpgrade": 180.71
+  },
+  "config-entries": {
+    "TestController_NotSecure_NoVault": 540,
+    "TestController_Secure_NoVault": 540,
+    "TestController_NotSecure_Vault": 540,
+    "TestController_Secure_Vault": 540
+  },
   "connect": {
     "TestConnectInjectNamespaces_SingleNamespace": 213,
-    "TestConnectInjectNamespaces_SingleNamespaceSecure": 213,
+    "TestConnectInjectNamespaces_SingleNamespaceSecure": 277.19,
     "TestConnectInjectNamespaces_MirroredNamespaces": 213,
     "TestConnectInjectNamespaces_MirroredNamespacesSecure": 213,
     "TestConnectInjectNamespaces_CleanupController": 694,
     "TestConnectInject_PermissiveMTLS": 196,
-    "TestConnectInject_LocalRateLimiting": 178
+    "TestConnectInject_LocalRateLimiting": 182.57,
+    "TestConnectInject_ExternalServers": 401.6
+  },
+  "connect-lifecycle": {
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_DrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_DrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod5": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod0": 370,
+    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod0": 370
   },
   "consul-dns": {
     "TestConsulDNSProxy_WithPartitionsAndCatalogSync_NotSecure_PrivilegedPort": 514,
@@ -35,6 +60,10 @@
     "TestConsulDNS_SecureNoProxy_NonPrivilegedPort": 136,
     "TestConsulDNS_SecureDNSProxy_NonPrivilegedPort": 136,
     "TestConsulDNS_SecureNoInjectDNSProxy_NonPrivilegedPort": 136
+  },
+  "metrics": {
+    "TestComponentMetrics": 83.1,
+    "TestAppMetrics": 162.76
   },
   "partitions": {
     "TestPartitions_Connect_DefaultNamespace": 553,
@@ -64,6 +93,19 @@
     "TestPeering_ConnectNamespaces_MirroredNamespacesSecure": 292,
     "TestPeering_Gateway": 365
   },
+  "sameness": {
+    "TestFailover_Connect_DefaultFailover": 1080,
+    "TestFailover_Connect_SecureFailover": 1080
+  },
+  "snapshot-agent": {
+    "TestSnapshotAgent_K8sSecret": 70.67,
+    "TestSnapshotAgent_Vault": 44.09
+  },
+  "sync": {
+    "TestSyncCatalogNamespaces": 383.66,
+    "TestSyncCatalog": 197.78,
+    "TestSyncCatalogWithIngress": 205.5
+  },
   "terminating-gateway": {
     "TestTerminatingGatewayNamespaceMirroring_AllDefault_NotSecure": 224,
     "TestTerminatingGatewayNamespaceMirroring_AllDefault_Secure": 224,
@@ -75,28 +117,15 @@
     "TestTerminatingGatewayNamespaceMirroring_ExternalDefaultOthersNonDefault_Secure": 224,
     "TestTerminatingGatewaySingleNamespace": 360
   },
+  "vault": {
+    "TestVault_Partitions": 159.12,
+    "TestVault": 527.06,
+    "TestVault_TLSAutoReload": 254.73
+  },
   "wan-federation": {
     "TestWANFederation_NotSecure": 408,
     "TestWANFederation_Secure": 408,
     "TestWANFederationFailover_NotSecure": 686,
     "TestWANFederationFailover_Secure": 686
-  },
-  "config-entries": {
-    "TestController_NotSecure_NoVault": 540,
-    "TestController_Secure_NoVault": 540,
-    "TestController_NotSecure_Vault": 540,
-    "TestController_Secure_Vault": 540
-  },
-  "connect-lifecycle": {
-    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_DrainListeners_GracePeriod5": 370,
-    "TestConnectInject_ProxyLifecycleShutdown_Secure_DrainListeners_GracePeriod5": 370,
-    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod5": 370,
-    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod5": 370,
-    "TestConnectInject_ProxyLifecycleShutdown_NotSecure_NoDrainListeners_GracePeriod0": 370,
-    "TestConnectInject_ProxyLifecycleShutdown_Secure_NoDrainListeners_GracePeriod0": 370
-  },
-  "sameness": {
-    "TestFailover_Connect_DefaultFailover": 1080,
-    "TestFailover_Connect_SecureFailover": 1080
   }
 }
