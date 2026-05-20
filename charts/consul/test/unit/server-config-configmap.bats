@@ -1288,10 +1288,21 @@ load _helpers
   [ ${actual} = 20 ]
 }
 
-@test "server/ConfigMap: server.logLevel is empty" {
+@test "server/ConfigMap: server.logLevel is empty, falls back to global.logLevel" {
   cd `chart_dir`
   local configmap=$(helm template \
       -s templates/server-config-configmap.yaml  \
+      . | tee /dev/stderr |
+      yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
+
+  [ "${configmap}" = "INFO" ]
+}
+
+@test "server/ConfigMap: server.logLevel is empty and global.logLevel is empty" {
+  cd `chart_dir`
+  local configmap=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.logLevel=' \
       . | tee /dev/stderr |
       yq -r '.data["server.json"]' | jq -r .log_level | tee /dev/stderr)
 
