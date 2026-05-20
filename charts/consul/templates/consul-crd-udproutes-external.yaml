@@ -49,6 +49,8 @@ spec:
     listKind: UDPRouteList
     plural: cudproutes
     singular: cudproute
+    shortNames:
+      - cudproutes
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
