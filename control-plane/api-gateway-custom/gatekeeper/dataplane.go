@@ -40,7 +40,7 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 		bearerTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 	}
 
-	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, bearerTokenFile, gateway.Name)
+	args, err := getDataplaneArgs(metrics, gateway.Namespace, config, gcc, bearerTokenFile, gateway.Name)
 	if err != nil {
 		return corev1.Container{}, err
 	}
@@ -151,9 +151,15 @@ func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmCo
 	return container, nil
 }
 
-func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, bearerTokenFile string, name string) ([]string, error) {
+func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, bearerTokenFile string, name string) ([]string, error) {
 	proxyIDFileName := "/consul/connect-inject/proxyid"
+	// Priority: GatewayClassConfig.spec.envoyConcurrency > HelmConfig.DefaultGatewayEnvoyConcurrency > hardcoded default (1)
 	envoyConcurrency := defaultEnvoyProxyConcurrency
+	if gcc.Spec.EnvoyConcurrency != nil {
+		envoyConcurrency = int(*gcc.Spec.EnvoyConcurrency)
+	} else if config.DefaultGatewayEnvoyConcurrency > 0 {
+		envoyConcurrency = config.DefaultGatewayEnvoyConcurrency
+	}
 
 	envoyAdminBindAddress := "127.0.0.1"
 	consulDPBindAddress := "127.0.0.1"

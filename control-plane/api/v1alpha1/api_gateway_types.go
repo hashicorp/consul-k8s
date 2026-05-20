@@ -68,6 +68,14 @@ type GatewayClassConfigSpec struct {
 
 	// Metrics defines how to configure the metrics for a gateway.
 	Metrics MetricsSpec `json:"metrics,omitempty"`
+
+	// +kubebuilder:validation:Minimum=0
+	// EnvoyConcurrency sets the number of Envoy worker threads for API Gateway pods.
+	// Setting to 0 uses the number of CPU cores on the node. Defaults to 1 if unset.
+	// Overrides the global default set via the Helm value
+	// connectInject.apiGateway.managedGatewayClass.envoyConcurrency.
+	// Maps to the -envoy-concurrency flag on consul-dataplane.
+	EnvoyConcurrency *int32 `json:"envoyConcurrency,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

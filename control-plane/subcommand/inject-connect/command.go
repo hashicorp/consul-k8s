@@ -90,6 +90,7 @@ type Command struct {
 	flagDefaultSidecarProxyMemoryLimit   string
 	flagDefaultSidecarProxyMemoryRequest string
 	flagDefaultEnvoyProxyConcurrency     int
+	flagDefaultGatewayEnvoyConcurrency   int
 
 	// Proxy lifecycle settings.
 	flagDefaultEnableSidecarProxyLifecycle                       bool
@@ -308,6 +309,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagInitContainerMemoryLimit, "init-container-memory-limit", "150Mi", "Init container memory limit.")
 
 	c.flagSet.IntVar(&c.flagDefaultEnvoyProxyConcurrency, "default-envoy-proxy-concurrency", 2, "Default Envoy proxy concurrency.")
+	c.flagSet.IntVar(&c.flagDefaultGatewayEnvoyConcurrency, "default-gateway-envoy-concurrency", 1, "Default Envoy proxy concurrency for API Gateway pods. Overridable per-gateway via GatewayClassConfig.spec.envoyConcurrency.")
 
 	c.flagSet.BoolVar(&c.flagDefaultEnableConsulDataplaneAsSidecar, "default-enable-consul-dataplane-as-sidecar", false, "Default for enabling consul-dataplane as a sidecar container in the pod. ")
 	c.flagSet.IntVar(&c.flagDefaultSidecarProbeCheckInitialDelaySeconds, "default-sidecar-probe-check-initial-delay-seconds", 1, "Default number of seconds for the k8s initial delay before the readiness & liveness probe starts checking the consul-dataplane sidecar container.")

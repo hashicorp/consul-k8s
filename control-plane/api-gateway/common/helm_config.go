@@ -55,6 +55,11 @@ type HelmConfig struct {
 	// such as Gateway scaling annotations and controller-managed HPAs are enabled.
 	EnableGatewayScaling bool
 
+	// DefaultGatewayEnvoyConcurrency is the global default number of Envoy worker threads
+	// for all API Gateway pods. Can be overridden per-gateway via GatewayClassConfig.spec.envoyConcurrency.
+	// Passed from the helm chart via command-line flags to our controller.
+	DefaultGatewayEnvoyConcurrency int
+
 	// The default path to use for scraping prometheus metrics, passed from the helm chart via command-line flags to our controller.
 	DefaultPrometheusScrapePath string
 

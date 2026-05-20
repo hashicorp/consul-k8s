@@ -134,6 +134,14 @@ spec:
                         type: object
                     type: object
                 type: object
+              envoyConcurrency:
+                description: EnvoyConcurrency sets the number of Envoy worker threads
+                  for API Gateway pods. Setting to 0 uses the number of CPU cores
+                  on the node. Defaults to 1 if unset. Overrides the global default
+                  set via the Helm value connectInject.apiGateway.managedGatewayClass.envoyConcurrency.
+                format: int32
+                minimum: 0
+                type: integer
               mapPrivilegedContainerPorts:
                 description: The value to add to privileged ports ( ports < 1024)
                   for gateway containers

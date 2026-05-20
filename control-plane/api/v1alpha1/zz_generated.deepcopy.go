@@ -554,6 +554,11 @@ func (in *GatewayClassConfigSpec) DeepCopyInto(out *GatewayClassConfigSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.EnvoyConcurrency != nil {
+		in, out := &in.EnvoyConcurrency, &out.EnvoyConcurrency
+		*out = new(int32)
+		**out = **in
+	}
 	in.DeploymentSpec.DeepCopyInto(&out.DeploymentSpec)
 	in.CopyAnnotations.DeepCopyInto(&out.CopyAnnotations)
 	in.Metrics.DeepCopyInto(&out.Metrics)

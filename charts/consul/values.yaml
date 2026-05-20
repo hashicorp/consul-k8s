@@ -2567,6 +2567,13 @@ connectInject:
       # will be the 80 + the number defined below.
       mapPrivilegedContainerPorts: 0
 
+      # The number of Envoy worker threads for API Gateway pods.
+      # Setting to 0 uses the number of CPU cores on the node. Defaults to 1.
+      # This value can be overridden per-gateway via the GatewayClassConfig CRD field `spec.envoyConcurrency`.
+      # This controls the -envoy-concurrency flag on consul-dataplane.
+      # @type: int
+      envoyConcurrency: 1
+
       # This value contains settings related to the gateway_resources_job that runs on helm install
       resourceJob:
         # The resource requests (CPU, memory, etc.) for the server-acl-init and server-acl-init-cleanup pods.
