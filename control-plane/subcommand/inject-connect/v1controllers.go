@@ -74,10 +74,19 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
 
-	isEnterpriseDistribution, err := consul.IsEnterpriseDistribution(consulConfig, watcher)
-	if err != nil {
-		setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; multi-port service registrations will remain disabled until a valid license is detected", "error", err)
-		isEnterpriseDistribution = false
+	// If partitions are enabled, we know this is Consul Enterprise,
+	// so skip the license check. The license endpoint requires operator:read
+	// which is not allowed in partition-scoped ACL policies.
+	var isEnterpriseDistribution bool
+	if c.flagEnablePartitions {
+		isEnterpriseDistribution = true
+	} else {
+		var err error
+		isEnterpriseDistribution, err = consul.IsEnterpriseDistribution(consulConfig, watcher)
+		if err != nil {
+			setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; multi-port service registrations will remain disabled until a valid license is detected", "error", err)
+			isEnterpriseDistribution = false
+		}
 	}
 
 	if err := (&endpoints.Controller{
