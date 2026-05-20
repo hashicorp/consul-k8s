@@ -313,7 +313,7 @@ type Client struct {
 
 type DNS struct {
 	Enabled           string      `yaml:"enabled"`
-	EnableRedirection bool        `yaml:"enableRedirection"`
+	EnableRedirection interface{} `yaml:"enableRedirection"`
 	Type              string      `yaml:"type"`
 	ClusterIP         interface{} `yaml:"clusterIP"`
 	Annotations       interface{} `yaml:"annotations"`
@@ -411,11 +411,11 @@ type TransparentProxy struct {
 }
 
 type Metrics struct {
-	DefaultEnabled              bool   `yaml:"defaultEnabled"`
-	DefaultEnableMerging        bool   `yaml:"defaultEnableMerging"`
-	DefaultMergedMetricsPort    int    `yaml:"defaultMergedMetricsPort"`
-	DefaultPrometheusScrapePort int    `yaml:"defaultPrometheusScrapePort"`
-	DefaultPrometheusScrapePath string `yaml:"defaultPrometheusScrapePath"`
+	DefaultEnabled              interface{} `yaml:"defaultEnabled"`
+	DefaultEnableMerging        bool        `yaml:"defaultEnableMerging"`
+	DefaultMergedMetricsPort    int         `yaml:"defaultMergedMetricsPort"`
+	DefaultPrometheusScrapePort int         `yaml:"defaultPrometheusScrapePort"`
+	DefaultPrometheusScrapePath string      `yaml:"defaultPrometheusScrapePath"`
 }
 
 type ACLInjectToken struct {
