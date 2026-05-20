@@ -17,5 +17,5 @@
 # - {runner: 12, test-packages: "api-gateway"}
 # - {runner: 13, test-packages: "ingress-gateway"}
 # - {runner: 14, test-packages: "terminating-gateway"}
-# - {runner: 15, test-packages: "vault"}
+- {runner: 15, test-packages: "vault"}
 # - {runner: 16, test-packages: "server"}
