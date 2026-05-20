@@ -219,7 +219,7 @@ type ExtraEnvironmentVars struct {
 }
 
 type Server struct {
-	Enabled                   interface{}              `yaml:"enabled"`
+	Enabled                   string                   `yaml:"enabled"`
 	Image                     interface{}              `yaml:"image"`
 	Replicas                  int                      `yaml:"replicas"`
 	BootstrapExpect           interface{}              `yaml:"bootstrapExpect"`
@@ -284,7 +284,7 @@ type SnapshotAgent struct {
 }
 
 type Client struct {
-	Enabled                  interface{}                    `yaml:"enabled"`
+	Enabled                  string                         `yaml:"enabled"`
 	Image                    interface{}                    `yaml:"image"`
 	Join                     interface{}                    `yaml:"join"`
 	DataDirectoryHostPath    interface{}                    `yaml:"dataDirectoryHostPath"`
@@ -312,7 +312,7 @@ type Client struct {
 }
 
 type DNS struct {
-	Enabled           interface{} `yaml:"enabled"`
+	Enabled           string      `yaml:"enabled"`
 	EnableRedirection interface{} `yaml:"enableRedirection"`
 	Type              string      `yaml:"type"`
 	ClusterIP         interface{} `yaml:"clusterIP"`
@@ -348,7 +348,7 @@ type Ingress struct {
 }
 
 type UIMetrics struct {
-	Enabled  interface{} `yaml:"enabled"`
+	Enabled  string `yaml:"enabled"`
 	Provider string `yaml:"provider"`
 	BaseURL  string `yaml:"baseURL"`
 }
@@ -358,7 +358,7 @@ type DashboardURLTemplates struct {
 }
 
 type UI struct {
-	Enabled               interface{}           `yaml:"enabled"`
+	Enabled               string                `yaml:"enabled"`
 	Service               UIService             `yaml:"service"`
 	Ingress               Ingress               `yaml:"ingress"`
 	Metrics               UIMetrics             `yaml:"metrics"`
@@ -411,11 +411,11 @@ type TransparentProxy struct {
 }
 
 type Metrics struct {
-	DefaultEnabled              interface{}   `yaml:"defaultEnabled"`
-	DefaultEnableMerging        bool   `yaml:"defaultEnableMerging"`
-	DefaultMergedMetricsPort    int    `yaml:"defaultMergedMetricsPort"`
-	DefaultPrometheusScrapePort int    `yaml:"defaultPrometheusScrapePort"`
-	DefaultPrometheusScrapePath string `yaml:"defaultPrometheusScrapePath"`
+	DefaultEnabled              interface{} `yaml:"defaultEnabled"`
+	DefaultEnableMerging        bool        `yaml:"defaultEnableMerging"`
+	DefaultMergedMetricsPort    int         `yaml:"defaultMergedMetricsPort"`
+	DefaultPrometheusScrapePort int         `yaml:"defaultPrometheusScrapePort"`
+	DefaultPrometheusScrapePath string      `yaml:"defaultPrometheusScrapePath"`
 }
 
 type ACLInjectToken struct {
