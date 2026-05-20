@@ -291,9 +291,6 @@ spec:
               exec /usr/local/bin/docker-entrypoint.sh consul agent \
                 -node="${NODE}" \
                 -advertise="${ADVERTISE_IP}" \
-                {{- if (default .Values.global.logLevel .Values.client.logLevel) }}
-                -log-level={{ default .Values.global.logLevel .Values.client.logLevel }} \
-                {{- end }}
                 {{- if .Values.global.dualStack.enabled }}
                 -bind="::" \
                 -client="::" \
