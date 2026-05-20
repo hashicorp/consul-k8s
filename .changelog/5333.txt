@@ -1,0 +1,7 @@
+```release-note:improvement
+control-plane: add configurable `envoyConcurrency` for API Gateway pods via `GatewayClassConfig.spec.envoyConcurrency` (per-gateway override) and `managedGatewayClass.envoyConcurrency` Helm value (cluster-wide default)
+```
+
+```release-note:improvement
+helm: add `managedGatewayClass.envoyConcurrency` value to configure the number of Envoy worker threads for API Gateway pods
+```
