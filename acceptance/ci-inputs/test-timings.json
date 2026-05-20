@@ -25,7 +25,8 @@
     "TestController_NotSecure_NoVault": 540,
     "TestController_Secure_NoVault": 540,
     "TestController_NotSecure_Vault": 540,
-    "TestController_Secure_Vault": 540
+    "TestController_Secure_Vault": 540,
+    "TestControllerNamespaces": 795.44
   },
   "connect": {
     "TestConnectInjectNamespaces_SingleNamespace": 213,
@@ -63,7 +64,7 @@
     "TestConsulDNS_SecureNoInjectDNSProxy_NonPrivilegedPort": 136
   },
   "metrics": {
-    "TestComponentMetrics": 83.1,
+    "TestComponentMetrics": 93.07,
     "TestAppMetrics": 165.36
   },
   "partitions": {
@@ -83,7 +84,7 @@
     "TestPartitions_Sync_SingleNamespaceACLs": 217,
     "TestPartitions_Sync_MirrorK8S": 217,
     "TestPartitions_Sync_MirrorK8SACLs": 217,
-    "TestPartitions_Gateway": 385
+    "TestPartitions_Gateway": 529.36
   },
   "peering": {
     "TestPeering_ConnectNamespaces_DefaultNamespace": 292,
@@ -93,7 +94,7 @@
     "TestPeering_ConnectNamespaces_SingleNamespaceSecure": 292,
     "TestPeering_ConnectNamespaces_MirroredNamespacesSecure": 292,
     "TestPeering_Gateway": 365,
-    "TestPeering_Connect": 608.81
+    "TestPeering_Connect": 715.92
   },
   "sameness": {
     "TestFailover_Connect_DefaultFailover": 1080,
@@ -120,14 +121,14 @@
     "TestTerminatingGatewaySingleNamespace": 360
   },
   "vault": {
-    "TestVault_Partitions": 159.12,
+    "TestVault_Partitions": 207.1,
     "TestVault": 527.06,
-    "TestVault_TLSAutoReload": 254.73
+    "TestVault_TLSAutoReload": 299.58
   },
   "wan-federation": {
     "TestWANFederation_NotSecure": 408,
     "TestWANFederation_Secure": 408,
-    "TestWANFederationFailover_NotSecure": 686,
+    "TestWANFederationFailover_NotSecure": 739.77,
     "TestWANFederationFailover_Secure": 686
   }
 }
