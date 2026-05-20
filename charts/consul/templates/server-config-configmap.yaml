@@ -27,8 +27,8 @@ data:
       },
       "datacenter": "{{ .Values.global.datacenter }}",
       "data_dir": "/consul/data",
-      {{- if .Values.server.logLevel }}
-      "log_level": "{{ .Values.server.logLevel | upper }}",
+      {{- if (or .Values.server.logLevel .Values.global.logLevel) }}
+      "log_level": "{{ (default .Values.global.logLevel .Values.server.logLevel) | upper }}",
       {{- end }}
       "enable_debug": {{ .Values.server.enableAgentDebug }},
       "domain": "{{ .Values.global.domain }}",
