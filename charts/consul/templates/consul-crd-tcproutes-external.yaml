@@ -49,6 +49,8 @@ spec:
     listKind: TCPRouteList
     plural: ctcproutes
     singular: ctcproute
+    shortNames:
+      - ctcproutes
   scope: Namespaced
   versions:
     - additionalPrinterColumns:

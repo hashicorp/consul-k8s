@@ -49,6 +49,8 @@ spec:
     listKind: TLSRouteList
     plural: ctlsroutes
     singular: ctlsroute
+    shortNames:
+      - ctlsroutes
   scope: Namespaced
   versions:
     - additionalPrinterColumns:

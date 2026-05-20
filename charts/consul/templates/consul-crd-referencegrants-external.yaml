@@ -49,6 +49,8 @@ spec:
     listKind: ReferenceGrantList
     plural: creferencegrants
     singular: creferencegrant
+    shortNames:
+      - crefgrant
   scope: Namespaced
   versions:
     - additionalPrinterColumns:

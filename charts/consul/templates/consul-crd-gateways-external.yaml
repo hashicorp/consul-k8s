@@ -49,6 +49,8 @@ spec:
     listKind: GatewayList
     plural: cgateways
     singular: cgateway
+    shortNames:
+      - cgtw
   scope: Namespaced
   versions:
     - additionalPrinterColumns:

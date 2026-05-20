@@ -49,6 +49,8 @@ spec:
     listKind: GRPCRouteList
     plural: cgrpcroutes
     singular: cgrpcroute
+    shortNames:
+      - cgrpcroutes
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
