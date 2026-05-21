@@ -297,6 +297,7 @@ func (c *Command) injectRules() (string, error) {
 partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
+  operator = "read"
 {{- else }}
   mesh = "write"
   operator = "write"
