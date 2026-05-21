@@ -45,6 +45,15 @@ service "consul-snapshot" {
 const entLicenseRules = `operator = "write"`
 const entPartitionLicenseRules = `acl = "write"`
 
+// connectInjectOperatorReadRules grants global operator:read so the connect-inject
+// controller can call /v1/operator/license to detect whether Consul is enterprise.
+// `operator` is a global-scope resource and cannot be granted to a partition-scoped
+// token, so this is created as a separate global policy attached to a token issued
+// in the default partition. The connect-inject controller uses this token only for
+// the IsEnterpriseDistribution check; all other Consul API calls continue to use
+// the partition-scoped connect-inject token.
+const connectInjectOperatorReadRules = `operator = "read"`
+
 // The partition token is utilized by the partition-init job and server-acl-init in
 // non-default partitions. This token requires permissions to create partitions, read the
 // agent endpoint during startup and have the ability to create an auth-method within a namespace
@@ -297,7 +306,6 @@ func (c *Command) injectRules() (string, error) {
 partition "{{ .PartitionName }}" {
   mesh = "write"
   acl = "write"
-  operator = "read"
 {{- else }}
   mesh = "write"
   operator = "write"
