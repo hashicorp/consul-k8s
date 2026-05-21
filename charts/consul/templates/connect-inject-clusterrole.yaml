@@ -150,10 +150,8 @@ rules:
   - use
 - apiGroups:
   - gateway.networking.k8s.io
-  - consul.hashicorp.com
   resources:
   - gatewayclasses
-  - customgatewayclasses
   - gateways
   - httproutes
   - tcproutes
@@ -167,25 +165,57 @@ rules:
   - update
   - watch
 - apiGroups:
-  - gateway.networking.k8s.io
   - consul.hashicorp.com
   resources:
+  - customgatewayclasses
+  - cgateways
+  - chttproutes
+  - ctcproutes
+  - creferencegrants
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
   - gatewayclasses/finalizers
-  - customgatewayclasses/finalizers
   - gateways/finalizers
   - httproutes/finalizers
   - tcproutes/finalizers
   verbs:
   - update
 - apiGroups:
-  - gateway.networking.k8s.io
   - consul.hashicorp.com
   resources:
+  - customgatewayclasses/finalizers
+  - cgateways/finalizers
+  - chttproutes/finalizers
+  - ctcproutes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - gateway.networking.k8s.io
+  resources:
   - gatewayclasses/status
-  - customgatewayclasses/status
   - gateways/status
   - httproutes/status
   - tcproutes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - customgatewayclasses/status
+  - cgateways/status
+  - chttproutes/status
+  - ctcproutes/status
   verbs:
   - get
   - patch
