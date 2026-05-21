@@ -39,7 +39,7 @@ metadata:
     release: {{ .Release.Name }}
     name: consul-custom-udproutes
     component: crd
-  name: udproutes.consul.hashicorp.com
+  name: cudproutes.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -47,8 +47,8 @@ spec:
       - gateway-api
     kind: UDPRoute
     listKind: UDPRouteList
-    plural: udproutes
-    singular: udproute
+    plural: cudproutes
+    singular: cudproute
     shortNames:
       - cudproutes
   scope: Namespaced
