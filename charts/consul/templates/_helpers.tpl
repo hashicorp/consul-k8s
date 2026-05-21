@@ -39,6 +39,13 @@ and consul-k8s-control-plane images.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.podSecurityContext" -}}
+{{- if .Values.global.podSecurityContext.enabled -}}
+securityContext:
+  fsGroup: 100
+  fsGroupChangePolicy: OnRootMismatch
+{{- end -}}
+{{- end -}}
 
 {{- define "consul.restrictedSecurityContextWithNetBindService" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}

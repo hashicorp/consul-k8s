@@ -812,6 +812,11 @@ global:
     enableTcpRoute: true
     consulapi:
       enabled: false
+
+  # Add additional securityContext at pod level for volume permissions.
+  podSecurityContext:
+    enabled: true
+
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:
