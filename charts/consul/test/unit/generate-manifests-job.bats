@@ -34,7 +34,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       . | tee /dev/stderr |
-      yq '.kind' | tee /dev/stderr)
+      yq -r '.kind' | tee /dev/stderr)
 
   [ "${actual}" = "Job" ]
 }
@@ -47,7 +47,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       . | tee /dev/stderr |
-      yq '.kind' | tee /dev/stderr)
+      yq -r '.kind' | tee /dev/stderr)
 
   [ "${actual}" = "Job" ]
 }
@@ -60,7 +60,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       . | tee /dev/stderr |
-      yq '.metadata.annotations."helm.sh/hook"' | tee /dev/stderr)
+      yq -r '.metadata.annotations."helm.sh/hook"' | tee /dev/stderr)
 
   [ "${actual}" = "pre-upgrade" ]
 }
@@ -73,7 +73,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       . | tee /dev/stderr |
-      yq '.metadata.annotations."helm.sh/hook-delete-policy"' | tee /dev/stderr)
+      yq -r '.metadata.annotations."helm.sh/hook-delete-policy"' | tee /dev/stderr)
 
   [ "${actual}" = "hook-succeeded,before-hook-creation" ]
 }
@@ -86,7 +86,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.restartPolicy' | tee /dev/stderr)
+      yq -r '.spec.template.spec.restartPolicy' | tee /dev/stderr)
 
   [ "${actual}" = "Never" ]
 }
@@ -99,7 +99,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.volumes[0].persistentVolumeClaim.claimName' | tee /dev/stderr)
+      yq -r '.spec.template.spec.volumes[0].persistentVolumeClaim.claimName' | tee /dev/stderr)
 
   [ "${actual}" = "release-name-consul-gatewayapi-pvc" ]
 }
@@ -112,7 +112,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].volumeMounts[0].mountPath' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].volumeMounts[0].mountPath' | tee /dev/stderr)
 
   [ "${actual}" = "/output/" ]
 }
@@ -120,34 +120,32 @@ load _helpers
 @test "generateManifests/Job: consulapi-enabled argument added when consulapi CRD enabled" {
   cd `chart_dir`
 
-  local spec=$(helm template \
+  run bash -c "
+    helm template \
       -s templates/generate-manifests-job.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       --set 'global.crds.consulapi.enabled=true' \
-      . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+      . | yq -r '.spec.template.spec.containers[0].args[]' | grep '^-consulapi-enabled=true$'
+  "
 
-  local actual=$(echo "$spec" | jq '.[4]')
-
-  [ "${actual}" = "\"-consulapi-enabled=true\"" ]
+  [ "$status" -eq 0 ]
 }
 
 @test "generateManifests/Job: openshift scc argument added when openshift enabled" {
   cd `chart_dir`
 
-  local spec=$(helm template \
+  run bash -c "
+    helm template \
       -s templates/generate-manifests-job.yaml \
       --set 'connectInject.enabled=true' \
       --set 'global.generateManifests=true' \
       --set 'global.openshift.enabled=true' \
       --set 'connectInject.apiGateway.managedGatewayClass.openshiftSCCName=restricted-v2' \
-      . | tee /dev/stderr |
-      yq -o=json '.spec.template.spec.containers[0].args' | tee /dev/stderr)
+      . | yq -r '.spec.template.spec.containers[0].args[]' | grep '^-openshift-scc-name=restricted-v2$'
+  "
 
-  local actual=$(echo "$spec" | jq '.[4]')
-
-  [ "${actual}" = "\"-openshift-scc-name=restricted-v2\"" ]
+  [ "$status" -eq 0 ]
 }
 
 @test "generateManifests/Job: renders configured image" {
@@ -159,7 +157,7 @@ load _helpers
       --set 'global.generateManifests=true' \
       --set 'global.imageK8S=hashicorp/consul-k8s-control-plane:2.0.0' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].image' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].image' | tee /dev/stderr)
 
   [ "${actual}" = "hashicorp/consul-k8s-control-plane:2.0.0" ]
 }
@@ -174,7 +172,7 @@ load _helpers
       --set 'global.podSecurityContext.enabled=true' \
       --set 'global.openshift.enabled=false' \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.securityContext.fsGroup' | tee /dev/stderr)
+      yq -r '.spec.template.spec.securityContext.fsGroup' | tee /dev/stderr)
 
   [ "${actual}" = "100" ]
 }
