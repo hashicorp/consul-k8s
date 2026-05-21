@@ -164,13 +164,11 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 	if version.IsFIPS() {
-		// make sure we are also using FIPS Consul
 		var versionInfo map[string]interface{}
-		_, err := consulClient.Raw().Query("/v1/agent/version", versionInfo, nil)
+		_, err := consulClient.Raw().Query("/v1/agent/version", &versionInfo, nil)
 		if err != nil {
-			c.logger.Warn("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. Unable to verify FIPS Consul while setting up Consul API client.")
-		}
-		if val, ok := versionInfo["FIPS"]; !ok || val == "" {
+			c.logger.Warn("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. Unable to verify FIPS Consul while setting up Consul API client.", "error", err)
+		} else if val, ok := versionInfo["FIPS"].(string); !ok || val == "" {
 			c.logger.Warn("This is a FIPS build of consul-k8s, which should be used with FIPS Consul. A non-FIPS version of Consul was detected.")
 		}
 	}

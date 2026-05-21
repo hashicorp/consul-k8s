@@ -126,6 +126,11 @@ func TestPartitions_Gateway(t *testing.T) {
 
 	helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
 
+	// Pre-flight: wait for the primary's expose-servers Service to be
+	// reachable before installing the secondary cluster (see other partition
+	// tests for rationale). No-op on Kind.
+	k8s.WaitForServiceReachable(t, cfg, defaultPartitionClusterContext, partitionServiceName, 8501)
+
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 	clientConsulCluster.Create(t)

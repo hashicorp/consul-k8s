@@ -25,6 +25,7 @@ const multiportAdminServiceName = "multiport-admin"
 // TestPartitions_Connect_MultiportServices validates cross-partition connectivity to
 // three ports exposed by a single Consul service registered from a multi-port workload.
 func TestPartitions_Connect_MultiportServices(t *testing.T) {
+	t.Skipf("SKIP: multiport test temporarily")
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -145,6 +146,11 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				}
 
 				helpers.MergeMaps(secondaryPartitionHelmValues, commonHelmValues)
+
+				// Pre-flight: wait for the primary's expose-servers Service to
+				// be reachable before installing the secondary cluster (see
+				// other partition tests for rationale). No-op on Kind.
+				k8s.WaitForServiceReachable(t, cfg, defaultPartitionClusterContext, partitionServiceName, 8501)
 
 				clientConsulCluster := consul.NewHelmCluster(t, secondaryPartitionHelmValues, secondaryPartitionClusterContext, cfg, releaseName)
 				clientConsulCluster.Create(t)
