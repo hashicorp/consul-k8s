@@ -813,9 +813,10 @@ global:
     consulapi:
       enabled: false
 
-  # Add additional securityContext at pod level for volume permissions.
+  # Add additional pod-level securityContext for the generate-manifests Job when volume permissions require it.
   podSecurityContext:
-    enabled: true
+    enabled: false
+    fsGroup: 100
 
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
