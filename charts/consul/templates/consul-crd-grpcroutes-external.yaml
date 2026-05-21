@@ -39,7 +39,7 @@ metadata:
     release: {{ .Release.Name }}
     name: consul-custom-grpcroutes
     component: crd
-  name: grpcroutes.consul.hashicorp.com
+  name: cgrpcroutes.consul.hashicorp.com
 spec:
   group: consul.hashicorp.com
   names:
@@ -47,8 +47,8 @@ spec:
       - gateway-api
     kind: GRPCRoute
     listKind: GRPCRouteList
-    plural: grpcroutes
-    singular: grpcroute
+    plural: cgrpcroutes
+    singular: cgrpcroute
     shortNames:
       - cgrpcroutes
   scope: Namespaced
