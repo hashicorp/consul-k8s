@@ -1117,8 +1117,9 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
 
 	epCtrl := Controller{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true,
 	}
 
 	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
@@ -1136,6 +1137,139 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort(t *testing.T) {
 	require.Empty(t, proxyServiceRegistration.Service.Proxy.LocalServiceAddress)
 	require.Zero(t, proxyServiceRegistration.Service.Proxy.LocalServicePort)
 	require.Nil(t, proxyServiceRegistration.Service.Proxy.Expose.Paths)
+}
+
+// TestCreateServiceRegistrations_SingleServiceMultiPort_CEFallback verifies that when
+// IsEnterpriseDistribution is false (Consul CE), multi-port service registrations fall back
+// to single-port registration using the default port.
+func TestCreateServiceRegistrations_SingleServiceMultiPort_CEFallback(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: false, // Consul CE
+	}
+
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	// On CE, Ports should be nil and Port should be the default port value.
+	require.Nil(t, serviceRegistration.Service.Ports)
+	require.Equal(t, 5050, serviceRegistration.Service.Port)
+
+	// Proxy service should also have nil Ports on CE.
+	require.Nil(t, proxyServiceRegistration.Service.Ports)
+
+	// LocalServiceAddress and LocalServicePort should be set for single-port mode.
+	require.Equal(t, "127.0.0.1", proxyServiceRegistration.Service.Proxy.LocalServiceAddress)
+	require.Equal(t, 5050, proxyServiceRegistration.Service.Proxy.LocalServicePort)
+}
+
+// TestCreateServiceRegistrations_SingleServiceMultiPort_EnterpriseSetsMultiplePorts verifies that when
+// IsEnterpriseDistribution is true (Consul Enterprise), multi-port service registrations are preserved.
+func TestCreateServiceRegistrations_SingleServiceMultiPort_EnterpriseSetsMultiplePorts(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          "http",
+					ContainerPort: 5050,
+				},
+				{
+					Name:          "metrics",
+					ContainerPort: 5051,
+				},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+
+	endpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true, // Consul Enterprise
+	}
+
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	// On Enterprise, Ports should be set and Port should be 0 (multi-port mode).
+	require.Equal(t, 0, serviceRegistration.Service.Port)
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: true},
+		{Name: "metrics", Port: 5051, Default: false},
+	}, serviceRegistration.Service.Ports)
+
+	// Proxy service should also have Ports set on Enterprise.
+	require.Equal(t, api.ServicePorts{
+		{Name: "http", Port: 5050, Default: true},
+		{Name: "metrics", Port: 5051, Default: false},
+	}, proxyServiceRegistration.Service.Ports)
+
+	// LocalServiceAddress and LocalServicePort should NOT be set in multi-port mode.
+	require.Empty(t, proxyServiceRegistration.Service.Proxy.LocalServiceAddress)
+	require.Zero(t, proxyServiceRegistration.Service.Proxy.LocalServicePort)
 }
 
 func TestCreateServiceRegistrations_SingleServiceMultiPort_FromEndpointsFallback(t *testing.T) {
@@ -1179,8 +1313,9 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_FromEndpointsFallback
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
 
 	epCtrl := Controller{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true,
 	}
 
 	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
@@ -1242,8 +1377,9 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
 
 	epCtrl := Controller{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true,
 	}
 
 	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
@@ -1297,8 +1433,9 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
 
 	epCtrl := Controller{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true,
 	}
 
 	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
@@ -1352,8 +1489,9 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
 
 	epCtrl := Controller{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true,
 	}
 
 	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
@@ -1406,8 +1544,9 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_MixedProtocolsFromAnn
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
 
 	epCtrl := Controller{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true,
 	}
 
 	_, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
@@ -1455,8 +1594,9 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_MixedProtocolsFromEnd
 	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, endpoints, namespace).Build()
 
 	epCtrl := Controller{
-		Client: fakeClient,
-		Log:    logrtest.New(t),
+		Client:                   fakeClient,
+		Log:                      logrtest.New(t),
+		IsEnterpriseDistribution: true,
 	}
 
 	_, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)

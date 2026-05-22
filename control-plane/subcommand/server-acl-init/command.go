@@ -564,6 +564,20 @@ func (c *Command) Run(args []string) int {
 			c.log.Error(err.Error())
 			return 1
 		}
+
+		// Create a separate global ACL token that grants only operator:read so the
+		// connect-inject controller can call /v1/operator/license to detect whether
+		// Consul is enterprise. `operator` is a global-scope resource and cannot
+		// be granted to a partition-scoped token, so this token must be issued in
+		// the default partition. Only the primary DC's default-partition
+		// server-acl-init run creates it; all other partitions will mount the
+		// secret created here.
+		if primary && (c.consulFlags.Partition == "" || c.consulFlags.Partition == consulDefaultPartition) {
+			if err := c.createGlobalACL("connect-inject-operator-read", connectInjectOperatorReadRules, consulDC, primary, dynamicClient); err != nil {
+				c.log.Error(err.Error())
+				return 1
+			}
+		}
 	}
 
 	if c.flagCreateEntLicenseToken {
