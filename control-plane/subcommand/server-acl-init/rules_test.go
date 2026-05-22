@@ -1080,6 +1080,14 @@ partition "part-1" {
 	}
 }
 
+// TestConnectInjectOperatorReadRules verifies the global operator:read policy
+// text used by the separate connect-inject operator-read token. This token is
+// required because Consul's operator resource is global-scope and cannot be
+// granted to a partition-scoped token.
+func TestConnectInjectOperatorReadRules(t *testing.T) {
+	require.Equal(t, `operator = "read"`, connectInjectOperatorReadRules)
+}
+
 // Test the dns-proxy rules with namespaces enabled or disabled.
 func TestDnsProxyRules(t *testing.T) {
 	cases := []struct {
