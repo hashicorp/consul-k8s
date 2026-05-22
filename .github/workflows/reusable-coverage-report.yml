@@ -1,0 +1,203 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Reusable workflow: merges per-module coverage profiles, computes the total,
+# posts/edits a PR comment, uploads an HTML artifact, uploads to Codecov, and
+# (on main) pushes a coverage badge SVG to the `badges` branch for the README.
+
+name: reusable-coverage-report
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write  # required for OIDC tokenless Codecov upload
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Download coverage profiles
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        with:
+          pattern: '*-coverage'
+          path: coverage-artifacts
+
+      - name: Compute coverage
+        id: coverage
+        run: |
+          PROFILES=$(find coverage-artifacts -name 'coverage.txt' 2>/dev/null | sort)
+          COUNT=$(echo "$PROFILES" | grep -c . || true)
+          echo "Found $COUNT coverage profile(s)"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "No coverage profiles found"
+            echo "total=N/A" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$COUNT" -eq 1 ]; then
+            cp "$(echo "$PROFILES")" merged-coverage.out
+          else
+            go install github.com/wadey/gocovmerge@latest
+            echo "$PROFILES" | xargs gocovmerge > merged-coverage.out
+          fi
+
+          # Exclude generated mock files and acceptance test paths.
+          # Go 1.20+ includes all compiled packages in the profile (even those
+          # without test files), which inflates the denominator.
+          TOTAL=$(awk '
+            /^mode:/ { next }
+            /\/mocks\/|\/mock_|\/acceptance\// { next }
+            { stmts += $2; if ($3 > 0) covered += $2 }
+            END { if (stmts > 0) printf "%.1f%%", covered/stmts*100; else print "0.0%" }
+          ' merged-coverage.out)
+          echo "Total coverage: $TOTAL"
+          echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
+
+          # Strip excluded lines from profile before generating HTML and per-package summary.
+          grep -v -e '/mocks/' -e '/mock_' -e '/acceptance/' merged-coverage.out > filtered-coverage.out || true
+          mv filtered-coverage.out merged-coverage.out
+
+          # Package-level summary grouped by top-level directory.
+          # go tool cover -func separates fields with variable numbers of tabs,
+          # so use $NF for the percentage and $1 for the path.
+          go tool cover -func merged-coverage.out | grep -v '^total:' | \
+            awk '{
+              sub(/^github\.com\/hashicorp\/consul-k8s\//, "", $1)
+              split($1, parts, "/")
+              pkg = parts[1]
+              gsub(/:.*/, "", pkg)
+              pct = $NF; gsub(/%/, "", pct)
+              sum[pkg] += pct; n[pkg]++
+            }
+            END {
+              for (pkg in sum) printf "%-40s %.1f%%\n", pkg, sum[pkg]/n[pkg]
+            }' | sort > pkg-summary.txt
+
+          {
+            echo "## Go Test Coverage"
+            echo ""
+            echo "**Total coverage: $TOTAL**"
+            echo ""
+            echo "| Package | Avg Coverage |"
+            echo "|---------|-------------|"
+            while IFS= read -r line; do
+              pkg=$(echo "$line" | awk '{print $1}')
+              pct=$(echo "$line" | awk '{print $2}')
+              echo "| \`$pkg\` | $pct |"
+            done < pkg-summary.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          go tool cover -html=merged-coverage.out -o coverage.html
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request' && steps.coverage.outputs.total != 'N/A'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOTAL: ${{ steps.coverage.outputs.total }}
+        run: |
+          BODY="### Go Test Coverage: **${TOTAL}**
+
+See the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for the full per-package breakdown and downloadable HTML report."
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --repo "${{ github.repository }}" \
+            --body "$BODY" \
+            --edit-last 2>/dev/null || \
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --repo "${{ github.repository }}" \
+            --body "$BODY"
+
+      - name: Upload HTML coverage report
+        if: steps.coverage.outputs.total != 'N/A'
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: coverage-report-html
+          path: |
+            merged-coverage.out
+            coverage.html
+
+      - name: Upload to Codecov
+        if: steps.coverage.outputs.total != 'N/A'
+        uses: codecov/codecov-action@e28ff129e5465c2c0dcc6f003fc735cb6ae0c673 # v4.5.0
+        with:
+          files: merged-coverage.out
+          use_oidc: true
+          fail_ci_if_error: false
+          verbose: false
+
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main' && steps.coverage.outputs.total != 'N/A'
+        env:
+          TOTAL: ${{ steps.coverage.outputs.total }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PCT=$(echo "$TOTAL" | tr -d '%')
+          if awk "BEGIN {exit !($PCT >= 75)}"; then COLOR="#4c1"
+          elif awk "BEGIN {exit !($PCT >= 60)}"; then COLOR="#97CA00"
+          elif awk "BEGIN {exit !($PCT >= 40)}"; then COLOR="#dfb317"
+          else COLOR="#e05d44"
+          fi
+
+          # Compute dynamic text widths: label "coverage" = 62px, value width ~7px/char
+          LABEL="coverage"
+          LABEL_W=62
+          VAL_LEN=${#TOTAL}
+          VAL_W=$(( VAL_LEN * 7 + 10 ))
+          TOTAL_W=$(( LABEL_W + VAL_W ))
+          LABEL_MID=$(( LABEL_W / 2 + 1 ))
+          VAL_MID=$(( LABEL_W + VAL_W / 2 ))
+
+          cat > /tmp/coverage.svg <<SVGEOF
+          <svg xmlns="http://www.w3.org/2000/svg" width="${TOTAL_W}" height="20">
+            <linearGradient id="s" x2="0" y2="100%">
+              <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+              <stop offset="1" stop-opacity=".1"/>
+            </linearGradient>
+            <rect rx="3" width="${TOTAL_W}" height="20" fill="#555"/>
+            <rect rx="3" x="${LABEL_W}" width="${VAL_W}" height="20" fill="${COLOR}"/>
+            <rect x="${LABEL_W}" width="4" height="20" fill="${COLOR}"/>
+            <rect rx="3" width="${TOTAL_W}" height="20" fill="url(#s)"/>
+            <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+              <text x="${LABEL_MID}" y="15" fill="#010101" fill-opacity=".3">${LABEL}</text>
+              <text x="${LABEL_MID}" y="14">${LABEL}</text>
+              <text x="${VAL_MID}" y="15" fill="#010101" fill-opacity=".3">${TOTAL}</text>
+              <text x="${VAL_MID}" y="14">${TOTAL}</text>
+            </g>
+          </svg>
+          SVGEOF
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          if git ls-remote --exit-code origin badges >/dev/null 2>&1; then
+            git fetch origin badges:badges --depth=1
+            git worktree add /tmp/badges-wt badges
+          else
+            git worktree add --detach /tmp/badges-wt HEAD
+            git -C /tmp/badges-wt checkout --orphan badges
+            git -C /tmp/badges-wt rm -rf . --quiet 2>/dev/null || true
+          fi
+
+          cp /tmp/coverage.svg /tmp/badges-wt/coverage.svg
+          git -C /tmp/badges-wt add coverage.svg
+          if git -C /tmp/badges-wt diff --staged --quiet; then
+            echo "Badge unchanged, skipping commit"
+          else
+            git -C /tmp/badges-wt commit -m "chore: update coverage badge [skip ci]"
+            git -C /tmp/badges-wt push origin HEAD:badges
+          fi

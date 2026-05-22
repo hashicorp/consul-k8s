@@ -1,0 +1,86 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Runs unit tests with coverage for the critical Go modules (control-plane, cli),
+# merges the profiles, and publishes the results via reusable-coverage-report.yml.
+# Triggers on PRs (posts a comment) and on pushes to main/release branches (updates badge).
+
+name: coverage
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "release/**"
+  push:
+    branches:
+      - main
+      - "release/**"
+
+jobs:
+  conditional-skip:
+    uses: ./.github/workflows/reusable-conditional-skip.yml
+
+  get-go-version:
+    needs: [conditional-skip]
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  unit-tests-control-plane:
+    name: unit-tests (control-plane)
+    needs: [get-go-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
+
+      - name: Run unit tests with coverage
+        # -p 1 disables parallelism to avoid port conflicts from shared
+        # default metrics / lifecycle server configuration.
+        run: cd control-plane && go test ./... -p 1 -coverprofile=coverage.txt -covermode=set
+
+      - name: Upload coverage profile
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: control-plane-coverage
+          path: control-plane/coverage.txt
+          if-no-files-found: ignore
+
+  unit-tests-cli:
+    name: unit-tests (cli)
+    needs: [get-go-version]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
+
+      - name: Run unit tests with coverage
+        run: cd cli && go test ./... -p 1 -coverprofile=coverage.txt -covermode=set
+
+      - name: Upload coverage profile
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: cli-coverage
+          path: cli/coverage.txt
+          if-no-files-found: ignore
+
+  coverage-report:
+    needs:
+      - get-go-version
+      - unit-tests-control-plane
+      - unit-tests-cli
+    uses: ./.github/workflows/reusable-coverage-report.yml
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    with:
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
