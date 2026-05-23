@@ -256,6 +256,7 @@ github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 h1:+ngKgrYPPJr
 github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 h1:X5VWvz21y3gzm9Nw/kaUeku/1+uBhcekkmy4IkffJww=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1/go.mod h1:Zanoh4+gvIgluNqcfMVTJueD4wSS5hT7zTt4Mrutd90=
+<<<<<<< HEAD
 github.com/hashicorp/consul/api v1.33.7 h1:apLZVzX7O7BLgHyh4pvczcsBzPmYSVXGKZQbOaA1ae0=
 github.com/hashicorp/consul/api v1.33.7/go.mod h1:SjR3cjwCUSLLDfVw5dFg76rnnKjOySxr8W8lC5s01C8=
 github.com/hashicorp/consul/envoyextensions v0.9.6 h1:IlxZFyP6zC9X5ffJrsue0ZCi6MjNP51P/obSpFI0hp0=
@@ -264,6 +265,16 @@ github.com/hashicorp/consul/sdk v0.17.3 h1:oZMMxzQGSsiT+ToOH50y3Qcs0nc9Ud+7L5lRx
 github.com/hashicorp/consul/sdk v0.17.3/go.mod h1:jnOmYjiNfVRpBaujQ1DFFVs0N6g3S1y6wygSjLTzYfc=
 github.com/hashicorp/consul/troubleshoot v0.8.7 h1:fO+jMPeJ401IevQQneIvjhINJEJdSMD1dVQr30PiUvc=
 github.com/hashicorp/consul/troubleshoot v0.8.7/go.mod h1:xv7QzWCD9DoI+fE/9g8j7xuQXfOV6FnLIePlc5+kRZg=
+=======
+github.com/hashicorp/consul/api v1.34.3 h1:OiZaQnwkS6uvutie3CF6NFXj8uScNezDlsU9MEqKT0s=
+github.com/hashicorp/consul/api v1.34.3/go.mod h1:A4wKd7yw7Wz4zn07p74+o0bLBi5dXsSDMMcMCEinY40=
+github.com/hashicorp/consul/envoyextensions v0.10.3 h1:qu9ry2bLiGNfph0zGpQHti+64UWq9r3YwbLfB78zwwU=
+github.com/hashicorp/consul/envoyextensions v0.10.3/go.mod h1:+uepTOzgPB1bj8p/k/il68l7h+v6JZOBQ3myZ9HxDtI=
+github.com/hashicorp/consul/sdk v0.18.1 h1:RDTeBvAeOveI2xI86sV+8WkaN7OkP4zz+cG3fOobDCM=
+github.com/hashicorp/consul/sdk v0.18.1/go.mod h1:XdP2tEJmAvlK4jgoKTTtohGkRJlS4mU44mv9/sjU21s=
+github.com/hashicorp/consul/troubleshoot v0.9.3 h1:DBY5bQ1qnaAXQmhYEvnTQ2d0mMLDU/ENuXl9QuIr6PA=
+github.com/hashicorp/consul/troubleshoot v0.9.3/go.mod h1:SuSYc0sWcfJdfXSpaQUCSPOxByM51WOYpnMsa8tylJg=
+>>>>>>> d8a3d3a19 (Consul Submodule Version Upgrade)
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
