@@ -1,0 +1,201 @@
+name: security-scan-containers
+
+on:
+  workflow_call:
+    inputs:
+      sha:
+        description: 'The sha of the commit'
+        required: true
+        type: string
+      repository:
+        description: 'The originating repository'
+        required: true
+        type: string
+      version:
+        description: 'The product version'
+        required: true
+        type: string
+      config:
+        description: 'Release metadata config'
+        required: true
+        type: string
+
+jobs:
+  download-containers:
+    runs-on: [self-hosted, ubuntu-22.04-x64, large]
+    outputs:
+      matrix-combinations: ${{ steps.set-matrix.outputs.matrix }}
+      filename: ${{ steps.get-filename.outputs.filename }}
+    permissions:
+      id-token: write
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - name: Authenticate to Vault
+        id: vault-auth
+        run: vault-auth
+      - name: Retrieve Vault-hosted Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v3.4.0
+        with:
+          url: ${{ steps.vault-auth.outputs.addr }}
+          caCertificate: ${{ steps.vault-auth.outputs.ca_certificate }}
+          token: ${{ steps.vault-auth.outputs.token }}
+          secrets: |
+            kv/data/github/${{ github.repository }} private_tools_token ;
+            kv/data/github/${{ github.repository }} crt_artifactory_token ;
+            kv/data/github/${{ github.repository }} crt_artifactory_user ;
+            kv/data/github/${{ github.repository }} jf_artifactory_secret_1 | jf_env_secret_1 ;
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: hashicorp/action-setup-bob@v2
+        with:
+          github-token: ${{ steps.secrets.outputs.private_tools_token }}
+
+      - name: download artifacts
+        env:
+          BOB_ARTIFACTORY_TOKEN: ${{ steps.secrets.outputs.crt_artifactory_token }}
+          BOB_ARTIFACTORY_USER: ${{ steps.secrets.outputs.crt_artifactory_user }}
+        run: |
+          bob download artifactory \
+            -channel pre-stable \
+            -commit ${{ github.event.client_payload.payload.sha }} \
+            -product-name=${{ github.event.client_payload.payload.repo }} \
+            -product-version=${{ github.event.client_payload.payload.version }} -pattern="*.docker*.tar" \
+            -output-dir=".bob/artifacts/images"
+
+      - id: set-matrix
+        run: ./.github/scripts/set-matrix-dir.sh ".bob/artifacts/images"
+
+      - name: get filename of container to scan
+        id: get-filename
+        run: |
+          files=(.bob/artifacts/images/*docker.tar)
+          echo "filename=$(basename "${files[0]}")" >> "$GITHUB_OUTPUT"
+
+  scan-container-ibm-twistlock:
+    needs: download-containers
+    runs-on: [self-hosted, ubuntu-22.04-x64, small]
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      id-token: write
+      contents: read
+    steps:
+      - name: Authenticate to Vault
+        id: vault-auth
+        run: vault-auth
+      - name: Retrieve Vault-hosted Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v3.4.0
+        with:
+          url: ${{ steps.vault-auth.outputs.addr }}
+          caCertificate: ${{ steps.vault-auth.outputs.ca_certificate }}
+          token: ${{ steps.vault-auth.outputs.token }}
+          secrets: |
+            kv/data/github/${{ github.repository }} private_tools_token ;
+            kv/data/github/${{ github.repository }} crt_artifactory_token ;
+            kv/data/github/${{ github.repository }} crt_artifactory_user ;
+            kv/data/github/${{ github.repository }} container_scan_github_dispatch_token ;
+            kv/data/github/${{ github.repository }} container_scan_github_mappings_read_token ;
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: checkout container-scanner-action locally
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: hashicorp/security-scanning
+          ref: main
+          token: ${{ steps.secrets.outputs.private_tools_token }}
+          path: .tmp/security-scanning
+          sparse-checkout: |
+            container-scanner-action
+      - name: download security scanner
+        env:
+          PRIVATE_TOOLS_TOKEN: ${{ steps.secrets.outputs.private_tools_token }}
+        run: ./.github/scripts/download-tools.sh scan security-scanner
+      - name: scan container with IBM CISO-managed twistlock
+        uses: ./.tmp/security-scanning/container-scanner-action
+        continue-on-error: true # we should monitor the action for failures and remove this once we are confident in the stability of the new scanning workflow
+        with:
+          repository: ${{ format('github.com/hashicorp/{0}', inputs.repository) }}
+          # pattern is like: https://artifactory.hashicorp.engineering/artifactory/hashicorp-crt-dev-local/boundary/0.21.3/3e4ae173dfcdca030f9cc3e6dc07039663db4b98/boundary_default_linux_amd64_0.21.3_3e4ae173dfcdca030f9cc3e6dc07039663db4b98.docker.tar
+          artifactory_container_url: ${{ format('https://artifactory.hashicorp.engineering/artifactory/hashicorp-crt-dev-local/{0}/{1}/{2}/{3}', inputs.repository, inputs.version, inputs.sha, needs.download-containers.outputs.filename) }}
+          # switch to true when we are confident in the new scanning workflow, and if this is for an actual release (not nightly)
+          is_prod: false
+          commit_sha: ${{ inputs.sha }}
+          github_dispatch_token: ${{ steps.secrets.outputs.container_scan_github_dispatch_token }}
+          github_mappings_token: ${{ steps.secrets.outputs.container_scan_github_mappings_read_token }}
+          github_private_modules_token: ${{ steps.secrets.outputs.private_tools_token }}
+          sarif_ingestion_api_url: ${{ vars.PRODSEC_SARIF_INGESTION_API_URL }}
+          passport_service_account: sarif-ingestion-dev-crt-workflows-common@hashicorp.com
+
+  scan-container:
+    runs-on: [self-hosted, ubuntu-22.04-x64, large]
+    needs: download-containers
+    timeout-minutes: 60
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        filename: ${{ fromJson(needs.download-containers.outputs.matrix-combinations) }}
+    steps:
+      - name: Authenticate to Vault
+        id: vault-auth
+        run: vault-auth
+      - name: Retrieve Vault-hosted Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v3.4.0
+        with:
+          url: ${{ steps.vault-auth.outputs.addr }}
+          caCertificate: ${{ steps.vault-auth.outputs.ca_certificate }}
+          token: ${{ steps.vault-auth.outputs.token }}
+          secrets: |
+            kv/data/github/${{ github.repository }} private_tools_token ;
+            kv/data/github/${{ github.repository }} crt_artifactory_token ;
+            kv/data/github/${{ github.repository }} crt_artifactory_user ;
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: download security scanner
+        env:
+          PRIVATE_TOOLS_TOKEN: ${{ steps.secrets.outputs.private_tools_token }}
+        run: ./.github/scripts/download-tools.sh scan security-scanner
+      - uses: hashicorp/action-setup-bob@v2
+        with:
+          github-token: ${{ steps.secrets.outputs.private_tools_token }}
+      - name: download artifacts
+        env:
+          BOB_ARTIFACTORY_TOKEN: ${{ steps.secrets.outputs.crt_artifactory_token }}
+          BOB_ARTIFACTORY_USER: ${{ steps.secrets.outputs.crt_artifactory_user }}
+        run: |
+          bob download artifactory -channel pre-stable -commit ${{ github.event.client_payload.payload.sha }} \
+          -product-name="${{ github.event.client_payload.payload.repo }}" -product-version="${{ github.event.client_payload.payload.version }}" -pattern="${{ matrix.filename }}" \
+          -output-dir=".bob/artifacts/images"
+      - name: scan container !b64
+      # Scan the container using configuration provided by the Orchestrator. This is a fallback path for builds that
+      # do not have the security scan configuration attached to their build metadata.
+        if: ${{ !github.event.client_payload.payload.securityScan }}
+        env:
+          SCAN_CONFIG: ${{ toJson(github.event.client_payload.payload.config) }}
+          SECURITY_SCANNER_CONFIG_FILE: scan.json
+        run: |
+          echo "$SCAN_CONFIG" > scan.json
+          cp .bob/artifacts/images/${{ matrix.filename }} .
+          bob scan container -config-file=scan.json -tar-file="${{ matrix.filename }}"
+      - name: scan container b64
+      # Scan the container using configuration attached to the build metadata. This config is base64 encoded so
+      # must be decoded before providing it to the security scanner.
+        if: ${{ github.event.client_payload.payload.securityScan }}
+        env:
+          SECURITY_SCANNER_CONFIG_FILE: scan.hcl
+        run: |
+          base64 --decode <<< "${{ github.event.client_payload.payload.securityScan }}" > scan.hcl
+          cp .bob/artifacts/images/${{ matrix.filename }} .
+          bob scan container -config-file=scan.hcl -tar-file="${{ matrix.filename }}"
+
+  send-metrics:
+    uses: ./.github/workflows/reusable-crt-setup-datadog-metrics.yml
+    with:
+      sha: ${{ github.event.client_payload.payload.sha }}
+      repository: ${{ github.event.client_payload.payload.repo }}
+      version: ${{ github.event.client_payload.payload.version }}
+      product: ${{ github.event.client_payload.payload.product}}
+      
