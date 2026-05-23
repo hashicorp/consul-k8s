@@ -5,12 +5,7 @@
 
 SECURITY:
 
-* security: upgrade `golang.org/x/crypto` to v0.52.0 to resolve [GO-2026-5005](https://pkg.go.dev/vuln/GO-2026-5005), [GO-2026-5006](https://pkg.go.dev/vuln/GO-2026-5006), [GO-2026-5013](https://pkg.go.dev/vuln/GO-2026-5013), [GO-2026-5023](https://pkg.go.dev/vuln/GO-2026-5023), and related CVEs
-- security: upgrade `golang.org/x/net` to v0.55.0 to resolve [GO-2026-5025](https://pkg.go.dev/vuln/GO-2026-5025), [GO-2026-5026](https://pkg.go.dev/vuln/GO-2026-5026), [GO-2026-5027](https://pkg.go.dev/vuln/GO-2026-5027), [GO-2026-5028](https://pkg.go.dev/vuln/GO-2026-5028), [GO-2026-5029](https://pkg.go.dev/vuln/GO-2026-5029), [GO-2026-5030](https://pkg.go.dev/vuln/GO-2026-5030)
-- security: upgrade `golang.org/x/sys` to v0.45.0 to resolve [GO-2026-5024](https://pkg.go.dev/vuln/GO-2026-5024)
-- security: upgrade `github.com/go-jose/go-jose/v4` to v4.1.4 to resolve [GHSA-78h2-9frx-2jm8](https://github.com/advisories/GHSA-78h2-9frx-2jm8)
-- security: upgrade `github.com/containerd/containerd` to v1.7.32 to resolve [GHSA-fqw6-gf59-qr4w](https://github.com/advisories/GHSA-fqw6-gf59-qr4w)
-- security: upgrade `github.com/hashicorp/vault/api` to v1.23.0 and `k8s.io/client-go` to v0.35.2 to transitively resolve x/crypto, x/net, and x/sys CVEs across all modules [[GH-5354](https://github.com/hashicorp/consul-k8s/issues/5354)]
+* security: upgrade `golang.org/x/crypto` to v0.52.0 (resolves [GO-2026-5005](https://pkg.go.dev/vuln/GO-2026-5005), [GO-2026-5006](https://pkg.go.dev/vuln/GO-2026-5006), [GO-2026-5013](https://pkg.go.dev/vuln/GO-2026-5013), [GO-2026-5023](https://pkg.go.dev/vuln/GO-2026-5023)), `golang.org/x/net` to v0.55.0 (resolves [GO-2026-5025](https://pkg.go.dev/vuln/GO-2026-5025), [GO-2026-5026](https://pkg.go.dev/vuln/GO-2026-5026), [GO-2026-5027](https://pkg.go.dev/vuln/GO-2026-5027), [GO-2026-5028](https://pkg.go.dev/vuln/GO-2026-5028), [GO-2026-5029](https://pkg.go.dev/vuln/GO-2026-5029), [GO-2026-5030](https://pkg.go.dev/vuln/GO-2026-5030)), `golang.org/x/sys` to v0.45.0 (resolves [GO-2026-5024](https://pkg.go.dev/vuln/GO-2026-5024)), `github.com/go-jose/go-jose/v4` to v4.1.4 (resolves [GHSA-78h2-9frx-2jm8](https://github.com/advisories/GHSA-78h2-9frx-2jm8)), `github.com/containerd/containerd` to v1.7.32 (resolves [GHSA-fqw6-gf59-qr4w](https://github.com/advisories/GHSA-fqw6-gf59-qr4w)), and `github.com/hashicorp/vault/api` to v1.23.0 and `k8s.io/client-go` to v0.35.2 to transitively resolve x/crypto, x/net, and x/sys CVEs across all modules. [[GH-5354](https://github.com/hashicorp/consul-k8s/issues/5354)]
 
 BUG FIXES:
 
@@ -19,6 +14,22 @@ BUG FIXES:
 * custom-gateway: Fix filename mismatch in gateway-resources-configmap-custom that prevented CPU and memory resource limits from being applied to the custom GatewayClassConfig. [[GH-5334](https://github.com/hashicorp/consul-k8s/issues/5334)]
 * endpoints-controller: add enterprise gating while registering services with multiple ports. In consul CE cluster, register single port catalog service for pods with multiple container ports. [[GH-5335](https://github.com/hashicorp/consul-k8s/issues/5335)]
 * helm: add pod level securityContext to get write access to the PVC. [[GH-5341](https://github.com/hashicorp/consul-k8s/issues/5341)]
+
+## 2.0.0-rc2 (May 17, 2026)
+
+SECURITY:
+
+* Upgrade to use `x/net` 0.53.0.
+This resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918) [[GH-5308](https://github.com/hashicorp/consul-k8s/issues/5308)]
+
+FEATURES:
+
+* api-gateway: add TLS SDS support for Kubernetes API Gateway listeners via listener `tls.options` (with gateway-level defaults) and per-backend `RouteTLSSDSFilter` overrides; this includes validation for incomplete SDS config and SDS inheritance behavior so route-level overrides can inherit clusterName from listener/global defaults. [[GH-5186](https://github.com/hashicorp/consul-k8s/issues/5186)]
+
+BUG FIXES:
+
+* connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check queried `/v1/agent/version` with a non-pointer map, so the response was never decoded and both FIPS warnings fired on every pod startup. The fix decodes the endpoint response correctly and checks the returned `FIPS` value. [[GH-5252](https://github.com/hashicorp/consul-k8s/issues/5252)]
+* helm-chart: remove redundant template crd-gatewaypolicies-custom.yaml from helm chart templates. [[GH-5307](https://github.com/hashicorp/consul-k8s/issues/5307)]
 
 ## 2.0.0-rc1 (April 30, 2026)
 
