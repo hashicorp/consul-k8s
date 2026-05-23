@@ -1,3 +1,25 @@
+## 2.0.0 (May 24, 2026)
+
+> NOTE: Consul K8s 2.0.x is compatible with Consul 2.0.x and Consul Dataplane 2.0.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+SECURITY:
+
+* security: upgrade `golang.org/x/crypto` to v0.52.0 to resolve [GO-2026-5005](https://pkg.go.dev/vuln/GO-2026-5005), [GO-2026-5006](https://pkg.go.dev/vuln/GO-2026-5006), [GO-2026-5013](https://pkg.go.dev/vuln/GO-2026-5013), [GO-2026-5023](https://pkg.go.dev/vuln/GO-2026-5023), and related CVEs
+- security: upgrade `golang.org/x/net` to v0.55.0 to resolve [GO-2026-5025](https://pkg.go.dev/vuln/GO-2026-5025), [GO-2026-5026](https://pkg.go.dev/vuln/GO-2026-5026), [GO-2026-5027](https://pkg.go.dev/vuln/GO-2026-5027), [GO-2026-5028](https://pkg.go.dev/vuln/GO-2026-5028), [GO-2026-5029](https://pkg.go.dev/vuln/GO-2026-5029), [GO-2026-5030](https://pkg.go.dev/vuln/GO-2026-5030)
+- security: upgrade `golang.org/x/sys` to v0.45.0 to resolve [GO-2026-5024](https://pkg.go.dev/vuln/GO-2026-5024)
+- security: upgrade `github.com/go-jose/go-jose/v4` to v4.1.4 to resolve [GHSA-78h2-9frx-2jm8](https://github.com/advisories/GHSA-78h2-9frx-2jm8)
+- security: upgrade `github.com/containerd/containerd` to v1.7.32 to resolve [GHSA-fqw6-gf59-qr4w](https://github.com/advisories/GHSA-fqw6-gf59-qr4w)
+- security: upgrade `github.com/hashicorp/vault/api` to v1.23.0 and `k8s.io/client-go` to v0.35.2 to transitively resolve x/crypto, x/net, and x/sys CVEs across all modules [[GH-5354](https://github.com/hashicorp/consul-k8s/issues/5354)]
+
+BUG FIXES:
+
+* cli: Fix  the issue When both Consul and Gateway API HTTPRoute CRDs are installed, kubectl encounters a naming ambiguity. [[GH-5328](https://github.com/hashicorp/consul-k8s/issues/5328)]
+* cli: Fix installation and upgrade failures caused by supplying boolean types to strictly typed string fields in custom helm values.yaml [[GH-5327](https://github.com/hashicorp/consul-k8s/issues/5327)]
+* custom-gateway: Fix filename mismatch in gateway-resources-configmap-custom that prevented CPU and memory resource limits from being applied to the custom GatewayClassConfig. [[GH-5334](https://github.com/hashicorp/consul-k8s/issues/5334)]
+* endpoints-controller: add enterprise gating while registering services with multiple ports. In consul CE cluster, register single port catalog service for pods with multiple container ports. [[GH-5335](https://github.com/hashicorp/consul-k8s/issues/5335)]
+* helm: add pod level securityContext to get write access to the PVC. [[GH-5341](https://github.com/hashicorp/consul-k8s/issues/5341)]
+
 ## 2.0.0-rc1 (April 30, 2026)
 
 BREAKING CHANGES:
