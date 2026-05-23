@@ -125,6 +125,11 @@ type Controller struct {
 	// with config to enable telemetry forwarding.
 	EnableTelemetryCollector bool
 
+	// IsEnterpriseDistribution indicates whether the connected Consul cluster
+	// reports a valid enterprise license. Multi-port service registrations are
+	// only supported on Consul Enterprise.
+	IsEnterpriseDistribution bool
+
 	MetricsConfig metrics.Config
 	Log           logr.Logger
 
@@ -444,6 +449,12 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	consulServicePort, consulServicePorts, err := r.servicePortsForRegistration(pod, serviceEndpoints)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Multi-port registrations are only supported on Consul Enterprise.
+	// On CE, fall back to single port registration using the default port.
+	if !r.IsEnterpriseDistribution && len(consulServicePorts) > 0 {
+		consulServicePorts = nil
 	}
 
 	var node corev1.Node
