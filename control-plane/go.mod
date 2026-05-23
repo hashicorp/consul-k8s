@@ -1,12 +1,12 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.25.9
+go 1.26
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.33.2
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.34.3
 
 replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.16.2
 
@@ -26,8 +26,8 @@ require (
 	github.com/hashicorp/consul-k8s/control-plane/cni v0.0.0-20240226161840-f3842c41cb2b
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/consul-server-connection-manager v0.1.12
-	github.com/hashicorp/consul/api v1.33.2
-	github.com/hashicorp/consul/sdk v0.17.1
+	github.com/hashicorp/consul/api v1.34.3
+	github.com/hashicorp/consul/sdk v0.18.1
 	github.com/hashicorp/go-bexpr v0.1.11
 	github.com/hashicorp/go-discover v1.1.0
 	github.com/hashicorp/go-hclog v1.6.3
@@ -46,7 +46,7 @@ require (
 	github.com/prometheus/client_golang v1.16.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.25.0
-	golang.org/x/exp v0.0.0-20250808145144-a408d31f581a
+	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/text v0.36.0
 	golang.org/x/time v0.6.0
 	gomodules.xyz/jsonpatch/v2 v2.4.0
