@@ -2,7 +2,7 @@
 
 SECURITY:
 
-* Upgrade to use `x/net` 0.53.0.
+* Upgrade to use `x/net` 0.55.0.
 This resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918) [[GH-5308](https://github.com/hashicorp/consul-k8s/issues/5308)]
 
 BUG FIXES:
