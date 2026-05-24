@@ -4,7 +4,7 @@
 apiVersion: v2
 name: consul
 version: 1.9.8
-appVersion: 1.22.8
+appVersion: 1.22.7
 kubeVersion: ">=1.22.0-0"
 description: Official HashiCorp Consul Chart
 home: https://www.consul.io
@@ -15,7 +15,7 @@ sources:
 annotations:
   artifacthub.io/images: |
     - name: consul
-      image: hashicorp/consul:1.22.8
+      image: hashicorp/consul:1.22.7
     - name: consul-k8s-control-plane
       image: hashicorp/consul-k8s-control-plane:1.9.8
     - name: consul-dataplane
