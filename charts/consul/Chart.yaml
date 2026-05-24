@@ -15,7 +15,7 @@ sources:
 annotations:
   artifacthub.io/images: |
     - name: consul
-      image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.22.8
+      image: docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:1.22.8
     - name: consul-k8s-control-plane
       image: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.9.8-dev
     - name: consul-dataplane
