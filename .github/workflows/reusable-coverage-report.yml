@@ -53,7 +53,7 @@ jobs:
           if [ "$COUNT" -eq 1 ]; then
             cp "$(echo "$PROFILES")" merged-coverage.out
           else
-            go install github.com/wadey/gocovmerge@latest
+            go install github.com/wadey/gocovmerge@b5bfa59ec0ad
             echo "$PROFILES" | xargs gocovmerge > merged-coverage.out
           fi
 
@@ -62,7 +62,7 @@ jobs:
           # without test files), which inflates the denominator.
           TOTAL=$(awk '
             /^mode:/ { next }
-            /\/mocks\/|\/mock_|\/acceptance\// { next }
+            /\/mocks\/|\/mock_|\/acceptance\/|\/cli\/helm\/mock\.go/ { next }
             { stmts += $2; if ($3 > 0) covered += $2 }
             END { if (stmts > 0) printf "%.1f%%", covered/stmts*100; else print "0.0%" }
           ' merged-coverage.out)
@@ -70,7 +70,7 @@ jobs:
           echo "total=$TOTAL" >> "$GITHUB_OUTPUT"
 
           # Strip excluded lines from profile before generating HTML and per-package summary.
-          grep -v -e '/mocks/' -e '/mock_' -e '/acceptance/' merged-coverage.out > filtered-coverage.out || true
+          grep -v -e '/mocks/' -e '/mock_' -e '/acceptance/' -e '/cli/helm/mock.go' merged-coverage.out > filtered-coverage.out || true
           mv filtered-coverage.out merged-coverage.out
 
           # Package-level summary grouped by top-level directory.
@@ -107,24 +107,36 @@ jobs:
 
       - name: Post PR comment
         if: inputs.pr-number != '' && steps.coverage.outputs.total != 'N/A'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           TOTAL: ${{ steps.coverage.outputs.total }}
         run: |
+          MARKER="<!-- coverage-report-comment -->"
           BODY=$(cat <<EOF
+          ${MARKER}
+
           ### Go Test Coverage: **${TOTAL}**
 
           See the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for the full per-package breakdown and downloadable HTML report.
           EOF
           )
 
-          gh pr comment ${{ inputs.pr-number }} \
-            --repo "${{ github.repository }}" \
-            --body "$BODY" \
-            --edit-last 2>/dev/null || \
-          gh pr comment ${{ inputs.pr-number }} \
-            --repo "${{ github.repository }}" \
-            --body "$BODY"
+          COMMENT_ID=$(gh api --paginate \
+            "repos/${{ github.repository }}/issues/${{ inputs.pr-number }}/comments" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body // "" | contains("<!-- coverage-report-comment -->"))) | .id' \
+            | tail -n1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api \
+              --method PATCH \
+              "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              -f body="$BODY"
+          else
+            gh pr comment ${{ inputs.pr-number }} \
+              --repo "${{ github.repository }}" \
+              --body "$BODY"
+          fi
 
       - name: Upload HTML coverage report
         if: steps.coverage.outputs.total != 'N/A'
