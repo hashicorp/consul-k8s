@@ -37,12 +37,20 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
 
+      - name: Install consul binary
+        # Several control-plane packages use testutil.NewTestServerConfigT which
+        # requires the consul binary on PATH to start a real test server.
+        run: |
+          CONSUL_VERSION="2.0.0"
+          curl -sSLO "https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip"
+          unzip "consul_${CONSUL_VERSION}_linux_amd64.zip" -d /usr/local/bin
+          rm "consul_${CONSUL_VERSION}_linux_amd64.zip"
+          consul version
+
       - name: Run unit tests with coverage
         # -p 1 disables parallelism to avoid port conflicts from shared
         # default metrics / lifecycle server configuration.
-        # -short skips integration tests that require the consul binary on PATH
-        # (consistent with the -short flag used by the main test workflow).
-        run: cd control-plane && go test ./... -short -p 1 -coverprofile=coverage.txt -covermode=set
+        run: cd control-plane && go test ./... -p 1 -coverprofile=coverage.txt -covermode=set
 
       - name: Upload coverage profile
         if: always()
