@@ -56,7 +56,6 @@ const nonPrivilegedPort = "8053"
 // - properly not resolving DNS for unexported services when ACLs are enabled.
 // - properly resolving DNS for exported services when ACLs are enabled.
 func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
-	t.Skip("skipping test temporarily")
 	env := suite.Environment()
 	cfg := suite.Config()
 
@@ -68,21 +67,21 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	}
 
 	cases := []dnsWithPartitionsTestCase{
-		// {
-		// 	name:   "not secure - ACLs and auto-encrypt not enabled",
-		// 	secure: false,
-		// 	port:   privilegedPort,
-		// },
+		{
+			name:   "not secure - ACLs and auto-encrypt not enabled",
+			secure: false,
+			port:   privilegedPort,
+		},
 		{
 			name:   "secure - ACLs and auto-encrypt enabled",
 			secure: true,
 			port:   privilegedPort,
 		},
-		// {
-		// 	name:   "not secure - ACLs and auto-encrypt not enabled",
-		// 	secure: false,
-		// 	port:   nonPrivilegedPort,
-		// },
+		{
+			name:   "not secure - ACLs and auto-encrypt not enabled",
+			secure: false,
+			port:   nonPrivilegedPort,
+		},
 		{
 			name:   "secure - ACLs and auto-encrypt enabled",
 			secure: true,
