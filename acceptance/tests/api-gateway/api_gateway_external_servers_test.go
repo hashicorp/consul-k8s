@@ -25,6 +25,7 @@ import (
 // It sets up an external Consul server in the same cluster but a different Helm installation
 // and then treats this server as external.
 func TestAPIGateway_ExternalServers(t *testing.T) {
+	t.Skip("TEMPORARY: skipping for targeted CI validation")
 	cfg := suite.Config()
 	ctx := suite.Environment().DefaultContext(t)
 

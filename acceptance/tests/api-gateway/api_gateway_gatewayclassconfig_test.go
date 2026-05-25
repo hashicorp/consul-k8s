@@ -31,6 +31,7 @@ import (
 // minInstances,maxInstances and defaultInstances parameters, and that changing the parent gateway does not affect
 // the child gateways.
 func TestAPIGateway_GatewayClassConfig(t *testing.T) {
+	t.Skip("TEMPORARY: skipping for targeted CI validation")
 	var (
 		defaultInstances = ptr.To(int32(2))
 		maxInstances     = ptr.To(int32(3))

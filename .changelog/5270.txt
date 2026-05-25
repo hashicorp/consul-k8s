@@ -1,0 +1,3 @@
+```release-note:bug
+acceptance: update the proxy lifecycle shutdown test to check Envoy's localhost listener during pod termination so the drain assertion does not depend on transparent proxy iptables rules surviving shutdown.
+```
