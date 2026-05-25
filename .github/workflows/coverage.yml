@@ -43,7 +43,7 @@ jobs:
         run: |
           CONSUL_VERSION="2.0.0"
           curl -sSLO "https://releases.hashicorp.com/consul/${CONSUL_VERSION}/consul_${CONSUL_VERSION}_linux_amd64.zip"
-          unzip "consul_${CONSUL_VERSION}_linux_amd64.zip" -d /usr/local/bin
+          unzip -o "consul_${CONSUL_VERSION}_linux_amd64.zip" consul -d /usr/local/bin
           rm "consul_${CONSUL_VERSION}_linux_amd64.zip"
           consul version
 
