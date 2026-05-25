@@ -13,6 +13,9 @@ on:
       go-version:
         required: true
         type: string
+      pr-number:
+        required: false
+        type: string
 
 jobs:
   report:
@@ -103,20 +106,23 @@ jobs:
           go tool cover -html=merged-coverage.out -o coverage.html
 
       - name: Post PR comment
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.total != 'N/A'
+        if: inputs.pr-number != '' && steps.coverage.outputs.total != 'N/A'
         env:
           GH_TOKEN: ${{ github.token }}
           TOTAL: ${{ steps.coverage.outputs.total }}
         run: |
-          BODY="### Go Test Coverage: **${TOTAL}**
+          BODY=$(cat <<EOF
+          ### Go Test Coverage: **${TOTAL}**
 
-See the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for the full per-package breakdown and downloadable HTML report."
+          See the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for the full per-package breakdown and downloadable HTML report.
+          EOF
+          )
 
-          gh pr comment ${{ github.event.pull_request.number }} \
+          gh pr comment ${{ inputs.pr-number }} \
             --repo "${{ github.repository }}" \
             --body "$BODY" \
             --edit-last 2>/dev/null || \
-          gh pr comment ${{ github.event.pull_request.number }} \
+          gh pr comment ${{ inputs.pr-number }} \
             --repo "${{ github.repository }}" \
             --body "$BODY"
 

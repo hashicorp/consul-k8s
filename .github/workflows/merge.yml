@@ -13,9 +13,19 @@ on:
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
   CONTEXT: "merge"
-  SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  SHA: ${{ github.sha }}
 
 jobs:
+  get-go-version:
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  coverage:
+    needs:
+      - get-go-version
+    uses: ./.github/workflows/coverage.yml
+    with:
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
+
   test:
     name: test
     runs-on: ubuntu-latest

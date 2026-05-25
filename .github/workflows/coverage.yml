@@ -1,21 +1,21 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
-# Runs unit tests with coverage for the critical Go modules (control-plane, cli),
-# merges the profiles, and publishes the results via reusable-coverage-report.yml.
-# Triggers on PRs (posts a comment) and on pushes to main/release branches (updates badge).
+# Reusable workflow that runs unit tests with coverage for the critical Go
+# modules (control-plane, cli), merges the profiles, and publishes the results
+# via reusable-coverage-report.yml.
 
 name: coverage
 
 on:
-  pull_request:
-    branches:
-      - main
-      - "release/**"
-  push:
-    branches:
-      - main
-      - "release/**"
+  workflow_call:
+    inputs:
+      go-version:
+        required: true
+        type: string
+      pr-number:
+        required: false
+        type: string
 
 jobs:
   conditional-skip:
@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          go-version: ${{ needs.get-go-version.outputs.go-version }}
+          go-version: ${{ inputs.go-version }}
 
       - name: Run unit tests with coverage
         # -p 1 disables parallelism to avoid port conflicts from shared
@@ -59,7 +59,7 @@ jobs:
 
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          go-version: ${{ needs.get-go-version.outputs.go-version }}
+          go-version: ${{ inputs.go-version }}
 
       - name: Run unit tests with coverage
         run: cd cli && go test ./... -p 1 -coverprofile=coverage.txt -covermode=set
@@ -83,4 +83,5 @@ jobs:
       pull-requests: write
       id-token: write
     with:
-      go-version: ${{ needs.get-go-version.outputs.go-version }}
+      go-version: ${{ inputs.go-version }}
+      pr-number: ${{ inputs.pr-number }}
