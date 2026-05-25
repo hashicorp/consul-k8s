@@ -134,6 +134,12 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 
 		// Now, configure the auth method in Vault.
 		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, secondaryAuthMethodName, k8sAuthMethodHost, authMethodRBACName, ns)
+
+		// Validate auth/kubernetes-dc2/config is persisted with a non-empty
+		// token_reviewer_jwt and that Vault can actually issue a TokenReview
+		// against the secondary k8s API. Surfaces auth-method races in ~3m
+		// with a clear message instead of as a 45m silent helm hook timeout.
+		vault.WaitForAuthMethodReady(t, vaultClient, secondaryCtx.KubernetesClient(t), secondaryAuthMethodName, authMethodRBACName, ns)
 	}
 	// -------------------------
 	// PKI
@@ -476,6 +482,17 @@ func TestVault_WANFederationViaGateways(t *testing.T) {
 		secondaryConsulHelmValues["meshGateway.service.type"] = "NodePort"
 		secondaryConsulHelmValues["meshGateway.service.nodePort"] = "30000"
 	}
+
+	// Pre-flight: the secondary consul install depends on two cross-cluster
+	// endpoints in the primary: the Vault server LB (vault-agent sidecars
+	// injected into every secondary pod connect to it; if unreachable, pods
+	// never become Ready and helm --wait times out at 15m) and the primary
+	// mesh-gateway LB (federation traffic). On fresh AWS ELBs DNS + SG +
+	// instance registration can briefly exceed helm's 15m budget. Block here
+	// so cold-start surfaces deterministically outside the helm wait. No-op
+	// on Kind (helper short-circuits when cfg.UseKind is true).
+	k8s.WaitForServiceReachable(t, cfg, primaryCtx, fmt.Sprintf("%s-vault", vaultReleaseName), 8200)
+	k8s.WaitForServiceReachable(t, cfg, primaryCtx, fmt.Sprintf("%s-consul-mesh-gateway", consulReleaseName), 443)
 
 	// Install the secondary consul cluster in the secondary kubernetes context.
 	secondaryConsulCluster := consul.NewHelmCluster(t, secondaryConsulHelmValues, secondaryCtx, cfg, consulReleaseName)

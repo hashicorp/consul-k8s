@@ -297,7 +297,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
 
-
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
 	// deleted at this point, in which case these operations will fail on non-existent

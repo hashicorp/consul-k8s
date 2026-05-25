@@ -235,11 +235,35 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 		}
 	})
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
-	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
-	require.NoError(t, err)
+	// On Kubernetes >= 1.24, when the auth-method Secret of type
+	// SecretTypeServiceAccountToken is manually created, the kube
+	// token-controller populates data.token asynchronously. If we read the
+	// Secret before that lands, Vault gets configured with an empty
+	// token_reviewer_jwt and every TokenReview Vault performs against the
+	// kubernetes API returns 401 — which Vault surfaces to login clients
+	// (vault-agent in partition-init / server-acl-init Jobs) as 403
+	// "permission denied" for the entire test run. Poll until the token is
+	// populated before writing the auth config to avoid this race.
+	var reviewerJWT, caCert string
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 60}, t, func(r *retry.R) {
+		tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+		require.NoError(r, err)
+		jwt := string(tokenSecret.Data["token"])
+		ca := string(tokenSecret.Data["ca.crt"])
+		if jwt == "" {
+			r.Errorf("auth method SA token secret %s/%s has empty data.token (waiting for token-controller)", saNS, secretName)
+			return
+		}
+		if ca == "" {
+			r.Errorf("auth method SA token secret %s/%s has empty data.ca.crt", saNS, secretName)
+			return
+		}
+		reviewerJWT = jwt
+		caCert = ca
+	})
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
-		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
-		"kubernetes_ca_cert": string(tokenSecret.Data["ca.crt"]),
+		"token_reviewer_jwt": reviewerJWT,
+		"kubernetes_ca_cert": caCert,
 		"kubernetes_host":    k8sHost,
 	})
 	require.NoError(t, err)
