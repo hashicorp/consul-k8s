@@ -37,6 +37,13 @@ jobs:
           pattern: '*-coverage'
           path: coverage-artifacts
 
+      - name: Create Go workspace for multi-module coverage analysis
+        # consul-k8s is a multi-module repo (control-plane/ and cli/ each have
+        # their own go.mod). go tool cover -func/-html needs to resolve package
+        # source paths across both modules. A go.work file at the root makes
+        # both modules visible without requiring a root-level go.mod.
+        run: go work init ./control-plane ./cli
+
       - name: Compute coverage
         id: coverage
         run: |
