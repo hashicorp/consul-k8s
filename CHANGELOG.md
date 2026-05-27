@@ -5,6 +5,27 @@ SECURITY:
 * Added input length validation on "consul.hashicorp.com/service-name" annotation [[GH-5107](https://github.com/hashicorp/consul-k8s/issues/5107)]
 * go: upgrade go version to 1.25.7 [[GH-5113](https://github.com/hashicorp/consul-k8s/issues/5113)]
 * docker: upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
+## 1.8.12 (April 26, 2026)
+
+
+SECURITY:
+
+* go: upgrade go version to 1.25.9 
+
+IMPROVEMENTS:
+
+* envoy: Update Envoy version to 1.34.13
+
+## 1.8.11 (March 23, 2026)
+
+BUG FIXES:
+
+* api-gateway: Fix cross-namespace ACL resource collisions by keying policy/role/binding-rule caches with gatewayName + namespace. Managed resource names are now namespace-scoped to prevent one gateway from affecting another when deployed in different Kubernetes namespaces. [[GH-5140](https://github.com/hashicorp/consul-k8s/pull/5140)]
+
+SECURITY:
+
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
 
 ## 1.8.10 (February 27, 2026)
 
@@ -66,6 +87,10 @@ FEATURES:
 * cli: Add `debug` command to collect configs, logs, and other data from a Consul on Kubernetes deployment in a archive/dir. [[GH-4800](https://github.com/hashicorp/consul-k8s/issues/4800)]
 * cli: Updated the status command to output the consul client & deployments status as well along with existing ones. [[GH-4790](https://github.com/hashicorp/consul-k8s/issues/4790)]
 * cli: added new -capture flag to proxy loglevel command, enabling users to capture logs for certain duration. [[GH-4788](https://github.com/hashicorp/consul-k8s/issues/4788)]
+
+## 1.8.9
+
+**UNRELEASED**
 
 ## 1.8.6 (2 December, 2025)
 
@@ -239,6 +264,29 @@ SECURITY:
 
 * updated golang.org/x/net dependency to 0.37.0 to fix vulnerability [[GO-2025-3503](https://pkg.go.dev/vuln/GO-2025-3503)] in CLI, CNI, acceptance and control-plane submodule.
   [[PR-4502](https://github.com/hashicorp/consul-k8s/pull/4502)] [[GH-4502](https://github.com/hashicorp/consul-k8s/issues/4502)]
+## 1.8.3 (September 30, 2025)
+
+SECURITY:
+
+* go: upgrade go version to 1.25.1 [[GH-4762](https://github.com/hashicorp/consul-k8s/issues/4762)]
+
+FEATURES:
+
+* Added boolean annotation "consul.hashicorp.com/enable-consul-dataplane-as-sidecar" for registering consul-dataplane as init container so that consul-dataplane container is initialised and started before application container. Default value is "false" i.e the feature is disabled by default. Also made the probe properties configurable through annotations. [[GH-4678](https://github.com/hashicorp/consul-k8s/issues/4678)]
+
+BUG FIXES:
+
+* control-plane: fix duplicate health check registrations for API Gateways and Mesh Gateways when node assignment is delayed [[GH-4715](https://github.com/hashicorp/consul-k8s/issues/4715)]
+
+## 1.8.0 (June 27, 2025)
+
+> NOTE: Consul K8s 1.8.x is compatible with Consul 1.20.x and Consul Dataplane 1.8.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+
+SECURITY:
+
+* updated golang.org/x/net dependency to 0.37.0 to fix vulnerability [[GO-2025-3503](https://pkg.go.dev/vuln/GO-2025-3503)] in CLI, CNI, acceptance and control-plane submodule.
+[[PR-4502](https://github.com/hashicorp/consul-k8s/pull/4502)] [[GH-4502](https://github.com/hashicorp/consul-k8s/issues/4502)]
 
 IMPROVEMENTS:
 
@@ -440,6 +488,7 @@ SECURITY:
 * updated golang.org/x/net dependency to 0.34.0 to fix vulnerability [[GO-2024-3333](https://pkg.go.dev/vuln/GO-2024-3333)] in CLI, CNI, acceptance and control-plane submodule.[[PR-4456](https://github.com/hashicorp/consul-k8s/pull/4456)]
 
 ## 1.6.1 (November 4, 2024)
+## 1.6.1 (November 4, 2023)
 
 SECURITY:
 

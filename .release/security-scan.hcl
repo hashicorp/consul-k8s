@@ -24,7 +24,8 @@ container {
 
   triage {
     suppress {
-      vulnerabilites = [
+      vulnerabilites = []
+      paths = [
         // The OSV scanner will trip on several packages that are included in the
         // the UBI images. This is due to RHEL using the same base version in the
         // package name for the life of the distro regardless of whether or not
@@ -48,18 +49,7 @@ binary {
 
   triage {
     suppress {
-      vulnerabilities = []
-    }
-  }
-}
-
-repository {
-  go_modules = true
-  osv        = true
-
-  triage {
-    suppress {
-      vulnerabilities = []
+      vulnerabilites = []
     }
   }
 }
