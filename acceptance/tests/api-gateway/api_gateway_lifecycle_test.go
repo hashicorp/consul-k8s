@@ -145,10 +145,10 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 
 	// Scenario: Ensure ACL roles/policies are set correctly
 	logger.Log(t, "checking that ACL roles/policies are set correctly for controlled gateway one")
-	checkACLRolesPolicies(t, consulClient, controlledGatewayOneName)
+	checkACLRolesPolicies(t, consulClient, controlledGatewayOneName, defaultNamespace)
 
 	logger.Log(t, "checking that ACL roles/policies are set correctly for controlled gateway two")
-	checkACLRolesPolicies(t, consulClient, controlledGatewayTwoName)
+	checkACLRolesPolicies(t, consulClient, controlledGatewayTwoName, defaultNamespace)
 
 	// Scenario: Swapping a route to another controlled gateway should clean up the old parent statuses and references on Consul resources
 
@@ -235,10 +235,10 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	checkEmptyRoute(t, k8sClient, routeOneName, defaultNamespace)
 
 	logger.Log(t, "checking that ACL roles/policies are set correctly for controlled gateway one")
-	checkACLRolesPolicies(t, consulClient, controlledGatewayOneName)
+	checkACLRolesPolicies(t, consulClient, controlledGatewayOneName, defaultNamespace)
 
 	logger.Log(t, "checking that ACL roles/policies are removed for controlled gateway two")
-	checkACLRolesPoliciesDontExist(t, consulClient, controlledGatewayTwoName)
+	checkACLRolesPoliciesDontExist(t, consulClient, controlledGatewayTwoName, defaultNamespace)
 
 	// Scenario: Changing a gateway class name on a gateway to something we don’t control should have the same affect as deleting it with the addition of cleaning up our finalizer from the gateway.
 
@@ -460,25 +460,27 @@ func createGatewayClass(t *testing.T, client client.Client, name, controllerName
 	require.NoError(t, err)
 }
 
-func checkACLRolesPolicies(t *testing.T, client *api.Client, gatewayName string) {
+func checkACLRolesPolicies(t *testing.T, client *api.Client, gatewayName, namespace string) {
 	t.Helper()
+	gatewayCacheKey := fmt.Sprintf("%s-%s", gatewayName, namespace)
 	retryCheck(t, 60, func(r *retry.R) {
-		role, _, err := client.ACL().RoleReadByName(fmt.Sprint("managed-gateway-acl-role-", gatewayName), nil)
+		role, _, err := client.ACL().RoleReadByName(fmt.Sprint("managed-gateway-acl-role-", gatewayCacheKey), nil)
 		require.NoError(r, err)
 		require.NotNil(r, role)
-		policy, _, err := client.ACL().PolicyReadByName(fmt.Sprint("api-gateway-policy-for-", gatewayName), nil)
+		policy, _, err := client.ACL().PolicyReadByName(fmt.Sprint("api-gateway-policy-for-", gatewayCacheKey), nil)
 		require.NoError(r, err)
 		require.NotNil(r, policy)
 	})
 }
 
-func checkACLRolesPoliciesDontExist(t *testing.T, client *api.Client, gatewayName string) {
+func checkACLRolesPoliciesDontExist(t *testing.T, client *api.Client, gatewayName, namespace string) {
 	t.Helper()
+	gatewayCacheKey := fmt.Sprintf("%s-%s", gatewayName, namespace)
 	retryCheck(t, 60, func(r *retry.R) {
-		role, _, err := client.ACL().RoleReadByName(fmt.Sprint("managed-gateway-acl-role-", gatewayName), nil)
+		role, _, err := client.ACL().RoleReadByName(fmt.Sprint("managed-gateway-acl-role-", gatewayCacheKey), nil)
 		require.NoError(r, err)
 		require.Nil(r, role)
-		policy, _, err := client.ACL().PolicyReadByName(fmt.Sprint("api-gateway-policy-for-", gatewayName), nil)
+		policy, _, err := client.ACL().PolicyReadByName(fmt.Sprint("api-gateway-policy-for-", gatewayCacheKey), nil)
 		require.NoError(r, err)
 		require.Nil(r, policy)
 	})

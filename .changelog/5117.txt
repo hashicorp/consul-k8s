@@ -1,0 +1,3 @@
+```release-note:security
+security: upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5
+```

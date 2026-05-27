@@ -18,7 +18,7 @@
 # either).
 ARG GOLANG_VERSION
 FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
-RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@40c38fd658f0fd07ce74f2ee51b8abd3bfed01b3
+RUN CGO_ENABLED=0 go install github.com/hashicorp/go-discover/cmd/discover@fe618ff0bb1c6adbcdff76bdfd9e850ee0193c47
 
 # dev copies the binary from a local build
 # -----------------------------------
@@ -175,7 +175,9 @@ ARG TARGETARCH
 # Copy license for Red Hat certification.
 COPY LICENSE /licenses/mozilla.txt
 
-RUN microdnf install -y ca-certificates libcap openssl shadow-utils iptables
+RUN microdnf update -y && \
+    microdnf install -y ca-certificates libcap openssl shadow-utils iptables && \
+    microdnf clean all
 
 # Create a non-root user to run the software. On OpenShift, this
 # will not matter since the container is run as a random user and group
