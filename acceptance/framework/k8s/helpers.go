@@ -6,6 +6,8 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
