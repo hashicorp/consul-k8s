@@ -156,7 +156,6 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
 	envoyAdminBindAddress := "127.0.0.1"
-	consulDPBindAddress := "127.0.0.1"
 	xdsBindAddress := "127.0.0.1"
 
 	dualStack := false
@@ -165,7 +164,6 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	}
 	if dualStack {
 		envoyAdminBindAddress = "::1"
-		consulDPBindAddress = "::"
 		xdsBindAddress = "::1"
 	}
 
@@ -178,7 +176,6 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
-		"-graceful-addr=" + consulDPBindAddress,
 	}
 
 	consulNamespace := namespaces.ConsulNamespace(

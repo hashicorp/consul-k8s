@@ -156,7 +156,6 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
 	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
-	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
 
@@ -170,7 +169,6 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 		"-log-level=" + config.LogLevel,
 		"-log-json=" + strconv.FormatBool(config.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
-		"-graceful-addr=" + consulDPBindAddress,
 	}
 
 	consulNamespace := namespaces.ConsulNamespace(

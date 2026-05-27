@@ -327,7 +327,6 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	}
 	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
-	consulDPBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
 	args := []string{
 		"-addresses", w.ConsulAddress,
@@ -339,7 +338,6 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		"-log-level=" + w.LogLevel,
 		"-log-json=" + strconv.FormatBool(w.LogJSON),
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
-		"-graceful-addr=" + consulDPBindAddress,
 	}
 
 	if w.SkipServerWatch {

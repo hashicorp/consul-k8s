@@ -853,7 +853,6 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 	dataplaneArgs = append(dataplaneArgs,
 		"-envoy-admin-bind-address=127.0.0.1",
 		"-xds-bind-addr=127.0.0.1",
-		"-graceful-addr=127.0.0.1",
 		"-consul-dns-bind-addr=127.0.0.1",
 	)
 
