@@ -45,6 +45,7 @@ const (
 
 	// Known EC2 not-found codes treated as terminal success during cleanup races.
 	ec2ErrCodeInvalidAllocationIDNotFound       = "InvalidAllocationID.NotFound"
+	ec2ErrCodeInvalidAddressNotFound            = "InvalidAddress.NotFound"
 	ec2ErrCodeInvalidInternetGatewayIDNotFound  = "InvalidInternetGatewayID.NotFound"
 	ec2ErrCodeInvalidNatGatewayIDNotFound       = "InvalidNatGatewayID.NotFound"
 	ec2ErrCodeInvalidNetworkInterfaceIDNotFound = "InvalidNetworkInterfaceID.NotFound"
@@ -110,6 +111,16 @@ func realMain(ctx context.Context) error {
 
 	// Find IAM policies and delete.
 	if err := cleanupIAMPolicies(ctx, iamClient); err != nil {
+		return err
+	}
+
+	// Release orphaned Elastic IPs. Done independently of the NAT-gateway
+	// / VPC cleanup below because EIPs can be left behind when Terraform
+	// fails before creating the NAT gateway, when the NAT gateway has
+	// already aged out of DescribeNatGateways, or when the VPC is already
+	// gone — in all of those cases the per-VPC loop never sees them and
+	// they eat into the regional EIP quota.
+	if err := cleanupEIPs(ctx, ec2Client); err != nil {
 		return err
 	}
 
@@ -1063,6 +1074,92 @@ func cleanupPersistentVolumes(ctx context.Context, ec2Client *ec2.Client) error 
 		} else {
 			fmt.Printf("Volume %s is not in 'available' state, skipping deletion\n", volumeID)
 		}
+	}
+
+	return nil
+}
+
+// cleanupEIPs releases orphaned Elastic IPs left behind by acceptance test
+// runs. An EIP is considered an orphan if it is currently unassociated
+// (no AssociationId) AND it carries one of the markers used by the
+// acceptance-test Terraform: either the `build_url` tag, or a Name tag
+// matching the `consul-k8s-*` prefix. We deliberately do not touch
+// associated EIPs — those are still in use by a NAT gateway / ELB / ENI
+// and will be released by the NAT-gateway cleanup path or by the owning
+// resource's own teardown.
+func cleanupEIPs(ctx context.Context, ec2Client *ec2.Client) error {
+	out, err := ec2Client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{
+		Filters: []ec2types.Filter{
+			{Name: aws.String("tag-key"), Values: []string{buildURLTag}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("describing EIPs: %w", err)
+	}
+
+	// Also pick up EIPs that only have a Name=consul-k8s-* tag (older
+	// resources may not carry build_url). We merge by AllocationId to
+	// avoid double-releasing.
+	nameOut, err := ec2Client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{
+		Filters: []ec2types.Filter{
+			{Name: aws.String("tag:Name"), Values: []string{"consul-k8s-*"}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("describing EIPs by Name tag: %w", err)
+	}
+
+	seen := make(map[string]struct{})
+	var candidates []ec2types.Address
+	for _, addrs := range [][]ec2types.Address{out.Addresses, nameOut.Addresses} {
+		for _, a := range addrs {
+			id := aws.ToString(a.AllocationId)
+			if id == "" {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			candidates = append(candidates, a)
+		}
+	}
+
+	var toRelease []ec2types.Address
+	for _, a := range candidates {
+		if a.AssociationId != nil {
+			fmt.Printf("EIP: Skipping (still associated) [id=%s,public_ip=%s]\n",
+				aws.ToString(a.AllocationId), aws.ToString(a.PublicIp))
+			continue
+		}
+		toRelease = append(toRelease, a)
+	}
+
+	if len(toRelease) == 0 {
+		fmt.Println("Found no orphan EIPs to clean up")
+		return nil
+	}
+
+	fmt.Printf("Found %d orphan EIP(s) to release\n", len(toRelease))
+	for _, a := range toRelease {
+		allocID := aws.ToString(a.AllocationId)
+		publicIP := aws.ToString(a.PublicIp)
+		fmt.Printf("EIP: Releasing... [id=%s,public_ip=%s]\n", allocID, publicIP)
+		_, err := ec2Client.ReleaseAddress(ctx, &ec2.ReleaseAddressInput{
+			AllocationId: a.AllocationId,
+		})
+		if err != nil {
+			if awsErrCodeIs(err, ec2ErrCodeInvalidAllocationIDNotFound) ||
+				awsErrCodeIs(err, ec2ErrCodeInvalidAddressNotFound) {
+				fmt.Printf("EIP: Not found (already released) [id=%s]\n", allocID)
+				continue
+			}
+			// Don't abort cleanup if a single EIP can't be released
+			// (e.g. it just became associated again); log and move on.
+			fmt.Printf("EIP: Failed to release [id=%s,err=%v]\n", allocID, err)
+			continue
+		}
+		fmt.Printf("EIP: Released [id=%s,public_ip=%s]\n", allocID, publicIP)
 	}
 
 	return nil
