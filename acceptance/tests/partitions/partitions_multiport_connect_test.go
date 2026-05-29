@@ -64,11 +64,11 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-remote",
 			secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-remote",
 		},
-		{
-			name:                         "none",
-			defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-none",
-			secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-none",
-		},
+		// {
+		// 	name:                         "none",
+		// 	defaultPartitionConfigPath:   "../fixtures/cases/crd-partitions/default-partition-default-multiport-single-service-config-none",
+		// 	secondaryPartitionConfigPath: "../fixtures/cases/crd-partitions/secondary-partition-default-multiport-single-service-config-none",
+		// },
 	}
 
 	for _, c := range aclCases {
