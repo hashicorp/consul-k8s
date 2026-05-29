@@ -171,13 +171,31 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				// Ensure outbound requests are successful only within a stable subset
 				// of the configured proxy grace window, and do not run checks past the deadline
 				// where pod/envoy teardown races can cause false negatives.
-				// Effective test duration = gracePeriodSeconds - 1s.
-
+				// We stop probing 1s before the deadline to account for kubectl exec latency:
+				// on slow platforms (EKS), an exec against a terminating pod can hang for
+				// several seconds before returning NotFound, so checking the top of each
+				// iteration prevents an in-flight probe from crossing the grace boundary.
 				graceDeadline := time.Now().Add(time.Duration(gracePeriodSeconds) * time.Second)
-				for time.Now().Before(graceDeadline) {
+				for {
+					// Guard at the top: stop before starting a new probe if fewer than
+					// 1s remain, to ensure the exec completes before pod teardown.
+					if time.Until(graceDeadline) < 1*time.Second {
+						break
+					}
 					logger.Logf(t, "checking connectivity to static-server from terminating pod %s", clientPodName)
 					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
 					require.NoError(t, err)
+
+					// if err != nil {
+					// 	// OPTIONAL ESCAPE HATCH.
+					// 	// A terminating pod can disappear between loop checks. Treat NotFound as
+					// 	// a clean end to in-grace probing instead of a test failure.
+					// 	if strings.Contains(output, "Error from server (NotFound)") || strings.Contains(err.Error(), "not found") {
+					// 		logger.Logf(t, "terminating pod %s no longer exists; ending grace-period probe loop", clientPodName)
+					// 		break
+					// 	}
+					// 	require.NoError(t, err)
+					// }
 					require.Condition(t, func() bool {
 						return !strings.Contains(output, "curl: (7) Failed to connect")
 					}, fmt.Sprintf("Error: %s", output))
@@ -190,12 +208,6 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 					// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
 					// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
 
-					// Stop probing when <1s remains to avoid boundary races with pod/envoy teardown;
-					// this validates stable in-grace behavior rather than the final edge second.
-					remaining := time.Until(graceDeadline)
-					if remaining < 1*time.Second {
-						break
-					}
 					time.Sleep(1 * time.Second)
 				}
 			} else {
