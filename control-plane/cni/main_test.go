@@ -721,6 +721,53 @@ const nomadStdinData = `{
 }
 `
 
+const cni110StdinData = `{
+    "cniVersion": "1.1.0",
+	"name": "kindnet",
+	"type": "kindnet",
+    "capabilities": {
+        "testCapability": false
+    },
+    "ipam": {
+        "type": "host-local"
+    },
+    "dns": {
+        "nameservers": ["nameserver"],
+        "domain": "domain",
+        "search": ["search"],
+        "options": ["option"]
+    },
+    "prevResult": {
+        "cniversion": "1.1.0",
+        "interfaces": [
+            {
+                "name": "eth0",
+                "sandbox": "/tmp"
+            }
+        ],
+        "ips": [
+            {
+                "version": "4",
+                "address": "10.0.0.2/24",
+                "gateway": "10.0.0.1",
+                "interface": 0
+            }
+        ],
+        "routes": []
+
+    },
+    "cni_bin_dir": "/opt/cni/bin",
+    "cni_net_dir": "/etc/cni/net.d",
+    "kubeconfig": "ZZZ-consul-cni-kubeconfig",
+    "log_level": "info",
+	"cni_host_token_path":"",
+	"cni_token_path": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+	"autorotate_token": false,
+    "multus": false,
+    "name": "consul-cni",
+    "type": "consul-cni"
+}`
+
 func minimalIPTablesJSON(t *testing.T) string {
 	cfg := iptables.Config{
 		ConsulDNSIP:          "127.0.0.1",

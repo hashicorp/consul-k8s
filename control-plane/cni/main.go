@@ -163,8 +163,9 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	// Check to see if the plugin is a chained plugin.
 	if cfg.PrevResult == nil {
 		// The plugin is not chained (ie multus) so create a fake result
+		// Use the CNI version from the config to ensure compatibility
 		result = &current.Result{
-			CNIVersion: "0.3.1",
+			CNIVersion: cfg.CNIVersion,
 		}
 	} else {
 		prevResult, err := current.GetResult(cfg.PrevResult)
@@ -273,7 +274,9 @@ func cmdCheck(_ *skel.CmdArgs) error {
 func main() {
 	c := &Command{}
 	bv.BuildVersion = version.GetHumanVersion()
-	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, cniv.All, bv.BuildString("consul-cni"))
+	// Support CNI spec versions 0.1.0 through 1.1.0 to ensure compatibility with GKE 1.35.3+
+	supportedVersions := cniv.PluginSupports("0.1.0", "0.2.0", "0.3.0", "0.3.1", "0.4.0", "1.0.0", "1.1.0")
+	skel.PluginMain(c.cmdAdd, cmdCheck, cmdDel, supportedVersions, bv.BuildString("consul-cni"))
 }
 
 func resolveKubeconfigPath(dir, base string) (string, error) {
