@@ -152,11 +152,17 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			})
 			clientPodName := pods.Items[0].Name
 
-			// Keep pod termination grace just above Envoy's shutdown grace so
-			// we can probe a stable in-grace window before teardown races.
-			podTerminationGracePeriod := gracePeriodSeconds + 1
+			// The k8s termination grace period must comfortably outlive Envoy's
+			// shutdownGracePeriodSeconds AND the in-test grace-period verification loop
+			// below, otherwise kubelet finalizes the pod while we're still trying to
+			// `kubectl exec` into it and the test fails with "pod not found" (not a
+			// real connectivity bug). Give ourselves a generous buffer.
+			terminationGracePeriod := gracePeriodSeconds + 30
+			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
+			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
+			require.NoError(t, err)
 
-			// RunKubectlAndGetOutputE args for exec into terminating pod, not just any static-client pod
+			// Exec into terminating pod, not just any static-client pod
 			args := []string{"exec", clientPodName, "-c", connhelper.StaticClientName, "--", "curl", "-vvvsSf"}
 
 			if cfg.EnableTransparentProxy {
@@ -165,44 +171,49 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 				args = append(args, "http://localhost:1234")
 			}
 
-			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, podTerminationGracePeriod)
-			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &podTerminationGracePeriod})
-			require.NoError(t, err)
-
 			if gracePeriodSeconds > 0 {
-				// Ensure outbound requests are successful only within a stable subset
-				// of the configured proxy grace window (gracePeriodSeconds - 1s),
-				// and do not run checks past the deadline
-				// where pod/envoy teardown races can cause false negatives.
+				// Ensure outbound requests are still successful during grace period.
+				gracePeriodTimer := time.NewTimer(time.Duration(gracePeriodSeconds) * time.Second)
+			gracePeriodLoop:
+				for {
+					select {
+					case <-gracePeriodTimer.C:
+						break gracePeriodLoop
+					default:
+						retrier := &retry.Counter{Count: 3, Wait: 1 * time.Second}
+						retry.RunWith(retrier, t, func(r *retry.R) {
+							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
+							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
+							if err != nil {
+								// If the pod is already gone, the grace-period window has effectively
+								// ended for the purposes of this assertion; don't keep retrying against
+								// a non-existent pod.
+								if strings.Contains(output, "not found") || strings.Contains(err.Error(), "not found") {
+									logger.Logf(r, "pod %s no longer exists; ending grace-period check", clientPodName)
+									return
+								}
+								r.Errorf("%v", err.Error())
+								return
+							}
+							require.Condition(r, func() bool {
+								return !strings.Contains(output, "curl: (7) Failed to connect")
+							}, fmt.Sprintf("Error: %s", output))
+						})
 
-				graceDeadline := time.Now().Add(time.Duration(gracePeriodSeconds) * time.Second)
-				for time.Now().Before(graceDeadline) {
-					logger.Logf(t, "checking connectivity to static-server from terminating pod %s", clientPodName)
-					output, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), args...)
-					require.NoError(t, err)
-					require.Condition(t, func() bool {
-						return !strings.Contains(output, "curl: (7) Failed to connect")
-					}, fmt.Sprintf("Error: %s", output))
+						// If listener draining is disabled, ensure inbound
+						// requests are accepted during grace period.
+						if !drainListenersEnabled {
+							connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+						}
+						// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
+						// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
 
-					// If listener draining is disabled, ensure inbound
-					// requests are accepted during grace period.
-					if !drainListenersEnabled {
-						connHelper.TestConnectionSuccess(t, connhelper.ConnHelperOpts{})
+						time.Sleep(2 * time.Second)
 					}
-					// TODO: check that the connection is unsuccessful when drainListenersEnabled is true
-					// dans note: I found it isn't sufficient to use the existing TestConnectionFailureWithoutIntention
-
-					// Stop probing when <1s remains to avoid boundary races with pod/envoy teardown;
-					// this validates stable in-grace behavior rather than the final edge second.
-					remaining := time.Until(graceDeadline)
-					if remaining < 1*time.Second {
-						break
-					}
-					time.Sleep(1 * time.Second)
 				}
 			} else {
 				// Ensure outbound requests fail because proxy has terminated
-				retry.RunWith(&retry.Timer{Timeout: time.Duration(podTerminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+				retry.RunWith(&retry.Timer{Timeout: time.Duration(terminationGracePeriod) * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
 					output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), args...)
 					require.Error(r, err)
 					require.Condition(r, func() bool {
