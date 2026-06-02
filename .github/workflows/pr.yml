@@ -27,7 +27,7 @@ jobs:
         # TODO: change ref to main after testing
         ref: abhishek/eks-cleanup
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.sha }}"}'
+        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}"}'
 
   # conditional-skip:
   #   uses: ./.github/workflows/reusable-conditional-skip.yml
