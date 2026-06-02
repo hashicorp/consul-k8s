@@ -15,7 +15,7 @@ replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha
 require (
 	github.com/armon/go-metrics v0.4.1
 	github.com/cenkalti/backoff v2.2.1+incompatible
-	github.com/containernetworking/cni v1.1.2
+	github.com/containernetworking/cni v1.3.0
 	github.com/deckarep/golang-set v1.7.1
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/evanphx/json-patch v5.6.0+incompatible
