@@ -4,7 +4,7 @@
 terraform {
   required_providers {
     azurerm = {
-      version = "3.40.0"
+      version = "~> 4.33.0"
     }
     helm = {
       source  = "hashicorp/helm"
