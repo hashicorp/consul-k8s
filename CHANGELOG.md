@@ -5,6 +5,18 @@ SECURITY:
 * Added input length validation on "consul.hashicorp.com/service-name" annotation [[GH-5107](https://github.com/hashicorp/consul-k8s/issues/5107)]
 * go: upgrade go version to 1.25.7 [[GH-5113](https://github.com/hashicorp/consul-k8s/issues/5113)]
 * docker: upgrade hashicorp/go-discover version to c9daf450621856f81604e3495af612b95db907d5 [[GH-5117](https://github.com/hashicorp/consul-k8s/issues/5117)]
+## 1.8.13 (May 24, 2026)
+
+SECURITY:
+
+* Upgrade to use `x/net` 0.55.0.
+This resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918) [[GH-5308](https://github.com/hashicorp/consul-k8s/issues/5308)]
+
+BUG FIXES:
+
+* connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check queried `/v1/agent/version` with a non-pointer map, so the response was never decoded and both FIPS warnings fired on every pod startup. The fix decodes the endpoint response correctly and checks the returned `FIPS` value. [[GH-5252](https://github.com/hashicorp/consul-k8s/issues/5252)]
+
+
 ## 1.8.12 (April 26, 2026)
 
 
