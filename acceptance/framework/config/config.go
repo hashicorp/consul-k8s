@@ -93,6 +93,7 @@ type TestConfig struct {
 	EnvoyImage             string
 	ConsulCollectorImage   string
 
+	HCPResourceID         string
 	VaultHelmChartVersion string
 	VaultServerVersion    string
 
@@ -108,7 +109,6 @@ type TestConfig struct {
 	UseOpenshift    bool
 
 	helmChartPath string
-	DualStack     bool
 }
 
 // HelmValuesFromConfig returns a map of Helm values
