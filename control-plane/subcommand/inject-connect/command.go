@@ -414,8 +414,6 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
-	healthProbeBindAddress := constants.Getv4orv6Str("0.0.0.0:9445", "[::]:9445")
-	metricsServiceBindAddress := constants.Getv4orv6Str("0.0.0.0:9444", "[::]:9444")
 	cfg := ctrl.GetConfigOrDie()
 	cfg.Timeout = 90 * time.Second
 	cfg.QPS = 50
@@ -431,9 +429,9 @@ func (c *Command) Run(args []string) int {
 		RenewDeadline:           ptr.To(60 * time.Second),
 		RetryPeriod:             ptr.To(15 * time.Second),
 		Metrics: metricsserver.Options{
-			BindAddress: metricsServiceBindAddress,
+			BindAddress: "0.0.0.0:9444",
 		},
-		HealthProbeBindAddress: healthProbeBindAddress,
+		HealthProbeBindAddress: "0.0.0.0:9445",
 		WebhookServer: webhook.NewServer(webhook.Options{
 			CertDir: c.flagCertDir,
 			Host:    listenSplits[0],

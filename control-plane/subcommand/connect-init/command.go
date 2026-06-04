@@ -205,7 +205,7 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagRedirectTrafficConfig != "" {
 		c.watcher.Stop() // Explicitly stop the watcher so that ACLs are cleaned up before we apply re-direction.
-		err = c.applyTrafficRedirectionRules(proxyService, constants.IsDualStack())
+		err = c.applyTrafficRedirectionRules(proxyService)
 		if err != nil {
 			c.logger.Error("error applying traffic redirection rules", "err", err)
 			return 1
@@ -385,7 +385,7 @@ type trafficRedirectProxyConfig struct {
 	StatsBindAddr string `mapstructure:"envoy_stats_bind_addr"`
 }
 
-func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack bool) error {
+func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService) error {
 	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.iptablesConfig)
 	if err != nil {
 		return err
@@ -418,7 +418,7 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 	}
 
 	// Configure any relevant information from the proxy service
-	err = iptables.Setup(c.iptablesConfig, dualStack)
+	err = iptables.Setup(c.iptablesConfig)
 	if err != nil {
 		return err
 	}

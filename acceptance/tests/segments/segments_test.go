@@ -41,9 +41,6 @@ func TestSegments_MeshWithAgentfulClients(t *testing.T) {
 
 			releaseName := helpers.RandomName()
 			addr := "0.0.0.0"
-			if cfg.DualStack {
-				addr = "::"
-			}
 			helmValues := map[string]string{
 				"connectInject.enabled": "true",
 
@@ -106,9 +103,6 @@ func TestSegments_MeshWithAgentfulClientsMultiCluster(t *testing.T) {
 			releaseName := helpers.RandomName()
 
 			addr := "0.0.0.0"
-			if cfg.DualStack {
-				addr = "::"
-			}
 			// deploy server cluster
 			serverClusterContext := suite.Environment().DefaultContext(t)
 			serverClusterHelmValues := map[string]string{

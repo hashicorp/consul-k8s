@@ -5,8 +5,6 @@ package endpoints
 
 import (
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
@@ -58,7 +56,7 @@ func (r *Controller) consulClientCfgForNodeAgent(serverClient *api.Client, pod c
 	if r.consulClientHttpPort != 0 {
 		consulClientHttpPort = r.consulClientHttpPort
 	}
-	ccCfg.Address = net.JoinHostPort(pod.Status.HostIP, strconv.Itoa(consulClientHttpPort))
+	ccCfg.Address = fmt.Sprintf("%s:%d", pod.Status.HostIP, consulClientHttpPort)
 
 	ccCfg.Token = state.Token
 

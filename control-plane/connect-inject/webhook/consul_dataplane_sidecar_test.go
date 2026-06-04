@@ -20,13 +20,11 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
-	"github.com/hashicorp/consul/agent/netutil"
 )
 
 const nodeName = "test-node"
 
 func TestHandlerConsulDataplaneSidecar(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		webhookSetupFunc     func(w *MeshWebhook)
 		additionalExpCmdArgs string
@@ -188,7 +186,7 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 
 			container, err := w.consulDataplaneSidecar(testNS, pod, multiPortInfo{})
 			require.NoError(t, err)
-			expCmd := "-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
+			expCmd := "-addresses 1.1.1.1 -grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort) +
 				" -proxy-service-id-path=/consul/connect-inject/proxyid " +
 				"-log-level=" + w.LogLevel + " -log-json=" + strconv.FormatBool(w.LogJSON) + " -envoy-concurrency=0" + c.additionalExpCmdArgs
 			require.Equal(t, expCmd, strings.Join(container.Args, " "))
@@ -243,7 +241,6 @@ func TestHandlerConsulDataplaneSidecar(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		annotations map[string]string
 		expFlags    string
@@ -308,7 +305,6 @@ func TestHandlerConsulDataplaneSidecar_Concurrency(t *testing.T) {
 
 // Test that we pass the dns proxy flag to dataplane correctly.
 func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	// We only want the flag passed when DNS and tproxy are both enabled. DNS/tproxy can
 	// both be enabled/disabled with annotations/labels on the pod and namespace and then globally
 	// through the helm chart. To test this we use an outer loop with the possible DNS settings and then
@@ -422,7 +418,6 @@ func TestHandlerConsulDataplaneSidecar_DNSProxy(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	tests := map[string]struct {
 		changeHook        func(*MeshWebhook)
 		changePod         func(*corev1.Pod)
@@ -563,7 +558,6 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	h := MeshWebhook{
 		ConsulConfig:  &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
 		ConsulAddress: "1.1.1.1",
@@ -671,7 +665,6 @@ func TestHandlerConsulDataplaneSidecar_ProxyHealthCheck_Multiport(t *testing.T) 
 }
 
 func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	for _, aclsEnabled := range []bool{false, true} {
 		name := fmt.Sprintf("acls enabled: %t", aclsEnabled)
 		t.Run(name, func(t *testing.T) {
@@ -734,17 +727,17 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 				},
 			}
 			expArgs := []string{
-				"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
+				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
-				"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
+				"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
 					"-log-level=info -log-json=false -envoy-concurrency=0 -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 			}
 			if aclsEnabled {
 				expArgs = []string{
-					"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
+					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token -tls-disabled -envoy-admin-bind-port=19000 -graceful-port=20600 -telemetry-prom-scrape-path=/metrics -- --base-id 0",
-					"-addresses 1.1.1.1 -envoy-admin-bind-address=127.0.0.1 -consul-dns-bind-addr=127.0.0.1 -xds-bind-addr=127.0.0.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
+					"-addresses 1.1.1.1 -grpc-port=8502 -proxy-service-id-path=/consul/connect-inject/proxyid-web-admin " +
 						"-log-level=info -log-json=false -envoy-concurrency=0 -credential-type=login -login-auth-method=test-auth-method " +
 						"-login-bearer-token-path=/consul/serviceaccount-web-admin/token -tls-disabled -envoy-admin-bind-port=19001 -graceful-port=20601 -telemetry-prom-scrape-path=/metrics -- --base-id 1",
 				}
@@ -800,7 +793,6 @@ func TestHandlerConsulDataplaneSidecar_Multiport(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		tproxyEnabled      bool
 		openShiftEnabled   bool
@@ -921,7 +913,6 @@ func TestHandlerConsulDataplaneSidecar_withSecurityContext(t *testing.T) {
 // Test that if the user specifies a pod security context with the same uid as `sidecarUserAndGroupID` that we return
 // an error to the meshWebhook.
 func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	require := require.New(t)
 	w := MeshWebhook{
 		ConsulConfig: &consul.Config{HTTPPort: 8500, GRPCPort: 8502},
@@ -949,7 +940,6 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicatePodSecurityContextUID(t
 // return an error to the meshWebhook. If a container using the consul-dataplane image has the same uid, we don't return an error
 // because in multiport pod there can be multiple consul-dataplane sidecars.
 func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContextUID(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name          string
 		pod           corev1.Pod
@@ -1034,7 +1024,6 @@ func TestHandlerConsulDataplaneSidecar_FailsWithDuplicateContainerSecurityContex
 // or via pod annotations. When arguments are passed in both ways, the
 // arguments set via pod annotations are used.
 func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name              string
 		envoyExtraArgs    string
@@ -1102,7 +1091,6 @@ func TestHandlerConsulDataplaneSidecar_EnvoyExtraArgs(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name                          string
 		pod                           corev1.Pod
@@ -1167,7 +1155,6 @@ func TestHandlerConsulDataplaneSidecar_UserVolumeMounts(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	mem1 := resource.MustParse("100Mi")
 	mem2 := resource.MustParse("200Mi")
 	cpu1 := resource.MustParse("100m")
@@ -1348,7 +1335,6 @@ func TestHandlerConsulDataplaneSidecar_Resources(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := []struct {
 		name       string
 		pod        corev1.Pod
@@ -1525,7 +1511,6 @@ func TestHandlerConsulDataplaneSidecar_Metrics(t *testing.T) {
 }
 
 func TestHandlerConsulDataplaneSidecar_Lifecycle(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	gracefulShutdownSeconds := 10
 	gracefulStartupSeconds := 10
 	gracefulPort := "20307"
@@ -1695,7 +1680,6 @@ func boolPtr(b bool) *bool {
 }
 
 func TestHandlerConsulDataplaneSidecar_LifecycleConfig(t *testing.T) {
-	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	cases := map[string]struct {
 		pod                          corev1.Pod
 		defaultProbeTimeout          int

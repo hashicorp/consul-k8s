@@ -5,9 +5,7 @@ package consul
 
 import (
 	"fmt"
-	"net"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
@@ -76,7 +74,7 @@ type Config struct {
 // of the consul-server-connection-manager.
 func NewClientFromConnMgrState(config *Config, state discovery.State) (*capi.Client, error) {
 	ipAddress := state.Address.IP
-	config.APIClientConfig.Address = net.JoinHostPort(ipAddress.String(), strconv.Itoa(config.HTTPPort))
+	config.APIClientConfig.Address = fmt.Sprintf("%s:%d", ipAddress.String(), config.HTTPPort)
 	if state.Token != "" {
 		config.APIClientConfig.Token = state.Token
 	}

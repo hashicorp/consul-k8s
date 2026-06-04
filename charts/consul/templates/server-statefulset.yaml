@@ -356,6 +356,7 @@ spec:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
           {{ template "consul.imagePullPolicy" . }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -425,6 +426,55 @@ spec:
                   name: {{ .Values.global.acls.replicationToken.secretName | quote }}
                   key: {{ .Values.global.acls.replicationToken.secretKey | quote }}
             {{- end }}
+            {{- if .Values.global.cloud.enabled}}
+            # These are mounted as secrets so that the consul server agent can use them.
+            # - the hcp-go-sdk in consul agent will already look for HCP_CLIENT_ID, HCP_CLIENT_SECRET, HCP_AUTH_URL,
+            #   HCP_SCADA_ADDRESS, and HCP_API_HOST.  so nothing more needs to be done.
+            # - HCP_RESOURCE_ID is created for use in the
+            #   `-hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"` logic in the command below.
+            {{- if .Values.global.cloud.clientId.secretName }}
+            - name: HCP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.clientId.secretName }}
+                  key: {{ .Values.global.cloud.clientId.secretKey }}
+            {{- end }}
+            {{- if .Values.global.cloud.clientSecret.secretName }}
+            - name: HCP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.clientSecret.secretName }}
+                  key: {{ .Values.global.cloud.clientSecret.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.resourceId.secretName }}
+            - name: HCP_RESOURCE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.resourceId.secretName }}
+                  key: {{ .Values.global.cloud.resourceId.secretKey }}
+            {{- end }}
+            {{- if .Values.global.cloud.authUrl.secretName }}
+            - name: HCP_AUTH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.authUrl.secretName }}
+                  key: {{ .Values.global.cloud.authUrl.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.apiHost.secretName }}
+            - name: HCP_API_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.apiHost.secretName }}
+                  key: {{ .Values.global.cloud.apiHost.secretKey }}
+            {{- end}}
+            {{- if .Values.global.cloud.scadaAddress.secretName }}
+            - name: HCP_SCADA_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.cloud.scadaAddress.secretName }}
+                  key: {{ .Values.global.cloud.scadaAddress.secretKey }}
+            {{- end}}
+            {{- end }}
             {{- if .Values.global.trustedCAs }}
             - name: SSL_CERT_DIR
               value: "/etc/ssl/certs:/trusted-cas"
@@ -475,6 +525,9 @@ spec:
                 {{- end }}
                 {{- end }}
                 -config-dir=/consul/extra-config \
+                {{- if and .Values.global.cloud.enabled .Values.global.cloud.resourceId.secretName }}
+                -hcl="cloud { resource_id = \"${HCP_RESOURCE_ID}\" }"
+                {{- end }}
                 
                 {{- if .Values.global.experiments }}
                 {{- $commaSeparatedValues := "" }}
@@ -592,18 +645,9 @@ spec:
                 - |
                   {{- if .Values.global.tls.enabled }}
                   curl -k \
-                    {{- if .Values.global.dualStack.enabled }}
-                    https://[::1]:8501/v1/status/leader \
-                    {{- else }}
                     https://127.0.0.1:8501/v1/status/leader \
-                    {{- end }}
                   {{- else }}
-                  curl \
-                    {{- if .Values.global.dualStack.enabled }}
-                    http://[::1]:8500/v1/status/leader \
-                    {{- else }}
-                    http://127.0.0.1:8500/v1/status/leader \
-                    {{- end }}
+                  curl http://127.0.0.1:8500/v1/status/leader \
                   {{- end }}
                   2>/dev/null | grep -E '".+"'
             failureThreshold: 2
@@ -639,11 +683,7 @@ spec:
             {{- end }}
             {{- if .Values.global.tls.enabled }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.enabled }}
-              value: https://[::1]:8501
-              {{- else }}
               value: https://127.0.0.1:8501
-              {{- end }}
             - name: CONSUL_CACERT
               {{- if .Values.global.secretsBackend.vault.enabled }}
               value: /vault/secrets/serverca.crt
@@ -652,11 +692,7 @@ spec:
               {{- end }}
             {{- else }}
             - name: CONSUL_HTTP_ADDR
-              {{- if .Values.global.dualStack.enabled }}
-              value: http://[::1]:8500
-              {{- else }}
               value: http://127.0.0.1:8500
-              {{- end }}
             {{- end }}
             {{- if (and .Values.global.enterpriseLicense.secretName .Values.global.enterpriseLicense.secretKey .Values.global.enterpriseLicense.enableLicenseAutoload (not .Values.global.acls.manageSystemACLs)) }}
             - name: CONSUL_LICENSE_PATH

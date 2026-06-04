@@ -3,8 +3,6 @@
 
 package constants
 
-import "os"
-
 const (
 	// LegacyConsulCAFile is the location of the Consul CA file inside the injected pod.
 	// This is used with the V1 API.
@@ -81,11 +79,10 @@ const (
 	// MeshV2VolumePath is the name of the volume that contains the proxy ID.
 	MeshV2VolumePath = "/consul/mesh-inject"
 
-	UseTLSEnvVar          = "CONSUL_USE_TLS"
-	CACertFileEnvVar      = "CONSUL_CACERT_FILE"
-	CACertPEMEnvVar       = "CONSUL_CACERT_PEM"
-	TLSServerNameEnvVar   = "CONSUL_TLS_SERVER_NAME"
-	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
+	UseTLSEnvVar        = "CONSUL_USE_TLS"
+	CACertFileEnvVar    = "CONSUL_CACERT_FILE"
+	CACertPEMEnvVar     = "CONSUL_CACERT_PEM"
+	TLSServerNameEnvVar = "CONSUL_TLS_SERVER_NAME"
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace
@@ -116,16 +113,4 @@ func GetNormalizedConsulPeer(peer string) string {
 	}
 
 	return peer
-}
-
-// IsDualStack checks ConsulDualStackEnvVar is set to true for dual stack.
-func IsDualStack() bool {
-	return os.Getenv(ConsulDualStackEnvVar) == "true"
-}
-
-func Getv4orv6Str(v4, v6 string) string {
-	if IsDualStack() {
-		return v6
-	}
-	return v4
 }

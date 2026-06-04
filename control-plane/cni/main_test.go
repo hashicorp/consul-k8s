@@ -39,16 +39,12 @@ func (f *fakeIptablesProvider) AddRule(name string, args ...string) {
 	f.rules = append(f.rules, strings.Join(rule, " "))
 }
 
-func (f *fakeIptablesProvider) ApplyRules(command string) error {
+func (f *fakeIptablesProvider) ApplyRules() error {
 	return nil
 }
 
 func (f *fakeIptablesProvider) Rules() []string {
 	return f.rules
-}
-
-func (f *fakeIptablesProvider) ClearAllRules() {
-	f.rules = nil
 }
 
 func Test_cmdAdd(t *testing.T) {

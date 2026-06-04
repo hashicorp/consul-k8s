@@ -12,7 +12,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -191,7 +190,7 @@ func (c *EnvoyConfig) UnmarshalJSON(b []byte) error {
 	for _, clusterStatus := range root.Clusters.ClusterStatuses {
 		var addresses []string
 		for _, status := range clusterStatus.HostStatuses {
-			address := net.JoinHostPort(status.Address.SocketAddress.Address, strconv.Itoa(int(status.Address.SocketAddress.PortValue)))
+			address := fmt.Sprintf("%s:%d", status.Address.SocketAddress.Address, int(status.Address.SocketAddress.PortValue))
 			addresses = append(addresses, address)
 			endpointMapping[address] = clusterStatus.Name
 		}
@@ -257,7 +256,7 @@ func parseClusters(rawCfg map[string]interface{}, clusterMapping map[string][]st
 			for _, lbEndpoint := range endpoint.LBEndpoints {
 				// Only add endpoints defined by IP addresses.
 				if addr := lbEndpoint.Endpoint.Address.SocketAddress.Address; net.ParseIP(addr) != nil {
-					endpoints = append(endpoints, net.JoinHostPort(addr, strconv.Itoa(int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue))))
+					endpoints = append(endpoints, fmt.Sprintf("%s:%d", addr, int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue)))
 				}
 			}
 		}
@@ -306,7 +305,7 @@ func parseEndpoints(rawCfg map[string]interface{}, endpointMapping map[string]st
 	for _, endpointConfig := range append(endpointsCD.StaticEndpointConfigs, endpointsCD.DynamicEndpointConfigs...) {
 		for _, endpoint := range endpointConfig.EndpointConfig.Endpoints {
 			for _, lbEndpoint := range endpoint.LBEndpoints {
-				address := net.JoinHostPort(lbEndpoint.Endpoint.Address.SocketAddress.Address, strconv.Itoa(int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue)))
+				address := fmt.Sprintf("%s:%d", lbEndpoint.Endpoint.Address.SocketAddress.Address, int(lbEndpoint.Endpoint.Address.SocketAddress.PortValue))
 
 				cluster := endpointConfig.EndpointConfig.Name
 				// Fill in cluster from EDS endpoint mapping.
@@ -347,8 +346,7 @@ func parseListeners(rawCfg map[string]interface{}) ([]Listener, error) {
 	listenersConfig = append(listenersConfig, listenersCD.StaticListeners...)
 
 	for _, listener := range listenersConfig {
-		address := net.JoinHostPort(listener.Listener.Address.SocketAddress.Address, strconv.Itoa(int(listener.Listener.Address.SocketAddress.PortValue)))
-
+		address := fmt.Sprintf("%s:%d", listener.Listener.Address.SocketAddress.Address, int(listener.Listener.Address.SocketAddress.PortValue))
 		// Format the filter chain configs into something more readable.
 		filterChain := []FilterChain{}
 		for _, chain := range listener.Listener.FilterChains {

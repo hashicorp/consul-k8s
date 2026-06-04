@@ -155,15 +155,8 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 	proxyIDFileName := "/consul/connect-inject/proxyid"
 	envoyConcurrency := defaultEnvoyProxyConcurrency
 
-	envoyAdminBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
-	xdsBindAddress := constants.Getv4orv6Str("127.0.0.1", "::1")
-	consulDNSBindAddress := constants.Getv4orv6Str(consulDataplaneDNSBindHost, ipv6ConsulDataplaneDNSBindHost)
-
 	args := []string{
 		"-addresses", config.ConsulConfig.Address,
-		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
-		"-consul-dns-bind-addr=" + consulDNSBindAddress,
-		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + config.LogLevel,

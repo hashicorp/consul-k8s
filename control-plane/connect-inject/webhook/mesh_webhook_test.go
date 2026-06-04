@@ -282,10 +282,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/spec/containers/0/env",
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 
@@ -371,10 +367,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 
@@ -433,10 +425,6 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -516,10 +504,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 		{
@@ -583,10 +567,6 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -676,10 +656,6 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -826,14 +802,10 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "replace",
 					Path:      "/spec/containers/0/readinessProbe/httpGet/port",
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 		{
-			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref, lifecycle enabled",
+			"multiport pod kube < 1.24 with AuthMethod, serviceaccount has secret ref",
 			MeshWebhook{
 				Log:                   logrtest.New(t),
 				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
@@ -841,7 +813,6 @@ func TestHandlerHandle(t *testing.T) {
 				decoder:               decoder,
 				Clientset:             testClientWithServiceAccountAndSecretRefs(),
 				AuthMethod:            "k8s",
-				LifecycleConfig:       lifecycle.Config{DefaultEnableProxyLifecycle: true},
 			},
 			admission.Request{
 				AdmissionRequest: admissionv1.AdmissionRequest{
@@ -858,31 +829,6 @@ func TestHandlerHandle(t *testing.T) {
 			},
 			"",
 			[]jsonpatch.Operation{
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/env",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/volumeMounts",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/readinessProbe",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/securityContext",
-				},
-				{
-					Operation: "replace",
-					Path:      "/spec/containers/0/name",
-				},
-				{
-					Operation: "add",
-					Path:      "/spec/containers/0/args",
-				},
-
 				{
 					Operation: "add",
 					Path:      "/spec/volumes",
@@ -918,10 +864,6 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/labels",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -986,10 +928,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 		{
@@ -1079,10 +1017,6 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/labels",
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 		{
@@ -1140,6 +1074,7 @@ func TestHandlerHandle(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.KeyTransparentProxyStatus),
 				},
+
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationOriginalPod),
@@ -1159,10 +1094,6 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/spec/dnsConfig",
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 			},
 		},
@@ -1231,10 +1162,6 @@ func TestHandlerHandle(t *testing.T) {
 				{
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
-				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
 				},
 				// Note: no DNS policy/config additions.
 			},
@@ -1415,10 +1342,6 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 					Operation: "add",
 					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationConsulK8sVersion),
 				},
-				{
-					Operation: "add",
-					Path:      "/metadata/annotations/" + escapeJSONPointer(constants.AnnotationDualStack),
-				},
 			},
 		},
 	}
@@ -1448,7 +1371,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 						value := actual[i].Value.([]any)
 						valueMap := value[0].(map[string]any)
 						envs := valueMap["env"].([]any)
-						redirectEnv := envs[9].(map[string]any)
+						redirectEnv := envs[8].(map[string]any)
 						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
 						iptablesJson := redirectEnv["value"].(string)
 
@@ -1497,7 +1420,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			"empty",
 			&corev1.Pod{},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1519,7 +1442,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1548,7 +1471,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				"consul.hashicorp.com/connect-service":     "foo",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1578,7 +1501,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "http",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1606,7 +1529,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "8080",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
