@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -191,7 +191,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			var gatewayAddress string
 			counter := &retry.Counter{Count: 120, Wait: 2 * time.Second}
 			retry.RunWith(counter, t, func(r *retry.R) {
-				var gateway gwv1beta1.Gateway
+				var gateway gwv1.Gateway
 				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 				require.NoError(r, err)
 
@@ -227,7 +227,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 			// so we can run assertions on the routes and the other objects
 
 			// gateway class checks
-			var gatewayClass gwv1beta1.GatewayClass
+			var gatewayClass gwv1.GatewayClass
 			retry.RunWith(&retry.Counter{Count: 40, Wait: 5 * time.Second}, t, func(r *retry.R) {
 				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway-class"}, &gatewayClass)
 				require.NoError(r, err)
@@ -237,7 +237,7 @@ func TestAPIGateway_Basic(t *testing.T) {
 				require.EqualValues(r, gatewayClassFinalizer, gatewayClass.Finalizers[0])
 
 				// http route checks
-				var httproute gwv1beta1.HTTPRoute
+				var httproute gwv1.HTTPRoute
 				err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "http-route", Namespace: "default"}, &httproute)
 				require.NoError(r, err)
 
@@ -467,17 +467,17 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	// the reconcile loop to run (hence the 2m timeout here).
 	var (
 		gatewayAddress                string
-		gatewayClass                  gwv1beta1.GatewayClass
-		httpRoute                     gwv1beta1.HTTPRoute
-		httpRouteAuth                 gwv1beta1.HTTPRoute
-		httpRouteAuth2                gwv1beta1.HTTPRoute
-		httpRouteNoAuthOnAuthListener gwv1beta1.HTTPRoute
-		httpRouteInvalid              gwv1beta1.HTTPRoute
+		gatewayClass                  gwv1.GatewayClass
+		httpRoute                     gwv1.HTTPRoute
+		httpRouteAuth                 gwv1.HTTPRoute
+		httpRouteAuth2                gwv1.HTTPRoute
+		httpRouteNoAuthOnAuthListener gwv1.HTTPRoute
+		httpRouteInvalid              gwv1.HTTPRoute
 	)
 
 	counter := &retry.Counter{Count: 60, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
 		require.NoError(r, err)
 

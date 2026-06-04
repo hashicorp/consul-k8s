@@ -1181,7 +1181,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"namespace", Partition:"", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both namespace and peer cannot be specified.`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.upstreamConfig.overrides[0]: Invalid value: {"name":"service","namespace":"namespace","peer":"peer","meshGateway":{}}: both namespace and peer cannot be specified.`,
 		},
 		"upstreamConfig.overrides.partition and peer": {
 			input: &ServiceDefaults{
@@ -1200,7 +1200,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.overrides[0]: Invalid value: v1alpha1.Upstream{Name:"service", Namespace:"", Partition:"upstream", Peer:"peer", EnvoyListenerJSON:"", EnvoyClusterJSON:"", Protocol:"", ConnectTimeoutMs:0, Limits:(*v1alpha1.UpstreamLimits)(nil), PassiveHealthCheck:(*v1alpha1.PassiveHealthCheck)(nil), MeshGateway:v1alpha1.MeshGateway{Mode:""}}: both partition and peer cannot be specified., spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.upstreamConfig.overrides[0]: Invalid value: {"name":"service","partition":"upstream","peer":"peer","meshGateway":{}}: both partition and peer cannot be specified., spec.upstreamConfig.overrides[0].partition: Invalid value: "upstream": Consul Enterprise Admin Partitions must be enabled to set upstream.partition]`,
 		},
 		"multi-error": {
 			input: &ServiceDefaults{
@@ -1290,7 +1290,7 @@ func TestServiceDefaults_Validate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.destination.port: Invalid value: 0x0: invalid port number`,
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.destination.port: Invalid value: 0: invalid port number`,
 		},
 		"MaxInboundConnections (invalid value)": {
 			input: &ServiceDefaults{

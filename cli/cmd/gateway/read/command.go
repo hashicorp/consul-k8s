@@ -12,8 +12,8 @@ import (
 	helmcli "helm.sh/helm/v3/pkg/cli"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 	"sigs.k8s.io/yaml"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -120,13 +120,13 @@ func (c *Command) Run(args []string) int {
 
 func (c *Command) fetchCRDs() error {
 	// Fetch Gateway
-	var gateway gwv1beta1.Gateway
+	var gateway gwv1.Gateway
 	if err := c.kubernetes.Get(context.Background(), client.ObjectKey{Namespace: c.flagGatewayNamespace, Name: c.gatewayName}, &gateway); err != nil {
 		return fmt.Errorf("error fetching Gateway CRD: %w", err)
 	}
 
 	// Fetch GatewayClass referenced by Gateway
-	var gatewayClass gwv1beta1.GatewayClass
+	var gatewayClass gwv1.GatewayClass
 	if err := c.kubernetes.Get(context.Background(), client.ObjectKey{Namespace: "", Name: string(gateway.Spec.GatewayClassName)}, &gatewayClass); err != nil {
 		return fmt.Errorf("error fetching GatewayClass CRD: %w", err)
 	}
@@ -139,7 +139,7 @@ func (c *Command) fetchCRDs() error {
 	//}
 
 	// Fetch HTTPRoutes that reference the Gateway
-	var httpRoutes gwv1beta1.HTTPRouteList
+	var httpRoutes gwv1.HTTPRouteList
 	if err := c.kubernetes.List(context.Background(), &httpRoutes); err != nil {
 		return fmt.Errorf("error fetching HTTPRoute CRDs: %w", err)
 	}
@@ -158,14 +158,14 @@ func (c *Command) fetchCRDs() error {
 	// }
 
 	gatewayWithRoutes := struct {
-		Gateway      gwv1beta1.Gateway      `json:"gateway"`
-		GatewayClass gwv1beta1.GatewayClass `json:"gatewayClass"`
-		HTTPRoutes   []gwv1beta1.HTTPRoute  `json:"httpRoutes"`
-		TCPRoutes    []gwv1alpha2.TCPRoute  `json:"tcpRoutes"`
+		Gateway      gwv1.Gateway          `json:"gateway"`
+		GatewayClass gwv1.GatewayClass     `json:"gatewayClass"`
+		HTTPRoutes   []gwv1.HTTPRoute      `json:"httpRoutes"`
+		TCPRoutes    []gwv1alpha2.TCPRoute `json:"tcpRoutes"`
 	}{
 		Gateway:      gateway,
 		GatewayClass: gatewayClass,
-		HTTPRoutes:   make([]gwv1beta1.HTTPRoute, 0, len(httpRoutes.Items)),
+		HTTPRoutes:   make([]gwv1.HTTPRoute, 0, len(httpRoutes.Items)),
 		TCPRoutes:    make([]gwv1alpha2.TCPRoute, 0, len(tcpRoutes.Items)),
 	}
 
@@ -283,8 +283,8 @@ func (c *Command) initKubernetes() (err error) {
 		}
 		// FUTURE Fix dependency discrepancies between modules in this repo so that this scheme can be added (see above)
 		//_ = v1alpha1.AddToScheme(c.kubernetes.Scheme())
-		_ = gwv1alpha2.AddToScheme(c.kubernetes.Scheme())
-		_ = gwv1beta1.AddToScheme(c.kubernetes.Scheme())
+		_ = gwv1alpha2.Install(c.kubernetes.Scheme())
+		_ = gwv1.Install(c.kubernetes.Scheme())
 	}
 
 	// If no namespace was specified, use the one from the kube context

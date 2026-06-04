@@ -23,7 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -66,12 +67,12 @@ var (
 		copyAnnotationKey:     "copy-this-annotation-value",
 	}
 
-	listeners = []gwv1beta1.Listener{
+	listeners = []gwv1.Listener{
 		{
 			Name:     "Listener 1",
 			Port:     8080,
 			Protocol: "TCP",
-			Hostname: common.PointerTo(gwv1beta1.Hostname("example.com")),
+			Hostname: common.PointerTo(gwv1.Hostname("example.com")),
 		},
 		{
 			Name:     "Listener 2",
@@ -82,13 +83,13 @@ var (
 			Name:     "Listener 3",
 			Port:     8080,
 			Protocol: "TCP",
-			Hostname: common.PointerTo(gwv1beta1.Hostname("example.net")),
+			Hostname: common.PointerTo(gwv1.Hostname("example.net")),
 		},
 	}
 )
 
 type testCase struct {
-	gateway            gwv1beta1.Gateway
+	gateway            gwv1.Gateway
 	gatewayClassConfig v1alpha1.GatewayClassConfig
 	helmConfig         common.HelmConfig
 
@@ -115,12 +116,12 @@ func TestUpsert(t *testing.T) {
 
 	cases := map[string]testCase{
 		"create a new gateway deployment with only Deployment": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -163,13 +164,13 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway with service and map privileged ports correctly": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name:     "Listener 1",
 							Port:     80,
@@ -233,12 +234,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway deployment with managed Service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -287,12 +288,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway deployment with managed Service and ACLs": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -351,12 +352,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway where the GatewayClassConfig has a default number of instances greater than the max on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -389,12 +390,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway where the GatewayClassConfig has a default number of instances lesser than the min on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -427,12 +428,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"update a gateway, adding a listener to a service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -516,13 +517,13 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"update a gateway, removing a listener from a service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						listeners[0],
 					},
 				},
@@ -606,12 +607,12 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"updating a gateway deployment respects the number of replicas a user has set": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -648,13 +649,13 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"updating a gateway deployment respects the labels and annotations a user has set": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        name,
 					Namespace:   namespace,
 					Annotations: copyAnnotations,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -718,13 +719,13 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"updating a gateway that has copy-annotations and labels doesn't panic if another controller has removed them all": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        name,
 					Namespace:   namespace,
 					Annotations: copyAnnotations,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -788,12 +789,12 @@ func TestUpsert(t *testing.T) {
 			ignoreTimestampOnService: true,
 		},
 		"update a gateway deployment by scaling it when no min or max number of instances is defined on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -830,12 +831,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"update a gateway deployment by scaling it lower than the min number of instances on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -872,12 +873,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"update a gateway deployment by scaling it higher than the max number of instances on the GatewayClassConfig": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -914,12 +915,12 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway with openshift enabled": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -976,21 +977,21 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway with TLS certificate reference in the same namespace": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name:     "Listener 1",
 							Port:     443,
 							Protocol: "TCP",
-							TLS: &gwv1beta1.GatewayTLSConfig{
-								CertificateRefs: []gwv1beta1.SecretObjectReference{
+							TLS: &gwv1.ListenerTLSConfig{
+								CertificateRefs: []gwv1.SecretObjectReference{
 									{
-										Namespace: common.PointerTo(gwv1beta1.Namespace(namespace)),
+										Namespace: common.PointerTo(gwv1.Namespace(namespace)),
 										Name:      "tls-cert",
 									},
 								},
@@ -1053,21 +1054,21 @@ func TestUpsert(t *testing.T) {
 			},
 		},
 		"create a new gateway with TLS certificate reference in a different namespace": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name:     "Listener 1",
 							Port:     443,
 							Protocol: "TCP",
-							TLS: &gwv1beta1.GatewayTLSConfig{
-								CertificateRefs: []gwv1beta1.SecretObjectReference{
+							TLS: &gwv1.ListenerTLSConfig{
+								CertificateRefs: []gwv1.SecretObjectReference{
 									{
-										Namespace: common.PointerTo(gwv1beta1.Namespace("non-default")),
+										Namespace: common.PointerTo(gwv1.Namespace("non-default")),
 										Name:      "tls-cert",
 									},
 								},
@@ -1145,7 +1146,7 @@ func TestUpsert(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
@@ -1157,7 +1158,9 @@ func TestUpsert(t *testing.T) {
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil)
+			gatekeeper := New(log, client, nil, client)
+
+			fmt.Print("Calling Upsert")
 
 			err := gatekeeper.Upsert(context.Background(), tc.gateway, tc.gatewayClassConfig, tc.helmConfig)
 			require.NoError(t, err)
@@ -1171,12 +1174,12 @@ func TestDelete(t *testing.T) {
 
 	cases := map[string]testCase{
 		"delete a gateway deployment with only Deployment": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -1210,12 +1213,12 @@ func TestDelete(t *testing.T) {
 			},
 		},
 		"delete a gateway deployment with a managed Service": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -1265,12 +1268,12 @@ func TestDelete(t *testing.T) {
 			},
 		},
 		"delete a gateway deployment with managed Service and ACLs": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -1328,12 +1331,12 @@ func TestDelete(t *testing.T) {
 			},
 		},
 		"delete a gateway deployment with a Secret": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			},
@@ -1399,7 +1402,7 @@ func TestDelete(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
@@ -1410,8 +1413,9 @@ func TestDelete(t *testing.T) {
 
 			objs := append(joinResources(tc.initialResources), &tc.gateway, &tc.gatewayClassConfig)
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
+
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
-			gatekeeper := New(log, client, nil)
+			gatekeeper := New(log, client, nil, client)
 
 			err := gatekeeper.Delete(context.Background(), tc.gateway)
 			require.NoError(t, err)
@@ -1419,6 +1423,7 @@ func TestDelete(t *testing.T) {
 			require.NoError(t, validateResourcesAreDeleted(t, client, tc.initialResources))
 		})
 	}
+
 }
 
 func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
@@ -1426,14 +1431,14 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 
 	ctx := context.Background()
 	s := runtime.NewScheme()
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 	require.NoError(t, rbac.AddToScheme(s))
 	require.NoError(t, corev1.AddToScheme(s))
 	require.NoError(t, appsv1.AddToScheme(s))
 	require.NoError(t, autoscalingv2.AddToScheme(s))
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -1444,7 +1449,7 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 				AnnotationHPACPUTarget:   "70",
 			},
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			Listeners: listeners,
 		},
 	}
@@ -1472,7 +1477,7 @@ func TestUpsertUpdatesHPAAnnotations(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
 	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 
-	g := New(logrtest.New(t), client, nil)
+	g := New(logrtest.New(t), client, nil, client)
 
 	require.NoError(t, g.Upsert(ctx, gateway, gcc, helmConfig))
 
@@ -1519,14 +1524,14 @@ func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
 
 	ctx := context.Background()
 	s := runtime.NewScheme()
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 	require.NoError(t, rbac.AddToScheme(s))
 	require.NoError(t, corev1.AddToScheme(s))
 	require.NoError(t, appsv1.AddToScheme(s))
 	require.NoError(t, autoscalingv2.AddToScheme(s))
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -1537,7 +1542,7 @@ func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
 				AnnotationHPACPUTarget:   "70",
 			},
 		},
-		Spec: gwv1beta1.GatewaySpec{
+		Spec: gwv1.GatewaySpec{
 			Listeners: listeners,
 		},
 	}
@@ -1564,7 +1569,7 @@ func TestUpsertIgnoresGatewayScalingAnnotationsWhenDisabled(t *testing.T) {
 	client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &gcc).Build()
 	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 
-	g := New(logrtest.New(t), client, nil)
+	g := New(logrtest.New(t), client, nil, client)
 
 	require.NoError(t, g.Upsert(ctx, gateway, gcc, helmConfig))
 
@@ -1621,19 +1626,19 @@ func TestUpsertPreservesManualScaleWithoutScalingAnnotations(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			ctx := context.Background()
 			s := runtime.NewScheme()
-			require.NoError(t, gwv1beta1.Install(s))
+			require.NoError(t, gwv1.Install(s))
 			require.NoError(t, v1alpha1.AddToScheme(s))
 			require.NoError(t, rbac.AddToScheme(s))
 			require.NoError(t, corev1.AddToScheme(s))
 			require.NoError(t, appsv1.AddToScheme(s))
 			require.NoError(t, autoscalingv2.AddToScheme(s))
 
-			gateway := gwv1beta1.Gateway{
+			gateway := gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 				},
-				Spec: gwv1beta1.GatewaySpec{
+				Spec: gwv1.GatewaySpec{
 					Listeners: listeners,
 				},
 			}
@@ -1646,7 +1651,7 @@ func TestUpsertPreservesManualScaleWithoutScalingAnnotations(t *testing.T) {
 			client := fake.NewClientBuilder().WithScheme(s).WithObjects(&gateway, &tc.gatewayClassConfig).Build()
 			netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 
-			g := New(logrtest.New(t), client, nil)
+			g := New(logrtest.New(t), client, nil, client)
 			require.NoError(t, g.Upsert(ctx, gateway, tc.gatewayClassConfig, helmConfig))
 
 			deployment := &appsv1.Deployment{}
@@ -1698,18 +1703,61 @@ func joinResources(resources resources) (objs []client.Object) {
 	return objs
 }
 
-func validateResourcesExist(t *testing.T, client client.Client, helmConfig common.HelmConfig, resources resources, ignoreTimestampOnService bool) error {
-	t.Helper()
+func normalizeDeployment(deployment *appsv1.Deployment) {
+	deployment.TypeMeta = metav1.TypeMeta{}
+	deployment.Status = appsv1.DeploymentStatus{}
 
+}
+
+func normalizeService(s *corev1.Service, ignoreTimestamp bool) {
+	s.TypeMeta = metav1.TypeMeta{}
+	s.Status = corev1.ServiceStatus{}
+
+	if ignoreTimestamp {
+		s.CreationTimestamp = metav1.Time{}
+	}
+}
+
+func normalizeSecret(s *corev1.Secret) {
+	s.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func normalizeServiceAccount(sa *corev1.ServiceAccount) {
+	sa.TypeMeta = metav1.TypeMeta{}
+
+}
+func normalizeRole(r *rbac.Role) {
+	r.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func normalizeRoleBinding(rb *rbac.RoleBinding) {
+	rb.TypeMeta = metav1.TypeMeta{}
+
+}
+
+func validateResourcesExist(
+	t *testing.T,
+	client client.Client,
+	helmConfig common.HelmConfig,
+	resources resources,
+	ignoreTimestampOnService bool,
+) error {
+	t.Helper()
+	ctx := context.Background()
 	for _, expected := range resources.deployments {
 		actual := &appsv1.Deployment{}
-		err := client.Get(context.Background(), types.NamespacedName{
+		err := client.Get(ctx, types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
 		}, actual)
 		if err != nil {
 			return err
 		}
+
+		normalizeDeployment(expected)
+		normalizeDeployment(actual)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1785,6 +1833,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.secrets {
 		actual := &corev1.Secret{}
+		actual.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Secret"))
+		t.Logf("Actual secret received %+v", actual)
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1792,6 +1842,9 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+
+		normalizeSecret(expected)
+		normalizeSecret(actual)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1801,6 +1854,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.roles {
 		actual := &rbac.Role{}
+		actual.GetObjectKind().SetGroupVersionKind(rbac.SchemeGroupVersion.WithKind("Role"))
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1808,7 +1862,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
-
+		normalizeRole(expected)
+		normalizeRole(actual)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 
@@ -1817,6 +1872,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.roleBindings {
 		actual := &rbac.RoleBinding{}
+		actual.GetObjectKind().SetGroupVersionKind(rbac.SchemeGroupVersion.WithKind("RoleBinding"))
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1825,6 +1881,8 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 			return err
 		}
 
+		normalizeRoleBinding(expected)
+		normalizeRoleBinding(actual)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 
@@ -1840,7 +1898,12 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+		// https://github.com/kubernetes-sigs/controller-runtime/issues/3302
+		// get the gvk for actual and set it since fake client doesn't do this automatically and it causes the equality check to fail
+		//actual.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Service"))
 
+		normalizeService(expected, ignoreTimestampOnService)
+		normalizeService(actual, ignoreTimestampOnService)
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
 		actual.Spec.Selector[createdAtLabelKey] = createdAtLabelValue
@@ -1854,6 +1917,7 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 
 	for _, expected := range resources.serviceAccounts {
 		actual := &corev1.ServiceAccount{}
+		actual.GetObjectKind().SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("ServiceAccount"))
 		err := client.Get(context.Background(), types.NamespacedName{
 			Name:      expected.Name,
 			Namespace: expected.Namespace,
@@ -1861,6 +1925,9 @@ func validateResourcesExist(t *testing.T, client client.Client, helmConfig commo
 		if err != nil {
 			return err
 		}
+
+		normalizeServiceAccount(expected)
+		normalizeServiceAccount(actual)
 
 		// Patch the createdAt label
 		actual.Labels[createdAtLabelKey] = createdAtLabelValue
@@ -1950,7 +2017,7 @@ func configureDeployment(name, namespace string, labels map[string]string, repli
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "gateway.networking.k8s.io/v1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -2010,7 +2077,7 @@ func configureSecret(name, namespace string, labels map[string]string, resourceV
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "gateway.networking.k8s.io/v1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -2047,7 +2114,7 @@ func configureRole(name, namespace string, labels map[string]string, resourceVer
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "gateway.networking.k8s.io/v1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -2072,7 +2139,7 @@ func configureRoleBinding(name, namespace string, labels map[string]string, reso
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "gateway.networking.k8s.io/v1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -2117,7 +2184,7 @@ func configureService(name, namespace string, labels, annotations map[string]str
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "gateway.networking.k8s.io/v1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),
@@ -2152,7 +2219,7 @@ func configureServiceAccount(name, namespace string, labels map[string]string, r
 			ResourceVersion: resourceVersion,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion:         "gateway.networking.k8s.io/v1beta1",
+					APIVersion:         "gateway.networking.k8s.io/v1",
 					Kind:               "Gateway",
 					Name:               name,
 					Controller:         common.PointerTo(true),

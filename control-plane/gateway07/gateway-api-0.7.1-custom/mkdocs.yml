@@ -1,0 +1,117 @@
+site_name: Kubernetes Gateway API
+repo_url: https://github.com/kubernetes-sigs/gateway-api
+repo_name: kubernetes-sigs/gateway-api
+site_dir: site
+docs_dir: site-src
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/git-alt
+  logo: images/k8s-favicon.png
+  favicon: images/k8s-favicon.png
+  features:
+    - search.highlight
+    - navigation.tabs
+    - navigation.top
+edit_uri: edit/main/site-src/
+plugins:
+  - search
+  - awesome-pages
+  - macros:
+      include_dir: examples
+      j2_line_comment_prefix: "#$"
+  - redirects:
+      redirect_maps:
+        'guides/getting-started.md': 'guides/index.md'
+        'contributing/community.md': 'contributing/index.md'
+  - mermaid2
+markdown_extensions:
+  - admonition
+  - meta
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets
+  - toc:
+      permalink: true
+  - tables
+nav:
+  - Overview:
+    - Introduction: index.md
+    - Concepts:
+        API Overview: concepts/api-overview.md
+        Conformance: concepts/conformance.md
+        Security Model: concepts/security-model.md
+        Implementation Guidelines: concepts/guidelines.md
+        Versioning: concepts/versioning.md
+    - Implementations: implementations.md
+    - FAQ: faq.md
+  - Guides:
+    - Getting started: guides/index.md
+    - Simple Gateway: guides/simple-gateway.md
+    - HTTP routing: guides/http-routing.md
+    - HTTP redirects and rewrites: guides/http-redirect-rewrite.md
+    - HTTP header modifier: guides/http-header-modifier.md
+    - HTTP traffic splitting: guides/traffic-splitting.md
+    - Cross-Namespace routing: guides/multiple-ns.md
+    - TLS: guides/tls.md
+    - TCP routing: guides/tcp.md
+    - gRPC Routing: guides/grpc-routing.md
+    - Migrating from Ingress: guides/migrating-from-ingress.md
+  - Reference:
+    - API Types:
+        GatewayClass: api-types/gatewayclass.md
+        Gateway: api-types/gateway.md
+        HTTPRoute: api-types/httproute.md
+        ReferenceGrant: api-types/referencegrant.md
+        GRPCRoute: api-types/grpcroute.md
+    - API specification: references/spec.md
+    - Policy Attachment: references/policy-attachment.md
+    - Enhancement Proposals:
+      - Overview: geps/overview.md
+      - Declined:
+        - geps/gep-735.md
+      - Provisional:
+        - geps/gep-1742.md
+        - geps/gep-1426.md
+        - geps/gep-1324.md
+        - geps/gep-1282.md
+        - geps/gep-1897.md
+      - Prototyping:
+        - geps/gep-1709.md
+      - Experimental:
+        - geps/gep-1748.md
+        - geps/gep-1323.md
+        - geps/gep-1016.md
+        - geps/gep-957.md
+        - geps/gep-713.md
+      - Standard:
+        - geps/gep-1364.md
+        - geps/gep-922.md
+        - geps/gep-917.md
+        - geps/gep-851.md
+        - geps/gep-820.md
+        - geps/gep-746.md
+        - geps/gep-726.md
+        - geps/gep-724.md
+        - geps/gep-718.md
+        - geps/gep-709.md
+  - Contributing:
+    - How to Get Involved: contributing/index.md
+    - Developer Guide: contributing/devguide.md
+    - Enhancement Requests: contributing/enhancement-requests.md
+    - GAMMA: contributing/gamma.md
+    - Contributor Ladder: contributing/contributor-ladder.md
+  - Blog:
+    - Index: blog/index.md
+    - 2022:
+      - blog/2022/graduating-to-beta.md
+    - 2021:
+      - blog/2021/introducing-v1alpha2.md

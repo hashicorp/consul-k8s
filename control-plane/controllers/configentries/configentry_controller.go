@@ -112,6 +112,11 @@ type ConfigEntryController struct {
 	// any created Consul namespaces to allow cross namespace service discovery.
 	// Only necessary if ACLs are enabled.
 	CrossNSACLPolicy string
+
+	// ACLTokenOverride, if non-empty, is attached to all Consul reads/writes made
+	// by this reconciler instance. This is used for controllers that need a
+	// dedicated token with different ACL scope than the default login token.
+	ACLTokenOverride string
 }
 
 // ReconcileEntry reconciles an update to a resource. CRD-specific controller's
@@ -143,7 +148,6 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 	}
 
 	consulEntry := configEntry.ToConsul(r.DatacenterName)
-
 	isSecretChange, _ := ctx.Value("isSecretChange").(bool)
 	if mutator, ok := crdCtrl.(Mutator); ok && isSecretChange {
 		if err := mutator.MutateConsulEntry(configEntry, consulEntry, req); err != nil {
@@ -172,7 +176,8 @@ func (r *ConfigEntryController) ReconcileEntry(ctx context.Context, crdCtrl Cont
 			if err != nil {
 				return r.syncUnknownWithError(ctx, logger, crdCtrl, configEntry, ConsulAgentError, err)
 			}
-			return r.syncSuccessful(ctx, crdCtrl, configEntry)
+			logger.Info("secret metadata sync completed")
+			return ctrl.Result{}, nil
 		}
 	}
 
@@ -347,10 +352,10 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 		// In terms of performance, Consul servers can handle tens of thousands
 		// of writes per second, so retrying at max every 5s isn't an issue and
 		// provides a better UX.
-		RateLimiter: workqueue.NewMaxOfRateLimiter(
-			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 5*time.Second),
+		RateLimiter: workqueue.NewTypedMaxOfRateLimiter[reconcile.Request](
+			workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](200*time.Millisecond, 5*time.Second),
 			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+			&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		),
 	}
 
@@ -556,6 +561,9 @@ func (r *ConfigEntryController) queryOpts(ns string) *capi.QueryOptions {
 	opts := &capi.QueryOptions{
 		Namespace: ns,
 	}
+	if r.ACLTokenOverride != "" {
+		opts.Token = r.ACLTokenOverride
+	}
 	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
 		// Only add ?partition=… for Enterprise clusters
 		opts.Partition = r.ConsulPartition
@@ -567,6 +575,9 @@ func (r *ConfigEntryController) queryOpts(ns string) *capi.QueryOptions {
 func (r *ConfigEntryController) writeOpts(ns string) *capi.WriteOptions {
 	opts := &capi.WriteOptions{
 		Namespace: ns,
+	}
+	if r.ACLTokenOverride != "" {
+		opts.Token = r.ACLTokenOverride
 	}
 	if r.EnableConsulAdminPartitions && r.ConsulPartition != "" {
 		opts.Partition = r.ConsulPartition

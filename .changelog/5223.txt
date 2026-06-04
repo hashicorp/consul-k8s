@@ -1,0 +1,3 @@
+```release-note:feature
+endpoints-controller: support multi-port service workloads by registering Consul Service with multiple ports in catalog service definition with default-port selection and protocol-consistency validation. Support registering multiport service upstreams based on pod annotation(consul.hashicorp.com/connect-service-upstreams).
+```

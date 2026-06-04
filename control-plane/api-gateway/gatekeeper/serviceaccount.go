@@ -12,12 +12,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
 
-func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1beta1.Gateway, config common.HelmConfig) error {
+func (g *Gatekeeper) upsertServiceAccount(ctx context.Context, gateway gwv1.Gateway, config common.HelmConfig) error {
 	// We only create a ServiceAccount if it's needed for RBAC or image pull secrets;
 	// otherwise, we clean up if one was previously created.
 	if config.AuthMethod == "" && !config.EnableOpenShift && len(config.ImagePullSecrets) == 0 {
@@ -68,7 +68,7 @@ func (g *Gatekeeper) deleteServiceAccount(ctx context.Context, gwName types.Name
 	return nil
 }
 
-func (g *Gatekeeper) serviceAccount(gateway gwv1beta1.Gateway, config common.HelmConfig) *corev1.ServiceAccount {
+func (g *Gatekeeper) serviceAccount(gateway gwv1.Gateway, config common.HelmConfig) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      gateway.Name,

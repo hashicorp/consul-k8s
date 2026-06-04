@@ -4,13 +4,15 @@
 package common
 
 import (
+	"strings"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -62,9 +64,9 @@ func (k *KubernetesUpdates) Operations() []client.Object {
 }
 
 type ReferenceValidator interface {
-	GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, secretRef gwv1beta1.SecretObjectReference) bool
-	HTTPRouteCanReferenceBackend(httproute gwv1beta1.HTTPRoute, backendRef gwv1beta1.BackendRef) bool
-	TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1beta1.BackendRef) bool
+	GatewayCanReferenceSecret(gateway gwv1.Gateway, secretRef gwv1.SecretObjectReference) bool
+	HTTPRouteCanReferenceBackend(httproute gwv1.HTTPRoute, backendRef gwv1.BackendRef) bool
+	TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1alpha2.BackendRef) bool
 }
 
 type certificate struct {
@@ -73,7 +75,7 @@ type certificate struct {
 }
 
 type httpRoute struct {
-	route    gwv1beta1.HTTPRoute
+	route    gwv1.HTTPRoute
 	gateways mapset.Set
 }
 
@@ -116,6 +118,7 @@ type ResourceMap struct {
 	tcpRouteGateways      map[api.ResourceReference]*tcpRoute
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
+	gateways              map[api.ResourceReference]gwv1.Gateway
 	externalFilters       map[corev1.ObjectReference]client.Object
 	gatewayPolicies       map[api.ResourceReference]*v1alpha1.GatewayPolicy
 
@@ -143,6 +146,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
+		gateways:              make(map[api.ResourceReference]gwv1.Gateway),
 		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
 		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
@@ -210,7 +214,7 @@ func (s *ResourceMap) ReferenceCountCertificate(secret corev1.Secret) {
 	}
 }
 
-func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
+func (s *ResourceMap) ReferenceCountGateway(gateway gwv1.Gateway) {
 	key := client.ObjectKeyFromObject(&gateway)
 	consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
 
@@ -222,7 +226,7 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 	}
 
 	for _, listener := range gateway.Spec.Listeners {
-		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1beta1.TLSModeTerminate) {
+		if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1.TLSModeTerminate) {
 			continue
 		}
 		for _, cert := range listener.TLS.CertificateRefs {
@@ -242,6 +246,140 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1beta1.Gateway) {
 	}
 
 	s.gatewayResources[consulKey] = set
+	s.gateways[consulKey] = gateway
+}
+
+// InheritedTLSSDSClusterForHTTPRoute returns a single unambiguous listener-level
+// SDS cluster name inherited through a route's Gateway parent refs.
+func (s *ResourceMap) InheritedTLSSDSClusterForHTTPRoute(route gwv1.HTTPRoute) (string, bool) {
+	clusters := make(map[string]struct{})
+
+	for _, parent := range route.Spec.ParentRefs {
+		if !NilOrEqual(parent.Group, gwv1.GroupVersion.Group) || !NilOrEqual(parent.Kind, KindGateway) {
+			continue
+		}
+
+		key := IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, route.Namespace)
+		consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
+
+		gateway, ok := s.gateways[consulKey]
+		if !ok {
+			continue
+		}
+
+		for _, listener := range gateway.Spec.Listeners {
+			if !httpRouteCanInheritFromListener(route, gateway, parent, listener) {
+				continue
+			}
+
+			effective := ResolveListenerTLSSDSConfig(gateway, listener, s)
+			if effective.Config != nil && effective.Config.ClusterName != "" {
+				clusters[effective.Config.ClusterName] = struct{}{}
+			}
+		}
+	}
+
+	if len(clusters) != 1 {
+		return "", false
+	}
+
+	for cluster := range clusters {
+		return cluster, true
+	}
+
+	return "", false
+}
+
+func httpRouteCanInheritFromListener(route gwv1.HTTPRoute, gateway gwv1.Gateway, parent gwv1.ParentReference, listener gwv1.Listener) bool {
+	if parent.SectionName != nil && listener.Name != *parent.SectionName {
+		return false
+	}
+	if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1.TLSModeTerminate) {
+		return false
+	}
+	if listener.Protocol != gwv1.HTTPProtocolType && listener.Protocol != gwv1.HTTPSProtocolType {
+		return false
+	}
+	if !httpRouteKindAllowedForListener(listener.AllowedRoutes) {
+		return false
+	}
+	if !httpRouteNamespaceAllowedForListener(gateway.Namespace, route.Namespace, listener.AllowedRoutes) {
+		return false
+	}
+	if !routeAllowedForListenerHostname(listener.Hostname, route.Spec.Hostnames) {
+		return false
+	}
+
+	return true
+}
+
+func httpRouteKindAllowedForListener(allowed *gwv1.AllowedRoutes) bool {
+	if allowed == nil || allowed.Kinds == nil {
+		return true
+	}
+
+	for _, kind := range allowed.Kinds {
+		if NilOrEqual(kind.Group, gwv1.GroupVersion.Group) && kind.Kind == gwv1.Kind("HTTPRoute") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func httpRouteNamespaceAllowedForListener(gatewayNamespace, routeNamespace string, allowed *gwv1.AllowedRoutes) bool {
+	if allowed == nil || allowed.Namespaces == nil || allowed.Namespaces.From == nil {
+		return true
+	}
+
+	switch *allowed.Namespaces.From {
+	case gwv1.NamespacesFromAll:
+		return true
+	case gwv1.NamespacesFromSame:
+		return gatewayNamespace == routeNamespace
+	case gwv1.NamespacesFromSelector:
+		// Namespace labels are not available in this helper, so do not exclude.
+		return true
+	default:
+		return false
+	}
+}
+
+func routeAllowedForListenerHostname(hostname *gwv1.Hostname, hostnames []gwv1.Hostname) bool {
+	if hostname == nil || len(hostnames) == 0 {
+		return true
+	}
+
+	for _, name := range hostnames {
+		if hostnamesMatch(name, *hostname) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hostnamesMatch(a gwv1.Hostname, b gwv1.Hostname) bool {
+	if a == "" || a == "*" || b == "" || b == "*" {
+		return true
+	}
+
+	if strings.HasPrefix(string(a), "*.") || strings.HasPrefix(string(b), "*.") {
+		aLabels, bLabels := strings.Split(string(a), "."), strings.Split(string(b), ".")
+		if len(aLabels) != len(bLabels) {
+			return false
+		}
+
+		for i := 1; i < len(aLabels); i++ {
+			if !strings.EqualFold(aLabels[i], bLabels[i]) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	return string(a) == string(b)
 }
 
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
@@ -351,7 +489,7 @@ func (s *ResourceMap) consulGatewaysForRoute(namespace string, refs []api.Resour
 	return gateways
 }
 
-func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1beta1.HTTPRoute) {
+func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1.HTTPRoute) {
 	key := client.ObjectKeyFromObject(&route)
 	consulKey := NormalizeMeta(s.toConsulReference(api.HTTPRoute, key))
 
@@ -370,7 +508,7 @@ func (s *ResourceMap) ReferenceCountHTTPRoute(route gwv1beta1.HTTPRoute) {
 	s.httpRouteGateways[consulKey] = set
 }
 
-func localObjectReferenceToObjectReference(filterRef gwv1beta1.LocalObjectReference, namespace string) corev1.ObjectReference {
+func localObjectReferenceToObjectReference(filterRef gwv1.LocalObjectReference, namespace string) corev1.ObjectReference {
 	return corev1.ObjectReference{
 		Kind:      string(filterRef.Kind),
 		Name:      string(filterRef.Name),
@@ -395,13 +533,13 @@ func (s *ResourceMap) AddExternalFilter(filter client.Object) {
 	s.externalFilters[key] = filter
 }
 
-func (s *ResourceMap) GetExternalFilter(filterRef gwv1beta1.LocalObjectReference, namespace string) (client.Object, bool) {
+func (s *ResourceMap) GetExternalFilter(filterRef gwv1.LocalObjectReference, namespace string) (client.Object, bool) {
 	key := localObjectReferenceToObjectReference(filterRef, namespace)
 	filter, ok := s.externalFilters[key]
 	return filter, ok
 }
 
-func (s *ResourceMap) ExternalFilterExists(filterRef gwv1beta1.LocalObjectReference, namespace string) bool {
+func (s *ResourceMap) ExternalFilterExists(filterRef gwv1.LocalObjectReference, namespace string) bool {
 	_, ok := s.GetExternalFilter(filterRef, namespace)
 	return ok
 }
@@ -461,10 +599,15 @@ func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.Gat
 	return value, exists
 }
 
-func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1beta1.Gateway, gatewayListener gwv1beta1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1.Gateway, gatewayListener gwv1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+	kind := gateway.Kind
+	if kind == "" {
+		kind = KindGateway
+	}
+
 	key := api.ResourceReference{
 		Name:        gateway.Name,
-		Kind:        gateway.Kind,
+		Kind:        kind,
 		SectionName: string(gatewayListener.Name),
 		Namespace:   gateway.Namespace,
 	}
@@ -493,11 +636,11 @@ func (s *ResourceMap) ReferenceCountTCPRoute(route gwv1alpha2.TCPRoute) {
 	s.tcpRouteGateways[consulKey] = set
 }
 
-func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1beta1.ParentReference) mapset.Set {
+func (s *ResourceMap) gatewaysForRoute(namespace string, refs []gwv1.ParentReference) mapset.Set {
 	gateways := mapset.NewSet()
 
 	for _, parent := range refs {
-		if NilOrEqual(parent.Group, gwv1beta1.GroupVersion.Group) && NilOrEqual(parent.Kind, "Gateway") {
+		if NilOrEqual(parent.Group, gwv1.GroupVersion.Group) && NilOrEqual(parent.Kind, "Gateway") {
 			key := IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, namespace)
 			consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
 
@@ -700,14 +843,14 @@ func (s *ResourceMap) toConsulReference(kind string, key types.NamespacedName) a
 	}
 }
 
-func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1beta1.Gateway, ref gwv1beta1.SecretObjectReference) bool {
+func (s *ResourceMap) GatewayCanReferenceSecret(gateway gwv1.Gateway, ref gwv1.SecretObjectReference) bool {
 	return s.referenceValidator.GatewayCanReferenceSecret(gateway, ref)
 }
 
-func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1beta1.HTTPRoute, ref gwv1beta1.BackendRef) bool {
+func (s *ResourceMap) HTTPRouteCanReferenceBackend(route gwv1.HTTPRoute, ref gwv1.BackendRef) bool {
 	return s.referenceValidator.HTTPRouteCanReferenceBackend(route, ref)
 }
 
-func (s *ResourceMap) TCPRouteCanReferenceBackend(route gwv1alpha2.TCPRoute, ref gwv1beta1.BackendRef) bool {
+func (s *ResourceMap) TCPRouteCanReferenceBackend(route gwv1alpha2.TCPRoute, ref gwv1.BackendRef) bool {
 	return s.referenceValidator.TCPRouteCanReferenceBackend(route, ref)
 }

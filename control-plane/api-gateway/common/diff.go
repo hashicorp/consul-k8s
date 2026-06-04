@@ -10,12 +10,12 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-func GatewayStatusesEqual(a, b gwv1beta1.GatewayStatus) bool {
+func GatewayStatusesEqual(a, b gwv1.GatewayStatus) bool {
 	return slices.EqualFunc(a.Addresses, b.Addresses, gatewayStatusesAddressesEqual) &&
 		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual) &&
 		slices.EqualFunc(a.Listeners, b.Listeners, gatewayStatusesListenersEqual)
@@ -29,19 +29,19 @@ func RouteAuthFilterStatusesEqual(a, b v1alpha1.RouteAuthFilterStatus) bool {
 	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
-func gatewayStatusesAddressesEqual(a, b gwv1beta1.GatewayAddress) bool {
+func gatewayStatusesAddressesEqual(a, b gwv1.GatewayStatusAddress) bool {
 	return BothNilOrEqual(a.Type, b.Type) &&
 		a.Value == b.Value
 }
 
-func gatewayStatusesListenersEqual(a, b gwv1beta1.ListenerStatus) bool {
+func gatewayStatusesListenersEqual(a, b gwv1.ListenerStatus) bool {
 	return a.AttachedRoutes == b.AttachedRoutes &&
 		a.Name == b.Name &&
 		slices.EqualFunc(a.SupportedKinds, b.SupportedKinds, routeGroupKindsEqual) &&
 		slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
-func routeGroupKindsEqual(a, b gwv1beta1.RouteGroupKind) bool {
+func routeGroupKindsEqual(a, b gwv1.RouteGroupKind) bool {
 	return BothNilOrEqual(a.Group, b.Group) &&
 		a.Kind == b.Kind
 }
@@ -187,8 +187,19 @@ func equalClaims(a, b *api.APIGatewayJWTClaimVerification) bool {
 func (e entryComparator) apiGatewayListenerTLSConfigurationsEqual(a, b api.APIGatewayTLSConfiguration) bool {
 	return a.MaxVersion == b.MaxVersion &&
 		a.MinVersion == b.MinVersion &&
+		e.gatewayTLSSDSConfigsEqual(a.SDS, b.SDS) &&
 		slices.Equal(a.CipherSuites, b.CipherSuites) &&
 		slices.EqualFunc(a.Certificates, b.Certificates, e.resourceReferencesEqual)
+}
+
+func (e entryComparator) gatewayTLSSDSConfigsEqual(a, b *api.GatewayTLSSDSConfig) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.ClusterName == b.ClusterName && a.CertResource == b.CertResource
 }
 
 func (e entryComparator) resourceReferencesEqual(a, b api.ResourceReference) bool {

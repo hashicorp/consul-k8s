@@ -26,7 +26,7 @@ type MeshWebhook struct {
 	// ConsulMeta contains metadata specific to the Consul installation.
 	ConsulMeta common.ConsulMeta
 
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // NOTE: The path value in the below line is the path to the webhook.

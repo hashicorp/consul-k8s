@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // Gateway probe annotations allow configuring Kubernetes health probes per-Gateway.
@@ -69,7 +69,7 @@ type ProbesConfig struct {
 // ProbesFromGateway extracts and parses probe configurations from Gateway annotations.
 // Returns nil if no probe annotations are present.
 // Returns error if annotation JSON is malformed or probe configuration is invalid.
-func ProbesFromGateway(gateway *gwv1beta1.Gateway) (*ProbesConfig, error) {
+func ProbesFromGateway(gateway *gwv1.Gateway) (*ProbesConfig, error) {
 	if gateway.Annotations == nil {
 		return nil, nil
 	}

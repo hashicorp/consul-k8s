@@ -1,0 +1,33 @@
+# See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md
+# This file should be kept in sync with k/org.
+
+aliases:
+  # Reference: https://github.com/kubernetes/org/blob/main/OWNERS_ALIASES
+  sig-network-leads:
+    - caseydavenport
+    - dcbw
+    - thockin
+
+  # Reference: https://github.com/kubernetes/org/blob/main/config/kubernetes-sigs/sig-network/teams.yaml
+  gateway-api-maintainers:
+    - bowei
+    - robscott
+    - shaneutt
+    - youngnick
+
+  gateway-api-mesh-leads:
+    - howardjohn
+    - keithmattix
+    - mikemorris
+
+  emeritus-gateway-api-maintainers:
+    - danehans
+    - hbagdi
+    - jpeach
+
+  gateway-api-conformance-reviewers:
+    - arkodg
+    - michaelbeaumont
+    - mlavacca
+    - sunjayBhatia
+    - xunzhuo

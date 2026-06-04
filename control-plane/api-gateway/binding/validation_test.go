@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -26,12 +26,12 @@ func TestValidateRefs(t *testing.T) {
 	for name, tt := range map[string]struct {
 		route           client.Object
 		services        map[types.NamespacedName]corev1.Service
-		referenceGrants []gwv1beta1.ReferenceGrant
+		referenceGrants []gwv1.ReferenceGrant
 		meshServices    []v1alpha1.MeshService
 		expectedErrors  []error
 	}{
 		"all pass no namespaces": {
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{{Name: "1"}, {Name: "2"}}, nil),
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{{Name: "1"}, {Name: "2"}}, nil),
 			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "test"}: {},
 				{Name: "2", Namespace: "test"}: {},
@@ -41,9 +41,9 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{nil, nil},
 		},
 		"all fails namespaces no reference grants": {
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
-				{Name: "1", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
-				{Name: "2", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
+				{Name: "1", Namespace: common.PointerTo[gwv1.Namespace]("other")},
+				{Name: "2", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 			}, nil),
 			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "other"}: {},
@@ -54,19 +54,19 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRefNotPermitted, errRefNotPermitted},
 		},
 		"all pass namespaces": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "HTTPRoute", Namespace: gwv1beta1.Namespace("test")},
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Service"},
 					},
 				}},
 			},
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
-				{Name: "1", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
-				{Name: "2", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
+				{Name: "1", Namespace: common.PointerTo[gwv1.Namespace]("other")},
+				{Name: "2", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 			}, nil),
 			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "other"}: {},
@@ -77,8 +77,8 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{nil, nil},
 		},
 		"some pass mixed missing reference grants": {
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
-				{Name: "1", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
+				{Name: "1", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 				{Name: "2"},
 			}, nil),
 			services: map[types.NamespacedName]corev1.Service{
@@ -90,18 +90,18 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRefNotPermitted, nil},
 		},
 		"all pass mixed": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "HTTPRoute", Namespace: gwv1beta1.Namespace("test")},
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Service"},
 					},
 				}},
 			},
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
-				{Name: "1", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
+				{Name: "1", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 				{Name: "2"},
 			}, nil),
 			services: map[types.NamespacedName]corev1.Service{
@@ -113,19 +113,19 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{nil, nil},
 		},
 		"all fail mixed": {
-			referenceGrants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "HTTPRoute", Namespace: gwv1beta1.Namespace("test")},
+			referenceGrants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "HTTPRoute", Namespace: gwv1.Namespace("test")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Service"},
 					},
 				}},
 			},
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
 				{Name: "1"},
-				{Name: "2", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+				{Name: "2", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 			}, nil),
 			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "other"}: {},
@@ -136,7 +136,7 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRouteBackendNotFound, errRouteBackendNotFound},
 		},
 		"all fail no namespaces": {
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
 				{Name: "1"},
 				{Name: "2"},
 			}, nil),
@@ -149,9 +149,9 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRouteBackendNotFound, errRouteBackendNotFound},
 		},
 		"all fail namespaces": {
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
-				{Name: "1", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
-				{Name: "2", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
+				{Name: "1", Namespace: common.PointerTo[gwv1.Namespace]("other")},
+				{Name: "2", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 			}, nil),
 			services: map[types.NamespacedName]corev1.Service{
 				{Name: "1", Namespace: "test"}: {},
@@ -162,8 +162,8 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRouteBackendNotFound, errRouteBackendNotFound},
 		},
 		"type failures": {
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
-				{Name: "1", Group: common.PointerTo[gwv1beta1.Group]("test")},
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
+				{Name: "1", Group: common.PointerTo[gwv1.Group]("test")},
 				{Name: "2"},
 			}, nil),
 			services: map[types.NamespacedName]corev1.Service{
@@ -175,11 +175,11 @@ func TestValidateRefs(t *testing.T) {
 			expectedErrors: []error{errRouteInvalidKind, nil},
 		},
 		"mesh services": {
-			route: testHTTPRouteBackends("route", "test", []gwv1beta1.BackendObjectReference{
+			route: testHTTPRouteBackends("route", "test", []gwv1.BackendObjectReference{
 				{
 					Name:  "1",
-					Group: common.PointerTo(gwv1beta1.Group(v1alpha1.ConsulHashicorpGroup)),
-					Kind:  common.PointerTo(gwv1beta1.Kind(v1alpha1.MeshServiceKind)),
+					Group: common.PointerTo(gwv1.Group(v1alpha1.ConsulHashicorpGroup)),
+					Kind:  common.PointerTo(gwv1.Kind(v1alpha1.MeshServiceKind)),
 				},
 			}, nil),
 			meshServices: []v1alpha1.MeshService{
@@ -213,15 +213,15 @@ func TestValidateGateway(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		object   gwv1beta1.Gateway
+		object   gwv1.Gateway
 		expected error
 	}{
 		"valid": {
-			object:   gwv1beta1.Gateway{},
+			object:   gwv1.Gateway{},
 			expected: nil,
 		},
 		"invalid": {
-			object: gwv1beta1.Gateway{Spec: gwv1beta1.GatewaySpec{Addresses: []gwv1beta1.GatewayAddress{
+			object: gwv1.Gateway{Spec: gwv1.GatewaySpec{Addresses: []gwv1.GatewaySpecAddress{
 				{Value: "1"},
 			}}},
 			expected: errGatewayUnsupportedAddress,
@@ -242,36 +242,36 @@ func TestMergedListeners_ValidateProtocol(t *testing.T) {
 	}{
 		"valid": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
 			},
 			expected: nil,
 		},
 		"invalid": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.TCPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.TCPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
 			},
 			expected: errListenerProtocolConflict,
 		},
 		"big list": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPSProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
-				{listener: gwv1beta1.Listener{Protocol: gwv1beta1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPSProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
+				{listener: gwv1.Listener{Protocol: gwv1.HTTPProtocolType}},
 			},
 			expected: errListenerProtocolConflict,
 		},
@@ -291,11 +291,11 @@ func TestMergedListeners_ValidateHostname(t *testing.T) {
 	}{
 		"valid": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("2")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("3")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("4")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("5")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("2")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("3")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("4")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("5")}},
 				{},
 			},
 			expected: nil,
@@ -303,24 +303,24 @@ func TestMergedListeners_ValidateHostname(t *testing.T) {
 		"invalid nil": {
 			mergedListeners: []mergedListener{
 				{},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("2")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("3")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("4")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("5")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("2")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("3")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("4")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("5")}},
 				{},
 			},
 			expected: errListenerHostnameConflict,
 		},
 		"invalid set": {
 			mergedListeners: []mergedListener{
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("2")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("3")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("4")}},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("5")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("2")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("3")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("4")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("5")}},
 				{},
-				{listener: gwv1beta1.Listener{Hostname: common.PointerTo[gwv1beta1.Hostname]("1")}},
+				{listener: gwv1.Listener{Hostname: common.PointerTo[gwv1.Hostname]("1")}},
 			},
 			expected: errListenerHostnameConflict,
 		},
@@ -342,25 +342,25 @@ func TestValidateTLS(t *testing.T) {
 	_, secret := generateTestCertificate(t, "", "")
 
 	for name, tt := range map[string]struct {
-		gateway                 gwv1beta1.Gateway
-		grants                  []gwv1beta1.ReferenceGrant
-		tls                     *gwv1beta1.GatewayTLSConfig
+		gateway                 gwv1.Gateway
+		grants                  []gwv1.ReferenceGrant
+		tls                     *gwv1.ListenerTLSConfig
 		certificates            []corev1.Secret
 		expectedResolvedRefsErr error
 		expectedAcceptedErr     error
 	}{
 		"no tls": {
-			gateway:                 gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:                 gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			tls:                     nil,
 			certificates:            nil,
 			expectedResolvedRefsErr: nil,
 			expectedAcceptedErr:     nil,
 		},
 		"not supported certificate": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				CertificateRefs: []gwv1beta1.SecretObjectReference{
-					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("other"), Group: common.PointerTo[gwv1beta1.Group]("test")},
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				CertificateRefs: []gwv1.SecretObjectReference{
+					{Name: "foo", Namespace: common.PointerTo[gwv1.Namespace]("other"), Group: common.PointerTo[gwv1.Group]("test")},
 				},
 			},
 			certificates: []corev1.Secret{
@@ -372,10 +372,10 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"not allowed certificate": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				CertificateRefs: []gwv1beta1.SecretObjectReference{
-					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				CertificateRefs: []gwv1.SecretObjectReference{
+					{Name: "foo", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 				},
 			},
 			certificates: []corev1.Secret{
@@ -387,20 +387,20 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"not found certificate": {
-			grants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "Gateway", Namespace: gwv1beta1.Namespace("default")},
+			grants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "other", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				CertificateRefs: []gwv1beta1.SecretObjectReference{
-					{Name: "zoiks", Namespace: common.PointerTo[gwv1beta1.Namespace]("other")},
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				CertificateRefs: []gwv1.SecretObjectReference{
+					{Name: "zoiks", Namespace: common.PointerTo[gwv1.Namespace]("other")},
 				},
 			},
 			certificates: []corev1.Secret{
@@ -412,20 +412,20 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"not found certificate mismatched namespace": {
-			grants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "Gateway", Namespace: gwv1beta1.Namespace("default")},
+			grants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "foo", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				CertificateRefs: []gwv1beta1.SecretObjectReference{
-					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("foo")},
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				CertificateRefs: []gwv1.SecretObjectReference{
+					{Name: "foo", Namespace: common.PointerTo[gwv1.Namespace]("foo")},
 				},
 			},
 			certificates: []corev1.Secret{
@@ -437,47 +437,47 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"passthrough mode": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				Mode: common.PointerTo(gwv1beta1.TLSModePassthrough),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				Mode: common.PointerTo(gwv1.TLSModePassthrough),
 			},
 			certificates:            nil,
 			expectedResolvedRefsErr: nil,
 			expectedAcceptedErr:     errListenerNoTLSPassthrough,
 		},
 		"valid targeted namespace": {
-			grants: []gwv1beta1.ReferenceGrant{
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "1", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "Gateway", Namespace: gwv1beta1.Namespace("default")},
+			grants: []gwv1.ReferenceGrant{
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "1", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "2", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "Gateway", Namespace: gwv1beta1.Namespace("default")},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "2", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
-				{ObjectMeta: metav1.ObjectMeta{Namespace: "3", Name: "grant"}, Spec: gwv1beta1.ReferenceGrantSpec{
-					From: []gwv1beta1.ReferenceGrantFrom{
-						{Group: gwv1beta1.GroupName, Kind: "Gateway", Namespace: gwv1beta1.Namespace("default")},
+				{ObjectMeta: metav1.ObjectMeta{Namespace: "3", Name: "grant"}, Spec: gwv1.ReferenceGrantSpec{
+					From: []gwv1.ReferenceGrantFrom{
+						{Group: gwv1.GroupName, Kind: "Gateway", Namespace: gwv1.Namespace("default")},
 					},
-					To: []gwv1beta1.ReferenceGrantTo{
+					To: []gwv1.ReferenceGrantTo{
 						{Kind: "Secret"},
 					},
 				}},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				CertificateRefs: []gwv1beta1.SecretObjectReference{
-					{Name: "foo", Namespace: common.PointerTo[gwv1beta1.Namespace]("1")},
-					{Name: "bar", Namespace: common.PointerTo[gwv1beta1.Namespace]("2")},
-					{Name: "baz", Namespace: common.PointerTo[gwv1beta1.Namespace]("3")},
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				CertificateRefs: []gwv1.SecretObjectReference{
+					{Name: "foo", Namespace: common.PointerTo[gwv1.Namespace]("1")},
+					{Name: "bar", Namespace: common.PointerTo[gwv1.Namespace]("2")},
+					{Name: "baz", Namespace: common.PointerTo[gwv1.Namespace]("3")},
 				},
 			},
 			certificates: []corev1.Secret{
@@ -489,9 +489,9 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"valid same namespace": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				CertificateRefs: []gwv1beta1.SecretObjectReference{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				CertificateRefs: []gwv1.SecretObjectReference{
 					{Name: "foo"},
 					{Name: "bar"},
 					{Name: "baz"},
@@ -506,16 +506,16 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr:     nil,
 		},
 		"valid empty certs": {
-			gateway:                 gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls:                     &gwv1beta1.GatewayTLSConfig{},
+			gateway:                 gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls:                     &gwv1.ListenerTLSConfig{},
 			certificates:            nil,
 			expectedResolvedRefsErr: nil,
 			expectedAcceptedErr:     nil,
 		},
 		"invalid cipher suite": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
 					common.TLSCipherSuitesAnnotationKey: "invalid",
 				},
 			},
@@ -523,9 +523,9 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr: errListenerUnsupportedTLSCipherSuite,
 		},
 		"cipher suite not configurable": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
 					common.TLSMinVersionAnnotationKey:   "TLSv1_3",
 					common.TLSCipherSuitesAnnotationKey: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 				},
@@ -534,9 +534,9 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr: errListenerTLSCipherSuiteNotConfigurable,
 		},
 		"invalid max version": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
 					common.TLSMaxVersionAnnotationKey: "invalid",
 				},
 			},
@@ -544,14 +544,80 @@ func TestValidateTLS(t *testing.T) {
 			expectedAcceptedErr: errListenerUnsupportedTLSMaxVersion,
 		},
 		"invalid min version": {
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
-			tls: &gwv1beta1.GatewayTLSConfig{
-				Options: map[gwv1beta1.AnnotationKey]gwv1beta1.AnnotationValue{
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
 					common.TLSMinVersionAnnotationKey: "invalid",
 				},
 			},
 			certificates:        nil,
 			expectedAcceptedErr: errListenerUnsupportedTLSMinVersion,
+		},
+		// RFC: listener tls.Options must supply BOTH SDS keys or neither.
+		// Setting only the cluster name is invalid.
+		"partial listener SDS - only cluster name - invalid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSClusterNameAnnotationKey): "listener-cluster",
+					// cert resource intentionally omitted
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSSDSIncomplete,
+		},
+		// RFC: listener tls.Options must supply BOTH SDS keys or neither.
+		// Setting only the cert resource is invalid.
+		"partial listener SDS - only cert resource - invalid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSCertResourceAnnotationKey): "listener-cert",
+					// cluster name intentionally omitted
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: errListenerTLSSDSIncomplete,
+		},
+		// RFC: no listener tls.Options SDS keys → gateway annotations are used; valid.
+		"no listener SDS options - gateway provides both - valid": {
+			gateway: gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						common.TLSSDSClusterNameAnnotationKey:  "gateway-cluster",
+						common.TLSSDSCertResourceAnnotationKey: "gateway-cert",
+					},
+				},
+			},
+			tls:                 &gwv1.ListenerTLSConfig{},
+			certificates:        nil,
+			expectedAcceptedErr: nil,
+		},
+		// RFC: both listener tls.Options SDS keys set → listener wins; valid.
+		"both listener SDS options set - valid": {
+			gateway: gwv1.Gateway{},
+			tls: &gwv1.ListenerTLSConfig{
+				Options: map[gwv1.AnnotationKey]gwv1.AnnotationValue{
+					gwv1.AnnotationKey(common.TLSSDSClusterNameAnnotationKey):  "listener-cluster",
+					gwv1.AnnotationKey(common.TLSSDSCertResourceAnnotationKey): "listener-cert",
+				},
+			},
+			certificates:        nil,
+			expectedAcceptedErr: nil,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -562,7 +628,7 @@ func TestValidateTLS(t *testing.T) {
 				resources.ReferenceCountCertificate(certificate)
 			}
 
-			actualAcceptedError, actualResolvedRefsError := validateTLS(tt.gateway, tt.tls, resources)
+			actualAcceptedError, actualResolvedRefsError := validateTLS(tt.gateway, gwv1.Listener{TLS: tt.tls}, resources)
 			require.ErrorIs(t, actualResolvedRefsError, tt.expectedResolvedRefsErr)
 			require.ErrorIs(t, actualAcceptedError, tt.expectedAcceptedErr)
 		})
@@ -573,79 +639,79 @@ func TestValidateListeners(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		listeners                   []gwv1beta1.Listener
+		listeners                   []gwv1.Listener
 		expectedAcceptedErr         error
 		listenerIndexToTest         int
 		mapPrivilegedContainerPorts int32
-		gateway                     gwv1beta1.Gateway
+		gateway                     gwv1.Gateway
 		resources                   resourceMapResources
 	}{
 		"valid protocol HTTP": {
-			listeners: []gwv1beta1.Listener{
-				{Protocol: gwv1beta1.HTTPProtocolType},
+			listeners: []gwv1.Listener{
+				{Protocol: gwv1.HTTPProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
 		"valid protocol HTTPS": {
-			listeners: []gwv1beta1.Listener{
-				{Protocol: gwv1beta1.HTTPSProtocolType},
+			listeners: []gwv1.Listener{
+				{Protocol: gwv1.HTTPSProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
 		"valid protocol TCP": {
-			listeners: []gwv1beta1.Listener{
-				{Protocol: gwv1beta1.TCPProtocolType},
+			listeners: []gwv1.Listener{
+				{Protocol: gwv1.TCPProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: nil,
 		},
 		"invalid protocol UDP": {
-			listeners: []gwv1beta1.Listener{
-				{Protocol: gwv1beta1.UDPProtocolType},
+			listeners: []gwv1.Listener{
+				{Protocol: gwv1.UDPProtocolType},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerUnsupportedProtocol,
 		},
 		"invalid port": {
-			listeners: []gwv1beta1.Listener{
-				{Protocol: gwv1beta1.TCPProtocolType, Port: 20000},
+			listeners: []gwv1.Listener{
+				{Protocol: gwv1.TCPProtocolType, Port: 20000},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerPortUnavailable,
 		},
 		"conflicted port": {
-			listeners: []gwv1beta1.Listener{
-				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
-				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
+			listeners: []gwv1.Listener{
+				{Protocol: gwv1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1.TCPProtocolType, Port: 80},
 			},
-			gateway:             gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:             gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources:           resourceMapResources{},
 			expectedAcceptedErr: errListenerPortUnavailable,
 			listenerIndexToTest: 1,
 		},
 		"conflicted mapped port": {
-			listeners: []gwv1beta1.Listener{
-				{Protocol: gwv1beta1.TCPProtocolType, Port: 80},
-				{Protocol: gwv1beta1.TCPProtocolType, Port: 2080},
+			listeners: []gwv1.Listener{
+				{Protocol: gwv1.TCPProtocolType, Port: 80},
+				{Protocol: gwv1.TCPProtocolType, Port: 2080},
 			},
-			gateway:                     gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway:                     gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			expectedAcceptedErr:         errListenerMappedToPrivilegedPortMapping,
 			resources:                   resourceMapResources{},
 			listenerIndexToTest:         1,
 			mapPrivilegedContainerPorts: 2000,
 		},
 		"valid JWT provider in override of policy": {
-			listeners: []gwv1beta1.Listener{
-				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			listeners: []gwv1.Listener{
+				{Name: "l1", Protocol: gwv1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -661,11 +727,11 @@ func TestValidateListeners(t *testing.T) {
 					{
 						Spec: v1alpha1.GatewayPolicySpec{
 							TargetRef: v1alpha1.PolicyTargetReference{
-								Group:       gwv1beta1.GroupVersion.String(),
+								Group:       gwv1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
 								Namespace:   "default",
-								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+								SectionName: common.PointerTo(gwv1.SectionName("l1")),
 							},
 							Override: &v1alpha1.GatewayPolicyConfig{
 								JWT: &v1alpha1.GatewayJWTRequirement{
@@ -684,10 +750,10 @@ func TestValidateListeners(t *testing.T) {
 			expectedAcceptedErr: nil,
 		},
 		"valid JWT provider in default of policy": {
-			listeners: []gwv1beta1.Listener{
-				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			listeners: []gwv1.Listener{
+				{Name: "l1", Protocol: gwv1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -703,11 +769,11 @@ func TestValidateListeners(t *testing.T) {
 					{
 						Spec: v1alpha1.GatewayPolicySpec{
 							TargetRef: v1alpha1.PolicyTargetReference{
-								Group:       gwv1beta1.GroupVersion.String(),
+								Group:       gwv1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
 								Namespace:   "default",
-								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+								SectionName: common.PointerTo(gwv1.SectionName("l1")),
 							},
 							Default: &v1alpha1.GatewayPolicyConfig{
 								JWT: &v1alpha1.GatewayJWTRequirement{
@@ -726,10 +792,10 @@ func TestValidateListeners(t *testing.T) {
 			expectedAcceptedErr: nil,
 		},
 		"invalid JWT provider in override of policy": {
-			listeners: []gwv1beta1.Listener{
-				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			listeners: []gwv1.Listener{
+				{Name: "l1", Protocol: gwv1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -745,11 +811,11 @@ func TestValidateListeners(t *testing.T) {
 					{
 						Spec: v1alpha1.GatewayPolicySpec{
 							TargetRef: v1alpha1.PolicyTargetReference{
-								Group:       gwv1beta1.GroupVersion.String(),
+								Group:       gwv1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
 								Namespace:   "default",
-								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+								SectionName: common.PointerTo(gwv1.SectionName("l1")),
 							},
 							Override: &v1alpha1.GatewayPolicyConfig{
 								JWT: &v1alpha1.GatewayJWTRequirement{
@@ -768,10 +834,10 @@ func TestValidateListeners(t *testing.T) {
 			expectedAcceptedErr: errListenerJWTProviderNotFound,
 		},
 		"invalid JWT provider in default of policy": {
-			listeners: []gwv1beta1.Listener{
-				{Name: "l1", Protocol: gwv1beta1.HTTPProtocolType},
+			listeners: []gwv1.Listener{
+				{Name: "l1", Protocol: gwv1.HTTPProtocolType},
 			},
-			gateway: gatewayWithFinalizer(gwv1beta1.GatewaySpec{}),
+			gateway: gatewayWithFinalizer(gwv1.GatewaySpec{}),
 			resources: resourceMapResources{
 				jwtProviders: []*v1alpha1.JWTProvider{
 					{
@@ -787,11 +853,11 @@ func TestValidateListeners(t *testing.T) {
 					{
 						Spec: v1alpha1.GatewayPolicySpec{
 							TargetRef: v1alpha1.PolicyTargetReference{
-								Group:       gwv1beta1.GroupVersion.String(),
+								Group:       gwv1.GroupVersion.String(),
 								Kind:        common.KindGateway,
 								Name:        "gateway",
 								Namespace:   "default",
-								SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+								SectionName: common.PointerTo(gwv1.SectionName("l1")),
 							},
 							Default: &v1alpha1.GatewayPolicyConfig{
 								JWT: &v1alpha1.GatewayJWTRequirement{
@@ -826,7 +892,7 @@ func TestRouteAllowedForListenerNamespaces(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		allowedRoutes    *gwv1beta1.AllowedRoutes
+		allowedRoutes    *gwv1.AllowedRoutes
 		gatewayNamespace string
 		routeNamespace   corev1.Namespace
 		expected         bool
@@ -844,32 +910,32 @@ func TestRouteAllowedForListenerNamespaces(t *testing.T) {
 			expected:         false,
 		},
 		"explicit same namespace allowed": {
-			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromSame)}},
+			allowedRoutes:    &gwv1.AllowedRoutes{Namespaces: &gwv1.RouteNamespaces{From: common.PointerTo(gwv1.NamespacesFromSame)}},
 			gatewayNamespace: "test",
 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
 			expected:         true,
 		},
 		"explicit same namespace not allowed": {
-			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromSame)}},
+			allowedRoutes:    &gwv1.AllowedRoutes{Namespaces: &gwv1.RouteNamespaces{From: common.PointerTo(gwv1.NamespacesFromSame)}},
 			gatewayNamespace: "test",
 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
 			expected:         false,
 		},
 		"all namespace allowed": {
-			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo(gwv1beta1.NamespacesFromAll)}},
+			allowedRoutes:    &gwv1.AllowedRoutes{Namespaces: &gwv1.RouteNamespaces{From: common.PointerTo(gwv1.NamespacesFromAll)}},
 			gatewayNamespace: "test",
 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "other"}},
 			expected:         true,
 		},
 		"invalid namespace from not allowed": {
-			allowedRoutes:    &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{From: common.PointerTo[gwv1beta1.FromNamespaces]("other")}},
+			allowedRoutes:    &gwv1.AllowedRoutes{Namespaces: &gwv1.RouteNamespaces{From: common.PointerTo[gwv1.FromNamespaces]("other")}},
 			gatewayNamespace: "test",
 			routeNamespace:   corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}},
 			expected:         false,
 		},
 		"labeled namespace allowed": {
-			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
-				From:     common.PointerTo(gwv1beta1.NamespacesFromSelector),
+			allowedRoutes: &gwv1.AllowedRoutes{Namespaces: &gwv1.RouteNamespaces{
+				From:     common.PointerTo(gwv1.NamespacesFromSelector),
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			}},
 			gatewayNamespace: "test",
@@ -879,8 +945,8 @@ func TestRouteAllowedForListenerNamespaces(t *testing.T) {
 			expected: true,
 		},
 		"labeled namespace not allowed": {
-			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
-				From:     common.PointerTo(gwv1beta1.NamespacesFromSelector),
+			allowedRoutes: &gwv1.AllowedRoutes{Namespaces: &gwv1.RouteNamespaces{
+				From:     common.PointerTo(gwv1.NamespacesFromSelector),
 				Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			}},
 			gatewayNamespace: "test",
@@ -890,8 +956,8 @@ func TestRouteAllowedForListenerNamespaces(t *testing.T) {
 			expected: false,
 		},
 		"invalid labeled namespace": {
-			allowedRoutes: &gwv1beta1.AllowedRoutes{Namespaces: &gwv1beta1.RouteNamespaces{
-				From: common.PointerTo(gwv1beta1.NamespacesFromSelector),
+			allowedRoutes: &gwv1.AllowedRoutes{Namespaces: &gwv1.RouteNamespaces{
+				From: common.PointerTo(gwv1.NamespacesFromSelector),
 				Selector: &metav1.LabelSelector{MatchExpressions: []metav1.LabelSelectorRequirement{
 					{Key: "foo", Operator: "junk", Values: []string{"1"}},
 				}},
@@ -913,28 +979,28 @@ func TestRouteAllowedForListenerHostname(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		hostname  *gwv1beta1.Hostname
-		hostnames []gwv1beta1.Hostname
+		hostname  *gwv1.Hostname
+		hostnames []gwv1.Hostname
 		expected  bool
 	}{
 		"empty hostnames": {
 			hostname:  nil,
-			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
+			hostnames: []gwv1.Hostname{"foo", "bar"},
 			expected:  true,
 		},
 		"empty hostname": {
-			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
+			hostname:  common.PointerTo[gwv1.Hostname]("foo"),
 			hostnames: nil,
 			expected:  true,
 		},
 		"any hostname match": {
-			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
-			hostnames: []gwv1beta1.Hostname{"foo", "bar"},
+			hostname:  common.PointerTo[gwv1.Hostname]("foo"),
+			hostnames: []gwv1.Hostname{"foo", "bar"},
 			expected:  true,
 		},
 		"no match": {
-			hostname:  common.PointerTo[gwv1beta1.Hostname]("foo"),
-			hostnames: []gwv1beta1.Hostname{"bar"},
+			hostname:  common.PointerTo[gwv1.Hostname]("foo"),
+			hostnames: []gwv1.Hostname{"bar"},
 			expected:  false,
 		},
 	} {
@@ -948,8 +1014,8 @@ func TestHostnamesMatch(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		one      gwv1beta1.Hostname
-		two      gwv1beta1.Hostname
+		one      gwv1.Hostname
+		two      gwv1.Hostname
 		expected bool
 	}{
 		"wildcard one": {
@@ -1003,7 +1069,7 @@ func TestRouteKindIsAllowedForListener(t *testing.T) {
 	t.Parallel()
 
 	for name, tt := range map[string]struct {
-		kinds    []gwv1beta1.RouteGroupKind
+		kinds    []gwv1.RouteGroupKind
 		gk       schema.GroupKind
 		expected bool
 	}{
@@ -1013,29 +1079,29 @@ func TestRouteKindIsAllowedForListener(t *testing.T) {
 			expected: true,
 		},
 		"group specified": {
-			kinds: []gwv1beta1.RouteGroupKind{
-				{Group: common.PointerTo[gwv1beta1.Group]("a"), Kind: "b"},
+			kinds: []gwv1.RouteGroupKind{
+				{Group: common.PointerTo[gwv1.Group]("a"), Kind: "b"},
 			},
 			gk:       schema.GroupKind{Group: "a", Kind: "b"},
 			expected: true,
 		},
 		"group unspecified": {
-			kinds: []gwv1beta1.RouteGroupKind{
+			kinds: []gwv1.RouteGroupKind{
 				{Kind: "b"},
 			},
 			gk:       schema.GroupKind{Group: "a", Kind: "b"},
 			expected: true,
 		},
 		"kind mismatch": {
-			kinds: []gwv1beta1.RouteGroupKind{
+			kinds: []gwv1.RouteGroupKind{
 				{Kind: "b"},
 			},
 			gk:       schema.GroupKind{Group: "a", Kind: "c"},
 			expected: false,
 		},
 		"group mismatch": {
-			kinds: []gwv1beta1.RouteGroupKind{
-				{Group: common.PointerTo[gwv1beta1.Group]("a"), Kind: "b"},
+			kinds: []gwv1.RouteGroupKind{
+				{Group: common.PointerTo[gwv1.Group]("a"), Kind: "b"},
 			},
 			gk:       schema.GroupKind{Group: "d", Kind: "b"},
 			expected: false,
@@ -1049,18 +1115,18 @@ func TestRouteKindIsAllowedForListener(t *testing.T) {
 
 func TestValidateGatewayPolicies(t *testing.T) {
 	for name, tc := range map[string]struct {
-		gateway   gwv1beta1.Gateway
+		gateway   gwv1.Gateway
 		policies  []v1alpha1.GatewayPolicy
 		resources *common.ResourceMap
 		expected  gatewayPolicyValidationResults
 	}{
 		"happy path, everything exists": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "l1",
 						},
@@ -1075,7 +1141,7 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					Spec: v1alpha1.GatewayPolicySpec{
 						TargetRef: v1alpha1.PolicyTargetReference{
 							Name:        "gw",
-							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							SectionName: common.PointerTo(gwv1.SectionName("l1")),
 						},
 						Override: &v1alpha1.GatewayPolicyConfig{
 							JWT: &v1alpha1.GatewayJWTRequirement{
@@ -1130,12 +1196,12 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references a gateway that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "l1",
 						},
@@ -1150,7 +1216,7 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					Spec: v1alpha1.GatewayPolicySpec{
 						TargetRef: v1alpha1.PolicyTargetReference{
 							Name:        "gw",
-							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
+							SectionName: common.PointerTo(gwv1.SectionName("does not exist")),
 						},
 						Override: &v1alpha1.GatewayPolicyConfig{
 							JWT: &v1alpha1.GatewayJWTRequirement{
@@ -1185,12 +1251,12 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references a JWT provider in the override section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "l1",
 						},
@@ -1205,7 +1271,7 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					Spec: v1alpha1.GatewayPolicySpec{
 						TargetRef: v1alpha1.PolicyTargetReference{
 							Name:        "gw",
-							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							SectionName: common.PointerTo(gwv1.SectionName("l1")),
 						},
 						Override: &v1alpha1.GatewayPolicyConfig{
 							JWT: &v1alpha1.GatewayJWTRequirement{
@@ -1240,12 +1306,12 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references a JWT provider in the default section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "l1",
 						},
@@ -1260,7 +1326,7 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					Spec: v1alpha1.GatewayPolicySpec{
 						TargetRef: v1alpha1.PolicyTargetReference{
 							Name:        "gw",
-							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							SectionName: common.PointerTo(gwv1.SectionName("l1")),
 						},
 						Default: &v1alpha1.GatewayPolicyConfig{
 							JWT: &v1alpha1.GatewayJWTRequirement{
@@ -1295,12 +1361,12 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references the same JWT provider in the both override and default section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "l1",
 						},
@@ -1315,7 +1381,7 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					Spec: v1alpha1.GatewayPolicySpec{
 						TargetRef: v1alpha1.PolicyTargetReference{
 							Name:        "gw",
-							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							SectionName: common.PointerTo(gwv1.SectionName("l1")),
 						},
 						Override: &v1alpha1.GatewayPolicyConfig{
 							JWT: &v1alpha1.GatewayJWTRequirement{
@@ -1359,12 +1425,12 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"a policy references different JWT providers in the both override and default section that does not exist": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "l1",
 						},
@@ -1379,7 +1445,7 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					Spec: v1alpha1.GatewayPolicySpec{
 						TargetRef: v1alpha1.PolicyTargetReference{
 							Name:        "gw",
-							SectionName: common.PointerTo(gwv1beta1.SectionName("l1")),
+							SectionName: common.PointerTo(gwv1.SectionName("l1")),
 						},
 						Override: &v1alpha1.GatewayPolicyConfig{
 							JWT: &v1alpha1.GatewayJWTRequirement{
@@ -1423,12 +1489,12 @@ func TestValidateGatewayPolicies(t *testing.T) {
 			},
 		},
 		"everything is wrong: listener does not exist and override and default both reference different missing jwt providers": {
-			gateway: gwv1beta1.Gateway{
+			gateway: gwv1.Gateway{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "gw",
 				},
-				Spec: gwv1beta1.GatewaySpec{
-					Listeners: []gwv1beta1.Listener{
+				Spec: gwv1.GatewaySpec{
+					Listeners: []gwv1.Listener{
 						{
 							Name: "l1",
 						},
@@ -1443,7 +1509,7 @@ func TestValidateGatewayPolicies(t *testing.T) {
 					Spec: v1alpha1.GatewayPolicySpec{
 						TargetRef: v1alpha1.PolicyTargetReference{
 							Name:        "gw",
-							SectionName: common.PointerTo(gwv1beta1.SectionName("does not exist")),
+							SectionName: common.PointerTo(gwv1.SectionName("does not exist")),
 						},
 						Override: &v1alpha1.GatewayPolicyConfig{
 							JWT: &v1alpha1.GatewayJWTRequirement{
@@ -1570,4 +1636,90 @@ func TestValidateAuthFilters(t *testing.T) {
 			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
 		})
 	}
+}
+
+func TestRouteTLSSDSFilterIsInvalid_ClusterInheritance(t *testing.T) {
+	t.Parallel()
+
+	resources := common.NewResourceMap(common.ResourceTranslator{}, nil, logrtest.NewTestLogger(t))
+	resources.ReferenceCountGateway(gwv1.Gateway{
+		TypeMeta: metav1.TypeMeta{Kind: common.KindGateway},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "gw",
+			Namespace: "default",
+			Annotations: map[string]string{
+				common.TLSSDSClusterNameAnnotationKey:  "inherited-cluster",
+				common.TLSSDSCertResourceAnnotationKey: "listener-cert",
+			},
+		},
+		Spec: gwv1.GatewaySpec{Listeners: []gwv1.Listener{{
+			Name:     "https",
+			Port:     8443,
+			Protocol: gwv1.HTTPSProtocolType,
+			TLS:      &gwv1.ListenerTLSConfig{},
+		}}},
+	})
+
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta:   metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{Name: "route-sds", Namespace: "default"},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{SDS: &v1alpha1.GatewayTLSSDSConfig{
+			ClusterName:  "",
+			CertResource: "backend-cert",
+		}},
+	})
+
+	httpsSection := gwv1.SectionName("https")
+	route := &gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{CommonRouteSpec: gwv1.CommonRouteSpec{ParentRefs: []gwv1.ParentReference{{
+			Name:        "gw",
+			SectionName: &httpsSection,
+		}}}},
+	}
+
+	filter := gwv1.HTTPRouteFilter{
+		Type: gwv1.HTTPRouteFilterExtensionRef,
+		ExtensionRef: &gwv1.LocalObjectReference{
+			Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+			Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+			Name:  "route-sds",
+		},
+	}
+
+	require.False(t, routeTLSSDSFilterIsInvalid(filter, route, resources, route.Namespace))
+}
+
+func TestRouteTLSSDSFilterIsInvalid_ClusterInheritanceMissing(t *testing.T) {
+	t.Parallel()
+
+	resources := common.NewResourceMap(common.ResourceTranslator{}, nil, logrtest.NewTestLogger(t))
+	resources.AddExternalFilter(&v1alpha1.RouteTLSSDSFilter{
+		TypeMeta:   metav1.TypeMeta{Kind: v1alpha1.RouteTLSSDSFilterKind},
+		ObjectMeta: metav1.ObjectMeta{Name: "route-sds", Namespace: "default"},
+		Spec: v1alpha1.RouteTLSSDSFilterSpec{SDS: &v1alpha1.GatewayTLSSDSConfig{
+			ClusterName:  "",
+			CertResource: "backend-cert",
+		}},
+	})
+
+	httpsSection := gwv1.SectionName("https")
+	route := &gwv1.HTTPRoute{
+		ObjectMeta: metav1.ObjectMeta{Name: "route", Namespace: "default"},
+		Spec: gwv1.HTTPRouteSpec{CommonRouteSpec: gwv1.CommonRouteSpec{ParentRefs: []gwv1.ParentReference{{
+			Name:        "gw",
+			SectionName: &httpsSection,
+		}}}},
+	}
+
+	filter := gwv1.HTTPRouteFilter{
+		Type: gwv1.HTTPRouteFilterExtensionRef,
+		ExtensionRef: &gwv1.LocalObjectReference{
+			Group: gwv1.Group(v1alpha1.ConsulHashicorpGroup),
+			Kind:  gwv1.Kind(v1alpha1.RouteTLSSDSFilterKind),
+			Name:  "route-sds",
+		},
+	}
+
+	require.True(t, routeTLSSDSFilterIsInvalid(filter, route, resources, route.Namespace))
 }

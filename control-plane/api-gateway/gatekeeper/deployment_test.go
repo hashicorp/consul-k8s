@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -233,7 +233,7 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 
 	log := logr.Discard()
 
-	gateway := gwv1beta1.Gateway{
+	gateway := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
@@ -273,7 +273,7 @@ func TestMergeDeployments_ProbePropagation(t *testing.T) {
 	assert.Equal(t, int32(8080), container.LivenessProbe.HTTPGet.Port.IntVal)
 
 	// Now update Gateway with different probe (TCPSocket instead of HTTPGet)
-	gatewayUpdated := gwv1beta1.Gateway{
+	gatewayUpdated := gwv1.Gateway{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-gateway",
 			Annotations: map[string]string{
