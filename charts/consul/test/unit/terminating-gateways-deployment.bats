@@ -16,12 +16,12 @@ load _helpers
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq 'select(document_index == 0)' | tee /dev/stderr)
+      yq -s '.[0]' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq '. | length > 0' | tee /dev/stderr)
+  local actual=$(echo $object | yq '. | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "${object}" | yq -r '.metadata.name' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.metadata.name' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-terminating-gateway" ]
 }
 
@@ -80,7 +80,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.imageConsulDataplane=new/image' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.containers[0].image' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].image' | tee /dev/stderr)
   [ "${actual}" = "new/image" ]
 }
 
@@ -89,102 +89,78 @@ load _helpers
 
 @test "terminatingGateways/Deployment: sets TLS env variables for terminating-gateway-init when global.tls.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local env=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
   [ "${actual}" = '8501' ]
 
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_USE_TLS") | .value' | tee /dev/stderr)
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_USE_TLS") | .value' | tee /dev/stderr)
   [ "${actual}" = 'true' ]
 
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT_FILE") | .value' | tee /dev/stderr)
   [ "${actual}" = "/consul/tls/ca/tls.crt" ]
 }
 
 @test "terminatingGateways/Deployment: sets TLS env variables for terminating-gateway-init when global.tls.enabled=false" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local env=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
+
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_HTTP_PORT") | .value' | tee /dev/stderr)
   [ "${actual}" = '8500' ]
 
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_USE_TLS")' | tee /dev/stderr)
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_USE_TLS")' |  tee /dev/stderr)
   [ "${actual}" = '' ]
 
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_TLS_SERVER_NAME")' | tee /dev/stderr)
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_TLS_SERVER_NAME")' |  tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=false' \
-      . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT_FILE")' | tee /dev/stderr)
+  local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_CACERT_FILE")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 }
 
 @test "terminatingGateways/Deployment: sets TLS flags for terminating-gateway when global.tls.enabled is false" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=false' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.containers[0].args | join(" ")' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  [[ "$actual" =~ "-tls-disabled" ]]
+  local actual=$(echo $object | yq -r '. | any(contains("-tls-disabled"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: sets TLS flags for terminating-gateway when global.tls.enabled" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.tls.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.containers[0].args | join(" ")' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  [[ "$actual" =~ "-ca-certs=/consul/tls/ca/tls.crt" ]]
+  local actual=$(echo $object | yq -r '. | any(contains("-ca-certs=/consul/tls/ca/tls.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: can overwrite CA secret with the provided one" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local ca_cert_volume=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -194,23 +170,14 @@ load _helpers
       --set 'global.tls.caKey.secretName=foo-ca-key' \
       --set 'global.tls.caKey.secretKey=key' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.volumes[] | select(.name=="consul-ca-cert") | .secret.secretName' | tee /dev/stderr)
+      yq -s '.[0].spec.template.spec.volumes[] | select(.name=="consul-ca-cert")' | tee /dev/stderr)
 
   # check that the provided ca cert secret is attached as a volume
+  local actual=$(echo $ca_cert_volume | yq -r '.secret.secretName' | tee /dev/stderr)
   [ "${actual}" = "foo-ca-cert" ]
 
   # check that the volume uses the provided secret key
-  local actual=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml  \
-      --set 'terminatingGateways.enabled=true' \
-      --set 'connectInject.enabled=true' \
-      --set 'global.tls.enabled=true' \
-      --set 'global.tls.caCert.secretName=foo-ca-cert' \
-      --set 'global.tls.caCert.secretKey=key' \
-      --set 'global.tls.caKey.secretName=foo-ca-key' \
-      --set 'global.tls.caKey.secretKey=key' \
-      . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.volumes[] | select(.name=="consul-ca-cert") | .secret.items[0].key' | tee /dev/stderr)
+  local actual=$(echo $ca_cert_volume | yq -r '.secret.items[0].key' | tee /dev/stderr)
   [ "${actual}" = "key" ]
 }
 
@@ -247,7 +214,7 @@ load _helpers
       --set 'global.enableConsulNamespaces=true' \
       --set 'terminatingGateways.defaults.consulNamespace=namespace' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.serviceAccountName' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.serviceAccountName' | tee /dev/stderr)
 
   [ "${actual}" = "release-name-consul-terminating-gateway" ]
 }
@@ -263,7 +230,7 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].env[] | @json' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo $env | jq -r '. | select(.name == "CONSUL_LOGIN_AUTH_METHOD") | .value' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-k8s-component-auth-method" ]
@@ -283,16 +250,16 @@ load _helpers
       --set 'terminatingGateways.enabled=true' \
       --set 'global.acls.manageSystemACLs=false' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].args' | tee /dev/stderr)
-printf '%s\n' "${object}" >&3
-actual=$(echo "${object}" | grep -q -- "-login-bearer-token-path" && echo "true" || echo "false")
-[ "${actual}" = "false" ]
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-actual=$(echo "${object}" | grep -q -- "-login-auth-method" && echo "true" || echo "false")
-[ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '. | any(contains("-login-bearer-path"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 
-actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" || echo "false")
-[ "${actual}" = "false" ]
+  local actual=$(echo $object | yq -r '. | any(contains("-login-method"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+
+  local actual=$(echo $object | yq -r '. | any(contains("-credential-type=login"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "terminatingGateways/Deployment: command flags are set when acls are enabled" {
@@ -303,15 +270,15 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].args' | tee /dev/stderr)
-  
-  actual=$(echo "${object}" | grep -q -- "-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token" && echo "true" || echo "false")
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
+
+  local actual=$(echo $object | yq -r '. | any(contains("-login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo "${object}" | grep -q -- "-login-auth-method=release-name-consul-k8s-component-auth-method" && echo "true" || echo "false")
+  local actual=$(echo $object | yq -r '. | any(contains("-login-auth-method=release-name-consul-k8s-component-auth-method"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" || echo "false")
+  local actual=$(echo $object | yq -r '. | any(contains("-credential-type=login"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -323,7 +290,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'global.acls.manageSystemACLs=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].env[] | @json' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].env[]' | tee /dev/stderr)
 
   local actual=$(echo $env | jq -r '. | select(.name == "DP_CREDENTIAL_LOGIN_META1") | .value' | tee /dev/stderr)
   [ "${actual}" = 'pod=$(NAMESPACE)/$(POD_NAME)' ]
@@ -343,7 +310,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       . | tee /dev/stderr |
-       yq -r 'select(document_index == 0) |.spec.template.metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
+       yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -355,7 +322,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       . | tee /dev/stderr |
-       yq -r 'select(document_index == 0) |.spec.template.metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+       yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
   [ "${actual}" = "20200" ]
 }
 
@@ -367,7 +334,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'global.metrics.enabled=true'  \
       . | tee /dev/stderr |
-       yq -r 'select(document_index == 0) |.spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+       yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
   [ "${actual}" = "/metrics" ]
 }
 
@@ -380,7 +347,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'global.metrics.enabled=true'  \
       --set 'terminatingGateways.defaults.annotations=prometheus.io/path: /anew/path' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
   [ "${actual}" = "/anew/path" ]
 }
 
@@ -395,13 +362,13 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       . | tee /dev/stderr |
       yq '.spec.template' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq -r 'select(document_index == 0) |.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "${object}" | yq -r 'select(document_index == 0) |.metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "${object}" | yq -r 'select(document_index == 0) |.metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -415,13 +382,13 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       . | tee /dev/stderr |
       yq '.spec.template' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq -r 'select(document_index == 0) |.metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/path"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "${object}" | yq -r 'select(document_index == 0) |.metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/port"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "${object}" | yq -r 'select(document_index == 0) |.metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
+  local actual=$(echo $object | yq -s -r '.[0].metadata.annotations."prometheus.io/scrape"' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -440,9 +407,9 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'externalServers.hosts[0]=consul' \
       --set 'externalServers.skipServerWatch=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].args' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | grep -q "-server-watch-disabled=true" && echo "true" || echo "false")
+  local actual=$(echo $object | yq -r '. | any(contains("-server-watch-disabled=true"))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
@@ -456,7 +423,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.replicas' | tee /dev/stderr)
+      yq -s -r '.[0].spec.replicas' | tee /dev/stderr)
   [ "${actual}" = "1" ]
 }
 
@@ -468,7 +435,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.replicas=3' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.replicas' | tee /dev/stderr)
+      yq -s -r '.[0].spec.replicas' | tee /dev/stderr)
   [ "${actual}" = "3" ]
 }
 
@@ -482,7 +449,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].name=gateway1' \
       --set 'terminatingGateways.gateways[0].replicas=12' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.replicas' | tee /dev/stderr)
+      yq -s -r '.[0].spec.replicas' | tee /dev/stderr)
   [ "${actual}" = "12" ]
 }
 
@@ -500,13 +467,13 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.defaults.extraVolumes[0].type=configMap' \
       --set 'terminatingGateways.defaults.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+      yq -r -s '.[0].spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.configMap.name' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.configMap.secretName' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
@@ -518,13 +485,13 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.defaults.extraVolumes[0].type=configMap' \
       --set 'terminatingGateways.defaults.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+      yq -r -s '.[0].spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.readOnly' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.mountPath' | tee /dev/stderr)
   [ "${actual}" = "/consul/userconfig/foo" ]
 }
@@ -540,13 +507,13 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.defaults.extraVolumes[0].type=secret' \
       --set 'terminatingGateways.defaults.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+      yq -r -s '.[0].spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.secret.name' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.secret.secretName' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
@@ -558,22 +525,21 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.defaults.extraVolumes[0].type=configMap' \
       --set 'terminatingGateways.defaults.extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+      yq -r -s '.[0].spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.readOnly' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.mountPath' | tee /dev/stderr)
   [ "${actual}" = "/consul/userconfig/foo" ]
 }
 
-
 @test "terminatingGateways/Deployment: adds extra secret volume with items" {
   cd `chart_dir`
 
-  local object=$(helm template \
+  local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -581,16 +547,9 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.defaults.extraVolumes[0].name=foo' \
       --set 'terminatingGateways.defaults.extraVolumes[0].items[0].key=key' \
       --set 'terminatingGateways.defaults.extraVolumes[0].items[0].path=path' \
-      . | tee /dev/stderr)
-
-  local actual=$(echo "${object}" | yq -r '.spec.template.spec.volumes[] | select(.name == "userconfig-foo") | .secret.secretName')
-  [ "${actual}" = "foo" ]
-
-  actual=$(echo "${object}" | yq -r '.spec.template.spec.volumes[] | select(.name == "userconfig-foo") | .secret.items[0].key')
-  [ "${actual}" = "key" ]
-
-  actual=$(echo "${object}" | yq -r '.spec.template.spec.volumes[] | select(.name == "userconfig-foo") | .secret.items[0].path')
-  [ "${actual}" = "path" ]
+      . | tee /dev/stderr |
+      yq -c -s '.[0].spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+  [ "${actual}" = "{\"name\":\"userconfig-foo\",\"secret\":{\"secretName\":\"foo\",\"items\":[{\"key\":\"key\",\"path\":\"path\"}]}}" ]
 }
 
 @test "terminatingGateways/Deployment: adds extra secret volume through specific gateway overriding defaults" {
@@ -607,13 +566,13 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].extraVolumes[0].type=secret' \
       --set 'terminatingGateways.gateways[0].extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+      yq -r -s '.[0].spec.template.spec.volumes[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.secret.name' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.secret.secretName' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
@@ -628,13 +587,13 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].extraVolumes[0].type=secret' \
       --set 'terminatingGateways.gateways[0].extraVolumes[0].name=foo' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
+      yq -r -s '.[0].spec.template.spec.containers[0].volumeMounts[] | select(.name == "userconfig-foo")' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.readOnly' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  local actual=$(echo "${object}" |
+  local actual=$(echo $object |
       yq -r '.mountPath' | tee /dev/stderr)
   [ "${actual}" = "/consul/userconfig/foo" ]
 }
@@ -649,7 +608,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].resources' | tee /dev/stderr)
 
   [ $(echo "${actual}" | yq -r '.requests.memory') = "100Mi" ]
   [ $(echo "${actual}" | yq -r '.requests.cpu') = "100m" ]
@@ -668,18 +627,18 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.defaults.resources.limits.memory=memory2' \
       --set 'terminatingGateways.defaults.resources.limits.cpu=cpu2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].resources' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq -r '.requests.memory' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
   [ "${actual}" = "memory" ]
 
-  local actual=$(echo "${object}" | yq -r '.requests.cpu' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
   [ "${actual}" = "cpu" ]
 
-  local actual=$(echo "${object}" | yq -r '.limits.memory' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
   [ "${actual}" = "memory2" ]
 
-  local actual=$(echo "${object}" | yq -r '.limits.cpu' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
   [ "${actual}" = "cpu2" ]
 }
 
@@ -699,18 +658,18 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].resources.limits.memory=gwmemory2' \
       --set 'terminatingGateways.gateways[0].resources.limits.cpu=gwcpu2' \
       . | tee /dev/stderr |
-      yq 'select(document_index == 0) |.spec.template.spec.containers[0].resources' | tee /dev/stderr)
+      yq -s '.[0].spec.template.spec.containers[0].resources' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq -r '.requests.memory' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.requests.memory' | tee /dev/stderr)
   [ "${actual}" = "gwmemory" ]
 
-  local actual=$(echo "${object}" | yq -r '.requests.cpu' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.requests.cpu' | tee /dev/stderr)
   [ "${actual}" = "gwcpu" ]
 
-  local actual=$(echo "${object}" | yq -r '.limits.memory' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.limits.memory' | tee /dev/stderr)
   [ "${actual}" = "gwmemory2" ]
 
-  local actual=$(echo "${object}" | yq -r '.limits.cpu' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.limits.cpu' | tee /dev/stderr)
   [ "${actual}" = "gwcpu2" ]
 }
 
@@ -724,7 +683,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.affinity' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.affinity' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -736,7 +695,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.affinity=key: value' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.affinity.key' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.affinity.key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
 
@@ -750,7 +709,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].name=gateway1' \
       --set 'terminatingGateways.gateways[0].affinity=key2: value2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.affinity.key2' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.affinity.key2' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
 }
 
@@ -764,7 +723,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.tolerations' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.tolerations' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -776,7 +735,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.tolerations=- key: value' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.tolerations[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
 
@@ -790,7 +749,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].name=gateway1' \
       --set 'terminatingGateways.gateways[0].tolerations=- key: value2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.tolerations[0].key' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
 }
 
@@ -815,7 +774,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.topologySpreadConstraints=- key: value' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
 
@@ -830,7 +789,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].name=gateway1' \
       --set 'terminatingGateways.gateways[0].topologySpreadConstraints=- key: value2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.topologySpreadConstraints[0].key' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
 }
 
@@ -844,7 +803,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.nodeSelector' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.nodeSelector' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -856,7 +815,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.nodeSelector=key: value' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.nodeSelector.key' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.nodeSelector.key' | tee /dev/stderr)
   [ "${actual}" = "value" ]
 }
 
@@ -870,7 +829,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].name=gateway1' \
       --set 'terminatingGateways.gateways[0].nodeSelector=key2: value2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.nodeSelector.key2' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.nodeSelector.key2' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
 }
 
@@ -884,7 +843,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.priorityClassName' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.priorityClassName' | tee /dev/stderr)
   [ "${actual}" = "null" ]
 }
 
@@ -896,7 +855,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.defaults.priorityClassName=name' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.priorityClassName' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.priorityClassName' | tee /dev/stderr)
   [ "${actual}" = "name" ]
 }
 
@@ -910,7 +869,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.gateways[0].name=gateway1' \
       --set 'terminatingGateways.gateways[0].priorityClassName=priority' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.priorityClassName' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.priorityClassName' | tee /dev/stderr)
   [ "${actual}" = "priority" ]
 }
 
@@ -924,7 +883,7 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.metadata.annotations | length' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations | length' | tee /dev/stderr)
   [ "${actual}" = "4" ]
 }
 
@@ -937,15 +896,15 @@ actual=$(echo "${object}" | grep -q -- "-credential-type=login" && echo "true" |
       --set 'terminatingGateways.defaults.annotations=key1: value1
 key2: value2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.metadata.annotations' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq '. | length' | tee /dev/stderr)
+  local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
   [ "${actual}" = "6" ]
 
-  local actual=$(echo "${object}" | yq -r '.key1' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.key1' | tee /dev/stderr)
   [ "${actual}" = "value1" ]
 
-  local actual=$(echo "${object}" | yq -r '.key2' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.key2' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
 }
 
@@ -959,15 +918,15 @@ key2: value2' \
       --set 'terminatingGateways.gateways[0].annotations=key1: value1
 key2: value2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.metadata.annotations' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq '. | length' | tee /dev/stderr)
+  local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
   [ "${actual}" = "6" ]
 
-  local actual=$(echo "${object}" | yq -r '.key1' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.key1' | tee /dev/stderr)
   [ "${actual}" = "value1" ]
 
-  local actual=$(echo "${object}" | yq -r '.key2' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.key2' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
 }
 
@@ -982,39 +941,34 @@ key2: value2' \
       --set 'terminatingGateways.gateways[0].annotations=key1: value1
 key2: value2' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.metadata.annotations' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | yq '. | length' | tee /dev/stderr)
+  local actual=$(echo $object | yq '. | length' | tee /dev/stderr)
   [ "${actual}" = "7" ]
 
-  local actual=$(echo "${object}" | yq -r '.defaultkey' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.defaultkey' | tee /dev/stderr)
   [ "${actual}" = "defaultvalue" ]
 
-  local actual=$(echo "${object}" | yq -r '.key1' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.key1' | tee /dev/stderr)
   [ "${actual}" = "value1" ]
 
-  local actual=$(echo "${object}" | yq -r '.key2' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.key2' | tee /dev/stderr)
   [ "${actual}" = "value2" ]
 }
 
 #--------------------------------------------------------------------
 # consul namespaces
-#
+
 @test "terminatingGateways/Deployment: namespace annotation is not present by default" {
   cd `chart_dir`
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
-      . |
-      yq -r 'select(document_index == 0) | .spec.template.metadata.annotations')
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations' | tee /dev/stderr)
 
-  printf '%s\n' "${object}" >&3
-
-  local actual=$(echo "${object}" | yq -r 'has("consul.hashicorp.com/gateway-namespace")')
-
-  printf 'actual=%s\n' "${actual}" >&3
-
+  local actual=$(echo $object | yq -r 'any(contains("consul.hashicorp.com/gateway-namespace"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
@@ -1028,7 +982,7 @@ key2: value2' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'terminatingGateways.defaults.consulNamespace=namespace' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
 
   [ "${actual}" = "namespace" ]
 }
@@ -1044,7 +998,7 @@ key2: value2' \
       --set 'terminatingGateways.gateways[0].name=terminating-gateway' \
       --set 'terminatingGateways.gateways[0].consulNamespace=new-namespace' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
 
   [ "${actual}" = "new-namespace" ]
 }
@@ -1059,26 +1013,26 @@ key2: value2' \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) |.spec.template.spec.containers[0].args' | tee /dev/stderr)
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  local actual=$(echo "${object}" | grep -q "-partition" && echo "true" || echo "false")
+  local actual=$(echo $object | yq -r '. | any(contains("-partition"))' | tee /dev/stderr)
   [ "${actual}" = "false" ]
 }
 
 @test "terminatingGateways/Deployment: partition command flag is specified through partition name" {
   cd `chart_dir`
-
   local object=$(helm template \
-      -s templates/terminating-gateways-deployment.yaml \
+      -s templates/terminating-gateways-deployment.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'global.adminPartitions.enabled=true' \
       --set 'global.adminPartitions.name=default' \
       . | tee /dev/stderr |
-      yq -r 'select(document_index == 0) | .spec.template.spec.containers[0].args')
+      yq -s -r '.[0].spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  [[ "${object}" =~ -service-partition=default ]]
+  local actual=$(echo $object | yq -r '. | any(contains("-partition=default"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: fails if admin partitions are enabled but namespaces aren't" {
@@ -1099,42 +1053,29 @@ key2: value2' \
 
 @test "terminatingGateways/Deployment: multiple gateways" {
   cd `chart_dir`
-
   local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       --set 'terminatingGateways.gateways[0].name=gateway1' \
       --set 'terminatingGateways.gateways[1].name=gateway2' \
-      .)
+      . | tee /dev/stderr |
+      yq -s -r '.' | tee /dev/stderr)
 
-  printf '%s\n' "${object}" >&3
-
-  # First deployment
-  local actual=$(echo "${object}" | \
-      yq -r 'select(document_index == 0) | .metadata.name')
+  local actual=$(echo $object | yq -r '.[0].metadata.name' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-gateway1" ]
 
-  # Second deployment
-  actual=$(echo "${object}" | \
-      yq -r 'select(document_index == 1) | .metadata.name')
+  local actual=$(echo $object | yq -r '.[1].metadata.name' | tee /dev/stderr)
   [ "${actual}" = "release-name-consul-gateway2" ]
 
-  # Verify first document exists
-  actual=$(echo "${object}" | \
-      yq 'select(document_index == 0) | length > 0')
+  local actual=$(echo $object | yq '.[0] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  # Verify second document exists
-  actual=$(echo "${object}" | \
-      yq 'select(document_index == 1) | length > 0')
+  local actual=$(echo $object | yq '.[1] | length > 0' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  # Verify third document does not exist
-  actual=$(echo "${object}" | \
-      yq 'select(document_index == 2) | length > 0')
-
-  [ -z "${actual}" ]
+  local actual=$(echo $object | yq '.[2] | length > 0' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 #--------------------------------------------------------------------
@@ -1156,38 +1097,35 @@ key2: value2' \
       yq -r '.spec.template' | tee /dev/stderr)
 
   # Check annotations
-  local actual=$(echo "${object}" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-init-first"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo "${object}" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject"]' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 
-  actual=$(echo "${object}" | yq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/role"]' | tee /dev/stderr)
   [ "${actual}" = "carole" ]
 
-  actual=$(echo "${object}" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-secret-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = "foo" ]
 
-  actual=$(echo "${object}" | yq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
+  local actual=$(echo $object | jq -r '.metadata.annotations["vault.hashicorp.com/agent-inject-template-serverca.crt"]' | tee /dev/stderr)
   [ "${actual}" = $'{{- with secret \"foo\" -}}\n{{- .Data.certificate -}}\n{{- end -}}' ]
 
-  # Ensure CA cert volume is not mounted when using Vault
-  actual=$(echo "${object}" | yq -r '.spec.volumes[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  actual=$(echo $object | jq -r '.spec.volumes[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  actual=$(echo "${object}" | yq -r '.spec.containers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  actual=$(echo $object | jq -r '.spec.containers[0].volumeMounts[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  actual=$(echo "${object}" | yq -r '.spec.initContainers[0].volumeMounts[] | select(.name == "consul-ca-cert")' | tee /dev/stderr)
+  actual=$(echo $object | jq -r '.spec.initContainers[0].volumeMounts[] | select( .name == "consul-ca-cert")' | tee /dev/stderr)
   [ "${actual}" = "" ]
 
-  # Ensure init container uses Vault-injected CA
-  actual=$(echo "${object}" | yq -r '.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
+  actual=$(echo $object | jq -r '.spec.initContainers[0].env[] | select(.name == "CONSUL_CACERT_FILE").value' | tee /dev/stderr)
   [ "${actual}" = "/vault/secrets/serverca.crt" ]
 
-  # Ensure dataplane uses Vault-injected CA
-  actual=$(echo "${object}" | yq -r '.spec.containers[0].args[]' | grep -c '^-ca-certs=/vault/secrets/serverca.crt$')
-  [ "${actual}" = "1" ]
+  actual=$(echo $object | jq -r '.spec.containers[0].args | any(contains("-ca-certs=/vault/secrets/serverca.crt"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: vault CA is not configured by default" {
@@ -1204,9 +1142,9 @@ key2: value2' \
     --set 'global.secretsBackend.vault.consulCARole=test' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
-  local actual=$(echo "${object}" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(echo "${object}" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -1225,9 +1163,9 @@ key2: value2' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
-  local actual=$(echo "${object}" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(echo "${object}" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
@@ -1246,15 +1184,15 @@ key2: value2' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
       yq -r '.spec.template' | tee /dev/stderr)
-  local actual=$(echo "${object}" | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/agent-extra-secret")')
   [ "${actual}" = "false" ]
-  local actual=$(echo"${object}" | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
+  local actual=$(echo $object | yq -r '.metadata.annotations | has("vault.hashicorp.com/ca-cert")')
   [ "${actual}" = "false" ]
 }
 
 @test "terminatingGateways/Deployment: vault CA is configured when both secretName and secretKey are set" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
     -s templates/terminating-gateways-deployment.yaml  \
     --set 'terminatingGateways.enabled=true' \
     --set 'connectInject.enabled=true' \
@@ -1267,23 +1205,10 @@ key2: value2' \
     --set 'global.secretsBackend.vault.ca.secretName=ca' \
     --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
     . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations."vault.hashicorp.com/agent-extra-secret"' | tee /dev/stderr)
+      yq -r '.spec.template' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/agent-extra-secret"')
   [ "${actual}" = "ca" ]
-  
-  local actual=$(helm template \
-    -s templates/terminating-gateways-deployment.yaml  \
-    --set 'terminatingGateways.enabled=true' \
-    --set 'connectInject.enabled=true' \
-    --set 'global.tls.enabled=true' \
-    --set 'global.tls.caCert.secretName=foo' \
-    --set 'global.secretsBackend.vault.enabled=true' \
-    --set 'global.secretsBackend.vault.consulClientRole=foo' \
-    --set 'global.secretsBackend.vault.consulServerRole=test' \
-    --set 'global.secretsBackend.vault.consulCARole=test' \
-    --set 'global.secretsBackend.vault.ca.secretName=ca' \
-    --set 'global.secretsBackend.vault.ca.secretKey=tls.crt' \
-    . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations."vault.hashicorp.com/ca-cert"' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/ca-cert"')
   [ "${actual}" = "/vault/custom/tls.crt" ]
 }
 
@@ -1332,7 +1257,7 @@ key2: value2' \
 
 @test "terminatingGateways/Deployment: vault namespace annotations can be set when secretsBackend.vault.vaultNamespace is set and .global.secretsBackend.vault.agentAnnotations is not set." {
   cd `chart_dir`
-  local actual=$(helm template \
+  local object=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
@@ -1344,7 +1269,8 @@ key2: value2' \
       --set 'global.secretsBackend.vault.consulCARole=carole' \
       --set 'global.secretsBackend.vault.vaultNamespace=vns' \
        . | tee /dev/stderr |
-      yq -r '.spec.template.metadata.annotations."vault.hashicorp.com/namespace"' | tee /dev/stderr)
+      yq -r '.spec.template' | tee /dev/stderr)
+  local actual=$(echo $object | yq -r '.metadata.annotations."vault.hashicorp.com/namespace"')
   [ "${actual}" = "vns" ]
 }
 
@@ -1544,13 +1470,13 @@ key2: value2' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].args | join(" ")' | tee /dev/stderr)
-  [[ "$actual" =~ "-tls-server-name=server.dc1.consul" ]]
+      yq '.spec.template.spec.containers[0].args | any(contains("-tls-server-name=server.dc1.consul"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: can provide a TLS server name for the sidecar-injector when global.cloud.enabled is set" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local env=$(helm template \
       -s templates/terminating-gateways-deployment.yaml  \
       --set 'terminatingGateways.enabled=true' \
       --set 'global.tls.enabled=true' \
@@ -1563,8 +1489,10 @@ key2: value2' \
       --set 'global.cloud.resourceId.secretName=resource-id-name' \
       --set 'global.cloud.resourceId.secretKey=resource-id-key' \
     . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_TLS_SERVER_NAME") | .value' | tee /dev/stderr)
+      yq '.spec.template.spec.initContainers[0].env[]' | tee /dev/stderr)
 
+  local actual=$(echo "$env" |
+    jq -r '. | select( .name == "CONSUL_TLS_SERVER_NAME").value' | tee /dev/stderr)
   [ "${actual}" = "server.dc1.consul" ]
 }
 
@@ -1620,50 +1548,58 @@ key2: value2' \
 
 @test "terminatingGateways/Deployment: use global.logLevel by default" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local cmd=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command | join(" ")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
 
-  [[ "$actual" =~ "-log-level=info" ]]
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: override global.logLevel when terminatingGateways.logLevel is set" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local cmd=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'terminatingGateways.logLevel=debug' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.initContainers[0].command | join(" ")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.initContainers[0].command' | tee /dev/stderr)
 
-  [[ "$actual" =~ "-log-level=debug" ]]
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: use global.logLevel by default for dataplane container" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local cmd=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].args | join(" ")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  [[ "$actual" =~ "-log-level=info" ]]
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=info"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
 
 @test "terminatingGateways/Deployment: override global.logLevel when terminatingGateways.logLevel is set for dataplane container" {
   cd `chart_dir`
-  local actual=$(helm template \
+  local cmd=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
       --set 'terminatingGateways.enabled=true' \
       --set 'terminatingGateways.logLevel=debug' \
       --set 'connectInject.enabled=true' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].args | join(" ")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].args' | tee /dev/stderr)
 
-  [[ "$actual" =~ "-log-level=debug" ]]
+  local actual=$(echo "$cmd" |
+    yq 'any(contains("-log-level=debug"))' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
 }
