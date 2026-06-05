@@ -647,39 +647,28 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 		}
 	}
 
-	// ✅ Aggregate all errors into ONE condition
-	var messages []string
-	reasonSet := make(map[string]struct{})
+	var conditions []metav1.Condition
 
 	for _, err := range g.resolvedRefsErrs {
-		messages = append(messages, err.Error())
+		reason := "InvalidRefs"
 
 		switch {
 		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
-			reasonSet["MissingListenerReference"] = struct{}{}
+			reason = "MissingListenerReference"
 		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
-			reasonSet["MissingJWTProviderReference"] = struct{}{}
+			reason = "MissingJWTProviderReference"
 		}
-	}
 
-	// Pick a combined reason
-	reason := "InvalidRefs"
-	if len(reasonSet) == 1 {
-		for r := range reasonSet {
-			reason = r
-		}
-	}
-
-	return []metav1.Condition{
-		{
+		conditions = append(conditions, metav1.Condition{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,
 			Reason:             reason,
 			ObservedGeneration: generation,
-			Message:            strings.Join(messages, "; "),
+			Message:            err.Error(),
 			LastTransitionTime: now,
-		},
+		})
 	}
+	return conditions
 }
 
 type authFilterValidationResults []authFilterValidationResult
