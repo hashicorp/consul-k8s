@@ -212,37 +212,19 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 					k8s.DeployKustomize(t, defaultPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-single-service-app")
 				}
 
-				// Deploy the client.
-				// CNI + tproxy + mode "none" requires explicit upstream annotations.
-				// With CNI, iptables are set up by the DaemonSet at pod-creation time,
-				// before consul-dataplane starts. The initial xDS snapshot therefore
-				// does not include the cross-partition EDS push for direct-connect
-				// mode "none" endpoints, leaving the outbound listener with only
-				// original-destination. Envoy forwards to the unroutable 240.0.0.x
-				// virtual IP and returns 503.
-				// Without CNI the init-container runs before consul-dataplane, which
-				// causes a later xDS sync that correctly includes the cross-partition
-				// cluster, so virtual-DNS tproxy works in that path.
-				// Explicit upstream annotations guarantee the cluster is present in
-				// xDS regardless of when the dataplane's initial snapshot is taken.
-				useTproxyClient := cfg.EnableTransparentProxy && !(cfg.EnableCNI && meshGatewayMode.name == "none")
-				logger.Log(t, "deploying client in secondary partition cluster")
-				if useTproxyClient {
-					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service-tproxy")
-				} else {
-					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
-				}
-
 				multiportPods, err := defaultPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=multiport"})
 				require.NoError(t, err)
 				require.Len(t, multiportPods.Items, 1)
 				require.Len(t, multiportPods.Items[0].Spec.Containers, 2)
 
-				staticClientPods, err := secondaryPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
-				require.NoError(t, err)
-				require.Len(t, staticClientPods.Items, 1)
-				require.Len(t, staticClientPods.Items[0].Spec.Containers, 2)
-
+				// Verify multiport service is registered with all ports and is healthy
+				// BEFORE deploying the client. This ensures that when the client's
+				// proxy starts, its initial xDS snapshot includes the complete
+				// cross-partition per-port configuration. Without this ordering, the
+				// proxy may receive an incomplete initial snapshot (missing some port
+				// VIPs/clusters) that never self-corrects — particularly in
+				// ACLs-disabled (default-allow) mode or with CNI where iptables are
+				// configured before consul-dataplane starts.
 				consulDefaultQueryOpts := &api.QueryOptions{Partition: defaultPartition, Namespace: "default"}
 				retry.Run(t, func(r *retry.R) {
 					services, _, err := consulClient.Catalog().Service(multiportServiceName, "", consulDefaultQueryOpts)
@@ -258,21 +240,20 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 					require.Len(r, legacyAdminServices, 0)
 				})
 
-				// Use virtual-DNS URLs only when the tproxy client fixture is deployed.
-				var upstreamAPIURL, upstreamMetricsURL, upstreamAdminURL string
-				if useTproxyClient {
-					upstreamAPIURL = "http://api-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
-					upstreamMetricsURL = "http://metrics.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
-					upstreamAdminURL = "http://admin-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
-				} else {
-					upstreamAPIURL = "http://localhost:1234"
-					upstreamMetricsURL = "http://localhost:2234"
-					upstreamAdminURL = "http://localhost:3234"
-				}
+				// Verify the service is healthy (not just registered). The proxy
+				// needs healthy endpoints in EDS to route traffic.
+				retry.Run(t, func(r *retry.R) {
+					healthServices, _, err := consulClient.Health().Service(multiportServiceName, "", true, consulDefaultQueryOpts)
+					require.NoError(r, err)
+					require.Len(r, healthServices, 1)
+				})
 
-				secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
-
-				// Create intention to allow cross-partition traffic.
+				// Create intention BEFORE deploying the client so the proxy's initial
+				// xDS snapshot includes multiport as an allowed upstream with all
+				// per-port VIPs and clusters configured. In ACLs-disabled mode
+				// (default-allow), creating the intention early still helps because it
+				// provides an explicit signal to Consul's xDS machinery to push the
+				// complete per-port configuration for the cross-partition service.
 				logger.Logf(t, "creating intention for destination %s", multiportServiceName)
 				_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 					Kind:      api.ServiceIntentions,
@@ -293,6 +274,42 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 					_, err := consulClient.ConfigEntries().Delete(api.ServiceIntentions, multiportServiceName, &api.WriteOptions{Partition: defaultPartition})
 					require.NoError(t, err)
 				})
+
+				// Deploy the client.
+				// CNI + tproxy requires explicit upstream annotations because with
+				// CNI, iptables are set up by the DaemonSet at pod-creation time,
+				// before consul-dataplane starts. The initial xDS snapshot therefore
+				// may not include the cross-partition per-port VIP filter chains,
+				// leaving the outbound listener unable to route traffic to 240.0.0.x
+				// virtual IPs (Envoy returns 503).
+				// Explicit upstream annotations guarantee the cluster is present in
+				// xDS regardless of when the dataplane's initial snapshot is taken.
+				useTproxyClient := cfg.EnableTransparentProxy && !cfg.EnableCNI
+				logger.Log(t, "deploying client in secondary partition cluster")
+				if useTproxyClient {
+					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service-tproxy")
+				} else {
+					k8s.DeployKustomize(t, secondaryPartitionClusterContext.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-partitions/default-ns-default-partition-multiport-single-service")
+				}
+
+				staticClientPods, err := secondaryPartitionClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{LabelSelector: "app=static-client"})
+				require.NoError(t, err)
+				require.Len(t, staticClientPods.Items, 1)
+				require.Len(t, staticClientPods.Items[0].Spec.Containers, 2)
+
+				// Use virtual-DNS URLs only when the tproxy client fixture is deployed.
+				var upstreamAPIURL, upstreamMetricsURL, upstreamAdminURL string
+				if useTproxyClient {
+					upstreamAPIURL = "http://api-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+					upstreamMetricsURL = "http://metrics.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+					upstreamAdminURL = "http://admin-port.multiport.virtual.default.ns.default.ap.dc1.dc.consul"
+				} else {
+					upstreamAPIURL = "http://localhost:1234"
+					upstreamMetricsURL = "http://localhost:2234"
+					upstreamAdminURL = "http://localhost:3234"
+				}
+
+				secondaryClientOpts := secondaryPartitionClusterContext.KubectlOptions(t)
 
 				logger.Log(t, "checking cross-partition connectivity for all three ports")
 				k8s.CheckStaticServerConnectionSuccessfulWithMessage(t, secondaryClientOpts, StaticClientName, "Response from api-port 9090: Hello there!", upstreamAPIURL)

@@ -19,13 +19,3 @@ spec:
   protocol: http
   meshGateway:
     mode: remote
----
-apiVersion: consul.hashicorp.com/v1alpha1
-kind: ServiceResolver
-metadata:
-  name: multiport
-spec:
-  redirect:
-    service: multiport
-    namespace: default
-    partition: default
