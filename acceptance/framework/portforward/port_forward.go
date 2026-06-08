@@ -16,6 +16,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	// reconnectProbeInterval is how often to poll the forwarded port for readiness after a reconnect.
+	reconnectProbeInterval = 1 * time.Second
+	// reconnectProbeTimeout is how long to wait for a reconnected port-forward to accept connections
+	// before closing it and retrying. kubectl port-forward launching is not the same as the remote
+	// endpoint being ready; this gap is where tests see spurious "connection refused" errors.
+	reconnectProbeTimeout = 30 * time.Second
+)
+
 // CreateTunnelToResourcePort returns a local address:port that is tunneled to the given resource's port.
 func CreateTunnelToResourcePort(t *testing.T, resourceName string, remotePort int, options *terratestk8s.KubectlOptions, logger terratestLogger.TestLogger) string {
 	localPort := terratestk8s.GetAvailablePort(t)
@@ -72,6 +81,28 @@ func monitorPortForwardedServer(t *testing.T, port int, tunnel *terratestk8s.Tun
 				if err != nil {
 					// If we couldn't establish a port forwarding channel, continue, so we can try again.
 					continue
+				}
+				// ForwardPortE starting the kubectl process does not mean the remote endpoint
+				// is accepting connections yet. Probe until ready or give up and retry next tick.
+				deadline := time.Now().Add(reconnectProbeTimeout)
+				ready := false
+				for time.Now().Before(deadline) {
+					select {
+					case <-doneChan:
+						tunnel.Close()
+						return
+					default:
+					}
+					if probe, dialErr := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port)); dialErr == nil {
+						_ = probe.Close()
+						ready = true
+						break
+					}
+					time.Sleep(reconnectProbeInterval)
+				}
+				if !ready {
+					logger.Log(t, "reconnected port-forward not accepting connections after timeout; closing and retrying")
+					tunnel.Close()
 				}
 			}
 			if conn != nil {

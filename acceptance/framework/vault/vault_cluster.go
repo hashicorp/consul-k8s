@@ -235,8 +235,16 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 		}
 	})
 	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
-	tokenSecret, err := v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
-	require.NoError(t, err)
+	// In K8s 1.24+ the token controller populates token/ca.crt asynchronously after the Secret is created.
+	// Retry until both fields are non-empty to avoid configuring Vault with an empty token_reviewer_jwt.
+	var tokenSecret *corev1.Secret
+	retry.RunWith(&retry.Counter{Count: 30, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		tokenSecret, err = v.kubernetesClient.CoreV1().Secrets(saNS).Get(context.Background(), secretName, metav1.GetOptions{})
+		require.NoError(r, err)
+		if len(tokenSecret.Data["token"]) == 0 {
+			r.Error("service account token not yet populated in secret")
+		}
+	})
 	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
 		"token_reviewer_jwt": string(tokenSecret.Data["token"]),
 		"kubernetes_ca_cert": string(tokenSecret.Data["ca.crt"]),
@@ -423,7 +431,12 @@ func (v *VaultCluster) initAndUnseal(t *testing.T) {
 		require.NoError(r, err)
 		require.Equal(r, corev1.PodRunning, serverPod.Status.Phase)
 
-		// Set up the client so that we can make API calls to initialize and unseal.
+		// Reset the client on each attempt so SetupVaultClient always creates a
+		// fresh portforward tunnel. The goroutine dies if Vault is not yet
+		// listening on port 8200 when the tunnel is established; without this
+		// reset, the nil-guard in SetupVaultClient returns the dead client on
+		// all subsequent retries.
+		v.vaultClient = nil
 		v.vaultClient = v.SetupVaultClient(r)
 
 		// Initialize Vault with 1 secret share. We don't need to
