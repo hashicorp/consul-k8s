@@ -66,20 +66,49 @@ resource "azurerm_kubernetes_cluster" "default" {
   kubernetes_version                = var.kubernetes_version
   role_based_access_control_enabled = true
 
-  // We're setting the network plugin and other network properties explicitly
-  // here even though they are the same as defaults to ensure that none of these CIDRs
-  // overlap with our vnet and subnet. Please see
-  // https://docs.microsoft.com/en-us/azure/aks/configure-kubenet#create-an-aks-cluster-in-the-virtual-network.
-  // We want to use kubenet plugin rather than Azure CNI because pods
-  // using kubenet will not be routable when we peer VNets,
-  // and that gives us more confidence that in any tests where cross-cluster
-  // communication is tested, the connections goes through the appropriate gateway
-  // rather than directly from pod to pod.
+  // We set the network plugin and CIDRs explicitly (even where they match the
+  // defaults) to ensure none of the pod/service CIDRs overlap with the VNet
+  // and subnet defined above.
+  //
+  // We use Azure CNI in *overlay* mode (network_plugin = "azure" with
+  // network_plugin_mode = "overlay"). Previously this configuration used
+  // kubenet, but kubenet was replaced for the following reasons:
+  //
+  //   1. On AKS v1.35, several partition-related acceptance tests started
+  //      failing. The partition-init container calls the consul-server API,
+  //      and the consul-server pod in turn tries to reach itself over RPC on
+  //      port 8300; that pod-to-self connection was not reachable on 1.35
+  //      with kubenet. 
+  //      A similar symptom is reported in https://github.com/Azure/AKS/issues/5669. 
+  //      The root cause is not yet confirmed (it may or may not be kubenet itself); 
+  //      switching to Azure CNI overlay made all the failing partition tests pass.
+  //      TODO: track down the actual root cause on AKS 1.35 + kubenet.
+  //
+  //   2. Kubenet is deprecated in AKS and scheduled for retirement by 2028.
+  //      Even before then, Azure _may_restrict_ its use for newly created
+  //      clusters, so moving off it now is a good idea regardless.
+  //
+  // Why overlay specifically (and not standard Azure CNI): the original
+  // reason for choosing kubenet was that kubenet pod IPs are not routable
+  // across peered VNets, which forces cross-cluster test traffic to go
+  // through the mesh/mesh-gateway rather than pod-to-pod directly. 
+  // Azure CNI overlay preserves this property — pods get IPs from a private pod_cidr
+  // that is not advertised to the VNet, and egress to peered VNets is SNAT'd
+  // to the node IP. Standard (non-overlay) Azure CNI would assign pod IPs
+  // from the VNet subnet and make them routable across peering, which would
+  // invalidate those tests.
+  //
+  // Refs:
+  //   https://learn.microsoft.com/azure/aks/azure-cni-overlay
+  //   https://learn.microsoft.com/en-us/azure/aks/concepts-network-azure-cni-overlay
+
   network_profile {
-    network_plugin = "kubenet"
-    service_cidr   = "10.0.0.0/16"
-    dns_service_ip = "10.0.0.10"
-    pod_cidr       = "10.244.0.0/16"
+    network_plugin      = "azure"
+    network_plugin_mode = "overlay"
+    network_policy      = "calico"
+    service_cidr        = "10.0.0.0/16"
+    dns_service_ip      = "10.0.0.10"
+    pod_cidr            = "10.244.0.0/16"
   }
 
   default_node_pool {
@@ -90,9 +119,8 @@ resource "azurerm_kubernetes_cluster" "default" {
     vnet_subnet_id  = azurerm_virtual_network.default[count.index].subnet.*.id[0]
   }
 
-  service_principal {
-    client_id     = var.client_id
-    client_secret = var.client_secret
+  identity {
+    type = "SystemAssigned"
   }
 
   tags = var.tags
