@@ -1,3 +1,6 @@
+# Copyright IBM Corp. 2018, 2026
+# SPDX-License-Identifier: MPL-2.0
+
 #$ Used in:
 #$ - site-src/guides/simple-gateway.md
 #$ - site-src/blog/2021/introducing-v1beta1.md
