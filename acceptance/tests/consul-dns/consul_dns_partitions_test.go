@@ -305,8 +305,8 @@ func fixAuthMethodCACertOnce(consulClient *api.Client, releaseName, partition st
 	queryOpts := &api.QueryOptions{Partition: partition}
 	writeOpts := &api.WriteOptions{Partition: partition}
 
-	deadline := time.Now().Add(10 * time.Minute)
 	for _, amName := range names {
+		deadline := time.Now().Add(10 * time.Minute)
 		for time.Now().Before(deadline) {
 			method, _, err := consulClient.ACL().AuthMethodRead(amName, queryOpts)
 			if err != nil || method == nil {
@@ -550,8 +550,6 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
-
-	consulClient, _ := defaultConsulCluster.SetupConsulClient(t, c.secure)
 
 	defaultPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: defaultPartition}
 	secondaryPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: secondaryPartition}
