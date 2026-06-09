@@ -205,6 +205,13 @@ func configureOpenShiftDNSForConsul(t *testing.T, ctx environment.TestContext, r
 		upstream = fmt.Sprintf("%s:%s", dnsIP, port)
 	}
 
+	// Snapshot the existing spec.servers before patching so we can restore it in cleanup.
+	existingServers, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+		"get", "dns.operator.openshift.io", "default",
+		"-o", "jsonpath={.spec.servers}")
+	require.NoError(t, err)
+	logger.Logf(t, "Captured existing OpenShift DNS Operator spec.servers: %s", existingServers)
+
 	logger.Logf(t, "Configuring OpenShift DNS Operator to forward consul domain to %s", upstream)
 	patchJSON := fmt.Sprintf(
 		`{"spec":{"servers":[{"name":"consul-dns","zones":["consul"],"forwardPlugin":{"policy":"Sequential","upstreams":["%s"]}}]}}`,
@@ -231,12 +238,18 @@ func configureOpenShiftDNSForConsul(t *testing.T, ctx environment.TestContext, r
 	// Give CoreDNS time to reload the new configuration via the reload plugin.
 	time.Sleep(15 * time.Second)
 
-	// Cleanup: remove the consul server entry from the DNS Operator CR.
+	// Cleanup: restore the original spec.servers snapshot.
 	t.Cleanup(func() {
-		logger.Log(t, "Restoring OpenShift DNS Operator configuration (removing consul servers entry)...")
+		logger.Log(t, "Restoring OpenShift DNS Operator configuration to original spec.servers...")
+		var restorePatch string
+		if existingServers == "" || existingServers == "null" {
+			restorePatch = `{"spec":{"servers":null}}`
+		} else {
+			restorePatch = fmt.Sprintf(`{"spec":{"servers":%s}}`, existingServers)
+		}
 		_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
 			"patch", "dns.operator.openshift.io", "default",
-			"--type=merge", "--patch", `{"spec":{"servers":[]}}`)
+			"--type=merge", "--patch", restorePatch)
 		if err != nil {
 			logger.Log(t, "Warning: failed to restore OpenShift DNS Operator config:", err)
 		}

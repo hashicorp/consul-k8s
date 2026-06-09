@@ -351,7 +351,7 @@ func fetchTLSCACertFromHost(host string) string {
 		addr = addr + ":443"
 	}
 
-	conn, err := tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: true})
+	conn, err := tls.Dial("tcp", addr, &tls.Config{})
 	if err != nil {
 		return ""
 	}
@@ -534,18 +534,18 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
-	_, err := k8s.RunKubectlAndGetOutputE(t, defaultClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	out, err := k8s.RunKubectlAndGetOutputE(t, defaultClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to create namespace %s in servers cluster: %s", staticServerNamespace, out)
 	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, defaultClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
 
 	logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
-	_, err = k8s.RunKubectlAndGetOutputE(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	out, err = k8s.RunKubectlAndGetOutputE(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
 	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
-		require.NoError(t, err)
+		require.NoError(t, err, "failed to create namespace %s in clients cluster: %s", staticServerNamespace, out)
 	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
