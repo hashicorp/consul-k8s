@@ -39,6 +39,63 @@ resource "random_string" "suffix" {
   special = false
 }
 
+# HC-COMPUTE-010 / SECVULN-44200: Canonical Ubuntu EKS-optimized AMI used when
+# enable_security_baseline is true so the worker nodes can carry hc-security-base.
+data "aws_ami" "ubuntu_eks" {
+  count       = var.enable_security_baseline ? 1 : 0
+  most_recent = true
+  owners      = [var.ubuntu_eks_ami_owner]
+
+  filter {
+    name   = "name"
+    values = [format(var.ubuntu_eks_ami_name_filter, var.kubernetes_version)]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+locals {
+  # Baseline node group: default EKS-optimized Amazon Linux AMI (current behavior).
+  # The launch-template keys are set to their module defaults so this object has
+  # the same shape as hardened_node_group (required for the conditional below).
+  default_node_group = {
+    desired_capacity = 3
+    max_capacity     = 3
+    min_capacity     = 3
+
+    instance_types = ["m5.xlarge"]
+
+    ami_id                     = null
+    create_launch_template     = false
+    enable_bootstrap_user_data = false
+    pre_userdata               = ""
+  }
+
+  # User-data that installs hc-security-base from internal Artifactory at boot.
+  hc_security_base_pre_userdata = var.enable_security_baseline ? templatefile("${path.module}/templates/install-hc-security-base.sh.tpl", {
+    afy_user     = var.afy_user
+    afy_password = var.afy_password
+  }) : ""
+
+  # Hardened node group: Canonical Ubuntu EKS AMI + hc-security-base install.
+  # A custom AMI requires the module to render bootstrap user-data (the launch
+  # template) so the nodes still join the cluster.
+  hardened_node_group = merge(local.default_node_group, {
+    ami_id                     = one(data.aws_ami.ubuntu_eks[*].id)
+    create_launch_template     = true
+    enable_bootstrap_user_data = true
+    pre_userdata               = local.hc_security_base_pre_userdata
+  })
+}
+
 module "vpc" {
   count   = var.cluster_count
   source  = "terraform-aws-modules/vpc/aws"
@@ -87,13 +144,7 @@ module "eks" {
   vpc_id = module.vpc[count.index].vpc_id
 
   node_groups = {
-    first = {
-      desired_capacity = 3
-      max_capacity     = 3
-      min_capacity     = 3
-
-      instance_types = ["m5.xlarge"]
-    }
+    first = var.enable_security_baseline ? local.hardened_node_group : local.default_node_group
   }
 
   manage_aws_auth        = false
