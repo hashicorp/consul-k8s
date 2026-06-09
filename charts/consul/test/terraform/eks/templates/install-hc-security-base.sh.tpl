@@ -30,11 +30,14 @@ install_hc_security_base() {
   install -m 0600 -o root -g root /dev/null "$AUTH_FILE"
   echo "machine artifactory.hashicorp.engineering login $AFY_USER password $AFY_PASSWORD" > "$AUTH_FILE"
 
-  printf 'deb [trusted=yes] %s/deb %s main\ndeb [trusted=yes] %s/deb deb main\n' \
-    "$BASE_URL" "$CODENAME" "$BASE_URL" > "$SRC_FILE"
-  chmod 0644 "$SRC_FILE"
-
+  # Fetch the Artifactory signing key first so the repo can be verified against it
+  # (signed-by) instead of disabling signature checks (trusted=yes).
   curl -fsSL -u "$AFY_USER:$AFY_PASSWORD" "$BASE_URL/api/gpg/key/public" -o "$GPG_FILE"
+  chmod 0644 "$GPG_FILE"
+
+  printf 'deb [signed-by=%s] %s/deb %s main\ndeb [signed-by=%s] %s/deb deb main\n' \
+    "$GPG_FILE" "$BASE_URL" "$CODENAME" "$GPG_FILE" "$BASE_URL" > "$SRC_FILE"
+  chmod 0644 "$SRC_FILE"
 
   apt-get -qy update
   apt-get -qy install --no-install-recommends hc-security-base
