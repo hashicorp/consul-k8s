@@ -37,40 +37,36 @@ variable "kubernetes_version" {
 # ----------------------------------------------------------------------------
 # HC-COMPUTE-010 / SECVULN-44200 security baseline
 #
-# The default EKS-optimized node image is Amazon Linux, which cannot carry the
-# hc-security-base Debian package the compliance scanner (Wiz/Uptycs) checks for
-# (`dpkg --list | grep hc-security-base`). When enable_security_baseline is true
-# the worker nodes are launched from a Canonical Ubuntu EKS-optimized AMI and
-# hc-security-base is installed at boot from HashiCorp internal Artifactory,
-# mirroring ami-builder/scripts/packer-install_meta_deb.sh.
+# The Uptycs EDR agent (k8sosquery DaemonSet + kubequery) is deployed to every
+# acceptance cluster so the ephemeral worker nodes are covered by the security
+# baseline, mirroring the AKS and GKE acceptance modules.
 # ----------------------------------------------------------------------------
 
-variable "enable_security_baseline" {
-  type        = bool
-  default     = false
-  description = "When true, run worker nodes on a Canonical Ubuntu EKS AMI and install hc-security-base at boot to satisfy HC-COMPUTE-010. Requires afy_user/afy_password. Validate in a single cluster before enabling in shared CI."
+variable "uptycs_owner" {
+  default     = "hc-team-consul-dg@ibm.com"
+  description = "Owner email for Uptycs EDR agent tags."
 }
 
-variable "ubuntu_eks_ami_owner" {
-  default     = "099720109477"
-  description = "AWS account id that owns the Ubuntu EKS AMIs (Canonical)."
-}
-
-variable "ubuntu_eks_ami_name_filter" {
-  default     = "ubuntu-eks/k8s_%s/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"
-  description = "Name filter for the Canonical Ubuntu EKS AMI. %s is replaced with kubernetes_version."
-}
-
-variable "afy_user" {
-  type        = string
+variable "uptycs_enroll_secret" {
   default     = ""
+  description = "Uptycs enroll secret containing customer identifiers."
   sensitive   = true
-  description = "HashiCorp Artifactory username used to fetch hc-security-base. Provide via TF_VAR_afy_user from CI secrets; never commit."
 }
 
-variable "afy_password" {
-  type        = string
+variable "uptycs_webhook_ca_bundle" {
   default     = ""
+  description = "Base64-encoded CA bundle for kubequery webhook."
   sensitive   = true
-  description = "HashiCorp Artifactory password/token used to fetch hc-security-base. Provide via TF_VAR_afy_password from CI secrets; never commit."
+}
+
+variable "uptycs_webhook_tls_crt" {
+  default     = ""
+  description = "Base64-encoded TLS certificate for kubequery webhook server."
+  sensitive   = true
+}
+
+variable "uptycs_webhook_tls_key" {
+  default     = ""
+  description = "Base64-encoded TLS private key for kubequery webhook server."
+  sensitive   = true
 }

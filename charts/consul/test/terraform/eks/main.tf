@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.27.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12.0"
+    }
   }
 }
 
@@ -37,63 +41,6 @@ data "aws_caller_identity" "caller" {}
 resource "random_string" "suffix" {
   length  = 8
   special = false
-}
-
-# HC-COMPUTE-010 / SECVULN-44200: Canonical Ubuntu EKS-optimized AMI used when
-# enable_security_baseline is true so the worker nodes can carry hc-security-base.
-data "aws_ami" "ubuntu_eks" {
-  count       = var.enable_security_baseline ? 1 : 0
-  most_recent = true
-  owners      = [var.ubuntu_eks_ami_owner]
-
-  filter {
-    name   = "name"
-    values = [format(var.ubuntu_eks_ami_name_filter, var.kubernetes_version)]
-  }
-
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
-locals {
-  # Baseline node group: default EKS-optimized Amazon Linux AMI (current behavior).
-  # The launch-template keys are set to their module defaults so this object has
-  # the same shape as hardened_node_group (required for the conditional below).
-  default_node_group = {
-    desired_capacity = 3
-    max_capacity     = 3
-    min_capacity     = 3
-
-    instance_types = ["m5.xlarge"]
-
-    ami_id                     = null
-    create_launch_template     = false
-    enable_bootstrap_user_data = false
-    pre_userdata               = ""
-  }
-
-  # User-data that installs hc-security-base from internal Artifactory at boot.
-  hc_security_base_pre_userdata = var.enable_security_baseline ? templatefile("${path.module}/templates/install-hc-security-base.sh.tpl", {
-    afy_user     = var.afy_user
-    afy_password = var.afy_password
-  }) : ""
-
-  # Hardened node group: Canonical Ubuntu EKS AMI + hc-security-base install.
-  # A custom AMI requires the module to render bootstrap user-data (the launch
-  # template) so the nodes still join the cluster.
-  hardened_node_group = merge(local.default_node_group, {
-    ami_id                     = one(data.aws_ami.ubuntu_eks[*].id)
-    create_launch_template     = true
-    enable_bootstrap_user_data = true
-    pre_userdata               = local.hc_security_base_pre_userdata
-  })
 }
 
 module "vpc" {
@@ -144,7 +91,13 @@ module "eks" {
   vpc_id = module.vpc[count.index].vpc_id
 
   node_groups = {
-    first = var.enable_security_baseline ? local.hardened_node_group : local.default_node_group
+    first = {
+      desired_capacity = 3
+      max_capacity     = 3
+      min_capacity     = 3
+
+      instance_types = ["m5.xlarge"]
+    }
   }
 
   manage_aws_auth        = false
@@ -340,4 +293,111 @@ resource "aws_route" "peering_public_1" {
   route_table_id            = module.vpc[1].public_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[0].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Deploy IBM Uptycs EDR agent to each EKS cluster.
+provider "helm" {
+  alias = "cluster_0"
+  kubernetes {
+    host                   = module.eks[0].cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.cluster[0].token
+  }
+}
+
+provider "helm" {
+  alias = "cluster_1"
+  kubernetes {
+    host                   = var.cluster_count > 1 ? module.eks[1].cluster_endpoint : module.eks[0].cluster_endpoint
+    cluster_ca_certificate = base64decode(var.cluster_count > 1 ? module.eks[1].cluster_certificate_authority_data : module.eks[0].cluster_certificate_authority_data)
+    token                  = var.cluster_count > 1 ? data.aws_eks_cluster_auth.cluster[1].token : data.aws_eks_cluster_auth.cluster[0].token
+  }
+}
+
+# Cluster 0 EDR
+resource "helm_release" "uptycs_0" {
+  provider         = helm.cluster_0
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_0" {
+  depends_on       = [helm_release.uptycs_0]
+  provider         = helm.cluster_0
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = module.eks[0].cluster_id
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
+}
+
+# Cluster 1 EDR (only when cluster_count > 1)
+resource "helm_release" "uptycs_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  provider         = helm.cluster_1
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  depends_on       = [helm_release.uptycs_1]
+  provider         = helm.cluster_1
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = module.eks[1].cluster_id
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
 }
