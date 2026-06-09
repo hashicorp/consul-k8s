@@ -18,3 +18,4 @@
 - {runner: 15, test-packages: "terminating-gateway", mode: "single-cluster"}
 - {runner: 16, test-packages: "vault", mode: "multi-cluster"}
 - {runner: 17, test-packages: "server", mode: "single-cluster"}
+- {runner: 18, test-packages: "consul-dns", mode: "multi-cluster"}

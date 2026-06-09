@@ -156,6 +156,19 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 		Immutable: secret.Immutable,
 	}
 
+	// Ensure the destination namespace exists before creating the secret.
+	// The namespace may not exist yet because the Helm install that creates it
+	// depends on these secrets being copied first (e.g., CA cert, partition token).
+	_, err = destContext.KubernetesClient(t).CoreV1().Namespaces().Get(context.Background(), destNamespace, metav1.GetOptions{})
+	if err != nil && apierrors.IsNotFound(err) {
+		_, err = destContext.KubernetesClient(t).CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{Name: destNamespace},
+		}, metav1.CreateOptions{})
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			require.NoError(t, err)
+		}
+	}
+
 	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
 	if err != nil && apierrors.IsUnauthorized(err) {
 		logger.Logf(t, "client-go unauthorized creating secret %q in namespace %q; falling back to kubectl create/apply", secretName, destNamespace)
