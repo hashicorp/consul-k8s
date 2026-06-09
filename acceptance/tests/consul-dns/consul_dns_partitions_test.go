@@ -4,8 +4,13 @@
 package consuldns
 
 import (
+	"crypto/tls"
+	"encoding/pem"
 	"fmt"
+	"net/url"
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +65,9 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	}
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+	if !cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(2) {
+		t.Skipf("skipping this test because it requires at least 2 clusters with -enable-multi-cluster and two kube contexts/configs")
 	}
 
 	cases := []dnsWithPartitionsTestCase{
@@ -271,6 +279,104 @@ func getVerifications(defaultClusterContext environment.TestContext, secondaryCl
 	return verifications
 }
 
+// fixAuthMethodCACertOnce waits until the named Consul k8s auth methods exist in the given
+// partition, then replaces their CACert with the public CA chain fetched from the actual
+// API server endpoint.  It must be called as a goroutine started BEFORE
+// secondaryConsulCluster.Create(t) so the pods can recover from CrashLoopBackOff.
+//
+// Why this is needed: server-acl-init reads the service account secret's ca.crt (the cluster-
+// internal CA) and stores it in the auth method's CACert field.  On OpenShift ROSA, the
+// external API server endpoint (api.*.openshiftapps.com) uses a publicly-trusted certificate
+// (e.g. Let's Encrypt), which the internal CA does NOT sign.  Every time a component pod
+// calls ACL Login, the Consul server calls /apis/authentication.k8s.io/v1/tokenreviews on
+// the external endpoint, fails to verify the cert against the internal CA, and returns
+// "x509: certificate signed by unknown authority".
+//
+// The fix replaces CACert with the intermediate + root CA certificates from the API server's
+// TLS chain, allowing the Consul server to validate the endpoint's certificate.
+//
+// server-acl-init creates the auth method once and exits; it does not re-set CACert on retry.
+// Therefore a single fix is sufficient.
+func fixAuthMethodCACertOnce(consulClient *api.Client, releaseName, partition string) {
+	names := []string{
+		fmt.Sprintf("%s-consul-k8s-component-auth-method", releaseName),
+		fmt.Sprintf("%s-consul-k8s-auth-method", releaseName),
+	}
+	queryOpts := &api.QueryOptions{Partition: partition}
+	writeOpts := &api.WriteOptions{Partition: partition}
+
+	for _, amName := range names {
+		deadline := time.Now().Add(10 * time.Minute)
+		for time.Now().Before(deadline) {
+			method, _, err := consulClient.ACL().AuthMethodRead(amName, queryOpts)
+			if err != nil || method == nil {
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			// Get the API server host from the auth method config.
+			host, _ := method.Config["Host"].(string)
+			if host == "" {
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			// Fetch the public CA chain from the API server's TLS endpoint.
+			caCert := fetchTLSCACertFromHost(host)
+			if caCert == "" {
+				time.Sleep(5 * time.Second)
+				continue
+			}
+
+			method.Config["CACert"] = caCert
+			if _, _, err = consulClient.ACL().AuthMethodUpdate(method, writeOpts); err != nil {
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			break
+		}
+	}
+}
+
+// fetchTLSCACertFromHost connects to the given HTTPS host, retrieves the TLS
+// certificate chain, and returns PEM-encoded CA certificates (intermediate + root)
+// that can validate the server's leaf certificate.
+func fetchTLSCACertFromHost(host string) string {
+	u, err := url.Parse(host)
+	if err != nil {
+		return ""
+	}
+	addr := u.Host
+	if !strings.Contains(addr, ":") {
+		addr = addr + ":443"
+	}
+
+	conn, err := tls.Dial("tcp", addr, &tls.Config{InsecureSkipVerify: true})
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+
+	certs := conn.ConnectionState().PeerCertificates
+	if len(certs) < 2 {
+		return ""
+	}
+
+	// Collect all non-leaf certificates (intermediates + root) as PEM.
+	var pemCerts []byte
+	for _, cert := range certs[1:] {
+		if cert.IsCA || cert.BasicConstraintsValid {
+			block := &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}
+			pemCerts = append(pemCerts, pem.EncodeToMemory(block)...)
+		}
+	}
+
+	if len(pemCerts) == 0 {
+		return ""
+	}
+	return string(pemCerts)
+}
+
 func restartDNSProxy(t *testing.T, releaseName string, ctx environment.TestContext) {
 	dnsDeploymentName := fmt.Sprintf("deployment/%s-consul-dns-proxy", releaseName)
 	restartDNSProxyCommand := []string{"rollout", "restart", dnsDeploymentName}
@@ -318,8 +424,15 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	serverHelmValues := map[string]string{
-		"server.exposeGossipAndRPCPorts": "true",
-		"server.extraConfig":             `"{\"log_level\": \"TRACE\"}"`,
+		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
+	}
+
+	// OpenShift SCCs do not allow host ports by default, and
+	// server.exposeGossipAndRPCPorts configures hostPort bindings.
+	if !(cfg.UseOpenshift || cfg.EnableOpenshift) {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+	} else {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "false"
 	}
 
 	if cfg.UseKind {
@@ -391,6 +504,20 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
+	// Initialize consulClient now (primary cluster is already ready) so we can pass it to
+	// the background goroutine that clears the CACert concurrently with secondary-cluster Create.
+	consulClient, _ := defaultConsulCluster.SetupConsulClient(t, c.secure)
+
+	// On OpenShift ROSA, server-acl-init stores the cluster-internal CA in the auth
+	// method's CACert field, but the external API server endpoint uses a publicly-
+	// trusted certificate.  This goroutine polls until auth methods appear, then
+	// replaces CACert with the correct public CA chain fetched from the API server's
+	// TLS handshake, allowing pods to recover from CrashLoopBackOff before the
+	// readiness timeout expires.
+	if c.secure && isOpenShift(t, secondaryClusterContext) {
+		go fixAuthMethodCACertOnce(consulClient, releaseName, secondaryPartition)
+	}
+
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
@@ -407,18 +534,22 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
-	k8s.RunKubectl(t, defaultClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	_, err := k8s.RunKubectlAndGetOutputE(t, defaultClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
+		require.NoError(t, err)
+	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, defaultClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
 
 	logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
-	k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	_, err = k8s.RunKubectlAndGetOutputE(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
+		require.NoError(t, err)
+	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
-
-	consulClient, _ := defaultConsulCluster.SetupConsulClient(t, c.secure)
 
 	defaultPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: defaultPartition}
 	secondaryPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: secondaryPartition}
@@ -481,4 +612,52 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	require.Equal(t, []string{"k8s"}, service[0].ServiceTags)
 
 	return releaseName, consulClient, defaultPartitionQueryOpts, secondaryPartitionQueryOpts, defaultConsulCluster
+}
+
+func reconcileComponentAuthMethodForOpenShift(t *testing.T, consulClient *api.Client, releaseName, secondaryPartition string, secondaryCtx environment.TestContext) {
+	t.Helper()
+
+	options := secondaryCtx.KubectlOptions(t)
+	configPath, err := options.GetConfigPath(t)
+	require.NoError(t, err)
+
+	apiConfig, err := terratestk8s.LoadApiClientConfigE(configPath, options.ContextName)
+	require.NoError(t, err)
+
+	require.NotEmpty(t, apiConfig.Host)
+
+	caBundle := apiConfig.CAData
+	if len(caBundle) == 0 && apiConfig.CAFile != "" {
+		caBundle, err = os.ReadFile(apiConfig.CAFile)
+		require.NoError(t, err)
+	}
+	require.NotEmpty(t, caBundle, "kubeconfig CA bundle must be present for OpenShift auth-method override")
+
+	authMethodName := fmt.Sprintf("%s-consul-k8s-component-auth-method", releaseName)
+	partitions := []string{defaultPartition, secondaryPartition}
+
+	counter := &retry.Counter{Count: 30, Wait: 10 * time.Second}
+	retry.RunWith(counter, t, func(r *retry.R) {
+		updatedAny := false
+		for _, partition := range partitions {
+			readOpts := &api.QueryOptions{Partition: partition}
+			authMethod, _, readErr := consulClient.ACL().AuthMethodRead(authMethodName, readOpts)
+			require.NoError(r, readErr)
+			if authMethod == nil {
+				continue
+			}
+
+			authMethod.Config["Host"] = apiConfig.Host
+			authMethod.Config["CACert"] = string(caBundle)
+
+			writeOpts := &api.WriteOptions{Partition: partition}
+			_, _, updateErr := consulClient.ACL().AuthMethodUpdate(authMethod, writeOpts)
+			require.NoError(r, updateErr)
+			updatedAny = true
+		}
+
+		if !updatedAny {
+			r.Errorf("waiting for auth method %q to exist before updating OpenShift Host/CACert", authMethodName)
+		}
+	})
 }
