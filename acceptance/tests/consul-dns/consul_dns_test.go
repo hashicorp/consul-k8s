@@ -184,7 +184,87 @@ func createACLTokenWithGivenPolicy(t *testing.T, consulClient *api.Client, polic
 	return err, dnsProxyToken
 }
 
+// isOpenShift returns true if the cluster is an OpenShift cluster, detected by
+// the presence of the openshift-dns namespace.
+func isOpenShift(t *testing.T, ctx environment.TestContext) bool {
+	_, err := ctx.KubernetesClient(t).CoreV1().Namespaces().Get(
+		context.Background(), "openshift-dns", metav1.GetOptions{})
+	return err == nil
+}
+
+// configureOpenShiftDNSForConsul patches the OpenShift DNS Operator CR to forward
+// consul domain queries to the Consul DNS service or proxy. This is the correct
+// approach for OpenShift clusters where DNS is managed by the DNS Operator in the
+// openshift-dns namespace rather than CoreDNS in kube-system.
+func configureOpenShiftDNSForConsul(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
+	dnsIP, err := getDNSServiceClusterIP(t, ctx, releaseName, enableDNSProxy)
+	require.NoError(t, err)
+
+	upstream := dnsIP
+	if enableDNSProxy {
+		upstream = fmt.Sprintf("%s:%s", dnsIP, port)
+	}
+
+	// Snapshot the existing spec.servers before patching so we can restore it in cleanup.
+	existingServers, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+		"get", "dns.operator.openshift.io", "default",
+		"-o", "jsonpath={.spec.servers}")
+	require.NoError(t, err)
+	logger.Logf(t, "Captured existing OpenShift DNS Operator spec.servers: %s", existingServers)
+
+	logger.Logf(t, "Configuring OpenShift DNS Operator to forward consul domain to %s", upstream)
+	patchJSON := fmt.Sprintf(
+		`{"spec":{"servers":[{"name":"consul-dns","zones":["consul"],"forwardPlugin":{"policy":"Sequential","upstreams":["%s"]}}]}}`,
+		upstream)
+
+	_, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+		"patch", "dns.operator.openshift.io", "default",
+		"--type=merge", "--patch", patchJSON)
+	require.NoError(t, err)
+
+	// Wait for the DNS Operator to update the dns-default ConfigMap with the consul forwarding rule.
+	logger.Log(t, "Waiting for OpenShift DNS ConfigMap to reflect consul forwarding rule...")
+	timer := &retry.Timer{Timeout: 5 * time.Minute, Wait: 10 * time.Second}
+	retry.RunWith(timer, t, func(r *retry.R) {
+		cm, err := ctx.KubernetesClient(t).CoreV1().ConfigMaps("openshift-dns").Get(
+			context.Background(), "dns-default", metav1.GetOptions{})
+		require.NoError(r, err)
+		corefile, ok := cm.Data["Corefile"]
+		require.True(r, ok, "dns-default ConfigMap missing Corefile key")
+		require.Contains(r, corefile, upstream,
+			"dns-default Corefile does not yet contain consul forwarding rule for %s", upstream)
+	})
+
+	// Give CoreDNS time to reload the new configuration via the reload plugin.
+	time.Sleep(15 * time.Second)
+
+	// Cleanup: restore the original spec.servers snapshot.
+	t.Cleanup(func() {
+		logger.Log(t, "Restoring OpenShift DNS Operator configuration to original spec.servers...")
+		var restorePatch string
+		if existingServers == "" || existingServers == "null" {
+			restorePatch = `{"spec":{"servers":null}}`
+		} else {
+			restorePatch = fmt.Sprintf(`{"spec":{"servers":%s}}`, existingServers)
+		}
+		_, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+			"patch", "dns.operator.openshift.io", "default",
+			"--type=merge", "--patch", restorePatch)
+		if err != nil {
+			logger.Log(t, "Warning: failed to restore OpenShift DNS Operator config:", err)
+		}
+		time.Sleep(5 * time.Second)
+	})
+}
+
 func updateCoreDNSWithConsulDomain(t *testing.T, ctx environment.TestContext, releaseName string, enableDNSProxy bool, port string) {
+	// On OpenShift, DNS is managed by the DNS Operator in openshift-dns, not CoreDNS
+	// in kube-system. Use the DNS Operator CR to configure consul domain forwarding.
+	if isOpenShift(t, ctx) {
+		configureOpenShiftDNSForConsul(t, ctx, releaseName, enableDNSProxy, port)
+		return
+	}
+
 	actualName := getCoreDNSConfigMapName(t, ctx)
 
 	// 1. BACKUP: Capture the current state
