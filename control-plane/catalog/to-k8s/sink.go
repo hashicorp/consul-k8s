@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/armon/go-metrics"
-	"github.com/armon/go-metrics/prometheus"
+	"github.com/hashicorp/go-metrics"
+	"github.com/hashicorp/go-metrics/prometheus"
 	metricsutil "github.com/hashicorp/consul-k8s/control-plane/catalog/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/coalesce"
 	"github.com/hashicorp/go-hclog"
