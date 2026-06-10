@@ -2853,6 +2853,8 @@ connectInject:
       - key: "kubernetes.io/metadata.name"
         operator: "NotIn"
         values: ["kube-system","local-path-storage","openebs","gmp-system","gke-managed-cim"]
+      - key: "openshift.io/cluster-monitoring"
+        operator: "DoesNotExist"
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,
