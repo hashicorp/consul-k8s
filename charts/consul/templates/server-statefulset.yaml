@@ -666,6 +666,19 @@ spec:
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
               {{- end }}
             {{- end }}
+            {{- if .Values.global.enableConsulNamespaces }}
+            {{- if .Values.connectInject.consulNamespaces.mirroringK8S }}
+            - name: CONSUL_NAMESPACE
+              value: {{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
+            {{- else }}
+            - name: CONSUL_NAMESPACE
+              value: {{ .Values.connectInject.consulNamespaces.consulDestinationNamespace }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            - name: CONSUL_PARTITION
+              value: {{ .Values.global.adminPartitions.name }}
+            {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server.snapshotAgent | nindent 12 }}
           command:
             - "/bin/sh"

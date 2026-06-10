@@ -15,6 +15,36 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{/*
+Resolve the Consul namespace that a terminating gateway service should be
+registered into. Resolution order:
+  1. Per-gateway consulNamespace.
+  2. terminatingGateways.defaults.consulNamespace, unless it is the bare
+     "default" sentinel (treated as unset so mirroring can take precedence).
+  3. The mirrored Consul namespace derived from the release namespace when
+     namespace mirroring is enabled.
+  4. The configured destination namespace (falling back to the defaults value).
+
+Usage:
+  {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
+*/}}
+{{- define "consul.terminatingGatewayNamespace" -}}
+{{- $root := .root -}}
+{{- $gatewayNamespace := .gatewayNamespace -}}
+{{- $defaultsNamespace := .defaultsNamespace -}}
+{{- if $gatewayNamespace -}}
+{{- $gatewayNamespace -}}
+{{- else if (and $defaultsNamespace (ne $defaultsNamespace "default")) -}}
+{{- $defaultsNamespace -}}
+{{- else if $root.Values.connectInject.consulNamespaces.mirroringK8S -}}
+{{- printf "%s%s" $root.Values.connectInject.consulNamespaces.mirroringK8SPrefix $root.Release.Namespace -}}
+{{- else if $root.Values.connectInject.consulNamespaces.consulDestinationNamespace -}}
+{{- $root.Values.connectInject.consulNamespaces.consulDestinationNamespace -}}
+{{- else -}}
+{{- default "default" $defaultsNamespace -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:

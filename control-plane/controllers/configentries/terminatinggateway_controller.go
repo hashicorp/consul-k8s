@@ -20,6 +20,7 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
+	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -645,7 +646,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		replicas = *termGW.Spec.Deployment.Replicas
 	}
 
-	consulNamespace := terminatingGatewayConsulNamespace(termGW, helmConfigValues)
+	consulNamespace := r.terminatingGatewayConsulNamespace(termGW, helmConfigValues)
 
 	logLevel := termGW.Spec.Deployment.LogLevel
 	if logLevel == "" {
@@ -1484,7 +1485,7 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	serviceAccountName := fmt.Sprintf("%s-%s", fullName, gatewayName)
 	authMethodName := fmt.Sprintf("%s-k8s-component-auth-method", fullName)
 
-	consulNamespace := terminatingGatewayConsulNamespace(termGW, helmValues)
+	consulNamespace := r.terminatingGatewayConsulNamespace(termGW, helmValues)
 
 	rules, err := r.renderTerminatingGatewayACLRules(gatewayName, consulNamespace)
 	if err != nil {
@@ -1645,7 +1646,19 @@ partition "{{ .Partition }}" {
 	return out.String(), nil
 }
 
-func terminatingGatewayConsulNamespace(
+// terminatingGatewayConsulNamespace resolves the Consul namespace that the
+// terminating gateway service should be registered into. Resolution order:
+//  1. Explicit spec.deployment.consulNamespace on the CRD.
+//  2. Per-gateway consulNamespace from Helm values.
+//  3. terminatingGateways.defaults.consulNamespace from Helm values (a bare
+//     "default" sentinel is treated as unset when Consul namespaces are enabled
+//     so that mirroring/destination resolution can take precedence).
+//  4. The namespace derived from the gateway's K8s namespace via the
+//     namespace-mirroring / destination-namespace configuration. This ensures
+//     that when mirroring is enabled (e.g. with Admin Partitions) the gateway
+//     is registered into the mirrored Consul namespace (K8s "consul" ->
+//     Consul "consul") instead of falling back to "default".
+func (r *TerminatingGatewayController) terminatingGatewayConsulNamespace(
 	termGW *consulv1alpha1.TerminatingGateway,
 	helmValues *helmvalues.HelmValues,
 ) string {
@@ -1653,10 +1666,12 @@ func terminatingGatewayConsulNamespace(
 		return defaultIfEmpty("")
 	}
 
+	// 1. Explicit namespace on the CRD wins.
 	if termGW.Spec.Deployment.ConsulNamespace != "" {
 		return termGW.Spec.Deployment.ConsulNamespace
 	}
 
+	// 2. Per-gateway override from Helm values.
 	gatewayName := defaultIfEmpty(termGW.Spec.Deployment.GatewayName, termGW.Name)
 	for _, gw := range helmValues.TerminatingGateways.Gateways {
 		if gw.Name == gatewayName && gw.ConsulNamespace != "" {
@@ -1664,5 +1679,37 @@ func terminatingGatewayConsulNamespace(
 		}
 	}
 
-	return defaultIfEmpty(helmValues.TerminatingGateways.Defaults.ConsulNamespace)
+	// namespacesEnabled reflects whether Consul Enterprise namespaces are turned
+	// on for this controller. We prefer the controller's runtime config but fall
+	// back to the Helm values when the controller is not fully wired (e.g. in
+	// some unit tests).
+	namespacesEnabled := helmValues.Global.EnableConsulNamespaces
+	if r != nil && r.ConfigEntryController != nil {
+		namespacesEnabled = r.ConfigEntryController.EnableConsulNamespaces
+	}
+
+	// 3. Helm defaults override. Treat the chart's "default" sentinel as unset
+	//    when namespaces are enabled so that the mirrored/destination namespace
+	//    derived from the gateway's K8s namespace can take precedence.
+	defaultsNS := helmValues.TerminatingGateways.Defaults.ConsulNamespace
+	if defaultsNS != "" && !(defaultsNS == "default" && namespacesEnabled) {
+		return defaultsNS
+	}
+
+	// 4. Fall back to the mirrored / destination namespace derived from the
+	//    gateway's K8s namespace.
+	if r != nil && r.ConfigEntryController != nil {
+		cec := r.ConfigEntryController
+		if ns := namespaces.ConsulNamespace(
+			termGW.Namespace,
+			cec.EnableConsulNamespaces,
+			cec.ConsulDestinationNamespace,
+			cec.EnableNSMirroring,
+			cec.NSMirroringPrefix,
+		); ns != "" {
+			return ns
+		}
+	}
+
+	return defaultIfEmpty(defaultsNS)
 }
