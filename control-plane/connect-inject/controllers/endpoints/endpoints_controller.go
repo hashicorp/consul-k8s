@@ -232,8 +232,11 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 						errs = multierror.Append(errs, err)
 					}
 				}
-
-				if hasBeenInjected(pod) {
+				isAPIGateway := false
+				if pod.Annotations != nil && pod.Annotations[constants.AnnotationGatewayKind] == "api-gateway" {
+					isAPIGateway = true
+				}
+				if hasBeenInjected(pod) && !isAPIGateway {
 					if isConsulDataplaneSupported(pod) {
 						if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
 							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)

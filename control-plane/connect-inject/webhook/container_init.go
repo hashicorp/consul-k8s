@@ -35,13 +35,14 @@ type initContainerCommandData struct {
 	MultiPort bool
 
 	// Log settings for the connect-init command.
-	LogLevel string
-	LogJSON  bool
+	LogLevel    string
+	LogJSON     bool
+	GatewayKind string
 }
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
+func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo, isAPIGateway bool) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
@@ -49,12 +50,17 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 	}
 
 	multiPort := mpi.serviceName != ""
+	gatewayKindString := ""
+	if isAPIGateway {
+		gatewayKindString = "api-gateway"
 
+	}
 	data := initContainerCommandData{
-		AuthMethod: w.AuthMethod,
-		MultiPort:  multiPort,
-		LogLevel:   w.LogLevel,
-		LogJSON:    w.LogJSON,
+		AuthMethod:  w.AuthMethod,
+		MultiPort:   multiPort,
+		LogLevel:    w.LogLevel,
+		LogJSON:     w.LogJSON,
+		GatewayKind: gatewayKindString,
 	}
 
 	// Create expected volume mounts
@@ -359,6 +365,9 @@ const initContainerCommandTpl = `
 consul-k8s-control-plane connect-init -pod-name=${POD_NAME} -pod-namespace=${POD_NAMESPACE} \
   -log-level={{ .LogLevel }} \
   -log-json={{ .LogJSON }} \
+  {{- if .GatewayKind }}
+  -gateway-kind="{{ .GatewayKind }}" \
+  {{- end }}
   {{- if .AuthMethod }}
   -service-account-name="{{ .ServiceAccountName }}" \
   -service-name="{{ .ServiceName }}" \

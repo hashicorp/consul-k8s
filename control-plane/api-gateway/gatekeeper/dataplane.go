@@ -164,6 +164,7 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 		"-addresses", config.ConsulConfig.Address,
 		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
 		"-consul-dns-bind-addr=" + consulDNSBindAddress,
+		"-consul-dns-bind-port=" + strconv.Itoa(consulDataplaneDNSBindPort),
 		"-xds-bind-addr=" + xdsBindAddress,
 		"-grpc-port=" + strconv.Itoa(config.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,

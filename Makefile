@@ -47,7 +47,7 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
-	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
+	@docker buildx build --push --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
 	   --no-cache \
        --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
@@ -74,9 +74,9 @@ endif
 
 .PHONY: control-plane-dev-docker-multi-arch
 control-plane-dev-docker-multi-arch: check-remote-dev-image-env ## Build consul-k8s-control-plane dev multi-arch Docker image.
-	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch "arm64 amd64"
-	@docker buildx create --use && docker buildx build -t '$(REMOTE_DEV_IMAGE)' \
-       --platform linux/amd64,linux/arm64 \
+	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch "arm64"
+	@docker buildx create --use && docker buildx build --push --debug -t '$(REMOTE_DEV_IMAGE)' \
+       --platform linux/arm64 \
        --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \

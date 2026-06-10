@@ -270,7 +270,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	// Add our volume that will be shared by the init container and
 	// the sidecar for passing data in the pod.
-	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume())
+	v := w.containerVolume()
+	found := false
+	for _, vol := range pod.Spec.Volumes {
+		if vol.Name == v.Name {
+			found = true
+		}
+	}
+	if !found {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v)
+	}
 
 	// Optionally mount data volume to other containers
 	w.injectVolumeMount(pod)
@@ -324,30 +333,37 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		w.Log.Error(err, "unable to get consul-dataplane as sidecar container in kubernetes enabled status")
 	}
 
+	isAPIGateway := false
+	if pod.Annotations != nil && pod.Annotations[constants.AnnotationGatewayKind] == "api-gateway" {
+		isAPIGateway = true
+	}
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
-		initContainer, err := w.containerInit(*ns, pod, multiPortInfo{})
+		initContainer, err := w.containerInit(*ns, pod, multiPortInfo{}, isAPIGateway)
 		if err != nil {
 			w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
 		}
+
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, initContainer)
 
-		// Add the Envoy sidecar.
-		envoySidecar, err := w.consulDataplaneSidecar(*ns, pod, multiPortInfo{})
-		if err != nil {
-			w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
-			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
-		}
-		//Append the Envoy sidecar before the application container only if lifecycle enabled.
-		if lifecycleEnabled && !consulDataplaneSidecarEnabled && ok == nil {
-			pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
-		} else if consulDataplaneSidecarEnabled && consulDataplaneSidecarEnabledOk == nil {
-			// Add as init container with sidecar behavior
-			pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
-		} else {
-			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+		if !isAPIGateway {
+			// Add the Envoy sidecar.
+			envoySidecar, err := w.consulDataplaneSidecar(*ns, pod, multiPortInfo{})
+			if err != nil {
+				w.Log.Error(err, "error configuring injection sidecar container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection sidecar container: %s", err))
+			}
+			//Append the Envoy sidecar before the application container only if lifecycle enabled.
+			if lifecycleEnabled && !consulDataplaneSidecarEnabled && ok == nil {
+				pod.Spec.Containers = append([]corev1.Container{envoySidecar}, pod.Spec.Containers...)
+			} else if consulDataplaneSidecarEnabled && consulDataplaneSidecarEnabledOk == nil {
+				// Add as init container with sidecar behavior
+				pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
+			} else {
+				pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+			}
 		}
 
 	} else {
@@ -410,7 +426,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 
 			// Add the init container that registers the service and sets up the Envoy configuration.
-			initContainer, err := w.containerInit(*ns, pod, mpi)
+			initContainer, err := w.containerInit(*ns, pod, mpi, isAPIGateway)
 			if err != nil {
 				w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))

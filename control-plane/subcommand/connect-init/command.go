@@ -176,7 +176,8 @@ func (c *Command) Run(args []string) int {
 	}
 	proxyService := &api.AgentService{}
 	if c.flagGatewayKind != "" {
-		err = backoff.Retry(c.getGatewayRegistration(consulClient), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
+		fmt.Println(1)
+		err = backoff.Retry(c.getGatewayRegistration(consulClient, proxyService), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 		if err != nil {
 			c.logger.Error("Timed out waiting for gateway registration", "error", err)
 			return 1
@@ -186,6 +187,8 @@ func (c *Command) Run(args []string) int {
 			return 1
 		}
 	} else {
+		fmt.Println(2)
+
 		var err = backoff.Retry(c.getConnectServiceRegistrations(consulClient, proxyService), backoff.WithMaxRetries(backoff.NewConstantBackOff(1*time.Second), c.serviceRegistrationPollingAttempts))
 		if err != nil {
 			c.logger.Error("Timed out waiting for service registration", "error", err)
@@ -294,7 +297,7 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client, proxy
 	}
 }
 
-func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
+func (c *Command) getGatewayRegistration(client *api.Client, proxyService *api.AgentService) backoff.Operation {
 	var proxyID string
 	registrationRetryCount := 0
 	return func() error {
@@ -322,6 +325,10 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 					" If your pod is not starting also check the connect-inject deployment logs.")
 			}
 			if len(gatewayList.Services) > 1 {
+				fmt.Println("=======> node ", gatewayList.Node)
+				for _, svc := range gatewayList.Services {
+					fmt.Println("=======> svc", svc.ID, svc.Service, svc.Meta, svc.Address, svc.Port, svc.Tags)
+				}
 				c.logger.Error("There are multiple Consul gateway services registered for this pod when there must only be one." +
 					" Check if there are multiple Kubernetes services selecting this gateway pod and add the label" +
 					" `consul.hashicorp.com/service-ignore: \"true\"` to all services except the one used by Consul for handling requests.")
@@ -332,6 +339,7 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 			switch gateway.Kind {
 			case api.ServiceKindAPIGateway, api.ServiceKindMeshGateway, api.ServiceKindIngressGateway, api.ServiceKindTerminatingGateway:
 				proxyID = gateway.ID
+				*proxyService = *gateway
 			}
 		}
 		if proxyID == "" {
@@ -396,6 +404,29 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 		c.iptablesConfig.IptablesProvider = c.iptablesProvider
 	}
 
+	// For gateways, consul-dataplane is the main container (not a sidecar) and runs
+	// as its image default UID, which differs from the ProxyUserID used in the
+	// iptables config. Its outbound connections to the consul server must bypass
+	// iptables redirect, otherwise consul-dataplane cannot connect to consul-server
+	// to obtain xDS config (chicken-and-egg problem with transparent proxy).
+	// Exclude all consul server ports: gRPC (xDS/ACL login) and HTTP (health, catalog).
+	if c.flagGatewayKind != "" {
+		if c.consul.GRPCPort != 0 {
+			c.iptablesConfig.ExcludeOutboundPorts = append(
+				c.iptablesConfig.ExcludeOutboundPorts,
+				fmt.Sprintf("%d", c.consul.GRPCPort),
+			)
+		}
+		if c.consul.HTTPPort != 0 {
+			c.iptablesConfig.ExcludeOutboundPorts = append(
+				c.iptablesConfig.ExcludeOutboundPorts,
+				fmt.Sprintf("%d", c.consul.HTTPPort),
+			)
+		}
+	}
+
+	b, err := json.MarshalIndent(svc, "", "  ")
+	fmt.Println(string(b), "\n", err)
 	if svc.Proxy.TransparentProxy != nil && svc.Proxy.TransparentProxy.OutboundListenerPort != 0 {
 		c.iptablesConfig.ProxyOutboundPort = svc.Proxy.TransparentProxy.OutboundListenerPort
 	}

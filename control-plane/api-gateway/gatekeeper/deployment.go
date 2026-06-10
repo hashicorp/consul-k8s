@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -110,15 +111,27 @@ func (g *Gatekeeper) deleteDeployment(ctx context.Context, gwName types.Namespac
 }
 
 func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1.Gateway, gcc v1alpha1.GatewayClassConfig, config common.HelmConfig, replicas *int32) (*appsv1.Deployment, error) {
-	initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
-	if err != nil {
-		return nil, err
+	//initContainer, err := g.initContainer(config, gateway.Name, gateway.Namespace)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	// Collect all gateway listener ports to exclude from tproxy inbound redirection.
+	// The gateway IS Envoy, so its own listener ports must not be redirected to the
+	// tproxy inbound port (20000), otherwise incoming connections are lost (RST).
+	listenerPorts := make([]string, 0, len(gateway.Spec.Listeners))
+	for _, listener := range gateway.Spec.Listeners {
+		listenerPorts = append(listenerPorts, strconv.Itoa(int(listener.Port)))
 	}
 
 	annotations := map[string]string{
-		"consul.hashicorp.com/connect-inject":        "false",
-		constants.AnnotationGatewayConsulServiceName: gateway.Name,
-		constants.AnnotationGatewayKind:              "api-gateway",
+		"consul.hashicorp.com/connect-inject":               "true",
+		"consul.hashicorp.com/transparent-proxy":            "true",
+		"consul.hashicorp.com/consul-dns":                   "true",
+		constants.AnnotationGatewayConsulServiceName:        gateway.Name,
+		constants.AnnotationGatewayKind:                     "api-gateway",
+		constants.AnnotationTProxyExcludeInboundPorts:       strings.Join(append(listenerPorts, strconv.Itoa(constants.ProxyDefaultHealthPort)), ","),
+		constants.AnnotationTransparentProxyOverwriteProbes: "false",
 	}
 
 	metrics := common.GatewayMetricsConfig(gateway, gcc, config)
@@ -131,7 +144,7 @@ func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1.Gateway, gcc v
 
 	volumes, mounts := volumesAndMounts(gateway)
 
-	volumes, mounts, err = g.additionalAccessLogVolumeMount(ctx, volumes, mounts)
+	volumes, mounts, err := g.additionalAccessLogVolumeMount(ctx, volumes, mounts)
 	if err != nil {
 		g.Log.Error(err, "error fetching proxy defaults for access logs")
 		return nil, err
@@ -161,7 +174,7 @@ func (g *Gatekeeper) deployment(ctx context.Context, gateway gwv1.Gateway, gcc v
 				Spec: corev1.PodSpec{
 					Volumes: volumes,
 					InitContainers: []corev1.Container{
-						initContainer,
+						//initContainer,
 					},
 					Containers: []corev1.Container{
 						container,
