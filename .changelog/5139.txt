@@ -1,0 +1,3 @@
+```release-note:bug
+catalog-sync: Fix cross-node service deregistration when multiple K8s clusters sync to the same Consul datacenter. The syncer now only deregisters services on its own consul-node-name, preventing clusters from removing each other's service registrations.
+```
