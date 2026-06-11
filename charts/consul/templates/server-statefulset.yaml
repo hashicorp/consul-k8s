@@ -352,6 +352,9 @@ spec:
           - name: extra-config
             mountPath: /consul/extra-config
         {{- include "consul.restrictedSecurityContext" . | nindent 8 }}
+      {{- if .Values.server.extraInitContainers }}
+      {{ toYaml .Values.server.extraInitContainers | nindent 6 }}
+      {{- end }}
       containers:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
