@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PRIMARY_CLUSTER_NAME="test-bed-east-tf"
-SECONDARY_CLUSTER_NAME="test-bed-west-tf"
-PRIMARY_REGION="us-east-2"
-SECONDARY_REGION="us-west-2"
-PRIMARY_VPC_ID="vpc-087a1fbff644aa939"
-SECONDARY_VPC_ID="vpc-0f3d0b8e78a6bf1b8"
-PRIMARY_VPC_CIDR="10.10.0.0/16"
-SECONDARY_VPC_CIDR="10.20.0.0/16"
+PRIMARY_CLUSTER_NAME="test-bed-418-east"
+SECONDARY_CLUSTER_NAME="test-bed-418-west"
 
 create_or_wait_cluster() {
   local cluster_name="$1"
@@ -20,8 +14,6 @@ create_or_wait_cluster() {
     echo "Creating cluster $cluster_name"
     rosa create cluster "$@"
   fi
-
-  wait_for_cluster_ready "$cluster_name"
 }
 
 wait_for_cluster_ready() {
@@ -46,6 +38,47 @@ wait_for_cluster_ready() {
   done
 }
 
+create_or_wait_cluster "$PRIMARY_CLUSTER_NAME" \
+  --cluster-name "$PRIMARY_CLUSTER_NAME" \
+  --region "us-east-2" \
+  --version "4.18.36" \
+  --sts \
+  --mode auto \
+  --yes \
+   \
+  --watch \
+  --machine-cidr "10.10.0.0/16" \
+  --service-cidr "172.30.0.0/16" \
+  --pod-cidr "10.128.0.0/14" \
+  --host-prefix 23 \
+  --subnet-ids "subnet-0b080f86fd5720fbe,subnet-0b51e2b2431ed0199" \
+  --replicas 3 \
+  --compute-machine-type "m5.xlarge" \
+  --channel-group stable &
+primary_cluster_pid=$!
+
+create_or_wait_cluster "$SECONDARY_CLUSTER_NAME" \
+  --cluster-name "$SECONDARY_CLUSTER_NAME" \
+  --region "us-west-2" \
+  --version "4.18.36" \
+  --sts \
+  --mode auto \
+  --yes \
+   \
+  --watch \
+  --machine-cidr "10.20.0.0/16" \
+  --service-cidr "172.31.0.0/16" \
+  --pod-cidr "10.132.0.0/14" \
+  --host-prefix 23 \
+  --subnet-ids "subnet-07c1cb86d55c3b305,subnet-03186c988b5f637a2" \
+  --replicas 3 \
+  --compute-machine-type "m5.xlarge" \
+  --channel-group stable &
+secondary_cluster_pid=$!
+
+wait "$primary_cluster_pid"
+wait "$secondary_cluster_pid"
+
 find_node_sg() {
   local region="$1"
   local vpc_id="$2"
@@ -68,65 +101,14 @@ find_node_sg() {
     ' | head -n 1
 }
 
-create_or_wait_cluster "$PRIMARY_CLUSTER_NAME" \
-  --cluster-name "$PRIMARY_CLUSTER_NAME" \
-  --region "$PRIMARY_REGION" \
-  --version "4.19.26" \
-  --sts \
-  --mode auto \
-  --yes \
-   \
-  --watch \
-  --machine-cidr "10.10.0.0/16" \
-  --service-cidr "172.30.0.0/16" \
-  --pod-cidr "10.128.0.0/14" \
-  --host-prefix 23 \
-  --subnet-ids "subnet-0648f9f512197f31a,subnet-0268c5bcffaf51f86" \
-  --replicas 2 \
-  --compute-machine-type "m5.xlarge" \
-  --channel-group stable &
-primary_cluster_pid=$!
+primary_infra_id="$(rosa describe cluster -c "test-bed-418-east" -o json | jq -r '.infra_id')"
+secondary_infra_id="$(rosa describe cluster -c "test-bed-418-west" -o json | jq -r '.infra_id')"
 
-create_or_wait_cluster "$SECONDARY_CLUSTER_NAME" \
-  --cluster-name "$SECONDARY_CLUSTER_NAME" \
-  --region "$SECONDARY_REGION" \
-  --version "4.19.26" \
-  --sts \
-  --mode auto \
-  --yes \
-   \
-  --watch \
-  --machine-cidr "10.20.0.0/16" \
-  --service-cidr "172.31.0.0/16" \
-  --pod-cidr "10.132.0.0/14" \
-  --host-prefix 23 \
-  --subnet-ids "subnet-07df0078c4d40da23,subnet-059a1ad62dd0feb65" \
-  --replicas 2 \
-  --compute-machine-type "m5.xlarge" \
-  --channel-group stable &
-secondary_cluster_pid=$!
-
-wait "$primary_cluster_pid"
-wait "$secondary_cluster_pid"
-
-primary_infra_id="$(rosa describe cluster -c "$PRIMARY_CLUSTER_NAME" -o json | jq -r '.infra_id')"
-secondary_infra_id="$(rosa describe cluster -c "$SECONDARY_CLUSTER_NAME" -o json | jq -r '.infra_id')"
-
-primary_worker_sg="$(find_node_sg "$PRIMARY_REGION" "$PRIMARY_VPC_ID" "$primary_infra_id")"
-secondary_worker_sg="$(find_node_sg "$SECONDARY_REGION" "$SECONDARY_VPC_ID" "$secondary_infra_id")"
-
-if [[ -z "$primary_worker_sg" || "$primary_worker_sg" == "None" ]]; then
-  echo "Unable to find primary node security group for $primary_infra_id in $PRIMARY_VPC_ID" >&2
-  exit 1
-fi
-
-if [[ -z "$secondary_worker_sg" || "$secondary_worker_sg" == "None" ]]; then
-  echo "Unable to find secondary node security group for $secondary_infra_id in $SECONDARY_VPC_ID" >&2
-  exit 1
-fi
+primary_worker_sg="$(find_node_sg "us-east-2" "vpc-0e6fa09f7760dc791" "$primary_infra_id")"
+secondary_worker_sg="$(find_node_sg "us-west-2" "vpc-00ff1a0b3a104c98b" "$secondary_infra_id")"
 
 aws ec2 authorize-security-group-ingress \
-  --region "$PRIMARY_REGION" \
+  --region "us-east-2" \
   --group-id "$primary_worker_sg" \
   --ip-permissions '[
     {"IpProtocol":"tcp","FromPort":8300,"ToPort":8300,"IpRanges":[{"CidrIp":"10.20.0.0/16","Description":"Consul RPC from secondary ROSA VPC"}]},
@@ -137,7 +119,7 @@ aws ec2 authorize-security-group-ingress \
   ]' >/dev/null 2>&1 || true
 
 aws ec2 authorize-security-group-ingress \
-  --region "$SECONDARY_REGION" \
+  --region "us-west-2" \
   --group-id "$secondary_worker_sg" \
   --ip-permissions '[
     {"IpProtocol":"tcp","FromPort":8300,"ToPort":8300,"IpRanges":[{"CidrIp":"10.10.0.0/16","Description":"Consul RPC from primary ROSA VPC"}]},
@@ -147,4 +129,4 @@ aws ec2 authorize-security-group-ingress \
     {"IpProtocol":"tcp","FromPort":8502,"ToPort":8502,"IpRanges":[{"CidrIp":"10.10.0.0/16","Description":"Consul gRPC TLS from primary ROSA VPC"}]}
   ]' >/dev/null 2>&1 || true
 
-echo "ROSA clusters are ready and worker security group ingress has been applied"
+echo "ROSA cluster pair rosa418 is ready"
