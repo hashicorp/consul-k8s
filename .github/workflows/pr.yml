@@ -17,6 +17,21 @@ jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
 
+  get-go-version:
+    needs: [conditional-skip]
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  coverage:
+    needs:
+      - conditional-skip
+      - get-go-version
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    uses: ./.github/workflows/coverage.yml
+    with:
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
+      pr-number: ${{ github.event.pull_request.number }}
+
   test:
     name: test
     needs: [ conditional-skip ]
