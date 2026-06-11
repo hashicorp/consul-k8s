@@ -4,23 +4,40 @@
 package stats
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
+	"github.com/posener/complete"
 	helmCLI "helm.sh/helm/v3/pkg/cli"
-	"io"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 const envoyAdminPort = 19000
+const (
+	filePerm = 0644
+	dirPerm  = 0755
+)
+
+const (
+	flagNameNamespace    = "namespace"
+	flagNameKubeConfig   = "kubeconfig"
+	flagNameKubeContext  = "context"
+	flagNameOutputFormat = "output"
+)
 
 type StatsCommand struct {
 	*common.BaseCommand
@@ -33,10 +50,11 @@ type StatsCommand struct {
 
 	set *flag.Sets
 
-	flagKubeConfig  string
-	flagKubeContext string
-	flagNamespace   string
-	flagPod         string
+	flagKubeConfig   string
+	flagKubeContext  string
+	flagNamespace    string
+	flagPod          string
+	flagOutputFormat string
 
 	once sync.Once
 	help string
@@ -50,22 +68,29 @@ func (c *StatsCommand) init() {
 
 	f := c.set.NewSet("Command Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "namespace",
+		Name:    flagNameNamespace,
 		Target:  &c.flagNamespace,
 		Usage:   "The namespace where the target Pod can be found.",
 		Aliases: []string{"n"},
 	})
+	f.StringVar(&flag.StringVar{
+		Name:    flagNameOutputFormat,
+		Target:  &c.flagOutputFormat,
+		Usage:   "To write the stats of a given proxy pod in a json file.",
+		Default: "",
+		Aliases: []string{"o"},
+	})
 
 	f = c.set.NewSet("Global Options")
 	f.StringVar(&flag.StringVar{
-		Name:    "kubeconfig",
+		Name:    flagNameKubeConfig,
 		Aliases: []string{"c"},
 		Target:  &c.flagKubeConfig,
 		Default: "",
 		Usage:   "Path to kubeconfig file.",
 	})
 	f.StringVar(&flag.StringVar{
-		Name:    "context",
+		Name:    flagNameKubeContext,
 		Target:  &c.flagKubeContext,
 		Default: "",
 		Usage:   "Kubernetes context to use.",
@@ -78,6 +103,9 @@ func (c *StatsCommand) init() {
 func (c *StatsCommand) validateFlags() error {
 	if len(c.set.Args()) > 0 {
 		return errors.New("should have no non-flag arguments")
+	}
+	if c.flagOutputFormat != "" && c.flagOutputFormat != "archive" {
+		return fmt.Errorf("invalid output format: '%s'. Only supported format for now is 'archive'", c.flagOutputFormat)
 	}
 	return nil
 }
@@ -92,7 +120,8 @@ func (c *StatsCommand) Run(args []string) int {
 	}
 
 	if err := c.validateFlags(); err != nil {
-		c.UI.Output(err.Error())
+		c.UI.Output(err.Error(), terminal.WithErrorStyle())
+		c.UI.Output("\n" + c.Help())
 		return 1
 	}
 
@@ -135,15 +164,25 @@ func (c *StatsCommand) Run(args []string) int {
 		RestConfig: c.restConfig,
 	}
 
+	if c.flagOutputFormat == "archive" {
+		fileName := fmt.Sprintf("proxy-stats-%s.json", c.flagPod)
+		proxyStatsFilePath := filepath.Join("proxy", fileName)
+		err := c.captureEnvoyStats(&pf, proxyStatsFilePath)
+		if err != nil {
+			c.UI.Output("error capturing envoy stats: %v", err, terminal.WithErrorStyle())
+			return 1
+		}
+		c.UI.Output("proxy stats '%s' output saved to '%s'", c.flagPod, proxyStatsFilePath, terminal.WithSuccessStyle())
+		return 0
+	}
+
 	stats, err := c.getEnvoyStats(&pf)
 	if err != nil {
 		c.UI.Output("error fetching envoy stats %v", err, terminal.WithErrorStyle())
 		return 1
 	}
-
 	c.UI.Output(stats)
 	return 0
-
 }
 
 func (c *StatsCommand) getEnvoyStats(pf common.PortForwarder) (string, error) {
@@ -168,6 +207,43 @@ func (c *StatsCommand) getEnvoyStats(pf common.PortForwarder) (string, error) {
 	}(resp.Body)
 
 	return string(bodyBytes), nil
+}
+
+// captureEnvoyStats - fetches proxy stats for a pod (using portforwarder) in json format and saves it to give filepath	(proxyStatsFilePath)
+func (c *StatsCommand) captureEnvoyStats(pf common.PortForwarder, proxyStatsFilePath string) error {
+	endpoint, err := pf.Open(c.Ctx)
+	if err != nil {
+		return fmt.Errorf("error port forwarding %w", err)
+	}
+	defer pf.Close()
+	resp, err := http.Get(fmt.Sprintf("http://%s/stats?format=json", endpoint))
+	if err != nil {
+		return fmt.Errorf("error hitting stats endpoint of envoy %w", err)
+	}
+	stats, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading body of http response %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Create file path and directory for storing stats
+	// NOTE: currently it is writing log file in cwd /proxy dir only. Also, file contents will be overwritten if
+	// the command is run multiple times for the same pod name or if file already exists.
+	if err := os.MkdirAll(filepath.Dir(proxyStatsFilePath), dirPerm); err != nil {
+		return fmt.Errorf("error creating proxy stats output directory: %w", err)
+	}
+
+	var statsJson bytes.Buffer
+	if err := json.Indent(&statsJson, stats, "", "\t"); err != nil {
+		return fmt.Errorf("error indenting JSON proxy stats output: %w", err)
+	}
+
+	if err := os.WriteFile(proxyStatsFilePath, statsJson.Bytes(), filePerm); err != nil {
+		// Note: Please do not delete the directory created above even if writing file fails.
+		// This (proxy) directory is used by all proxy read, log, list, stats command, for storing their outputs as archive.
+		return fmt.Errorf("error writing proxy stats output to json file '%s': %w", proxyStatsFilePath, err)
+	}
+	return nil
 }
 
 // setupKubeClient to use for non Helm SDK calls to the Kubernetes API The Helm SDK will use
@@ -211,6 +287,25 @@ func (c *StatsCommand) parseFlags(args []string) error {
 	}
 
 	return nil
+}
+
+// AutocompleteFlags returns a mapping of supported flags and autocomplete
+// options for this command. The map key for the Flags map should be the
+// complete flag such as "-foo" or "--foo".
+func (c *StatsCommand) AutocompleteFlags() complete.Flags {
+	return complete.Flags{
+		fmt.Sprintf("-%s", flagNameNamespace):    complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameOutputFormat): complete.PredictNothing,
+		fmt.Sprintf("-%s", flagNameKubeConfig):   complete.PredictFiles("*"),
+		fmt.Sprintf("-%s", flagNameKubeContext):  complete.PredictNothing,
+	}
+}
+
+// AutocompleteArgs returns the argument predictor for this command.
+// Since argument completion is not supported, this will return
+// complete.PredictNothing.
+func (c *StatsCommand) AutocompleteArgs() complete.Predictor {
+	return complete.PredictNothing
 }
 
 // Help returns a description of the command and how it is used.

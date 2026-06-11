@@ -1,0 +1,3 @@
+```release-note:feature
+cli: Added new flag -output to proxy stats command enabling the user to write output to json file
+```
