@@ -50,7 +50,7 @@ func RunKubectlAndGetOutputWithLoggerE(t testutil.TestingTB, options *k8s.Kubect
 	if options.ConfigPath != "" {
 		cmdArgs = append(cmdArgs, "--kubeconfig", options.ConfigPath)
 	}
-	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") && !sliceContains(args, "-A") {
+	if options.Namespace != "" && !sliceContains(args, "-n") && !sliceContains(args, "--namespace") {
 		cmdArgs = append(cmdArgs, "--namespace", options.Namespace)
 	}
 	cmdArgs = append(cmdArgs, args...)

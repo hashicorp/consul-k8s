@@ -1,3 +1,0 @@
-```release-note:bug
-cli: Fix installation and upgrade failures caused by supplying boolean types to strictly typed string fields in custom helm values.yaml
-```

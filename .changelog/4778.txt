@@ -1,3 +1,0 @@
-```release-note:feature
-control-plane: Added support to sync multiple ports of a service from k8s to consul.
-```

@@ -1,3 +1,0 @@
-```release-note:feature
-Dual Gateway Architecture Model: Custom controller along with stable controller will be available
-```

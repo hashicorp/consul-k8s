@@ -6,7 +6,6 @@ package apigateway
 import (
 	"context"
 	"fmt"
-	"net"
 	"testing"
 
 	"github.com/hashicorp/consul/api"
@@ -89,13 +88,6 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	})
 
-	// fetch the api-resources installed
-	logger.Log(t, "fetching api-resources")
-	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "api-resources")
-	// log the api-resources output to help with debugging if the test fails due to missing CRDs
-	logger.Log(t, "api-resources output:\n%s", out)
-	require.NoError(t, err)
-
 	logger.Log(t, "creating api-gateway resources")
 	// Apply api-gateway resources with retry logic to handle intermittent failures
 	retry.Run(t, func(r *retry.R) {
@@ -134,7 +126,7 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	k8sOptions := ctx.KubectlOptions(t)
-	targetAddress := fmt.Sprintf("http://%s/", net.JoinHostPort(gatewayAddress, "8080"))
+	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
 
 	// check that intentions keep our connection from happening
 	k8s.CheckStaticServerHTTPConnectionFailing(t, k8sOptions, StaticClientName, targetAddress)

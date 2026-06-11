@@ -1,3 +1,0 @@
-```release-note:improvement
-updated consul image version to 1.22.0-dev
-```

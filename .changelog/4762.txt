@@ -1,3 +1,0 @@
-```release-note:security
-go: upgrade go version to 1.25.1
-```

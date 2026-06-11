@@ -6,8 +6,6 @@ package k8s
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -96,7 +94,7 @@ func KubernetesAPIServerHost(t *testing.T, cfg *config.TestConfig, ctx environme
 		// The Kubernetes AuthMethod host is read from the endpoints for the Kubernetes service.
 		kubernetesEndpoint, err := ctx.KubernetesClient(t).CoreV1().Endpoints("default").Get(context.Background(), "kubernetes", metav1.GetOptions{})
 		require.NoError(t, err)
-		k8sAPIHost = fmt.Sprintf("https://%s", net.JoinHostPort(kubernetesEndpoint.Subsets[0].Addresses[0].IP, strconv.Itoa(int(kubernetesEndpoint.Subsets[0].Ports[0].Port))))
+		k8sAPIHost = fmt.Sprintf("https://%s:%d", kubernetesEndpoint.Subsets[0].Addresses[0].IP, kubernetesEndpoint.Subsets[0].Ports[0].Port)
 	} else {
 		k8sAPIHost = KubernetesAPIServerHostFromOptions(t, ctx.KubectlOptions(t))
 	}

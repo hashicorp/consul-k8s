@@ -637,10 +637,7 @@ func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
 	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds]; ok {
 		seconds, _ = strconv.Atoi(v)
 	}
-	if seconds > 0 {
-		return int32(seconds)
-	}
-	return 0
+	return int32(seconds)
 }
 
 func (w *MeshWebhook) getSidecarProbeCheckInitialDelaySeconds(pod corev1.Pod) int32 {
@@ -648,10 +645,9 @@ func (w *MeshWebhook) getSidecarProbeCheckInitialDelaySeconds(pod corev1.Pod) in
 	if v, ok := pod.Annotations[constants.AnnotationSidecarInitialProbeCheckDelaySeconds]; ok {
 		seconds, _ = strconv.Atoi(v)
 	}
-	if seconds > 0 {
-		return int32(seconds)
-	}
-	return 0
+
+	return int32(seconds)
+
 }
 
 // getMetricsPorts creates container ports for exposing services such as prometheus.

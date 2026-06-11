@@ -1,3 +1,0 @@
-```release-note:bug
-cli: Fix  the issue When both Consul and Gateway API HTTPRoute CRDs are installed, kubectl encounters a naming ambiguity.
-```
