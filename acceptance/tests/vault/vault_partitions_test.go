@@ -121,6 +121,13 @@ func TestVault_Partitions(t *testing.T) {
 
 		// Now, configure the auth method in Vault.
 		secondaryVaultCluster.ConfigureAuthMethod(t, vaultClient, "kubernetes-"+secondaryPartition, k8sAuthMethodHost, authMethodRBACName, ns)
+
+		// Validate auth/kubernetes-<partition>/config is persisted with a
+		// non-empty token_reviewer_jwt and that Vault can actually issue a
+		// TokenReview against the secondary k8s API. This fails in ~3m with
+		// a clear message if the auth method is broken — instead of the
+		// 45m silent helm pre-install hang we used to see on GHA-EKS.
+		vault.WaitForAuthMethodReady(t, vaultClient, clientClusterCtx.KubernetesClient(t), "kubernetes-"+secondaryPartition, authMethodRBACName, ns)
 	}
 
 	// -------------------------
@@ -405,6 +412,16 @@ func TestVault_Partitions(t *testing.T) {
 	}
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
+
+	// Pre-flight: ensure the primary's expose-servers Service is actually
+	// reachable on its HTTPS port before installing the workload cluster.
+	// The workload install fires a `partition-init` pre-install Job (and later
+	// a `server-acl-init` post-upgrade Job) that calls this address; both are
+	// gated by helm's 15m hook timeout. Block here so LB cold-start (DNS,
+	// ELB registration, SG activation) surfaces deterministically here
+	// instead of as a "failed pre-install: timed out" inside helm. No-op on
+	// Kind.
+	k8s.WaitForServiceReachable(t, cfg, serverClusterCtx, partitionServiceName, 8501)
 
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterCtx, cfg, consulReleaseName)

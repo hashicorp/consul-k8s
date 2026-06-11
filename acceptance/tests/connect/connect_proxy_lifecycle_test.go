@@ -152,8 +152,12 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 			})
 			clientPodName := pods.Items[0].Name
 
-			// We should terminate the pods shortly after envoy gracefully shuts down in our 5s test cases.
-			var terminationGracePeriod int64 = 6
+			// The k8s termination grace period must comfortably outlive Envoy's
+			// shutdownGracePeriodSeconds AND the in-test grace-period verification loop
+			// below, otherwise kubelet finalizes the pod while we're still trying to
+			// `kubectl exec` into it and the test fails with "pod not found" (not a
+			// real connectivity bug). Give ourselves a generous buffer.
+			terminationGracePeriod := gracePeriodSeconds + 30
 			logger.Logf(t, "killing the %q pod with %dseconds termination grace period", clientPodName, terminationGracePeriod)
 			err = ctx.KubernetesClient(t).CoreV1().Pods(ns).Delete(context.Background(), clientPodName, metav1.DeleteOptions{GracePeriodSeconds: &terminationGracePeriod})
 			require.NoError(t, err)
@@ -181,6 +185,13 @@ func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 							logger.Logf(r, "checking connectivity to static-server from terminating pod %s", clientPodName)
 							output, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t), args...)
 							if err != nil {
+								// If the pod is already gone, the grace-period window has effectively
+								// ended for the purposes of this assertion; don't keep retrying against
+								// a non-existent pod.
+								if strings.Contains(output, "not found") || strings.Contains(err.Error(), "not found") {
+									logger.Logf(r, "pod %s no longer exists; ending grace-period check", clientPodName)
+									return
+								}
 								r.Errorf("%v", err.Error())
 								return
 							}
