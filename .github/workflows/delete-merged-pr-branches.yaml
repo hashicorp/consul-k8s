@@ -1,0 +1,137 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+name: Delete Branches with Merged/Closed PRs
+on:
+  schedule:
+    - cron: "0 6 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry run: log branches that would be deleted without actually deleting them"
+        type: boolean
+        default: true
+      min-days-since-merge:
+        description: "Only delete if PR was merged/closed at least this many days ago (default: 7)"
+        type: number
+        default: 7
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete-merged-pr-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete branches whose PRs are merged or closed
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            // inputs.dry-run is the string 'true'/'false' for workflow_dispatch (boolean inputs),
+            // or '' for schedule triggers. Compare as string to avoid type-coercion bugs.
+            const dryRun = '${{ inputs.dry-run }}' === 'true';
+            const minDaysSinceMerge = ${{ inputs.min-days-since-merge || 7 }};
+            const cutoffDate = new Date(Date.now() - minDaysSinceMerge * 24 * 60 * 60 * 1000);
+
+            // Branches that must never be deleted by this workflow
+            // These are protected from deletion by org rulesets but still adding an extra check here
+            const PROTECTED_PATTERNS = [
+              /^main$/,
+              /^master$/,
+              /^release\/.+/,
+              /^develop$/,
+            ];
+
+            const isProtected = (name) => PROTECTED_PATTERNS.some((p) => p.test(name));
+
+            console.log(`dry-run: ${dryRun}`);
+            console.log(`min-days-since-merge: ${minDaysSinceMerge}`);
+            console.log(`Cutoff date: ${cutoffDate.toISOString()}`);
+
+            // Paginate all non-protected branches
+            const allBranches = await github.paginate(github.rest.repos.listBranches, {
+              owner,
+              repo,
+              protected: false,
+              per_page: 100,
+            });
+
+            console.log(`\nTotal unprotected branches found: ${allBranches.length}`);
+
+            const toDelete = [];
+            const skipped = [];
+
+            for (const branch of allBranches) {
+              const name = branch.name;
+
+              if (isProtected(name)) {
+                skipped.push({ name, reason: "matches protected pattern" });
+                continue;
+              }
+
+              // Look for closed PRs (merged PRs have state=closed + merged_at set)
+              const { data: prs } = await github.rest.pulls.list({
+                owner,
+                repo,
+                head: `${owner}:${name}`,
+                state: "closed",
+                per_page: 1,
+                sort: "updated",
+                direction: "desc",
+              });
+
+              if (prs.length === 0) {
+                skipped.push({ name, reason: "no closed PR found" });
+                continue;
+              }
+
+              const pr = prs[0];
+              const closedAt = new Date(pr.closed_at);
+              const wasMerged = pr.merged_at !== null;
+
+              if (closedAt > cutoffDate) {
+                skipped.push({
+                  name,
+                  reason: `PR #${pr.number} closed too recently (${pr.closed_at})`,
+                });
+                continue;
+              }
+
+              toDelete.push({
+                name,
+                prNumber: pr.number,
+                prState: wasMerged ? "merged" : "closed (unmerged)",
+                closedAt: pr.closed_at,
+              });
+            }
+
+            console.log(`\n=== Branches to delete (${toDelete.length}) ===`);
+            for (const b of toDelete) {
+              console.log(`  ${b.name} — PR #${b.prNumber} ${b.prState} on ${b.closedAt}`);
+              if (!dryRun) {
+                try {
+                  await github.rest.git.deleteRef({
+                    owner,
+                    repo,
+                    ref: `heads/${b.name}`,
+                  });
+                  console.log(`  ✓ Deleted`);
+                } catch (err) {
+                  console.log(`  ✗ Failed to delete: ${err.message}`);
+                }
+              }
+            }
+
+            console.log(`\n=== Skipped branches (${skipped.length}) ===`);
+            for (const b of skipped) {
+              console.log(`  ${b.name} — ${b.reason}`);
+            }
+
+            console.log(`\n=== Summary ===`);
+            console.log(`  Deleted : ${dryRun ? 0 : toDelete.length} (dry-run: ${dryRun})`);
+            console.log(`  Would delete: ${toDelete.length}`);
+            console.log(`  Skipped : ${skipped.length}`);
