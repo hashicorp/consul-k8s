@@ -1,3 +1,0 @@
-```release-note:feature
-ipv6: Addition of ipv6 changes for consul-k8s connect inject and cni
-```
