@@ -1,0 +1,3 @@
+```release-note:feature
+cli: add new output format "archive" to proxy list command. It will write command output to json file.
+```
