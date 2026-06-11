@@ -1040,7 +1040,7 @@ key2: value2' \
   [ "${actual}" = "k8s-consul" ]
 }
 
-@test "terminatingGateways/Deployment: consulNamespace uses destination namespace when mirroring is disabled" {
+@test "terminatingGateways/Deployment: consulNamespace ignores connect destination namespace when mirroring is disabled" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/terminating-gateways-deployment.yaml \
@@ -1053,7 +1053,7 @@ key2: value2' \
       . | tee /dev/stderr |
       yq -s -r '.[0].spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
 
-  [ "${actual}" = "dest-ns" ]
+  [ "${actual}" = "default" ]
 }
 
 @test "terminatingGateways/Deployment: consulNamespace defaults to default when mirroring disabled and no destination set" {

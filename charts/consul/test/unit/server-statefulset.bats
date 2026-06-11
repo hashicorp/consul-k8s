@@ -3085,7 +3085,7 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "consul" ]
 }
 
-@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE uses destination namespace when mirroring disabled" {
+@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE not set when mirroring disabled even if destination namespace is set" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/server-statefulset.yaml  \
@@ -3095,8 +3095,8 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'connectInject.consulNamespaces.consulDestinationNamespace=dest-ns' \
       --namespace consul \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[1].env[] | select(.name == "CONSUL_NAMESPACE") | .value' | tee /dev/stderr)
-  [ "${actual}" = "dest-ns" ]
+      yq -r '.spec.template.spec.containers[1].env | any(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "server/StatefulSet: snapshot-agent: CONSUL_PARTITION set when adminPartitions enabled" {

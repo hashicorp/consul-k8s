@@ -23,7 +23,15 @@ registered into. Resolution order:
      "default" sentinel (treated as unset so mirroring can take precedence).
   3. The mirrored Consul namespace derived from the release namespace when
      namespace mirroring is enabled.
-  4. The configured destination namespace (falling back to the defaults value).
+  4. The terminatingGateways.defaults.consulNamespace value (i.e. "default").
+
+Note: This intentionally does NOT consult
+connectInject.consulNamespaces.consulDestinationNamespace. Terminating gateways have
+historically only resolved their namespace from terminatingGateways.defaults.consulNamespace
+/ the per-gateway consulNamespace, and the gateway's ACL policy (created by server-acl-init)
+is scoped to that same namespace. Following the connect destination namespace here would
+register the service into a namespace its ACL token is not authorized for. Mirroring is the
+only additional case we resolve, matching connect-injected services and the API gateway.
 
 Usage:
   {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
@@ -38,8 +46,6 @@ Usage:
 {{- $defaultsNamespace -}}
 {{- else if $root.Values.connectInject.consulNamespaces.mirroringK8S -}}
 {{- printf "%s%s" $root.Values.connectInject.consulNamespaces.mirroringK8SPrefix $root.Release.Namespace -}}
-{{- else if $root.Values.connectInject.consulNamespaces.consulDestinationNamespace -}}
-{{- $root.Values.connectInject.consulNamespaces.consulDestinationNamespace -}}
 {{- else -}}
 {{- default "default" $defaultsNamespace -}}
 {{- end -}}

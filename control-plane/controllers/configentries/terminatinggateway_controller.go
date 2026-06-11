@@ -20,7 +20,6 @@ import (
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
-	"github.com/hashicorp/consul-k8s/control-plane/namespaces"
 	capi "github.com/hashicorp/consul/api"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -1679,37 +1678,37 @@ func (r *TerminatingGatewayController) terminatingGatewayConsulNamespace(
 		}
 	}
 
-	// namespacesEnabled reflects whether Consul Enterprise namespaces are turned
-	// on for this controller. We prefer the controller's runtime config but fall
-	// back to the Helm values when the controller is not fully wired (e.g. in
-	// some unit tests).
+	// namespacesEnabled / mirroring reflect whether Consul Enterprise namespaces
+	// and namespace mirroring are turned on for this controller. We prefer the
+	// controller's runtime config but fall back to the Helm values when the
+	// controller is not fully wired (e.g. in some unit tests).
 	namespacesEnabled := helmValues.Global.EnableConsulNamespaces
+	mirroring := false
+	mirroringPrefix := ""
 	if r != nil && r.ConfigEntryController != nil {
 		namespacesEnabled = r.ConfigEntryController.EnableConsulNamespaces
+		mirroring = r.ConfigEntryController.EnableNSMirroring
+		mirroringPrefix = r.ConfigEntryController.NSMirroringPrefix
 	}
 
 	// 3. Helm defaults override. Treat the chart's "default" sentinel as unset
-	//    when namespaces are enabled so that the mirrored/destination namespace
-	//    derived from the gateway's K8s namespace can take precedence.
+	//    when namespaces are enabled so that the mirrored namespace derived from
+	//    the gateway's K8s namespace can take precedence.
 	defaultsNS := helmValues.TerminatingGateways.Defaults.ConsulNamespace
 	if defaultsNS != "" && !(defaultsNS == "default" && namespacesEnabled) {
 		return defaultsNS
 	}
 
-	// 4. Fall back to the mirrored / destination namespace derived from the
-	//    gateway's K8s namespace.
-	if r != nil && r.ConfigEntryController != nil {
-		cec := r.ConfigEntryController
-		if ns := namespaces.ConsulNamespace(
-			termGW.Namespace,
-			cec.EnableConsulNamespaces,
-			cec.ConsulDestinationNamespace,
-			cec.EnableNSMirroring,
-			cec.NSMirroringPrefix,
-		); ns != "" {
-			return ns
-		}
+	// 4. Mirroring only. We intentionally do NOT fall back to the connect
+	//    destination namespace: the terminating gateway's ACL policy (created by
+	//    server-acl-init) is scoped to this same resolved namespace, and following
+	//    the destination namespace would register the service into a namespace its
+	//    ACL token is not authorized for. Mirroring maps the gateway into the
+	//    Consul namespace matching its K8s namespace, consistent with the Helm path.
+	if namespacesEnabled && mirroring {
+		return mirroringPrefix + termGW.Namespace
 	}
 
+	// 5. Default.
 	return defaultIfEmpty(defaultsNS)
 }

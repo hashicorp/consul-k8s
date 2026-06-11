@@ -253,14 +253,14 @@ func TestTerminatingGatewayController_terminatingGatewayConsulNamespace(t *testi
 			},
 			expectedNS: "k8s-" + kubeNS,
 		},
-		"destination namespace used when mirroring disabled": {
+		"default when mirroring disabled even if destination namespace is set": {
 			termGW: newTermGW("", ""),
 			helm:   &helmvalues.HelmValues{},
 			cec: &ConfigEntryController{
 				EnableConsulNamespaces:     true,
 				ConsulDestinationNamespace: "dest-ns",
 			},
-			expectedNS: "dest-ns",
+			expectedNS: "default",
 		},
 		"falls back to default when namespaces disabled": {
 			termGW:     newTermGW("", ""),
