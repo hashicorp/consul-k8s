@@ -80,7 +80,7 @@ spec:
         "consul.hashicorp.com/gateway-kind": "terminating-gateway"
         "consul.hashicorp.com/gateway-consul-service-name": "{{ .name }}"
         {{- if $root.Values.global.enableConsulNamespaces }}
-        "consul.hashicorp.com/gateway-namespace": {{ (default $defaults.consulNamespace .consulNamespace) }}
+        "consul.hashicorp.com/gateway-namespace": {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
         {{- end }}
         {{- if (and $root.Values.global.secretsBackend.vault.enabled $root.Values.global.tls.enabled) }}
         "vault.hashicorp.com/agent-init-first": "true"
@@ -187,7 +187,7 @@ spec:
           {{- include "consul.consulK8sConsulServerEnvVars" $root | nindent 10 }}
           {{- if $root.Values.global.enableConsulNamespaces }}
           - name: CONSUL_NAMESPACE
-            value: {{ (default $defaults.consulNamespace .consulNamespace) }}
+            value: {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
           {{- end }}
           {{- if $root.Values.global.acls.manageSystemACLs }}
           - name: CONSUL_LOGIN_AUTH_METHOD
@@ -288,7 +288,7 @@ spec:
           {{- end }}
           - -proxy-service-id-path=/consul/service/proxy-id
           {{- if $root.Values.global.enableConsulNamespaces }}
-          - -service-namespace={{ (default $defaults.consulNamespace .consulNamespace) }}
+          - -service-namespace={{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
           {{- end }}
           {{- if and $root.Values.global.tls.enabled }}
           {{- if (not (and $root.Values.externalServers.enabled $root.Values.externalServers.useSystemRoots)) }}
