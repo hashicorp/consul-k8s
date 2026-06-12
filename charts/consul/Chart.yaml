@@ -13,7 +13,7 @@ sources:
   - https://github.com/hashicorp/consul
   - https://github.com/hashicorp/consul-k8s
 annotations:
-  artifacthub.io/prerelease: true
+  artifacthub.io/prerelease: "true"
   artifacthub.io/images: |
     - name: consul
       image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.21-dev

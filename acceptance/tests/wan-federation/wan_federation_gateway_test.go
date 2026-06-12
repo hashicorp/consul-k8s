@@ -221,7 +221,6 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 	})
 
 	targetAddress := fmt.Sprintf("http://%s:8080/", gatewayAddress)
-
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, targetAddress)
 

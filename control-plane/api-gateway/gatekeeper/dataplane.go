@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -19,16 +19,17 @@ import (
 )
 
 const (
-	allCapabilities              = "ALL"
-	netBindCapability            = "NET_BIND_SERVICE"
-	consulDataplaneDNSBindHost   = "127.0.0.1"
-	consulDataplaneDNSBindPort   = 8600
-	defaultEnvoyProxyConcurrency = 1
-	volumeNameForConnectInject   = "consul-connect-inject-data"
-	volumeNameForTLSCerts        = "consul-gateway-tls-certificates"
+	allCapabilities                = "ALL"
+	netBindCapability              = "NET_BIND_SERVICE"
+	consulDataplaneDNSBindHost     = "127.0.0.1"
+	ipv6ConsulDataplaneDNSBindHost = "::1"
+	consulDataplaneDNSBindPort     = 8600
+	defaultEnvoyProxyConcurrency   = 1
+	volumeNameForConnectInject     = "consul-connect-inject-data"
+	volumeNameForTLSCerts          = "consul-gateway-tls-certificates"
 )
 
-func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1beta1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
+func consulDataplaneContainer(metrics common.MetricsConfig, config common.HelmConfig, gcc v1alpha1.GatewayClassConfig, gateway gwv1.Gateway, mounts []corev1.VolumeMount) (corev1.Container, error) {
 	// Extract the service account token's volume mount.
 	var (
 		err             error
@@ -163,7 +164,12 @@ func getDataplaneArgs(metrics common.MetricsConfig, namespace string, config com
 		"-envoy-concurrency=" + strconv.Itoa(envoyConcurrency),
 	}
 
-	consulNamespace := namespaces.ConsulNamespace(namespace, config.EnableNamespaces, config.ConsulDestinationNamespace, config.EnableNamespaceMirroring, config.NamespaceMirroringPrefix)
+	consulNamespace := namespaces.ConsulNamespace(
+		namespace, config.EnableNamespaces,
+		config.ConsulDestinationNamespace,
+		config.EnableNamespaceMirroring,
+		config.NamespaceMirroringPrefix,
+	)
 
 	if config.AuthMethod != "" {
 		args = append(args,

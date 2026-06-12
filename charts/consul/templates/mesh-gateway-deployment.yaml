@@ -169,6 +169,10 @@ spec:
         {{- end }}
         - name: CONSUL_NODE_NAME
           value: $(NODE_NAME)-virtual
+        - name: DP_ENVOY_READY_BIND_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         command:
         - "/bin/sh"
         - "-ec"

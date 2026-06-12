@@ -55,6 +55,9 @@ const (
 	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
+
+	// annotationDualStack stores if pod need to run in dualstack mode
+	annotationDualStack = "consul.hashicorp.com/dual-stack"
 )
 
 type Command struct {
@@ -176,7 +179,6 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	var iptablesCfg iptables.Config
-
 	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
 	if cniArgsIPTablesCfg != "" {
 		var err error
@@ -217,6 +219,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		if err != nil {
 			return err
 		}
+
 	}
 
 	// Set NetNS passed through the CNI.

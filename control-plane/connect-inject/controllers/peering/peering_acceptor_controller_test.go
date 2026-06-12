@@ -244,7 +244,7 @@ func TestReconcile_CreateUpdatePeeringAcceptor(t *testing.T) {
 						Backend: "kubernetes",
 					},
 				},
-				LatestPeeringVersion: ptr.To(uint64(2)),
+				LatestPeeringVersion: ptr.To(int64(2)),
 			},
 			expectedConsulPeerings: []*api.Peering{
 				{
@@ -709,7 +709,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 					},
 					ResourceVersion: "some-old-sha",
 				},
-				LatestPeeringVersion: ptr.To(uint64(3)),
+				LatestPeeringVersion: ptr.To(int64(3)),
 			},
 		},
 		"is no/op if annotation value is equal to value in status": {
@@ -725,7 +725,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 					},
 					ResourceVersion: "some-old-sha",
 				},
-				LatestPeeringVersion: ptr.To(uint64(3)),
+				LatestPeeringVersion: ptr.To(int64(3)),
 			},
 		},
 		"updates if annotation value is greater than value in status": {
@@ -740,7 +740,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 						Backend: "kubernetes",
 					},
 				},
-				LatestPeeringVersion: ptr.To(uint64(4)),
+				LatestPeeringVersion: ptr.To(int64(4)),
 			},
 		},
 	}
@@ -771,7 +771,7 @@ func TestReconcile_VersionAnnotation(t *testing.T) {
 						},
 						ResourceVersion: "some-old-sha",
 					},
-					LatestPeeringVersion: ptr.To(uint64(3)),
+					LatestPeeringVersion: ptr.To(int64(3)),
 				},
 			}
 			secret := createSecret("acceptor-created-secret", "default", "data", "some-data")
