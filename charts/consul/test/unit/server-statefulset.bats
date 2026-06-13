@@ -3471,6 +3471,60 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
 }
 
 #--------------------------------------------------------------------
+# snapshotAgent Consul namespaces
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE not set when enableConsulNamespaces is false" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env | any(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE mirrors release namespace when mirroringK8S is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[] | select(.name == "CONSUL_NAMESPACE") | .value' | tee /dev/stderr)
+  [ "${actual}" = "consul" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_NAMESPACE not set when mirroring disabled even if destination namespace is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --set 'connectInject.consulNamespaces.consulDestinationNamespace=dest-ns' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env | any(.name == "CONSUL_NAMESPACE")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/StatefulSet: snapshot-agent: CONSUL_PARTITION set when adminPartitions enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-statefulset.yaml  \
+      --set 'server.snapshotAgent.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'global.adminPartitions.enabled=true' \
+      --set 'global.adminPartitions.name=default' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[1].env[] | select(.name == "CONSUL_PARTITION") | .value' | tee /dev/stderr)
+  [ "${actual}" = "default" ]
+}
+
+#--------------------------------------------------------------------
 # snapshotAgent Interval
 
 @test "server/StatefulSet: snapshot-agent: interval defaults to 1h" {
