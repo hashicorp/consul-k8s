@@ -119,13 +119,13 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 
 			// patch the resources to reference each other
 			logger.Log(t, "patching gateway to certificate")
-			k8s.RunKubectl(t, gatewayK8SOptions, "patch", "gateway", "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
+			k8s.RunKubectl(t, gatewayK8SOptions, "patch", gatewayGatewayResource, "gateway", "-p", fmt.Sprintf(`{"spec":{"listeners":[{"protocol":"HTTPS","port":8082,"name":"https","tls":{"certificateRefs":[{"name":"certificate","namespace":"%s"}]},"allowedRoutes":{"namespaces":{"from":"All"}}}]}}`, certificateNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to target server")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", gatewayHTTPRouteResource, "route", "-p", fmt.Sprintf(`{"spec":{"rules":[{"backendRefs":[{"name":"static-server","namespace":"%s","port":80}]}]}}`, serviceNamespace), "--type=merge")
 
 			logger.Log(t, "patching route to gateway")
-			k8s.RunKubectl(t, routeK8SOptions, "patch", "httproute", "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
+			k8s.RunKubectl(t, routeK8SOptions, "patch", gatewayHTTPRouteResource, "route", "-p", fmt.Sprintf(`{"spec":{"parentRefs":[{"name":"gateway","namespace":"%s"}]}}`, gatewayNamespace), "--type=merge")
 
 			// Grab a kubernetes and consul client so that we can verify binding
 			// behavior prior to issuing requests through the gateway.
