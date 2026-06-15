@@ -9,7 +9,7 @@ metadata:
     chart: {{ template "consul.chart" . }}
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
-    component: enerate-manifests
+    component: generate-manifests
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "-9"

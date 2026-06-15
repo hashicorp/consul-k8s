@@ -28,10 +28,7 @@ metadata:
     gateway.networking.k8s.io/channel: experimental
   creationTimestamp: null
   labels:
-    app: {{ template "consul.name" . }}
-    chart: {{ template "consul.chart" . }}
-    heritage: {{ .Release.Service }}
-    release: {{ .Release.Name }}
+    name: consul-tcproutes
     component: crd
   name: tcproutes.gateway.networking.k8s.io
 spec:
