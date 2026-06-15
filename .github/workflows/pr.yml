@@ -45,7 +45,7 @@ jobs:
         repo: hashicorp/consul-k8s-workflows
         ref: manisha/ocp_419_test
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
-        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "token":"${{ secrets.ELEVATED_GITHUB_TOKEN }}", "gotestsum-version":"1.12.3" }'
+        inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "gotestsum-version":"1.12.3" }'
 
   pass-required-checks-on-skip:
     needs: [ conditional-skip ]
