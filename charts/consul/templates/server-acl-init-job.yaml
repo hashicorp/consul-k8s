@@ -251,11 +251,7 @@ spec:
             {{- if .Values.global.enableConsulNamespaces }}
             {{- $root := . }}
             {{- range .Values.terminatingGateways.gateways }}
-            {{- if (or $root.Values.terminatingGateways.defaults.consulNamespace .consulNamespace) }}
-            -terminating-gateway-name="{{ .name }}.{{ (default $root.Values.terminatingGateways.defaults.consulNamespace .consulNamespace) }}" \
-            {{- else }}
-            -terminating-gateway-name="{{ .name }}" \
-            {{- end }}
+            -terminating-gateway-name="{{ .name }}.{{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $root.Values.terminatingGateways.defaults.consulNamespace) }}" \
             {{- end }}
             {{- else }}
             {{- range .Values.terminatingGateways.gateways }}
