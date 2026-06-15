@@ -20,7 +20,6 @@ rules:
   verbs: ["get", "delete", "list", "watch"]
 - apiGroups:
     - gateway.networking.k8s.io
-    - consul.hashicorp.com
   resources:
     - gatewayclasses
     - gateways
@@ -30,6 +29,22 @@ rules:
     - referencegrants
     - grpcroutes
     - udproutes
+  verbs:
+    - get
+    - create
+    - update
+    - patch
+- apiGroups:
+    - consul.hashicorp.com
+  resources:
+    - customgatewayclasses
+    - cgateways
+    - chttproutes
+    - ctcproutes
+    - ctlsroutes
+    - creferencegrants
+    - cgrpcroutes
+    - cudproutes
   verbs:
     - get
     - create

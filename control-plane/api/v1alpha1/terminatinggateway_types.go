@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"reflect"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -183,6 +184,18 @@ type LinkedService struct {
 
 	// DisableAutoHostRewrite disables terminating gateways auto host rewrite feature when set to true.
 	DisableAutoHostRewrite bool `json:"disableAutoHostRewrite,omitempty"`
+
+	// SecretRef references a Kubernetes secret containing TLS certificates.
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty"`
+}
+
+// SecretReference defines the name of the Kubernetes secret.
+// +kubebuilder:object:generate=true
+type SecretReference struct {
+	// Name is the name of the Kubernetes secret.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name,omitempty"`
 }
 
 func (l LinkedService) NamespaceName() string {
@@ -324,8 +337,44 @@ func (in *TerminatingGateway) MatchesConsul(candidate capi.ConfigEntry) bool {
 	if !ok {
 		return false
 	}
+	desired, ok := in.ToConsul("").(*capi.TerminatingGatewayConfigEntry)
+	if !ok {
+		return false
+	}
 	// No datacenter is passed to ToConsul as we ignore the Meta field when checking for equality.
-	return cmp.Equal(in.ToConsul(""), configEntry, cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"), cmpopts.IgnoreUnexported(), cmpopts.EquateEmpty())
+	return cmp.Equal(
+		normalizeTerminatingGatewayForCompare(desired),
+		normalizeTerminatingGatewayForCompare(configEntry),
+		cmpopts.IgnoreFields(capi.TerminatingGatewayConfigEntry{}, "Partition", "Namespace", "Meta", "ModifyIndex", "CreateIndex"),
+		cmpopts.IgnoreUnexported(),
+		cmpopts.EquateEmpty(),
+	)
+}
+
+func normalizeTerminatingGatewayForCompare(in *capi.TerminatingGatewayConfigEntry) *capi.TerminatingGatewayConfigEntry {
+	if in == nil {
+		return nil
+	}
+
+	normalized := *in
+	normalized.Services = append([]capi.LinkedService(nil), in.Services...)
+	for i := range normalized.Services {
+		clearLinkedServiceStringField(&normalized.Services[i], "Namespace")
+		clearLinkedServiceStringField(&normalized.Services[i], "Partition")
+	}
+
+	return &normalized
+}
+
+func clearLinkedServiceStringField(in *capi.LinkedService, field string) {
+	v := reflect.ValueOf(in)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return
+	}
+	fieldValue := v.Elem().FieldByName(field)
+	if fieldValue.IsValid() && fieldValue.CanSet() && fieldValue.Kind() == reflect.String {
+		fieldValue.SetString("")
+	}
 }
 
 func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {

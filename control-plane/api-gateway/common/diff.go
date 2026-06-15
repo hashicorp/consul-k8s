@@ -187,8 +187,19 @@ func equalClaims(a, b *api.APIGatewayJWTClaimVerification) bool {
 func (e entryComparator) apiGatewayListenerTLSConfigurationsEqual(a, b api.APIGatewayTLSConfiguration) bool {
 	return a.MaxVersion == b.MaxVersion &&
 		a.MinVersion == b.MinVersion &&
+		e.gatewayTLSSDSConfigsEqual(a.SDS, b.SDS) &&
 		slices.Equal(a.CipherSuites, b.CipherSuites) &&
 		slices.EqualFunc(a.Certificates, b.Certificates, e.resourceReferencesEqual)
+}
+
+func (e entryComparator) gatewayTLSSDSConfigsEqual(a, b *api.GatewayTLSSDSConfig) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.ClusterName == b.ClusterName && a.CertResource == b.CertResource
 }
 
 func (e entryComparator) resourceReferencesEqual(a, b api.ResourceReference) bool {

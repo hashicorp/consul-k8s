@@ -51,6 +51,10 @@ type HelmConfig struct {
 	// by default on a deployed gateway, passed from the helm chart via command-line flags to our controller.
 	EnableGatewayMetrics bool
 
+	// EnableGatewayScaling indicates whether Enterprise API Gateway scaling features
+	// such as Gateway scaling annotations and controller-managed HPAs are enabled.
+	EnableGatewayScaling bool
+
 	// The default path to use for scraping prometheus metrics, passed from the helm chart via command-line flags to our controller.
 	DefaultPrometheusScrapePath string
 

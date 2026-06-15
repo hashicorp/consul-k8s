@@ -5,6 +5,8 @@ metadata:
   labels:
     component: api-gateway
   namespace: consul
+  labels:
+    component: api-gateway
 spec:
   gatewayClassName: consul
   listeners:

@@ -1,3 +1,147 @@
+## 2.0.0 (May 24, 2026)
+
+> NOTE: Consul K8s 2.0.x is compatible with Consul 2.0.x and Consul Dataplane 2.0.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
+
+BREAKING CHANGES:
+
+* api-gateway: upgrade the old-stable controller to use `gateway.networking.k8s.io` v1.5.1. [[GH-5181](https://github.com/hashicorp/consul-k8s/issues/5181)]
+
+SECURITY:
+
+* security: update go to 1.26 [[GH-5269](https://github.com/hashicorp/consul-k8s/issues/5269)]
+* security: update `google.golang.org/grpc` to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/issues/5183)]
+* security: upgrade `golang.org/x/crypto` to v0.52.0 (resolves [GO-2026-5005](https://pkg.go.dev/vuln/GO-2026-5005), [GO-2026-5006](https://pkg.go.dev/vuln/GO-2026-5006), [GO-2026-5013](https://pkg.go.dev/vuln/GO-2026-5013), [GO-2026-5023](https://pkg.go.dev/vuln/GO-2026-5023)), `golang.org/x/net` to v0.55.0 (resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918), [GO-2026-5025](https://pkg.go.dev/vuln/GO-2026-5025), [GO-2026-5026](https://pkg.go.dev/vuln/GO-2026-5026), [GO-2026-5027](https://pkg.go.dev/vuln/GO-2026-5027), [GO-2026-5028](https://pkg.go.dev/vuln/GO-2026-5028), [GO-2026-5029](https://pkg.go.dev/vuln/GO-2026-5029), [GO-2026-5030](https://pkg.go.dev/vuln/GO-2026-5030)), `golang.org/x/sys` to v0.45.0 (resolves [GO-2026-5024](https://pkg.go.dev/vuln/GO-2026-5024)), `github.com/go-jose/go-jose/v4` to v4.1.4 (resolves [GHSA-78h2-9frx-2jm8](https://github.com/advisories/GHSA-78h2-9frx-2jm8)), `github.com/containerd/containerd` to v1.7.32 (resolves [GHSA-fqw6-gf59-qr4w](https://github.com/advisories/GHSA-fqw6-gf59-qr4w)), and `github.com/hashicorp/vault/api` to v1.23.0 and `k8s.io/client-go` to v0.35.2 to transitively resolve x/crypto, x/net, and x/sys CVEs across all modules. [[GH-5354](https://github.com/hashicorp/consul-k8s/issues/5354)]
+
+FEATURES:
+
+* api-gateway: add TLS SDS support for Kubernetes API Gateway listeners via listener `tls.options` (with gateway-level defaults) and per-backend `RouteTLSSDSFilter` overrides; this includes validation for incomplete SDS config and SDS inheritance behavior so route-level overrides can inherit clusterName from listener/global defaults. [[GH-5186](https://github.com/hashicorp/consul-k8s/issues/5186)]
+* api-gateway: add a dual-controller architecture that runs a custom controller alongside the old-stable controller, limit controller watches to Consul-managed Gateways, and add a Helm flag (`enableTcpRoute`) to enable or disable TCPRoute GVK watch/reconciliation in the old-stable controller. [[GH-5181](https://github.com/hashicorp/consul-k8s/issues/5181)]
+* endpoints-controller: support multi-port service workloads by registering Consul Service with multiple ports in catalog service definition with default-port selection and protocol-consistency validation. Support registering multiport service upstreams based on pod annotation(consul.hashicorp.com/connect-service-upstreams). [[GH-5223](https://github.com/hashicorp/consul-k8s/issues/5223)]
+* terminating-gateway: Added support for deploying terminating gateways pod using CRDs. This allows users to manage terminating gateways using Kubernetes-native resources, providing greater flexibility and ease of use when deploying and configuring terminating gateways in their Kubernetes clusters. [[GH-5109](https://github.com/hashicorp/consul-k8s/issues/5109)]
+* terminating-gateway: add `secretRef` support for linked services and trigger a Consul config entry update when the referenced Kubernetes Secret changes so Envoy can refresh SDS-backed certificates. [[GH-5157](https://github.com/hashicorp/consul-k8s/issues/5157)]
+* RateLimit: A new Custom Resource Definition (CRD) for the RateLimit kind in Consul on Kubernetes. The RateLimit CRD enables users to configure rate limiting policies for Consul services declaratively via Kubernetes resources.In admin-partitions + ACL environments, users must provide the dedicated "globalConfigACLToken.secretName" & "globalConfigACLToken.secretKey" with operator token for rate-limiter features; otherwise reconciliation may fail even though apply succeeds. [[GH-5156](https://github.com/hashicorp/consul-k8s/pull/5156)]
+
+IMPROVEMENTS:
+
+* api-gateway: Added Enterprise API Gateway scaling support with annotation-driven configuration. Gateways can now scale beyond the previous 8-instance limit using static replica counts (consul.hashicorp.com/default-replicas) or controller-managed HPA (consul.hashicorp.com/hpa-enabled, consul.hashicorp.com/hpa-minimum-replicas, consul.hashicorp.com/hpa-maximum-replicas, consul.hashicorp.com/hpa-cpu-utilisation-target). The deprecated GatewayClassConfig deployment fields (defaultInstances, minInstances, maxInstances) are now deprecated in favor of Gateway annotations. [[GH-5172](https://github.com/hashicorp/consul-k8s/issues/5172)]
+* api-gateway: Added new templates for gateway crds under API group consul.hashicorp.com, added short hands for the same. For example, 'kubectl get chttproutes' fetches httproutes under the consul.hashicorp.com API group. [[GH-5233](https://github.com/hashicorp/consul-k8s/issues/5233)]
+
+BUG FIXES:
+
+* cli: Fix the issue when both Consul and Gateway API HTTPRoute CRDs are installed, kubectl encounters a naming ambiguity. [[GH-5328](https://github.com/hashicorp/consul-k8s/issues/5328)]
+* cli: Fix installation and upgrade failures caused by supplying boolean types to strictly typed string fields in custom helm values.yaml [[GH-5327](https://github.com/hashicorp/consul-k8s/issues/5327)]
+* connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check queried `/v1/agent/version` with a non-pointer map, so the response was never decoded and both FIPS warnings fired on every pod startup. The fix decodes the endpoint response correctly and checks the returned `FIPS` value. [[GH-5252](https://github.com/hashicorp/consul-k8s/issues/5252)]
+* custom-gateway: Fix filename mismatch in gateway-resources-configmap-custom that prevented CPU and memory resource limits from being applied to the custom GatewayClassConfig. [[GH-5334](https://github.com/hashicorp/consul-k8s/issues/5334)]
+* endpoints-controller: add enterprise gating while registering services with multiple ports. In consul CE cluster, register single port catalog service for pods with multiple container ports. [[GH-5335](https://github.com/hashicorp/consul-k8s/issues/5335)]
+* helm: add pod level securityContext to get write access to the PVC. [[GH-5341](https://github.com/hashicorp/consul-k8s/issues/5341)]
+* helm-chart: remove redundant template crd-gatewaypolicies-custom.yaml from helm chart templates. [[GH-5307](https://github.com/hashicorp/consul-k8s/issues/5307)]
+
+
+## 1.9.8 (May 24, 2026)
+
+SECURITY:
+
+* Upgrade to use `x/net` 0.55.0.
+This resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918) [[GH-5308](https://github.com/hashicorp/consul-k8s/issues/5308)]
+
+BUG FIXES:
+
+* connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check queried `/v1/agent/version` with a non-pointer map, so the response was never decoded and both FIPS warnings fired on every pod startup. The fix decodes the endpoint response correctly and checks the returned `FIPS` value. [[GH-5252](https://github.com/hashicorp/consul-k8s/issues/5252)]
+
+
+
+## 1.8.13 (May 24, 2026)
+
+SECURITY:
+
+* Upgrade to use `x/net` 0.55.0.
+This resolves [GO-2026-4918](https://pkg.go.dev/vuln/GO-2026-4918) [[GH-5308](https://github.com/hashicorp/consul-k8s/issues/5308)]
+
+BUG FIXES:
+
+* connect-init: fix incorrect FIPS Consul version check that caused misleading WARN messages in the `consul-connect-inject-init` init container logs even when a fully FIPS-compliant setup was used. The original check queried `/v1/agent/version` with a non-pointer map, so the response was never decoded and both FIPS warnings fired on every pod startup. The fix decodes the endpoint response correctly and checks the returned `FIPS` value. [[GH-5252](https://github.com/hashicorp/consul-k8s/issues/5252)]
+
+
+## 2.0.0-rc1 (April 30, 2025)
+
+BREAKING CHANGES:
+
+* api-gateway: upgrade the old-stable controller to use `gateway.networking.k8s.io` v1.5.1. [[GH-5181](https://github.com/hashicorp/consul-k8s/issues/5181)]
+
+SECURITY:
+
+* security: update go to 1.26 [[GH-5269](https://github.com/hashicorp/consul-k8s/issues/5269)]
+* security: update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/issues/5183)]
+* security: upgrade tornado 6.3.2 -> 6.5.5 to fix GHSA-fqwm-6jpj-5wxc (CVE-2026-35536): cookie attribute injection via `.RequestHandler.set_cookie` [[GH-5297](https://github.com/hashicorp/consul-k8s/pull/5297)]
+
+FEATURES:
+
+* api-gateway: add a dual-controller architecture that runs a custom controller alongside the old-stable controller, limit controller watches to Consul-managed Gateways, and add a Helm flag (`enableTcpRoute`) to enable or disable TCPRoute GVK watch/reconciliation in the old-stable controller. [[GH-5181](https://github.com/hashicorp/consul-k8s/issues/5181)]
+* endpoints-controller: support multi-port service workloads by registering Consul Service with multiple ports in catalog service definition with default-port selection and protocol-consistency validation. Support registering multiport service upstreams based on pod annotation(consul.hashicorp.com/connect-service-upstreams). [[GH-5223](https://github.com/hashicorp/consul-k8s/issues/5223)]
+* terminating-gateway: Added support for deploying terminating gateways pod using CRDs. This allows users to manage terminating gateways using Kubernetes-native resources, providing greater flexibility and ease of use when deploying and configuring terminating gateways in their Kubernetes clusters. [[GH-5109](https://github.com/hashicorp/consul-k8s/issues/5109)]
+* terminating-gateway: add `secretRef` support for linked services and trigger a Consul config entry update when the referenced Kubernetes Secret changes so Envoy can refresh SDS-backed certificates. [[GH-5157](https://github.com/hashicorp/consul-k8s/issues/5157)]
+* RateLimit: A new Custom Resource Definition (CRD) for the RateLimit kind in Consul on Kubernetes. The RateLimit CRD enables users to configure rate limiting policies for Consul services declaratively via Kubernetes resources.In admin-partitions + ACL environments, users must provide the dedicated "globalConfigACLToken.secretName" & "globalConfigACLToken.secretKey" with operator token for rate-limiter features; otherwise reconciliation may fail even though apply succeeds. [[GH-5156](https://github.com/hashicorp/consul-k8s/pull/5156)]
+
+IMPROVEMENTS:
+
+* api-gateway: Added Enterprise API Gateway scaling support with annotation-driven configuration. Gateways can now scale beyond the previous 8-instance limit using static replica counts (consul.hashicorp.com/default-replicas) or controller-managed HPA (consul.hashicorp.com/hpa-enabled, consul.hashicorp.com/hpa-minimum-replicas, consul.hashicorp.com/hpa-maximum-replicas, consul.hashicorp.com/hpa-cpu-utilisation-target). The deprecated GatewayClassConfig deployment fields (defaultInstances, minInstances, maxInstances) are now deprecated in favor of Gateway annotations. [[GH-5172](https://github.com/hashicorp/consul-k8s/issues/5172)]
+* api-gateway: Added new templates for gateway crds under API group consul.hashicorp.com, added short hands for the same. For example, 'kubectl get chttproutes' fetches httproutes under the consul.hashicorp.com API group. [[GH-5233](https://github.com/hashicorp/consul-k8s/issues/5233)]
+
+## 1.9.7 (April 26, 2026)
+
+SECURITY:
+
+* go: upgrade go version to 1.25.9 
+
+IMPROVEMENTS:
+
+* envoy: Update Envoy version to 1.35.10
+
+
+## 1.8.12 (April 26, 2026)
+
+SECURITY:
+
+* go: upgrade go version to 1.25.9 
+
+IMPROVEMENTS:
+
+* envoy: Update Envoy version to 1.34.13
+
+
+## 1.9.6 (March 31, 2026)
+
+BUG FIXES:
+
+* api-gateway: Fix cross-namespace ACL resource collisions by keying policy/role/binding-rule caches with gatewayName + namespace. Managed resource names are now namespace-scoped to prevent one gateway from affecting another when deployed in different Kubernetes namespaces. [[GH-5140](https://github.com/hashicorp/consul-k8s/pull/5140)]
+
+SECURITY:
+
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+
+## 1.8.11 (March 31, 2026)
+
+BUG FIXES:
+
+* api-gateway: Fix cross-namespace ACL resource collisions by keying policy/role/binding-rule caches with gatewayName + namespace. Managed resource names are now namespace-scoped to prevent one gateway from affecting another when deployed in different Kubernetes namespaces. [[GH-5140](https://github.com/hashicorp/consul-k8s/pull/5140)]
+
+SECURITY:
+
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+
+## 1.7.13 (March 31, 2026)
+
+BUG FIXES:
+
+* api-gateway: Fix cross-namespace ACL resource collisions by keying policy/role/binding-rule caches with gatewayName + namespace. Managed resource names are now namespace-scoped to prevent one gateway from affecting another when deployed in different Kubernetes namespaces. [[GH-5140](https://github.com/hashicorp/consul-k8s/pull/5140)]
+
+SECURITY:
+
+* go: upgrade go version to 1.25.8 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+* update google.golang.org/grpc to fix CVE-2026-33186 [[GH-5183](https://github.com/hashicorp/consul-k8s/pull/5183)]
+
 ## 1.9.5 (February 27, 2026)
 
 SECURITY:

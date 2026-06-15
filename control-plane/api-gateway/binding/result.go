@@ -251,6 +251,7 @@ var (
 	// We map anything under here to a custom ListenerConditionReason of Invalid on
 	// an Accepted status type.
 	errListenerNoTLSPassthrough              = errors.New("TLS passthrough is not supported")
+	errListenerTLSSDSIncomplete              = errors.New("tls SDS configuration requires both tls_sds_cluster_name and tls_sds_cert_resource")
 	errListenerTLSCipherSuiteNotConfigurable = errors.New("tls_min_version does not allow tls_cipher_suites configuration")
 	errListenerUnsupportedTLSCipherSuite     = errors.New("unsupported cipher suite in tls_cipher_suites")
 	errListenerUnsupportedTLSMaxVersion      = errors.New("unsupported tls_max_version")
@@ -647,39 +648,28 @@ func (g gatewayPolicyValidationResult) resolvedRefsConditions(generation int64) 
 		}
 	}
 
-	// ✅ Aggregate all errors into ONE condition
-	var messages []string
-	reasonSet := make(map[string]struct{})
+	var conditions []metav1.Condition
 
 	for _, err := range g.resolvedRefsErrs {
-		messages = append(messages, err.Error())
+		reason := "InvalidRefs"
 
 		switch {
 		case errors.Is(err, errPolicyListenerReferenceDoesNotExist):
-			reasonSet["MissingListenerReference"] = struct{}{}
+			reason = "MissingListenerReference"
 		case errors.Is(err, errPolicyJWTProvidersReferenceDoesNotExist):
-			reasonSet["MissingJWTProviderReference"] = struct{}{}
+			reason = "MissingJWTProviderReference"
 		}
-	}
 
-	// Pick a combined reason
-	reason := "InvalidRefs"
-	if len(reasonSet) == 1 {
-		for r := range reasonSet {
-			reason = r
-		}
-	}
-
-	return []metav1.Condition{
-		{
+		conditions = append(conditions, metav1.Condition{
 			Type:               "ResolvedRefs",
 			Status:             metav1.ConditionFalse,
 			Reason:             reason,
 			ObservedGeneration: generation,
-			Message:            strings.Join(messages, "; "),
+			Message:            err.Error(),
 			LastTransitionTime: now,
-		},
+		})
 	}
+	return conditions
 }
 
 type authFilterValidationResults []authFilterValidationResult

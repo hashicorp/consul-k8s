@@ -68,3 +68,28 @@ func TestNewClient_httpClientDefaultTimeout(t *testing.T) {
 	require.Error(t, err, "Get \"http://126.0.0.1/v1/agent/checks\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)")
 
 }
+
+func TestCloneConfigCopiesAPIClientConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := &Config{
+		APIClientConfig: &capi.Config{
+			Address: "https://consul-server.default.svc",
+			Token:   "original-token",
+		},
+		HTTPPort: 8500,
+	}
+
+	cloned := cloneConfig(cfg)
+
+	require.NotSame(t, cfg, cloned)
+	require.NotSame(t, cfg.APIClientConfig, cloned.APIClientConfig)
+	require.Equal(t, "https://consul-server.default.svc", cfg.APIClientConfig.Address)
+	require.Equal(t, "original-token", cfg.APIClientConfig.Token)
+
+	cloned.APIClientConfig.Address = "https://10.0.0.1:8500"
+	cloned.APIClientConfig.Token = "runtime-token"
+
+	require.Equal(t, "https://consul-server.default.svc", cfg.APIClientConfig.Address)
+	require.Equal(t, "original-token", cfg.APIClientConfig.Token)
+}

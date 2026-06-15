@@ -4,6 +4,8 @@
 package common
 
 import (
+	"strings"
+
 	mapset "github.com/deckarep/golang-set"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -116,6 +118,7 @@ type ResourceMap struct {
 	tcpRouteGateways      map[api.ResourceReference]*tcpRoute
 	httpRouteGateways     map[api.ResourceReference]*httpRoute
 	gatewayResources      map[api.ResourceReference]*resourceSet
+	gateways              map[api.ResourceReference]gwv1.Gateway
 	externalFilters       map[corev1.ObjectReference]client.Object
 	gatewayPolicies       map[api.ResourceReference]*v1alpha1.GatewayPolicy
 
@@ -143,6 +146,7 @@ func NewResourceMap(translator ResourceTranslator, validator ReferenceValidator,
 		tcpRouteGateways:      make(map[api.ResourceReference]*tcpRoute),
 		httpRouteGateways:     make(map[api.ResourceReference]*httpRoute),
 		gatewayResources:      make(map[api.ResourceReference]*resourceSet),
+		gateways:              make(map[api.ResourceReference]gwv1.Gateway),
 		gatewayPolicies:       make(map[api.ResourceReference]*v1alpha1.GatewayPolicy),
 		jwtProviders:          make(map[api.ResourceReference]*v1alpha1.JWTProvider),
 	}
@@ -242,6 +246,140 @@ func (s *ResourceMap) ReferenceCountGateway(gateway gwv1.Gateway) {
 	}
 
 	s.gatewayResources[consulKey] = set
+	s.gateways[consulKey] = gateway
+}
+
+// InheritedTLSSDSClusterForHTTPRoute returns a single unambiguous listener-level
+// SDS cluster name inherited through a route's Gateway parent refs.
+func (s *ResourceMap) InheritedTLSSDSClusterForHTTPRoute(route gwv1.HTTPRoute) (string, bool) {
+	clusters := make(map[string]struct{})
+
+	for _, parent := range route.Spec.ParentRefs {
+		if !NilOrEqual(parent.Group, gwv1.GroupVersion.Group) || !NilOrEqual(parent.Kind, KindGateway) {
+			continue
+		}
+
+		key := IndexedNamespacedNameWithDefault(parent.Name, parent.Namespace, route.Namespace)
+		consulKey := NormalizeMeta(s.toConsulReference(api.APIGateway, key))
+
+		gateway, ok := s.gateways[consulKey]
+		if !ok {
+			continue
+		}
+
+		for _, listener := range gateway.Spec.Listeners {
+			if !httpRouteCanInheritFromListener(route, gateway, parent, listener) {
+				continue
+			}
+
+			effective := ResolveListenerTLSSDSConfig(gateway, listener, s)
+			if effective.Config != nil && effective.Config.ClusterName != "" {
+				clusters[effective.Config.ClusterName] = struct{}{}
+			}
+		}
+	}
+
+	if len(clusters) != 1 {
+		return "", false
+	}
+
+	for cluster := range clusters {
+		return cluster, true
+	}
+
+	return "", false
+}
+
+func httpRouteCanInheritFromListener(route gwv1.HTTPRoute, gateway gwv1.Gateway, parent gwv1.ParentReference, listener gwv1.Listener) bool {
+	if parent.SectionName != nil && listener.Name != *parent.SectionName {
+		return false
+	}
+	if listener.TLS == nil || (listener.TLS.Mode != nil && *listener.TLS.Mode != gwv1.TLSModeTerminate) {
+		return false
+	}
+	if listener.Protocol != gwv1.HTTPProtocolType && listener.Protocol != gwv1.HTTPSProtocolType {
+		return false
+	}
+	if !httpRouteKindAllowedForListener(listener.AllowedRoutes) {
+		return false
+	}
+	if !httpRouteNamespaceAllowedForListener(gateway.Namespace, route.Namespace, listener.AllowedRoutes) {
+		return false
+	}
+	if !routeAllowedForListenerHostname(listener.Hostname, route.Spec.Hostnames) {
+		return false
+	}
+
+	return true
+}
+
+func httpRouteKindAllowedForListener(allowed *gwv1.AllowedRoutes) bool {
+	if allowed == nil || allowed.Kinds == nil {
+		return true
+	}
+
+	for _, kind := range allowed.Kinds {
+		if NilOrEqual(kind.Group, gwv1.GroupVersion.Group) && kind.Kind == gwv1.Kind("HTTPRoute") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func httpRouteNamespaceAllowedForListener(gatewayNamespace, routeNamespace string, allowed *gwv1.AllowedRoutes) bool {
+	if allowed == nil || allowed.Namespaces == nil || allowed.Namespaces.From == nil {
+		return true
+	}
+
+	switch *allowed.Namespaces.From {
+	case gwv1.NamespacesFromAll:
+		return true
+	case gwv1.NamespacesFromSame:
+		return gatewayNamespace == routeNamespace
+	case gwv1.NamespacesFromSelector:
+		// Namespace labels are not available in this helper, so do not exclude.
+		return true
+	default:
+		return false
+	}
+}
+
+func routeAllowedForListenerHostname(hostname *gwv1.Hostname, hostnames []gwv1.Hostname) bool {
+	if hostname == nil || len(hostnames) == 0 {
+		return true
+	}
+
+	for _, name := range hostnames {
+		if hostnamesMatch(name, *hostname) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hostnamesMatch(a gwv1.Hostname, b gwv1.Hostname) bool {
+	if a == "" || a == "*" || b == "" || b == "*" {
+		return true
+	}
+
+	if strings.HasPrefix(string(a), "*.") || strings.HasPrefix(string(b), "*.") {
+		aLabels, bLabels := strings.Split(string(a), "."), strings.Split(string(b), ".")
+		if len(aLabels) != len(bLabels) {
+			return false
+		}
+
+		for i := 1; i < len(aLabels); i++ {
+			if !strings.EqualFold(aLabels[i], bLabels[i]) {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	return string(a) == string(b)
 }
 
 func (s *ResourceMap) ResourcesToGC(key types.NamespacedName) []api.ResourceReference {
@@ -462,9 +600,14 @@ func (s *ResourceMap) GetJWTProviderForGatewayJWTProvider(provider *v1alpha1.Gat
 }
 
 func (s *ResourceMap) GetPolicyForGatewayListener(gateway gwv1.Gateway, gatewayListener gwv1.Listener) (*v1alpha1.GatewayPolicy, bool) {
+	kind := gateway.Kind
+	if kind == "" {
+		kind = KindGateway
+	}
+
 	key := api.ResourceReference{
 		Name:        gateway.Name,
-		Kind:        gateway.Kind,
+		Kind:        kind,
 		SectionName: string(gatewayListener.Name),
 		Namespace:   gateway.Namespace,
 	}

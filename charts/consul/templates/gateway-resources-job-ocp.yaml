@@ -60,9 +60,9 @@ spec:
             - consul-k8s-control-plane
           args:
             - gateway-resources-custom
-            - -gateway-class-name=consul-custom
+            - -gateway-class-name=consul-custom-class
             - -gateway-class-config-name=consul-api-gateway-custom
-            - -controller-name=consul.hashicorp.com/gateway-controller-custom
+            - -controller-name=consul.hashicorp.com/gateway-controller-consul
             - -app={{template "consul.name" .}}
             - -chart={{template "consul.chart" .}}
             - -heritage={{ .Release.Service }}

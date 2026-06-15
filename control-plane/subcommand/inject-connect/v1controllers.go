@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/webhook"
+	"github.com/hashicorp/consul-k8s/control-plane/consul"
 	controllers "github.com/hashicorp/consul-k8s/control-plane/controllers/configentries"
 	webhookconfiguration "github.com/hashicorp/consul-k8s/control-plane/helper/webhook-configuration"
 	"github.com/hashicorp/consul-k8s/control-plane/subcommand/flags"
@@ -72,6 +73,22 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 		DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 	}
+
+	// If partitions are enabled, we know this is Consul Enterprise,
+	// so skip the license check. The license endpoint requires operator:read
+	// which is not allowed in partition-scoped ACL policies.
+	var isEnterpriseDistribution bool
+	if c.flagEnablePartitions {
+		isEnterpriseDistribution = true
+	} else {
+		var err error
+		isEnterpriseDistribution, err = consul.IsEnterpriseDistribution(consulConfig, watcher)
+		if err != nil {
+			setupLog.Info("Unable to validate Consul enterprise license for enterprise feature gating; multi-port service registrations will remain disabled until a valid license is detected", "error", err)
+			isEnterpriseDistribution = false
+		}
+	}
+
 	if err := (&endpoints.Controller{
 		Client:                     mgr.GetClient(),
 		ConsulClientConfig:         consulConfig,
@@ -97,6 +114,7 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		ReleaseNamespace:           c.flagReleaseNamespace,
 		EnableAutoEncrypt:          c.flagEnableAutoEncrypt,
 		EnableTelemetryCollector:   c.flagEnableTelemetryCollector,
+		IsEnterpriseDistribution:   isEnterpriseDistribution,
 		Context:                    ctx,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", endpoints.Controller{})
@@ -161,14 +179,18 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 				ConsulPartition:             c.consul.Partition,
 				ConsulCACert:                string(c.caCertPem),
 				EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+				EnableGatewayScaling:        c.flagEnableGatewayScaling,
 				DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 				DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 				InitContainerResources:      &c.initContainerResources,
 			},
-			AllowK8sNamespacesSet:   allowK8sNamespaces,
-			DenyK8sNamespacesSet:    denyK8sNamespaces,
-			ConsulClientConfig:      consulConfig,
-			ConsulServerConnMgr:     watcher,
+			AllowK8sNamespacesSet: allowK8sNamespaces,
+			DenyK8sNamespacesSet:  denyK8sNamespaces,
+			ConsulClientConfig:    consulConfig,
+			ConsulServerConnMgr:   watcher,
+			ConsulMeta: apicommon.ConsulMeta{
+				IsEnterpriseDistribution: isEnterpriseDistribution,
+			},
 			NamespacesEnabled:       c.flagEnableNamespaces,
 			CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 			Partition:               c.consul.Partition,
@@ -232,14 +254,18 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			ConsulPartition:             c.consul.Partition,
 			ConsulCACert:                string(c.caCertPem),
 			EnableGatewayMetrics:        c.flagEnableGatewayMetrics,
+			EnableGatewayScaling:        c.flagEnableGatewayScaling,
 			DefaultPrometheusScrapePath: c.flagDefaultPrometheusScrapePath,
 			DefaultPrometheusScrapePort: c.flagDefaultPrometheusScrapePort,
 			InitContainerResources:      &c.initContainerResources,
 		},
-		AllowK8sNamespacesSet:   allowK8sNamespaces,
-		DenyK8sNamespacesSet:    denyK8sNamespaces,
-		ConsulClientConfig:      consulConfig,
-		ConsulServerConnMgr:     watcher,
+		AllowK8sNamespacesSet: allowK8sNamespaces,
+		DenyK8sNamespacesSet:  denyK8sNamespaces,
+		ConsulClientConfig:    consulConfig,
+		ConsulServerConnMgr:   watcher,
+		ConsulMeta: apicommon.ConsulMeta{
+			IsEnterpriseDistribution: isEnterpriseDistribution,
+		},
 		NamespacesEnabled:       c.flagEnableNamespaces,
 		CrossNamespaceACLPolicy: c.flagCrossNamespaceACLPolicy,
 		Partition:               c.consul.Partition,
@@ -269,6 +295,23 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
 		ConsulPartition:            c.consul.Partition,
 		CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+	}
+
+	globalConfigEntryReconciler := configEntryReconciler
+	if c.flagGlobalConfigACLToken != "" {
+		globalConfigEntryReconciler = &controllers.ConfigEntryController{
+			ConsulClientConfig:         consulConfig,
+			ConsulServerConnMgr:        watcher,
+			DatacenterName:             c.consul.Datacenter,
+			EnableConsulNamespaces:     c.flagEnableNamespaces,
+			ConsulDestinationNamespace: c.flagConsulDestinationNamespace,
+			EnableNSMirroring:          c.flagEnableK8SNSMirroring,
+			NSMirroringPrefix:          c.flagK8SNSMirroringPrefix,
+			ConsulPartition:            c.consul.Partition,
+			CrossNSACLPolicy:           c.flagCrossNamespaceACLPolicy,
+			ACLTokenOverride:           c.flagGlobalConfigACLToken,
+		}
+		setupLog.Info("using dedicated ACL token for global config entry controllers")
 	}
 	if err := (&controllers.ServiceDefaultsController{
 		ConfigEntryController: configEntryReconciler,
@@ -391,7 +434,15 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		setupLog.Error(err, "unable to create controller", "controller", apicommon.ControlPlaneRequestLimit)
 		return err
 	}
-
+	if err := (&controllers.RateLimitController{
+		ConfigEntryController: globalConfigEntryReconciler,
+		Client:                mgr.GetClient(),
+		Log:                   ctrl.Log.WithName("controller").WithName(apicommon.RateLimit),
+		Scheme:                mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", apicommon.RateLimit)
+		return err
+	}
 	if err := (&registration.RegistrationsController{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -494,12 +545,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(mgr)
 
 	consulMeta := apicommon.ConsulMeta{
-		PartitionsEnabled:    c.flagEnablePartitions,
-		Partition:            c.consul.Partition,
-		NamespacesEnabled:    c.flagEnableNamespaces,
-		DestinationNamespace: c.flagConsulDestinationNamespace,
-		Mirroring:            c.flagEnableK8SNSMirroring,
-		Prefix:               c.flagK8SNSMirroringPrefix,
+		IsEnterpriseDistribution: isEnterpriseDistribution,
+		PartitionsEnabled:        c.flagEnablePartitions,
+		Partition:                c.consul.Partition,
+		NamespacesEnabled:        c.flagEnableNamespaces,
+		DestinationNamespace:     c.flagConsulDestinationNamespace,
+		Mirroring:                c.flagEnableK8SNSMirroring,
+		Prefix:                   c.flagK8SNSMirroringPrefix,
 	}
 
 	// Note: The path here should be identical to the one on the kubebuilder
@@ -580,6 +632,15 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		Client:     mgr.GetClient(),
 		Logger:     ctrl.Log.WithName("webhooks").WithName(apicommon.ControlPlaneRequestLimit),
 		ConsulMeta: consulMeta,
+	}).SetupWithManager(mgr)
+
+	(&v1alpha1.RateLimitWebhook{
+		Client:                  mgr.GetClient(),
+		Logger:                  ctrl.Log.WithName("webhooks").WithName(apicommon.RateLimit),
+		ConsulMeta:              consulMeta,
+		EnableACLs:              c.flagACLAuthMethod != "",
+		EnablePartitions:        c.flagEnablePartitions,
+		HasGlobalConfigACLToken: c.flagGlobalConfigACLToken != "",
 	}).SetupWithManager(mgr)
 
 	(&v1alpha1.GatewayPolicyWebhook{

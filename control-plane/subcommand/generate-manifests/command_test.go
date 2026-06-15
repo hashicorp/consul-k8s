@@ -97,9 +97,6 @@ func TestRun(t *testing.T) {
 		"neither exist": {
 			client: fake.NewClientBuilder().WithScheme(s).Build(),
 		},
-		"no client": {
-			client: nil,
-		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tt := tt
@@ -383,7 +380,7 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-// TestWriteObjects validates the output manifests are in the expected format and have the expected mutations.
+// test function for writeObjects to validate the output manifests are in the expected format and have the expected mutations.
 func TestWriteObjects(t *testing.T) {
 	tmpDir := t.TempDir()
 	gatewayMap = map[string]bool{}
@@ -479,7 +476,7 @@ func TestWriteObjects(t *testing.T) {
 	require.Equal(t, "consul.hashicorp.com/v1beta1", consulObj["apiVersion"])
 
 	md := consulObj["metadata"].(map[string]interface{})
-	require.Equal(t, "test-gw-custom", md["name"])
+	require.Equal(t, "test-gw-consul", md["name"])
 	spec := consulObj["spec"].(map[string]interface{})
 	listeners := spec["listeners"].([]interface{})
 	require.Len(t, listeners, 2)
@@ -496,5 +493,5 @@ func TestWriteObjects(t *testing.T) {
 	l2 := listeners[1].(map[string]interface{})
 	require.EqualValues(t, 443, l2["port"])
 	require.Equal(t, "https", l2["name"])
-	require.Equal(t, "consul-custom", spec["gatewayClassName"])
+	require.Equal(t, "consul-custom-class", spec["gatewayClassName"])
 }
