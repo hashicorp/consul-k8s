@@ -637,7 +637,10 @@ func (w *MeshWebhook) getLivenessFailureSeconds(pod corev1.Pod) int32 {
 	if v, ok := pod.Annotations[constants.AnnotationSidecarProxyLivenessFailureSeconds]; ok {
 		seconds, _ = strconv.Atoi(v)
 	}
-	return int32(seconds)
+	if seconds > 0 {
+		return int32(seconds)
+	}
+	return 0
 }
 
 func (w *MeshWebhook) getSidecarProbeCheckInitialDelaySeconds(pod corev1.Pod) int32 {

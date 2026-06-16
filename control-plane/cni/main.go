@@ -55,9 +55,6 @@ const (
 	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
 	// iptables rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
-
-	// annotationDualStack stores if pod need to run in dualstack mode
-	annotationDualStack = "consul.hashicorp.com/dual-stack"
 )
 
 type Command struct {
