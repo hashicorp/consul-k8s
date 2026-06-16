@@ -37,7 +37,7 @@ jobs:
             // inputs.dry-run is the string 'true'/'false' for workflow_dispatch boolean inputs.
             // Compare as string to avoid type-coercion bugs.
             const dryRun = '${{ inputs.dry-run }}' === 'true';
-            const minDaysSinceMerge = Number(${{ inputs.min-days-since-merge || 7 }});
+            const minDaysSinceMerge = Number('${{ inputs.min-days-since-merge }}');
             if (isNaN(minDaysSinceMerge) || minDaysSinceMerge < 0) {
               throw new Error(`Invalid min-days-since-merge value: ${minDaysSinceMerge}`);
             }
@@ -110,9 +110,19 @@ jobs:
               }
 
               const pr = prs[0];
+
+              const branchSha = branch.commit?.sha;
+              const prHeadSha = pr.head?.sha;
+              if (branchSha && prHeadSha && branchSha !== prHeadSha) {
+                skipped.push({
+                  name,
+                  reason: `latest closed PR #${pr.number} does not match current branch head (${prHeadSha} != ${branchSha})`,
+                });
+                continue;
+              }
+
               const closedAt = new Date(pr.closed_at);
               const wasMerged = pr.merged_at !== null;
-
               if (closedAt > cutoffDate) {
                 skipped.push({
                   name,
