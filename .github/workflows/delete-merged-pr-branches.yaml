@@ -3,8 +3,6 @@
 
 name: Delete Branches with Merged/Closed PRs
 on:
-  schedule:
-    - cron: "0 6 * * 1-5"
   workflow_dispatch:
     inputs:
       dry-run:
@@ -31,10 +29,13 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
-            // inputs.dry-run is the string 'true'/'false' for workflow_dispatch (boolean inputs),
-            // or '' for schedule triggers. Compare as string to avoid type-coercion bugs.
+            // inputs.dry-run is the string 'true'/'false' for workflow_dispatch boolean inputs.
+            // Compare as string to avoid type-coercion bugs.
             const dryRun = '${{ inputs.dry-run }}' === 'true';
-            const minDaysSinceMerge = ${{ inputs.min-days-since-merge || 7 }};
+            const minDaysSinceMerge = Number(${{ inputs.min-days-since-merge || 7 }});
+            if (isNaN(minDaysSinceMerge) || minDaysSinceMerge < 0) {
+              throw new Error(`Invalid min-days-since-merge value: ${minDaysSinceMerge}`);
+            }
             const cutoffDate = new Date(Date.now() - minDaysSinceMerge * 24 * 60 * 60 * 1000);
 
             // Branches that must never be deleted by this workflow
@@ -70,6 +71,20 @@ jobs:
 
               if (isProtected(name)) {
                 skipped.push({ name, reason: "matches protected pattern" });
+                continue;
+              }
+
+              // Skip branches that currently have an open PR — they are actively in use
+              const { data: openPrs } = await github.rest.pulls.list({
+                owner,
+                repo,
+                head: `${owner}:${name}`,
+                state: "open",
+                per_page: 1,
+              });
+
+              if (openPrs.length > 0) {
+                skipped.push({ name, reason: `has open PR #${openPrs[0].number}` });
                 continue;
               }
 
