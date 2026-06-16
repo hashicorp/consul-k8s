@@ -89,6 +89,7 @@ func NewHelmCluster(
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
+		ensureNamespaceExists(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace)
 		configureSCCs(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
@@ -779,6 +780,22 @@ func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.T
 	}
 
 	require.Failf(t, "Failed to create or update namespace", "Namespace=%s, CreateError=%s, UpdateError=%s", namespace, createErr, updateErr)
+}
+
+// ensureNamespaceExists creates the given namespace if it does not already exist.
+func ensureNamespaceExists(t *testing.T, client kubernetes.Interface, namespace string) {
+	t.Helper()
+	_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err = client.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
