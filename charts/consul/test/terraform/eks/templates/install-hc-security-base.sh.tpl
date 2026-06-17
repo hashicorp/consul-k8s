@@ -12,8 +12,14 @@
 install_hc_security_base() {
   export DEBIAN_FRONTEND=noninteractive
 
-  local AFY_USER='${afy_user}'
-  local AFY_PASSWORD='${afy_password}'
+  # Secrets are injected base64-encoded and decoded here at runtime. base64 text
+  # is [A-Za-z0-9+/=] only, so the embedded value can never contain a shell
+  # metacharacter (quote, '$', backtick, newline); decoding restores the exact
+  # original bytes. This is robust to arbitrary characters in the credential,
+  # unlike a raw shell literal which breaks on a quote.
+  local AFY_USER AFY_PASSWORD
+  AFY_USER="$(printf '%s' '${afy_user_b64}' | base64 -d)"
+  AFY_PASSWORD="$(printf '%s' '${afy_password_b64}' | base64 -d)"
   local BASE_URL="https://artifactory.hashicorp.engineering/artifactory"
   local AUTH_FILE="/etc/apt/auth.conf.d/hc_artifactory.conf"
   local SRC_FILE="/etc/apt/sources.list.d/hc_artifactory.list"
@@ -31,8 +37,10 @@ install_hc_security_base() {
   echo "machine artifactory.hashicorp.engineering login $AFY_USER password $AFY_PASSWORD" > "$AUTH_FILE"
 
   # Fetch the Artifactory signing key first so the repo can be verified against it
-  # (signed-by) instead of disabling signature checks (trusted=yes).
-  curl -fsSL -u "$AFY_USER:$AFY_PASSWORD" "$BASE_URL/api/gpg/key/public" -o "$GPG_FILE"
+  # (signed-by) instead of disabling signature checks (trusted=yes). Use the
+  # netrc auth file written above instead of -u so credentials are not exposed on
+  # the process command line (visible via ps / cloud-init logs).
+  curl -fsSL --netrc-file "$AUTH_FILE" "$BASE_URL/api/gpg/key/public" -o "$GPG_FILE"
   chmod 0644 "$GPG_FILE"
 
   printf 'deb [signed-by=%s] %s/deb %s main\ndeb [signed-by=%s] %s/deb deb main\n' \
@@ -42,9 +50,11 @@ install_hc_security_base() {
   apt-get -qy update
   apt-get -qy install --no-install-recommends hc-security-base
 
-  # Hygiene: remove the internal repo + credentials from the running node once
-  # the package is installed; the compliance check only needs the package present.
-  rm -f "$AUTH_FILE" "$SRC_FILE"
+  # Hygiene: remove the internal repo, credentials and signing key from the
+  # running node once the package is installed; the compliance check only needs
+  # the package present. Removing the key avoids permanently expanding the node's
+  # apt trust store beyond this one-time install.
+  rm -f "$AUTH_FILE" "$SRC_FILE" "$GPG_FILE"
   apt-get -qy update || true
 }
 

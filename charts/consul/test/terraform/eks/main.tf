@@ -84,9 +84,10 @@ locals {
   }
 
   # User-data that installs hc-security-base from internal Artifactory at boot.
+  # Credentials are base64-encoded so they embed safely regardless of content.
   hc_security_base_pre_userdata = var.enable_security_baseline ? templatefile("${path.module}/templates/install-hc-security-base.sh.tpl", {
-    afy_user     = var.afy_user
-    afy_password = var.afy_password
+    afy_user_b64     = base64encode(var.afy_user)
+    afy_password_b64 = base64encode(var.afy_password)
   }) : ""
 
   # Hardened node group: Canonical Ubuntu EKS AMI + hc-security-base install.
