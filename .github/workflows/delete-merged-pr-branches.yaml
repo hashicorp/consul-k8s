@@ -79,6 +79,7 @@ jobs:
                 continue;
               }
 
+              try {
               // Skip branches that currently have an open PR — they are actively in use
               const { data: openPrs } = await github.rest.pulls.list({
                 owner,
@@ -137,6 +138,13 @@ jobs:
                 prState: wasMerged ? "merged" : "closed (unmerged)",
                 closedAt: pr.closed_at,
               });
+              } catch (err) {
+                if (err.status === 403 || err.status === 429) {
+                  console.log(`  Rate limited on branch ${name}, stopping early.`);
+                  break;
+                }
+                console.log(`  Error processing ${name}: ${err.message}`);
+              }
             }
 
             console.log(`\n=== Branches to delete (${toDelete.length}) ===`);
