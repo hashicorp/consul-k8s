@@ -161,15 +161,35 @@ func (c *Command) meshGatewayRules() (string, error) {
 	// namespaces, it needs access to all namespaces. For peering, it requires the ability to list all peers which in
 	// enterprise requires peering:read on all partitions or in OSS requires a top level peering:read. Since we cannot
 	// determine whether we are using an enterprise or OSS consul image based on whether peering is enabled, we include
-	// both permissions here.
+	// both permissions here. When admin partitions are enabled, service and node read permissions must be granted under
+	// partition_prefix so mesh gateways can form clusters for failover targets in other local partitions.
 	meshGatewayRulesTpl := `mesh = "write"
 {{- if .EnablePeering }}
 peering = "read"
-{{- if eq .PartitionName "default" }}
-partition_prefix "" {
-  peering = "read"
-}
 {{- end }}
+{{- if .EnablePartitions }}
+partition_prefix "" {
+{{- if .EnablePeering }}
+  peering = "read"
+{{- end }}
+{{- if .EnableNamespaces }}
+  namespace_prefix "" {
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
+  }
+{{- else }}
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+{{- end }}
+}
 {{- end }}
 {{- if .EnableNamespaces }}
 namespace "default" {
@@ -179,6 +199,9 @@ namespace "default" {
   }
 {{- if .EnableNamespaces }}
 }
+{{- end }}
+{{- if not .EnablePartitions }}
+{{- if .EnableNamespaces }}
 namespace_prefix "" {
 {{- end }}
   node_prefix "" {
@@ -189,6 +212,7 @@ namespace_prefix "" {
   }
 {{- if .EnableNamespaces }}
 }
+{{- end }}
 {{- end }}
 `
 

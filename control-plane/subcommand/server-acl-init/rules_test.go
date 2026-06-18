@@ -204,15 +204,15 @@ peering = "read"
 peering = "read"
 partition_prefix "" {
   peering = "read"
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
 }
   service "mesh-gateway" {
      policy = "write"
-  }
-  node_prefix "" {
-  	policy = "read"
-  }
-  service_prefix "" {
-     policy = "read"
   }`,
 		},
 		{
@@ -221,14 +221,17 @@ partition_prefix "" {
 			PartitionName: "non-default",
 			Expected: `mesh = "write"
 peering = "read"
-  service "mesh-gateway" {
-     policy = "write"
-  }
+partition_prefix "" {
+  peering = "read"
   node_prefix "" {
-  	policy = "read"
+    policy = "read"
   }
   service_prefix "" {
-     policy = "read"
+    policy = "read"
+  }
+}
+  service "mesh-gateway" {
+     policy = "write"
   }`,
 		},
 		{
@@ -250,6 +253,101 @@ namespace_prefix "" {
      policy = "read"
   }
 }`,
+		},
+		{
+			Name:             "Peering, namespaces, and default partition are enabled",
+			EnablePeering:    true,
+			EnableNamespaces: true,
+			PartitionName:    "default",
+			Expected: `mesh = "write"
+peering = "read"
+partition_prefix "" {
+  peering = "read"
+  namespace_prefix "" {
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
+  }
+}
+namespace "default" {
+  service "mesh-gateway" {
+     policy = "write"
+  }
+}`,
+		},
+		{
+			Name:             "Peering, namespaces, and non-default partition are enabled",
+			EnablePeering:    true,
+			EnableNamespaces: true,
+			PartitionName:    "non-default",
+			Expected: `mesh = "write"
+peering = "read"
+partition_prefix "" {
+  peering = "read"
+  namespace_prefix "" {
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
+  }
+}
+namespace "default" {
+  service "mesh-gateway" {
+     policy = "write"
+  }
+}`,
+		},
+		{
+			// Sameness Group failover across local admin partitions only
+			// (no cluster peering). The partition_prefix read grants must
+			// still be present so the mesh gateway can form failover
+			// clusters for services in sibling partitions.
+			Name:             "Namespaces and partition are enabled, peering disabled",
+			EnablePeering:    false,
+			EnableNamespaces: true,
+			PartitionName:    "non-default",
+			Expected: `mesh = "write"
+partition_prefix "" {
+  namespace_prefix "" {
+    node_prefix "" {
+      policy = "read"
+    }
+    service_prefix "" {
+      policy = "read"
+    }
+  }
+}
+namespace "default" {
+  service "mesh-gateway" {
+     policy = "write"
+  }
+}`,
+		},
+		{
+			// Partitions enabled with neither peering nor namespaces. The
+			// chart forbids partitions without namespaces, but the template
+			// must still render valid HCL via the else branch.
+			Name:             "Partition is enabled, peering and namespaces disabled",
+			EnablePeering:    false,
+			EnableNamespaces: false,
+			PartitionName:    "non-default",
+			Expected: `mesh = "write"
+partition_prefix "" {
+  node_prefix "" {
+    policy = "read"
+  }
+  service_prefix "" {
+    policy = "read"
+  }
+}
+  service "mesh-gateway" {
+     policy = "write"
+  }`,
 		},
 	}
 
