@@ -50,7 +50,10 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 
 		// Describe and get logs for any pods.
 		pods, err := client.CoreV1().Pods(kubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: labelSelector})
-		require.NoError(t, err)
+		if err != nil {
+			logger.Log(t, "unable to get pods for debug output", "err", err)
+			return
+		}
 
 		for _, pod := range pods.Items {
 			// Get logs for each pod, passing the discard logger to make sure secrets aren't printed to test logs.
