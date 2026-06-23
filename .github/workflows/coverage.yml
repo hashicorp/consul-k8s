@@ -95,3 +95,61 @@ jobs:
     with:
       go-version: ${{ inputs.go-version }}
       pr-number: ${{ inputs.pr-number }}
+
+  coverage-gate:
+    name: coverage-gate
+    needs: [coverage-report]
+    # Patch coverage measures the lines a PR adds/modifies, so it only applies
+    # to pull requests. Pushes to main call this workflow without a pr-number
+    # and have no "patch" to evaluate.
+    if: inputs.pr-number != ''
+    runs-on: ubuntu-latest
+    env:
+      # Minimum required coverage of the lines a PR adds/modifies (patch
+      # coverage). New/changed code must be at least this well tested.
+      PATCH_THRESHOLD: "90"
+    steps:
+      - name: Enforce patch coverage threshold
+        env:
+          PATCH: ${{ needs.coverage-report.outputs.patch }}
+          COVERED: ${{ needs.coverage-report.outputs.patch_covered }}
+          COVERABLE: ${{ needs.coverage-report.outputs.patch_coverable }}
+        run: |
+          set -euo pipefail
+
+          echo "Patch coverage:     ${PATCH:-<empty>}"
+          echo "Required threshold: ${PATCH_THRESHOLD}%"
+          echo "Changed lines:      ${COVERED:-0}/${COVERABLE:-0} covered"
+
+          # No coverable Go lines changed (e.g. docs-only or test-only PRs) -> nothing to gate.
+          if [ -z "${PATCH}" ] || [ "${PATCH}" = "N/A" ]; then
+            echo "::notice::No coverable Go lines changed in this PR; patch-coverage gate skipped."
+            {
+              echo "### ✅ Coverage gate passed"
+              echo ""
+              echo "No coverable Go lines changed in this PR, so there is nothing to gate."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          PCT="${PATCH%\%}"
+
+          if awk "BEGIN { exit !(${PCT} >= ${PATCH_THRESHOLD}) }"; then
+            echo "::notice::Patch coverage ${PATCH} meets the ${PATCH_THRESHOLD}% threshold."
+            {
+              echo "### ✅ Coverage gate passed"
+              echo ""
+              echo "Patch coverage **${PATCH}** (${COVERED}/${COVERABLE} changed lines) ≥ required **${PATCH_THRESHOLD}%**."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Patch coverage ${PATCH} is below the required ${PATCH_THRESHOLD}% threshold."
+            {
+              echo "### ❌ Coverage gate failed"
+              echo ""
+              echo "Patch coverage **${PATCH}** (${COVERED}/${COVERABLE} changed lines) is below the required **${PATCH_THRESHOLD}%** threshold."
+              echo ""
+              echo "The lines this PR adds or modifies are not sufficiently covered by tests."
+              echo "Add tests for the new/changed code, or adjust \`PATCH_THRESHOLD\` in \`.github/workflows/coverage.yml\` (with reviewer sign-off)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
