@@ -157,6 +157,15 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		} else {
 			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
 		}
+	} else if c.Cfg.EnableOpenshift {
+		// On OpenShift without CNI, use the OCP-specific fixtures which set
+		// transparent-proxy-overwrite-probes=false to avoid probe rewriting issues.
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
+		if c.Cfg.EnableTransparentProxy {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
+		} else {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
+		}
 	} else {
 		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 		if c.Cfg.EnableTransparentProxy {
