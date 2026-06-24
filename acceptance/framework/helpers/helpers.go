@@ -224,7 +224,14 @@ type ConsulOptions struct {
 }
 
 var CommonConsulCRDs = []string{
+	"cgateways.consul.hashicorp.com",
+	"cgrpcroutes.consul.hashicorp.com",
+	"chttproutes.consul.hashicorp.com",
 	"controlplanerequestlimits.consul.hashicorp.com",
+	"creferencegrants.consul.hashicorp.com",
+	"ctcproutes.consul.hashicorp.com",
+	"ctlsroutes.consul.hashicorp.com",
+	"cudproutes.consul.hashicorp.com",
 	"customgatewayclasses.consul.hashicorp.com",
 	"customgatewaypolicies.consul.hashicorp.com",
 	"exportedservices.consul.hashicorp.com",
@@ -240,11 +247,13 @@ var CommonConsulCRDs = []string{
 	"peeringacceptors.consul.hashicorp.com",
 	"peeringdialers.consul.hashicorp.com",
 	"proxydefaults.consul.hashicorp.com",
+	"ratelimits.consul.hashicorp.com",
 	"referencegrants.consul.hashicorp.com",
 	"registrations.consul.hashicorp.com",
 	"routeauthfilters.consul.hashicorp.com",
 	"routeretryfilters.consul.hashicorp.com",
 	"routetimeoutfilters.consul.hashicorp.com",
+	"routetlssdsfilters.consul.hashicorp.com",
 	"samenessgroups.consul.hashicorp.com",
 	"servicedefaults.consul.hashicorp.com",
 	"serviceintentions.consul.hashicorp.com",

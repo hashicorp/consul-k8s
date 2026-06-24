@@ -43,8 +43,9 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 	cfg := suite.Config()
 	namespace := ctx.KubectlOptions(t).Namespace
 	helmValues := map[string]string{
-		"global.logLevel":       "trace",
-		"connectInject.enabled": "true",
+		"global.logLevel":                               "trace",
+		"connectInject.enabled":                         "true",
+		"global.openshift.crds.customConsulapi.enabled": "true",
 	}
 	releaseName := helpers.RandomName()
 	consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)

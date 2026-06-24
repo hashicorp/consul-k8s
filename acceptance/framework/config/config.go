@@ -264,6 +264,12 @@ func (c *TestConfig) SkipWhenOpenshiftAndCNI(t *testing.T) {
 	}
 }
 
+func (c *TestConfig) SkipWhenOpenshift(t *testing.T) {
+	if c.EnableOpenshift {
+		t.Skip("skipping because -enable-openshift is set and this test is not supported on OpenShift")
+	}
+}
+
 func (c *TestConfig) SkipWhenCNI(t *testing.T) {
 	if c.EnableCNI {
 		t.Skip("skipping because -enable-cni is set and doesn't apply to this accepatance test")

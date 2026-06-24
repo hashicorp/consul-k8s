@@ -49,6 +49,7 @@ type CLICluster struct {
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 	cli                cli.CLI
+	enableOpenshift    bool
 }
 
 // NewCLICluster creates a new Consul cluster struct which can be used to create
@@ -118,6 +119,7 @@ func NewCLICluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		cli:                *cli,
+		enableOpenshift:    cfg.UseOpenshift || cfg.EnableOpenshift,
 	}
 }
 
@@ -143,12 +145,35 @@ func (c *CLICluster) Create(t *testing.T) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	out, err := c.cli.Run(t, c.kubectlOptions, args...)
-	if err != nil {
-		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
-		c.logger.Logf(t, "command stdout: %s", string(out))
+	// On OpenShift, transient Kubernetes API errors (e.g. context deadline exceeded from
+	// admission webhooks) can cause the install to fail. Wrap the install in a retry loop
+	// so that transient failures are recovered by cleaning up the partial release and retrying.
+	if c.enableOpenshift {
+		retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+			out, err := c.cli.Run(r, c.kubectlOptions, args...)
+			if err != nil {
+				c.logger.Logf(r, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+				c.logger.Logf(r, "command stdout: %s", string(out))
+				if isCLIOutputRetryable(string(out)) {
+					// Attempt to clean up any partial/failed Helm release before retrying.
+					destroyArgs := []string{"uninstall", "-auto-approve", "-wipe-data"}
+					if _, destroyErr := c.cli.Run(r, c.kubectlOptions, destroyArgs...); destroyErr != nil {
+						c.logger.Logf(r, "cleanup before retry failed (ignoring): %s", destroyErr.Error())
+					}
+					r.Errorf("retrying consul-k8s install after transient error: %v\noutput: %s", err, string(out))
+					return
+				}
+			}
+			require.NoError(r, err)
+		})
+	} else {
+		out, err := c.cli.Run(t, c.kubectlOptions, args...)
+		if err != nil {
+			c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+			c.logger.Logf(t, "command stdout: %s", string(out))
+		}
+		require.NoError(t, err)
 	}
-	require.NoError(t, err)
 
 	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
 }
@@ -314,4 +339,28 @@ func (c *CLICluster) setKube(args []string) []string {
 	}
 
 	return args
+}
+
+// isCLIOutputRetryable reports whether the CLI stdout output from a failed
+// consul-k8s install indicates a transient Kubernetes API error that is safe
+// to retry.  The CLI exits with status 1 for all errors, so we inspect the
+// human-readable output rather than the error itself.
+func isCLIOutputRetryable(output string) bool {
+	outputLower := strings.ToLower(output)
+	retryableSubstrings := []string{
+		"tls handshake timeout",
+		"connection reset by peer",
+		"connection refused",
+		"i/o timeout",
+		"context deadline exceeded",
+		"unexpected eof",
+		"http2: client connection lost",
+		"unable to connect to the server",
+	}
+	for _, s := range retryableSubstrings {
+		if strings.Contains(outputLower, s) {
+			return true
+		}
+	}
+	return false
 }
