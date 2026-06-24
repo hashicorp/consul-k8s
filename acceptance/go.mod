@@ -57,12 +57,15 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
-	go.mongodb.org/mongo-driver v1.14.0 // indirect
+	go.mongodb.org/mongo-driver v1.17.9 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.39.0 // indirect
 	go.opentelemetry.io/otel/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/trace v1.39.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	go.yaml.in/yaml/v3 v3.0.4 // indirect
 )
 
 require (
@@ -136,9 +139,6 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/urfave/cli v1.22.12 // indirect
-	github.com/x448/float16 v0.8.4 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
 	golang.org/x/mod v0.35.0 // indirect
