@@ -1,3 +1,11 @@
+## 2.0.1 (June 24, 2026)
+
+BUG FIXES:
+
+* control-plane: fix a race during startup where pod registration could be permanently skipped when the Kubernetes Endpoints object lagged behind Pod IP assignment. The endpoints controller now requeues reconciliation until the Endpoints address is populated. [[GH-5386](https://github.com/hashicorp/consul-k8s/issues/5386)]
+* snapshot-agent: Fix bug where the `consul-snapshot` service was registered into the `default` Consul namespace instead of the namespace mirrored from the Kubernetes namespace it is deployed in when `global.enableConsulNamespaces` is enabled. The snapshot agent now also registers into the configured admin partition. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+* terminating-gateways: Fix bug where the terminating gateway service was registered into the `default` Consul namespace instead of the mirrored Consul namespace (matching its Kubernetes namespace) when `global.enableConsulNamespaces` and namespace mirroring were enabled. Applies to both the Helm-managed terminating gateway deployment and the `TerminatingGateway` CRD controller. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+
 ## 2.0.0 (May 24, 2026)
 
 > NOTE: Consul K8s 2.0.x is compatible with Consul 2.0.x and Consul Dataplane 2.0.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
