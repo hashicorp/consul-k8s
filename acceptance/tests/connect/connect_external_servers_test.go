@@ -43,6 +43,17 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				"connectInject.cni.enabled": "false",
 			}
 
+			if cfg.EnableOpenshift {
+				// On ROSA/OCP with OVN-Kubernetes, gRPC connections to the headless consul-server service
+				// (which returns pod IPs directly via DNS) are disrupted by the OVN-K8s datapath for ALL
+				// long-lived streams — including the xDS stream that consul-dataplane needs to configure
+				// envoy. Repeated disruptions prevent consul-dataplane from completing a full xDS sync.
+				// A ClusterIP expose-servers service provides a stable virtual IP routed through OVN's
+				// load-balancer NAT rules, which are not subject to the same Geneve-tunnel ct timeouts.
+				serverHelmValues["server.exposeService.enabled"] = "true"
+				serverHelmValues["server.exposeService.type"] = "ClusterIP"
+			}
+
 			serverReleaseName := helpers.RandomName()
 			consulServerCluster := consul.NewHelmCluster(t, serverHelmValues, ctx, cfg, serverReleaseName)
 
@@ -69,6 +80,31 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				helmValues["externalServers.httpsPort"] = "8501"
 			}
 
+			if cfg.EnableOpenshift {
+				// On ROSA/OCP (OVN-Kubernetes), several issues prevent reliable external-server connect:
+				//
+				// 1. ALL long-lived gRPC streams to headless-service pod IPs are disrupted by OVN-K8s
+				//    Geneve-tunnel ct timeouts — including the xDS stream. consul-dataplane retries but
+				//    cannot complete a full xDS sync before the next disruption.
+				//    Fix: use the ClusterIP expose-servers service (stable OVN load-balancer NAT path).
+				//
+				// 2. The TLS cert SANs are generated for the headless service name (e.g.
+				//    <rel>-consul-server.*) and do NOT include the expose-servers name.
+				//    Fix: set tlsServerName to the headless service DNS name for TLS SNI matching.
+				//
+				// 3. skipServerWatch avoids opening the idle server-watch stream to pod IPs.
+				//
+				// 4. On OCP without CNI, transparent proxy is disabled to prevent tproxy iptables from
+				//    intercepting the static-server's httpGet startup/liveness probes and routing them
+				//    through envoy before xDS is received. Disabling tproxy globally means probes go
+				//    directly to the app port and the explicit upstream annotation (localhost:1234) is
+				//    used instead — which does not require iptables and works independently of tproxy.
+				helmValues["externalServers.hosts[0]"] = fmt.Sprintf("%s-consul-expose-servers", serverReleaseName)
+				helmValues["externalServers.tlsServerName"] = fmt.Sprintf("%s-consul-server", serverReleaseName)
+				helmValues["externalServers.skipServerWatch"] = "true"
+				helmValues["connectInject.transparentProxy.defaultEnabled"] = "false"
+			}
+
 			releaseName := helpers.RandomName()
 			consulCluster := consul.NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
 			consulCluster.SkipCheckForPreviousInstallations = true
@@ -90,20 +126,37 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 						staticClientFixture = "../fixtures/cases/static-client-openshift-inject-cni"
 					}
 				} else {
-					// OpenShift WITHOUT CNI
+					// OpenShift WITHOUT CNI. Transparent proxy is disabled globally (see
+					// connectInject.transparentProxy.defaultEnabled=false above), so kubelet
+					// probes go directly to the app port without iptables interception.
+					// static-server-openshift provides an exec readiness probe for the health-check
+					// sync test (touch /tmp/unhealthy). static-client-openshift-inject explicitly
+					// marks tproxy disabled and uses the localhost:1234 explicit upstream.
 					staticServerFixture = "../fixtures/cases/static-server-openshift"
-					if cfg.EnableTransparentProxy {
-						staticClientFixture = "../fixtures/cases/static-client-openshift-tproxy"
-					} else {
-						staticClientFixture = "../fixtures/cases/static-client-openshift-inject"
-					}
+					staticClientFixture = "../fixtures/cases/static-client-openshift-inject"
 				}
 			} else if cfg.EnableTransparentProxy {
 				staticClientFixture = "../fixtures/cases/static-client-tproxy"
 			}
 
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerFixture)
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticClientFixture)
+			// On OCP, tproxy is not enabled (to avoid kubelet probe interception deadlock with envoy).
+			// curl checks use localhost:1234 via the explicit upstream annotation on the client.
+			// WaitForPodsRunningPhase is sufficient — the curl retry loop in the test provides
+			// additional time for consul-dataplane to receive xDS and proxy traffic.
+			useTransparentProxy := cfg.EnableTransparentProxy
+			if cfg.EnableOpenshift {
+				namespace := ctx.KubectlOptions(t).Namespace
+				k8s.DeployKustomizeNoWait(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerFixture)
+				k8s.DeployKustomizeNoWait(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticClientFixture)
+				// Wait until init containers are done and application containers have started.
+				// consul-dataplane's readiness probe (TCPSocket port 20000) may still be pending
+				// until envoy receives xDS, but the connection check retry loop below covers that.
+				k8s.WaitForPodsRunningPhase(t, ctx.KubernetesClient(t), namespace, "app=static-server")
+				k8s.WaitForPodsRunningPhase(t, ctx.KubernetesClient(t), namespace, "app=static-client")
+			} else {
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerFixture)
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticClientFixture)
+			}
 
 			// Check that both static-server and static-client have been injected and now have 2 containers.
 			for _, labelSelector := range []string{"app=static-server", "app=static-client"} {
@@ -119,7 +172,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 				consulClient, _ := consulServerCluster.SetupConsulClient(t, true)
 
 				logger.Log(t, "checking that the connection is not successful because there's no intention")
-				if cfg.EnableTransparentProxy {
+				if useTransparentProxy {
 					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://static-server")
 				} else {
 					k8s.CheckStaticServerConnectionFailing(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
@@ -142,7 +195,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			}
 
 			logger.Log(t, "checking that connection is successful")
-			if cfg.EnableTransparentProxy {
+			if useTransparentProxy {
 				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://static-server")
 			} else {
 				k8s.CheckStaticServerConnectionSuccessful(t, ctx.KubectlOptions(t), connhelper.StaticClientName, "http://localhost:1234")
@@ -159,7 +212,7 @@ func TestConnectInject_ExternalServers(t *testing.T) {
 			// there will be no healthy proxy host to connect to. That's why we can't assert that we receive an empty reply
 			// from server, which is the case when a connection is unsuccessful due to intentions in other tests.
 			logger.Log(t, "checking that connection is unsuccessful")
-			if cfg.EnableTransparentProxy {
+			if useTransparentProxy {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server", "curl: (7) Failed to connect to static-server port 80"}, "", "http://static-server")
 			} else {
 				k8s.CheckStaticServerConnectionMultipleFailureMessages(t, ctx.KubectlOptions(t), connhelper.StaticClientName, false, []string{"curl: (56) Recv failure: Connection reset by peer", "curl: (52) Empty reply from server"}, "", "http://localhost:1234")

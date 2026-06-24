@@ -14,3 +14,9 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
+        # On OpenShift without CNI, transparent proxy relies on iptables redirection.
+        # Explicitly disable it so the webhook does not rewrite readiness probes to
+        # point at Envoy (which may fail while Envoy waits for xDS config from the
+        # external Consul server). Explicit upstream annotations are used instead.
+        "consul.hashicorp.com/transparent-proxy": "false"
+        "consul.hashicorp.com/transparent-proxy-overwrite-probes": "false"

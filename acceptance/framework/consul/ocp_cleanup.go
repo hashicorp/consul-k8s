@@ -471,6 +471,11 @@ func (h *HelmCluster) deleteStaleHelmReleases(t *testing.T) {
 	t.Helper()
 
 	output, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--all", "--output", "json")
+	if err != nil && strings.Contains(err.Error(), "unknown flag: --all") {
+		// Some Helm versions do not support the --all long flag; fall back to listing deployed releases only.
+		logger.Logf(t, "helm list --all not supported, falling back to listing deployed releases only")
+		output, err = helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--output", "json")
+	}
 	require.NoError(t, err)
 
 	var releases []struct {

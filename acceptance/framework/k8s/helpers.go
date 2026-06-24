@@ -69,6 +69,37 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 	logger.Log(t, "Finished waiting for pods to be ready.")
 }
 
+// WaitForPodsRunningPhase waits until all pods matching podLabelSelector are in the Running phase.
+// Unlike WaitForAllPodsToBeReady, this does NOT require the PodReady condition to be True — it only
+// requires that all init containers have completed and at least one regular container is running.
+// Use this on OCP where consul-dataplane's readiness probe may fail for platform-specific reasons
+// even though the sidecar is functional and envoy can serve mesh traffic.
+// The connection validity is then verified by the test's own curl-based retry loop.
+func WaitForPodsRunningPhase(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
+	t.Helper()
+
+	// Wait up to 20m (same budget as WaitForAllPodsToBeReady).
+	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
+	logger.Logf(t, "Waiting %s for pods with label %q to reach Running phase.", time.Duration(counter.Count*int(counter.Wait)), podLabelSelector)
+
+	retry.RunWith(counter, t, func(r *retry.R) {
+		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{LabelSelector: podLabelSelector})
+		require.NoError(r, err)
+		require.NotEmpty(r, pods.Items)
+
+		var notRunning []string
+		for _, pod := range pods.Items {
+			if pod.Status.Phase != corev1.PodRunning {
+				notRunning = append(notRunning, fmt.Sprintf("%s(%s)", pod.Name, pod.Status.Phase))
+			}
+		}
+		if len(notRunning) > 0 {
+			r.Errorf("%d pods not in Running phase: %s", len(notRunning), strings.Join(notRunning, ","))
+		}
+	})
+	logger.Log(t, "Pods reached Running phase.")
+}
+
 // IsReady returns true if pod is ready.
 func IsReady(pod corev1.Pod) bool {
 	if pod.Status.Phase == corev1.PodPending {
