@@ -74,12 +74,12 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 			port:   privilegedPort,
 		},
 		{
-			name:   "not secure - ACLs and auto-encrypt not enabled non-privileged port",
+			name:   "not secure - ACLs and auto-encrypt not enabled",
 			secure: false,
 			port:   nonPrivilegedPort,
 		},
 		{
-			name:   "secure - ACLs and auto-encrypt enabled non-privileged port",
+			name:   "secure - ACLs and auto-encrypt enabled",
 			secure: true,
 			port:   nonPrivilegedPort,
 		},

@@ -323,7 +323,6 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		}
 		envoyConcurrency = int(val)
 	}
-
 	args := []string{
 		"-addresses", w.ConsulAddress,
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
@@ -392,6 +391,7 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 	if mpi.serviceName != "" {
 		gracefulPort = gracefulPort + mpi.serviceIndex
 	}
+
 	args = append(args, fmt.Sprintf("-graceful-port=%d", gracefulPort))
 
 	enableProxyLifecycle, err := w.LifecycleConfig.EnableProxyLifecycle(pod)
@@ -648,10 +648,9 @@ func (w *MeshWebhook) getSidecarProbeCheckInitialDelaySeconds(pod corev1.Pod) in
 	if v, ok := pod.Annotations[constants.AnnotationSidecarInitialProbeCheckDelaySeconds]; ok {
 		seconds, _ = strconv.Atoi(v)
 	}
-	if seconds > 0 {
-		return int32(seconds)
-	}
-	return 0
+
+	return int32(seconds)
+
 }
 
 // getMetricsPorts creates container ports for exposing services such as prometheus.

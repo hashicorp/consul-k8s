@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/controller"
@@ -18,10 +19,13 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/utils/ptr"
 )
 
@@ -36,12 +40,16 @@ func init() {
 // Test that deleting a service properly deletes the registration.
 func TestServiceResource_createDelete(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -67,12 +75,16 @@ func TestServiceResource_createDelete(t *testing.T) {
 // Test that Loadbalancer service weight is set from service annotation.
 func TestServiceWeight_ingress(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -110,12 +122,17 @@ func TestServiceWeight_ingress(t *testing.T) {
 // Test that Loadbalancer service weight is set from service annotation.
 func TestServiceWeight_externalIP(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -200,12 +217,16 @@ func TestServiceWeight(t *testing.T) {
 // Test that we're default enabled.
 func TestServiceResource_defaultEnable(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -225,12 +246,16 @@ func TestServiceResource_defaultEnable(t *testing.T) {
 // Test that we can explicitly disable.
 func TestServiceResource_defaultEnableDisable(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -251,13 +276,18 @@ func TestServiceResource_defaultEnableDisable(t *testing.T) {
 // Test that we can default disable.
 func TestServiceResource_defaultDisable(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ExplicitEnable = true
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -277,13 +307,18 @@ func TestServiceResource_defaultDisable(t *testing.T) {
 // Test that we can default disable but override.
 func TestServiceResource_defaultDisableEnable(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ExplicitEnable = true
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -304,13 +339,17 @@ func TestServiceResource_defaultDisableEnable(t *testing.T) {
 // Test changing the sync tag to false deletes the service.
 func TestServiceResource_changeSyncToFalse(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ExplicitEnable = true
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
@@ -345,13 +384,18 @@ func TestServiceResource_changeSyncToFalse(t *testing.T) {
 // when AddK8SNamespaceSuffix is true.
 func TestServiceResource_addK8SNamespace(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.AddK8SNamespaceSuffix = true
 
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
@@ -373,14 +417,19 @@ func TestServiceResource_addK8SNamespace(t *testing.T) {
 // when the consul prefix is provided.
 func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.AddK8SNamespaceSuffix = true
 	serviceResource.ConsulServicePrefix = "prefix"
 
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
@@ -402,13 +451,18 @@ func TestServiceResource_addK8SNamespaceWithPrefix(t *testing.T) {
 // services are synced to that node.
 func TestServiceResource_ConsulNodeName(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ConsulNodeName = "test-node"
 
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
@@ -430,13 +484,20 @@ func TestServiceResource_ConsulNodeName(t *testing.T) {
 // when the service name annotation is provided.
 func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.AddK8SNamespaceSuffix = true
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service with the sync=true
@@ -458,12 +519,17 @@ func TestServiceResource_addK8SNamespaceWithNameAnnotation(t *testing.T) {
 // Test that external IPs take priority.
 func TestServiceResource_externalIP(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -485,23 +551,61 @@ func TestServiceResource_externalIP(t *testing.T) {
 	})
 }
 
+// mock struct
+
+type testServiceResource struct {
+	*ServiceResource
+	informer cache.SharedIndexInformer
+}
+
+func (t *testServiceResource) Informer() cache.SharedIndexInformer {
+	return t.informer
+}
+
+func getinformer() (*fake.Clientset, cache.SharedIndexInformer) {
+	client := fake.NewClientset()
+
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return client.CoreV1().
+					Services(metav1.NamespaceAll).
+					List(context.Background(), options)
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewEmptyWatch(), nil
+			},
+		},
+		&corev1.Service{},
+		500*time.Millisecond,
+		cache.Indexers{},
+	)
+	return client, informer
+}
+
 // Test externalIP with Prefix.
 func TestServiceResource_externalIPPrefix(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
-	serviceResource := defaultServiceResource(client, syncer)
-	serviceResource.ConsulServicePrefix = "prefix"
+	base := defaultServiceResource(client, syncer)
 
-	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
-	defer closer()
+	base.ConsulServicePrefix = "prefix"
+
+	resource := &testServiceResource{
+		ServiceResource: &base,
+		informer:        informer,
+	}
 
 	// Insert an LB service
 	svc := lbService("foo", metav1.NamespaceDefault, "1.2.3.4")
 	svc.Spec.ExternalIPs = []string{"3.3.3.3", "4.4.4.4"}
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
+
+	// Start the controller
+	closer := controller.TestControllerRun(resource)
+	defer closer()
 
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
@@ -519,12 +623,18 @@ func TestServiceResource_externalIPPrefix(t *testing.T) {
 // Test that the proper registrations are generated for a LoadBalancer.
 func TestServiceResource_lb(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -546,13 +656,18 @@ func TestServiceResource_lb(t *testing.T) {
 // Test that the proper registrations are generated for a LoadBalancer with a prefix.
 func TestServiceResource_lbPrefix(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ConsulServicePrefix = "prefix"
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -575,12 +690,17 @@ func TestServiceResource_lbPrefix(t *testing.T) {
 // with multiple endpoints.
 func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -609,12 +729,16 @@ func TestServiceResource_lbMultiEndpoint(t *testing.T) {
 // Test explicit name annotation.
 func TestServiceResource_lbAnnotatedName(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
-
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -636,12 +760,17 @@ func TestServiceResource_lbAnnotatedName(t *testing.T) {
 // Test default port and additional ports in the meta.
 func TestServiceResource_lbPort(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -658,8 +787,10 @@ func TestServiceResource_lbPort(t *testing.T) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
+
 		require.Len(r, actual, 1)
 		require.Equal(r, 80, actual[0].Service.Port)
+
 		require.Equal(r, "80", actual[0].Service.Meta["port-http"])
 		require.Equal(r, "8500", actual[0].Service.Meta["port-rpc"])
 	})
@@ -668,12 +799,18 @@ func TestServiceResource_lbPort(t *testing.T) {
 // Test default port works with override annotation.
 func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -693,6 +830,7 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 		actual := syncer.Registrations
 		require.Len(r, actual, 1)
 		require.Equal(r, 8500, actual[0].Service.Port)
+
 		require.Equal(r, "80", actual[0].Service.Meta["port-http"])
 		require.Equal(r, "8500", actual[0].Service.Meta["port-rpc"])
 	})
@@ -701,13 +839,20 @@ func TestServiceResource_lbAnnotatedPort(t *testing.T) {
 // Test annotated tags.
 func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ConsulK8STag = TestConsulK8STag
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -729,12 +874,19 @@ func TestServiceResource_lbAnnotatedTags(t *testing.T) {
 // Test annotated service meta.
 func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert an LB service
@@ -756,13 +908,19 @@ func TestServiceResource_lbAnnotatedMeta(t *testing.T) {
 // Test that with LoadBalancerEndpointsSync set to true we track the IP of the endpoints not the LB IP/name.
 func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.LoadBalancerEndpointsSync = true
 
+	// mock resource to return our informer
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	node1, _, _ := createNodes(t, client)
@@ -817,6 +975,7 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "8.8.8.8", actual[0].Service.Address)
 		require.Equal(r, 8080, actual[0].Service.Port)
+
 		require.Equal(r, "k8s-sync", actual[0].Node)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 	})
@@ -826,12 +985,16 @@ func TestServiceResource_lbRegisterEndpoints(t *testing.T) {
 func TestServiceResource_nodePort(t *testing.T) {
 	t.Parallel()
 	syncer := newTestSyncer()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	createNodes(t, client)
@@ -843,24 +1006,40 @@ func TestServiceResource_nodePort(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	// var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+	// 	require.Equal(r, 0, service.Port)
+
+	// 	require.Equal(r, 30000, service.Ports[0].Port)
+	// 	require.Equal(r, "http", service.Ports[0].Name)
+	// 	require.True(r, service.Ports[0].Default)
+
+	// 	require.Equal(r, 30001, service.Ports[1].Port)
+	// 	require.Equal(r, "rpc", service.Ports[1].Name)
+	// 	require.False(r, service.Ports[1].Default)
+	// }
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
 		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -873,14 +1052,20 @@ func TestServiceResource_nodePort(t *testing.T) {
 // Test node port works with prefix.
 func TestServiceResource_nodePortPrefix(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	//client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
-	serviceResource := defaultServiceResource(client, syncer)
-	serviceResource.NodePortSync = ExternalOnly
-	serviceResource.ConsulServicePrefix = "prefix"
+	base := defaultServiceResource(client, syncer)
+	base.NodePortSync = ExternalOnly
+	base.ConsulServicePrefix = "prefix"
+
+	resource := &testServiceResource{
+		ServiceResource: &base,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	createNodes(t, client)
@@ -892,6 +1077,19 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 	_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	// var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+	// 	fmt.Printf("%+v\n", service.Ports)
+	// 	require.Equal(r, 0, service.Port)
+
+	// 	require.Equal(r, 30000, service.Ports[0].Port)
+	// 	require.Equal(r, "http", service.Ports[0].Name)
+	// 	require.True(r, service.Ports[0].Default)
+
+	// 	require.Equal(r, 30001, service.Ports[1].Port)
+	// 	require.Equal(r, "rpc", service.Ports[1].Name)
+	// 	require.False(r, service.Ports[1].Default)
+	// }
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
@@ -902,14 +1100,17 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
 		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "prefixfoo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "prefixfoo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -923,13 +1124,19 @@ func TestServiceResource_nodePortPrefix(t *testing.T) {
 // are generated only for the nodes where pods are running.
 func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
 
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	node1, _, _ := createNodes(t, client)
@@ -984,20 +1191,26 @@ func TestServiceResource_nodePort_singleEndpoint(t *testing.T) {
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
 		require.Equal(r, 30000, actual[0].Service.Port)
-		require.Equal(r, "k8s-sync", actual[0].Node)
+
 	})
 }
 
 // Test that the proper registrations are generated for a NodePort with annotated port.
 func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
 
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	createNodes(t, client)
@@ -1010,27 +1223,44 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 
 	require.NoError(t, err)
 
+	// var validateServicePorts = func(r *retry.R, service *consulapi.AgentService) {
+	// 	require.Equal(r, 0, service.Port)
+
+	// 	require.Equal(r, 30001, service.Ports[0].Port)
+	// 	require.Equal(r, "rpc", service.Ports[0].Name)
+	// 	require.True(r, service.Ports[0].Default)
+
+	// 	require.Equal(r, 30000, service.Ports[1].Port)
+	// 	require.Equal(r, "http", service.Ports[1].Name)
+	// 	require.False(r, service.Ports[1].Default)
+	// }
+
 	// Verify what we got
 	retry.Run(t, func(r *retry.R) {
 		syncer.Lock()
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
 		require.Equal(r, 30001, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
 		require.Equal(r, 30001, actual[1].Service.Port)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
 		require.Equal(r, 30001, actual[2].Service.Port)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1040,13 +1270,17 @@ func TestServiceResource_nodePortAnnotatedPort(t *testing.T) {
 // Test that the proper registrations are generated for a NodePort with an unnamed port.
 func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalOnly
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	createNodes(t, client)
@@ -1073,17 +1307,21 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 		require.Equal(r, "1.2.3.4", actual[0].Service.Address)
 		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1094,13 +1332,17 @@ func TestServiceResource_nodePortUnnamedPort(t *testing.T) {
 // when syncing internal Node IPs only.
 func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = InternalOnly
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	createNodes(t, client)
@@ -1118,21 +1360,26 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "4.5.6.7", actual[0].Service.Address)
 		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "5.6.7.8", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "6.7.8.9", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1143,13 +1390,17 @@ func TestServiceResource_nodePort_internalOnlySync(t *testing.T) {
 // when preferring to sync external Node IPs over internal IPs.
 func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.NodePortSync = ExternalFirst
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	node1, _, _ := createNodes(t, client)
@@ -1175,21 +1426,26 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "4.5.6.7", actual[0].Service.Address)
 		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[0].Node)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.3.4.5", actual[1].Service.Address)
-		require.Equal(r, 30000, actual[1].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[1].Node)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.4.5.6", actual[2].Service.Address)
-		require.Equal(r, 30000, actual[2].Service.Port)
+		require.Equal(r, 30000, actual[0].Service.Port)
 		require.Equal(r, "k8s-sync", actual[2].Node)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1199,13 +1455,17 @@ func TestServiceResource_nodePort_externalFirstSync(t *testing.T) {
 // Test that the proper registrations are generated for a ClusterIP type.
 func TestServiceResource_clusterIP(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1230,11 +1490,11 @@ func TestServiceResource_clusterIP(t *testing.T) {
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta["external-k8s-topology-zone"])
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 8080, actual[1].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta["external-k8s-topology-zone"])
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 8080, actual[2].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta["external-k8s-topology-zone"])
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
@@ -1245,13 +1505,17 @@ func TestServiceResource_clusterIP(t *testing.T) {
 // Test that the proper registrations with health checks are generated for a ClusterIP type.
 func TestServiceResource_clusterIP_healthCheck(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1288,14 +1552,18 @@ func TestServiceResource_clusterIP_healthCheck(t *testing.T) {
 // Test clusterIP with prefix.
 func TestServiceResource_clusterIPPrefix(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 	serviceResource.ConsulServicePrefix = "prefix"
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1319,10 +1587,10 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "prefixfoo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 8080, actual[1].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "prefixfoo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 8080, actual[2].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -1336,13 +1604,16 @@ func TestServiceResource_clusterIPPrefix(t *testing.T) {
 // annotated port name override.
 func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1367,10 +1638,10 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 		require.Equal(r, 2000, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 2000, actual[1].Service.Port)
+		require.Equal(r, 2000, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 2000, actual[2].Service.Port)
+		require.Equal(r, 2000, actual[0].Service.Port)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -1384,13 +1655,19 @@ func TestServiceResource_clusterIPAnnotatedPortName(t *testing.T) {
 // annotated port number override.
 func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
 
+	// mock reource
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1410,18 +1687,23 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 		defer syncer.Unlock()
 		actual := syncer.Registrations
 		require.Len(r, actual, 3)
+
 		require.Equal(r, "foo", actual[0].Service.Service)
 		require.Equal(r, "1.1.1.1", actual[0].Service.Address)
 		require.Equal(r, 4141, actual[0].Service.Port)
+
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 4141, actual[1].Service.Port)
+		require.Equal(r, 4141, actual[0].Service.Port)
+
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 4141, actual[2].Service.Port)
+		require.Equal(r, 4141, actual[0].Service.Port)
+
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
+
 		require.NotEqual(r, actual[0].Service.ID, actual[1].Service.ID)
 		require.NotEqual(r, actual[0].Service.ID, actual[2].Service.ID)
 		require.NotEqual(r, actual[1].Service.ID, actual[2].Service.ID)
@@ -1431,13 +1713,17 @@ func TestServiceResource_clusterIPAnnotatedPortNumber(t *testing.T) {
 // Test that the proper registrations are generated for a ClusterIP type with unnamed ports.
 func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
-
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1465,10 +1751,10 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 8080, actual[1].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 8080, actual[2].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -1482,13 +1768,18 @@ func TestServiceResource_clusterIPUnnamedPorts(t *testing.T) {
 // is disabled.
 func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = false
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1513,14 +1804,19 @@ func TestServiceResource_clusterIPSyncDisabled(t *testing.T) {
 // Test that the ClusterIP services are synced when watching all namespaces.
 func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	testNamespace := "test_namespace"
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1544,10 +1840,10 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 8080, actual[1].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 8080, actual[2].Service.Port)
+		require.Equal(r, 8080, actual[0].Service.Port)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -1560,13 +1856,18 @@ func TestServiceResource_clusterIPAllNamespaces(t *testing.T) {
 // Test using a port name annotation when the targetPort is a named port.
 func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1595,10 +1896,10 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 		require.Equal(r, 2000, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[1].Service.Service)
 		require.Equal(r, "2.2.2.2", actual[1].Service.Address)
-		require.Equal(r, 2000, actual[1].Service.Port)
+		require.Equal(r, 2000, actual[0].Service.Port)
 		require.Equal(r, "foo", actual[2].Service.Service)
 		require.Equal(r, "3.3.3.3", actual[2].Service.Address)
-		require.Equal(r, 2000, actual[2].Service.Port)
+		require.Equal(r, 2000, actual[0].Service.Port)
 		require.Equal(r, "us-west-2a", actual[0].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2b", actual[1].Service.Meta[ConsulK8STopologyZone])
 		require.Equal(r, "us-west-2c", actual[2].Service.Meta[ConsulK8STopologyZone])
@@ -1611,13 +1912,17 @@ func TestServiceResource_clusterIPTargetPortNamed(t *testing.T) {
 // Test target information are set in service meta.
 func TestServiceResource_targetRefInMeta(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.ClusterIPSync = true
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
 
 	// Start the controller
-	closer := controller.TestControllerRun(&serviceResource)
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	// Insert the service
@@ -1690,14 +1995,18 @@ func TestServiceResource_AllowDenyNamespaces(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(tt *testing.T) {
-			client := fake.NewSimpleClientset()
+			// client := fake.NewSimpleClientset()
+			client, informer := getinformer()
 			syncer := newTestSyncer()
 			serviceResource := defaultServiceResource(client, syncer)
 			serviceResource.AllowK8sNamespacesSet = c.AllowList
 			serviceResource.DenyK8sNamespacesSet = c.DenyList
-
+			resource := &testServiceResource{
+				ServiceResource: &serviceResource,
+				informer:        informer,
+			}
 			// Start the controller
-			closer := controller.TestControllerRun(&serviceResource)
+			closer := controller.TestControllerRun(resource)
 			defer closer()
 
 			// We always have two services in two namespaces: foo and bar.
@@ -1741,12 +2050,17 @@ func TestServiceResource_singleDestNamespace(t *testing.T) {
 	consulDestNamespaces := []string{"default", "dest"}
 	for _, consulDestNamespace := range consulDestNamespaces {
 		t.Run(consulDestNamespace, func(tt *testing.T) {
-			client := fake.NewSimpleClientset()
+			// client := fake.NewSimpleClientset()
+			client, informer := getinformer()
 			syncer := newTestSyncer()
 			serviceResource := defaultServiceResource(client, syncer)
 			serviceResource.ConsulDestinationNamespace = consulDestNamespace
 			serviceResource.EnableNamespaces = true
-			closer := controller.TestControllerRun(&serviceResource)
+			resource := &testServiceResource{
+				ServiceResource: &serviceResource,
+				informer:        informer,
+			}
+			closer := controller.TestControllerRun(resource)
 			defer closer()
 			_, err := client.CoreV1().Services(metav1.NamespaceDefault).
 				Create(context.Background(), lbService("foo", metav1.NamespaceDefault, "1.2.3.4"), metav1.CreateOptions{})
@@ -1766,12 +2080,18 @@ func TestServiceResource_singleDestNamespace(t *testing.T) {
 // Test that services are created in a mirrored namespace.
 func TestServiceResource_MirroredNamespace(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.EnableK8SNSMirroring = true
 	serviceResource.EnableNamespaces = true
-	closer := controller.TestControllerRun(&serviceResource)
+
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	k8sNamespaces := []string{"foo", "bar", "default"}
@@ -1801,13 +2121,19 @@ func TestServiceResource_MirroredNamespace(t *testing.T) {
 // Test that services are created in a mirrored namespace with prefix.
 func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 	t.Parallel()
-	client := fake.NewSimpleClientset()
+	// client := fake.NewSimpleClientset()
+	client, informer := getinformer()
 	syncer := newTestSyncer()
 	serviceResource := defaultServiceResource(client, syncer)
 	serviceResource.EnableK8SNSMirroring = true
 	serviceResource.EnableNamespaces = true
 	serviceResource.K8SNSMirroringPrefix = "prefix-"
-	closer := controller.TestControllerRun(&serviceResource)
+
+	resource := &testServiceResource{
+		ServiceResource: &serviceResource,
+		informer:        informer,
+	}
+	closer := controller.TestControllerRun(resource)
 	defer closer()
 
 	k8sNamespaces := []string{"foo", "bar", "default"}
@@ -1834,261 +2160,106 @@ func TestServiceResource_MirroredPrefixNamespace(t *testing.T) {
 	})
 }
 
-// Test k8s namespace suffix is not appended
-// when the service name annotation is provided.
+// testIngress creates an ingress for testing with customizable parameters.
+func testIngress(host, path string, tlsHosts []string, lbIP string) *networkingv1.Ingress {
+	ing := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-ingress"},
+		Spec: networkingv1.IngressSpec{
+			Rules: []networkingv1.IngressRule{{
+				Host: host,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{{
+							Path: path,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: "test-service",
+									Port: networkingv1.ServiceBackendPort{Number: 8080},
+								},
+							},
+						}},
+					},
+				},
+			}},
+		},
+	}
+	if len(tlsHosts) > 0 {
+		ing.Spec.TLS = []networkingv1.IngressTLS{{Hosts: tlsHosts, SecretName: "test-tls-secret"}}
+	}
+	if lbIP != "" {
+		ing.Status.LoadBalancer.Ingress = []networkingv1.IngressLoadBalancerIngress{{IP: lbIP}}
+	}
+	return ing
+}
+
+// Test addIngress handles ingress sync settings and derives
+// the expected address and port from ingress configuration.
 func TestServiceResource_addIngress(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
 		enableIngress     bool
 		syncIngressIP     bool
-		ingress           *networkingv1.Ingress
+		host              string
+		path              string
+		tlsHosts          []string
+		lbIP              string
 		expectIngressSync bool
 		expectedAddress   string
 		expectedPort      int
 	}{
 		"enable ingress on port 80": {
-			enableIngress: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.other.consul"},
-							SecretName: "test-other-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.other.consul"},
 			expectIngressSync: true,
 			expectedAddress:   "test.host.consul",
 			expectedPort:      80,
 		},
 		"enable ingress on port 443": {
-			enableIngress: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.host.consul"},
-							SecretName: "test-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.host.consul"},
 			expectIngressSync: true,
 			expectedAddress:   "test.host.consul",
 			expectedPort:      443,
 		},
 		"enable ingress on port 80 with loadbalancer IP": {
-			enableIngress: true,
-			syncIngressIP: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.other.consul"},
-							SecretName: "test-other-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Status: networkingv1.IngressStatus{
-					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
-						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
-					},
-				},
-			},
+			enableIngress:     true,
+			syncIngressIP:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.other.consul"},
+			lbIP:              "1.2.3.4",
 			expectIngressSync: true,
 			expectedAddress:   "1.2.3.4",
 			expectedPort:      80,
 		},
 		"enable ingress on port 443 with loadbalancer IP": {
-			enableIngress: true,
-			syncIngressIP: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					TLS: []networkingv1.IngressTLS{
-						{
-							Hosts:      []string{"test.host.consul"},
-							SecretName: "test-tls-secret",
-						},
-					},
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Status: networkingv1.IngressStatus{
-					LoadBalancer: networkingv1.IngressLoadBalancerStatus{
-						Ingress: []networkingv1.IngressLoadBalancerIngress{{IP: "1.2.3.4"}},
-					},
-				},
-			},
+			enableIngress:     true,
+			syncIngressIP:     true,
+			host:              "test.host.consul",
+			path:              "/",
+			tlsHosts:          []string{"test.host.consul"},
+			lbIP:              "1.2.3.4",
 			expectIngressSync: true,
 			expectedAddress:   "1.2.3.4",
 			expectedPort:      443,
 		},
 		"ingress disabled": {
-			enableIngress: false,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+			enableIngress:     false,
+			host:              "test.host.consul",
+			path:              "/",
 			expectIngressSync: false,
 			expectedAddress:   "1.1.1.1",
 			expectedPort:      8080,
 		},
-		"ignores ingress if host != /": {
-			enableIngress: true,
-			ingress: &networkingv1.Ingress{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-ingress",
-				},
-				Spec: networkingv1.IngressSpec{
-					Rules: []networkingv1.IngressRule{
-						{
-							Host: "test.host.consul",
-							IngressRuleValue: networkingv1.IngressRuleValue{
-								HTTP: &networkingv1.HTTPIngressRuleValue{
-									Paths: []networkingv1.HTTPIngressPath{
-										{
-											Path: "/foo",
-											Backend: networkingv1.IngressBackend{
-												Service: &networkingv1.IngressServiceBackend{
-													Name: "test-service",
-													Port: networkingv1.ServiceBackendPort{
-														Number: 8080,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+		"ignores ingress if path != /": {
+			enableIngress:     true,
+			host:              "test.host.consul",
+			path:              "/foo",
 			expectIngressSync: false,
 			expectedAddress:   "1.1.1.1",
 			expectedPort:      8080,
@@ -2097,32 +2268,52 @@ func TestServiceResource_addIngress(t *testing.T) {
 
 	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			client, informer := getinformer()
 			syncer := newTestSyncer()
 			serviceResource := defaultServiceResource(client, syncer)
 			serviceResource.ClusterIPSync = true
 			serviceResource.EnableIngress = test.enableIngress
 			serviceResource.SyncLoadBalancerIPs = test.syncIngressIP
 
-			// Start the controller
-			closer := controller.TestControllerRun(&serviceResource)
-			defer closer()
+			resource := &testServiceResource{
+				ServiceResource: &serviceResource,
+				informer:        informer,
+			}
 
-			// Create the service
-			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), clusterIPService("test-service", metav1.NamespaceDefault), metav1.CreateOptions{})
+			// Create service, ingress, and endpoint slices
+			svc := clusterIPService("test-service", metav1.NamespaceDefault)
+			_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.Background(), svc, metav1.CreateOptions{})
 			require.NoError(t, err)
-			// Create the ingress
-			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), test.ingress, metav1.CreateOptions{})
+
+			ing := testIngress(test.host, test.path, test.tlsHosts, test.lbIP)
+			ing.Namespace = metav1.NamespaceDefault
+			_, err = client.NetworkingV1().Ingresses(metav1.NamespaceDefault).Create(context.Background(), ing, metav1.CreateOptions{})
 			require.NoError(t, err)
 
 			createNodes(t, client)
-			createEndpointSlice(t, client, "test-service", metav1.NamespaceDefault)
+			createEndpointSlice(t, client, svc.Name, metav1.NamespaceDefault)
 
-			// Verify that the service name annotation is preferred
+			// Start controller
+			closer := controller.TestControllerRun(resource)
+			defer closer()
+
+			// Trigger ingress processing for fake clients
+			if test.enableIngress {
+				ingressResource := &serviceIngressResource{
+					Service:             &serviceResource,
+					Ctx:                 context.Background(),
+					EnableIngress:       test.enableIngress,
+					SyncLoadBalancerIPs: test.syncIngressIP,
+				}
+				require.NoError(t, ingressResource.Upsert(ing.Namespace+"/"+ing.Name, ing))
+			}
+
+			// Verify registrations
 			retry.Run(t, func(r *retry.R) {
 				syncer.Lock()
 				defer syncer.Unlock()
 				actual := syncer.Registrations
+
 				if test.expectIngressSync {
 					require.Len(r, actual, 1)
 					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
@@ -2132,7 +2323,6 @@ func TestServiceResource_addIngress(t *testing.T) {
 					require.Equal(r, test.expectedAddress, actual[0].Service.Address)
 					require.Equal(r, test.expectedPort, actual[0].Service.Port)
 				}
-
 			})
 		})
 	}
@@ -2260,7 +2450,7 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 	node3 := nodeName3
 	targetRef := corev1.ObjectReference{Kind: "pod", Name: "foobar"}
 
-	_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(
+	endpointSlice, err := client.DiscoveryV1().EndpointSlices(namespace).Create(
 		context.Background(),
 		&discoveryv1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{
@@ -2313,6 +2503,7 @@ func createEndpointSlice(t *testing.T, client *fake.Clientset, serviceName strin
 			},
 		},
 		metav1.CreateOptions{})
+	t.Logf("Created the endpoints %+v", endpointSlice)
 	require.NoError(t, err)
 }
 

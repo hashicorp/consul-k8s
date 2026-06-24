@@ -65,7 +65,7 @@ func NewCLICluster(
 	createOrUpdateNamespace(t, ctx.KubernetesClient(t), consulNS)
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, consulNS)
+		configurePSA(t, ctx.KubernetesClient(t), cfg, consulNS)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
@@ -271,7 +271,7 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 		tunnel.Close()
 	})
 
-	config.Address = fmt.Sprintf("127.0.0.1:%d", localPort)
+	config.Address = fmt.Sprintf("localhost:%d", localPort)
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 

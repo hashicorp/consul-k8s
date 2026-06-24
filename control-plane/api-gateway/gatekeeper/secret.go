@@ -14,12 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 )
 
-func (g *Gatekeeper) upsertSecret(ctx context.Context, gateway gwv1beta1.Gateway) error {
+func (g *Gatekeeper) upsertSecret(ctx context.Context, gateway gwv1.Gateway) error {
 	desiredSecret, err := g.secret(ctx, gateway)
 	if err != nil {
 		return fmt.Errorf("failed to create certificate secret for gateway %s/%s: %w", gateway.Namespace, gateway.Name, err)
@@ -55,7 +55,7 @@ func (g *Gatekeeper) upsertSecret(ctx context.Context, gateway gwv1beta1.Gateway
 	return nil
 }
 
-func (g *Gatekeeper) deleteSecret(ctx context.Context, gw gwv1beta1.Gateway) error {
+func (g *Gatekeeper) deleteSecret(ctx context.Context, gw gwv1.Gateway) error {
 	secret := &corev1.Secret{}
 	if err := g.Client.Get(ctx, g.namespacedName(gw), secret); err != nil {
 		if k8serrors.IsNotFound(err) {
@@ -78,7 +78,7 @@ func (g *Gatekeeper) deleteSecret(ctx context.Context, gw gwv1beta1.Gateway) err
 	return nil
 }
 
-func (g *Gatekeeper) secret(ctx context.Context, gateway gwv1beta1.Gateway) (*corev1.Secret, error) {
+func (g *Gatekeeper) secret(ctx context.Context, gateway gwv1.Gateway) (*corev1.Secret, error) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: gateway.Namespace,
@@ -124,7 +124,7 @@ func (g *Gatekeeper) secret(ctx context.Context, gateway gwv1beta1.Gateway) (*co
 	return secret, nil
 }
 
-func newSecretMutator(existing, desired *corev1.Secret, gateway gwv1beta1.Gateway, scheme *runtime.Scheme) resourceMutator {
+func newSecretMutator(existing, desired *corev1.Secret, gateway gwv1.Gateway, scheme *runtime.Scheme) resourceMutator {
 	return func() error {
 		existing.Data = desired.Data
 		return controllerruntime.SetControllerReference(&gateway, existing, scheme)

@@ -53,7 +53,7 @@ type PeeringDialerSpec struct {
 // PeeringDialerStatus defines the observed state of PeeringDialer.
 type PeeringDialerStatus struct {
 	// LatestPeeringVersion is the latest version of the resource that was reconciled.
-	LatestPeeringVersion *uint64 `json:"latestPeeringVersion,omitempty"`
+	LatestPeeringVersion *int64 `json:"latestPeeringVersion,omitempty"`
 	// SecretRef shows the status of the secret.
 	// +optional
 	SecretRef *SecretRefStatus `json:"secret,omitempty"`

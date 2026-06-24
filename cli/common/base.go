@@ -22,6 +22,12 @@ type BaseCommand struct {
 
 	// UI is used to write to the CLI.
 	UI terminal.UI
+
+	// CleanupReqAndCompleted is a channel to signal main if a command requires cleanup.
+	// After its cleanup is complete, the command sends a confirmation to main via this channel.
+	// Use Case:
+	// On signal interrupt, a command can use it to block main from exiting until its cleanup is complete.
+	CleanupReqAndCompleted chan bool
 }
 
 // Close cleans up any resources that the command created. This should be

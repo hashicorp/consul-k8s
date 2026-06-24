@@ -5,13 +5,15 @@ package binding
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
 	gatewaycommon "github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -50,7 +52,7 @@ func registrationForPod(metrics gatewaycommon.MetricsConfig, namespace string, g
 	if metrics.Enabled {
 		proxyConfigOverrides = &api.AgentServiceConnectProxyConfig{
 			Config: map[string]interface{}{
-				metricsConfiguration: fmt.Sprintf("%s:%d", pod.Status.PodIP, metrics.Port),
+				metricsConfiguration: net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(metrics.Port)),
 			},
 		}
 	}
