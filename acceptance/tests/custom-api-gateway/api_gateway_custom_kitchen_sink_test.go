@@ -46,12 +46,13 @@ func TestAPIGateway_KitchenSink(t *testing.T) {
 	consulServerCluster.Create(t)
 
 	helmValues := map[string]string{
-		"server.enabled": "false",
-		"connectInject.consulNamespaces.mirroringK8S": "true",
-		"global.acls.manageSystemACLs":                "true",
-		"global.tls.enabled":                          "true",
-		"global.logLevel":                             "trace",
-		"externalServers.enabled":                     "true",
+		"server.enabled":                                "false",
+		"connectInject.consulNamespaces.mirroringK8S":   "true",
+		"global.acls.manageSystemACLs":                  "true",
+		"global.tls.enabled":                            "true",
+		"global.logLevel":                               "trace",
+		"global.openshift.crds.customConsulapi.enabled": "true",
+		"externalServers.enabled":                       "true",
 		"externalServers.hosts[0]":                    fmt.Sprintf("%s-consul-server", serverReleaseName),
 		"externalServers.httpsPort":                   "8501",
 		"global.tls.caCert.secretName":                fmt.Sprintf("%s-consul-ca-cert", serverReleaseName),

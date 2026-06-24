@@ -162,7 +162,12 @@ func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[str
 	if strings.HasPrefix(t.Name(), "TestAPIGateway") {
 		//To install custom gateway API CRDs in OpenShift for API Gateway tests,
 		//we need to enable the consulapi CRDs since the custom gateway API CRDs depend on some of the consulapi CRDs.
-		values["global.openshift.crds.consulapi.enabled"] = "true"
+		// However, if the test explicitly requests the legacy custom gateway CRD (gateways.consul.hashicorp.com),
+		// skip installing the new cgateways.consul.hashicorp.com CRD — the two share the same kind/listKind
+		// within consul.hashicorp.com and will conflict if both are applied simultaneously.
+		if values["global.openshift.crds.customConsulapi.enabled"] != "true" {
+			values["global.openshift.crds.consulapi.enabled"] = "true"
+		}
 	}
 
 	if cfg.IsOpenshiftGreaterThan4_18 {

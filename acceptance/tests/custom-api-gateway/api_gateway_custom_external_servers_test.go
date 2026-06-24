@@ -43,17 +43,18 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	consulServerCluster.Create(t)
 
 	helmValues := map[string]string{
-		"server.enabled":                        "false",
-		"global.acls.manageSystemACLs":          "true",
-		"global.tls.enabled":                    "true",
-		"connectInject.enabled":                 "true",
-		"externalServers.enabled":               "true",
-		"externalServers.hosts[0]":              fmt.Sprintf("%s-consul-server", serverReleaseName),
-		"externalServers.httpsPort":             "8501",
-		"global.tls.caCert.secretName":          fmt.Sprintf("%s-consul-ca-cert", serverReleaseName),
-		"global.tls.caCert.secretKey":           "tls.crt",
-		"global.acls.bootstrapToken.secretName": fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName),
-		"global.acls.bootstrapToken.secretKey":  "token",
+		"server.enabled":                                "false",
+		"global.acls.manageSystemACLs":                  "true",
+		"global.tls.enabled":                            "true",
+		"connectInject.enabled":                         "true",
+		"global.openshift.crds.customConsulapi.enabled": "true",
+		"externalServers.enabled":                       "true",
+		"externalServers.hosts[0]":                      fmt.Sprintf("%s-consul-server", serverReleaseName),
+		"externalServers.httpsPort":                     "8501",
+		"global.tls.caCert.secretName":                  fmt.Sprintf("%s-consul-ca-cert", serverReleaseName),
+		"global.tls.caCert.secretKey":                   "tls.crt",
+		"global.acls.bootstrapToken.secretName":         fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName),
+		"global.acls.bootstrapToken.secretKey":          "token",
 	}
 
 	releaseName := helpers.RandomName()

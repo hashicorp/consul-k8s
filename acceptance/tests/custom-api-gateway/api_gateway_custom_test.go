@@ -34,7 +34,7 @@ import (
 
 const (
 	StaticClientName           = "static-client"
-	gatewayClassControllerName = "consul.hashicorp.com/gateway-controller-custom"
+	gatewayClassControllerName = "consul.hashicorp.com/gateway-controller-consul"
 	gatewayClassFinalizer      = "gateway-exists-finalizer.consul.hashicorp.com"
 	gatewayFinalizer           = "gateway-finalizer.consul.hashicorp.com"
 )
@@ -192,10 +192,11 @@ func TestAPIGateway_Basic(t *testing.T) {
 			}
 
 			helmValues := map[string]string{
-				"connectInject.enabled":        "true",
-				"global.acls.manageSystemACLs": strconv.FormatBool(c.secure),
-				"global.tls.enabled":           strconv.FormatBool(c.secure),
-				"global.logLevel":              "trace",
+				"connectInject.enabled":                         "true",
+				"global.openshift.crds.customConsulapi.enabled": "true",
+				"global.acls.manageSystemACLs":                  strconv.FormatBool(c.secure),
+				"global.tls.enabled":                            strconv.FormatBool(c.secure),
+				"global.logLevel":                               "trace",
 			}
 
 			releaseName := helpers.RandomName()
@@ -539,11 +540,12 @@ func TestAPIGateway_JWTAuth_Basic(t *testing.T) {
 	}
 
 	helmValues := map[string]string{
-		"connectInject.enabled":                       "true",
-		"connectInject.consulNamespaces.mirroringK8S": "true",
-		"global.acls.manageSystemACLs":                "true",
-		"global.tls.enabled":                          "true",
-		"global.logLevel":                             "trace",
+		"connectInject.enabled":                          "true",
+		"global.openshift.crds.customConsulapi.enabled":  "true",
+		"connectInject.consulNamespaces.mirroringK8S":    "true",
+		"global.acls.manageSystemACLs":                   "true",
+		"global.tls.enabled":                             "true",
+		"global.logLevel":                                "trace",
 	}
 
 	releaseName := helpers.RandomName()

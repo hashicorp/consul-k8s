@@ -875,7 +875,13 @@ global:
     crds: 
       enableTcpRoute: false
       consulapi:
-        enabled: false 
+        enabled: false
+      # customConsulapi.enabled installs the gateways.consul.hashicorp.com CRD (v1beta1)
+      # used by the legacy custom gateway controller (gateway-controller-custom).
+      # This is mutually exclusive with consulapi.enabled — only one of the two
+      # "Gateway" kinds can be established in the consul.hashicorp.com group at a time.
+      customConsulapi:
+        enabled: false
 
   # The time in seconds that the consul API client will wait for a response from
   # the API before cancelling the request.

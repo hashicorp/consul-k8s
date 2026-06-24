@@ -417,6 +417,7 @@ func createScalingGatewayClassResources(
 ) string {
 	t.Helper()
 
+	cfg := suite.Config()
 	gatewayClassConfigName := helpers.RandomName()
 	gatewayClassName := helpers.RandomName()
 
@@ -427,6 +428,9 @@ func createScalingGatewayClassResources(
 		Spec: v1alpha1.GatewayClassConfigSpec{
 			DeploymentSpec: deploymentSpec,
 		},
+	}
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
 	}
 
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)

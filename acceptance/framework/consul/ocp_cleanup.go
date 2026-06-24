@@ -461,9 +461,46 @@ func (h *HelmCluster) deleteStaleConsulOwnedCRDs(t *testing.T) {
 
 		if ownerRelease != "" && ownerRelease != h.releaseName {
 			logger.Logf(t, "Deleting stale CRD %s owned by release %s before installing release %s", crd, ownerRelease, h.releaseName)
+			h.clearStaleCRDObjectFinalizers(t, crd)
 			_, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "delete", "crd", crd, "--ignore-not-found=true")
 			require.NoError(t, err)
 		}
+	}
+}
+
+// clearStaleCRDObjectFinalizers removes finalizers from any lingering custom
+// resources of the given CRD so that deleting the CRD does not hang on the
+// apiextensions customresourcecleanup finalizer. deleteStaleGatewayAndConsulAPIResources
+// only clears finalizers on namespaced resources, so cluster-scoped CRs (such as
+// customgatewayclasses) would otherwise leave the CRD stuck in Terminating.
+func (h *HelmCluster) clearStaleCRDObjectFinalizers(t *testing.T, crd string) {
+	t.Helper()
+
+	// List custom resources for this CRD. Cluster-scoped resources (e.g.
+	// customgatewayclasses) are returned regardless of namespace; namespaced
+	// resources are scoped to the install namespace, matching how
+	// deleteStaleGatewayAndConsulAPIResources operates.
+	output, err := k8s.RunKubectlAndGetOutputE(
+		t,
+		h.helmOptions.KubectlOptions,
+		"get", crd,
+		"-o", "name",
+		"--ignore-not-found=true",
+	)
+	if err != nil {
+		// The CRD may already be gone or have no objects; nothing to clear.
+		return
+	}
+
+	for _, objectName := range splitNonEmptyLines(output) {
+		logger.Logf(t, "Clearing finalizers on %s before deleting stale CRD %s", objectName, crd)
+		_, _ = k8s.RunKubectlAndGetOutputE(
+			t,
+			h.helmOptions.KubectlOptions,
+			"patch", objectName,
+			"--type=merge",
+			"-p", `{"metadata":{"finalizers":[]}}`,
+		)
 	}
 }
 

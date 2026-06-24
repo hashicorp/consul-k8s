@@ -4,6 +4,10 @@
         .Values.connectInject.apiGateway.manageExternalCRDs 
         .Values.connectInject.apiGateway.manageNonStandardCRDs
     )
+    (not (and
+        (default false .Values.global.openshift.enabled)
+        (default false .Values.global.openshift.crds.customConsulapi.enabled)
+    ))
     (or 
         (and 
             .Values.global.crds.consulapi.enabled 

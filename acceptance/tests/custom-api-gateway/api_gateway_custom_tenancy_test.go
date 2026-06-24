@@ -86,12 +86,13 @@ func TestAPIGateway_Tenancy(t *testing.T) {
 			ctx := suite.Environment().DefaultContext(t)
 
 			helmValues := map[string]string{
-				"global.enableConsulNamespaces":               strconv.FormatBool(c.namespaceMirroring),
-				"global.acls.manageSystemACLs":                strconv.FormatBool(c.secure),
-				"global.tls.enabled":                          strconv.FormatBool(c.secure),
-				"global.logLevel":                             "trace",
-				"connectInject.enabled":                       "true",
-				"connectInject.consulNamespaces.mirroringK8S": strconv.FormatBool(c.namespaceMirroring),
+				"global.enableConsulNamespaces":                strconv.FormatBool(c.namespaceMirroring),
+				"global.acls.manageSystemACLs":                 strconv.FormatBool(c.secure),
+				"global.tls.enabled":                           strconv.FormatBool(c.secure),
+				"global.logLevel":                              "trace",
+				"connectInject.enabled":                        "true",
+				"global.openshift.crds.customConsulapi.enabled": "true",
+				"connectInject.consulNamespaces.mirroringK8S":  strconv.FormatBool(c.namespaceMirroring),
 			}
 
 			releaseName := helpers.RandomName()
