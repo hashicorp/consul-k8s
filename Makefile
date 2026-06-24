@@ -15,7 +15,7 @@ GOTESTSUM_PATH?=$(shell command -v gotestsum)
 
 .PHONY: gen-helm-docs
 gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consul website. Usage: make gen-helm-docs consul=<path-to-consul-repo>.
-	@cd hack/helm-reference-gen; go run ./... $(consul)
+	@cd hack/helm-reference-gen; go run ./... $(docsRepo)
 
 .PHONY: copy-crds-to-chart
 copy-crds-to-chart: ## Copy generated CRD YAML into charts/consul. Usage: make copy-crds-to-chart
@@ -191,7 +191,7 @@ acceptance-lint: ## Run linter in the control-plane directory.
 # For CNI acceptance tests, the calico CNI plugin needs to be installed on Kind. Our consul-cni plugin will not work
 # without another plugin installed first
 kind-cni-calico: ## install cni plugin on kind
-	kubectl create namespace calico-system ||true
+	kubectl create namespace calico-system || true
 	kubectl create -f $(CURDIR)/acceptance/framework/environment/cni-kind/tigera-operator.yaml
 	# Sleeps are needed as installs can happen too quickly for Kind to handle it
 	@sleep 30
@@ -207,6 +207,7 @@ kind-delete:
 
 .PHONY: kind-cni
 kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
+	
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc1 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc2 --image $(KIND_NODE_IMAGE)
@@ -215,13 +216,16 @@ kind-cni: kind-delete ## Helper target for doing local cni acceptance testing
 	make kind-cni-calico
 	kind create cluster --config=$(CURDIR)/acceptance/framework/environment/cni-kind/kind.config --name dc4 --image $(KIND_NODE_IMAGE)
 	make kind-cni-calico
+	
 
 .PHONY: kind
 kind: kind-delete ## Helper target for doing local acceptance testing (works in all cases)
+		
 	kind create cluster --name dc1 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc2 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc3 --image $(KIND_NODE_IMAGE)
 	kind create cluster --name dc4 --image $(KIND_NODE_IMAGE)
+
 
 .PHONY: kind-small
 kind-small: kind-delete ## Helper target for doing local acceptance testing (when you only need two clusters)
@@ -286,7 +290,7 @@ ifeq (, $(shell which copywrite))
 	@echo "Installing copywrite"
 	@go install github.com/hashicorp/copywrite@latest
 endif
-	@copywrite headers --spdx "MPL-2.0" 
+	@copywrite headers --spdx "MPL-2.0"
 
 ##@ CI Targets
 

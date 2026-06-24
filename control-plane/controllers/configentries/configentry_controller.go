@@ -306,10 +306,10 @@ func setupWithManager(mgr ctrl.Manager, resource client.Object, reconciler recon
 		// In terms of performance, Consul servers can handle tens of thousands
 		// of writes per second, so retrying at max every 5s isn't an issue and
 		// provides a better UX.
-		RateLimiter: workqueue.NewMaxOfRateLimiter(
-			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 5*time.Second),
+		RateLimiter: workqueue.NewTypedMaxOfRateLimiter[reconcile.Request](
+			workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](200*time.Millisecond, 5*time.Second),
 			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+			&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		),
 	}
 

@@ -8,9 +8,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"strings"
 	"text/template"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/go-logr/logr"

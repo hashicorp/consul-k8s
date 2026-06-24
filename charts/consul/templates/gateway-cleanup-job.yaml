@@ -46,6 +46,7 @@ spec:
             - gateway-cleanup
             - -gateway-class-name=consul
             - -gateway-class-config-name=consul-api-gateway
+            - -gateway-class-config-namespace={{ .Release.Namespace }}
           resources:
             requests:
               memory: "50Mi"

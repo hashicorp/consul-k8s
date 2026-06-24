@@ -121,3 +121,7 @@ file. These are also fully documented directly on the
 
 You can find examples and complete tutorials on how to deploy Consul on 
 Kubernetes using Helm on the [HashiCorp Learn website](https://learn.hashicorp.com/collections/consul/kubernetes).
+
+# Additional Licenses
+It includes a modified fork of Kubernetes Gateway API,
+which is licensed under Apache License 2.0.

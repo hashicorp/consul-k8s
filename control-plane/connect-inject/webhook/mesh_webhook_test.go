@@ -1420,7 +1420,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			"empty",
 			&corev1.Pod{},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":null},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":null},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1442,7 +1442,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 				},
 			},
 			map[string]string{
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1471,7 +1471,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				"consul.hashicorp.com/connect-service":     "foo",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null,\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{\"annotations\":{\"consul.hashicorp.com/connect-service\":\"foo\"}},\"spec\":{\"containers\":[{\"name\":\"web\",\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1501,7 +1501,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "http",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"name\":\"http\",\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},
@@ -1529,7 +1529,7 @@ func TestHandlerDefaultAnnotations(t *testing.T) {
 			},
 			map[string]string{
 				constants.AnnotationPort:                   "8080",
-				constants.AnnotationOriginalPod:            "{\"metadata\":{\"creationTimestamp\":null},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
+				constants.AnnotationOriginalPod:            "{\"metadata\":{},\"spec\":{\"containers\":[{\"name\":\"web\",\"ports\":[{\"containerPort\":8080}],\"resources\":{}},{\"name\":\"web-side\",\"resources\":{}}]},\"status\":{}}",
 				constants.LegacyAnnotationConsulK8sVersion: version.GetHumanVersion(),
 				constants.AnnotationConsulK8sVersion:       version.GetHumanVersion(),
 			},

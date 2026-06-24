@@ -1734,8 +1734,8 @@ func TestServiceIntentions_Validate(t *testing.T) {
 			namespacesEnabled: true,
 			partitionsEnabled: true,
 			expectedErrMsgs: []string{
-				`spec.sources[0]: Invalid value: v1alpha1.SourceIntention{Name:"web", Namespace:"namespace-b", Peer:"peer-other", Partition:"partition-other", SamenessGroup:"", Action:"allow", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
-				`spec.sources[1]: Invalid value: v1alpha1.SourceIntention{Name:"db", Namespace:"namespace-c", Peer:"peer-2", Partition:"partition-2", SamenessGroup:"", Action:"deny", Permissions:v1alpha1.IntentionPermissions(nil), Description:""}: cannot set peer and partition at the same time.`,
+				`spec.sources[0]: Invalid value: {"name":"web","namespace":"namespace-b","peer":"peer-other","partition":"partition-other","action":"allow"}: cannot set peer and partition at the same time.`,
+				`spec.sources[1]: Invalid value: {"name":"db","namespace":"namespace-c","peer":"peer-2","partition":"partition-2","action":"deny"}: cannot set peer and partition at the same time.`,
 			},
 		},
 		"multiple errors: wildcard peer and partition and samenessgroup specified": {
