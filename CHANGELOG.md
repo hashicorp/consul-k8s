@@ -1,3 +1,18 @@
+## 1.8.14 (June 24, 2026)
+BREAKING CHANGES:
+
+* api-gateway: upgrade the old-stable controller to use `gateway.networking.k8s.io` v1.5.1. [[GH-5370](https://github.com/hashicorp/consul-k8s/issues/5370)]
+
+FEATURES:
+
+* api-gateway: add a dual-controller architecture that runs a custom controller alongside the old-stable controller, limit controller watches to Consul-managed Gateways, and add a Helm flag (`enableTcpRoute`) to enable or disable TCPRoute GVK watch/reconciliation in the old-stable controller. [[GH-5370](https://github.com/hashicorp/consul-k8s/issues/5370)]
+
+BUG FIXES:
+
+* control-plane: fix a race during startup where pod registration could be permanently skipped when the Kubernetes Endpoints object lagged behind Pod IP assignment. The endpoints controller now requeues reconciliation until the Endpoints address is populated. [[GH-5386](https://github.com/hashicorp/consul-k8s/issues/5386)]
+* snapshot-agent: Fix bug where the `consul-snapshot` service was registered into the `default` Consul namespace instead of the namespace mirrored from the Kubernetes namespace it is deployed in when `global.enableConsulNamespaces` is enabled. The snapshot agent now also registers into the configured admin partition. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+* terminating-gateways: Fix bug where the terminating gateway service was registered into the `default` Consul namespace instead of the mirrored Consul namespace (matching its Kubernetes namespace) when `global.enableConsulNamespaces` and namespace mirroring were enabled. Applies to both the Helm-managed terminating gateway deployment and the `TerminatingGateway` CRD controller. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+
 ## 1.8.13 (May 24, 2026)
 
 SECURITY:
