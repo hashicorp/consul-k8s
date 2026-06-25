@@ -27,6 +27,8 @@ const (
 )
 
 func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
+	w.Log.Info("building consul-dataplane sidecar", "namespace", namespace.Name, "service", mpi.serviceName, "image", w.ImageConsulDataplane)
+
 	resources, err := w.sidecarResources(pod)
 	if err != nil {
 		return corev1.Container{}, err
@@ -306,6 +308,9 @@ func (w *MeshWebhook) consulDataplaneSidecar(namespace corev1.Namespace, pod cor
 			TimeoutSeconds:      w.getSidecarProbeTimeoutSeconds(pod),
 		}
 	}
+
+	w.Log.Info("built consul-dataplane sidecar", "container", container.Name, "image", container.Image)
+
 	return container, nil
 }
 
