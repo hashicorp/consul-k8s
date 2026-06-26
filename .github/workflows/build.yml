@@ -19,6 +19,10 @@ env:
 jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
+    with:
+      # Allow manual runs (workflow_dispatch) on any branch, including unprotected
+      # ones, without failing the conditional-skip guard.
+      allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' }}
 
   get-go-version:
     # Cascades down to test jobs
