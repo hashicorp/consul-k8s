@@ -279,34 +279,42 @@ func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
 	t.Helper()
 
 	for _, namespace := range []string{"ns1", "ns2"} {
-		ns, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+		_, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			continue
 		}
 		require.NoError(t, err)
 
-		if len(ns.Spec.Finalizers) > 0 {
-			nsCopy := ns.DeepCopy()
-			nsCopy.Spec.Finalizers = nil
-			_, err = h.kubernetesClient.CoreV1().Namespaces().Finalize(context.Background(), nsCopy, metav1.UpdateOptions{})
-			if err != nil && !errors.IsNotFound(err) && !errors.IsConflict(err) {
-				require.NoError(t, err)
-			}
-		}
-
 		logger.Logf(t, "Deleting stale test namespace %s before Helm install", namespace)
+		// Request deletion first so the namespace controller starts terminating the
+		// namespace with its finalizers intact. We must NOT clear the spec finalizers
+		// before issuing the delete: doing so on a namespace that has not yet been
+		// marked for deletion wedges it permanently in the Terminating phase on
+		// OpenShift. If the namespace is still present after the delete is requested,
+		// we force-clear its finalizers via the finalize subresource below.
 		err = h.kubernetesClient.CoreV1().Namespaces().Delete(context.Background(), namespace, h.cleanupDeleteOptions())
 		if err != nil && !errors.IsNotFound(err) {
 			require.NoError(t, err)
 		}
-		time.Sleep(15 * time.Second)
+
 		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
-			_, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+			ns, err := h.kubernetesClient.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return
 			}
 			require.NoError(r, err)
-			r.Errorf("namespace %s still exists after cleanup", namespace)
+
+			// The namespace is still present, which means it is stuck in the
+			// Terminating phase. Force-clear its finalizers via the finalize
+			// subresource so the API server can complete the deletion. This mirrors
+			// `kubectl replace --raw /api/v1/namespaces/<ns>/finalize` and is safe
+			// because the delete above already set the deletion timestamp.
+			nsCopy := ns.DeepCopy()
+			nsCopy.Spec.Finalizers = nil
+			if _, ferr := h.kubernetesClient.CoreV1().Namespaces().Finalize(context.Background(), nsCopy, metav1.UpdateOptions{}); ferr != nil && !errors.IsNotFound(ferr) && !errors.IsConflict(ferr) {
+				require.NoError(r, ferr)
+			}
+			r.Errorf("namespace %s still terminating, forced finalizer removal and will re-check", namespace)
 		})
 	}
 }
