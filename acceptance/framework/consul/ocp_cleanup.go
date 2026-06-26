@@ -507,7 +507,7 @@ func (h *HelmCluster) clearStaleCRDObjectFinalizers(t *testing.T, crd string) {
 func (h *HelmCluster) deleteStaleHelmReleases(t *testing.T) {
 	t.Helper()
 
-	output, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--all", "--output", "json")
+	output, err := helm.RunHelmCommandAndGetOutputE(t, h.helmOptions, "list", "--output", "json")
 	require.NoError(t, err)
 
 	var releases []struct {
