@@ -62,6 +62,11 @@ const (
 	// This address does not need to be routable as this node is ephemeral, and we're only providing it because
 	// Consul's API currently requires node address to be provided when registering a node.
 	consulNodeAddress = "127.0.0.1"
+
+	// endpointsLagRequeueInterval is how long to wait before retrying a reconcile when
+	// the Pod has a valid IP but the backing Endpoints object hasn't been populated yet.
+	// This handles the startup race where the Endpoints object lags behind Pod IP assignment.
+	endpointsLagRequeueInterval = 2 * time.Second
 )
 
 type Controller struct {
@@ -125,6 +130,11 @@ type Controller struct {
 	// with config to enable telemetry forwarding.
 	EnableTelemetryCollector bool
 
+	// IsEnterpriseDistribution indicates whether the connected Consul cluster
+	// reports a valid enterprise license. Multi-port service registrations are
+	// only supported on Consul Enterprise.
+	IsEnterpriseDistribution bool
+
 	MetricsConfig metrics.Config
 	Log           logr.Logger
 
@@ -141,6 +151,11 @@ type Controller struct {
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
 	var serviceEndpoints corev1.Endpoints
+
+	// requeueForEndpointsLag is set to true when registration is skipped because the
+	// Endpoints object hasn't yet been populated with a Pod's IP, even though the Pod
+	// already has one. This is a transient startup condition, so we requeue to retry.
+	requeueForEndpointsLag := false
 
 	// Ignore the request if the namespace of the endpoint is not allowed.
 	if common.ShouldIgnore(req.Namespace, r.DenyK8sNamespacesSet, r.AllowK8sNamespacesSet) {
@@ -219,6 +234,18 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 				// Skip registration if node information is incomplete to prevent duplicate registrations.
 				if pod.Spec.NodeName == "" || address.IP == "" || pod.Status.HostIP == "" {
+					// If the Endpoints address IP is empty but the Pod already has a valid IP,
+					// this is a transient startup race where the Endpoints object is lagging
+					// behind Pod IP assignment. Requeue so we retry once Endpoints catches up,
+					// instead of treating this as a terminal skip.
+					if address.IP == "" && pod.Status.PodIP != "" {
+						requeueForEndpointsLag = true
+						r.Log.Info("Endpoints address not yet populated for pod with valid IP; will requeue",
+							"pod", pod.Name, "namespace", pod.Namespace,
+							"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
+						continue
+					}
+
 					r.Log.Info("skipping pod registration due to incomplete node information",
 						"pod", pod.Name, "namespace", pod.Namespace,
 						"nodeName", pod.Spec.NodeName, "podIP", address.IP, "hostIP", pod.Status.HostIP)
@@ -281,6 +308,15 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	if err != nil {
 		r.Log.Error(err, "failed to deregister endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 		errs = multierror.Append(errs, err)
+	}
+
+	// If we skipped registering a pod because its Endpoints address wasn't populated yet,
+	// requeue so we retry once the Endpoints object catches up. Use the shorter of the two
+	// intervals (the existing deregister requeue vs. our lag requeue) so neither is delayed.
+	if requeueForEndpointsLag {
+		if requeueAfter == 0 || endpointsLagRequeueInterval < requeueAfter {
+			requeueAfter = endpointsLagRequeueInterval
+		}
 	}
 
 	return ctrl.Result{RequeueAfter: requeueAfter}, errs
@@ -444,6 +480,12 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	consulServicePort, consulServicePorts, err := r.servicePortsForRegistration(pod, serviceEndpoints)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Multi-port registrations are only supported on Consul Enterprise.
+	// On CE, fall back to single port registration using the default port.
+	if !r.IsEnterpriseDistribution && len(consulServicePorts) > 0 {
+		consulServicePorts = nil
 	}
 
 	var node corev1.Node

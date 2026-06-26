@@ -356,7 +356,6 @@ spec:
         - name: consul
           image: "{{ default .Values.global.image .Values.server.image | trimPrefix "\"" | trimSuffix "\"" }}"
           {{ template "consul.imagePullPolicy" . }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
             - name: ADVERTISE_IP
               valueFrom:
@@ -666,6 +665,14 @@ spec:
               {{- else }}
               value: /consul/license/{{ .Values.global.enterpriseLicense.secretKey }}
               {{- end }}
+            {{- end }}
+            {{- if (and .Values.global.enableConsulNamespaces .Values.connectInject.consulNamespaces.mirroringK8S) }}
+            - name: CONSUL_NAMESPACE
+              value: {{ .Values.connectInject.consulNamespaces.mirroringK8SPrefix }}{{ .Release.Namespace }}
+            {{- end }}
+            {{- if .Values.global.adminPartitions.enabled }}
+            - name: CONSUL_PARTITION
+              value: {{ .Values.global.adminPartitions.name }}
             {{- end }}
             {{- include "consul.extraEnvironmentVars" .Values.server.snapshotAgent | nindent 12 }}
           command:
