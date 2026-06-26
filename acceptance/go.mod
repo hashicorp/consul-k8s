@@ -7,6 +7,8 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane => ../control-plane
 
+replace github.com/hashicorp/consul/api => /Users/bharath/hashicorp/consul/api
+
 require (
 	github.com/go-logr/logr v1.4.3
 	github.com/gruntwork-io/terratest v0.46.7

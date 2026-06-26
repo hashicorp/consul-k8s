@@ -5,6 +5,7 @@ go 1.26
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.13.4
 	github.com/hashicorp/consul-k8s/version => ../version
+	github.com/hashicorp/consul/api => /Users/bharath/hashicorp/consul/api
 )
 
 require (
