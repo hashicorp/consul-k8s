@@ -160,11 +160,6 @@ func TestFailover_Connect(t *testing.T) {
 			testClusters[keyCluster02a].primaryCluster = testClusters[keyCluster02a]
 			testClusters[keyCluster03a].primaryCluster = testClusters[keyCluster03a]
 
-			// Setup Namespaces.
-			for _, v := range testClusters {
-				createNamespaces(t, cfg, v.context)
-			}
-
 			commonHelmValues := map[string]string{
 				"global.peering.enabled": "true",
 
@@ -325,6 +320,17 @@ func TestFailover_Connect(t *testing.T) {
 			// Wait for the clusters to start up
 			logger.Log(t, "waiting for clusters to start up . . .")
 			wg.Wait()
+
+			// Set up the test namespaces after the Helm install completes. On
+			// OpenShift the pre-install cleanup deletes any stale ns1/ns2 namespaces
+			// before each install, so they must be (re)created here, after the
+			// install, to mirror the ordering used by the partitions tests. Creating
+			// them after the install also ensures their teardown runs before Consul is
+			// uninstalled, so app pods with Consul finalizers are removed while
+			// connect-inject is still running.
+			for _, v := range testClusters {
+				createNamespaces(t, cfg, v.context)
+			}
 
 			// Create a ProxyDefaults resource to configure services to use the mesh
 			// gateways and set server and client opts.
