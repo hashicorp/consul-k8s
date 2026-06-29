@@ -438,8 +438,13 @@ func createRoute(t *testing.T, client client.Client, name, namespace, parent, ta
 		},
 	}
 
-	err := client.Create(context.Background(), route)
-	require.NoError(t, err)
+	// Retry the create to tolerate a stale route from a previous run that is
+	// still terminating (finalizer held), which yields "object is being
+	// deleted: already exists" until cleanup completes.
+	retryCheck(t, 30, func(r *retry.R) {
+		err := client.Create(context.Background(), route)
+		require.NoError(r, err)
+	})
 	return route
 }
 
