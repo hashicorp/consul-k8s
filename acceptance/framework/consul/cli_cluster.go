@@ -5,6 +5,7 @@ package consul
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -144,6 +145,14 @@ func (c *CLICluster) Create(t *testing.T) {
 	// Match the timeout for the helm tests.
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
+
+	// On OpenShift, clean up any stale consul Helm releases across all namespaces before
+	// installing. A previous failed/interrupted test may have left a release in a different
+	// namespace (e.g. "default") which causes `consul-k8s install` to refuse with
+	// "A Consul cluster is already installed".
+	if c.enableOpenshift {
+		c.cleanupStaleConsulReleasesAllNamespaces(t)
+	}
 
 	// On OpenShift, transient Kubernetes API errors (e.g. context deadline exceeded from
 	// admission webhooks) can cause the install to fail. Wrap the install in a retry loop
@@ -339,6 +348,52 @@ func (c *CLICluster) setKube(args []string) []string {
 	}
 
 	return args
+}
+
+// cleanupStaleConsulReleasesAllNamespaces finds and force-removes any stale consul
+// Helm releases across all namespaces using helm directly (with --no-hooks to bypass
+// the gateway-cleanup job that may hang on a failed cluster). This prevents
+// `consul-k8s install` from refusing with "A Consul cluster is already installed".
+func (c *CLICluster) cleanupStaleConsulReleasesAllNamespaces(t *testing.T) {
+	t.Helper()
+
+	// Build helm options with no namespace so helm list -A searches everywhere.
+	koptsCopy := *c.kubectlOptions
+	koptsCopy.Namespace = ""
+	optsCopy := *c.helmOptions
+	optsCopy.KubectlOptions = &koptsCopy
+
+	output, err := helm.RunHelmCommandAndGetOutputE(t, &optsCopy, "list", "-A", "--output", "json")
+	if err != nil {
+		c.logger.Logf(t, "warning: failed to list helm releases for pre-install cleanup: %s", err)
+		return
+	}
+
+	var releases []struct {
+		Name      string `json:"name"`
+		Namespace string `json:"namespace"`
+		Chart     string `json:"chart"`
+	}
+	if err := json.Unmarshal([]byte(output), &releases); err != nil {
+		c.logger.Logf(t, "warning: failed to parse helm list output for pre-install cleanup: %s", err)
+		return
+	}
+
+	for _, release := range releases {
+		if !strings.Contains(release.Chart, "consul") {
+			continue
+		}
+		c.logger.Logf(t, "Removing stale consul Helm release %s in namespace %s before CLI install", release.Name, release.Namespace)
+		nsKopts := *c.kubectlOptions
+		nsKopts.Namespace = release.Namespace
+		nsOpts := *c.helmOptions
+		nsOpts.KubectlOptions = &nsKopts
+		if _, delErr := helm.RunHelmCommandAndGetOutputE(t, &nsOpts,
+			"uninstall", release.Name, "--no-hooks", "--timeout", "30s",
+		); delErr != nil {
+			c.logger.Logf(t, "warning: failed to uninstall stale release %s/%s: %s", release.Namespace, release.Name, delErr)
+		}
+	}
 }
 
 // isCLIOutputRetryable reports whether the CLI stdout output from a failed
