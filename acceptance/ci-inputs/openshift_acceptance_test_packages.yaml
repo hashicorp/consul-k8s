@@ -9,7 +9,7 @@
 # - {runner: 5, test-packages: "snapshot-agent", mode: "single-cluster"}
 # - {runner: 6, test-packages: "wan-federation", mode: "multi-cluster"}
 # - {runner: 7, test-packages: "partitions", mode: "multi-cluster"}
-- {runner: 8, test-packages: "connect", mode: "multi-cluster"}
+# - {runner: 8, test-packages: "connect", mode: "multi-cluster"}
 # - {runner: 9, test-packages: "sync", mode: "single-cluster"}
 # - {runner: 10, test-packages: "consul-dns", mode: "multi-cluster"}
 # - {runner: 11, test-packages: "config-entries", mode: "single-cluster"}

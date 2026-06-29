@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -438,14 +439,57 @@ func createRoute(t *testing.T, client client.Client, name, namespace, parent, ta
 		},
 	}
 
-	// Retry the create to tolerate a stale route from a previous run that is
-	// still terminating (finalizer held), which yields "object is being
-	// deleted: already exists" until cleanup completes.
+	// Remove any stale route of the same name left over from a previous run
+	// before creating. On reused clusters (e.g. -no-cleanup-on-failure) a route
+	// can be stuck Terminating because its finalizer was never cleared after the
+	// prior release's controller was torn down, which makes Create fail with
+	// "object is being deleted: already exists".
+	deleteStaleRoute(t, client, name, namespace)
+
 	retryCheck(t, 30, func(r *retry.R) {
 		err := client.Create(context.Background(), route)
 		require.NoError(r, err)
 	})
 	return route
+}
+
+// deleteStaleRoute ensures no HTTPRoute with the given name/namespace exists
+// before a new one is created. It force-removes finalizers so a route that is
+// stuck Terminating (its controller is gone) can be garbage collected, then
+// waits until the object is fully deleted.
+func deleteStaleRoute(t *testing.T, c client.Client, name, namespace string) {
+	t.Helper()
+	key := types.NamespacedName{Name: name, Namespace: namespace}
+
+	retryCheck(t, 30, func(r *retry.R) {
+		var route gwv1beta1.HTTPRoute
+		err := c.Get(context.Background(), key, &route)
+		if apierrors.IsNotFound(err) {
+			return
+		}
+		require.NoError(r, err)
+
+		// Clear finalizers so a route stuck Terminating can be collected.
+		if len(route.Finalizers) > 0 {
+			route.Finalizers = nil
+			if err := c.Update(context.Background(), &route); err != nil &&
+				!apierrors.IsNotFound(err) && !apierrors.IsConflict(err) {
+				require.NoError(r, err)
+			}
+		}
+
+		// Trigger deletion if it is not already being deleted.
+		if route.DeletionTimestamp.IsZero() {
+			if err := c.Delete(context.Background(), &route); err != nil &&
+				!apierrors.IsNotFound(err) {
+				require.NoError(r, err)
+			}
+		}
+
+		// Retry until the route is fully gone.
+		err = c.Get(context.Background(), key, &route)
+		require.True(r, apierrors.IsNotFound(err), "stale route %q still exists", name)
+	})
 }
 
 func createGateway(t *testing.T, client client.Client, name, namespace, gatewayClass, certificate string) *gwv1beta1.Gateway {
