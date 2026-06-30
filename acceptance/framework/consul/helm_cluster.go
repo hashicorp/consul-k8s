@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -33,6 +33,14 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
+)
+
+const (
+	retryWaitDuration        = 20 * time.Second
+	retryMaxCount            = 5
+	staleConsulLabelSelector = "chart=consul-helm"
+	openShiftCleanupWait     = 20 * time.Second
+	openShiftCleanupCount    = 5
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -56,9 +64,11 @@ type HelmCluster struct {
 	releaseName        string
 	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
+	isOpenShiftGTE419  bool
 	noCleanupOnFailure bool
 	noCleanup          bool
 	debugDirectory     string
+	enableOpenshift    bool
 	logger             terratestLogger.TestLogger
 }
 
@@ -69,6 +79,7 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
+
 	if cfg.EnableRestrictedPSAEnforcement {
 		configureNamespace(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
@@ -78,6 +89,7 @@ func NewHelmCluster(
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
+		ensureNamespaceExists(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace)
 		configureSCCs(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
@@ -93,6 +105,10 @@ func NewHelmCluster(
 	// Merge all helm values
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
+
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		applyOpenShiftDefaults(t, cfg, values)
+	}
 
 	logger := terratestLogger.New(logger.TestLogger{})
 
@@ -118,18 +134,68 @@ func NewHelmCluster(
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
+		isOpenShiftGTE419:  cfg.IsOpenshiftGreaterThan4_18,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
+		enableOpenshift:    cfg.EnableOpenshift || cfg.UseOpenshift,
 		logger:             logger,
 	}
+}
+
+func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[string]string) {
+	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
+	// attempt to adopt or create them for per-test releases.
+	//4.18 either manageExternalCRDs or manageNonStandardCRDs will true with enableTcpRoute true
+	//4.19 pass flag isOCPGreaterThan4_18 to true
+	// OpenShift clusters can already have Gateway API CRDs managed outside this Helm release.
+	// Disable external CRD management to avoid Helm ownership conflicts during install.
+	values["global.openshift.enabled"] = "true"
+	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
+	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
+	//It will install the tcproute gateway.networking.k8s.io/v1alpha2 CRD
+	//& gateway controller will be watching for tcproutes in the cluster.
+	values["global.openshift.crds.enableTcpRoute"] = "true"
+
+	//Only installing custom gateway API CRDs in OpenShift for API Gateway tests.
+	//For other tests packages, we can rely on the standard Gateway API CRDs and avoid installing any custom CRDs.
+	if strings.HasPrefix(t.Name(), "TestAPIGateway") {
+		//To install custom gateway API CRDs in OpenShift for API Gateway tests,
+		//we need to enable the consulapi CRDs since the custom gateway API CRDs depend on some of the consulapi CRDs.
+		values["global.openshift.crds.consulapi.enabled"] = "true"
+	}
+
+	if cfg.IsOpenshiftGreaterThan4_18 {
+		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.18 and later.
+		values["global.openshift.isOcpGreaterthan4_18"] = "true"
+	}
+
+	// OpenShift's default security context constraints can cause issues with Helm test cleanup,
+	// so we set the affinity to null to allow the chart's default anti-affinity rules to take effect.
+	values["server.affinity"] = "null"
+
+	// OpenShift: Override container security context to allow OpenShift SCCs to manage permissions
+	// We need to disable runAsNonRoot since the Consul image runs as root by default
+	// OpenShift SCCs will manage the actual user/group assignments
+
+	// Must provide full security context when overriding to avoid using restrictedSecurityContext helper
+	values["server.containerSecurityContext.server.allowPrivilegeEscalation"] = "false"
+	values["server.containerSecurityContext.server.runAsNonRoot"] = "false"
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
 
 	// check and remove any CRDs with finalizers
-	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	if !h.enableOpenshift {
+		helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	} else {
+		helpers.GetCRDRemoveFinalizersForCRDNames(t, h.helmOptions.KubectlOptions, helpers.OpenShiftCleanupCRDs(!h.isOpenShiftGTE419))
+	}
+
+	if h.enableOpenshift && !h.SkipCheckForPreviousInstallations {
+		h.cleanupOpenShiftBeforeInstall(t)
+	}
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
@@ -158,10 +224,44 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
-		require.NoError(r, err)
-	})
+	if !h.enableOpenshift {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+			err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			require.NoError(r, err)
+		})
+	} else {
+		retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+			logger.Logf(t, "Installing Helm chart %s with release name %s in namespace %s", chartName, h.releaseName, h.helmOptions.KubectlOptions.Namespace)
+			err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			if err != nil && strings.Contains(err.Error(), "has no deployed releases") {
+				//TODO:: recheck this
+				// Helm can leave a release in history-only state; remove it so upgrade --install can succeed.
+				logger.Logf(t, "Release %s is in history-only state, deleting release and retrying install: %s", h.releaseName, err)
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+				logger.Logf(t, "Gateway cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
+				h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			if err != nil && isGatewayResourcesAlreadyExistsError(err) {
+				logger.Logf(t, "Gateway resources already exist for release %s, deleting resources and retrying install: %s", h.releaseName, err)
+				h.deleteGatewayResourcesJobIfExistsForRelease(r, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			if err != nil && isServerACLInitCleanupAlreadyExistsError(err) {
+				logger.Logf(t, "Server ACL init cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
+				h.deleteServerACLInitCleanupJobIfExistsForRelease(r, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			if err != nil && isRetryableHelmInstallError(err) {
+				r.Errorf("retrying helm upgrade for release %s after transient Kubernetes API error: %v", h.releaseName, err)
+				return
+			}
+			require.NoError(r, err)
+		})
+	}
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -179,9 +279,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
-	var gatewayClassList gwv1beta1.GatewayClassList
+	var gatewayClassList gwv1.GatewayClassList
 	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
 	}) == nil {
@@ -204,10 +304,30 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		require.NoError(r, err)
-	})
+	if !h.enableOpenshift {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+			err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			require.NoError(r, err)
+		})
+	} else {
+		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+			err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+				h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
+				err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			}
+			if err != nil && h.enableOpenshift {
+				// In OpenShift acceptance runs, uninstall hooks can fail due to stale/missing
+				// cluster-scoped CRD state. Fall back to no-hooks uninstall so cleanup remains best-effort.
+				h.logger.Logf(r, "Helm delete failed for release %s in OpenShift, falling back to no-hooks uninstall: %v", h.releaseName, err)
+				err = h.uninstallReleaseNoHooks(t, h.releaseName)
+			}
+			// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
+			if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
+				require.NoError(r, err)
+			}
+		})
+	}
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
@@ -281,9 +401,16 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, service := range services.Items {
 			if strings.Contains(service.Name, h.releaseName) {
-				err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
-				if !errors.IsNotFound(err) {
-					require.NoError(r, err)
+				if !h.enableOpenshift {
+					err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				} else {
+					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, h.cleanupDeleteOptions())
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
 				}
 			}
 		}
@@ -328,6 +455,30 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 
+		if h.enableOpenshift {
+			mutatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range mutatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), webhookConfig.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				}
+			}
+
+			validatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range validatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.Background(), webhookConfig.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				}
+			}
+		}
+
 		// Delete any secrets that have h.releaseName in their name.
 		secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
@@ -345,9 +496,16 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, job := range jobs.Items {
 			if strings.Contains(job.Name, h.releaseName) {
-				err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
-				if !errors.IsNotFound(err) {
-					require.NoError(r, err)
+				if !h.enableOpenshift {
+					err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				} else {
+					err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, h.cleanupDeleteOptions())
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
 				}
 			}
 		}
@@ -622,6 +780,22 @@ func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.T
 	}
 
 	require.Failf(t, "Failed to create or update namespace", "Namespace=%s, CreateError=%s, UpdateError=%s", namespace, createErr, updateErr)
+}
+
+// ensureNamespaceExists creates the given namespace if it does not already exist.
+func ensureNamespaceExists(t *testing.T, client kubernetes.Interface, namespace string) {
+	t.Helper()
+	_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err = client.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
 }
 
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
