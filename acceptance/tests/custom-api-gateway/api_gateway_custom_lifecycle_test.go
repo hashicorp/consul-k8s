@@ -366,6 +366,7 @@ func checkConsulRouteParent(t *testing.T, client *api.Client, name, parent strin
 	})
 }
 
+// checkEmptyRoute verifies that the specified HTTPRoute has no parents.
 func checkEmptyRoute(t *testing.T, client client.Client, name, namespace string) {
 	t.Helper()
 
