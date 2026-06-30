@@ -62,6 +62,8 @@ type TestFlags struct {
 
 	flagDualStack bool
 
+	flagIsOpenshiftGreaterThan4_18 bool
+
 	once sync.Once
 }
 
@@ -166,6 +168,8 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagDualStack, "dual-stack", false, "Dual stack test with both IPv4 and IPv6")
 
+	flag.BoolVar(&t.flagIsOpenshiftGreaterThan4_18, "is-openshift-greater-than-4-18", true, "Indicates if the OpenShift version is greater than 4.18, which is relevant for certain test cases that depend on features available in OpenShift 4.18 and later.")
+
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
 	}
@@ -242,16 +246,17 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		VaultHelmChartVersion:  t.flagVaultHelmChartVersion,
 		VaultServerVersion:     t.flagVaultServerVersion,
 
-		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
-		NoCleanup:          t.flagNoCleanup,
-		DebugDirectory:     tempDir,
-		UseAKS:             t.flagUseAKS,
-		UseEKS:             t.flagUseEKS,
-		UseGKE:             t.flagUseGKE,
-		UseGKEAutopilot:    t.flagUseGKEAutopilot,
-		UseKind:            t.flagUseKind,
-		UseOpenshift:       t.flagUseOpenshift,
-		DualStack:          t.flagDualStack,
+		NoCleanupOnFailure:         t.flagNoCleanupOnFailure,
+		NoCleanup:                  t.flagNoCleanup,
+		DebugDirectory:             tempDir,
+		UseAKS:                     t.flagUseAKS,
+		UseEKS:                     t.flagUseEKS,
+		UseGKE:                     t.flagUseGKE,
+		UseGKEAutopilot:            t.flagUseGKEAutopilot,
+		UseKind:                    t.flagUseKind,
+		UseOpenshift:               t.flagUseOpenshift,
+		DualStack:                  t.flagDualStack,
+		IsOpenshiftGreaterThan4_18: t.flagIsOpenshiftGreaterThan4_18,
 	}
 
 	return c

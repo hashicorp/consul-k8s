@@ -4,7 +4,9 @@
 package connect
 
 import (
+	"bytes"
 	"context"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
@@ -74,11 +76,31 @@ func deployStaticServer(t *testing.T, cfg *config.TestConfig, ch connhelper.Conn
 func writeCrd(t *testing.T, ch connhelper.ConnectHelper, path string) {
 	t.Helper()
 
+	opts := ch.Ctx.KubectlOptions(t)
+	applyPath := path
+
+	// On OpenShift, fixtures may have a hardcoded namespace (e.g. "default") that
+	// conflicts when the test runs in a different namespace (e.g. "consul").
+	// Substitute the namespace inline so the fixture file itself stays unchanged.
+	if ch.Cfg.EnableOpenshift && opts.Namespace != "" && opts.Namespace != "default" {
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		content = bytes.ReplaceAll(content, []byte("namespace: default"), []byte("namespace: "+opts.Namespace))
+		f, err := os.CreateTemp("", "crd-*.yaml")
+		require.NoError(t, err)
+		_, err = f.Write(content)
+		require.NoError(t, err)
+		f.Close()
+		applyPath = f.Name()
+		// Remove temp file after the kubectl delete cleanup runs (LIFO order).
+		t.Cleanup(func() { os.Remove(applyPath) })
+	}
+
 	t.Cleanup(func() {
-		_, _ = k8s.RunKubectlAndGetOutputE(t, ch.Ctx.KubectlOptions(t), "delete", "-f", path)
+		_, _ = k8s.RunKubectlAndGetOutputE(t, opts, "delete", "-f", applyPath)
 	})
 
-	_, err := k8s.RunKubectlAndGetOutputE(t, ch.Ctx.KubectlOptions(t), "apply", "-f", path)
+	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "apply", "-f", applyPath)
 	require.NoError(t, err)
 }
 

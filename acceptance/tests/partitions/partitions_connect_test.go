@@ -95,9 +95,8 @@ func TestPartitions_Connect(t *testing.T) {
 				"global.adminPartitions.enabled": "true",
 				"global.enableConsulNamespaces":  "true",
 				"global.logLevel":                "debug",
-
-				"global.tls.enabled":   "true",
-				"global.tls.httpsOnly": strconv.FormatBool(c.ACLsEnabled),
+				"global.tls.enabled":             "true",
+				"global.tls.httpsOnly":           strconv.FormatBool(c.ACLsEnabled),
 
 				"global.acls.manageSystemACLs": strconv.FormatBool(c.ACLsEnabled),
 
