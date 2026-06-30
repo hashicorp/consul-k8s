@@ -41,7 +41,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
-	defaultNamespace := "default"
+	defaultNamespace := ctx.KubectlOptions(t).Namespace
 
 	// create a service to target
 	targetName := "static-server"
@@ -54,6 +54,9 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: gatewayClassConfigName,
 		},
+	}
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
 	}
 	logger.Log(t, "creating gateway class config")
 	err := k8sClient.Create(context.Background(), gatewayClassConfig)
@@ -201,6 +204,7 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	logger.Log(t, "marking gateway two as using TCP")
 	updateKubernetes(t, k8sClient, controlledGatewayTwo, func(g *gwv1.Gateway) {
 		g.Spec.Listeners[0].Protocol = gwv1.TCPProtocolType
+		g.Spec.Listeners[0].TLS = nil
 	})
 
 	// check that the route is unbound and all Consul objects and Kubernetes statuses are cleaned up
@@ -263,9 +267,11 @@ func TestAPIGateway_Lifecycle(t *testing.T) {
 	// check that the Kubernetes gateway is cleaned up
 	logger.Log(t, "checking that gateway one is cleaned up in Kubernetes")
 	retryCheck(t, 60, func(r *retry.R) {
+		var route gwv1.Gateway
 		var gw gwv1.Gateway
-
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &gw)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &route)
+		require.NoError(r, err)
+		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: controlledGatewayOneName, Namespace: defaultNamespace}, &gw)
 		require.NoError(r, err)
 
 		require.Len(r, gw.Finalizers, 0)
@@ -388,6 +394,7 @@ func updateKubernetes[T client.Object](t *testing.T, k8sClient client.Client, o 
 
 func createRoute(t *testing.T, client client.Client, name, namespace, parent, target string) *gwv1.HTTPRoute {
 	t.Helper()
+	targetPort := gwv1.PortNumber(80)
 
 	route := &gwv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
@@ -403,7 +410,10 @@ func createRoute(t *testing.T, client client.Client, name, namespace, parent, ta
 			Rules: []gwv1.HTTPRouteRule{
 				{BackendRefs: []gwv1.HTTPBackendRef{
 					{BackendRef: gwv1.BackendRef{
-						BackendObjectReference: gwv1.BackendObjectReference{Name: gwv1.ObjectName(target)},
+						BackendObjectReference: gwv1.BackendObjectReference{
+							Name: gwv1.ObjectName(target),
+							Port: &targetPort,
+						},
 					}},
 				}},
 			},
