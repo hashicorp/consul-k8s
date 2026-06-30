@@ -1,6 +1,9 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+# This fixture is for OpenShift WITHOUT CNI enabled.
+# For OpenShift WITH CNI, use static-server-openshift-cni instead.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -10,7 +13,12 @@ spec:
     metadata:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
-        "k8s.v1.cni.cncf.io/networks": '[{ "name":"consul-cni" }]'
+        # On OpenShift without CNI, prevent the webhook from rewriting the app container's
+        # readiness probe to point at Envoy. The exec probe (test ! -f /tmp/unhealthy) runs
+        # directly on the container and passes immediately; consul-dataplane's own probe
+        # is unaffected. Transparent proxy (iptables redirection) remains enabled so that
+        # the curl-based connection check via http://static-server works correctly.
+        "consul.hashicorp.com/transparent-proxy-overwrite-probes": "false"
     spec:
       containers:
         - name: static-server

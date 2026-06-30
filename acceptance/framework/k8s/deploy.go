@@ -51,6 +51,38 @@ func Deploy(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, 
 // sets up a cleanup function and waits for the deployment to become available.
 func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string) {
 	t.Helper()
+	DeployKustomizeWithTimeout(t, options, noCleanupOnFailure, noCleanup, debugDirectory, kustomizeDir, "5m")
+}
+
+// DeployKustomizeNoWait applies the kustomize directory and registers a cleanup function but does NOT
+// run kubectl wait. Use this on platforms where kubectl wait is unreliable (e.g. OpenShift with external
+// servers) and follow it with WaitForPodsRunningPhase to gate on pod Running phase via the k8s API.
+func DeployKustomizeNoWait(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string) {
+	t.Helper()
+
+	KubectlApplyK(t, options, kustomizeDir)
+
+	output, err := RunKubectlAndGetOutputE(t, options, "kustomize", kustomizeDir)
+	require.NoError(t, err)
+
+	deployment := v1.Deployment{}
+	err = yaml.NewYAMLOrJSONDecoder(strings.NewReader(output), 1024).Decode(&deployment)
+	require.NoError(t, err)
+
+	helpers.Cleanup(t, noCleanupOnFailure, noCleanup, func() {
+		// Note: this delete command won't wait for pods to be fully terminated.
+		// This shouldn't cause any test pollution because the underlying
+		// objects are deployments, and so when other tests create these
+		// they should have different pod names.
+		WritePodsDebugInfoIfFailed(t, options, debugDirectory, labelMapToString(deployment.GetLabels()))
+		KubectlDeleteK(t, options, kustomizeDir)
+	})
+}
+
+// DeployKustomizeWithTimeout is like DeployKustomize but accepts a custom kubectl wait timeout string (e.g. "10m").
+// Use this when a platform (e.g. OpenShift) needs a longer wait for connect-init to complete.
+func DeployKustomizeWithTimeout(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory string, kustomizeDir string, timeout string) {
+	t.Helper()
 
 	KubectlApplyK(t, options, kustomizeDir)
 
@@ -71,7 +103,7 @@ func DeployKustomize(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailu
 	})
 
 	// The timeout to allow for connect-init to wait for services to be registered by the endpoints controller.
-	RunKubectl(t, options, "wait", "--for=condition=available", "--timeout=5m", fmt.Sprintf("deploy/%s", deployment.Name))
+	RunKubectl(t, options, "wait", "--for=condition=available", fmt.Sprintf("--timeout=%s", timeout), fmt.Sprintf("deploy/%s", deployment.Name))
 }
 
 func DeployJob(t *testing.T, options *k8s.KubectlOptions, noCleanupOnFailure bool, noCleanup bool, debugDirectory, kustomizeDir string) {

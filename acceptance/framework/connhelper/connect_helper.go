@@ -157,6 +157,15 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 		} else {
 			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
 		}
+	} else if c.Cfg.EnableOpenshift {
+		// On OpenShift without CNI, use the OCP-specific fixtures which set
+		// transparent-proxy-overwrite-probes=false to avoid probe rewriting issues.
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
+		if c.Cfg.EnableTransparentProxy {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
+		} else {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
+		}
 	} else {
 		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
 		if c.Cfg.EnableTransparentProxy {
@@ -186,8 +195,8 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 func (c *ConnectHelper) CreateNamespace(t *testing.T, namespace string) {
 	opts := c.Ctx.KubectlOptions(t)
-	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
-	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+	output, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+	if err != nil && (strings.Contains(err.Error(), "AlreadyExists") || strings.Contains(output, "AlreadyExists")) {
 		return
 	}
 	require.NoError(t, err)
@@ -353,22 +362,47 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts) {
 		destinationNamespace = opts.DestinationNamespace
 	}
 
-	retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-			Kind:      api.ServiceIntentions,
-			Name:      StaticServerName,
-			Namespace: destinationNamespace,
-			Sources: []*api.SourceIntention{
-				{
-					Namespace: sourceNamespace,
-					Name:      client,
-					Action:    api.IntentionActionAllow,
+	if c.Cfg.EnableOpenshift || c.Cfg.UseOpenshift {
+		retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+		retry.RunWith(retrier, t, func(r *retry.R) {
+			intention := &api.ServiceIntentionsConfigEntry{
+				Kind: api.ServiceIntentions,
+				Name: StaticServerName,
+				Sources: []*api.SourceIntention{
+					{
+						Name:   client,
+						Action: api.IntentionActionAllow,
+					},
 				},
-			},
-		}, nil)
-		require.NoError(r, err)
-	})
+			}
+
+			// Only set namespace fields if Consul namespaces are enabled
+			if c.HelmValues["global.enableConsulNamespaces"] == "true" {
+				intention.Namespace = destinationNamespace
+				intention.Sources[0].Namespace = sourceNamespace
+			}
+
+			_, _, err := c.ConsulClient.ConfigEntries().Set(intention, nil)
+			require.NoError(r, err)
+		})
+	} else {
+		retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+		retry.RunWith(retrier, t, func(r *retry.R) {
+			_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+				Kind:      api.ServiceIntentions,
+				Name:      StaticServerName,
+				Namespace: destinationNamespace,
+				Sources: []*api.SourceIntention{
+					{
+						Namespace: sourceNamespace,
+						Name:      client,
+						Action:    api.IntentionActionAllow,
+					},
+				},
+			}, nil)
+			require.NoError(r, err)
+		})
+	}
 }
 
 // TestConnectionSuccess ensures the static-server pod can connect to the

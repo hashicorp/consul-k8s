@@ -36,8 +36,8 @@ func GenerateGossipSecret() (string, error) {
 func ConfigurePKICerts(t *testing.T,
 	vaultClient *vapi.Client, baseUrl, allowedSubdomain, roleName, ns, datacenter,
 	maxTTL string) string {
-	allowedDomains := fmt.Sprintf("%s.consul,%s,%s.%s,%s.%s.svc,%s.default.svc.cluster.local", datacenter,
-		allowedSubdomain, allowedSubdomain, ns, allowedSubdomain, ns, allowedSubdomain)
+	allowedDomains := fmt.Sprintf("%s.consul,%s,%s.%s,%s.%s.svc,%s.%s.svc.cluster.local", datacenter,
+		allowedSubdomain, allowedSubdomain, ns, allowedSubdomain, ns, allowedSubdomain, ns)
 	params := map[string]interface{}{
 		"allowed_domains":    allowedDomains,
 		"allow_bare_domains": "true",

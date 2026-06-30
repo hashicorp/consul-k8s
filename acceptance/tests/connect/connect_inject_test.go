@@ -223,7 +223,13 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 				// because golang will execute them in reverse order i.e. the last registered
 				// cleanup function will be executed first.
 				t.Cleanup(func() {
-					retrier := &retry.Timer{Timeout: 5 * time.Minute, Wait: 1 * time.Second}
+					aclTimeout := 5 * time.Minute
+					if cfg.EnableOpenshift {
+						// On OCP the endpoints controller may take longer to clean up ACL tokens
+						// for pods deleted mid-test (e.g. pods recycled during SA patching).
+						aclTimeout = 10 * time.Minute
+					}
+					retrier := &retry.Timer{Timeout: aclTimeout, Wait: 1 * time.Second}
 					retry.RunWith(retrier, t, func(r *retry.R) {
 						tokens, _, err := consulClient.ACL().TokenList(nil)
 						require.NoError(r, err)
@@ -238,8 +244,38 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			}
 
 			logger.Log(t, "creating multiport static-server and static-client deployments")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
+			if cfg.EnableOpenshift {
+				// On OCP/OVN-Kubernetes, consul-dataplane's TCPSocket readiness probe (port 20000)
+				// only passes once envoy has received full xDS config. OVN-K8s disrupts long-lived
+				// gRPC streams to headless service pod IPs, so xDS may not complete before any
+				// fixed timeout. Using WaitForPodsRunningPhase (phase==Running, not Ready) avoids
+				// the deadlock — the connection-check retry loop below provides the actual gate.
+				namespace := ctx.KubectlOptions(t).Namespace
+				k8s.DeployKustomizeNoWait(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
+				k8s.DeployKustomizeNoWait(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
+				// OCP 4.x: sa.Secrets only contains the dockercfg image-pull secret, not the
+				// kubernetes.io/service-account-token secret. The webhook picks sa.Secrets[0]
+				// (dockercfg) and mounts it, causing init containers to fail with
+				// "open /consul/serviceaccount-<svc>/token: no such file or directory".
+				// Patch both SAs so the token secret (named after the SA) appears in sa.Secrets,
+				// then delete any pods admitted before the patch so they are recreated correctly.
+				for _, saName := range []string{multiport, multiportAdmin} {
+					retrier := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+					retry.RunWith(retrier, t, func(r *retry.R) {
+						_, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(t),
+							"patch", "sa", saName,
+							"--type=merge",
+							fmt.Sprintf(`-p={"secrets":[{"name":"%s"}]}`, saName))
+						require.NoError(r, err)
+					})
+				}
+				k8s.RunKubectl(t, ctx.KubectlOptions(t), "delete", "pods", "--ignore-not-found", "-l", "app=multiport")
+				k8s.WaitForPodsRunningPhase(t, ctx.KubernetesClient(t), namespace, "app=multiport")
+				k8s.WaitForPodsRunningPhase(t, ctx.KubernetesClient(t), namespace, "app=static-client")
+			} else {
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/multiport-app")
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-inject-multiport")
+			}
 
 			// Check that static-client has been injected and now has 2 containers.
 			podList, err := ctx.KubernetesClient(t).CoreV1().Pods(ctx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{
@@ -300,7 +336,13 @@ func TestConnectInject_MultiportServices(t *testing.T) {
 			// pod to static-server.
 
 			// Deploy static-server.
-			k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			if cfg.EnableOpenshift {
+				namespace := ctx.KubectlOptions(t).Namespace
+				k8s.DeployKustomizeNoWait(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+				k8s.WaitForPodsRunningPhase(t, ctx.KubernetesClient(t), namespace, "app=static-server")
+			} else {
+				k8s.DeployKustomize(t, ctx.KubectlOptions(t), cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			}
 
 			// For outbound connections from the multi port pod, only intentions from the first service in the multiport
 			// pod need to be created, since all upstream connections are made through the first service's envoy proxy.

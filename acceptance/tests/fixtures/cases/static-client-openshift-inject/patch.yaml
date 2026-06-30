@@ -1,6 +1,9 @@
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 
+# This fixture is for OpenShift WITHOUT CNI enabled.
+# For OpenShift WITH CNI, use static-client-openshift-inject-cni instead.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,4 +14,9 @@ spec:
       annotations:
         "consul.hashicorp.com/connect-inject": "true"
         "consul.hashicorp.com/connect-service-upstreams": "static-server:1234"
-        "k8s.v1.cni.cncf.io/networks": '[{ "name":"consul-cni" }]'
+        # On OpenShift without CNI, transparent proxy relies on iptables redirection.
+        # Explicitly disable it so the webhook does not rewrite readiness probes to
+        # point at Envoy (which may fail while Envoy waits for xDS config from the
+        # external Consul server). Explicit upstream annotations are used instead.
+        "consul.hashicorp.com/transparent-proxy": "false"
+        "consul.hashicorp.com/transparent-proxy-overwrite-probes": "false"
