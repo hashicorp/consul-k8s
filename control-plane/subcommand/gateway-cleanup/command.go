@@ -14,6 +14,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/mitchellh/cli"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -168,8 +169,7 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 	config := &v1alpha1.GatewayClassConfig{}
 	err := c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
 	if err != nil {
-
-		if k8serrors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) || meta.IsNoMatchError(err) {
 			// no gateway class config, just ignore and return
 			return nil
 		}
@@ -185,7 +185,7 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 	gatewayClass := &gwv1.GatewayClass{}
 	err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
 	if err != nil {
-		if k8serrors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) || meta.IsNoMatchError(err) {
 			// no gateway class, just ignore and return
 			return nil
 		}
@@ -199,12 +199,12 @@ func (c *Command) deleteGatewayClassAndGatewayClasConfig() error {
 	// make sure they're gone
 	if err := backoff.Retry(func() error {
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassConfigName}, config)
-		if err == nil || !k8serrors.IsNotFound(err) {
+		if err == nil || (!k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err)) {
 			return errors.New("gateway class config still exists")
 		}
 
 		err = c.k8sClient.Get(context.Background(), types.NamespacedName{Name: c.flagGatewayClassName}, gatewayClass)
-		if err == nil || !k8serrors.IsNotFound(err) {
+		if err == nil || (!k8serrors.IsNotFound(err) && !meta.IsNoMatchError(err)) {
 			return errors.New("gateway class still exists")
 		}
 

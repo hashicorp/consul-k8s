@@ -34,12 +34,14 @@ func WritePodsDebugInfoIfFailed(t *testing.T, kubectlOptions *k8s.KubectlOptions
 
 		contextName := environment.KubernetesContextFromOptions(t, kubectlOptions)
 
-		// Create a directory for the test, first remove special characters from test name
+		// Create a directory for the test, first remove special characters from test name & contextname
+		// usually Openshift contextName have some special characters.
 		reg, err := regexp.Compile("[^A-Za-z0-9/_-]+")
 		if err != nil {
 			logger.Log(t, "unable to generate regex for test name special character replacement", "err", err)
 		}
 		tn := reg.ReplaceAllString(t.Name(), "_")
+		contextName = reg.ReplaceAllString(contextName, "_")
 
 		testDebugDirectory := filepath.Join(debugDirectory, tn, contextName)
 		require.NoError(t, os.MkdirAll(testDebugDirectory, 0755))
