@@ -31,6 +31,7 @@ const (
 	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
 	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
 	HTTPRoute_RouteTLSSDSFilterIndex  = "__httproute_referencing_routetlssdsfilter"
+	HTTPRoute_RouteExtProcIndex       = "__httproute_referencing_routeextproc"
 
 	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
 	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
@@ -155,6 +156,10 @@ var indexes = []index{
 	},
 	{
 		name:        HTTPRoute_RouteTLSSDSFilterIndex,
+		target:      &gwv1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{name: HTTPRoute_RouteExtProcIndex,
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},

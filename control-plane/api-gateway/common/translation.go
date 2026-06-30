@@ -188,6 +188,13 @@ func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.Rou
 	}
 }
 
+func (t ResourceTranslator) translateRouteExtProcFilter(routeExtProc *v1alpha1.RouteExtProc) api.ExtProcFilter {
+	return api.ExtProcFilter{
+		StatPrefix: routeExtProc.Spec.StatPrefix,
+		Mode:       routeExtProc.Spec.Mode,
+	}
+}
+
 func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
 	if policy == nil {
 		return nil, nil
@@ -392,6 +399,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter,
 		responseHeaderFilters = []api.HTTPHeaderFilter{}
 		jwtFilter             *api.JWTFilter
 		tlsConfig             *api.GatewayServiceTLSConfig
+		extProcFilters        []api.ExtProcFilter
 	)
 
 	// Convert Gateway API filters to portions of the Consul request and response filters.
@@ -479,6 +487,8 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter,
 						CertResource: routeTLSFilter.Spec.SDS.CertResource,
 					}}
 				}
+			case v1alpha1.RouteExtProcKind:
+				extProcFilters = append(extProcFilters, t.translateRouteExtProcFilter(crdFilter.(*v1alpha1.RouteExtProc)))
 			}
 		}
 	}
@@ -489,6 +499,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter,
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
 		JWT:           jwtFilter,
+		ExtProc:       extProcFilters,
 	}
 
 	responseFilter := api.HTTPResponseFilters{

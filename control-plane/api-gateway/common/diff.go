@@ -242,7 +242,8 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual) &&
+		slices.EqualFunc(a.Filters.ExtProc, b.Filters.ExtProc, e.extProcFiltersEqual)
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
@@ -293,6 +294,10 @@ func (e entryComparator) retryFiltersEqual(a, b api.RetryFilter) bool {
 
 func (e entryComparator) timeoutFiltersEqual(a, b api.TimeoutFilter) bool {
 	return a.RequestTimeout == b.RequestTimeout && a.IdleTimeout == b.IdleTimeout
+}
+
+func (e entryComparator) extProcFiltersEqual(a, b api.ExtProcFilter) bool {
+	return a.StatPrefix == b.StatPrefix && a.Mode == b.Mode
 }
 
 // jwtFiltersEqual compares the contents of the list of providers on the JWT filters for a route, returning true if the
