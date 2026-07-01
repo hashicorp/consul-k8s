@@ -6,11 +6,11 @@ replace github.com/hashicorp/consul-k8s/version => ../version
 
 replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
-replace github.com/hashicorp/consul/api => github.com/hashicorp/consul-enterprise/api v1.4.1-0.20260701092830-a98149b60ef1
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20260701104039-a0c11b9c505b
 
-replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul-enterprise/sdk v0.4.1-0.20260701092830-a98149b60ef1
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.18.1-0.20260701104039-a0c11b9c505b
 
-replace github.com/hashicorp/consul => github.com/hashicorp/consul-enterprise v1.11.1-0.20260701092830-a98149b60ef1
+replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260701104039-a0c11b9c505b
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
