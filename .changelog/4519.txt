@@ -1,0 +1,3 @@
+```release-note:bug
+control-plane: skip Ingress objects without HTTP rule to prevent segfault.
+```
