@@ -1391,9 +1391,16 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 								httpProbe := probe["httpGet"]
 								httpProbeMap := httpProbe.(map[string]any)
 								port := httpProbeMap["port"]
-								portNum := port.(float64)
-
-								overwritePorts = append(overwritePorts, strconv.Itoa(int(portNum)))
+								switch p := port.(type) {
+								case float64:
+									overwritePorts = append(overwritePorts, strconv.Itoa(int(p)))
+								case json.Number:
+									portInt, err := p.Int64()
+									require.NoError(t, err)
+									overwritePorts = append(overwritePorts, strconv.Itoa(int(portInt)))
+								default:
+									require.Failf(t, "unexpected probe port type", "got %T", port)
+								}
 							}
 						}
 					}
