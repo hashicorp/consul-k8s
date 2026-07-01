@@ -10,11 +10,13 @@ import (
 	"strings"
 
 	mapset "github.com/deckarep/golang-set"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 // override function for tests.
@@ -737,6 +739,44 @@ func (g authFilterValidationResult) resolvedRefsCondition(generation int64) meta
 		Reason:             "MissingJWTProviderReference",
 		ObservedGeneration: generation,
 		Message:            g.resolvedRefErr.Error(),
+		LastTransitionTime: now,
+	}
+}
+
+type extProcFilterValidationResults []extProcFilterValidationResult
+
+type extProcFilterValidationResult struct {
+	acceptedErr error
+}
+
+var (
+	errRouteExtProcOverridesWithoutOverrideMode = errors.New(`route ext_proc filter sets "overrides" but mode is not "override"`)
+)
+
+func (g extProcFilterValidationResults) Conditions(generation int64, idx int) []v1alpha1.Condition {
+	return g[idx].Conditions(generation)
+}
+
+func (g extProcFilterValidationResult) Conditions(generation int64) []v1alpha1.Condition {
+	return []v1alpha1.Condition{g.acceptedCondition(generation)}
+}
+
+func (g extProcFilterValidationResult) acceptedCondition(generation int64) v1alpha1.Condition {
+	now := timeFunc()
+	if g.acceptedErr != nil {
+		return v1alpha1.Condition{
+			Type:               "Accepted",
+			Status:             corev1.ConditionFalse,
+			Reason:             "Invalid",
+			Message:            g.acceptedErr.Error(),
+			LastTransitionTime: now,
+		}
+	}
+	return v1alpha1.Condition{
+		Type:               "Accepted",
+		Status:             corev1.ConditionTrue,
+		Reason:             "Accepted",
+		Message:            "route ext_proc filter accepted",
 		LastTransitionTime: now,
 	}
 }

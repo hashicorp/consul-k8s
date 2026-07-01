@@ -159,7 +159,8 @@ var indexes = []index{
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
-	{name: HTTPRoute_RouteExtProcIndex,
+	{
+		name:        HTTPRoute_RouteExtProcIndex,
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},

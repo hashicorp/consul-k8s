@@ -189,9 +189,37 @@ func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.Rou
 }
 
 func (t ResourceTranslator) translateRouteExtProcFilter(routeExtProc *v1alpha1.RouteExtProc) api.ExtProcFilter {
-	return api.ExtProcFilter{
+	filter := api.ExtProcFilter{
 		StatPrefix: routeExtProc.Spec.StatPrefix,
 		Mode:       routeExtProc.Spec.Mode,
+	}
+
+	if o := routeExtProc.Spec.Overrides; o != nil {
+		overrides := &api.ExtProcOverrides{
+			// MessageTimeout:   o.MessageTimeout,
+			// FailureModeAllow: o.FailureModeAllow,
+		}
+		if o.Processing != nil {
+			overrides.Processing = &api.ExtProcProcessing{
+				Request:  translateExtProcProcessingDirection(o.Processing.Request),
+				Response: translateExtProcProcessingDirection(o.Processing.Response),
+			}
+		}
+		filter.Overrides = overrides
+	}
+
+	return filter
+}
+
+func translateExtProcProcessingDirection(d *v1alpha1.RouteExtProcProcessingDirection) *api.ExtProcProcessingDirection {
+	if d == nil {
+		return nil
+	}
+	return &api.ExtProcProcessingDirection{
+		HeadersMode:  d.HeadersMode,
+		BodyMode:     d.BodyMode,
+		TrailersMode: d.TrailersMode,
+		MaxBodyBytes: d.MaxBodyBytes,
 	}
 }
 

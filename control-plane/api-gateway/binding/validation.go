@@ -805,6 +805,28 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 	return results
 }
 
+// validateExtProcFilters checks each RouteExtProc for internal consistency between
+// its Mode and Overrides. Invalid filters are surfaced as an unaccepted status
+// condition rather than being silently dropped. Results are index-aligned with the
+// input slice (nil entries produce a zero-value, accepted result).
+func validateExtProcFilters(extProcFilters []*v1alpha1.RouteExtProc) extProcFilterValidationResults {
+	results := make(extProcFilterValidationResults, 0, len(extProcFilters))
+
+	for _, filter := range extProcFilters {
+		var result extProcFilterValidationResult
+		if filter != nil {
+			switch strings.ToLower(filter.Spec.Mode) {
+			case "enabled", "disabled":
+				if filter.Spec.Overrides != nil {
+					result.acceptedErr = errRouteExtProcOverridesWithoutOverrideMode
+				}
+			}
+		}
+		results = append(results, result)
+	}
+	return results
+}
+
 // toNamespaceSet constructs a list of labels used to match a Namespace.
 func toNamespaceSet(name string, labels map[string]string) klabels.Labels {
 	// If namespace label is not set, implicitly insert it to support older Kubernetes versions
