@@ -8,6 +8,16 @@ const (
 
 	AnnotationGatewayClassConfig = "consul.hashicorp.com/gateway-class-config-custom"
 
+	// AnnotationExtAuthz toggles external authorization (ext_authz). On a Gateway
+	// it sets the gateway-wide default posture; on an HTTPRoute it overrides that
+	// default for every rule in the route. Supported values: "enabled", "disabled".
+	AnnotationExtAuthz = "consul.hashicorp.com/ext-authz"
+
+	// ExtAuthzEnabledValue / ExtAuthzDisabledValue are the supported values for
+	// AnnotationExtAuthz.
+	ExtAuthzEnabledValue  = "enabled"
+	ExtAuthzDisabledValue = "disabled"
+
 	// The following annotation keys are used in the v1beta1.GatewayTLSConfig's Options on a v1beta1.Listener.
 	TLSCipherSuitesAnnotationKey = "api-gateway-custom.consul.hashicorp.com/tls_cipher_suites"
 	TLSMaxVersionAnnotationKey   = "api-gateway-custom.consul.hashicorp.com/tls_max_version"
