@@ -1531,6 +1531,17 @@ func TestValidateAuthFilters(t *testing.T) {
 			}}),
 			expected: authFilterValidationResults{authFilterValidationResult{}},
 		},
+		"auth filter with only ext_authz and no JWT is valid": {
+			authFilters: []*v1alpha1.RouteAuthFilter{
+				{
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						ExtAuthz: &v1alpha1.RouteAuthFilterExtAuthz{Enabled: true},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{}),
+			expected:  authFilterValidationResults{authFilterValidationResult{}},
+		},
 		"auth filter references missing JWT Provider": {
 			authFilters: []*v1alpha1.RouteAuthFilter{
 				{

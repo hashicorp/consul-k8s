@@ -290,8 +290,6 @@ github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom
 github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.6/go.mod h1:vQpiSINpXSVWi8O8brEPEEzdeB62LROLLSrGSqImTtg=
 github.com/hashicorp/consul-server-connection-manager v0.1.12 h1:c/7LIghSdVqQKu4v9SPzxeHot0pphQ/FtRzzDlN3Vrg=
 github.com/hashicorp/consul-server-connection-manager v0.1.12/go.mod h1:f1x48hfZMLUTqdwBVPTezV43COWTixtnLmSbxjD0SHg=
-github.com/hashicorp/consul/api v1.34.3 h1:OiZaQnwkS6uvutie3CF6NFXj8uScNezDlsU9MEqKT0s=
-github.com/hashicorp/consul/api v1.34.3/go.mod h1:A4wKd7yw7Wz4zn07p74+o0bLBi5dXsSDMMcMCEinY40=
 github.com/hashicorp/consul/proto-public v0.8.1 h1:9l6fc3E22a5TpY91/s0gxo2k9ZXwYLA0FzLXSmx5+Ww=
 github.com/hashicorp/consul/proto-public v0.8.1/go.mod h1:y6fW1f60io8flp02L/lnDnTAL3M73X7+dLgoCvr/lhA=
 github.com/hashicorp/consul/sdk v0.18.1 h1:RDTeBvAeOveI2xI86sV+8WkaN7OkP4zz+cG3fOobDCM=
