@@ -188,6 +188,41 @@ func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.Rou
 	}
 }
 
+func (t ResourceTranslator) translateRouteExtProcFilter(routeExtProc *v1alpha1.RouteExtProc) api.ExtProcFilter {
+	filter := api.ExtProcFilter{
+		StatPrefix: routeExtProc.Spec.StatPrefix,
+		Mode:       routeExtProc.Spec.Mode,
+	}
+
+	if o := routeExtProc.Spec.Overrides; o != nil {
+		overrides := &api.ExtProcOverrides{
+			// MessageTimeout:   o.MessageTimeout,
+			// FailureModeAllow: o.FailureModeAllow,
+		}
+		if o.Processing != nil {
+			overrides.Processing = &api.ExtProcProcessing{
+				Request:  translateExtProcProcessingDirection(o.Processing.Request),
+				Response: translateExtProcProcessingDirection(o.Processing.Response),
+			}
+		}
+		filter.Overrides = overrides
+	}
+
+	return filter
+}
+
+func translateExtProcProcessingDirection(d *v1alpha1.RouteExtProcProcessingDirection) *api.ExtProcProcessingDirection {
+	if d == nil {
+		return nil
+	}
+	return &api.ExtProcProcessingDirection{
+		HeadersMode:  d.HeadersMode,
+		BodyMode:     d.BodyMode,
+		TrailersMode: d.TrailersMode,
+		MaxBodyBytes: d.MaxBodyBytes,
+	}
+}
+
 func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.GatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
 	if policy == nil {
 		return nil, nil
@@ -392,6 +427,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter,
 		responseHeaderFilters = []api.HTTPHeaderFilter{}
 		jwtFilter             *api.JWTFilter
 		tlsConfig             *api.GatewayServiceTLSConfig
+		extProcFilters        []api.ExtProcFilter
 	)
 
 	// Convert Gateway API filters to portions of the Consul request and response filters.
@@ -479,6 +515,8 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter,
 						CertResource: routeTLSFilter.Spec.SDS.CertResource,
 					}}
 				}
+			case v1alpha1.RouteExtProcKind:
+				extProcFilters = append(extProcFilters, t.translateRouteExtProcFilter(crdFilter.(*v1alpha1.RouteExtProc)))
 			}
 		}
 	}
@@ -489,6 +527,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter,
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
 		JWT:           jwtFilter,
+		ExtProc:       extProcFilters,
 	}
 
 	responseFilter := api.HTTPResponseFilters{

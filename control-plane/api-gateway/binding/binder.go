@@ -129,8 +129,10 @@ func (b *Binder) Snapshot() *Snapshot {
 	var listenerValidation listenerValidationResults
 	var policyValidation gatewayPolicyValidationResults
 	var authFilterValidation authFilterValidationResults
+	var extProcFilterValidation extProcFilterValidationResults
 
 	authFilters := b.config.Resources.GetExternalAuthFilters()
+	extProcFilters := b.config.Resources.GetExternalExtProcFilters()
 	if !isGatewayDeleted {
 		var updatedGwcc bool
 
@@ -148,6 +150,7 @@ func (b *Binder) Snapshot() *Snapshot {
 		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, gatewayClassConfig)
 		policyValidation = validateGatewayPolicies(b.config.Gateway, b.config.Policies, b.config.Resources)
 		authFilterValidation = validateAuthFilters(authFilters, b.config.Resources)
+		extProcFilterValidation = validateExtProcFilters(extProcFilters)
 	}
 
 	// used for tracking how many routes have successfully bound to which listeners
@@ -276,6 +279,23 @@ func (b *Binder) Snapshot() *Snapshot {
 			if !common.RouteAuthFilterStatusesEqual(filterStatus, authFilter.Status) {
 				authFilter.Status = filterStatus
 				snapshot.Kubernetes.StatusUpdates.Add(authFilter)
+			}
+		}
+
+		for idx, extProcFilter := range extProcFilters {
+			if extProcFilter == nil {
+				continue
+			}
+			extProcFilter := extProcFilter
+
+			var filterStatus v1alpha1.Status
+			filterStatus.Conditions = extProcFilterValidation.Conditions(extProcFilter.Generation, idx)
+			filterStatus.LastSyncedTime = extProcFilter.Status.LastSyncedTime
+
+			// only mark the filter as needing a status update if there's a diff with its old status
+			if !common.RouteExtProcStatusesEqual(filterStatus, extProcFilter.Status) {
+				extProcFilter.Status = filterStatus
+				snapshot.Kubernetes.StatusUpdates.Add(extProcFilter)
 			}
 		}
 	} else {

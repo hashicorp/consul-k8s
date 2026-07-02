@@ -29,6 +29,10 @@ func RouteAuthFilterStatusesEqual(a, b v1alpha1.RouteAuthFilterStatus) bool {
 	return slices.EqualFunc(a.Conditions, b.Conditions, conditionsEqual)
 }
 
+func RouteExtProcStatusesEqual(a, b v1alpha1.Status) bool {
+	return slices.EqualFunc(a.Conditions, b.Conditions, consulConditionsEqual)
+}
+
 func gatewayStatusesAddressesEqual(a, b gwv1.GatewayStatusAddress) bool {
 	return BothNilOrEqual(a.Type, b.Type) &&
 		a.Value == b.Value
@@ -54,6 +58,16 @@ func conditionsEqual(a, b metav1.Condition) bool {
 		a.Reason == b.Reason &&
 		a.Message == b.Message &&
 		a.ObservedGeneration == b.ObservedGeneration
+}
+
+// consulConditionsEqual compares the consul-k8s Condition type used by resources
+// that embed the common Status. It intentionally ignores LastTransitionTime so we
+// don't always fail a conditional check per-reconciliation.
+func consulConditionsEqual(a, b v1alpha1.Condition) bool {
+	return a.Type == b.Type &&
+		a.Status == b.Status &&
+		a.Reason == b.Reason &&
+		a.Message == b.Message
 }
 
 func EntriesEqual(a, b api.ConfigEntry) bool {
@@ -242,7 +256,8 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual) &&
+		slices.EqualFunc(a.Filters.ExtProc, b.Filters.ExtProc, e.extProcFiltersEqual)
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
@@ -293,6 +308,31 @@ func (e entryComparator) retryFiltersEqual(a, b api.RetryFilter) bool {
 
 func (e entryComparator) timeoutFiltersEqual(a, b api.TimeoutFilter) bool {
 	return a.RequestTimeout == b.RequestTimeout && a.IdleTimeout == b.IdleTimeout
+}
+
+func (e entryComparator) extProcFiltersEqual(a, b api.ExtProcFilter) bool {
+	return a.StatPrefix == b.StatPrefix &&
+		a.Mode == b.Mode &&
+		bothNilOrEqualFunc(a.Overrides, b.Overrides, e.extProcOverridesEqual)
+}
+
+func (e entryComparator) extProcOverridesEqual(a, b api.ExtProcOverrides) bool {
+	// return a.MessageTimeout == b.MessageTimeout &&
+	// 	bothNilOrEqualFunc(a.FailureModeAllow, b.FailureModeAllow, func(x, y bool) bool { return x == y }) &&
+	// 	bothNilOrEqualFunc(a.Processing, b.Processing, e.extProcProcessingEqual)
+	return bothNilOrEqualFunc(a.Processing, b.Processing, e.extProcProcessingEqual)
+}
+
+func (e entryComparator) extProcProcessingEqual(a, b api.ExtProcProcessing) bool {
+	return bothNilOrEqualFunc(a.Request, b.Request, e.extProcProcessingDirectionEqual) &&
+		bothNilOrEqualFunc(a.Response, b.Response, e.extProcProcessingDirectionEqual)
+}
+
+func (e entryComparator) extProcProcessingDirectionEqual(a, b api.ExtProcProcessingDirection) bool {
+	return a.HeadersMode == b.HeadersMode &&
+		a.BodyMode == b.BodyMode &&
+		a.TrailersMode == b.TrailersMode &&
+		a.MaxBodyBytes == b.MaxBodyBytes
 }
 
 // jwtFiltersEqual compares the contents of the list of providers on the JWT filters for a route, returning true if the

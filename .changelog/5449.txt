@@ -1,0 +1,3 @@
+```release-note:feature
+xds: Addition of envoy ext-proc support and addition of RouteExtProc CRD for Consul ENT
+```
