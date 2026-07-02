@@ -975,10 +975,10 @@ func (t *serviceEndpointsResource) Delete(endptKey string, raw interface{}) erro
 				delete(t.Service.consulMap, svcKey)
 				t.Service.sync()
 			}
+			t.Service.Log.Info("delete endpoint", "key", endptKey)
 		}
 	}
 
-	t.Service.Log.Info("delete endpoint", "key", endptKey)
 	return nil
 }
 
