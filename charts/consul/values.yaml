@@ -2838,6 +2838,7 @@ connectInject:
   # want those pods injected and local-path-storage and openebs so that
   # Kind (Kubernetes In Docker) and [OpenEBS](https://openebs.io/) respectively can provision Pods used to create PVCs.
   # We also exclude gmp-system and gke-managed-cim namespaces that are used by GKE for managing the cluster.
+  # We also exclude any namespaces with the label `openshift.io/cluster-monitoring` since those are used by OpenShift for cluster monitoring and typically should not be injected.
   # Note that this exclusion is only supported in Kubernetes v1.21.1+.
   #
   # Example:
@@ -2853,6 +2854,8 @@ connectInject:
       - key: "kubernetes.io/metadata.name"
         operator: "NotIn"
         values: ["kube-system","local-path-storage","openebs","gmp-system","gke-managed-cim"]
+      - key: "openshift.io/cluster-monitoring"
+        operator: "DoesNotExist"
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,
