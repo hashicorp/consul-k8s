@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	consulv1alpha1 "github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	"github.com/hashicorp/consul-k8s/control-plane/controllers/helmvalues"
 	"github.com/hashicorp/consul-k8s/control-plane/helper/test"
 )
 
@@ -168,4 +169,113 @@ func TestTerminatingGatewayController_MutateConsulEntry(t *testing.T) {
 	err = controller.MutateConsulEntry(obj, &capi.ServiceConfigEntry{}, reconcile.Request{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expected TerminatingGatewayConfigEntry")
+}
+
+// TestTerminatingGatewayController_terminatingGatewayConsulNamespace verifies the
+// resolution order for the Consul namespace a terminating gateway registers into,
+// including the namespace-mirroring fallback used when Admin Partitions are enabled.
+func TestTerminatingGatewayController_terminatingGatewayConsulNamespace(t *testing.T) {
+	t.Parallel()
+
+	const kubeNS = "consul"
+
+	newTermGW := func(specNS, gatewayName string) *consulv1alpha1.TerminatingGateway {
+		return &consulv1alpha1.TerminatingGateway{
+			ObjectMeta: metav1.ObjectMeta{Name: "terminating-gateway", Namespace: kubeNS},
+			Spec: consulv1alpha1.TerminatingGatewaySpec{
+				Deployment: consulv1alpha1.TerminatingGatewayDeploymentSpec{
+					ConsulNamespace: specNS,
+					GatewayName:     gatewayName,
+				},
+			},
+		}
+	}
+
+	cases := map[string]struct {
+		termGW     *consulv1alpha1.TerminatingGateway
+		helm       *helmvalues.HelmValues
+		cec        *ConfigEntryController
+		expectedNS string
+	}{
+		"explicit spec.deployment.consulNamespace wins": {
+			termGW: newTermGW("explicit-ns", ""),
+			helm:   &helmvalues.HelmValues{},
+			cec: &ConfigEntryController{
+				EnableConsulNamespaces: true,
+				EnableNSMirroring:      true,
+			},
+			expectedNS: "explicit-ns",
+		},
+		"per-gateway helm override wins over defaults": {
+			termGW: newTermGW("", ""),
+			helm: &helmvalues.HelmValues{
+				TerminatingGateways: helmvalues.TerminatingGatewaysConfig{
+					Defaults: helmvalues.Defaults{ConsulNamespace: "defaults-ns"},
+					Gateways: []helmvalues.Gateway{{Name: "terminating-gateway", ConsulNamespace: "per-gw-ns"}},
+				},
+			},
+			cec:        &ConfigEntryController{EnableConsulNamespaces: true},
+			expectedNS: "per-gw-ns",
+		},
+		"non-default defaults.consulNamespace is respected": {
+			termGW: newTermGW("", ""),
+			helm: &helmvalues.HelmValues{
+				TerminatingGateways: helmvalues.TerminatingGatewaysConfig{
+					Defaults: helmvalues.Defaults{ConsulNamespace: "defaults-ns"},
+				},
+			},
+			cec: &ConfigEntryController{
+				EnableConsulNamespaces: true,
+				EnableNSMirroring:      true,
+			},
+			expectedNS: "defaults-ns",
+		},
+		"mirroring maps to the K8s namespace when defaults is the default sentinel": {
+			termGW: newTermGW("", ""),
+			helm: &helmvalues.HelmValues{
+				TerminatingGateways: helmvalues.TerminatingGatewaysConfig{
+					Defaults: helmvalues.Defaults{ConsulNamespace: "default"},
+				},
+			},
+			cec: &ConfigEntryController{
+				EnableConsulNamespaces: true,
+				EnableNSMirroring:      true,
+			},
+			expectedNS: kubeNS,
+		},
+		"mirroring with prefix maps to prefixed K8s namespace": {
+			termGW: newTermGW("", ""),
+			helm:   &helmvalues.HelmValues{},
+			cec: &ConfigEntryController{
+				EnableConsulNamespaces: true,
+				EnableNSMirroring:      true,
+				NSMirroringPrefix:      "k8s-",
+			},
+			expectedNS: "k8s-" + kubeNS,
+		},
+		"default when mirroring disabled even if destination namespace is set": {
+			termGW: newTermGW("", ""),
+			helm:   &helmvalues.HelmValues{},
+			cec: &ConfigEntryController{
+				EnableConsulNamespaces:     true,
+				ConsulDestinationNamespace: "dest-ns",
+			},
+			expectedNS: "default",
+		},
+		"falls back to default when namespaces disabled": {
+			termGW:     newTermGW("", ""),
+			helm:       &helmvalues.HelmValues{},
+			cec:        &ConfigEntryController{EnableConsulNamespaces: false},
+			expectedNS: "default",
+		},
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			r := &TerminatingGatewayController{ConfigEntryController: tc.cec}
+			require.Equal(t, tc.expectedNS, r.terminatingGatewayConsulNamespace(tc.termGW, tc.helm))
+		})
+	}
 }

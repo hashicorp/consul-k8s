@@ -645,7 +645,7 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		replicas = *termGW.Spec.Deployment.Replicas
 	}
 
-	consulNamespace := terminatingGatewayConsulNamespace(termGW, helmConfigValues)
+	consulNamespace := r.terminatingGatewayConsulNamespace(termGW, helmConfigValues)
 
 	logLevel := termGW.Spec.Deployment.LogLevel
 	if logLevel == "" {
@@ -1484,7 +1484,7 @@ func (r *TerminatingGatewayController) ensureTerminatingGatewayACLBootstrap(
 	serviceAccountName := fmt.Sprintf("%s-%s", fullName, gatewayName)
 	authMethodName := fmt.Sprintf("%s-k8s-component-auth-method", fullName)
 
-	consulNamespace := terminatingGatewayConsulNamespace(termGW, helmValues)
+	consulNamespace := r.terminatingGatewayConsulNamespace(termGW, helmValues)
 
 	rules, err := r.renderTerminatingGatewayACLRules(gatewayName, consulNamespace)
 	if err != nil {
@@ -1645,7 +1645,19 @@ partition "{{ .Partition }}" {
 	return out.String(), nil
 }
 
-func terminatingGatewayConsulNamespace(
+// terminatingGatewayConsulNamespace resolves the Consul namespace that the
+// terminating gateway service should be registered into. Resolution order:
+//  1. Explicit spec.deployment.consulNamespace on the CRD.
+//  2. Per-gateway consulNamespace from Helm values.
+//  3. terminatingGateways.defaults.consulNamespace from Helm values (a bare
+//     "default" sentinel is treated as unset when Consul namespaces are enabled
+//     so that mirroring/destination resolution can take precedence).
+//  4. The namespace derived from the gateway's K8s namespace via the
+//     namespace-mirroring / destination-namespace configuration. This ensures
+//     that when mirroring is enabled (e.g. with Admin Partitions) the gateway
+//     is registered into the mirrored Consul namespace (K8s "consul" ->
+//     Consul "consul") instead of falling back to "default".
+func (r *TerminatingGatewayController) terminatingGatewayConsulNamespace(
 	termGW *consulv1alpha1.TerminatingGateway,
 	helmValues *helmvalues.HelmValues,
 ) string {
@@ -1653,10 +1665,12 @@ func terminatingGatewayConsulNamespace(
 		return defaultIfEmpty("")
 	}
 
+	// 1. Explicit namespace on the CRD wins.
 	if termGW.Spec.Deployment.ConsulNamespace != "" {
 		return termGW.Spec.Deployment.ConsulNamespace
 	}
 
+	// 2. Per-gateway override from Helm values.
 	gatewayName := defaultIfEmpty(termGW.Spec.Deployment.GatewayName, termGW.Name)
 	for _, gw := range helmValues.TerminatingGateways.Gateways {
 		if gw.Name == gatewayName && gw.ConsulNamespace != "" {
@@ -1664,5 +1678,37 @@ func terminatingGatewayConsulNamespace(
 		}
 	}
 
-	return defaultIfEmpty(helmValues.TerminatingGateways.Defaults.ConsulNamespace)
+	// namespacesEnabled / mirroring reflect whether Consul Enterprise namespaces
+	// and namespace mirroring are turned on for this controller. We prefer the
+	// controller's runtime config but fall back to the Helm values when the
+	// controller is not fully wired (e.g. in some unit tests).
+	namespacesEnabled := helmValues.Global.EnableConsulNamespaces
+	mirroring := false
+	mirroringPrefix := ""
+	if r != nil && r.ConfigEntryController != nil {
+		namespacesEnabled = r.ConfigEntryController.EnableConsulNamespaces
+		mirroring = r.ConfigEntryController.EnableNSMirroring
+		mirroringPrefix = r.ConfigEntryController.NSMirroringPrefix
+	}
+
+	// 3. Helm defaults override. Treat the chart's "default" sentinel as unset
+	//    when namespaces are enabled so that the mirrored namespace derived from
+	//    the gateway's K8s namespace can take precedence.
+	defaultsNS := helmValues.TerminatingGateways.Defaults.ConsulNamespace
+	if defaultsNS != "" && !(defaultsNS == "default" && namespacesEnabled) {
+		return defaultsNS
+	}
+
+	// 4. Mirroring only. We intentionally do NOT fall back to the connect
+	//    destination namespace: the terminating gateway's ACL policy (created by
+	//    server-acl-init) is scoped to this same resolved namespace, and following
+	//    the destination namespace would register the service into a namespace its
+	//    ACL token is not authorized for. Mirroring maps the gateway into the
+	//    Consul namespace matching its K8s namespace, consistent with the Helm path.
+	if namespacesEnabled && mirroring {
+		return mirroringPrefix + termGW.Namespace
+	}
+
+	// 5. Default.
+	return defaultIfEmpty(defaultsNS)
 }

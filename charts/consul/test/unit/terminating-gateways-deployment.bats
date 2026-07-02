@@ -1003,6 +1003,74 @@ key2: value2' \
   [ "${actual}" = "new-namespace" ]
 }
 
+@test "terminatingGateways/Deployment: consulNamespace mirrors release namespace when mirroringK8S is enabled and no namespace is set" {
+  cd `chart_dir`
+  local object=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --namespace consul \
+      . | tee /dev/stderr)
+
+  local actual=$(echo "$object" | yq -s -r '.[0].spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+  [ "${actual}" = "consul" ]
+
+  local env=$(echo "$object" | yq -s -r '.[0].spec.template.spec.initContainers[0].env[] | select(.name == "CONSUL_NAMESPACE") | .value' | tee /dev/stderr)
+  [ "${env}" = "consul" ]
+
+  local arg=$(echo "$object" | yq -s -r '.[0].spec.template.spec.containers[0].args | any(contains("-service-namespace=consul"))' | tee /dev/stderr)
+  [ "${arg}" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: consulNamespace mirrors release namespace with prefix when mirroringK8SPrefix is set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8SPrefix=k8s-' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+
+  [ "${actual}" = "k8s-consul" ]
+}
+
+@test "terminatingGateways/Deployment: consulNamespace ignores connect destination namespace when mirroring is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --set 'connectInject.consulNamespaces.consulDestinationNamespace=dest-ns' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+
+  [ "${actual}" = "default" ]
+}
+
+@test "terminatingGateways/Deployment: consulNamespace defaults to default when mirroring disabled and no destination set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/terminating-gateways-deployment.yaml \
+      --set 'terminatingGateways.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'global.enableConsulNamespaces=true' \
+      --set 'connectInject.consulNamespaces.mirroringK8S=false' \
+      --namespace consul \
+      . | tee /dev/stderr |
+      yq -s -r '.[0].spec.template.metadata.annotations."consul.hashicorp.com/gateway-namespace"' | tee /dev/stderr)
+
+  [ "${actual}" = "default" ]
+}
+
 #--------------------------------------------------------------------
 # partitions
 
