@@ -6,6 +6,7 @@ package flags
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -26,6 +27,9 @@ const (
 	NamespaceEnvVar  = "CONSUL_NAMESPACE"
 	PartitionEnvVar  = "CONSUL_PARTITION"
 	DatacenterEnvVar = "CONSUL_DATACENTER"
+
+	ClientCertFileEnvVar = "CONSUL_CLIENT_CERT_FILE"
+	ClientKeyFileEnvVar  = "CONSUL_CLIENT_KEY_FILE"
 
 	ACLTokenEnvVar     = "CONSUL_ACL_TOKEN"
 	ACLTokenFileEnvVar = "CONSUL_ACL_TOKEN_FILE"
@@ -60,10 +64,12 @@ type ConsulFlags struct {
 }
 
 type ConsulTLSFlags struct {
-	UseTLS        bool
-	CACertFile    string
-	CACertPEM     string
-	TLSServerName string
+	UseTLS         bool
+	CACertFile     string
+	CACertPEM      string
+	ClientCertFile string
+	ClientKeyFile  string
+	TLSServerName  string
 }
 
 type ConsulACLFlags struct {
@@ -146,6 +152,13 @@ func (f *ConsulFlags) Flags() *flag.FlagSet {
 		"The server name to use as the SNI host when connecting via TLS. "+
 			"This can also be specified via the CONSUL_TLS_SERVER_NAME environment variable.")
 	fs.BoolVar(&f.UseTLS, "use-tls", useTLS, "If true, use TLS for connections to Consul.")
+	fs.StringVar(&f.ClientCertFile, "client-cert-file", os.Getenv(ClientCertFileEnvVar),
+		"Path to a client certificate file to use for TLS when communicating with Consul."+
+			" If this is set then you need to also set client-key-file."+
+			" Can also be specified via the "+ClientCertFileEnvVar+" environment variable.")
+	fs.StringVar(&f.ClientKeyFile, "client-key-file", os.Getenv(ClientKeyFileEnvVar),
+		"Path to a corresponding key file for the client certificate that was set using client-cert-file."+
+			" Can also be specified via the "+ClientKeyFileEnvVar+" environment variable.")
 	fs.StringVar(&f.Token, "token", os.Getenv(ACLTokenEnvVar),
 		"ACL token to use for connection to Consul."+
 			"This can also be specified via the CONSUL_ACL_TOKEN environment variable.")
@@ -200,6 +213,15 @@ func (f *ConsulFlags) ConsulServerConnMgrConfig() (discovery.Config, error) {
 				return discovery.Config{}, err
 			}
 		}
+
+		if f.ClientCertFile != "" {
+			cert, err := tls.LoadX509KeyPair(f.ClientCertFile, f.ClientKeyFile)
+			if err != nil {
+				return discovery.Config{}, fmt.Errorf("failed to load client certificate: %w", err)
+			}
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+
 		tlsConfig.ServerName = f.TLSServerName
 		cfg.TLS = tlsConfig
 	}
@@ -251,6 +273,9 @@ func (f *ConsulFlags) ConsulClientConfig() *consul.Config {
 		} else if f.CACertPEM != "" {
 			cfg.TLSConfig.CAPem = []byte(f.CACertPEM)
 		}
+
+		cfg.TLSConfig.CertFile = f.ClientCertFile
+		cfg.TLSConfig.KeyFile = f.ClientKeyFile
 
 		// Infer TLS server name from addresses.
 		if f.TLSServerName == "" && !strings.HasPrefix(f.Addresses, "exec=") {
