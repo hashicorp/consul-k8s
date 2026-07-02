@@ -2,20 +2,30 @@
 # SPDX-License-Identifier: MPL-2.0
 
 # Cloud package is not included in test suite as it is triggered from a non consul-k8s repo and requires HCP credentials
-- {runner: 0, test-packages: "partitions"}
-- {runner: 1, test-packages: "peering"}
+- {runner: 0, test-packages: "partitions", run-filter: "^TestPartitions_Connect$"}
+- {runner: 22, test-packages: "partitions", run-filter: "^TestPartitions_Gateway|^TestPartitions_Sync|^TestPartitions_Connect_MultiportServices"}
+- {runner: 1, test-packages: "peering", run-filter: "^TestPeering_Connect$"}
+- {runner: 24, test-packages: "peering", run-filter: "^TestPeering_Gateway|^TestPeering_ConnectNamespaces"}
 - {runner: 2, test-packages: "sameness"}
-- {runner: 3, test-packages: "connect"}
+- {runner: 3, test-packages: "connect", run-filter: "^TestConnectInject$|^TestConnectInject_VirtualIPFailover|^TestConnectInject_CleanupKilledPods|^TestConnectInject_MultiportServices"}
+- {runner: 21, test-packages: "connect", run-filter: "^TestConnectInjectNamespaces|^TestConnectInject_LocalRateLimiting|^TestConnectInject_PermissiveMTLS"}
 - {runner: 4, test-packages: "snapshot-agent"}
 - {runner: 5, test-packages: "wan-federation"}
 - {runner: 6, test-packages: "cli"}
-- {runner: 7, test-packages: "vault"}
+- {runner: 7, test-packages: "vault", run-filter: "^TestVault_WANFederationViaGateways"}
+- {runner: 25, test-packages: "vault", run-filter: "^TestVault$|^TestVault_Partitions"}
+- {runner: 26, test-packages: "vault", run-filter: "^TestVault_TLSAutoReload|^TestVault_VaultNamespace"}
 - {runner: 8, test-packages: "metrics"}
 - {runner: 9, test-packages: "server"}
-- {runner: 10, test-packages: "api-gateway"}
+- {runner: 10, test-packages: "api-gateway", run-filter: "TestAPIGateway_KitchenSink"}
+- {runner: 20, test-packages: "api-gateway", run-filter: "TestAPIGateway_Basic|TestAPIGateway_JWTAuth|TestAPIGateway_Lifecycle|TestAPIGateway_Tenancy|TestAPIGateway_GatewayClassConfig|TestAPIGateway_Scaling"}
+- {runner: 11, test-packages: "connect-lifecycle"}
 - {runner: 12, test-packages: "sync"}
+- {runner: 18, test-packages: "connect-external"}
+- {runner: 19, test-packages: "api-gateway-external"}
 - {runner: 13, test-packages: "example"}
 - {runner: 14, test-packages: "consul-dns"}
 - {runner: 15, test-packages: "config-entries"}
-- {runner: 16, test-packages: "terminating-gateway"}
+- {runner: 16, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGatewaySingleNamespace|^TestTerminatingGatewayNamespaceMirroring"}
+- {runner: 23, test-packages: "terminating-gateway", run-filter: "^TestTerminatingGateway$|^TestTerminatingGatewayDestinations|^TestTerminatingGatewaySecretRotation"}
 - {runner: 17, test-packages: "basic"}
