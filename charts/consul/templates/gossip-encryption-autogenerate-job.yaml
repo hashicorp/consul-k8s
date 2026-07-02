@@ -68,4 +68,12 @@ spec:
             limits:
               memory: "50Mi"
               cpu: "50m"
+      {{- if .Values.global.gossipEncryption.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.gossipEncryption.tolerations . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.global.gossipEncryption.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.global.gossipEncryption.nodeSelector . | indent 8 | trim }}
+      {{- end }}
 {{- end }}
