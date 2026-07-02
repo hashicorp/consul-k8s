@@ -14,13 +14,13 @@ require (
 	github.com/hashicorp/consul/sdk v0.17.3
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-uuid v1.0.3
-	github.com/hashicorp/go-version v1.6.0
+	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/hcp-sdk-go v0.50.0
-	github.com/hashicorp/serf v0.10.1
+	github.com/hashicorp/serf v0.10.2
 	github.com/hashicorp/vault/api v1.23.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/proto/otlp v0.19.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.28.9
 	k8s.io/apimachinery v0.28.9
@@ -79,6 +79,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
+	github.com/hashicorp/go-metrics v0.5.4 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.2.0 // indirect
@@ -95,7 +96,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-zglob v0.0.2-0.20190814121620-e3c945676326 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/miekg/dns v1.1.50 // indirect
+	github.com/miekg/dns v1.1.56 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
