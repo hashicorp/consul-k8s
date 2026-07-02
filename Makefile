@@ -1,7 +1,7 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh version/version.go)
 GOLANG_VERSION?=$(shell head -n 1 .go-version)
-CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
-CONSUL_ENTERPRISE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-enterprise-version.sh charts/consul/values.yaml)
+CONSUL_IMAGE_VERSION = 'public.ecr.aws/n9h4m6z2/ajay/consul-enterprise:consul-ext-proc-test-0001'
+CONSUL_ENTERPRISE_IMAGE_VERSION = 'public.ecr.aws/n9h4m6z2/ajay/consul-enterprise:consul-ext-proc-test-0001'
 CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
 KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
 KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
@@ -14,7 +14,7 @@ GOTESTSUM_PATH?=$(shell command -v gotestsum)
 
 ##@ Helm Targets
 
-.PHONY: gen-helm-docs
+.PHONY: gen-helm-docs 
 gen-helm-docs: ## Generate Helm reference docs from values.yaml and update Consul website. Usage: make gen-helm-docs consul=<path-to-consul-repo>.
 	@cd hack/helm-reference-gen; go run ./... $(docsRepo)
 
