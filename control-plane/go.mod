@@ -12,6 +12,8 @@ replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.18
 
 replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260701104039-a0c11b9c505b
 
+replace github.com/denverdino/aliyungo => github.com/denverdino/aliyungo v0.0.0-20170926055100-d3308649c661
+
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/containernetworking/cni v1.3.0
@@ -167,7 +169,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nicolai86/scaleway-sdk v1.10.2-0.20180628010248-798f60e20bb2 // indirect
-	github.com/opentracing/opentracing-go v1.2.1-0.20220228012449-10b1cf09e00b // indirect
 	github.com/packethost/packngo v0.31.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
