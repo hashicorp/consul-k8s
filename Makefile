@@ -8,6 +8,7 @@ KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.
 KUBECTL_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kubectlVersion)
 
 GO_MODULES := $(shell find . -name go.mod -exec dirname {} \; | sort)
+GOTAGS     ?= hashicorpmetrics
 
 GOTESTSUM_PATH?=$(shell command -v gotestsum)
 
@@ -101,21 +102,7 @@ control-plane-fips-dev-docker: ## Build consul-k8s-control-plane FIPS dev Docker
 .PHONY: control-plane-test
 control-plane-test: ## Run go test for the control plane.
 ifeq ("$(GOTESTSUM_PATH)","")
-	cd control-plane && go test ./...
-else
-	cd control-plane && \
-	gotestsum \
-		--format=pkgname \
-		--debug \
-		--rerun-fails=3 \
-		--packages="./..."
-endif
-
-
-.PHONY: control-plane-ent-test
-control-plane-ent-test: ## Run go test with Consul enterprise tests. The consul binary in your PATH must be Consul Enterprise.
-ifeq ("$(GOTESTSUM_PATH)","")
-	cd control-plane && go test ./... -tags=enterprise
+	cd control-plane && go test -tags=$(GOTAGS) ./...
 else
 	cd control-plane && \
 	gotestsum \
@@ -124,12 +111,28 @@ else
 		--rerun-fails=3 \
 		--packages="./..." \
 		-- \
-		--tags enterprise
+		-tags=$(GOTAGS)
+endif
+
+
+.PHONY: control-plane-ent-test
+control-plane-ent-test: ## Run go test with Consul enterprise tests. The consul binary in your PATH must be Consul Enterprise.
+ifeq ("$(GOTESTSUM_PATH)","")
+	cd control-plane && go test ./... -tags=$(GOTAGS),enterprise
+else
+	cd control-plane && \
+	gotestsum \
+		--format=pkgname \
+		--debug \
+		--rerun-fails=3 \
+		--packages="./..." \
+		-- \
+		--tags $(GOTAGS),enterprise
 endif
 
 .PHONY: control-plane-cov
 control-plane-cov: ## Run go test with code coverage.
-	cd control-plane; go test ./... -coverprofile=coverage.out; go tool cover -html=coverage.out
+	cd control-plane; go test -tags=$(GOTAGS) ./... -coverprofile=coverage.out; go tool cover -html=coverage.out
 
 .PHONY: control-plane-clean
 control-plane-clean: ## Delete bin and pkg dirs.

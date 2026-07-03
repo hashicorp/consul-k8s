@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/armon/go-metrics/prometheus"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-metrics/prometheus"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 	apiv1 "k8s.io/api/core/v1"
