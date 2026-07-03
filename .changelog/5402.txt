@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Exclude OpenShift namespaces from the consul-connect-inject webhook injection by default
+```
