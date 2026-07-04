@@ -98,6 +98,10 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 					defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
 					defaultPartitionHelmValues["server.exposeService.nodePort.https"] = "30000"
 					defaultPartitionHelmValues["server.exposeService.nodePort.grpc"] = "30100"
+				} else if cfg.EnableOpenshift || cfg.UseOpenshift {
+					// On ROSA/OpenShift with AWS Load Balancer Controller, NLBs default to internal-facing.
+					// Force internet-facing so the expose-servers LB is publicly resolvable from any cluster.
+					defaultPartitionHelmValues["server.exposeService.annotations"] = `"service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing"`
 				}
 
 				releaseName := helpers.RandomName()

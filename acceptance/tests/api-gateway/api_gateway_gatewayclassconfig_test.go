@@ -35,13 +35,12 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 		defaultInstances = ptr.To(int32(2))
 		maxInstances     = ptr.To(int32(3))
 		minInstances     = ptr.To(int32(1))
-
-		namespace        = "default"
 		gatewayClassName = "gateway-class"
 	)
 
 	ctx := suite.Environment().DefaultContext(t)
 	cfg := suite.Config()
+	namespace := ctx.KubectlOptions(t).Namespace
 	helmValues := map[string]string{
 		"global.logLevel":       "trace",
 		"connectInject.enabled": "true",
@@ -76,6 +75,9 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 				MinInstances:     minInstances,
 			},
 		},
+	}
+	if cfg.EnableOpenshift {
+		gatewayClassConfig.Spec.OpenshiftSCCName = "restricted-v2"
 	}
 	logger.Log(t, "creating gateway class config")
 	err = k8sClient.Create(context.Background(), gatewayClassConfig)
@@ -209,7 +211,7 @@ func TestAPIGateway_GatewayClassConfig(t *testing.T) {
 
 func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *int32) {
 	t.Helper()
-
+	cfg := suite.Config()
 	var deployment appsv1.Deployment
 	err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &deployment)
 	require.NoError(t, err)
@@ -220,12 +222,48 @@ func scale(t *testing.T, client client.Client, name, namespace string, scaleTo *
 	err = client.Update(context.Background(), &deployment)
 	require.NoError(t, err)
 
+	if cfg.EnableOpenshift {
+		retryCheckWithWait(t, 12, 5*time.Second, func(r *retry.R) {
+			var updatedDeployment appsv1.Deployment
+			err := client.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, &updatedDeployment)
+			require.NoError(r, err)
+			require.NotNil(r, updatedDeployment.Spec.Replicas)
+		})
+
+		triggerGatewayReconcile(t, client, name, namespace)
+
+		// The gateway controller can observe the owned Deployment update before its cache
+		// reflects the new replica count. Trigger a second reconcile after a short delay so
+		// the clamp logic uses the latest Deployment state.
+		time.Sleep(15 * time.Second)
+		triggerGatewayReconcile(t, client, name, namespace)
+	}
+
+}
+
+func triggerGatewayReconcile(t *testing.T, client client.Client, name, namespace string) {
+	gateway := &gwv1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				"component": "api-gateway",
+			},
+		},
+	}
+	updateKubernetes(t, client, gateway, func(g *gwv1.Gateway) {
+		if g.Annotations == nil {
+			g.Annotations = map[string]string{}
+		}
+		g.Annotations["acceptance.hashicorp.com/reconcile-trigger"] = time.Now().UTC().Format(time.RFC3339Nano)
+	})
 }
 
 func checkNumberOfInstances(t *testing.T, k8client client.Client, consulClient *api.Client, name, namespace string, wantNumber *int32, gateway *gwv1.Gateway) {
 	t.Helper()
 
 	retryCheckWithWait(t, 40, 10*time.Second, func(r *retry.R) {
+		triggerGatewayReconcile(t, k8client, name, namespace)
 		logger.Log(t, "checking that gateway instances match defined gateway class config")
 		logger.Log(t, fmt.Sprintf("want: %d", *wantNumber))
 

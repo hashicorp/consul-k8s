@@ -33,6 +33,10 @@ func TestPeering_Gateway(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		t.Skipf("skipping this test because peering changes related to aws CSL-13250 is not yet merged into main branch and those changes are required to run peering tests on OpenShift")
+	}
+
 	ver, err := version.NewVersion("1.13.0")
 	require.NoError(t, err)
 	if cfg.ConsulVersion != nil && cfg.ConsulVersion.LessThan(ver) {
@@ -173,11 +177,13 @@ func TestPeering_Gateway(t *testing.T) {
 
 	// Copy secret from client peer to server peer.
 	k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
+	})
 
 	// Create the peering dialer on the server peer.
 	k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 		k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 	})
 
@@ -266,7 +272,7 @@ func TestPeering_Gateway(t *testing.T) {
 	// leader election so we may need to wait a long time for
 	// the reconcile loop to run (hence the 1m timeout here).
 	var gatewayAddress string
-	counter := &retry.Counter{Count: 10, Wait: 2 * time.Second}
+	counter := &retry.Counter{Count: 30, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: staticClientNamespace}, &gateway)
@@ -287,10 +293,10 @@ func TestPeering_Gateway(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
-	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway")
+	helpers.WaitForHTTPRouteWithRetry(t, staticClientOpts, "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 	logger.Log(t, "patching route to target server")
-	k8s.RunKubectl(t, staticClientOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+	k8s.RunKubectl(t, staticClientOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 	logger.Log(t, "checking that the connection is not successful because there's no intention")
 	k8s.CheckStaticServerHTTPConnectionFailing(t, staticClientOpts, staticClientName, targetAddress)
