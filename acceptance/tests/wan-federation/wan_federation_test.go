@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -472,6 +473,11 @@ func copyFederationSecret(t *testing.T, releaseName string, primaryContext, seco
 	federationSecret.ResourceVersion = ""
 	federationSecret.Namespace = secondaryContext.KubectlOptions(t).Namespace
 	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
+	if k8serrors.IsAlreadyExists(err) {
+		// Secret may already exist from a previous failed run; delete and recreate it.
+		_ = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Delete(context.Background(), federationSecretName, metav1.DeleteOptions{})
+		_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
+	}
 	require.NoError(t, err)
 
 	return federationSecretName

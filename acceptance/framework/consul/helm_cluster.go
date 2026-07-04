@@ -832,7 +832,9 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 		}
 
 		_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
-		require.NoError(t, err)
+		if err != nil && !errors.IsAlreadyExists(err) {
+			require.NoError(t, err)
+		}
 	} else {
 		require.NoError(t, err)
 	}

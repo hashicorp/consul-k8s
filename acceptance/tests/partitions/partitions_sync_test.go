@@ -119,6 +119,10 @@ func TestPartitions_Sync(t *testing.T) {
 			if cfg.UseKind {
 				serverHelmValues["server.exposeService.type"] = "NodePort"
 				serverHelmValues["server.exposeService.nodePort.https"] = "30000"
+			} else if cfg.EnableOpenshift || cfg.UseOpenshift {
+				// On ROSA/OpenShift with AWS Load Balancer Controller, NLBs default to internal-facing.
+				// Force internet-facing so the expose-servers LB is publicly resolvable from any cluster.
+				serverHelmValues["server.exposeService.annotations"] = `"service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing"`
 			}
 
 			releaseName := helpers.RandomName()

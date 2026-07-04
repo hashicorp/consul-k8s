@@ -285,11 +285,14 @@ func (v *VaultCluster) ConfigureAuthMethod(t *testing.T, vaultClient *vapi.Clien
 // We need to take vaultClient here in case this Vault cluster does not have a server to run API commands against.
 func (v *VaultCluster) OpenshiftConfigureAuthMethod(t *testing.T, vaultClient *vapi.Client, authPath, k8sHost, saName, saNS string) {
 	v.logger.Logf(t, "enabling kubernetes auth method on %s path", authPath)
-	err := vaultClient.Sys().EnableAuthWithOptions(authPath, &vapi.EnableAuthOptions{
-		Type: "kubernetes",
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		err := vaultClient.Sys().EnableAuthWithOptions(authPath, &vapi.EnableAuthOptions{
+			Type: "kubernetes",
+		})
+		require.NoError(r, err)
 	})
-	require.NoError(t, err)
 
+	var err error
 	// To configure the auth method, we need to read the token and the CA cert from the auth method's
 	// service account token. In Kube-1.24 and above the secret is not automatically generated so we
 	// rely on it being created prior to calling ConfigureAuthMethod.
@@ -337,7 +340,6 @@ func (v *VaultCluster) OpenshiftConfigureAuthMethod(t *testing.T, vaultClient *v
 	})
 
 	client := v.kubernetesAPIClient(t)
-	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
 	if tokenReviewerJWT == "" || kubernetesCACert == "" {
 		var tokenSecret *corev1.Secret
 		retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
@@ -358,12 +360,15 @@ func (v *VaultCluster) OpenshiftConfigureAuthMethod(t *testing.T, vaultClient *v
 	require.NotEmpty(t, tokenReviewerJWT, "service account token for %s/%s is empty", saNS, saName)
 	require.NotEmpty(t, kubernetesCACert, "kubernetes CA cert for %s/%s is empty", saNS, saName)
 
-	_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
-		"token_reviewer_jwt": tokenReviewerJWT,
-		"kubernetes_ca_cert": kubernetesCACert,
-		"kubernetes_host":    k8sHost,
+	v.logger.Logf(t, "updating vault kubernetes auth config for %s auth path", authPath)
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		_, err = vaultClient.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), map[string]interface{}{
+			"token_reviewer_jwt": tokenReviewerJWT,
+			"kubernetes_ca_cert": kubernetesCACert,
+			"kubernetes_host":    k8sHost,
+		})
+		require.NoError(r, err)
 	})
-	require.NoError(t, err)
 }
 
 // Create installs Vault via Helm and then calls bootstrap to initialize it.
