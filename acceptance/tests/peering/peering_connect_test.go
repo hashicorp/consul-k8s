@@ -149,7 +149,7 @@ func TestPeering_Connect(t *testing.T) {
 			logger.Log(t, "creating mesh config")
 			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
 
-			// On OpenShift, Helm installs with --skip-crds so the Mesh CRD may not be
+			// Manisha Test On OpenShift, Helm installs with --skip-crds so the Mesh CRD may not be
 			// registered yet immediately after Helm returns. Wait for it to be established.
 			if cfg.EnableOpenshift || cfg.UseOpenshift {
 				for _, ctx := range []environment.TestContext{staticServerPeerClusterContext, staticClientPeerClusterContext} {
