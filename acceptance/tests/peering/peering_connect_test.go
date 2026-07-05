@@ -13,6 +13,7 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -147,6 +148,17 @@ func TestPeering_Connect(t *testing.T) {
 			// Create Mesh resource to use mesh gateways.
 			logger.Log(t, "creating mesh config")
 			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
+
+			// On OpenShift, Helm installs with --skip-crds so the Mesh CRD may not be
+			// registered yet immediately after Helm returns. Wait for it to be established.
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				for _, ctx := range []environment.TestContext{staticServerPeerClusterContext, staticClientPeerClusterContext} {
+					retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+						_, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "get", "crd", "meshes.consul.hashicorp.com")
+						require.NoError(r, err)
+					})
+				}
+			}
 
 			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
