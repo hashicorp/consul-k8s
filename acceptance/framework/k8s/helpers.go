@@ -188,6 +188,15 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 			require.NoError(t, err)
 		}
 
+		// Wait for the secret to be fully gone before recreating it.
+		// On OpenShift, deletion may not be immediate due to finalizer processing.
+		retry.RunWith(&retry.Timer{Timeout: 30 * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+			_, getErr := destContext.KubernetesClient(r).CoreV1().Secrets(destNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
+			if getErr == nil {
+				r.Errorf("secret %q still exists, waiting for deletion", secretName)
+			}
+		})
+
 		retry.Run(t, func(r *retry.R) {
 			_, createErr := destContext.KubernetesClient(r).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
 			require.NoError(r, createErr)
