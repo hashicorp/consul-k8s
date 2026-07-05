@@ -53,8 +53,6 @@ spec:
     listKind: HTTPRouteList
     plural: chttproutes
     singular: chttproute
-    shortNames:
-      - chttproutes
   scope: Namespaced
   versions:
     - additionalPrinterColumns:
