@@ -31,6 +31,14 @@ func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
 	logger.Logf(t, "Cleaning stale Consul resources before Helm install in OpenShift namespace %s", h.helmOptions.KubectlOptions.Namespace)
 
 	h.resetNamespacePSAEnforcementLabel(t)
+	// Clear finalizers on all resources in the consul namespace first so that
+	// subsequent deletes are not blocked by stuck finalizer handlers (e.g.
+	// connect-inject webhook that is already gone).
+	h.clearNamespaceResourceFinalizers(t, h.helmOptions.KubectlOptions.Namespace)
+	// Kill any running gateway-resources / gateway-cleanup Jobs before we clean
+	// up CRDs. These Jobs call kubectl-apply to install CRDs with the old release's
+	// annotation and will undo our CRD cleanup if left running.
+	h.deleteAllGatewayJobsInNamespace(t)
 	h.deleteStaleTestNamespaces(t)
 	h.deleteStaleNamedSecretsForRelease(t, h.releaseName)
 	h.deleteGatewayHookJobsIfExistsForRelease(t, h.releaseName)
@@ -40,9 +48,111 @@ func (h *HelmCluster) cleanupOpenShiftBeforeInstall(t *testing.T) {
 		h.deleteStaleAPIGatewayTestClusterResources(t)
 	}
 	h.deleteStaleHelmReleases(t)
+	h.deleteStaleHelmManagedResources(t)
 	h.deleteStaleConsulOwnedCRDs(t)
 	h.deleteStaleStaticPrefixedResources(t)
 	h.deleteStaleLabeledResources(t)
+}
+
+// clearNamespaceResourceFinalizers removes finalizers from all resources in the
+// given namespace so that subsequent deletes are not blocked by stale finalizer
+// handlers (e.g. the connect-inject webhook may already be gone, leaving pods or
+// services stuck with an unreachable finalizer). This is called at the very start
+// of cleanupOpenShiftBeforeInstall, before any deletes are issued.
+func (h *HelmCluster) clearNamespaceResourceFinalizers(t *testing.T, namespace string) {
+	t.Helper()
+	logger.Logf(t, "Clearing stale finalizers on resources in namespace %s before Helm install", namespace)
+	ctx := context.Background()
+
+	// Pods
+	pods, err := h.kubernetesClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+	if err == nil {
+		for i := range pods.Items {
+			if len(pods.Items[i].Finalizers) == 0 {
+				continue
+			}
+			podCopy := pods.Items[i].DeepCopy()
+			podCopy.Finalizers = nil
+			if _, patchErr := h.kubernetesClient.CoreV1().Pods(namespace).Update(ctx, podCopy, metav1.UpdateOptions{}); patchErr != nil && !errors.IsNotFound(patchErr) && !errors.IsConflict(patchErr) {
+				logger.Logf(t, "warning: failed to clear finalizers on pod %s: %s", podCopy.Name, patchErr)
+			}
+		}
+	}
+
+	// Services
+	services, err := h.kubernetesClient.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+	if err == nil {
+		for i := range services.Items {
+			if len(services.Items[i].Finalizers) == 0 {
+				continue
+			}
+			svcCopy := services.Items[i].DeepCopy()
+			svcCopy.Finalizers = nil
+			if _, patchErr := h.kubernetesClient.CoreV1().Services(namespace).Update(ctx, svcCopy, metav1.UpdateOptions{}); patchErr != nil && !errors.IsNotFound(patchErr) && !errors.IsConflict(patchErr) {
+				logger.Logf(t, "warning: failed to clear finalizers on service %s: %s", svcCopy.Name, patchErr)
+			}
+		}
+	}
+
+	// ConfigMaps
+	configMaps, err := h.kubernetesClient.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{})
+	if err == nil {
+		for i := range configMaps.Items {
+			if len(configMaps.Items[i].Finalizers) == 0 {
+				continue
+			}
+			cmCopy := configMaps.Items[i].DeepCopy()
+			cmCopy.Finalizers = nil
+			if _, patchErr := h.kubernetesClient.CoreV1().ConfigMaps(namespace).Update(ctx, cmCopy, metav1.UpdateOptions{}); patchErr != nil && !errors.IsNotFound(patchErr) && !errors.IsConflict(patchErr) {
+				logger.Logf(t, "warning: failed to clear finalizers on configmap %s: %s", cmCopy.Name, patchErr)
+			}
+		}
+	}
+
+	// Secrets
+	secrets, err := h.kubernetesClient.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
+	if err == nil {
+		for i := range secrets.Items {
+			if len(secrets.Items[i].Finalizers) == 0 {
+				continue
+			}
+			secCopy := secrets.Items[i].DeepCopy()
+			secCopy.Finalizers = nil
+			if _, patchErr := h.kubernetesClient.CoreV1().Secrets(namespace).Update(ctx, secCopy, metav1.UpdateOptions{}); patchErr != nil && !errors.IsNotFound(patchErr) && !errors.IsConflict(patchErr) {
+				logger.Logf(t, "warning: failed to clear finalizers on secret %s: %s", secCopy.Name, patchErr)
+			}
+		}
+	}
+
+	// Deployments
+	deployments, err := h.kubernetesClient.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{})
+	if err == nil {
+		for i := range deployments.Items {
+			if len(deployments.Items[i].Finalizers) == 0 {
+				continue
+			}
+			dCopy := deployments.Items[i].DeepCopy()
+			dCopy.Finalizers = nil
+			if _, patchErr := h.kubernetesClient.AppsV1().Deployments(namespace).Update(ctx, dCopy, metav1.UpdateOptions{}); patchErr != nil && !errors.IsNotFound(patchErr) && !errors.IsConflict(patchErr) {
+				logger.Logf(t, "warning: failed to clear finalizers on deployment %s: %s", dCopy.Name, patchErr)
+			}
+		}
+	}
+
+	// StatefulSets
+	statefulSets, err := h.kubernetesClient.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{})
+	if err == nil {
+		for i := range statefulSets.Items {
+			if len(statefulSets.Items[i].Finalizers) == 0 {
+				continue
+			}
+			ssCopy := statefulSets.Items[i].DeepCopy()
+			ssCopy.Finalizers = nil
+			if _, patchErr := h.kubernetesClient.AppsV1().StatefulSets(namespace).Update(ctx, ssCopy, metav1.UpdateOptions{}); patchErr != nil && !errors.IsNotFound(patchErr) && !errors.IsConflict(patchErr) {
+				logger.Logf(t, "warning: failed to clear finalizers on statefulset %s: %s", ssCopy.Name, patchErr)
+			}
+		}
+	}
 }
 
 func (h *HelmCluster) resetNamespacePSAEnforcementLabel(t *testing.T) {
@@ -429,42 +539,46 @@ func splitNonEmptyLines(output string) []string {
 func (h *HelmCluster) deleteStaleConsulOwnedCRDs(t *testing.T) {
 	t.Helper()
 
-	logger.Logf(t, "Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts")
-	// These cluster-scoped CRDs can keep stale Helm ownership annotations from
-	// earlier acceptance releases. Limit cleanup to Consul-owned CRDs and only
-	// include Gateway API CRDs on OpenShift versions where tests install them.
+	logger.Logf(t, "Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races")
+	// On OpenShift tests use --skip-crds, so Helm never manages CRDs directly.
+	// CRDs are installed/updated by the gateway-resources Job of each release.
+	// Because the Job Pod races with cleanup (it may write the CRD annotation
+	// AFTER we check it), annotation-based detection is unreliable. The safest
+	// approach is to delete ALL consul CRDs unconditionally; the new install's
+	// gateway-resources Job will recreate them with the correct release annotation.
 	crds := helpers.OpenShiftCleanupCRDs(!h.isOpenShiftGTE419)
-	//sort.Strings(crds) test
 
+	var deletedCRDs []string
 	for _, crd := range crds {
-		var ownerRelease string
-		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
-			var output string
-			var err error
-			output, err = k8s.RunKubectlAndGetOutputE(
-				r,
-				h.helmOptions.KubectlOptions,
-				"get", "crd", crd,
-				"--ignore-not-found=true",
-				"-o", "jsonpath={.metadata.annotations.meta\\.helm\\.sh/release-name}",
-			)
-			if err != nil {
-				if isTransientKubeAPIError(err, output) {
-					r.Errorf("transient kube API error checking stale CRD %s ownership: %s", crd, strings.TrimSpace(err.Error()+"\n"+output))
-					return
-				}
-				require.NoError(r, err)
-			}
+		// Clear any CRs for this CRD first to unblock deletion.
+		h.clearStaleCRDObjectFinalizers(t, crd)
 
-			ownerRelease = strings.TrimSpace(output)
-		})
-
-		if ownerRelease != "" && ownerRelease != h.releaseName {
-			logger.Logf(t, "Deleting stale CRD %s owned by release %s before installing release %s", crd, ownerRelease, h.releaseName)
-			h.clearStaleCRDObjectFinalizers(t, crd)
-			_, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "delete", "crd", crd, "--ignore-not-found=true")
-			require.NoError(t, err)
+		out, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions,
+			"delete", "crd", crd, "--ignore-not-found=true", "--wait=false")
+		if err != nil && !strings.Contains(err.Error(), "not found") {
+			logger.Logf(t, "warning: failed to delete CRD %s: %s (output: %s)", crd, err, out)
+			continue
 		}
+		deletedCRDs = append(deletedCRDs, crd)
+	}
+
+	// Wait for every CRD to be fully gone before returning. A CRD still in
+	// Terminating state when Helm runs will cause "invalid ownership metadata".
+	for _, crd := range deletedCRDs {
+		retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+			out, err := k8s.RunKubectlAndGetOutputE(r, h.helmOptions.KubectlOptions,
+				"get", "crd", crd, "--ignore-not-found=true", "-o", "name")
+			if err != nil {
+				r.Errorf("transient error waiting for CRD %s to be deleted: %s", crd, err)
+				return
+			}
+			if strings.TrimSpace(out) != "" {
+				// Still present or Terminating; clear finalizers and retry.
+				h.clearStaleCRDObjectFinalizers(t, crd)
+				r.Errorf("CRD %s still present, waiting for deletion to complete", crd)
+			}
+		})
+		logger.Logf(t, "CRD %s fully deleted", crd)
 	}
 }
 
@@ -501,6 +615,51 @@ func (h *HelmCluster) clearStaleCRDObjectFinalizers(t *testing.T, crd string) {
 			"--type=merge",
 			"-p", `{"metadata":{"finalizers":[]}}`,
 		)
+	}
+}
+
+// deleteStaleHelmManagedResources deletes ConfigMaps and Secrets in the consul namespace
+// that carry a "meta.helm.sh/release-name" annotation belonging to a *different* Helm
+// release than the current one. These are left behind when a previous test's Helm release
+// was in a non-deployed state (failed, pending-install, etc.) and therefore was not found
+// by "helm list" (which only returns deployed releases when --all is unsupported). Their
+// presence causes the next "helm install" to fail with "invalid ownership metadata".
+func (h *HelmCluster) deleteStaleHelmManagedResources(t *testing.T) {
+	t.Helper()
+	namespace := h.helmOptions.KubectlOptions.Namespace
+
+	configMaps, err := h.kubernetesClient.CoreV1().ConfigMaps(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Logf(t, "warning: failed to list ConfigMaps for stale Helm resource cleanup: %s", err)
+	} else {
+		for _, cm := range configMaps.Items {
+			relName, ok := cm.Annotations["meta.helm.sh/release-name"]
+			if !ok || relName == h.releaseName {
+				continue
+			}
+			logger.Logf(t, "Deleting stale Helm-managed ConfigMap %s (owned by release %s, current is %s)", cm.Name, relName, h.releaseName)
+			delErr := h.kubernetesClient.CoreV1().ConfigMaps(namespace).Delete(context.Background(), cm.Name, metav1.DeleteOptions{})
+			if delErr != nil && !errors.IsNotFound(delErr) {
+				logger.Logf(t, "warning: failed to delete stale ConfigMap %s: %s", cm.Name, delErr)
+			}
+		}
+	}
+
+	secrets, err := h.kubernetesClient.CoreV1().Secrets(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Logf(t, "warning: failed to list Secrets for stale Helm resource cleanup: %s", err)
+	} else {
+		for _, sec := range secrets.Items {
+			relName, ok := sec.Annotations["meta.helm.sh/release-name"]
+			if !ok || relName == h.releaseName {
+				continue
+			}
+			logger.Logf(t, "Deleting stale Helm-managed Secret %s (owned by release %s, current is %s)", sec.Name, relName, h.releaseName)
+			delErr := h.kubernetesClient.CoreV1().Secrets(namespace).Delete(context.Background(), sec.Name, metav1.DeleteOptions{})
+			if delErr != nil && !errors.IsNotFound(delErr) {
+				logger.Logf(t, "warning: failed to delete stale Secret %s: %s", sec.Name, delErr)
+			}
+		}
 	}
 }
 
@@ -781,6 +940,61 @@ func isServerACLInitCleanupAlreadyExistsError(err error) bool {
 	return strings.Contains(errText, "server-acl-init-cleanup") && strings.Contains(errText, "already exists")
 }
 
+func isHelmOwnershipConflictError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errText := err.Error()
+	return strings.Contains(errText, "cannot be imported into the current release") ||
+		strings.Contains(errText, "invalid ownership metadata")
+}
+
+// deleteAllGatewayJobsInNamespace deletes every gateway-resources and
+// gateway-cleanup Job in the consul namespace, regardless of which Helm release
+// owns them. These Jobs run kubectl-apply to install CRDs and will undo any
+// stale-CRD cleanup if left running in the background. This must be called both
+// in pre-install cleanup (so no Job starts writing after cleanup) and inside the
+// install-retry loop when an ownership conflict is detected.
+func (h *HelmCluster) deleteAllGatewayJobsInNamespace(t *testing.T) {
+	t.Helper()
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	gatewayJobPatterns := []string{
+		"consul-gateway-resources",
+		"consul-gateway-cleanup",
+		"consul-gateway-resources-custom",
+		"consul-gateway-cleanup-custom",
+	}
+
+	jobs, err := h.kubernetesClient.BatchV1().Jobs(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		logger.Logf(t, "warning: failed to list Jobs for gateway job cleanup: %s", err)
+		return
+	}
+	for _, job := range jobs.Items {
+		for _, pattern := range gatewayJobPatterns {
+			if strings.Contains(job.Name, pattern) {
+				logger.Logf(t, "Deleting stale gateway Job %s in namespace %s to stop it from recreating CRDs", job.Name, namespace)
+				_ = h.kubernetesClient.BatchV1().Jobs(namespace).Delete(
+					context.Background(), job.Name, fastDeleteOptions(),
+				)
+				// Also delete any Pods created by this Job so they stop running kubectl-apply.
+				pods, podErr := h.kubernetesClient.CoreV1().Pods(namespace).List(
+					context.Background(),
+					metav1.ListOptions{LabelSelector: "job-name=" + job.Name},
+				)
+				if podErr == nil {
+					for _, pod := range pods.Items {
+						_ = h.kubernetesClient.CoreV1().Pods(namespace).Delete(
+							context.Background(), pod.Name, fastDeleteOptions(),
+						)
+					}
+				}
+				break
+			}
+		}
+	}
+}
+
 func isRetryableHelmInstallError(err error) bool {
 	if err == nil {
 		return false
@@ -795,6 +1009,14 @@ func isRetryableHelmInstallError(err error) bool {
 		"context deadline exceeded",
 		"unexpected eof",
 		"http2: client connection lost",
+		// Helm returns this when --timeout fires (helm upgrade --install --timeout Nm)
+		"timed out waiting for the condition",
+		// Server-Side Apply field manager conflicts arise when CRDs or other
+		// resources carry managed fields from a previous Helm release name.
+		// These are transient w.r.t. the test lifecycle and are resolved by
+		// the --force-conflicts flag on subsequent retries.
+		"conflict occurred while applying object",
+		"apply failed with",
 	}
 
 	for _, s := range retryableSubstrings {

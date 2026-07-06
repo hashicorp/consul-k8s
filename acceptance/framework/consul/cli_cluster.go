@@ -86,8 +86,14 @@ func NewCLICluster(
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
 
-	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		applyOpenShiftDefaults(t, cfg, values)
+	isOnOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
+	isOCPGreaterThan418 := cfg.IsOpenshiftGreaterThan4_18
+	if isOnOpenShift {
+		isOCPGreaterThan418 = detectIsOpenShiftGreaterThan418(t, ctx, cfg.IsOpenshiftGreaterThan4_18)
+	}
+
+	if isOnOpenShift {
+		applyOpenShiftDefaults(t, cfg, values, isOCPGreaterThan418)
 	}
 
 	logger := terratestLogger.New(logger.TestLogger{})

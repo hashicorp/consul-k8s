@@ -6,6 +6,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -106,8 +107,18 @@ func NewHelmCluster(
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
 
-	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		applyOpenShiftDefaults(t, cfg, values)
+	// Auto-detect the OCP version from the cluster so the correct chart behaviour
+	// is applied regardless of which cluster version the test runs against.
+	// The -is-openshift-greater-than-4-18 CLI flag is used only as a fallback if
+	// detection fails (e.g. insufficient permissions or non-OpenShift cluster).
+	isOnOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
+	isOCPGreaterThan418 := cfg.IsOpenshiftGreaterThan4_18
+	if isOnOpenShift {
+		isOCPGreaterThan418 = detectIsOpenShiftGreaterThan418(t, ctx, cfg.IsOpenshiftGreaterThan4_18)
+	}
+
+	if isOnOpenShift {
+		applyOpenShiftDefaults(t, cfg, values, isOCPGreaterThan418)
 	}
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -115,9 +126,29 @@ func NewHelmCluster(
 	// Wait up to 15 min for K8s resources to be in a ready state. Increasing
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
+	//
+	// On OpenShift, --force-conflicts is added to install/upgrade so that Helm
+	// forcibly takes ownership of any Server-Side Apply managed-field conflicts.
+	// These conflicts arise when CRDs (installed by gateway-resources jobs) still
+	// carry managed fields from a previous Helm release (e.g. meta.helm.sh/release-name
+	// pointing to an old test release name). Without this flag all 5 install retries
+	// fail immediately with "conflict occurred while applying object ... Apply failed
+	// with N conflicts: conflicts with \"helm\"".
+	// OCP installs take longer than non-OCP because of image pulls from
+	// registry.connect.redhat.com, SCC validation, and slower node scheduling.
+	// Use a longer timeout specifically for OCP to avoid spurious timeouts that
+	// waste retry budget and leave stale pending-install releases on the cluster.
+	installTimeout := "15m"
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		installTimeout = "25m"
+	}
+	installUpgradeArgs := []string{"--timeout", installTimeout, "--debug", "--skip-crds"}
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		installUpgradeArgs = append(installUpgradeArgs, "--force-conflicts")
+	}
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m", "--debug", "--skip-crds"},
-		"upgrade": {"--timeout", "15m", "--debug", "--skip-crds"},
+		"install": installUpgradeArgs,
+		"upgrade": installUpgradeArgs,
 		"delete":  {"--timeout", "15m", "--debug"},
 	}
 
@@ -134,7 +165,7 @@ func NewHelmCluster(
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
-		isOpenShiftGTE419:  cfg.IsOpenshiftGreaterThan4_18,
+		isOpenShiftGTE419:  isOCPGreaterThan418,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
@@ -143,7 +174,38 @@ func NewHelmCluster(
 	}
 }
 
-func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[string]string) {
+// detectIsOpenShiftGreaterThan418 queries the cluster's ClusterVersion resource to determine
+// whether this is an OpenShift cluster running version 4.19 or later. On any error
+// (e.g. non-OpenShift cluster, insufficient permissions) it falls back to flagFallback.
+func detectIsOpenShiftGreaterThan418(t *testing.T, ctx environment.TestContext, flagFallback bool) bool {
+	t.Helper()
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+		"get", "clusterversion", "version",
+		"-o", "jsonpath={.status.desired.version}",
+		"--ignore-not-found=true",
+	)
+	if err != nil || strings.TrimSpace(out) == "" {
+		logger.Logf(t, "Could not detect OpenShift cluster version (err=%v output=%q); using flag fallback: isOCPGreaterThan418=%v", err, out, flagFallback)
+		return flagFallback
+	}
+	versionStr := strings.TrimSpace(out)
+	parts := strings.Split(versionStr, ".")
+	if len(parts) < 2 {
+		logger.Logf(t, "Unexpected OpenShift version format %q; using flag fallback: isOCPGreaterThan418=%v", versionStr, flagFallback)
+		return flagFallback
+	}
+	major, errMajor := strconv.Atoi(parts[0])
+	minor, errMinor := strconv.Atoi(parts[1])
+	if errMajor != nil || errMinor != nil {
+		logger.Logf(t, "Could not parse OpenShift version %q; using flag fallback: isOCPGreaterThan418=%v", versionStr, flagFallback)
+		return flagFallback
+	}
+	isOCPGreaterThan418 := major > 4 || (major == 4 && minor > 18)
+	logger.Logf(t, "Detected OpenShift cluster version %s → isOCPGreaterThan418=%v", versionStr, isOCPGreaterThan418)
+	return isOCPGreaterThan418
+}
+
+func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[string]string, isOCPGreaterThan418 bool) {
 	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
 	// attempt to adopt or create them for per-test releases.
 	//4.18 either manageExternalCRDs or manageNonStandardCRDs will true with enableTcpRoute true
@@ -170,8 +232,8 @@ func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[str
 		}
 	}
 
-	if cfg.IsOpenshiftGreaterThan4_18 {
-		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.18 and later.
+	if isOCPGreaterThan418 {
+		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.19 and later.
 		values["global.openshift.isOcpGreaterthan4_18"] = "true"
 	}
 
@@ -260,7 +322,40 @@ func (h *HelmCluster) Create(t *testing.T) {
 				h.deleteServerACLInitCleanupJobIfExistsForRelease(r, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
+			// "cannot be imported" / "invalid ownership metadata" means a CRD (or other
+			// cluster-scoped resource) still has a meta.helm.sh/release-name annotation
+			// from a different, stale release. This can happen when a background
+			// gateway-resources Job from a previous failed install re-applies CRDs AFTER
+			// our pre-install cleanup. Kill all consul gateway-resource Jobs (which are
+			// the writers), then re-run the full CRD + release cleanup before retrying.
+			if err != nil && isHelmOwnershipConflictError(err) {
+				logger.Logf(t, "Helm ownership conflict for release %s — killing background gateway Jobs and re-running stale CRD cleanup before retry: %s", h.releaseName, err)
+				// Delete ALL gateway-resources / gateway-cleanup Jobs in the namespace
+				// regardless of release name, so a stale background job can no longer
+				// recreate CRDs with its old annotation after we clean them up.
+				h.deleteAllGatewayJobsInNamespace(t)
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				h.deleteStaleHelmReleases(t)
+				h.deleteStaleHelmManagedResources(t)
+				h.deleteStaleConsulOwnedCRDs(t)
+				r.Errorf("retrying helm install for release %s after ownership conflict cleanup", h.releaseName)
+				return
+			}
 			if err != nil && isRetryableHelmInstallError(err) {
+				// After a timeout or transient error the install left partial resources on
+				// the cluster (pending-install release, running gateway Jobs, etc.). Kill
+				// all gateway Jobs so their kubectl-apply cannot overwrite CRD annotations
+				// with the old release name (which would cause an ownership conflict on the
+				// next attempt), then uninstall the partial release before retrying.
+				// We do NOT need to delete CRDs here: they are already annotated with the
+				// current release name (test-kvxicd), so Helm will accept them as its own
+				// on the next attempt without a conflict.
+				if h.enableOpenshift {
+					logger.Logf(t, "Transient install error for release %s — killing background gateway Jobs and removing partial release before retry: %v", h.releaseName, err)
+					h.deleteAllGatewayJobsInNamespace(t)
+					_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+					h.deleteStaleHelmReleases(t)
+				}
 				r.Errorf("retrying helm upgrade for release %s after transient Kubernetes API error: %v", h.releaseName, err)
 				return
 			}
