@@ -144,7 +144,11 @@ func NewHelmCluster(
 	}
 	installUpgradeArgs := []string{"--timeout", installTimeout, "--debug", "--skip-crds"}
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		installUpgradeArgs = append(installUpgradeArgs, "--force-conflicts")
+		// --force-conflicts was introduced in Helm 3.13.0. Only add it when the
+		// installed Helm binary supports it — older CI runners may not.
+		if helmSupportsForceConflicts(t) {
+			installUpgradeArgs = append(installUpgradeArgs, "--force-conflicts")
+		}
 	}
 	extraArgs := map[string][]string{
 		"install": installUpgradeArgs,
@@ -172,6 +176,38 @@ func NewHelmCluster(
 		enableOpenshift:    cfg.EnableOpenshift || cfg.UseOpenshift,
 		logger:             logger,
 	}
+}
+
+// helmSupportsForceConflicts returns true if the installed Helm binary is
+// version 3.13.0 or later, which is when --force-conflicts was introduced.
+// On any error or unexpected output it returns false so the flag is simply
+// omitted rather than causing the test to fail.
+func helmSupportsForceConflicts(t *testing.T) bool {
+	t.Helper()
+	out, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "version", "--short")
+	if err != nil {
+		logger.Logf(t, "warning: could not determine Helm version, skipping --force-conflicts: %s", err)
+		return false
+	}
+	// Output is like "v3.14.2+g..." or "v3.12.0".
+	out = strings.TrimSpace(out)
+	out = strings.TrimPrefix(out, "v")
+	// Strip any build metadata (e.g. "+g1234abc").
+	if idx := strings.Index(out, "+"); idx != -1 {
+		out = out[:idx]
+	}
+	parts := strings.Split(out, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	major, errMaj := strconv.Atoi(parts[0])
+	minor, errMin := strconv.Atoi(parts[1])
+	if errMaj != nil || errMin != nil {
+		return false
+	}
+	supported := major > 3 || (major == 3 && minor >= 13)
+	logger.Logf(t, "Detected Helm version %s → --force-conflicts supported: %v", strings.Join(parts, "."), supported)
+	return supported
 }
 
 // detectIsOpenShiftGreaterThan418 queries the cluster's ClusterVersion resource to determine
