@@ -6,6 +6,7 @@ package consuldns
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +61,9 @@ func TestConsulDNSProxy_WithPartitionsAndCatalogSync(t *testing.T) {
 	}
 	if !cfg.EnableEnterprise {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+	if !cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(2) {
+		t.Skipf("skipping this test because it requires at least 2 clusters with -enable-multi-cluster and two kube contexts/configs")
 	}
 
 	cases := []dnsWithPartitionsTestCase{
@@ -318,13 +322,24 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	serverHelmValues := map[string]string{
-		"server.exposeGossipAndRPCPorts": "true",
-		"server.extraConfig":             `"{\"log_level\": \"TRACE\"}"`,
+		"server.extraConfig": `"{\"log_level\": \"TRACE\"}"`,
+	}
+
+	// OpenShift SCCs do not allow host ports by default, and
+	// server.exposeGossipAndRPCPorts configures hostPort bindings.
+	if !(cfg.UseOpenshift || cfg.EnableOpenshift) {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+	} else {
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "false"
 	}
 
 	if cfg.UseKind {
 		serverHelmValues["server.exposeService.type"] = "NodePort"
 		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
+	} else if cfg.EnableOpenshift || cfg.UseOpenshift {
+		// On ROSA/OpenShift with AWS Load Balancer Controller, NLBs default to internal-facing.
+		// Force internet-facing so the expose-servers LB is publicly resolvable from any cluster.
+		serverHelmValues["server.exposeService.annotations"] = `"service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing"`
 	}
 
 	releaseName := helpers.RandomName()
@@ -391,6 +406,8 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
 
+	consulClient, _ := defaultConsulCluster.SetupConsulClient(t, c.secure)
+
 	// Install the consul cluster without servers in the client cluster kubernetes context.
 	secondaryConsulCluster := consul.NewHelmCluster(t, clientHelmValues, secondaryClusterContext, cfg, releaseName)
 	secondaryConsulCluster.Create(t)
@@ -407,18 +424,22 @@ func setupClustersAndStaticService(t *testing.T, cfg *config.TestConfig, default
 	}
 
 	logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
-	k8s.RunKubectl(t, defaultClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	out, err := k8s.RunKubectlAndGetOutputE(t, defaultClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
+		require.NoError(t, err, "failed to create namespace %s in servers cluster: %s", staticServerNamespace, out)
+	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, defaultClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
 
 	logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
-	k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	out, err = k8s.RunKubectlAndGetOutputE(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
+	if err != nil && !strings.Contains(err.Error(), "AlreadyExists") {
+		require.NoError(t, err, "failed to create namespace %s in clients cluster: %s", staticServerNamespace, out)
+	}
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
 	})
-
-	consulClient, _ := defaultConsulCluster.SetupConsulClient(t, c.secure)
 
 	defaultPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: defaultPartition}
 	secondaryPartitionQueryOpts := &api.QueryOptions{Namespace: defaultNamespace, Partition: secondaryPartition}

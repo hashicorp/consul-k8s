@@ -141,7 +141,7 @@ func TestController_createDelete(t *testing.T) {
 func TestController_update(t *testing.T) {
 	require := require.New(t)
 
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	resource, data, _, dataLock := testResource(client)
 
 	// CREATE first

@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	terratestK8s "github.com/gruntwork-io/terratest/modules/k8s"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -20,6 +22,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -63,6 +66,9 @@ func TestWANFederation(t *testing.T) {
 
 			primaryContext := env.DefaultContext(t)
 			secondaryContext := env.Context(t, 1)
+
+			cleanupWANTestDeployments(t, cfg, primaryContext)
+			cleanupWANTestDeployments(t, cfg, secondaryContext)
 
 			primaryHelmValues := map[string]string{
 				"global.datacenter": primaryDatacenter,
@@ -163,6 +169,7 @@ func TestWANFederation(t *testing.T) {
 				ReleaseName:     releaseName,
 				Ctx:             primaryContext,
 				UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
+				HelmValues:      primaryHelmValues,
 				Cfg:             cfg,
 				ConsulClient:    primaryClient,
 			}
@@ -171,6 +178,7 @@ func TestWANFederation(t *testing.T) {
 				ReleaseName:     releaseName,
 				Ctx:             secondaryContext,
 				UseAppNamespace: cfg.EnableRestrictedPSAEnforcement,
+				HelmValues:      secondaryHelmValues,
 				Cfg:             cfg,
 				ConsulClient:    secondaryClient,
 			}
@@ -234,6 +242,12 @@ func TestWANFederationFailover(t *testing.T) {
 
 			primaryContext := env.DefaultContext(t)
 			secondaryContext := env.Context(t, 1)
+
+			cleanupWANTestDeployments(t, cfg, primaryContext)
+			cleanupWANTestDeployments(t, cfg, secondaryContext)
+			cleanupWANTestDeploymentsInNamespace(t, primaryContext, primaryNamespace)
+			cleanupWANTestDeploymentsInNamespace(t, primaryContext, secondaryNamespace)
+			cleanupWANTestDeploymentsInNamespace(t, secondaryContext, primaryNamespace)
 
 			primaryHelmValues := map[string]string{
 				"global.datacenter": primaryDatacenter,
@@ -340,6 +354,7 @@ func TestWANFederationFailover(t *testing.T) {
 				ReleaseName:     releaseName,
 				Ctx:             primaryContext,
 				UseAppNamespace: false,
+				HelmValues:      primaryHelmValues,
 				Cfg:             cfg,
 				ConsulClient:    primaryClient,
 			}
@@ -348,6 +363,7 @@ func TestWANFederationFailover(t *testing.T) {
 				ReleaseName:     releaseName,
 				Ctx:             secondaryContext,
 				UseAppNamespace: false,
+				HelmValues:      secondaryHelmValues,
 				Cfg:             cfg,
 				ConsulClient:    secondaryClient,
 			}
@@ -457,7 +473,66 @@ func copyFederationSecret(t *testing.T, releaseName string, primaryContext, seco
 	federationSecret.ResourceVersion = ""
 	federationSecret.Namespace = secondaryContext.KubectlOptions(t).Namespace
 	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
+	if k8serrors.IsAlreadyExists(err) {
+		// Secret may already exist from a previous failed run; delete and recreate it.
+		_ = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Delete(context.Background(), federationSecretName, metav1.DeleteOptions{})
+		_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
+	}
 	require.NoError(t, err)
 
 	return federationSecretName
+}
+
+func cleanupWANTestDeployments(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext) {
+	t.Helper()
+
+	cleanupWANTestDeploymentsInNamespace(t, ctx, ctx.KubectlOptions(t).Namespace)
+
+	if cfg.EnableRestrictedPSAEnforcement {
+		cleanupWANTestDeploymentsInNamespace(t, ctx, ctx.KubectlOptions(t).Namespace+"-apps")
+	}
+}
+
+func cleanupWANTestDeploymentsInNamespace(t *testing.T, ctx environment.TestContext, namespace string) {
+	t.Helper()
+
+	options := ctx.KubectlOptionsForNamespace(namespace)
+	resources := []string{
+		"deployment/static-client",
+		"deployment/static-server",
+		"service/static-client",
+		"service/static-server",
+		"serviceaccount/static-client",
+		"serviceaccount/static-server",
+		"rolebinding/static-client-psp",
+		"rolebinding/static-server-psp",
+		"rolebinding/static-client-openshift-privileged",
+		"rolebinding/static-server-openshift-privileged",
+	}
+
+	logger.Logf(t, "cleaning up stale WAN test workloads in namespace %s", namespace)
+	retrier := &retry.Counter{Count: 5, Wait: 5 * time.Second}
+	var output string
+	var err error
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err = k8s.RunKubectlAndGetOutputE(r, options, append([]string{"delete", "--ignore-not-found=true", "--wait=true"}, resources...)...)
+		if err == nil {
+			return
+		}
+
+		if strings.Contains(err.Error(), "namespaces \""+namespace+"\" not found") {
+			err = nil
+			return
+		}
+
+		combined := err.Error() + "\n" + output
+		if strings.Contains(combined, "Unable to connect to the server") ||
+			strings.Contains(combined, "TLS handshake timeout") ||
+			strings.Contains(combined, "Client.Timeout exceeded") ||
+			strings.Contains(combined, "EOF") {
+			r.Errorf("transient cleanup error for namespace %s: %s", namespace, strings.TrimSpace(combined))
+			return
+		}
+	})
+	require.NoError(t, err)
 }

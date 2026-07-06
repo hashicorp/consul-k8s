@@ -817,6 +817,22 @@ global:
   podSecurityContext:
     enabled: false
 
+  # Disable this once the manifests are generated and subsequent helm upgrades
+  
+  generateManifests: false
+
+  # During the install:
+  # custom crds and gateway TCP crd enabling
+  # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.
+  # crds.consulapi.enabled install the CRDs under consul.hashicorp.com API group and enables the new custom gateway controller to watch for the resources.
+
+  # During the upgrade - manifests are generated.
+  # if consulapi.enabled is set to false; no manifests will be generated under consul.hashicorp.com API group
+  # if consulapi.enables is set to true; manifests will be generated and applied under consul.hashicorp.com API group
+  crds:
+    enableTcpRoute: true
+    consulapi:
+      enabled: false
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:
@@ -859,7 +875,13 @@ global:
     crds: 
       enableTcpRoute: false
       consulapi:
-        enabled: false 
+        enabled: false
+      # customConsulapi.enabled installs the gateways.consul.hashicorp.com CRD (v1beta1)
+      # used by the legacy custom gateway controller (gateway-controller-custom).
+      # This is mutually exclusive with consulapi.enabled — only one of the two
+      # "Gateway" kinds can be established in the consul.hashicorp.com group at a time.
+      customConsulapi:
+        enabled: false
 
   # The time in seconds that the consul API client will wait for a response from
   # the API before cancelling the request.
