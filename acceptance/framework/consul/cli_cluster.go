@@ -88,19 +88,13 @@ func NewCLICluster(
 	helpers.MergeMaps(values, helmValues)
 
 	isOnOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
-	isGTE419 := cfg.IsOpenshiftGreaterThan4_18
+	isOCPGreaterThan418 := cfg.IsOpenshiftGreaterThan4_18
 	if isOnOpenShift {
-		isGTE419 = detectIsOpenShiftGTE419(t, ctx, cfg.IsOpenshiftGreaterThan4_18)
+		isOCPGreaterThan418 = detectIsOpenShiftGreaterThan418(t, ctx, cfg.IsOpenshiftGreaterThan4_18)
 	}
 
 	if isOnOpenShift {
-		applyOpenShiftDefaults(t, cfg, values, isGTE4194_18
-	if isOnOpenShift {
-		isGTE419 = detectIsOpenShiftGTE419(t, ctx, cfg.IsOpenshiftGreaterThan4_18)
-	}
-
-	if isOnOpenShift {
-		applyOpenShiftDefaults(t, cfg, values, isGTE419)
+		applyOpenShiftDefaults(t, cfg, values, isOCPGreaterThan418)
 	}
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -418,8 +412,6 @@ func (c *CLICluster) cleanupStaleConsulReleasesAllNamespaces(t *testing.T) {
 // consul-k8s install indicates a transient Kubernetes API error that is safe
 // to retry.  The CLI exits with status 1 for all errors, so we inspect the
 // human-readable output rather than the error itself.
-func isCLIOutputRetryable(output string) bool {
-
 // deleteStaleConsulSecrets removes consul-owned secrets from the install
 // namespace that are left behind by a previous failed or interrupted install.
 // `consul-k8s install` refuses to proceed when it finds these and exits with
