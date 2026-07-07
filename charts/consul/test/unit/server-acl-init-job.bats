@@ -478,6 +478,10 @@ load _helpers
 
 @test "serverACLInit/Job: terminating gateways acl option enabled with .terminatingGateways.enabled=true, namespaces enabled, no default namespace set" {
   cd `chart_dir`
+  # With namespaces enabled and mirroring on (the chart default), the gateway is
+  # mirrored into the Consul namespace matching the release namespace. The ACL
+  # token name must use that same namespace so it stays in lockstep with the
+  # gateway's service registration.
   local actual=$(helm template \
       -s templates/server-acl-init-job.yaml  \
       --set 'global.acls.manageSystemACLs=true' \
@@ -485,8 +489,9 @@ load _helpers
       --set 'connectInject.enabled=true' \
       --set 'global.enableConsulNamespaces=true' \
       --set 'terminatingGateways.defaults.consulNamespace=' \
+      --namespace consul \
       . | tee /dev/stderr |
-      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway\""))' | tee /dev/stderr)
+      yq '.spec.template.spec.containers[0].command | any(contains("-terminating-gateway-name=\"terminating-gateway.consul\""))' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

@@ -4,11 +4,15 @@
 terraform {
   required_providers {
     azurerm = {
-      version = "~> 4.27.0"
+      version = "~> 4.33.0"
     }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.5.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12.0"
     }
   }
 }
@@ -99,4 +103,113 @@ resource "local_file" "kubeconfigs" {
   content         = azurerm_kubernetes_cluster.default[count.index].kube_config_raw
   filename        = pathexpand("~/.kube/consul-k8s-${random_id.suffix[count.index].dec}")
   file_permission = "0600"
+}
+
+# Deploy IBM Uptycs EDR agent to each AKS cluster.
+provider "helm" {
+  alias = "cluster_0"
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.default[0].kube_config[0].host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.default[0].kube_config[0].client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.default[0].kube_config[0].client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.default[0].kube_config[0].cluster_ca_certificate)
+  }
+}
+
+provider "helm" {
+  alias = "cluster_1"
+  kubernetes {
+    host                   = var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].host : azurerm_kubernetes_cluster.default[0].kube_config[0].host
+    client_certificate     = base64decode(var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].client_certificate : azurerm_kubernetes_cluster.default[0].kube_config[0].client_certificate)
+    client_key             = base64decode(var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].client_key : azurerm_kubernetes_cluster.default[0].kube_config[0].client_key)
+    cluster_ca_certificate = base64decode(var.cluster_count > 1 ? azurerm_kubernetes_cluster.default[1].kube_config[0].cluster_ca_certificate : azurerm_kubernetes_cluster.default[0].kube_config[0].cluster_ca_certificate)
+  }
+}
+
+# Cluster 0 EDR
+resource "helm_release" "uptycs_0" {
+  provider         = helm.cluster_0
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_0" {
+  depends_on       = [helm_release.uptycs_0]
+  provider         = helm.cluster_0
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = azurerm_kubernetes_cluster.default[0].name
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
+}
+
+# Cluster 1 EDR (only when cluster_count > 1)
+resource "helm_release" "uptycs_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  provider         = helm.cluster_1
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  depends_on       = [helm_release.uptycs_1]
+  provider         = helm.cluster_1
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = azurerm_kubernetes_cluster.default[1].name
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
 }

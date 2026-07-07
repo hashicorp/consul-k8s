@@ -1,0 +1,3 @@
+```release-note:security
+containerd: upgrade github.com/containerd/containerd to v1.7.33 to fix vulnerability GHSA-xhf5-7wjv-pqxp and GHSA-jpcc-p29g-p8mq
+```
