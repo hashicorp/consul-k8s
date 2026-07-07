@@ -160,6 +160,9 @@ func (c *Controller) LastSyncResourceVersion() string {
 
 // HasSyncedChecker implements cache.Controller.
 func (c *Controller) HasSyncedChecker() cache.DoneChecker {
+	if c.informer == nil {
+		return nil
+	}
 	return c.informer.HasSyncedChecker()
 }
 
