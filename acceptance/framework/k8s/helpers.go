@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -156,6 +157,18 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 		Immutable: secret.Immutable,
 	}
 
+	// Strip Helm-managed labels from the copy. The destination cluster/namespace
+	// has no knowledge of the source Helm release; keeping these labels causes the
+	// OCP pre-install cleanup (deleteStaleLabeledResources with chart=consul-helm)
+	// to silently delete secrets that were manually copied (e.g. CA certs, partition
+	// tokens), breaking pre-install Jobs that try to mount them as volumes.
+	if secretToCopy.Labels != nil {
+		delete(secretToCopy.Labels, "chart")
+		delete(secretToCopy.Labels, "heritage")
+		delete(secretToCopy.Labels, "app")
+		delete(secretToCopy.Labels, "release")
+	}
+
 	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
 	if err != nil && apierrors.IsUnauthorized(err) {
 		logger.Logf(t, "client-go unauthorized creating secret %q in namespace %q; falling back to kubectl create/apply", secretName, destNamespace)
@@ -183,14 +196,28 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 	}
 
 	if err != nil && apierrors.IsAlreadyExists(err) {
-		err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Delete(context.Background(), secretName, metav1.DeleteOptions{})
+		// First: force-patch any finalizers off the secret so deletion cannot be blocked.
+		// This matters on OpenShift where stale consul installs (no-cleanup-on-failure)
+		// may leave controllers running that added finalizers to this secret.
+		patchBytes := []byte(`{"metadata":{"finalizers":[]}}`)
+		_, patchErr := destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Patch(
+			context.Background(), secretName, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+		if patchErr != nil && !apierrors.IsNotFound(patchErr) {
+			logger.Logf(t, "warning: could not patch finalizers off secret %q: %v", secretName, patchErr)
+		}
+
+		// Delete with GracePeriodSeconds=0 (immediate, equivalent to --force --grace-period=0).
+		gracePeriod := int64(0)
+		err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Delete(
+			context.Background(), secretName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
 		if err != nil && !apierrors.IsNotFound(err) {
 			require.NoError(t, err)
 		}
 
 		// Wait for the secret to be fully gone before recreating it.
-		// On OpenShift, deletion may not be immediate due to finalizer processing.
-		retry.RunWith(&retry.Timer{Timeout: 30 * time.Second, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		// On OpenShift, even after force-delete the API server cache may lag —
+		// use a generous timeout as a safety net.
+		retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 			_, getErr := destContext.KubernetesClient(r).CoreV1().Secrets(destNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
 			if getErr == nil {
 				r.Errorf("secret %q still exists, waiting for deletion", secretName)

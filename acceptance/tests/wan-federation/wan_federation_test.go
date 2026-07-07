@@ -101,7 +101,7 @@ func TestWANFederation(t *testing.T) {
 			primaryConsulCluster.Create(t)
 
 			// Get the federation secret from the primary cluster and apply it to secondary cluster
-			federationSecretName := copyFederationSecret(t, releaseName, primaryContext, secondaryContext)
+			federationSecretName := copyFederationSecret(t, cfg, releaseName, primaryContext, secondaryContext)
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryContext)
 
@@ -283,7 +283,7 @@ func TestWANFederationFailover(t *testing.T) {
 			primaryConsulCluster.Create(t)
 
 			// Get the federation secret from the primary cluster and apply it to secondary cluster
-			federationSecretName := copyFederationSecret(t, releaseName, primaryContext, secondaryContext)
+			federationSecretName := copyFederationSecret(t, cfg, releaseName, primaryContext, secondaryContext)
 
 			k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, secondaryContext)
 
@@ -464,7 +464,7 @@ func serviceFailoverCheck(t *testing.T, options *terratestK8s.KubectlOptions, po
 	logger.Log(t, resp)
 }
 
-func copyFederationSecret(t *testing.T, releaseName string, primaryContext, secondaryContext environment.TestContext) string {
+func copyFederationSecret(t *testing.T, cfg *config.TestConfig, releaseName string, primaryContext, secondaryContext environment.TestContext) string {
 	// Get the federation secret from the primary cluster and apply it to secondary cluster
 	federationSecretName := fmt.Sprintf("%s-consul-federation", releaseName)
 	logger.Logf(t, "Retrieving federation secret %s from the primary cluster and applying to the secondary", federationSecretName)
@@ -472,6 +472,20 @@ func copyFederationSecret(t *testing.T, releaseName string, primaryContext, seco
 	require.NoError(t, err)
 	federationSecret.ResourceVersion = ""
 	federationSecret.Namespace = secondaryContext.KubectlOptions(t).Namespace
+
+	// On OpenShift the pre-install cleanup deletes all resources labeled
+	// "chart=consul-helm". The federation secret originates from the primary
+	// Helm release and carries those labels; if we copy them unchanged the
+	// cleanup will silently delete the secret, leaving server-acl-init unable
+	// to mount the replication token / TLS CA — causing every pod attempt to
+	// fail and exhaust backoffLimit over ~25 minutes.
+	if (cfg.UseOpenshift || cfg.EnableOpenshift) && federationSecret.Labels != nil {
+		delete(federationSecret.Labels, "chart")
+		delete(federationSecret.Labels, "heritage")
+		delete(federationSecret.Labels, "app")
+		delete(federationSecret.Labels, "release")
+	}
+
 	_, err = secondaryContext.KubernetesClient(t).CoreV1().Secrets(secondaryContext.KubectlOptions(t).Namespace).Create(context.Background(), federationSecret, metav1.CreateOptions{})
 	if k8serrors.IsAlreadyExists(err) {
 		// Secret may already exist from a previous failed run; delete and recreate it.

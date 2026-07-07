@@ -675,14 +675,37 @@ func (h *HelmCluster) deleteStaleHelmReleases(t *testing.T) {
 	require.NoError(t, err)
 
 	var releases []struct {
-		Name  string `json:"name"`
-		Chart string `json:"chart"`
+		Name    string `json:"name"`
+		Chart   string `json:"chart"`
+		Status  string `json:"status"`
+		Updated string `json:"updated"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(output), &releases))
+
+	// helmUpdatedLayout is the time format Helm uses in its JSON output.
+	// Example: "2026-07-07 07:38:32.713564976 +0000 UTC"
+	const helmUpdatedLayout = "2006-01-02 15:04:05.999999999 -0700 MST"
 
 	for _, release := range releases {
 		if !strings.Contains(release.Chart, "consul") {
 			continue
+		}
+
+		// Protect recently-deployed releases (deployed within the last 10 minutes).
+		// In partition/multi-cluster tests both the primary and secondary clusters
+		// share the same K8s context and namespace. Without this guard the secondary
+		// cluster's pre-install cleanup deletes the primary cluster that was just
+		// installed, destroying the servers and breaking every Job that depends on
+		// them (partition-init, server-acl-init, etc.).
+		// Truly stale releases from previous -no-cleanup-on-failure runs will be
+		// older than 10 minutes and will still be removed.
+		if release.Status == "deployed" && release.Updated != "" {
+			deployedAt, parseErr := time.Parse(helmUpdatedLayout, release.Updated)
+			if parseErr == nil && time.Since(deployedAt) < 10*time.Minute {
+				logger.Logf(t, "Skipping recently deployed release %s (deployed %s ago, within 10-minute protection window)",
+					release.Name, time.Since(deployedAt).Round(time.Second))
+				continue
+			}
 		}
 
 		logger.Logf(t, "Deleting stale Helm release %s in namespace %s before install", release.Name, h.helmOptions.KubectlOptions.Namespace)

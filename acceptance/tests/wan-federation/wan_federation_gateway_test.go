@@ -84,7 +84,7 @@ func TestWANFederation_Gateway(t *testing.T) {
 		k8sAuthMethodHost = k8s.KubernetesAPIServerHostFromOptions(t, secondaryContext.KubectlOptions(t))
 	}
 
-	federationSecretName := copyFederationSecret(t, releaseName, primaryContext, secondaryContext)
+	federationSecretName := copyFederationSecret(t, cfg, releaseName, primaryContext, secondaryContext)
 
 	// Create secondary cluster
 	secondaryHelmValues := map[string]string{

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gruntwork-io/terratest/modules/helm"
 	"github.com/stretchr/testify/require"
@@ -204,14 +205,31 @@ func (v *VaultCluster) cleanupStaleVaultReleases(t *testing.T) {
 		return
 	}
 
-	for _, release := range installedReleases {
-		// if !strings.Contains(release["chart"], "vault-") {
-		// 	continue
-		// }
+	// helmUpdatedLayout is the time format Helm uses in its JSON output.
+	// Example: "2026-07-07 13:46:44.771169202 +0000 UTC"
+	const helmUpdatedLayout = "2006-01-02 15:04:05.999999999 -0700 MST"
 
+	for _, release := range installedReleases {
 		releaseName := release["name"]
 		if releaseName == "" {
 			continue
+		}
+
+		// Protect recently-deployed releases (deployed within the last 10 minutes).
+		// In partition tests both the primary (server) and secondary (agent-only)
+		// Vault clusters share the same K8s context and namespace. Without this
+		// guard the secondary cluster's pre-install cleanup deletes the primary
+		// Vault server that was just installed, breaking the port-forward used to
+		// configure auth methods on it.
+		// Truly stale releases from previous -no-cleanup-on-failure runs will be
+		// older than 10 minutes and will still be removed.
+		if release["status"] == "deployed" && release["updated"] != "" {
+			deployedAt, parseErr := time.Parse(helmUpdatedLayout, release["updated"])
+			if parseErr == nil && time.Since(deployedAt) < 10*time.Minute {
+				v.logger.Logf(t, "Skipping recently deployed release %s (deployed %s ago, within 10-minute protection window)",
+					releaseName, time.Since(deployedAt).Round(time.Second))
+				continue
+			}
 		}
 
 		v.logger.Logf(t, "Found stale Vault release %s (chart %s), uninstalling before fresh test install", releaseName, release["chart"])
