@@ -106,13 +106,26 @@ func TestAPIGateway_ExtAuthz_OIDC_Mesh(t *testing.T) {
 		k8s.RunKubectl(t, k8sOptions, "wait", "--for=condition=available", "--timeout=5m", "deploy/"+deployment)
 	}
 
-	// Wait for the route to be accepted and synced to Consul (k8s side).
-	helpers.WaitForHTTPRouteWithRetry(t, k8sOptions, "static-server-route", fixturePath)
-
-	// Ensure static-server is registered in the Consul catalog before asserting
-	// route status. The route only reaches Accepted once its backendRef resolves
-	// to a registered upstream; otherwise Consul reports NoUpstreamServicesTargeted.
+	// Create the HTTPRoute only after static-server is Ready and registered in the
+	// Consul catalog. The route's kustomization intentionally omits httproute.yaml
+	// so the route is applied here, last. If the route is reconciled while
+	// static-server has no Ready endpoints, consul-k8s writes the Consul http-route
+	// with zero upstreams and Consul reports NoUpstreamServicesTargeted; recovery
+	// can exceed the assertion window under the heavier within-mesh scenario.
+	// Creating the route after the backend is ready guarantees its first Consul
+	// write already targets the upstream.
 	waitForConsulServiceRegistered(t, consulClient, "static-server")
+
+	logger.Log(t, "creating the httproute now that static-server is registered")
+	routeManifest := fixturePath + "/httproute.yaml"
+	out, err = k8s.RunKubectlAndGetOutputE(t, k8sOptions, "apply", "-f", routeManifest)
+	require.NoError(t, err, out)
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		_, _ = k8s.RunKubectlAndGetOutputE(t, k8sOptions, "delete", "-f", routeManifest, "--ignore-not-found=true")
+	})
+
+	// Wait for the route to be created and synced to Consul (k8s side).
+	helpers.WaitForHTTPRouteWithRetry(t, k8sOptions, "static-server-route", fixturePath)
 
 	// Wait for the gateway to be accepted and to expose an address we can route to.
 	k8sClient := ctx.ControllerRuntimeClient(t)

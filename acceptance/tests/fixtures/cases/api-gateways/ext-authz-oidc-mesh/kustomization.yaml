@@ -14,7 +14,6 @@ resources:
 - gatewayclassconfig.yaml
 - gatewayclass.yaml
 - gateway.yaml
-- httproute.yaml
 - dex.yaml
 - servicedefaults.yaml
 - intention.yaml
