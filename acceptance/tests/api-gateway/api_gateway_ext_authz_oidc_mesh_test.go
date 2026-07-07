@@ -109,6 +109,11 @@ func TestAPIGateway_ExtAuthz_OIDC_Mesh(t *testing.T) {
 	// Wait for the route to be accepted and synced to Consul (k8s side).
 	helpers.WaitForHTTPRouteWithRetry(t, k8sOptions, "static-server-route", fixturePath)
 
+	// Ensure static-server is registered in the Consul catalog before asserting
+	// route status. The route only reaches Accepted once its backendRef resolves
+	// to a registered upstream; otherwise Consul reports NoUpstreamServicesTargeted.
+	waitForConsulServiceRegistered(t, consulClient, "static-server")
+
 	// Wait for the gateway to be accepted and to expose an address we can route to.
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	var gatewayAddress string

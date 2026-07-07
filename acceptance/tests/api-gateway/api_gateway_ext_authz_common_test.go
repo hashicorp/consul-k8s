@@ -8,12 +8,33 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
+
+// waitForConsulServiceRegistered blocks until the named service has at least one
+// instance registered in the Consul catalog.
+//
+// An API gateway HTTPRoute only becomes Accepted once Consul can resolve its
+// backendRefs to a registered upstream service; until the backend's pod is Ready
+// and registered, Consul reports the route as NoUpstreamServicesTargeted. Waiting
+// for the backend to appear in the catalog before asserting route status removes
+// that race (which is more pronounced under the heavier within-mesh scenario).
+func waitForConsulServiceRegistered(t *testing.T, consulClient *api.Client, service string) {
+	t.Helper()
+
+	retry.RunWith(&retry.Counter{Count: 60, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		services, _, err := consulClient.Catalog().Service(service, "", nil)
+		require.NoError(r, err)
+		require.NotEmptyf(r, services, "expected service %q to be registered in the Consul catalog", service)
+	})
+}
 
 // configureLocalExtAuthzDev wires an ext_authz api-gateway test up to
 // locally-built images and a license file when EXT_AUTHZ_LOCAL_DEV is set,
