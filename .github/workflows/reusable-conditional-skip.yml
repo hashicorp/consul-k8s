@@ -2,6 +2,12 @@ name: conditional-skip
 
 on:
   workflow_call:
+    inputs:
+      allow-unprotected-branches:
+        description: "Allow this check to run on pushes to unprotected branches (e.g. feature branches) without erroring."
+        type: boolean
+        required: false
+        default: false
     outputs:
       skip-ci:
         description: "Whether we should skip build and test jobs"
@@ -14,17 +20,20 @@ jobs:
     outputs:
       skip-ci: ${{ steps.maybe-skip-ci.outputs.skip-ci }}
     steps:
-      # We only allow use of conditional skip in two scenarios:
+      # We only allow use of conditional skip in three scenarios:
       #   1. PRs
       #   2. Pushes (merges) to protected branches (`main`, `release/**`)
+      #   3. Callers that explicitly opt in via the `allow-unprotected-branches` input
       #
       # The second scenario is the only place we can be sure that checking just the
       # latest change on the branch is sufficient. In PRs, we need to check _all_ commits.
       # The ability to do this is ultimately determined by the triggers of the calling
       # workflow, since `base_ref` (the target branch of a PR) is only available in
-      # `pull_request` events, not `push`.
+      # `pull_request` events, not `push`. Callers that opt in via
+      # `allow-unprotected-branches` accept that pushes to unprotected branches only
+      # evaluate the changes in the triggering push.
       - name: Error if conditional check is not allowed
-        if: ${{ !github.base_ref && !github.ref_protected }}
+        if: ${{ !inputs.allow-unprotected-branches && !github.base_ref && !github.ref_protected }}
         run: |
           echo "Conditional skip requires a PR event with 'base_ref' or 'push' to a protected branch."
           echo "github.base_ref: ${{ github.base_ref }}"
