@@ -17,7 +17,7 @@
 # go-discover builds the discover binary (which we don't currently publish
 # either).
 ARG GOLANG_VERSION
-FROM golang:${GOLANG_VERSION}-alpine3.24 AS go-discover
+FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
 # Build go-discover in a synthetic module so we can pin patched versions of
 # golang.org/x/crypto (>=v0.52.0) and golang.org/x/net (>=v0.55.0) via MVS,
 # overriding the older versions bundled with go-discover v1.2.0.
