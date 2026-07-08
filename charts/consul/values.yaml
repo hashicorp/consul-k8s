@@ -5,6 +5,11 @@
 
 # Holds values that affect multiple components of the chart.
 global:
+  # Installs the Gateway API CRDs (gatewayclasses, gateways, httproutes, referencegrants)
+  # when Consul on Kubernetes is installed. Set to false on OpenShift clusters where these
+  # CRDs are pre-installed and managed by the Ingress Operator — setting this to true on
+  # OpenShift will cause the install/upgrade to fail with a ValidatingAdmissionPolicy error.
+  # On non-OpenShift clusters this should remain true (default) so Consul installs the CRDs.
   installK8sNetworkingCRDs: true
   # The main enabled/disabled setting. If true, servers,
   # clients, Consul DNS and the Consul UI will be enabled. Each component can override
