@@ -110,6 +110,46 @@ rollingUpdate:
   [ "${actual}" = "true" ]
 }
 
+#--------------------------------------------------------------------
+# scheduling
+
+@test "cni/DaemonSet: tolerations use critical addon defaults" {
+  cd `chart_dir`
+  local tolerations=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations' | tee /dev/stderr)
+
+  local actual=$(echo "$tolerations" |
+    yq -r '.[0].key' | tee /dev/stderr)
+  [ "${actual}" = "CriticalAddonsOnly" ]
+
+  local actual=$(echo "$tolerations" |
+    yq -r '.[0].operator' | tee /dev/stderr)
+  [ "${actual}" = "Exists" ]
+
+  local actual=$(echo "$tolerations" |
+    yq -r '.[1].effect' | tee /dev/stderr)
+  [ "${actual}" = "NoExecute" ]
+
+  local actual=$(echo "$tolerations" |
+    yq -r '.[1].operator' | tee /dev/stderr)
+  [ "${actual}" = "Exists" ]
+}
+
+@test "cni/DaemonSet: tolerations can be overridden" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml  \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set-string $'connectInject.cni.tolerations=- key: custom\n  operator: Exists' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+  [ "${actual}" = "custom" ]
+}
 
 #--------------------------------------------------------------------
 # resources
