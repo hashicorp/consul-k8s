@@ -1,3 +1,3 @@
 ```release-note:security
-security: upgrade tornado 6.5.5 -> 6.5.6 in the custom gateway-api 0.7.1 module to fix GHSA-mgf9-4vpg-hj56 (CVE-2026-49855): AsyncHTTPClient accumulates decompressed chunks without a size limit (gzip bomb)
+security: upgrade tornado 6.5.5 -> 6.5.7 in the custom gateway-api 0.7.1 module to fix three advisories: GHSA-mgf9-4vpg-hj56 (CVE-2026-49855) where AsyncHTTPClient accumulates decompressed chunks without a size limit (gzip bomb), GHSA-3x9g-8vmp-wqvf where SimpleAsyncHTTPClient forwards Authorization/Cookie headers across cross-origin redirects, and GHSA-pw6j-qg29-8w7f where CurlAsyncHTTPClient leaks per-request credentials (client cert, proxy auth) on pooled handle reuse
 ```
