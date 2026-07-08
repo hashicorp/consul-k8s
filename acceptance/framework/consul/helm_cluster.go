@@ -346,16 +346,24 @@ func (h *HelmCluster) Create(t *testing.T) {
 			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
 				logger.Logf(t, "Gateway cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
 				h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
+				// Uninstall the partial release so the retry does a fresh install
+				// instead of a rolling upgrade (rolling upgrade leaves an extra pod
+				// stuck NotReady on OCP, blocking WaitForAllPodsToBeReady).
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
 			if err != nil && isGatewayResourcesAlreadyExistsError(err) {
 				logger.Logf(t, "Gateway resources already exist for release %s, deleting resources and retrying install: %s", h.releaseName, err)
 				h.deleteGatewayResourcesJobIfExistsForRelease(r, h.releaseName)
+				// Uninstall before retry — same reason as above.
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
 			if err != nil && isServerACLInitCleanupAlreadyExistsError(err) {
 				logger.Logf(t, "Server ACL init cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
 				h.deleteServerACLInitCleanupJobIfExistsForRelease(r, h.releaseName)
+				// Uninstall before retry — same reason as above.
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
 			// "cannot be imported" / "invalid ownership metadata" means a CRD (or other
