@@ -3,11 +3,12 @@ htmlmin==0.1.12
 Jinja2==3.1.6
 jsmin==3.0.1
 livereload==2.6.3
-# mkdocs 2.4.1 requires Markdown < 3.4.0
-# https://github.com/kubernetes-sigs/gateway-api/pull/1671#issuecomment-1400586465
-Markdown==3.3.7
+# Markdown 3.8.1 fixes GHSA-5wmx-573v-2qwq (CVE-2025-69534): an uncaught
+# AssertionError on malformed HTML-like input. mkdocs is bumped to 1.6.1
+# because mkdocs 1.4.3 pins markdown<3.4, which excludes the fix.
+Markdown==3.8.1
 MarkupSafe==2.1.2
-mkdocs==1.4.3
+mkdocs==1.6.1
 mkdocs-awesome-pages-plugin==2.9.1
 mkdocs-macros-plugin==0.7.0
 mkdocs-material==9.1.12
