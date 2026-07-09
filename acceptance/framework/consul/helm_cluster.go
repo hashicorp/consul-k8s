@@ -14,7 +14,6 @@ import (
 	terratestLogger "github.com/gruntwork-io/terratest/modules/logger"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
-	policyv1beta "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +74,7 @@ func NewHelmCluster(
 	}
 
 	if cfg.EnablePodSecurityPolicies {
-		configurePodSecurityPolicies(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
+		configurePSA(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
@@ -169,7 +168,6 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	t.Helper()
 
 	k8s.WritePodsDebugInfoIfFailed(t, h.helmOptions.KubectlOptions, h.debugDirectory, "release="+h.releaseName)
-
 
 	// Clean up any stuck gateway resources, note that we swallow all errors from
 	// here down since the terratest helm installation may actually already be
@@ -547,110 +545,39 @@ func (h *HelmCluster) SetupConsulClient(t *testing.T, secure bool, release ...st
 	return consulClient, config.Address
 }
 
-// configurePodSecurityPolicies creates a simple pod security policy, a cluster role to allow access to the PSP,
-// and a role binding that binds the default service account in the helm installation namespace to the cluster role.
-// We bind the default service account for tests that are spinning up pods without a service account set so that
-// they will not be rejected by the kube pod security policy controller.
-func configurePodSecurityPolicies(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
-	pspName := "test-psp"
+// configurePSA sets Pod Security Admission labels on the helm installation namespace.
+// PodSecurityPolicies were removed from the Kubernetes API in v1.25; the Pod Security
+// Admission controller (namespace labels) is the recommended replacement.
+func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	require.NoError(t, err)
 
-	// Pod Security Policy
-	{
-		// Check if the pod security policy with this name already exists
-		_, err := client.PolicyV1beta1().PodSecurityPolicies().Get(context.Background(), pspName, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
-			// This pod security policy can be used by any tests resources.
-			// This policy is fairly simple and only prevents from running privileged containers.
-			psp := &policyv1beta.PodSecurityPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-psp",
-				},
-				Spec: policyv1beta.PodSecurityPolicySpec{
-					Privileged:          true,
-					AllowedCapabilities: []corev1.Capability{"NET_ADMIN"},
-					SELinux: policyv1beta.SELinuxStrategyOptions{
-						Rule: policyv1beta.SELinuxStrategyRunAsAny,
-					},
-					SupplementalGroups: policyv1beta.SupplementalGroupsStrategyOptions{
-						Rule: policyv1beta.SupplementalGroupsStrategyRunAsAny,
-					},
-					RunAsUser: policyv1beta.RunAsUserStrategyOptions{
-						Rule: policyv1beta.RunAsUserStrategyRunAsAny,
-					},
-					FSGroup: policyv1beta.FSGroupStrategyOptions{
-						Rule: policyv1beta.FSGroupStrategyRunAsAny,
-					},
-					Volumes: []policyv1beta.FSType{policyv1beta.All},
-				},
-			}
-			_, err = client.PolicyV1beta1().PodSecurityPolicies().Create(context.Background(), psp, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
+	lbls := ns.GetLabels()
+	if lbls == nil {
+		lbls = make(map[string]string)
 	}
+	lbls["pod-security.kubernetes.io/enforce"] = "privileged"
+	lbls["pod-security.kubernetes.io/audit"] = "privileged"
+	lbls["pod-security.kubernetes.io/warn"] = "privileged"
+	ns.SetLabels(lbls)
 
-	// Cluster role for the PSP.
-	{
-		// Check if we have a cluster role that authorizes the use of the pod security policy.
-		_, err := client.RbacV1().ClusterRoles().Get(context.Background(), pspName, metav1.GetOptions{})
-
-		// If it doesn't exist, create the clusterrole.
-		if errors.IsNotFound(err) {
-			pspClusterRole := &rbacv1.ClusterRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pspName,
-				},
-				Rules: []rbacv1.PolicyRule{
-					{
-						Verbs:         []string{"use"},
-						APIGroups:     []string{"policy"},
-						Resources:     []string{"podsecuritypolicies"},
-						ResourceNames: []string{pspName},
-					},
-				},
-			}
-			_, err = client.RbacV1().ClusterRoles().Create(context.Background(), pspClusterRole, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
-	}
-
-	// A role binding to allow default service account in the installation namespace access to the PSP.
-	{
-		// Check if this cluster role binding already exists.
-		_, err := client.RbacV1().RoleBindings(namespace).Get(context.Background(), pspName, metav1.GetOptions{})
-
-		if errors.IsNotFound(err) {
-			pspRoleBinding := &rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: pspName,
-				},
-				Subjects: []rbacv1.Subject{
-					{
-						Kind:      rbacv1.ServiceAccountKind,
-						Name:      "default",
-						Namespace: namespace,
-					},
-				},
-				RoleRef: rbacv1.RoleRef{
-					Kind: "ClusterRole",
-					Name: pspName,
-				},
-			}
-
-			_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), pspRoleBinding, metav1.CreateOptions{})
-			require.NoError(t, err)
-		} else {
-			require.NoError(t, err)
-		}
-	}
+	_, err = client.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+	require.NoError(t, err)
 
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-		_ = client.PolicyV1beta1().PodSecurityPolicies().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().ClusterRoles().Delete(context.Background(), pspName, metav1.DeleteOptions{})
-		_ = client.RbacV1().RoleBindings(namespace).Delete(context.Background(), pspName, metav1.DeleteOptions{})
+		ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+		if err != nil {
+			return
+		}
+		lbls := ns.GetLabels()
+		if lbls == nil {
+			return
+		}
+		delete(lbls, "pod-security.kubernetes.io/enforce")
+		delete(lbls, "pod-security.kubernetes.io/audit")
+		delete(lbls, "pod-security.kubernetes.io/warn")
+		ns.SetLabels(lbls)
+		_, _ = client.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 	})
 }
 
