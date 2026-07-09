@@ -733,38 +733,6 @@ func (h *HelmCluster) uninstallReleaseNoHooks(t *testing.T, releaseName string) 
 	return err
 }
 
-// forceDeleteReleasePods immediately force-deletes (gracePeriod=0) all pods
-// that carry the label "release=<releaseName>" in the install namespace.
-//
-// On OpenShift, init containers stuck in PodInitializing can survive a
-// helm-uninstall for 30+ minutes because:
-//   - consul-dataplane's init loop retries indefinitely until its own internal
-//     timeout fires (typically ~60 s after the last Consul server contact);
-//   - until that internal timeout fires, the pod's DeletionTimestamp is set
-//     but the pod is NOT yet reported as Terminating by the Kubernetes endpoint
-//     controller, so WaitForAllPodsToBeReady still counts it as NotReady.
-//
-// Calling this function right after uninstallReleaseNoHooks and before the
-// re-install ensures the new install sees a clean pod namespace so that
-// WaitForAllPodsToBeReady only observes the freshly-created pods.
-func (h *HelmCluster) forceDeleteReleasePods(t *testing.T, releaseName string) {
-	t.Helper()
-	ns := h.helmOptions.KubectlOptions.Namespace
-	pods, err := h.kubernetesClient.CoreV1().Pods(ns).List(
-		context.Background(),
-		metav1.ListOptions{LabelSelector: "release=" + releaseName},
-	)
-	if err != nil {
-		logger.Logf(t, "warning: forceDeleteReleasePods: could not list pods for release %s: %v", releaseName, err)
-		return
-	}
-	opts := fastDeleteOptions()
-	for _, pod := range pods.Items {
-		logger.Logf(t, "force-deleting lingering pod %s/%s before re-install of release %s", ns, pod.Name, releaseName)
-		_ = h.kubernetesClient.CoreV1().Pods(ns).Delete(context.Background(), pod.Name, opts)
-	}
-}
-
 func fastDeleteOptions() metav1.DeleteOptions {
 	var gracePeriod int64 = 0
 	background := metav1.DeletePropagationBackground

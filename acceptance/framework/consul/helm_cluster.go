@@ -341,7 +341,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 				// Helm can leave a release in history-only state; remove it so upgrade --install can succeed.
 				logger.Logf(t, "Release %s is in history-only state, deleting release and retrying install: %s", h.releaseName, err)
 				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
-				h.forceDeleteReleasePods(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
 			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
@@ -351,7 +350,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 				// instead of a rolling upgrade (rolling upgrade leaves an extra pod
 				// stuck NotReady on OCP, blocking WaitForAllPodsToBeReady).
 				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
-				h.forceDeleteReleasePods(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
 			if err != nil && isGatewayResourcesAlreadyExistsError(err) {
@@ -359,7 +357,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 				h.deleteGatewayResourcesJobIfExistsForRelease(r, h.releaseName)
 				// Uninstall before retry — same reason as above.
 				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
-				h.forceDeleteReleasePods(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
 			if err != nil && isServerACLInitCleanupAlreadyExistsError(err) {
@@ -367,7 +364,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 				h.deleteServerACLInitCleanupJobIfExistsForRelease(r, h.releaseName)
 				// Uninstall before retry — same reason as above.
 				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
-				h.forceDeleteReleasePods(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
 			// "cannot be imported" / "invalid ownership metadata" means a CRD (or other
@@ -383,7 +379,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 				// recreate CRDs with its old annotation after we clean them up.
 				h.deleteAllGatewayJobsInNamespace(t)
 				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
-				h.forceDeleteReleasePods(t, h.releaseName)
 				h.deleteStaleHelmReleases(t)
 				h.deleteStaleHelmManagedResources(t)
 				h.deleteStaleConsulOwnedCRDs(t)
@@ -403,7 +398,6 @@ func (h *HelmCluster) Create(t *testing.T) {
 					logger.Logf(t, "Transient install error for release %s — killing background gateway Jobs and removing partial release before retry: %v", h.releaseName, err)
 					h.deleteAllGatewayJobsInNamespace(t)
 					_ = h.uninstallReleaseNoHooks(t, h.releaseName)
-					h.forceDeleteReleasePods(t, h.releaseName)
 					h.deleteStaleHelmReleases(t)
 				}
 				r.Errorf("retrying helm upgrade for release %s after transient Kubernetes API error: %v", h.releaseName, err)

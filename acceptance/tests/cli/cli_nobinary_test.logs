@@ -1,7 +1,0 @@
-=== RUN   TestInstall
-=== RUN   TestInstall/not-secure
-    connect_helper.go:89: 2026-06-24T19:33:34+05:30 Installing Consul cluster
-    connect_helper.go:90: 2026-06-24T19:34:29+05:30 Waiting 20m0s for pods with label "release=consul" to be ready.
-    connect_helper.go:90: 2026-06-24T19:34:29+05:30 Finished waiting for pods to be ready.
-TestInstall/not-secure 2026-06-24T19:34:29+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin
-    connect_helper.go:138: 2026-06-24T19:34:30+05:30 creating static-server and static-client deployments

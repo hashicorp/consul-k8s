@@ -63,15 +63,6 @@ func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespac
 
 		var notReadyPods []string
 		for _, pod := range pods.Items {
-			// Skip pods that are already being deleted (DeletionTimestamp set).
-			// On OCP, init containers can keep a pod in PodInitializing for 30+
-			// minutes after its owning Deployment was deleted; including those pods
-			// in the not-ready list would block the check for the entire duration.
-			// The endpoint controller already excludes Terminating pods from
-			// service addresses, so skipping them here is safe.
-			if pod.DeletionTimestamp != nil {
-				continue
-			}
 			if !IsReady(pod) {
 				notReadyPods = append(notReadyPods, pod.Name)
 			}

@@ -1,3 +1,0 @@
-go: cannot find main module, but found .git/config in /Users/manishakumari/Work/single_ocp/consul-k8s
-	to create a module there, run:
-	go mod init
