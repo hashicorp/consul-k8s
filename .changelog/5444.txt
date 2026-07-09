@@ -1,0 +1,3 @@
+```release-note:feature
+api-gateway: Add support for external authorization (`ext_authz`) on the API Gateway. A new `extAuthz` block on the `RouteAuthFilter` CRD and a `consul.hashicorp.com/ext-authz` annotation (on `Gateway` and `HTTPRoute`) let you set the gateway-wide ext_authz posture and override it per route. Requires a Consul version with API Gateway `ext_authz` support.
+```
