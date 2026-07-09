@@ -34,6 +34,10 @@ func TestPartitions_Gateway(t *testing.T) {
 		t.Skipf("skipping this test because -enable-enterprise is not set")
 	}
 
+	if cfg.EnableOpenshift || cfg.UseOpenshift {
+		t.Skipf("skipping this test because some gateway changes related to aws CSL-13250 is not yet merged into main branch and those changes are required to run peering tests on OpenShift")
+	}
+
 	const defaultPartition = "default"
 	const secondaryPartition = "secondary"
 
@@ -73,6 +77,10 @@ func TestPartitions_Gateway(t *testing.T) {
 		defaultPartitionHelmValues["server.exposeService.type"] = "NodePort"
 		defaultPartitionHelmValues["server.exposeService.nodePort.https"] = "30000"
 		defaultPartitionHelmValues["server.exposeService.nodePort.grpc"] = "30100"
+	} else if cfg.EnableOpenshift || cfg.UseOpenshift {
+		// On ROSA/OpenShift with AWS Load Balancer Controller, NLBs default to internal-facing.
+		// Force internet-facing so the expose-servers LB is publicly resolvable from any cluster.
+		defaultPartitionHelmValues["server.exposeService.annotations"] = `"service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing"`
 	}
 
 	releaseName := helpers.RandomName()
@@ -282,7 +290,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		}
 
 		logger.Log(t, "patching route to target server")
-		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 		logger.Log(t, "checking that the connection is not successful because there's no intention")
 		k8s.CheckStaticServerHTTPConnectionFailing(t, secondaryPartitionClusterStaticClientOpts, StaticClientName, targetAddress)
@@ -342,7 +350,7 @@ func TestPartitions_Gateway(t *testing.T) {
 		})
 
 		logger.Log(t, "patching route to target server")
-		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		k8s.RunKubectl(t, secondaryPartitionClusterStaticServerOpts, "patch", "httproutes.gateway.networking.k8s.io", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
 
 		logger.Log(t, "logging gateway + route for debugging")
 

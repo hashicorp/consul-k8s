@@ -6,6 +6,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul/api"
@@ -33,6 +34,14 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
+)
+
+const (
+	retryWaitDuration        = 20 * time.Second
+	retryMaxCount            = 5
+	staleConsulLabelSelector = "chart=consul-helm"
+	openShiftCleanupWait     = 20 * time.Second
+	openShiftCleanupCount    = 5
 )
 
 // HelmCluster implements Cluster and uses Helm
@@ -56,9 +65,11 @@ type HelmCluster struct {
 	releaseName        string
 	runtimeClient      client.Client
 	kubernetesClient   kubernetes.Interface
+	isOpenShiftGTE419  bool
 	noCleanupOnFailure bool
 	noCleanup          bool
 	debugDirectory     string
+	enableOpenshift    bool
 	logger             terratestLogger.TestLogger
 }
 
@@ -69,6 +80,7 @@ func NewHelmCluster(
 	cfg *config.TestConfig,
 	releaseName string,
 ) *HelmCluster {
+
 	if cfg.EnableRestrictedPSAEnforcement {
 		configureNamespace(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
@@ -78,6 +90,7 @@ func NewHelmCluster(
 	}
 
 	if cfg.EnableOpenshift && cfg.EnableTransparentProxy {
+		ensureNamespaceExists(t, ctx.KubernetesClient(t), ctx.KubectlOptions(t).Namespace)
 		configureSCCs(t, ctx.KubernetesClient(t), cfg, ctx.KubectlOptions(t).Namespace)
 	}
 
@@ -94,14 +107,52 @@ func NewHelmCluster(
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
 
+	// Auto-detect the OCP version from the cluster so the correct chart behaviour
+	// is applied regardless of which cluster version the test runs against.
+	// The -is-openshift-greater-than-4-18 CLI flag is used only as a fallback if
+	// detection fails (e.g. insufficient permissions or non-OpenShift cluster).
+	isOnOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
+	isOCPGreaterThan418 := cfg.IsOpenshiftGreaterThan4_18
+	if isOnOpenShift {
+		isOCPGreaterThan418 = detectIsOpenShiftGreaterThan418(t, ctx, cfg.IsOpenshiftGreaterThan4_18)
+	}
+
+	if isOnOpenShift {
+		applyOpenShiftDefaults(t, cfg, values, isOCPGreaterThan418)
+	}
+
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	// Wait up to 15 min for K8s resources to be in a ready state. Increasing
 	// this from the default of 5 min could help with flakiness in environments
 	// like AKS where volumes take a long time to mount.
+	//
+	// On OpenShift, --force-conflicts is added to install/upgrade so that Helm
+	// forcibly takes ownership of any Server-Side Apply managed-field conflicts.
+	// These conflicts arise when CRDs (installed by gateway-resources jobs) still
+	// carry managed fields from a previous Helm release (e.g. meta.helm.sh/release-name
+	// pointing to an old test release name). Without this flag all 5 install retries
+	// fail immediately with "conflict occurred while applying object ... Apply failed
+	// with N conflicts: conflicts with \"helm\"".
+	// OCP installs take longer than non-OCP because of image pulls from
+	// registry.connect.redhat.com, SCC validation, and slower node scheduling.
+	// Use a longer timeout specifically for OCP to avoid spurious timeouts that
+	// waste retry budget and leave stale pending-install releases on the cluster.
+	installTimeout := "15m"
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		installTimeout = "25m"
+	}
+	installUpgradeArgs := []string{"--timeout", installTimeout, "--debug", "--skip-crds"}
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		// --force-conflicts was introduced in Helm 3.13.0. Only add it when the
+		// installed Helm binary supports it — older CI runners may not.
+		if helmSupportsForceConflicts(t) {
+			installUpgradeArgs = append(installUpgradeArgs, "--force-conflicts")
+		}
+	}
 	extraArgs := map[string][]string{
-		"install": {"--timeout", "15m", "--debug", "--skip-crds"},
-		"upgrade": {"--timeout", "15m", "--debug", "--skip-crds"},
+		"install": installUpgradeArgs,
+		"upgrade": installUpgradeArgs,
 		"delete":  {"--timeout", "15m", "--debug"},
 	}
 
@@ -118,18 +169,136 @@ func NewHelmCluster(
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
+		isOpenShiftGTE419:  isOCPGreaterThan418,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
+		enableOpenshift:    cfg.EnableOpenshift || cfg.UseOpenshift,
 		logger:             logger,
 	}
+}
+
+// helmSupportsForceConflicts returns true if the installed Helm binary is
+// version 3.13.0 or later, which is when --force-conflicts was introduced.
+// On any error or unexpected output it returns false so the flag is simply
+// omitted rather than causing the test to fail.
+func helmSupportsForceConflicts(t *testing.T) bool {
+	t.Helper()
+	out, err := helm.RunHelmCommandAndGetOutputE(t, &helm.Options{}, "version", "--short")
+	if err != nil {
+		logger.Logf(t, "warning: could not determine Helm version, skipping --force-conflicts: %s", err)
+		return false
+	}
+	// Output is like "v3.14.2+g..." or "v3.12.0".
+	out = strings.TrimSpace(out)
+	out = strings.TrimPrefix(out, "v")
+	// Strip any build metadata (e.g. "+g1234abc").
+	if idx := strings.Index(out, "+"); idx != -1 {
+		out = out[:idx]
+	}
+	parts := strings.Split(out, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	major, errMaj := strconv.Atoi(parts[0])
+	minor, errMin := strconv.Atoi(parts[1])
+	if errMaj != nil || errMin != nil {
+		return false
+	}
+	supported := major > 3 || (major == 3 && minor >= 13)
+	logger.Logf(t, "Detected Helm version %s → --force-conflicts supported: %v", strings.Join(parts, "."), supported)
+	return supported
+}
+
+// detectIsOpenShiftGreaterThan418 queries the cluster's ClusterVersion resource to determine
+// whether this is an OpenShift cluster running version 4.19 or later. On any error
+// (e.g. non-OpenShift cluster, insufficient permissions) it falls back to flagFallback.
+func detectIsOpenShiftGreaterThan418(t *testing.T, ctx environment.TestContext, flagFallback bool) bool {
+	t.Helper()
+	out, err := k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t),
+		"get", "clusterversion", "version",
+		"-o", "jsonpath={.status.desired.version}",
+		"--ignore-not-found=true",
+	)
+	if err != nil || strings.TrimSpace(out) == "" {
+		logger.Logf(t, "Could not detect OpenShift cluster version (err=%v output=%q); using flag fallback: isOCPGreaterThan418=%v", err, out, flagFallback)
+		return flagFallback
+	}
+	versionStr := strings.TrimSpace(out)
+	parts := strings.Split(versionStr, ".")
+	if len(parts) < 2 {
+		logger.Logf(t, "Unexpected OpenShift version format %q; using flag fallback: isOCPGreaterThan418=%v", versionStr, flagFallback)
+		return flagFallback
+	}
+	major, errMajor := strconv.Atoi(parts[0])
+	minor, errMinor := strconv.Atoi(parts[1])
+	if errMajor != nil || errMinor != nil {
+		logger.Logf(t, "Could not parse OpenShift version %q; using flag fallback: isOCPGreaterThan418=%v", versionStr, flagFallback)
+		return flagFallback
+	}
+	isOCPGreaterThan418 := major > 4 || (major == 4 && minor > 18)
+	logger.Logf(t, "Detected OpenShift cluster version %s → isOCPGreaterThan418=%v", versionStr, isOCPGreaterThan418)
+	return isOCPGreaterThan418
+}
+
+func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[string]string, isOCPGreaterThan418 bool) {
+	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
+	// attempt to adopt or create them for per-test releases.
+	//4.18 either manageExternalCRDs or manageNonStandardCRDs will true with enableTcpRoute true
+	//4.19 pass flag isOCPGreaterThan4_18 to true
+	// OpenShift clusters can already have Gateway API CRDs managed outside this Helm release.
+	// Disable external CRD management to avoid Helm ownership conflicts during install.
+	values["global.openshift.enabled"] = "true"
+	values["connectInject.apiGateway.manageExternalCRDs"] = "false"
+	values["connectInject.apiGateway.manageNonStandardCRDs"] = "true"
+	//It will install the tcproute gateway.networking.k8s.io/v1alpha2 CRD
+	//& gateway controller will be watching for tcproutes in the cluster.
+	values["global.openshift.crds.enableTcpRoute"] = "true"
+
+	//Only installing custom gateway API CRDs in OpenShift for API Gateway tests.
+	//For other tests packages, we can rely on the standard Gateway API CRDs and avoid installing any custom CRDs.
+	if strings.HasPrefix(t.Name(), "TestAPIGateway") {
+		//To install custom gateway API CRDs in OpenShift for API Gateway tests,
+		//we need to enable the consulapi CRDs since the custom gateway API CRDs depend on some of the consulapi CRDs.
+		// However, if the test explicitly requests the legacy custom gateway CRD (gateways.consul.hashicorp.com),
+		// skip installing the new cgateways.consul.hashicorp.com CRD — the two share the same kind/listKind
+		// within consul.hashicorp.com and will conflict if both are applied simultaneously.
+		if values["global.openshift.crds.customConsulapi.enabled"] != "true" {
+			values["global.openshift.crds.consulapi.enabled"] = "true"
+		}
+	}
+
+	if isOCPGreaterThan418 {
+		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.19 and later.
+		values["global.openshift.isOcpGreaterthan4_18"] = "true"
+	}
+
+	// OpenShift's default security context constraints can cause issues with Helm test cleanup,
+	// so we set the affinity to null to allow the chart's default anti-affinity rules to take effect.
+	values["server.affinity"] = "null"
+
+	// OpenShift: Override container security context to allow OpenShift SCCs to manage permissions
+	// We need to disable runAsNonRoot since the Consul image runs as root by default
+	// OpenShift SCCs will manage the actual user/group assignments
+
+	// Must provide full security context when overriding to avoid using restrictedSecurityContext helper
+	values["server.containerSecurityContext.server.allowPrivilegeEscalation"] = "false"
+	values["server.containerSecurityContext.server.runAsNonRoot"] = "false"
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
 	t.Helper()
 
 	// check and remove any CRDs with finalizers
-	helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	if !h.enableOpenshift {
+		helpers.GetCRDRemoveFinalizers(t, h.helmOptions.KubectlOptions)
+	} else {
+		helpers.GetCRDRemoveFinalizersForCRDNames(t, h.helmOptions.KubectlOptions, helpers.OpenShiftCleanupCRDs(!h.isOpenShiftGTE419))
+	}
+
+	if h.enableOpenshift && !h.SkipCheckForPreviousInstallations {
+		h.cleanupOpenShiftBeforeInstall(t)
+	}
 
 	// Make sure we delete the cluster if we receive an interrupt signal and
 	// register cleanup so that we delete the cluster when test finishes.
@@ -158,10 +327,85 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
-		require.NoError(r, err)
-	})
+	if !h.enableOpenshift {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+			err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			require.NoError(r, err)
+		})
+	} else {
+		retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+			logger.Logf(t, "Installing Helm chart %s with release name %s in namespace %s", chartName, h.releaseName, h.helmOptions.KubectlOptions.Namespace)
+			err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			if err != nil && strings.Contains(err.Error(), "has no deployed releases") {
+				//TODO:: recheck this
+				// Helm can leave a release in history-only state; remove it so upgrade --install can succeed.
+				logger.Logf(t, "Release %s is in history-only state, deleting release and retrying install: %s", h.releaseName, err)
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+				logger.Logf(t, "Gateway cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
+				h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
+				// Uninstall the partial release so the retry does a fresh install
+				// instead of a rolling upgrade (rolling upgrade leaves an extra pod
+				// stuck NotReady on OCP, blocking WaitForAllPodsToBeReady).
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			if err != nil && isGatewayResourcesAlreadyExistsError(err) {
+				logger.Logf(t, "Gateway resources already exist for release %s, deleting resources and retrying install: %s", h.releaseName, err)
+				h.deleteGatewayResourcesJobIfExistsForRelease(r, h.releaseName)
+				// Uninstall before retry — same reason as above.
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			if err != nil && isServerACLInitCleanupAlreadyExistsError(err) {
+				logger.Logf(t, "Server ACL init cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
+				h.deleteServerACLInitCleanupJobIfExistsForRelease(r, h.releaseName)
+				// Uninstall before retry — same reason as above.
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
+			// "cannot be imported" / "invalid ownership metadata" means a CRD (or other
+			// cluster-scoped resource) still has a meta.helm.sh/release-name annotation
+			// from a different, stale release. This can happen when a background
+			// gateway-resources Job from a previous failed install re-applies CRDs AFTER
+			// our pre-install cleanup. Kill all consul gateway-resource Jobs (which are
+			// the writers), then re-run the full CRD + release cleanup before retrying.
+			if err != nil && isHelmOwnershipConflictError(err) {
+				logger.Logf(t, "Helm ownership conflict for release %s — killing background gateway Jobs and re-running stale CRD cleanup before retry: %s", h.releaseName, err)
+				// Delete ALL gateway-resources / gateway-cleanup Jobs in the namespace
+				// regardless of release name, so a stale background job can no longer
+				// recreate CRDs with its old annotation after we clean them up.
+				h.deleteAllGatewayJobsInNamespace(t)
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				h.deleteStaleHelmReleases(t)
+				h.deleteStaleHelmManagedResources(t)
+				h.deleteStaleConsulOwnedCRDs(t)
+				r.Errorf("retrying helm install for release %s after ownership conflict cleanup", h.releaseName)
+				return
+			}
+			if err != nil && isRetryableHelmInstallError(err) {
+				// After a timeout or transient error the install left partial resources on
+				// the cluster (pending-install release, running gateway Jobs, etc.). Kill
+				// all gateway Jobs so their kubectl-apply cannot overwrite CRD annotations
+				// with the old release name (which would cause an ownership conflict on the
+				// next attempt), then uninstall the partial release before retrying.
+				// We do NOT need to delete CRDs here: they are already annotated with the
+				// current release name (test-kvxicd), so Helm will accept them as its own
+				// on the next attempt without a conflict.
+				if h.enableOpenshift {
+					logger.Logf(t, "Transient install error for release %s — killing background gateway Jobs and removing partial release before retry: %v", h.releaseName, err)
+					h.deleteAllGatewayJobsInNamespace(t)
+					_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+					h.deleteStaleHelmReleases(t)
+				}
+				r.Errorf("retrying helm upgrade for release %s after transient Kubernetes API error: %v", h.releaseName, err)
+				return
+			}
+			require.NoError(r, err)
+		})
+	}
 
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
@@ -179,9 +423,9 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 	require.NoError(t, err)
 
 	// Forcibly delete all gateway classes and remove their finalizers.
-	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1beta1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
+	_ = h.runtimeClient.DeleteAllOf(context.Background(), &gwv1.GatewayClass{}, client.HasLabels{"release=" + h.releaseName})
 
-	var gatewayClassList gwv1beta1.GatewayClassList
+	var gatewayClassList gwv1.GatewayClassList
 	if h.runtimeClient.List(context.Background(), &gatewayClassList, &client.ListOptions{
 		LabelSelector: labels.NewSelector().Add(*requirement),
 	}) == nil {
@@ -204,10 +448,30 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		}
 	}
 
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
-		err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
-		require.NoError(r, err)
-	})
+	if !h.enableOpenshift {
+		retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+			err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			require.NoError(r, err)
+		})
+	} else {
+		retry.RunWith(h.cleanupRetryCounter(), t, func(r *retry.R) {
+			err := helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
+				h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
+				err = helm.DeleteE(r, h.helmOptions, h.releaseName, false)
+			}
+			if err != nil && h.enableOpenshift {
+				// In OpenShift acceptance runs, uninstall hooks can fail due to stale/missing
+				// cluster-scoped CRD state. Fall back to no-hooks uninstall so cleanup remains best-effort.
+				h.logger.Logf(r, "Helm delete failed for release %s in OpenShift, falling back to no-hooks uninstall: %v", h.releaseName, err)
+				err = h.uninstallReleaseNoHooks(t, h.releaseName)
+			}
+			// If the release is already deleted / not found, that is acceptable — proceed to resource cleanup.
+			if err != nil && !strings.Contains(err.Error(), "not found") && !strings.Contains(err.Error(), "already deleted") {
+				require.NoError(r, err)
+			}
+		})
+	}
 
 	// Retry because sometimes certain resources (like PVC) take time to delete
 	// in cloud providers.
@@ -281,9 +545,16 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, service := range services.Items {
 			if strings.Contains(service.Name, h.releaseName) {
-				err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
-				if !errors.IsNotFound(err) {
-					require.NoError(r, err)
+				if !h.enableOpenshift {
+					err := h.kubernetesClient.CoreV1().Services(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), service.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				} else {
+					err := h.deleteServiceWithFinalizerCleanup(context.Background(), h.helmOptions.KubectlOptions.Namespace, &service, h.cleanupDeleteOptions())
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
 				}
 			}
 		}
@@ -328,6 +599,30 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 			}
 		}
 
+		if h.enableOpenshift {
+			mutatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range mutatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					err := h.kubernetesClient.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(context.Background(), webhookConfig.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				}
+			}
+
+			validatingWebhookConfigs, err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(context.Background(), metav1.ListOptions{})
+			require.NoError(r, err)
+			for _, webhookConfig := range validatingWebhookConfigs.Items {
+				if strings.Contains(webhookConfig.Name, h.releaseName) {
+					err := h.kubernetesClient.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(context.Background(), webhookConfig.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				}
+			}
+		}
+
 		// Delete any secrets that have h.releaseName in their name.
 		secrets, err := h.kubernetesClient.CoreV1().Secrets(h.helmOptions.KubectlOptions.Namespace).List(context.Background(), metav1.ListOptions{})
 		require.NoError(r, err)
@@ -345,9 +640,16 @@ func (h *HelmCluster) Destroy(t *testing.T) {
 		require.NoError(r, err)
 		for _, job := range jobs.Items {
 			if strings.Contains(job.Name, h.releaseName) {
-				err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
-				if !errors.IsNotFound(err) {
-					require.NoError(r, err)
+				if !h.enableOpenshift {
+					err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, metav1.DeleteOptions{})
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
+				} else {
+					err := h.kubernetesClient.BatchV1().Jobs(h.helmOptions.KubectlOptions.Namespace).Delete(context.Background(), job.Name, h.cleanupDeleteOptions())
+					if !errors.IsNotFound(err) {
+						require.NoError(r, err)
+					}
 				}
 			}
 		}
@@ -624,6 +926,22 @@ func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.T
 	require.Failf(t, "Failed to create or update namespace", "Namespace=%s, CreateError=%s, UpdateError=%s", namespace, createErr, updateErr)
 }
 
+// ensureNamespaceExists creates the given namespace if it does not already exist.
+func ensureNamespaceExists(t *testing.T, client kubernetes.Interface, namespace string) {
+	t.Helper()
+	_, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, err = client.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	} else {
+		require.NoError(t, err)
+	}
+}
+
 // configureSCCs creates RoleBindings that bind the default service account to cluster roles
 // allowing access to the privileged Security Context Constraints on OpenShift.
 func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
@@ -653,7 +971,9 @@ func configureSCCs(t *testing.T, client kubernetes.Interface, cfg *config.TestCo
 		}
 
 		_, err = client.RbacV1().RoleBindings(namespace).Create(context.Background(), roleBinding, metav1.CreateOptions{})
-		require.NoError(t, err)
+		if err != nil && !errors.IsAlreadyExists(err) {
+			require.NoError(t, err)
+		}
 	} else {
 		require.NoError(t, err)
 	}

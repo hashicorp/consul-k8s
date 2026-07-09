@@ -13,6 +13,7 @@ import (
 
 	terratestk8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -148,6 +149,17 @@ func TestPeering_Connect(t *testing.T) {
 			logger.Log(t, "creating mesh config")
 			kustomizeMeshDir := "../fixtures/bases/mesh-peering"
 
+			// Manisha Test On OpenShift, Helm installs with --skip-crds so the Mesh CRD may not be
+			// registered yet immediately after Helm returns. Wait for it to be established.
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				for _, ctx := range []environment.TestContext{staticServerPeerClusterContext, staticClientPeerClusterContext} {
+					retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+						_, err := k8s.RunKubectlAndGetOutputE(r, ctx.KubectlOptions(r), "get", "crd", "meshes.consul.hashicorp.com")
+						require.NoError(r, err)
+					})
+				}
+			}
+
 			k8s.KubectlApplyK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 				k8s.KubectlDeleteK(t, staticServerPeerClusterContext.KubectlOptions(t), kustomizeMeshDir)
@@ -179,6 +191,15 @@ func TestPeering_Connect(t *testing.T) {
 				require.NoError(r, err)
 			})
 
+			// On OpenShift, delete any stale api-token on both clusters before creating
+			// the PeeringAcceptor so the controller always generates a fresh token.
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				_, _ = k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t),
+					"delete", "secret", "api-token", "--ignore-not-found=true")
+				_, _ = k8s.RunKubectlAndGetOutputE(t, staticServerPeerClusterContext.KubectlOptions(t),
+					"delete", "secret", "api-token", "--ignore-not-found=true")
+			}
+
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
@@ -192,11 +213,13 @@ func TestPeering_Connect(t *testing.T) {
 
 			// Copy secret from client peer to server peer.
 			k8s.CopySecret(t, staticClientPeerClusterContext, staticServerPeerClusterContext, "api-token")
+			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
+			})
 
 			// Create the peering dialer on the server peer.
 			k8s.KubectlApply(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, staticServerPeerClusterContext.KubectlOptions(t), "delete", "secret", "api-token")
 				k8s.KubectlDelete(t, staticServerPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-dialer.yaml")
 			})
 

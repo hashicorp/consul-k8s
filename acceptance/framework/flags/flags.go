@@ -62,6 +62,8 @@ type TestFlags struct {
 
 	flagDualStack bool
 
+	flagIsOpenshiftGreaterThan4_18 bool
+
 	once sync.Once
 }
 
@@ -166,6 +168,8 @@ func (t *TestFlags) init() {
 
 	flag.BoolVar(&t.flagDualStack, "dual-stack", false, "Dual stack test with both IPv4 and IPv6")
 
+	flag.BoolVar(&t.flagIsOpenshiftGreaterThan4_18, "is-openshift-greater-than-4-18", false, "Fallback: indicates if the OpenShift version is greater than 4.18. The version is normally auto-detected from the cluster's ClusterVersion resource; this flag is only used when auto-detection fails.")
+
 	if t.flagEnterpriseLicense == "" {
 		t.flagEnterpriseLicense = os.Getenv("CONSUL_ENT_LICENSE")
 	}
@@ -242,16 +246,17 @@ func (t *TestFlags) TestConfigFromFlags() *config.TestConfig {
 		VaultHelmChartVersion:  t.flagVaultHelmChartVersion,
 		VaultServerVersion:     t.flagVaultServerVersion,
 
-		NoCleanupOnFailure: t.flagNoCleanupOnFailure,
-		NoCleanup:          t.flagNoCleanup,
-		DebugDirectory:     tempDir,
-		UseAKS:             t.flagUseAKS,
-		UseEKS:             t.flagUseEKS,
-		UseGKE:             t.flagUseGKE,
-		UseGKEAutopilot:    t.flagUseGKEAutopilot,
-		UseKind:            t.flagUseKind,
-		UseOpenshift:       t.flagUseOpenshift,
-		DualStack:          t.flagDualStack,
+		NoCleanupOnFailure:         t.flagNoCleanupOnFailure,
+		NoCleanup:                  t.flagNoCleanup,
+		DebugDirectory:             tempDir,
+		UseAKS:                     t.flagUseAKS,
+		UseEKS:                     t.flagUseEKS,
+		UseGKE:                     t.flagUseGKE,
+		UseGKEAutopilot:            t.flagUseGKEAutopilot,
+		UseKind:                    t.flagUseKind,
+		UseOpenshift:               t.flagUseOpenshift,
+		DualStack:                  t.flagDualStack,
+		IsOpenshiftGreaterThan4_18: t.flagIsOpenshiftGreaterThan4_18,
 	}
 
 	return c

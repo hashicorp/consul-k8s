@@ -62,7 +62,10 @@ func TestInstall(t *testing.T) {
 			}
 
 			// Run proxy list and get the two results.
-			listOut, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "list")
+			// Explicitly pass -namespace to ensure proxy list queries the correct namespace,
+			// since the CLI's namespace detection relies on the current kubeconfig context
+			// rather than the -context flag.
+			listOut, err := cli.Run(t, ctx.KubectlOptions(t), "proxy", "list", "-namespace", ctx.KubectlOptions(t).Namespace)
 			require.NoError(t, err)
 			logger.Log(t, string(listOut))
 			list := translateListOutput(listOut)
@@ -75,7 +78,7 @@ func TestInstall(t *testing.T) {
 			retrier := &retry.Timer{Timeout: 10 * time.Minute, Wait: 20 * time.Second}
 			retry.RunWith(retrier, t, func(r *retry.R) {
 				for podName := range list {
-					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName)
+					out, err := cli.Run(r, ctx.KubectlOptions(r), "proxy", "read", podName, "-namespace", ctx.KubectlOptions(r).Namespace)
 					require.NoError(r, err)
 
 					output := string(out)
@@ -104,7 +107,7 @@ func TestInstall(t *testing.T) {
 				require.NoError(r, err)
 
 				clientPodName = clientPod.Items[0].Name
-				upstreamsOut, err = cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "upstreams", "-pod", clientPodName)
+				upstreamsOut, err = cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "upstreams", "-pod", clientPodName, "-namespace", ctx.KubectlOptions(r).Namespace)
 				logger.Log(r, string(upstreamsOut))
 				require.NoError(r, err)
 			})
@@ -123,7 +126,7 @@ func TestInstall(t *testing.T) {
 					)
 					require.NoError(r, err)
 					serverIP := serverService.Items[0].Spec.ClusterIP
-					proxyOut, err := cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP)
+					proxyOut, err := cli.Run(r, ctx.KubectlOptions(r), "troubleshoot", "proxy", "-pod", clientPodName, "-upstream-ip", serverIP, "-namespace", ctx.KubectlOptions(r).Namespace)
 					require.NoError(r, err)
 					require.Regexp(r, "Upstream resources are valid", string(proxyOut))
 					logger.Log(r, string(proxyOut))
@@ -143,6 +146,8 @@ func TestInstall(t *testing.T) {
 						clientPodName,
 						"-upstream-envoy-id",
 						"static-server",
+						"-namespace",
+						ctx.KubectlOptions(r).Namespace,
 					)
 					require.NoError(r, err)
 					require.Regexp(r, "Upstream resources are valid", string(proxyOut))
@@ -161,7 +166,11 @@ func TestInstall(t *testing.T) {
 // translates the table into a map.
 func translateListOutput(raw []byte) map[string]string {
 	formatted := make(map[string]string)
-	for _, pod := range strings.Split(strings.TrimSpace(string(raw)), "\n")[3:] {
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) < 3 {
+		return formatted
+	}
+	for _, pod := range lines[3:] {
 		row := strings.Split(strings.TrimSpace(pod), "\t")
 
 		var name string

@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -19,7 +21,9 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -37,16 +41,19 @@ func KubernetesAPIServerHostFromOptions(t *testing.T, options *terratestk8s.Kube
 }
 
 // WaitForAllPodsToBeReady waits until all pods with the provided podLabelSelector
-// are in the ready status. It checks every 2 second for 20 minutes.
+// are in the ready status. It checks every 2 second for up to 30 minutes.
 // If there is at least one container in a pod that isn't ready after that,
 // it fails the test.
 func WaitForAllPodsToBeReady(t *testing.T, client kubernetes.Interface, namespace, podLabelSelector string) {
 	t.Helper()
 
-	// Wait up to 20m.
-	// On Azure, volume provisioning can sometimes take close to 5 min,
-	// so we need to give a bit more time for pods to become healthy.
-	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
+	// Wait up to 30m (Count=900, Wait=2s).
+	// On Azure, volume provisioning can take close to 5 min. On OpenShift,
+	// pod scheduling + SCC admission takes 25-30 min under load; the previous
+	// 20m (Count=600) caused timeout+retry cycles that doubled total setup time.
+	// Note: the effective timeout is longer than the nominal value because each
+	// pod-list API call on a loaded cluster adds 1-3s per iteration.
+	counter := &retry.Counter{Count: 900, Wait: 2 * time.Second}
 	logger.Logf(t, "Waiting %s for pods with label %q to be ready.", time.Duration(counter.Count*int(counter.Wait)), podLabelSelector)
 
 	retry.RunWith(counter, t, func(r *retry.R) {
@@ -138,10 +145,111 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 	var err error
 	retry.Run(t, func(r *retry.R) {
 		secret, err = sourceContext.KubernetesClient(r).CoreV1().Secrets(sourceContext.KubectlOptions(r).Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
-		secret.ResourceVersion = ""
 		require.NoError(r, err)
 	})
-	secret.Namespace = destContext.KubectlOptions(t).Namespace
-	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destContext.KubectlOptions(t).Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	destNamespace := destContext.KubectlOptions(t).Namespace
+
+	secretToCopy := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        secret.Name,
+			Namespace:   destNamespace,
+			Labels:      secret.Labels,
+			Annotations: secret.Annotations,
+		},
+		Type:      secret.Type,
+		Data:      secret.Data,
+		Immutable: secret.Immutable,
+	}
+
+	// Strip Helm-managed labels from the copy. The destination cluster/namespace
+	// has no knowledge of the source Helm release; keeping these labels causes the
+	// OCP pre-install cleanup (deleteStaleLabeledResources with chart=consul-helm)
+	// to silently delete secrets that were manually copied (e.g. CA certs, partition
+	// tokens), breaking pre-install Jobs that try to mount them as volumes.
+	if secretToCopy.Labels != nil {
+		delete(secretToCopy.Labels, "chart")
+		delete(secretToCopy.Labels, "heritage")
+		delete(secretToCopy.Labels, "app")
+		delete(secretToCopy.Labels, "release")
+	}
+
+	_, err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
+	if err != nil && apierrors.IsUnauthorized(err) {
+		logger.Logf(t, "client-go unauthorized creating secret %q in namespace %q; falling back to kubectl create/apply", secretName, destNamespace)
+
+		createNamespaceOut, createNamespaceErr := RunKubectlAndGetOutputE(t, destContext.KubectlOptions(t), "create", "namespace", destNamespace)
+		if createNamespaceErr != nil && !strings.Contains(createNamespaceOut, "AlreadyExists") {
+			require.NoError(t, createNamespaceErr, createNamespaceOut)
+		}
+
+		_, _ = RunKubectlAndGetOutputE(t, destContext.KubectlOptions(t), "delete", "secret", secretName, "-n", destNamespace, "--ignore-not-found=true")
+
+		createArgs := []string{"create", "secret", "generic", secretName, "-n", destNamespace, "--type", string(secret.Type)}
+		keys := make([]string, 0, len(secret.Data))
+		for k := range secret.Data {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			createArgs = append(createArgs, fmt.Sprintf("--from-literal=%s=%s", key, string(secret.Data[key])))
+		}
+
+		out, createErr := RunKubectlAndGetOutputE(t, destContext.KubectlOptions(t), createArgs...)
+		require.NoError(t, createErr, out)
+		return
+	}
+
+	if err != nil && apierrors.IsAlreadyExists(err) {
+		// If the existing secret already has the same data as what we want to copy,
+		// AND we are on the same cluster/namespace (single-cluster peering on OCP),
+		// we're done — the PeeringAcceptor controller already owns this secret with
+		// current data. Only apply this optimisation for the same-cluster case:
+		// for two-cluster peering a stale leftover secret from a previous
+		// --no-cleanup-on-failure run can have identical bytes if the Consul CA cert
+		// was reused, which would cause the PeeringDialer to use an expired token.
+		sameCluster := sourceContext.KubectlOptions(t).ContextName == destContext.KubectlOptions(t).ContextName &&
+			sourceContext.KubectlOptions(t).Namespace == destContext.KubectlOptions(t).Namespace
+		existingSecret, getErr := destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Get(
+			context.Background(), secretName, metav1.GetOptions{})
+		if sameCluster && getErr == nil && reflect.DeepEqual(existingSecret.Data, secretToCopy.Data) {
+			logger.Logf(t, "secret %q already exists in %q with matching data (same cluster); skipping re-create", secretName, destNamespace)
+			return
+		}
+
+		// First: force-patch any finalizers off the secret so deletion cannot be blocked.
+		// This matters on OpenShift where stale consul installs (no-cleanup-on-failure)
+		// may leave controllers running that added finalizers to this secret.
+		patchBytes := []byte(`{"metadata":{"finalizers":[]}}`)
+		_, patchErr := destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Patch(
+			context.Background(), secretName, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+		if patchErr != nil && !apierrors.IsNotFound(patchErr) {
+			logger.Logf(t, "warning: could not patch finalizers off secret %q: %v", secretName, patchErr)
+		}
+
+		// Delete with GracePeriodSeconds=0 (immediate, equivalent to --force --grace-period=0).
+		gracePeriod := int64(0)
+		err = destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Delete(
+			context.Background(), secretName, metav1.DeleteOptions{GracePeriodSeconds: &gracePeriod})
+		if err != nil && !apierrors.IsNotFound(err) {
+			require.NoError(t, err)
+		}
+
+		// Wait for the secret to be fully gone before recreating it.
+		// On OpenShift, even after force-delete the API server cache may lag —
+		// use a generous timeout as a safety net.
+		retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+			_, getErr := destContext.KubernetesClient(r).CoreV1().Secrets(destNamespace).Get(context.Background(), secretName, metav1.GetOptions{})
+			if getErr == nil {
+				r.Errorf("secret %q still exists, waiting for deletion", secretName)
+			}
+		})
+
+		retry.Run(t, func(r *retry.R) {
+			_, createErr := destContext.KubernetesClient(r).CoreV1().Secrets(destNamespace).Create(context.Background(), secretToCopy, metav1.CreateOptions{})
+			require.NoError(r, createErr)
+		})
+		return
+	}
+
 	require.NoError(t, err)
 }

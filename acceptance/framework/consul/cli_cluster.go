@@ -5,6 +5,7 @@ package consul
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -49,6 +50,7 @@ type CLICluster struct {
 	debugDirectory     string
 	logger             terratestLogger.TestLogger
 	cli                cli.CLI
+	enableOpenshift    bool
 }
 
 // NewCLICluster creates a new Consul cluster struct which can be used to create
@@ -85,6 +87,16 @@ func NewCLICluster(
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
 
+	isOnOpenShift := cfg.UseOpenshift || cfg.EnableOpenshift
+	isOCPGreaterThan418 := cfg.IsOpenshiftGreaterThan4_18
+	if isOnOpenShift {
+		isOCPGreaterThan418 = detectIsOpenShiftGreaterThan418(t, ctx, cfg.IsOpenshiftGreaterThan4_18)
+	}
+
+	if isOnOpenShift {
+		applyOpenShiftDefaults(t, cfg, values, isOCPGreaterThan418)
+	}
+
 	logger := terratestLogger.New(logger.TestLogger{})
 
 	kopts := ctx.KubectlOptions(t)
@@ -114,6 +126,7 @@ func NewCLICluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 		cli:                *cli,
+		enableOpenshift:    cfg.UseOpenshift || cfg.EnableOpenshift,
 	}
 }
 
@@ -139,12 +152,49 @@ func (c *CLICluster) Create(t *testing.T) {
 	args = append(args, "-timeout", "15m")
 	args = append(args, "-auto-approve")
 
-	out, err := c.cli.Run(t, c.kubectlOptions, args...)
-	if err != nil {
-		c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
-		c.logger.Logf(t, "command stdout: %s", string(out))
+	// On OpenShift, clean up any stale consul Helm releases across all namespaces before
+	// installing. A previous failed/interrupted test may have left a release in a different
+	// namespace (e.g. "default") which causes `consul-k8s install` to refuse with
+	// "A Consul cluster is already installed".
+	if c.enableOpenshift {
+		c.cleanupStaleConsulReleasesAllNamespaces(t)
+		// Delete any orphaned consul secrets left by a previous failed/interrupted install.
+		// `consul-k8s install` exits immediately with a non-zero status when it finds these,
+		// asking the operator to delete them manually. We do so proactively.
+		c.deleteStaleConsulSecrets(t)
 	}
-	require.NoError(t, err)
+
+	// On OpenShift, transient Kubernetes API errors (e.g. context deadline exceeded from
+	// admission webhooks) can cause the install to fail. Wrap the install in a retry loop
+	// so that transient failures are recovered by cleaning up the partial release and retrying.
+	if c.enableOpenshift {
+		retry.RunWith(&retry.Counter{Wait: retryWaitDuration, Count: retryMaxCount}, t, func(r *retry.R) {
+			out, err := c.cli.Run(r, c.kubectlOptions, args...)
+			if err != nil {
+				c.logger.Logf(r, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+				c.logger.Logf(r, "command stdout: %s", string(out))
+				if isCLIOutputRetryable(string(out)) {
+					// Attempt to clean up any partial/failed Helm release before retrying.
+					destroyArgs := []string{"uninstall", "-auto-approve", "-wipe-data"}
+					if _, destroyErr := c.cli.Run(r, c.kubectlOptions, destroyArgs...); destroyErr != nil {
+						c.logger.Logf(r, "cleanup before retry failed (ignoring): %s", destroyErr.Error())
+					}
+					// Also delete any stale secrets that appeared between retries.
+					c.deleteStaleConsulSecrets(t)
+					r.Errorf("retrying consul-k8s install after transient error: %v\noutput: %s", err, string(out))
+					return
+				}
+			}
+			require.NoError(r, err)
+		})
+	} else {
+		out, err := c.cli.Run(t, c.kubectlOptions, args...)
+		if err != nil {
+			c.logger.Logf(t, "error running command `consul-k8s %s`: %s", strings.Join(args, " "), err.Error())
+			c.logger.Logf(t, "command stdout: %s", string(out))
+		}
+		require.NoError(t, err)
+	}
 
 	k8s.WaitForAllPodsToBeReady(t, c.kubernetesClient, consulNS, fmt.Sprintf("release=%s", c.releaseName))
 }
@@ -310,4 +360,124 @@ func (c *CLICluster) setKube(args []string) []string {
 	}
 
 	return args
+}
+
+// cleanupStaleConsulReleasesAllNamespaces finds and force-removes any stale consul
+// Helm releases across all namespaces using helm directly (with --no-hooks to bypass
+// the gateway-cleanup job that may hang on a failed cluster). This prevents
+// `consul-k8s install` from refusing with "A Consul cluster is already installed".
+func (c *CLICluster) cleanupStaleConsulReleasesAllNamespaces(t *testing.T) {
+	t.Helper()
+
+	// Build helm options with no namespace so helm list -A searches everywhere.
+	koptsCopy := *c.kubectlOptions
+	koptsCopy.Namespace = ""
+	optsCopy := *c.helmOptions
+	optsCopy.KubectlOptions = &koptsCopy
+
+	output, err := helm.RunHelmCommandAndGetOutputE(t, &optsCopy, "list", "-A", "--output", "json")
+	if err != nil {
+		c.logger.Logf(t, "warning: failed to list helm releases for pre-install cleanup: %s", err)
+		return
+	}
+
+	var releases []struct {
+		Name      string `json:"name"`
+		Namespace string `json:"namespace"`
+		Chart     string `json:"chart"`
+	}
+	if err := json.Unmarshal([]byte(output), &releases); err != nil {
+		c.logger.Logf(t, "warning: failed to parse helm list output for pre-install cleanup: %s", err)
+		return
+	}
+
+	for _, release := range releases {
+		if !strings.Contains(release.Chart, "consul") {
+			continue
+		}
+		c.logger.Logf(t, "Removing stale consul Helm release %s in namespace %s before CLI install", release.Name, release.Namespace)
+		nsKopts := *c.kubectlOptions
+		nsKopts.Namespace = release.Namespace
+		nsOpts := *c.helmOptions
+		nsOpts.KubectlOptions = &nsKopts
+		if _, delErr := helm.RunHelmCommandAndGetOutputE(t, &nsOpts,
+			"uninstall", release.Name, "--no-hooks", "--timeout", "30s",
+		); delErr != nil {
+			c.logger.Logf(t, "warning: failed to uninstall stale release %s/%s: %s", release.Namespace, release.Name, delErr)
+		}
+	}
+}
+
+// isCLIOutputRetryable reports whether the CLI stdout output from a failed
+// consul-k8s install indicates a transient Kubernetes API error that is safe
+// to retry.  The CLI exits with status 1 for all errors, so we inspect the
+// human-readable output rather than the error itself.
+// deleteStaleConsulSecrets removes consul-owned secrets from the install
+// namespace that are left behind by a previous failed or interrupted install.
+// `consul-k8s install` refuses to proceed when it finds these and exits with
+// a non-zero status, so we delete them proactively before each install attempt.
+func (c *CLICluster) deleteStaleConsulSecrets(t *testing.T) {
+	t.Helper()
+	secrets, err := c.kubernetesClient.CoreV1().Secrets(consulNS).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		c.logger.Logf(t, "warning: failed to list secrets for pre-install cleanup: %s", err)
+		return
+	}
+	// These prefixes cover all secrets that `consul-k8s install` checks for.
+	staleSecretPrefixes := []string{
+		"consul-bootstrap-acl-token",
+		"consul-ca-cert",
+		"consul-ca-key",
+		"consul-connect-inject",
+		"consul-enterprise-license-acl-token",
+		"consul-server-cert",
+		"consul-federation",
+		"consul-partition-acl-token",
+	}
+	for _, secret := range secrets.Items {
+		// Never delete the license secret we create ourselves.
+		if secret.Name == "license" {
+			continue
+		}
+		for _, prefix := range staleSecretPrefixes {
+			if strings.HasPrefix(secret.Name, prefix) {
+				c.logger.Logf(t, "Deleting stale consul secret %s in namespace %s before CLI install", secret.Name, consulNS)
+				if delErr := c.kubernetesClient.CoreV1().Secrets(consulNS).Delete(
+					context.Background(), secret.Name, metav1.DeleteOptions{},
+				); delErr != nil && !errors.IsNotFound(delErr) {
+					c.logger.Logf(t, "warning: failed to delete stale secret %s: %s", secret.Name, delErr)
+				}
+				break
+			}
+		}
+	}
+}
+
+func isCLIOutputRetryable(output string) bool {
+	outputLower := strings.ToLower(output)
+	retryableSubstrings := []string{
+		"tls handshake timeout",
+		"connection reset by peer",
+		"connection refused",
+		"i/o timeout",
+		"context deadline exceeded",
+		"unexpected eof",
+		"http2: client connection lost",
+		"unable to connect to the server",
+		// A stale installation from a previous test run (e.g. a re-run after failure)
+		// may not have been fully cleaned up by cleanupStaleConsulReleasesAllNamespaces.
+		// Treat this as retryable so the retry block runs `consul-k8s uninstall -wipe-data`
+		// to fully remove the existing release before retrying the install.
+		"a consul cluster is already installed",
+		// `consul-k8s install` exits immediately when it finds leftover secrets from a
+		// previous install. The retry handler calls deleteStaleConsulSecrets() to remove
+		// them before the next attempt.
+		"found consul secrets",
+	}
+	for _, s := range retryableSubstrings {
+		if strings.Contains(outputLower, s) {
+			return true
+		}
+	}
+	return false
 }
