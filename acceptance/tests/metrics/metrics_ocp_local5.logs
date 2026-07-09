@@ -1,0 +1,84 @@
+=== RUN   TestComponentMetrics
+    metrics_test.go:69: 2026-07-06T17:28:23+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    metrics_test.go:69: 2026-07-06T17:28:23+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    metrics_test.go:69: 2026-07-06T17:28:23+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    metrics_test.go:69: 2026-07-06T17:28:23+05:30 Clearing stale finalizers on resources in namespace consul before Helm install
+    metrics_test.go:69: 2026-07-06T17:28:23+05:30 Deleting stale gateway Job test-fv4jwj-consul-gateway-resources-custom in namespace consul to stop it from recreating CRDs
+    metrics_test.go:69: 2026-07-06T17:28:23+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-06T17:28:24+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-06T17:28:24+05:30 Error: unknown flag: --all
+    metrics_test.go:69: 2026-07-06T17:28:24+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-06T17:28:24+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-06T17:28:24+05:30 []
+    metrics_test.go:69: 2026-07-06T17:28:24+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    metrics_test.go:69: 2026-07-06T17:28:31+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    metrics_test.go:69: 2026-07-06T17:28:31+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:251: 2026-07-06T17:28:32+05:30 Installing Helm chart ../../../charts/consul with release name test-baubp5 in namespace consul
+    helm_cluster.go:251: 2026-07-06T17:44:01+05:30 Installing Helm chart ../../../charts/consul with release name test-baubp5 in namespace consul
+    helm_cluster.go:282: 2026-07-06T17:44:03+05:30 Helm ownership conflict for release test-baubp5 — killing background gateway Jobs and re-running stale CRD cleanup before retry: error while running command: exit status 1; level=DEBUG msg="getting history for release" release=test-baubp5
+        level=DEBUG msg="Original chart version" version=""
+        level=DEBUG msg="Chart path" path=/Users/manishakumari/Work/single_ocp/consul-k8s/charts/consul
+        level=DEBUG msg="number of dependencies in the chart" chart=consul dependencies=0
+        Error: unable to continue with install: CustomResourceDefinition "customgatewayclasses.consul.hashicorp.com" in namespace "" exists and cannot be imported into the current release: invalid ownership metadata; annotation validation error: key "meta.helm.sh/release-name" must equal "test-baubp5": current value is "test-i51c6g"
+    helm_cluster.go:286: 2026-07-06T17:44:03+05:30 Deleting stale gateway Job test-i51c6g-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+    command.go:100: 2026-07-06T17:44:03+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-baubp5 --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T17:44:03+05:30 Error: uninstall: Release not loaded: test-baubp5: release: not found
+    command.go:100: 2026-07-06T17:44:03+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-06T17:44:04+05:30 Error: unknown flag: --all
+    helm_cluster.go:288: 2026-07-06T17:44:04+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-06T17:44:04+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-06T17:44:04+05:30 [{"name":"test-i51c6g","namespace":"consul","revision":"1","updated":"2026-07-06 12:02:11.194799424 +0000 UTC","status":"pending-install","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    helm_cluster.go:288: 2026-07-06T17:44:04+05:30 Deleting stale Helm release test-i51c6g in namespace consul before install
+    command.go:100: 2026-07-06T17:44:04+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-i51c6g --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T17:44:07+05:30 release "test-i51c6g" uninstalled
+    helm_cluster.go:290: 2026-07-06T17:44:07+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    helm_cluster.go:290: 2026-07-06T17:44:09+05:30 Deleting stale CRD gatewayclassconfigs.consul.hashicorp.com owned by release test-i51c6g before installing release test-baubp5
+    helm_cluster.go:290: 2026-07-06T17:44:09+05:30 Clearing finalizers on gatewayclassconfig.consul.hashicorp.com/consul-api-gateway before deleting stale CRD gatewayclassconfigs.consul.hashicorp.com
+Finalizers removed from CRD gatewayclassconfigs.consul.hashicorp.com
+    helm_cluster.go:290: 2026-07-06T17:44:15+05:30 CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+    helm_cluster.go:251: 2026-07-06T17:44:35+05:30 Installing Helm chart ../../../charts/consul with release name test-baubp5 in namespace consul
+    helm_cluster.go:251: 2026-07-06T18:00:06+05:30 Installing Helm chart ../../../charts/consul with release name test-baubp5 in namespace consul
+    helm_cluster.go:251: 2026-07-06T18:15:43+05:30 Installing Helm chart ../../../charts/consul with release name test-baubp5 in namespace consul
+    helm_cluster.go:282: 2026-07-06T18:15:45+05:30 Helm ownership conflict for release test-baubp5 — killing background gateway Jobs and re-running stale CRD cleanup before retry: error while running command: exit status 1; level=DEBUG msg="getting history for release" release=test-baubp5
+        level=DEBUG msg="Original chart version" version=""
+        level=DEBUG msg="Chart path" path=/Users/manishakumari/Work/single_ocp/consul-k8s/charts/consul
+        level=DEBUG msg="number of dependencies in the chart" chart=consul dependencies=0
+        Error: unable to continue with install: CustomResourceDefinition "customgatewayclasses.consul.hashicorp.com" in namespace "" exists and cannot be imported into the current release: invalid ownership metadata; annotation validation error: key "meta.helm.sh/release-name" must equal "test-baubp5": current value is "test-qqzn3j"
+    helm_cluster.go:286: 2026-07-06T18:15:45+05:30 Deleting stale gateway Job test-qqzn3j-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+    command.go:100: 2026-07-06T18:15:45+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-baubp5 --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T18:15:45+05:30 Error: uninstall: Release not loaded: test-baubp5: release: not found
+    command.go:100: 2026-07-06T18:15:45+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-06T18:15:45+05:30 Error: unknown flag: --all
+    helm_cluster.go:288: 2026-07-06T18:15:45+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-06T18:15:45+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-06T18:15:46+05:30 [{"name":"test-qqzn3j","namespace":"consul","revision":"1","updated":"2026-07-06 12:33:33.90465119 +0000 UTC","status":"pending-install","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    helm_cluster.go:288: 2026-07-06T18:15:46+05:30 Deleting stale Helm release test-qqzn3j in namespace consul before install
+    command.go:100: 2026-07-06T18:15:46+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-qqzn3j --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T18:15:49+05:30 release "test-qqzn3j" uninstalled
+    helm_cluster.go:290: 2026-07-06T18:15:49+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    helm_cluster.go:290: 2026-07-06T18:15:51+05:30 Deleting stale CRD gatewayclassconfigs.consul.hashicorp.com owned by release test-qqzn3j before installing release test-baubp5
+    helm_cluster.go:290: 2026-07-06T18:15:51+05:30 Clearing finalizers on gatewayclassconfig.consul.hashicorp.com/consul-api-gateway before deleting stale CRD gatewayclassconfigs.consul.hashicorp.com
+Finalizers removed from CRD gatewayclassconfigs.consul.hashicorp.com
+    helm_cluster.go:290: 2026-07-06T18:15:58+05:30 CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+    retry.go:219: logger.go:42: 2026-07-06T18:15:43+05:30 Running command helm with args [upgrade --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --timeout 15m --debug --skip-crds --force-conflicts --set client.enabled=true --set client.extraConfig="{\"log_level\": \"TRACE\"}" --set connectInject.apiGateway.manageExternalCRDs=false --set connectInject.apiGateway.manageNonStandardCRDs=true --set connectInject.enabled=true --set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 --set connectInject.transparentProxy.defaultEnabled=false --set controller.resources.requests.cpu=50m --set dns.enabled=false --set global.datacenter=dc1 --set global.enterpriseLicense.secretKey=key --set global.enterpriseLicense.secretName=license --set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi --set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi --set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi --set global.logLevel=debug --set global.metrics.enableAgentMetrics=true --set global.metrics.enabled=true --set global.openshift.crds.enableTcpRoute=true --set global.openshift.enabled=true --set global.openshift.isOcpGreaterthan4_18=true --set ingressGateways.defaults.resources.requests.cpu=50m --set ingressGateways.enabled=true --set ingressGateways.gateways[0].name=ingress-gateway --set ingressGateways.gateways[0].replicas=1 --set meshGateway.enabled=true --set meshGateway.replicas=1 --set meshGateway.resources.requests.cpu=50m --set meshGateway.service.type=ClusterIP --set server.affinity=null --set server.containerSecurityContext.server.allowPrivilegeEscalation=false --set server.containerSecurityContext.server.runAsNonRoot=false --set server.extraConfig="{\"log_level\": \"TRACE\"}" --set server.replicas=1 --set terminatingGateways.defaults.resources.requests.cpu=50m --set terminatingGateways.enabled=true --set terminatingGateways.gateways[0].name=terminating-gateway --set terminatingGateways.gateways[0].replicas=1 --install test-baubp5 /Users/manishakumari/Work/single_ocp/consul-k8s/charts/consul]
+        
+        logger.go:42: 2026-07-06T18:15:43+05:30 level=DEBUG msg="getting history for release" release=test-baubp5
+        
+        logger.go:42: 2026-07-06T18:15:43+05:30 Release "test-baubp5" does not exist. Installing it now.
+        
+        logger.go:42: 2026-07-06T18:15:43+05:30 level=DEBUG msg="Original chart version" version=""
+        
+        logger.go:42: 2026-07-06T18:15:43+05:30 level=DEBUG msg="Chart path" path=/Users/manishakumari/Work/single_ocp/consul-k8s/charts/consul
+        
+        logger.go:42: 2026-07-06T18:15:43+05:30 level=DEBUG msg="number of dependencies in the chart" chart=consul dependencies=0
+        
+        logger.go:42: 2026-07-06T18:15:45+05:30 Error: unable to continue with install: CustomResourceDefinition "customgatewayclasses.consul.hashicorp.com" in namespace "" exists and cannot be imported into the current release: invalid ownership metadata; annotation validation error: key "meta.helm.sh/release-name" must equal "test-baubp5": current value is "test-qqzn3j"
+        
+        retry.go:39: retrying helm install for release test-baubp5 after ownership conflict cleanup
+        
+    helpers.go:114: 2026-07-06T18:15:58+05:30 skipping resource cleanup
+    helpers.go:114: 2026-07-06T18:15:58+05:30 skipping resource cleanup
+--- FAIL: TestComponentMetrics (2861.59s)
+FAIL
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/metrics	2862.397s
+FAIL

@@ -1,0 +1,355 @@
+=== RUN   TestConnectInject_ProxyLifecycleShutdown
+=== RUN   TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_true,_gracePeriodSeconds:_5
+    connect_helper.go:89: 2026-06-23T14:39:53+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T14:39:58+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    connect_helper.go:90: 2026-06-23T14:39:58+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T14:39:58+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:39:58+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T14:39:59+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T14:39:59+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T14:39:59+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T14:39:59+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T14:40:00+05:30 []
+    connect_helper.go:90: 2026-06-23T14:40:00+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T14:40:04+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T14:40:05+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T14:40:06+05:30 Installing Helm chart ../../../charts/consul with release name test-uk1tfa in namespace consul
+    connect_helper.go:90: 2026-06-23T14:40:24+05:30 Waiting 20m0s for pods with label "release=test-uk1tfa" to be ready.
+    connect_helper.go:90: 2026-06-23T14:40:46+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_true,_gracePeriodSeconds:_5 2026-06-23T14:40:46+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-23T14:40:47+05:30 creating static-server and static-client deployments
+    connect_proxy_lifecycle_test.go:114: 2026-06-23T14:42:38+05:30 waiting for static-client and static-server to be registered with Consul
+    connect_helper.go:403: 2026-06-23T14:42:38+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-23T14:42:39+05:30 Took 597.001791ms to check if static server connection was successful
+    connect_proxy_lifecycle_test.go:157: 2026-06-23T14:42:39+05:30 killing the "static-client-6b8c8684dd-v8cxh" pod with 6seconds termination grace period
+    retry.go:219: logger.go:42: 2026-06-23T14:42:48+05:30 checking connectivity to static-server from terminating pod static-client-6b8c8684dd-v8cxh
+        
+        logger.go:42: 2026-06-23T14:42:48+05:30 Output: Error from server (NotFound): pods "static-client-6b8c8684dd-v8cxh" not found
+        .
+        
+        retry.go:39: exit status 1
+        
+    helpers.go:114: 2026-06-23T14:42:48+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:42:48+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:42:48+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:42:48+05:30 skipping resource cleanup
+=== NAME  TestConnectInject_ProxyLifecycleShutdown
+    logger.go:42: 2026-06-23T14:42:48+05:30 stopping monitor of the port-forwarded server
+=== RUN   TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_true,_gracePeriodSeconds:_5
+    connect_helper.go:89: 2026-06-23T14:42:48+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T14:42:53+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T14:42:53+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:42:53+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T14:43:01+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T14:43:01+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T14:43:01+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T14:43:01+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T14:43:01+05:30 [{"name":"test-uk1tfa","namespace":"consul","revision":"1","updated":"2026-06-23 14:40:06.979913 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_helper.go:90: 2026-06-23T14:43:01+05:30 Deleting stale Helm release test-uk1tfa in namespace consul before install
+    command.go:100: 2026-06-23T14:43:01+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-uk1tfa --no-hooks --timeout 30s]
+    command.go:185: 2026-06-23T14:43:05+05:30 release "test-uk1tfa" uninstalled
+    connect_helper.go:90: 2026-06-23T14:43:05+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T14:43:05+05:30 Deleting stale CRD customgatewayclasses.consul.hashicorp.com owned by release test-uk1tfa before installing release test-axajas
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    helpers.go:484: 2026-06-23T14:43:06+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    connect_helper.go:90: 2026-06-23T14:43:11+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T14:43:11+05:30 Deleting stale deployment resource deployment.apps/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:11+05:30 Deleting stale deployment resource deployment.apps/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:12+05:30 Deleting stale service resource service/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:12+05:30 Deleting stale service resource service/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:12+05:30 Deleting stale serviceaccount resource serviceaccount/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:12+05:30 Deleting stale serviceaccount resource serviceaccount/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:13+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:13+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:13+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:13+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:43:14+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T14:43:15+05:30 Installing Helm chart ../../../charts/consul with release name test-axajas in namespace consul
+    connect_helper.go:90: 2026-06-23T14:43:57+05:30 Waiting 20m0s for pods with label "release=test-axajas" to be ready.
+    connect_helper.go:90: 2026-06-23T14:44:01+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_true,_gracePeriodSeconds:_5 2026-06-23T14:44:01+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-23T14:44:02+05:30 creating static-server and static-client deployments
+    connect_proxy_lifecycle_test.go:114: 2026-06-23T14:46:01+05:30 waiting for static-client and static-server to be registered with Consul
+    connect_helper.go:314: 2026-06-23T14:46:02+05:30 checking that the connection is not successful because there's no intention
+    connect_helper.go:339: 2026-06-23T14:46:02+05:30 creating intention
+    connect_helper.go:403: 2026-06-23T14:46:02+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-23T14:46:03+05:30 Took 579.195625ms to check if static server connection was successful
+    connect_proxy_lifecycle_test.go:157: 2026-06-23T14:46:03+05:30 killing the "static-client-6b8c8684dd-gqsq6" pod with 6seconds termination grace period
+    retry.go:219: logger.go:42: 2026-06-23T14:46:13+05:30 checking connectivity to static-server from terminating pod static-client-6b8c8684dd-gqsq6
+        
+        logger.go:42: 2026-06-23T14:46:13+05:30 Output: Error from server (NotFound): pods "static-client-6b8c8684dd-gqsq6" not found
+        .
+        
+        retry.go:39: exit status 1
+        
+    helpers.go:114: 2026-06-23T14:46:13+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:46:13+05:30 skipping resource cleanup
+    retry.go:219: retry.go:39: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:132
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:183
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:190
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:127
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:1317
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:1667
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2030
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/runtime/panic.go:694
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:1022
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:221
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:203
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/connect/connect_proxy_lifecycle_test.go:180
+        	Error:      	"token created via login: {\"pod\":\"consul/static-client-6b8c8684dd-9kvn2\",\"pod-uid\":\"4195262a-ec2e-47f9-ad54-0a46c5706d7f\"}" should not contain "static-client"
+        	Test:       	TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_true,_gracePeriodSeconds:_5
+        
+        
+    helpers.go:114: 2026-06-23T14:48:13+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:48:13+05:30 skipping resource cleanup
+=== NAME  TestConnectInject_ProxyLifecycleShutdown
+    logger.go:42: 2026-06-23T14:48:13+05:30 stopping monitor of the port-forwarded server
+=== RUN   TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_5
+    connect_helper.go:89: 2026-06-23T14:48:13+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T14:48:18+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T14:48:18+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:18+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T14:48:25+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T14:48:26+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T14:48:26+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T14:48:26+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T14:48:26+05:30 [{"name":"test-axajas","namespace":"consul","revision":"1","updated":"2026-06-23 14:43:15.724828 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_helper.go:90: 2026-06-23T14:48:26+05:30 Deleting stale Helm release test-axajas in namespace consul before install
+    command.go:100: 2026-06-23T14:48:26+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-axajas --no-hooks --timeout 30s]
+    command.go:185: 2026-06-23T14:48:28+05:30 release "test-axajas" uninstalled
+    connect_helper.go:90: 2026-06-23T14:48:28+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T14:48:33+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T14:48:33+05:30 Deleting stale deployment resource deployment.apps/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:33+05:30 Deleting stale deployment resource deployment.apps/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:34+05:30 Deleting stale service resource service/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:34+05:30 Deleting stale service resource service/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:34+05:30 Deleting stale serviceaccount resource serviceaccount/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:34+05:30 Deleting stale serviceaccount resource serviceaccount/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:35+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:35+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:35+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:35+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:48:36+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T14:48:37+05:30 Installing Helm chart ../../../charts/consul with release name test-ojxgbt in namespace consul
+    connect_helper.go:90: 2026-06-23T14:48:53+05:30 Waiting 20m0s for pods with label "release=test-ojxgbt" to be ready.
+    connect_helper.go:90: 2026-06-23T14:49:13+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_5 2026-06-23T14:49:13+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-23T14:49:13+05:30 creating static-server and static-client deployments
+    connect_proxy_lifecycle_test.go:114: 2026-06-23T14:50:48+05:30 waiting for static-client and static-server to be registered with Consul
+    connect_helper.go:403: 2026-06-23T14:50:49+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-23T14:50:49+05:30 Took 566.254917ms to check if static server connection was successful
+    connect_proxy_lifecycle_test.go:157: 2026-06-23T14:50:49+05:30 killing the "static-client-6b8c8684dd-2bksb" pod with 6seconds termination grace period
+    connect_helper.go:403: 2026-06-23T14:50:50+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-23T14:50:51+05:30 Took 1.15352175s to check if static server connection was successful
+    retry.go:219: logger.go:42: 2026-06-23T14:50:59+05:30 checking connectivity to static-server from terminating pod static-client-6b8c8684dd-2bksb
+        
+        logger.go:42: 2026-06-23T14:51:00+05:30 Output: Error from server (NotFound): pods "static-client-6b8c8684dd-2bksb" not found
+        .
+        
+        retry.go:39: exit status 1
+        
+    helpers.go:114: 2026-06-23T14:51:00+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:51:00+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:51:00+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:51:00+05:30 skipping resource cleanup
+=== NAME  TestConnectInject_ProxyLifecycleShutdown
+    logger.go:42: 2026-06-23T14:51:00+05:30 stopping monitor of the port-forwarded server
+=== RUN   TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_5
+    connect_helper.go:89: 2026-06-23T14:51:00+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T14:51:04+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T14:51:04+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:51:05+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T14:51:12+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T14:51:12+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T14:51:12+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T14:51:12+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T14:51:13+05:30 [{"name":"test-ojxgbt","namespace":"consul","revision":"1","updated":"2026-06-23 14:48:37.507381 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_helper.go:90: 2026-06-23T14:51:13+05:30 Deleting stale Helm release test-ojxgbt in namespace consul before install
+    command.go:100: 2026-06-23T14:51:13+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-ojxgbt --no-hooks --timeout 30s]
+    command.go:185: 2026-06-23T14:52:54+05:30 release "test-ojxgbt" uninstalled
+    connect_helper.go:90: 2026-06-23T14:52:54+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T14:52:55+05:30 Deleting stale CRD customgatewayclasses.consul.hashicorp.com owned by release test-ojxgbt before installing release test-zorkwc
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    helpers.go:484: 2026-06-23T14:52:56+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    connect_helper.go:90: 2026-06-23T14:53:01+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T14:53:01+05:30 Deleting stale deployment resource deployment.apps/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:01+05:30 Deleting stale deployment resource deployment.apps/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:02+05:30 Deleting stale service resource service/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:02+05:30 Deleting stale service resource service/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:02+05:30 Deleting stale serviceaccount resource serviceaccount/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:02+05:30 Deleting stale serviceaccount resource serviceaccount/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:03+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:03+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:03+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:04+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:53:04+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T14:53:05+05:30 Installing Helm chart ../../../charts/consul with release name test-zorkwc in namespace consul
+    connect_helper.go:90: 2026-06-23T14:53:56+05:30 Waiting 20m0s for pods with label "release=test-zorkwc" to be ready.
+    connect_helper.go:90: 2026-06-23T14:53:57+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_5 2026-06-23T14:53:57+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-23T14:53:57+05:30 creating static-server and static-client deployments
+    connect_proxy_lifecycle_test.go:114: 2026-06-23T14:55:56+05:30 waiting for static-client and static-server to be registered with Consul
+    connect_helper.go:314: 2026-06-23T14:55:56+05:30 checking that the connection is not successful because there's no intention
+    connect_helper.go:339: 2026-06-23T14:55:57+05:30 creating intention
+    connect_helper.go:403: 2026-06-23T14:55:57+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-23T14:55:57+05:30 Took 596.521583ms to check if static server connection was successful
+    connect_proxy_lifecycle_test.go:157: 2026-06-23T14:55:57+05:30 killing the "static-client-6b8c8684dd-4xt4q" pod with 6seconds termination grace period
+    retry.go:219: logger.go:42: 2026-06-23T14:56:06+05:30 checking connectivity to static-server from terminating pod static-client-6b8c8684dd-4xt4q
+        
+        logger.go:42: 2026-06-23T14:56:06+05:30 Output: Error from server (NotFound): pods "static-client-6b8c8684dd-4xt4q" not found
+        .
+        
+        retry.go:39: exit status 1
+        
+    helpers.go:114: 2026-06-23T14:56:06+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:56:06+05:30 skipping resource cleanup
+    retry.go:219: retry.go:39: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:131
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:183
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:190
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:127
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:1317
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:1667
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2030
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/runtime/panic.go:694
+        	            				/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:1022
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:221
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:203
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/connect/connect_proxy_lifecycle_test.go:180
+        	Error:      	"token created via login: {\"pod\":\"consul/static-server-69cfbfc7d5-ths7f\",\"pod-uid\":\"15453783-df73-4267-8cad-5a3fe771dab4\"}" should not contain "static-server"
+        	Test:       	TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_5
+        
+        
+    helpers.go:114: 2026-06-23T14:58:06+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T14:58:06+05:30 skipping resource cleanup
+    port_forward.go:56: 2026-06-23T14:58:06+05:30 stopping monitor of the port-forwarded server
+=== RUN   TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_0
+    connect_helper.go:89: 2026-06-23T14:58:06+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T14:58:11+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T14:58:11+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:11+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T14:58:20+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T14:58:20+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T14:58:20+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T14:58:20+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T14:58:21+05:30 [{"name":"test-zorkwc","namespace":"consul","revision":"1","updated":"2026-06-23 14:53:06.082219 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_helper.go:90: 2026-06-23T14:58:21+05:30 Deleting stale Helm release test-zorkwc in namespace consul before install
+    command.go:100: 2026-06-23T14:58:21+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-zorkwc --no-hooks --timeout 30s]
+    command.go:185: 2026-06-23T14:58:24+05:30 release "test-zorkwc" uninstalled
+    connect_helper.go:90: 2026-06-23T14:58:24+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T14:58:30+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T14:58:30+05:30 Deleting stale deployment resource deployment.apps/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:30+05:30 Deleting stale deployment resource deployment.apps/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:31+05:30 Deleting stale service resource service/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:31+05:30 Deleting stale service resource service/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:31+05:30 Deleting stale serviceaccount resource serviceaccount/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:31+05:30 Deleting stale serviceaccount resource serviceaccount/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:32+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:32+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:32+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:33+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T14:58:33+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T14:58:34+05:30 Installing Helm chart ../../../charts/consul with release name test-bgsfie in namespace consul
+    connect_helper.go:90: 2026-06-23T14:58:56+05:30 Waiting 20m0s for pods with label "release=test-bgsfie" to be ready.
+    connect_helper.go:90: 2026-06-23T14:59:17+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_0 2026-06-23T14:59:17+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-23T14:59:17+05:30 creating static-server and static-client deployments
+    connect_proxy_lifecycle_test.go:114: 2026-06-23T15:01:05+05:30 waiting for static-client and static-server to be registered with Consul
+    connect_helper.go:403: 2026-06-23T15:01:06+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-23T15:01:06+05:30 Took 624.274917ms to check if static server connection was successful
+    connect_proxy_lifecycle_test.go:157: 2026-06-23T15:01:06+05:30 killing the "static-client-6b8c8684dd-nmvzh" pod with 6seconds termination grace period
+    connect_proxy_lifecycle_test.go:229: 2026-06-23T15:01:14+05:30 scaling down the static-client deployment to 0 replicas to clean up the terminating pod "static-client-6b8c8684dd-nmvzh"
+    connect_proxy_lifecycle_test.go:248: 2026-06-23T15:01:16+05:30 ensuring pod is deregistered after termination
+    helpers.go:111: 2026-06-23T15:01:16+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_0
+    helpers.go:111: 2026-06-23T15:01:17+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_0
+    helpers.go:111: 2026-06-23T15:01:18+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_0
+    port_forward.go:56: 2026-06-23T15:01:18+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-06-23T15:01:38+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_0
+=== RUN   TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_0
+    connect_helper.go:89: 2026-06-23T15:01:38+05:30 Installing Consul cluster
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    connect_helper.go:90: 2026-06-23T15:01:43+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T15:01:43+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T15:01:43+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T15:01:44+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T15:01:44+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T15:01:44+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T15:01:44+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T15:01:45+05:30 []
+    connect_helper.go:90: 2026-06-23T15:01:45+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T15:01:50+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T15:01:51+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T15:01:52+05:30 Installing Helm chart ../../../charts/consul with release name test-asacym in namespace consul
+    connect_helper.go:90: 2026-06-23T15:02:32+05:30 Waiting 20m0s for pods with label "release=test-asacym" to be ready.
+    connect_helper.go:90: 2026-06-23T15:02:34+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_0 2026-06-23T15:02:34+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-23T15:02:35+05:30 creating static-server and static-client deployments
+    connect_proxy_lifecycle_test.go:114: 2026-06-23T15:04:30+05:30 waiting for static-client and static-server to be registered with Consul
+    connect_helper.go:314: 2026-06-23T15:04:30+05:30 checking that the connection is not successful because there's no intention
+    connect_helper.go:339: 2026-06-23T15:04:31+05:30 creating intention
+    connect_helper.go:403: 2026-06-23T15:04:31+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-23T15:04:31+05:30 Took 491.804083ms to check if static server connection was successful
+    connect_proxy_lifecycle_test.go:157: 2026-06-23T15:04:31+05:30 killing the "static-client-6b8c8684dd-2zk26" pod with 6seconds termination grace period
+    connect_proxy_lifecycle_test.go:229: 2026-06-23T15:04:38+05:30 scaling down the static-client deployment to 0 replicas to clean up the terminating pod "static-client-6b8c8684dd-2zk26"
+    connect_proxy_lifecycle_test.go:248: 2026-06-23T15:04:40+05:30 ensuring pod is deregistered after termination
+    helpers.go:111: 2026-06-23T15:04:40+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_0
+    helpers.go:111: 2026-06-23T15:04:41+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_0
+    helpers.go:111: 2026-06-23T15:04:42+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_0
+    port_forward.go:56: 2026-06-23T15:04:42+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-06-23T15:05:03+05:30 cleaning up resources for TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_0
+--- FAIL: TestConnectInject_ProxyLifecycleShutdown (1510.49s)
+    --- FAIL: TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_true,_gracePeriodSeconds:_5 (175.36s)
+    --- FAIL: TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_true,_gracePeriodSeconds:_5 (324.81s)
+    --- FAIL: TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_5 (166.88s)
+    --- FAIL: TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_5 (426.42s)
+    --- PASS: TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_false,_gracePeriodSeconds:_0 (211.73s)
+    --- PASS: TestConnectInject_ProxyLifecycleShutdown/secure:_true,_drainListeners:_false,_gracePeriodSeconds:_0 (205.29s)
+=== RUN   TestConnectInject_ProxyLifecycleShutdownJob
+    connect_helper.go:89: 2026-06-23T15:05:03+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T15:05:08+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    connect_helper.go:90: 2026-06-23T15:05:08+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T15:05:08+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T15:05:08+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T15:05:09+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T15:05:09+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T15:05:09+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T15:05:09+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T15:05:09+05:30 []
+    connect_helper.go:90: 2026-06-23T15:05:09+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T15:05:14+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T15:05:15+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T15:05:16+05:30 Installing Helm chart ../../../charts/consul with release name test-oq5sm1 in namespace consul
+    connect_helper.go:90: 2026-06-23T15:05:32+05:30 Waiting 20m0s for pods with label "release=test-oq5sm1" to be ready.
+    connect_helper.go:90: 2026-06-23T15:05:53+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdownJob 2026-06-23T15:05:53+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:260: 2026-06-23T15:05:53+05:30 creating static-server deployment
+    connect_proxy_lifecycle_test.go:306: 2026-06-23T15:07:34+05:30 waiting for static-server to be registered with Consul
+    connect_helper.go:222: 2026-06-23T15:07:34+05:30 creating job-client deployment
+    kubectl.go:72: 2026-06-23T15:07:34+05:30 Output: the namespace from the provided object "default" does not match the namespace "consul". You must pass '--namespace=default' to perform this operation.
+        the namespace from the provided object "default" does not match the namespace "consul". You must pass '--namespace=default' to perform this operation.
+        the namespace from the provided object "default" does not match the namespace "consul". You must pass '--namespace=default' to perform this operation.
+        .
+    kubectl.go:100: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/k8s/kubectl.go:100
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/k8s/deploy.go:112
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:223
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/connect/connect_proxy_lifecycle_test.go:325
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestConnectInject_ProxyLifecycleShutdownJob
+    helpers.go:114: 2026-06-23T15:07:34+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T15:07:34+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T15:07:34+05:30 skipping resource cleanup
+--- FAIL: TestConnectInject_ProxyLifecycleShutdownJob (151.00s)
+FAIL
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/connect	1662.393s
+FAIL

@@ -1,0 +1,62 @@
+=== RUN   TestInstall
+=== RUN   TestInstall/not-secure
+    connect_helper.go:89: 2026-06-24T16:58:45+05:30 Installing Consul cluster
+    cli.go:44: 2026-06-24T16:58:45+05:30 Running `consul-k8s install -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set dns.enableRedirection=true -set global.acls.manageSystemACLs=false -set connectInject.apiGateway.manageExternalCRDs=false -set server.containerSecurityContext.server.runAsNonRoot=false -set global.logLevel=debug -set server.replicas=1 -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi -set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi -set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi -set global.openshift.enabled=true -set global.enterpriseLicense.secretName=license -set connectInject.enabled=true -set global.tls.enabled=false -set global.openshift.crds.enableTcpRoute=true -set server.affinity=null -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set dns.enabled=true -set global.enterpriseLicense.secretKey=key -set connectInject.transparentProxy.defaultEnabled=false -set connectInject.apiGateway.manageNonStandardCRDs=true -set global.openshift.isOcpGreaterthan4_18=true -timeout 15m -auto-approve -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    connect_helper.go:90: 2026-06-24T16:58:46+05:30 error running command `consul-k8s install -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set dns.enableRedirection=true -set global.acls.manageSystemACLs=false -set connectInject.apiGateway.manageExternalCRDs=false -set server.containerSecurityContext.server.runAsNonRoot=false -set global.logLevel=debug -set server.replicas=1 -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi -set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi -set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi -set global.openshift.enabled=true -set global.enterpriseLicense.secretName=license -set connectInject.enabled=true -set global.tls.enabled=false -set global.openshift.crds.enableTcpRoute=true -set server.affinity=null -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set dns.enabled=true -set global.enterpriseLicense.secretKey=key -set connectInject.transparentProxy.defaultEnabled=false -set connectInject.apiGateway.manageNonStandardCRDs=true -set global.openshift.isOcpGreaterthan4_18=true -timeout 15m -auto-approve`: exit status 1
+    connect_helper.go:90: 2026-06-24T16:58:46+05:30 command stdout: 
+        ==> Checking if Consul can be installed
+         ! Cannot install Consul. A Consul cluster is already installed in namespace consul with name consul.
+            Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.
+        
+    connect_helper.go:90: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/cli_cluster.go:151
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:90
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/cli/cli_install_test.go:57
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestInstall/not-secure
+    helpers.go:114: 2026-06-24T16:58:46+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-24T16:58:46+05:30 skipping resource cleanup
+=== RUN   TestInstall/secure
+    connect_helper.go:89: 2026-06-24T16:58:46+05:30 Installing Consul cluster
+    cli.go:44: 2026-06-24T16:58:46+05:30 Running `consul-k8s install -set dns.enabled=true -set connectInject.transparentProxy.defaultEnabled=false -set connectInject.enabled=true -set dns.enableRedirection=true -set server.containerSecurityContext.server.runAsNonRoot=false -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.enterpriseLicense.secretKey=key -set global.tls.enabled=true -set server.affinity=null -set global.logLevel=debug -set server.replicas=1 -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi -set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi -set connectInject.apiGateway.manageExternalCRDs=false -set connectInject.apiGateway.manageNonStandardCRDs=true -set global.openshift.isOcpGreaterthan4_18=true -set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi -set global.enterpriseLicense.secretName=license -set global.openshift.enabled=true -set global.acls.manageSystemACLs=true -set global.openshift.crds.enableTcpRoute=true -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -timeout 15m -auto-approve -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    connect_helper.go:90: 2026-06-24T16:58:46+05:30 error running command `consul-k8s install -set dns.enabled=true -set connectInject.transparentProxy.defaultEnabled=false -set connectInject.enabled=true -set dns.enableRedirection=true -set server.containerSecurityContext.server.runAsNonRoot=false -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.enterpriseLicense.secretKey=key -set global.tls.enabled=true -set server.affinity=null -set global.logLevel=debug -set server.replicas=1 -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi -set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi -set connectInject.apiGateway.manageExternalCRDs=false -set connectInject.apiGateway.manageNonStandardCRDs=true -set global.openshift.isOcpGreaterthan4_18=true -set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi -set global.enterpriseLicense.secretName=license -set global.openshift.enabled=true -set global.acls.manageSystemACLs=true -set global.openshift.crds.enableTcpRoute=true -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -timeout 15m -auto-approve`: exit status 1
+    connect_helper.go:90: 2026-06-24T16:58:46+05:30 command stdout: 
+        ==> Checking if Consul can be installed
+         ! Cannot install Consul. A Consul cluster is already installed in namespace consul with name consul.
+            Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.
+        
+    connect_helper.go:90: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/cli_cluster.go:151
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:90
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/cli/cli_install_test.go:57
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestInstall/secure
+    helpers.go:114: 2026-06-24T16:58:46+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-24T16:58:46+05:30 skipping resource cleanup
+--- FAIL: TestInstall (1.15s)
+    --- FAIL: TestInstall/not-secure (0.75s)
+    --- FAIL: TestInstall/secure (0.40s)
+=== RUN   TestUpgrade
+    connect_helper.go:89: 2026-06-24T16:58:46+05:30 Installing Consul cluster
+    cli.go:44: 2026-06-24T16:58:46+05:30 Running `consul-k8s install -set global.openshift.enabled=true -set server.affinity=null -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set server.containerSecurityContext.server.runAsNonRoot=false -set global.logLevel=debug -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi -set global.enterpriseLicense.secretName=license -set global.enterpriseLicense.secretKey=key -set connectInject.transparentProxy.defaultEnabled=false -set dns.enableRedirection=true -set global.tls.enabled=false -set server.replicas=1 -set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi -set connectInject.enabled=true -set global.acls.manageSystemACLs=false -set connectInject.apiGateway.manageExternalCRDs=false -set connectInject.apiGateway.manageNonStandardCRDs=true -set global.openshift.crds.enableTcpRoute=true -set global.openshift.isOcpGreaterthan4_18=true -set dns.enabled=true -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi -timeout 15m -auto-approve -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    connect_helper.go:90: 2026-06-24T16:58:47+05:30 error running command `consul-k8s install -set global.openshift.enabled=true -set server.affinity=null -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set server.containerSecurityContext.server.runAsNonRoot=false -set global.logLevel=debug -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi -set global.enterpriseLicense.secretName=license -set global.enterpriseLicense.secretKey=key -set connectInject.transparentProxy.defaultEnabled=false -set dns.enableRedirection=true -set global.tls.enabled=false -set server.replicas=1 -set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi -set connectInject.enabled=true -set global.acls.manageSystemACLs=false -set connectInject.apiGateway.manageExternalCRDs=false -set connectInject.apiGateway.manageNonStandardCRDs=true -set global.openshift.crds.enableTcpRoute=true -set global.openshift.isOcpGreaterthan4_18=true -set dns.enabled=true -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi -timeout 15m -auto-approve`: exit status 1
+    connect_helper.go:90: 2026-06-24T16:58:47+05:30 command stdout: 
+        ==> Checking if Consul can be installed
+         ! Cannot install Consul. A Consul cluster is already installed in namespace consul with name consul.
+            Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.
+        
+    connect_helper.go:90: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/cli_cluster.go:151
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:90
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/cli/cli_upgrade_test.go:31
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestUpgrade
+    helpers.go:114: 2026-06-24T16:58:47+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-24T16:58:47+05:30 skipping resource cleanup
+--- FAIL: TestUpgrade (0.41s)
+FAIL
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/cli	2.264s
+FAIL

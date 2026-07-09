@@ -1,0 +1,7 @@
+consul-k8s not found in PATH, running make cli-dev
+==> Installing consul-k8s CLI tool for darwin/arm64
+cp: /bin/consul-k8s: Operation not permitted
+make: *** [cli-dev] Error 1
+failed to run make cli-dev: exit status 2
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/cli	12.261s
+FAIL

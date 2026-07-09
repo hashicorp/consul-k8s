@@ -1,0 +1,47 @@
+=== RUN   TestConnectInject_PermissiveMTLS
+    connect_helper.go:89: 2026-06-26T18:36:15+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-26T18:36:22+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-26T18:36:22+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:22+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-26T18:36:30+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-26T18:36:30+05:30 [{"name":"test-hlsmzx","namespace":"consul","revision":"1","updated":"2026-06-26 18:21:37.220461 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_helper.go:90: 2026-06-26T18:36:30+05:30 Deleting stale Helm release test-hlsmzx in namespace consul before install
+    command.go:100: 2026-06-26T18:36:30+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-hlsmzx --no-hooks --timeout 30s]
+    command.go:185: 2026-06-26T18:36:33+05:30 release "test-hlsmzx" uninstalled
+    connect_helper.go:90: 2026-06-26T18:36:33+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-26T18:36:34+05:30 Deleting stale CRD customgatewayclasses.consul.hashicorp.com owned by release test-hlsmzx before installing release test-zbo01w
+    connect_helper.go:90: 2026-06-26T18:36:34+05:30 Clearing finalizers on customgatewayclass.consul.hashicorp.com/consul-custom-class before deleting stale CRD customgatewayclasses.consul.hashicorp.com
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    helpers.go:493: 2026-06-26T18:36:36+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    connect_helper.go:90: 2026-06-26T18:36:41+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-26T18:36:41+05:30 Deleting stale deployment resource deployment.apps/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:41+05:30 Deleting stale deployment resource deployment.apps/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:41+05:30 Deleting stale service resource service/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:41+05:30 Deleting stale service resource service/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:42+05:30 Deleting stale serviceaccount resource serviceaccount/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:42+05:30 Deleting stale serviceaccount resource serviceaccount/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:42+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:42+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:43+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:43+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-26T18:36:43+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-06-26T18:36:44+05:30 Installing Helm chart ../../../charts/consul with release name test-zbo01w in namespace consul
+    connect_helper.go:90: 2026-06-26T18:37:24+05:30 Waiting 20m0s for pods with label "release=test-zbo01w" to be ready.
+    connect_helper.go:90: 2026-06-26T18:37:32+05:30 Finished waiting for pods to be ready.
+TestConnectInject_PermissiveMTLS 2026-06-26T18:37:32+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin
+    permissive_mtls_test.go:43: 2026-06-26T18:37:32+05:30 Creating static-client deployment with connect-inject=false
+    permissive_mtls_test.go:44: 2026-06-26T18:37:34+05:30 Creating static-server deployment with connect-inject=true
+    permissive_mtls_test.go:47: 2026-06-26T18:39:07+05:30 Check that incoming non-mTLS connection fails in MutualTLSMode = strict
+    permissive_mtls_test.go:50: 2026-06-26T18:39:08+05:30 Set allowEnablingPermissiveMutualTLS = true
+    permissive_mtls_test.go:53: 2026-06-26T18:39:08+05:30 Set mutualTLSMode = permissive for static-server
+    permissive_mtls_test.go:56: 2026-06-26T18:39:09+05:30 Check that incoming mTLS connection is successful in MutualTLSMode = permissive
+    permissive_mtls_test.go:57: 2026-06-26T18:39:09+05:30 Took 557.953833ms to check if static server connection was successful
+    helpers.go:111: 2026-06-26T18:39:10+05:30 cleaning up resources for TestConnectInject_PermissiveMTLS
+    helpers.go:111: 2026-06-26T18:39:10+05:30 cleaning up resources for TestConnectInject_PermissiveMTLS
+    helpers.go:111: 2026-06-26T18:39:11+05:30 cleaning up resources for TestConnectInject_PermissiveMTLS
+    port_forward.go:56: 2026-06-26T18:39:11+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-06-26T18:39:34+05:30 cleaning up resources for TestConnectInject_PermissiveMTLS
+    helpers.go:111: 2026-06-26T18:39:34+05:30 cleaning up resources for TestConnectInject_PermissiveMTLS
+--- PASS: TestConnectInject_PermissiveMTLS (199.42s)
+PASS
+ok  	github.com/hashicorp/consul-k8s/acceptance/tests/connect	201.889s

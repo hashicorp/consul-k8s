@@ -1,0 +1,878 @@
+Testing package: github.com/hashicorp/consul-k8s/acceptance/tests/wan-federation
+FAIL tests/wan-federation.TestWANFederation_Gateway (8562.42s)
+      wan_federation_gateway_test.go:42: 2026-07-07T00:43:38Z cleaning up stale WAN test workloads in namespace consul
+      wan_federation_gateway_test.go:43: 2026-07-07T00:43:43Z cleaning up stale WAN test workloads in namespace consul
+      wan_federation_gateway_test.go:44: 2026-07-07T00:43:49Z cleaning up stale WAN test workloads in namespace ns1
+      wan_federation_gateway_test.go:45: 2026-07-07T00:43:54Z cleaning up stale WAN test workloads in namespace ns2
+      wan_federation_gateway_test.go:46: 2026-07-07T00:43:59Z cleaning up stale WAN test workloads in namespace ns1
+      wan_federation_gateway_test.go:47: 2026-07-07T00:44:04Z cleaning up stale WAN test workloads in namespace ns2
+      helm_cluster.go:117: 2026-07-07T00:44:13Z Detected OpenShift cluster version 4.18.32 → isOCPGreaterThan418=false
+  TestWANFederation_Gateway 2026-07-07T00:44:13Z logger.go:66: Running command helm with args [version --short]
+  TestWANFederation_Gateway 2026-07-07T00:44:13Z logger.go:66: v3.9.4+gdbc6d8e
+      helm_cluster.go:149: 2026-07-07T00:44:13Z Detected Helm version 3.9.4 → --force-conflicts supported: false
+      wan_federation_gateway_test.go:72: 2026-07-07T00:44:24Z Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+      wan_federation_gateway_test.go:72: 2026-07-07T00:44:24Z Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+      wan_federation_gateway_test.go:72: 2026-07-07T00:44:24Z Resetting stale PSA enforcement label on namespace consul before Helm install
+      wan_federation_gateway_test.go:72: 2026-07-07T00:44:24Z Clearing stale finalizers on resources in namespace consul before Helm install
+      wan_federation_gateway_test.go:72: 2026-07-07T00:44:28Z Deleting stale Gateway API and Consul API resources before Helm install
+      command.go:100: 2026-07-07T00:44:30Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-07T00:44:31Z []
+      wan_federation_gateway_test.go:72: 2026-07-07T00:44:32Z Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races
+      kubectl.go:72: 2026-07-07T00:44:33Z Output: error: the server doesn't have a resource type "cgateways"
+          .
+      kubectl.go:72: 2026-07-07T00:44:35Z Output: error: the server doesn't have a resource type "cgrpcroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:44:37Z Output: error: the server doesn't have a resource type "chttproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:44:39Z Output: error: the server doesn't have a resource type "controlplanerequestlimits"
+          .
+      kubectl.go:72: 2026-07-07T00:44:41Z Output: error: the server doesn't have a resource type "creferencegrants"
+          .
+      kubectl.go:72: 2026-07-07T00:44:42Z Output: error: the server doesn't have a resource type "ctcproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:44:44Z Output: error: the server doesn't have a resource type "ctlsroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:44:46Z Output: error: the server doesn't have a resource type "cudproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:44:48Z Output: error: the server doesn't have a resource type "customgatewayclasses"
+          .
+      kubectl.go:72: 2026-07-07T00:44:49Z Output: error: the server doesn't have a resource type "customgatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-07T00:44:51Z Output: error: the server doesn't have a resource type "exportedservices"
+          .
+      kubectl.go:72: 2026-07-07T00:44:53Z Output: error: the server doesn't have a resource type "gatewayclassconfigs"
+          .
+      kubectl.go:72: 2026-07-07T00:44:55Z Output: error: the server doesn't have a resource type "gatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-07T00:44:57Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-07T00:44:58Z Output: error: the server doesn't have a resource type "grpcroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:45:00Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:45:02Z Output: error: the server doesn't have a resource type "ingressgateways"
+          .
+      kubectl.go:72: 2026-07-07T00:45:04Z Output: error: the server doesn't have a resource type "jwtproviders"
+          .
+      kubectl.go:72: 2026-07-07T00:45:06Z Output: error: the server doesn't have a resource type "meshes"
+          .
+      kubectl.go:72: 2026-07-07T00:45:07Z Output: error: the server doesn't have a resource type "meshservices"
+          .
+      kubectl.go:72: 2026-07-07T00:45:09Z Output: error: the server doesn't have a resource type "peeringacceptors"
+          .
+      kubectl.go:72: 2026-07-07T00:45:11Z Output: error: the server doesn't have a resource type "peeringdialers"
+          .
+      kubectl.go:72: 2026-07-07T00:45:13Z Output: error: the server doesn't have a resource type "proxydefaults"
+          .
+      kubectl.go:72: 2026-07-07T00:45:15Z Output: error: the server doesn't have a resource type "ratelimits"
+          .
+      kubectl.go:72: 2026-07-07T00:45:16Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-07T00:45:18Z Output: error: the server doesn't have a resource type "registrations"
+          .
+      kubectl.go:72: 2026-07-07T00:45:20Z Output: error: the server doesn't have a resource type "routeauthfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:45:22Z Output: error: the server doesn't have a resource type "routeretryfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:45:24Z Output: error: the server doesn't have a resource type "routetimeoutfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:45:25Z Output: error: the server doesn't have a resource type "routetlssdsfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:45:27Z Output: error: the server doesn't have a resource type "samenessgroups"
+          .
+      kubectl.go:72: 2026-07-07T00:45:29Z Output: error: the server doesn't have a resource type "servicedefaults"
+          .
+      kubectl.go:72: 2026-07-07T00:45:31Z Output: error: the server doesn't have a resource type "serviceintentions"
+          .
+      kubectl.go:72: 2026-07-07T00:45:33Z Output: error: the server doesn't have a resource type "serviceresolvers"
+          .
+      kubectl.go:72: 2026-07-07T00:45:34Z Output: error: the server doesn't have a resource type "servicerouters"
+          .
+      kubectl.go:72: 2026-07-07T00:45:36Z Output: error: the server doesn't have a resource type "servicesplitters"
+          .
+      kubectl.go:72: 2026-07-07T00:45:38Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:45:40Z Output: error: the server doesn't have a resource type "terminatinggateways"
+          .
+      kubectl.go:72: 2026-07-07T00:45:41Z Output: error: the server doesn't have a resource type "tlsroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:45:43Z Output: error: the server doesn't have a resource type "trafficpermissions"
+          .
+      kubectl.go:72: 2026-07-07T00:45:45Z Output: error: the server doesn't have a resource type "udproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:45:47Z Output: error: the server doesn't have a resource type "gatewayclasses"
+          .
+      kubectl.go:72: 2026-07-07T00:45:49Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-07T00:45:50Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:45:52Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-07T00:45:54Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      wan_federation_gateway_test.go:72: 2026-07-07T00:45:56Z CRD cgateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:45:56Z CRD cgrpcroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:45:57Z CRD chttproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:45:58Z CRD controlplanerequestlimits.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:45:59Z CRD creferencegrants.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:45:59Z CRD ctcproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:00Z CRD ctlsroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:01Z CRD cudproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:02Z CRD customgatewayclasses.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:02Z CRD customgatewaypolicies.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:03Z CRD exportedservices.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:04Z CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:05Z CRD gatewaypolicies.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:06Z CRD gateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:06Z CRD grpcroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:07Z CRD httproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:08Z CRD ingressgateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:09Z CRD jwtproviders.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:09Z CRD meshes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:10Z CRD meshservices.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:11Z CRD peeringacceptors.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:12Z CRD peeringdialers.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:12Z CRD proxydefaults.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:13Z CRD ratelimits.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:14Z CRD referencegrants.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:15Z CRD registrations.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:15Z CRD routeauthfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:16Z CRD routeretryfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:17Z CRD routetimeoutfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:18Z CRD routetlssdsfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:18Z CRD samenessgroups.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:19Z CRD servicedefaults.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:20Z CRD serviceintentions.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:21Z CRD serviceresolvers.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:22Z CRD servicerouters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:22Z CRD servicesplitters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:23Z CRD tcproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:24Z CRD terminatinggateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:25Z CRD tlsroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:25Z CRD trafficpermissions.auth.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:26Z CRD udproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:27Z CRD gatewayclasses.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:28Z CRD gateways.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:28Z CRD httproutes.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:29Z CRD referencegrants.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:30Z CRD tcproutes.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:30Z Deleting static resources in deployment, service, serviceaccount and rolebinding
+      wan_federation_gateway_test.go:72: 2026-07-07T00:46:33Z Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+      helm_cluster.go:337: 2026-07-07T00:46:40Z Installing Helm chart ../../../charts/consul with release name test-mejrij in namespace consul
+      wan_federation_gateway_test.go:72: 2026-07-07T00:49:36Z Waiting 20m0s for pods with label "release=test-mejrij" to be ready.
+      wan_federation_gateway_test.go:72: 2026-07-07T00:49:47Z Finished waiting for pods to be ready.
+      wan_federation_test.go:470: 2026-07-07T00:49:47Z Retrieving federation secret test-mejrij-consul-federation from the primary cluster and applying to the secondary
+      helm_cluster.go:117: 2026-07-07T00:49:50Z Detected OpenShift cluster version 4.18.32 → isOCPGreaterThan418=false
+  TestWANFederation_Gateway 2026-07-07T00:49:50Z logger.go:66: Running command helm with args [version --short]
+  TestWANFederation_Gateway 2026-07-07T00:49:50Z logger.go:66: v3.9.4+gdbc6d8e
+      helm_cluster.go:149: 2026-07-07T00:49:50Z Detected Helm version 3.9.4 → --force-conflicts supported: false
+      wan_federation_gateway_test.go:123: 2026-07-07T00:50:02Z Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+      wan_federation_gateway_test.go:123: 2026-07-07T00:50:02Z Resetting stale PSA enforcement label on namespace consul before Helm install
+      wan_federation_gateway_test.go:123: 2026-07-07T00:50:02Z Clearing stale finalizers on resources in namespace consul before Helm install
+      wan_federation_gateway_test.go:123: 2026-07-07T00:50:06Z Deleting stale Gateway API and Consul API resources before Helm install
+      command.go:100: 2026-07-07T00:50:38Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-07T00:50:41Z [{"name":"test-mejrij","namespace":"consul","revision":"1","updated":"2026-07-07 00:46:44.318864737 +0000 UTC","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+      wan_federation_gateway_test.go:123: 2026-07-07T00:50:41Z Deleting stale Helm release test-mejrij in namespace consul before install
+      command.go:100: 2026-07-07T00:50:41Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T00:50:53Z release "test-mejrij" uninstalled
+      wan_federation_gateway_test.go:123: 2026-07-07T00:50:54Z Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races
+      kubectl.go:72: 2026-07-07T00:50:56Z Output: error: the server doesn't have a resource type "cgateways"
+          .
+      kubectl.go:72: 2026-07-07T00:50:58Z Output: error: the server doesn't have a resource type "cgrpcroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:00Z Output: error: the server doesn't have a resource type "chttproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:01Z Output: error: the server doesn't have a resource type "controlplanerequestlimits"
+          .
+      kubectl.go:72: 2026-07-07T00:51:03Z Output: error: the server doesn't have a resource type "creferencegrants"
+          .
+      kubectl.go:72: 2026-07-07T00:51:05Z Output: error: the server doesn't have a resource type "ctcproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:07Z Output: error: the server doesn't have a resource type "ctlsroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:09Z Output: error: the server doesn't have a resource type "cudproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:10Z Output: error: the server doesn't have a resource type "customgatewayclasses"
+          .
+      kubectl.go:72: 2026-07-07T00:51:12Z Output: error: the server doesn't have a resource type "customgatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-07T00:51:14Z Output: error: the server doesn't have a resource type "exportedservices"
+          .
+      kubectl.go:72: 2026-07-07T00:51:16Z Output: error: the server doesn't have a resource type "gatewayclassconfigs"
+          .
+      kubectl.go:72: 2026-07-07T00:51:18Z Output: error: the server doesn't have a resource type "gatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-07T00:51:19Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-07T00:51:21Z Output: error: the server doesn't have a resource type "grpcroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:23Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:25Z Output: error: the server doesn't have a resource type "ingressgateways"
+          .
+      kubectl.go:72: 2026-07-07T00:51:27Z Output: error: the server doesn't have a resource type "jwtproviders"
+          .
+      kubectl.go:72: 2026-07-07T00:51:28Z Output: error: the server doesn't have a resource type "meshes"
+          .
+      kubectl.go:72: 2026-07-07T00:51:30Z Output: error: the server doesn't have a resource type "meshservices"
+          .
+      kubectl.go:72: 2026-07-07T00:51:32Z Output: error: the server doesn't have a resource type "peeringacceptors"
+          .
+      kubectl.go:72: 2026-07-07T00:51:34Z Output: error: the server doesn't have a resource type "peeringdialers"
+          .
+      kubectl.go:72: 2026-07-07T00:51:36Z Output: error: the server doesn't have a resource type "proxydefaults"
+          .
+      kubectl.go:72: 2026-07-07T00:51:37Z Output: error: the server doesn't have a resource type "ratelimits"
+          .
+      kubectl.go:72: 2026-07-07T00:51:39Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-07T00:51:41Z Output: error: the server doesn't have a resource type "registrations"
+          .
+      kubectl.go:72: 2026-07-07T00:51:43Z Output: error: the server doesn't have a resource type "routeauthfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:51:45Z Output: error: the server doesn't have a resource type "routeretryfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:51:46Z Output: error: the server doesn't have a resource type "routetimeoutfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:51:48Z Output: error: the server doesn't have a resource type "routetlssdsfilters"
+          .
+      kubectl.go:72: 2026-07-07T00:51:50Z Output: error: the server doesn't have a resource type "samenessgroups"
+          .
+      kubectl.go:72: 2026-07-07T00:51:52Z Output: error: the server doesn't have a resource type "servicedefaults"
+          .
+      kubectl.go:72: 2026-07-07T00:51:54Z Output: error: the server doesn't have a resource type "serviceintentions"
+          .
+      kubectl.go:72: 2026-07-07T00:51:55Z Output: error: the server doesn't have a resource type "serviceresolvers"
+          .
+      kubectl.go:72: 2026-07-07T00:51:57Z Output: error: the server doesn't have a resource type "servicerouters"
+          .
+      kubectl.go:72: 2026-07-07T00:51:59Z Output: error: the server doesn't have a resource type "servicesplitters"
+          .
+      kubectl.go:72: 2026-07-07T00:52:01Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:52:03Z Output: error: the server doesn't have a resource type "terminatinggateways"
+          .
+      kubectl.go:72: 2026-07-07T00:52:04Z Output: error: the server doesn't have a resource type "tlsroutes"
+          .
+      kubectl.go:72: 2026-07-07T00:52:06Z Output: error: the server doesn't have a resource type "trafficpermissions"
+          .
+      kubectl.go:72: 2026-07-07T00:52:08Z Output: error: the server doesn't have a resource type "udproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:52:10Z Output: error: the server doesn't have a resource type "gatewayclasses"
+          .
+      kubectl.go:72: 2026-07-07T00:52:12Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-07T00:52:13Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-07T00:52:15Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-07T00:52:17Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:19Z CRD cgateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:19Z CRD cgrpcroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:20Z CRD chttproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:21Z CRD controlplanerequestlimits.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:22Z CRD creferencegrants.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:22Z CRD ctcproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:23Z CRD ctlsroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:24Z CRD cudproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:25Z CRD customgatewayclasses.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:26Z CRD customgatewaypolicies.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:26Z CRD exportedservices.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:27Z CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:28Z CRD gatewaypolicies.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:29Z CRD gateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:29Z CRD grpcroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:30Z CRD httproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:31Z CRD ingressgateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:32Z CRD jwtproviders.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:32Z CRD meshes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:33Z CRD meshservices.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:34Z CRD peeringacceptors.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:35Z CRD peeringdialers.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:35Z CRD proxydefaults.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:36Z CRD ratelimits.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:37Z CRD referencegrants.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:38Z CRD registrations.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:39Z CRD routeauthfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:39Z CRD routeretryfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:40Z CRD routetimeoutfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:41Z CRD routetlssdsfilters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:42Z CRD samenessgroups.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:42Z CRD servicedefaults.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:43Z CRD serviceintentions.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:44Z CRD serviceresolvers.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:45Z CRD servicerouters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:45Z CRD servicesplitters.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:46Z CRD tcproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:47Z CRD terminatinggateways.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:48Z CRD tlsroutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:48Z CRD trafficpermissions.auth.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:49Z CRD udproutes.consul.hashicorp.com fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:50Z CRD gatewayclasses.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:51Z CRD gateways.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:52Z CRD httproutes.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:52Z CRD referencegrants.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:53Z CRD tcproutes.gateway.networking.k8s.io fully deleted
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:53Z Deleting static resources in deployment, service, serviceaccount and rolebinding
+      wan_federation_gateway_test.go:123: 2026-07-07T00:52:56Z Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+      helm_cluster.go:337: 2026-07-07T00:53:04Z Installing Helm chart ../../../charts/consul with release name test-mejrij in namespace consul
+      helm_cluster.go:390: 2026-07-07T01:19:04Z Transient install error for release test-mejrij — killing background gateway Jobs and removing partial release before retry: error while running command: exit status 1; history.go:56: [debug] getting history for release test-mejrij
+          install.go:178: [debug] Original chart version: ""
+          install.go:195: [debug] CHART PATH: /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul
+          
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" ServiceAccount
+          client.go:339: [debug] serviceaccounts "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Role
+          client.go:339: [debug] roles.rbac.authorization.k8s.io "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" RoleBinding
+          client.go:339: [debug] rolebindings.rbac.authorization.k8s.io "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-tls-init with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: ADDED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:128: [debug] creating 86 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-gateway-resources" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-gateway-resources" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-gateway-resources with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: ADDED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-server-acl-init-cleanup with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: ADDED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-server-acl-init-cleanup" Job
+          Error: failed post-install: timed out waiting for the condition
+          helm.go:84: [debug] failed post-install: timed out waiting for the condition
+      helm_cluster.go:391: 2026-07-07T01:19:05Z Deleting stale gateway Job test-mejrij-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+      command.go:100: 2026-07-07T01:19:05Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T01:19:17Z release "test-mejrij" uninstalled
+      command.go:100: 2026-07-07T01:19:17Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-07T01:19:18Z []
+      helm_cluster.go:337: 2026-07-07T01:19:38Z Installing Helm chart ../../../charts/consul with release name test-mejrij in namespace consul
+      helm_cluster.go:390: 2026-07-07T01:45:39Z Transient install error for release test-mejrij — killing background gateway Jobs and removing partial release before retry: error while running command: exit status 1; history.go:56: [debug] getting history for release test-mejrij
+          install.go:178: [debug] Original chart version: ""
+          install.go:195: [debug] CHART PATH: /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul
+          
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" ServiceAccount
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Role
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" RoleBinding
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-tls-init with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: ADDED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:128: [debug] creating 86 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-gateway-resources" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-gateway-resources" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-gateway-resources with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: ADDED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-server-acl-init-cleanup with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: ADDED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-server-acl-init-cleanup" Job
+          Error: failed post-install: timed out waiting for the condition
+          helm.go:84: [debug] failed post-install: timed out waiting for the condition
+      helm_cluster.go:391: 2026-07-07T01:45:40Z Deleting stale gateway Job test-mejrij-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+      command.go:100: 2026-07-07T01:45:40Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T01:45:52Z release "test-mejrij" uninstalled
+      command.go:100: 2026-07-07T01:45:52Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-07T01:45:53Z []
+      helm_cluster.go:337: 2026-07-07T01:46:13Z Installing Helm chart ../../../charts/consul with release name test-mejrij in namespace consul
+      helm_cluster.go:390: 2026-07-07T02:12:15Z Transient install error for release test-mejrij — killing background gateway Jobs and removing partial release before retry: error while running command: exit status 1; history.go:56: [debug] getting history for release test-mejrij
+          install.go:178: [debug] Original chart version: ""
+          install.go:195: [debug] CHART PATH: /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul
+          
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" ServiceAccount
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Role
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" RoleBinding
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-tls-init with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: ADDED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:128: [debug] creating 86 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-gateway-resources" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-gateway-resources" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-gateway-resources with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: ADDED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-server-acl-init-cleanup with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: ADDED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-server-acl-init-cleanup" Job
+          Error: failed post-install: timed out waiting for the condition
+          helm.go:84: [debug] failed post-install: timed out waiting for the condition
+      helm_cluster.go:391: 2026-07-07T02:12:16Z Deleting stale gateway Job test-mejrij-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+      command.go:100: 2026-07-07T02:12:16Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T02:12:29Z release "test-mejrij" uninstalled
+      command.go:100: 2026-07-07T02:12:29Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-07T02:12:30Z []
+      helm_cluster.go:337: 2026-07-07T02:12:50Z Installing Helm chart ../../../charts/consul with release name test-mejrij in namespace consul
+      helm_cluster.go:390: 2026-07-07T02:38:50Z Transient install error for release test-mejrij — killing background gateway Jobs and removing partial release before retry: error while running command: exit status 1; history.go:56: [debug] getting history for release test-mejrij
+          install.go:178: [debug] Original chart version: ""
+          install.go:195: [debug] CHART PATH: /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul
+          
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" ServiceAccount
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Role
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" RoleBinding
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-tls-init with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: ADDED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:128: [debug] creating 86 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-gateway-resources" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-gateway-resources" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-gateway-resources with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: ADDED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-server-acl-init-cleanup with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: ADDED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-server-acl-init-cleanup" Job
+          Error: failed post-install: timed out waiting for the condition
+          helm.go:84: [debug] failed post-install: timed out waiting for the condition
+      helm_cluster.go:391: 2026-07-07T02:38:51Z Deleting stale gateway Job test-mejrij-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+      command.go:100: 2026-07-07T02:38:51Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T02:39:04Z release "test-mejrij" uninstalled
+      command.go:100: 2026-07-07T02:39:04Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-07T02:39:05Z []
+      helm_cluster.go:337: 2026-07-07T02:39:25Z Installing Helm chart ../../../charts/consul with release name test-mejrij in namespace consul
+      helm_cluster.go:390: 2026-07-07T03:05:32Z Transient install error for release test-mejrij — killing background gateway Jobs and removing partial release before retry: error while running command: exit status 1; history.go:56: [debug] getting history for release test-mejrij
+          install.go:178: [debug] Original chart version: ""
+          install.go:195: [debug] CHART PATH: /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul
+          
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" ServiceAccount
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Role
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" RoleBinding
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-tls-init with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: ADDED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:128: [debug] creating 86 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-gateway-resources" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-gateway-resources" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-gateway-resources with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: ADDED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-server-acl-init-cleanup with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: ADDED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-server-acl-init-cleanup" Job
+          Error: failed post-install: timed out waiting for the condition
+          helm.go:84: [debug] failed post-install: timed out waiting for the condition
+      helm_cluster.go:391: 2026-07-07T03:05:33Z Deleting stale gateway Job test-mejrij-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+      command.go:100: 2026-07-07T03:05:33Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T03:05:45Z release "test-mejrij" uninstalled
+      command.go:100: 2026-07-07T03:05:45Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-07T03:05:46Z []
+      retry.go:219: logger.go:42: 2026-07-07T02:39:25Z Running command helm with args [upgrade --namespace consul --timeout 25m --debug --skip-crds --set client.extraConfig="{\"log_level\": \"TRACE\"}" --set connectInject.apiGateway.manageExternalCRDs=false --set connectInject.apiGateway.manageNonStandardCRDs=true --set connectInject.enabled=true --set connectInject.replicas=1 --set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 --set connectInject.transparentProxy.defaultEnabled=true --set dns.enabled=false --set global.acls.manageSystemACLs=true --set global.acls.replicationToken.secretKey=replicationToken --set global.acls.replicationToken.secretName=test-mejrij-consul-federation --set global.datacenter=dc2 --set global.enterpriseLicense.secretKey=key --set global.enterpriseLicense.secretName=license --set global.federation.enabled=true --set global.federation.k8sAuthMethodHost=*** --set global.federation.primaryDatacenter=dc1 --set global.image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-dev --set global.imageConsulDataplane=docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev --set global.imageK8S=docker.io/hashicorppreview/consul-k8s-control-plane:2.1.0-dev-pr-5466-8c3648d10a75045d5c5ffd5db4f79e510121981b --set global.logLevel=debug --set global.openshift.crds.enableTcpRoute=true --set global.openshift.enabled=true --set global.tls.caCert.secretKey=caCert --set global.tls.caCert.secretName=test-mejrij-consul-federation --set global.tls.caKey.secretKey=caKey --set global.tls.caKey.secretName=test-mejrij-consul-federation --set global.tls.enabled=true --set global.tls.httpsOnly=false --set meshGateway.enabled=true --set meshGateway.replicas=1 --set server.affinity=null --set server.containerSecurityContext.server.allowPrivilegeEscalation=false --set server.containerSecurityContext.server.runAsNonRoot=false --set server.extraConfig="{\"log_level\": \"TRACE\"}" --set server.extraVolumes[0].items[0].key=serverConfigJSON --set server.extraVolumes[0].items[0].path=config.json --set server.extraVolumes[0].load=true --set server.extraVolumes[0].name=test-mejrij-consul-federation --set server.extraVolumes[0].type=secret --set server.replicas=1 --install test-mejrij /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul]
+          
+          logger.go:42: 2026-07-07T02:39:25Z history.go:56: [debug] getting history for release test-mejrij
+          
+          logger.go:42: 2026-07-07T02:39:26Z Release "test-mejrij" does not exist. Installing it now.
+          
+          logger.go:42: 2026-07-07T02:39:26Z install.go:178: [debug] Original chart version: ""
+          
+          logger.go:42: 2026-07-07T02:39:26Z install.go:195: [debug] CHART PATH: /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul
+          
+          logger.go:42: 2026-07-07T02:39:26Z 
+          
+          logger.go:42: 2026-07-07T02:39:55Z client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" ServiceAccount
+          
+          logger.go:42: 2026-07-07T02:39:57Z client.go:128: [debug] creating 1 resource(s)
+          
+          logger.go:42: 2026-07-07T02:39:57Z client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Role
+          
+          logger.go:42: 2026-07-07T02:39:59Z client.go:128: [debug] creating 1 resource(s)
+          
+          logger.go:42: 2026-07-07T02:39:59Z client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" RoleBinding
+          
+          logger.go:42: 2026-07-07T02:40:01Z client.go:128: [debug] creating 1 resource(s)
+          
+          logger.go:42: 2026-07-07T02:40:01Z client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          
+          logger.go:42: 2026-07-07T02:40:01Z client.go:339: [debug] jobs.batch "test-mejrij-consul-tls-init" not found
+          
+          logger.go:42: 2026-07-07T02:40:02Z client.go:128: [debug] creating 1 resource(s)
+          
+          logger.go:42: 2026-07-07T02:40:03Z client.go:540: [debug] Watching for changes to Job test-mejrij-consul-tls-init with timeout of 25m0s
+          
+          logger.go:42: 2026-07-07T02:40:03Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: ADDED
+          
+          logger.go:42: 2026-07-07T02:40:03Z client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:05Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          
+          logger.go:42: 2026-07-07T02:40:05Z client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:06Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          
+          logger.go:42: 2026-07-07T02:40:06Z client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:08Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          
+          logger.go:42: 2026-07-07T02:40:08Z client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:08Z client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          
+          logger.go:42: 2026-07-07T02:40:08Z client.go:128: [debug] creating 86 resource(s)
+          
+          logger.go:42: 2026-07-07T02:40:13Z client.go:310: [debug] Starting delete for "test-mejrij-consul-gateway-resources" Job
+          
+          logger.go:42: 2026-07-07T02:40:13Z client.go:339: [debug] jobs.batch "test-mejrij-consul-gateway-resources" not found
+          
+          logger.go:42: 2026-07-07T02:40:15Z client.go:128: [debug] creating 1 resource(s)
+          
+          logger.go:42: 2026-07-07T02:40:15Z client.go:540: [debug] Watching for changes to Job test-mejrij-consul-gateway-resources with timeout of 25m0s
+          
+          logger.go:42: 2026-07-07T02:40:15Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: ADDED
+          
+          logger.go:42: 2026-07-07T02:40:15Z client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:18Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          
+          logger.go:42: 2026-07-07T02:40:18Z client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:20Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          
+          logger.go:42: 2026-07-07T02:40:20Z client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:21Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          
+          logger.go:42: 2026-07-07T02:40:21Z client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:24Z client.go:128: [debug] creating 1 resource(s)
+          
+          logger.go:42: 2026-07-07T02:40:24Z client.go:540: [debug] Watching for changes to Job test-mejrij-consul-server-acl-init-cleanup with timeout of 25m0s
+          
+          logger.go:42: 2026-07-07T02:40:24Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: ADDED
+          
+          logger.go:42: 2026-07-07T02:40:24Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T02:40:27Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          
+          logger.go:42: 2026-07-07T02:40:27Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:08Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          
+          logger.go:42: 2026-07-07T03:05:08Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:08Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:09Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          
+          logger.go:42: 2026-07-07T03:05:09Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:16Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          
+          logger.go:42: 2026-07-07T03:05:16Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:17Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          
+          logger.go:42: 2026-07-07T03:05:17Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:18Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          
+          logger.go:42: 2026-07-07T03:05:18Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:19Z client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          
+          logger.go:42: 2026-07-07T03:05:19Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:19Z client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+          
+          logger.go:42: 2026-07-07T03:05:24Z client.go:310: [debug] Starting delete for "test-mejrij-consul-server-acl-init-cleanup" Job
+          
+          logger.go:42: 2026-07-07T03:05:32Z Error: failed post-install: timed out waiting for the condition
+          
+          logger.go:42: 2026-07-07T03:05:32Z helm.go:84: [debug] failed post-install: timed out waiting for the condition
+          
+          retry.go:39: retrying helm upgrade for release test-mejrij after transient Kubernetes API error: error while running command: exit status 1; history.go:56: [debug] getting history for release test-mejrij
+          install.go:178: [debug] Original chart version: ""
+          install.go:195: [debug] CHART PATH: /home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/charts/consul
+          
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" ServiceAccount
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Role
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" RoleBinding
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-tls-init" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-tls-init with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: ADDED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-tls-init: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-tls-init: MODIFIED
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-tls-init" Job
+          client.go:128: [debug] creating 86 resource(s)
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-gateway-resources" Job
+          client.go:339: [debug] jobs.batch "test-mejrij-consul-gateway-resources" not found
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-gateway-resources with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: ADDED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-gateway-resources: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-gateway-resources: MODIFIED
+          client.go:128: [debug] creating 1 resource(s)
+          client.go:540: [debug] Watching for changes to Job test-mejrij-consul-server-acl-init-cleanup with timeout of 25m0s
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: ADDED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+          client.go:568: [debug] Add/Modify event for test-mejrij-consul-server-acl-init-cleanup: MODIFIED
+          client.go:607: [debug] test-mejrij-consul-server-acl-init-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+          client.go:310: [debug] Starting delete for "test-mejrij-consul-server-acl-init-cleanup" Job
+          Error: failed post-install: timed out waiting for the condition
+          helm.go:84: [debug] failed post-install: timed out waiting for the condition
+          
+      helpers.go:111: 2026-07-07T03:05:46Z cleaning up resources for TestWANFederation_Gateway
+      helm_cluster.go:306: 2026-07-07T03:05:46Z dumping logs, pod info, and envoy config for release=test-mejrij to /tmp/test-results/debug/TestWANFederation_Gateway/default/api-ocpate2-6hog-p1-openshiftapps-com_6443/***
+  TestWANFederation_Gateway 2026-07-07T03:05:55Z logger.go:66: Running command kubectl with args [--namespace consul get endpoints test-mejrij-consul-mesh-gateway -o yaml]
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66: apiVersion: v1
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66: kind: Endpoints
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66: metadata:
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:   creationTimestamp: "2026-07-07T02:40:12Z"
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:   labels:
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:     app: consul
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:     app.kubernetes.io/managed-by: Helm
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:     chart: consul-helm
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:     component: mesh-gateway
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:     heritage: Helm
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:     release: test-mejrij
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:   name: test-mejrij-consul-mesh-gateway
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:   namespace: consul
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:   resourceVersion: "1258804"
+  TestWANFederation_Gateway 2026-07-07T03:05:56Z logger.go:66:   uid: 4952b254-08fd-46f8-88f8-43f1813a823b
+      command.go:100: 2026-07-07T03:05:58Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T03:05:59Z Error: uninstall: Release not loaded: test-mejrij: release: not found
+      helpers.go:111: 2026-07-07T03:06:08Z cleaning up resources for TestWANFederation_Gateway
+      helpers.go:111: 2026-07-07T03:06:08Z cleaning up resources for TestWANFederation_Gateway
+      helpers.go:111: 2026-07-07T03:06:08Z cleaning up resources for TestWANFederation_Gateway
+      helm_cluster.go:306: 2026-07-07T03:06:08Z dumping logs, pod info, and envoy config for release=test-mejrij to /tmp/test-results/debug/TestWANFederation_Gateway/default/api-ocpate2-6hog-p1-openshiftapps-com_6443/***
+      command.go:100: 2026-07-07T03:06:12Z Running command helm with args [uninstall --namespace consul test-mejrij --no-hooks --timeout 30s]
+      command.go:185: 2026-07-07T03:06:13Z Error: uninstall: Release not loaded: test-mejrij: release: not found
+      helpers.go:111: 2026-07-07T03:06:20Z cleaning up resources for TestWANFederation_Gateway
+      helpers.go:111: 2026-07-07T03:06:20Z cleaning up resources for TestWANFederation_Gateway
+  
+  FAIL Package tests/wan-federation (3h0m0.063s)

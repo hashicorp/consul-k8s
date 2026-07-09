@@ -1,0 +1,160 @@
+=== FAIL: tests/cli TestInstall/secure (705.17s)
+    connect_helper.go:89: 2026-06-29T07:30:21Z Installing Consul cluster
+    retry.go:219: logger.go:42: 2026-06-29T07:31:51Z Running `consul-k8s install -set connectInject.transparentProxy.defaultEnabled=true -set global.imageConsulDataplane=docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev -set global.tls.enabled=true -set global.openshift.isOcpGreaterthan4_18=true -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set server.containerSecurityContext.server.runAsNonRoot=false -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set global.enterpriseLicense.secretKey=key -set dns.enableRedirection=true -set connectInject.apiGateway.manageNonStandardCRDs=true -set server.affinity=null -set global.logLevel=debug -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.enterpriseLicense.secretName=license -set global.openshift.enabled=true -set global.acls.manageSystemACLs=true -set connectInject.enabled=true -set connectInject.apiGateway.manageExternalCRDs=false -set server.replicas=1 -set dns.enabled=true -set global.imageK8S=docker.io/hashicorppreview/consul-k8s-control-plane:2.1.0-dev-pr-5445-69dbda3cfcc29bf404e47ffd1a11e2bf007de8d5 -set global.openshift.crds.enableTcpRoute=true -set global.image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-dev -timeout 15m -auto-approve -context default/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/***`
+        
+        logger.go:42: 2026-06-29T07:31:54Z error running command `consul-k8s install -set connectInject.transparentProxy.defaultEnabled=true -set global.imageConsulDataplane=docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev -set global.tls.enabled=true -set global.openshift.isOcpGreaterthan4_18=true -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set server.containerSecurityContext.server.runAsNonRoot=false -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set global.enterpriseLicense.secretKey=key -set dns.enableRedirection=true -set connectInject.apiGateway.manageNonStandardCRDs=true -set server.affinity=null -set global.logLevel=debug -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.enterpriseLicense.secretName=license -set global.openshift.enabled=true -set global.acls.manageSystemACLs=true -set connectInject.enabled=true -set connectInject.apiGateway.manageExternalCRDs=false -set server.replicas=1 -set dns.enabled=true -set global.imageK8S=docker.io/hashicorppreview/consul-k8s-control-plane:2.1.0-dev-pr-5445-69dbda3cfcc29bf404e47ffd1a11e2bf007de8d5 -set global.openshift.crds.enableTcpRoute=true -set global.image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-dev -timeout 15m -auto-approve`: exit status 1
+        
+        logger.go:42: 2026-06-29T07:31:54Z command stdout: 
+        ==> Checking if Consul can be installed
+         ! Cannot install Consul. A Consul cluster is already installed in namespace default with name test-cwletr.
+            Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.
+        
+        
+        retry.go:39: 
+        	Error Trace:	/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/consul/cli_cluster.go:167
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:183
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:190
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/consul/cli_cluster.go:152
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/connhelper/connect_helper.go:90
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/tests/cli/cli_install_test.go:57
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestInstall/secure
+        
+        
+    helpers.go:111: 2026-06-29T07:31:54Z cleaning up resources for TestInstall/secure
+    cli_cluster.go:134: 2026-06-29T07:31:54Z dumping logs, pod info, and envoy config for release=consul to /tmp/test-results/debug/TestInstall/secure/default/api-ocpnewloc2-xk4y-p1-openshiftapps-com_6443/***
+    cli.go:44: 2026-06-29T07:31:57Z Running `consul-k8s uninstall -auto-approve -wipe-data -context default/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/***`
+    cli_cluster.go:134: 2026-06-29T07:42:04Z error running command `consul-k8s uninstall -auto-approve -wipe-data`: exit status 1
+    cli_cluster.go:134: 2026-06-29T07:42:04Z command stdout: 
+        ==> Checking if Consul demo application can be uninstalled
+            No existing Consul demo application installation found.
+        
+        ==> Checking if Consul can be uninstalled
+         ✓ Existing Consul installation found.
+        
+        ==> Consul Uninstall Summary
+            Name: test-cwletr
+            Namespace: default
+         --> Deleting custom resources managed by Consul
+         --> uninstall: Deleting test-cwletr
+         --> creating 1 resource(s)
+         --> Watching for changes to Job test-cwletr-consul-gateway-cleanup with timeout of 10m0s
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: ADDED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 0, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 0, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 1, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 1, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 2, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 2, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 2, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 2, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 3, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 3, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 3, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 3, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 3, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 4, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 4, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 4, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 4, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 4, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 5, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 5, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 5, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 1, jobs failed: 5, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 5, jobs succeeded: 0
+         --> Add/Modify event for test-cwletr-consul-gateway-cleanup: MODIFIED
+         --> test-cwletr-consul-gateway-cleanup: Jobs active: 0, jobs failed: 6, jobs succeeded: 0
+         --> Starting delete for "test-cwletr-consul-gateway-cleanup" Job
+         --> beginning wait for 1 resources to be deleted with timeout of 10m0s
+         ! 1 error occurred:
+        	* timed out waiting for the condition
+        
+        
+        
+    cli_cluster.go:134: 
+        	Error Trace:	/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/consul/cli_cluster.go:232
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/consul/cli_cluster.go:134
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/helpers/helpers.go:112
+        	            				/home/runner/actions-runner/_work/_tool/go/1.26.2/x64/src/testing/testing.go:1317
+        	            				/home/runner/actions-runner/_work/_tool/go/1.26.2/x64/src/testing/testing.go:1667
+        	            				/home/runner/actions-runner/_work/_tool/go/1.26.2/x64/src/testing/testing.go:2030
+        	            				/home/runner/actions-runner/_work/_tool/go/1.26.2/x64/src/runtime/panic.go:694
+        	            				/home/runner/actions-runner/_work/_tool/go/1.26.2/x64/src/testing/testing.go:1022
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:221
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:203
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/consul/cli_cluster.go:152
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/connhelper/connect_helper.go:90
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/tests/cli/cli_install_test.go:57
+        	            				/home/runner/actions-runner/_work/_tool/go/1.26.2/x64/src/runtime/asm_amd64.s:1771
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestInstall/secure
+    helpers.go:111: 2026-06-29T07:42:04Z cleaning up resources for TestInstall/secure
+    helpers.go:111: 2026-06-29T07:42:04Z cleaning up resources for TestInstall/secure
+
+=== FAIL: tests/cli TestInstall (705.17s)
+
+=== FAIL: tests/cli TestUpgrade (705.20s)
+    connect_helper.go:89: 2026-06-29T07:42:09Z Installing Consul cluster
+    retry.go:219: logger.go:42: 2026-06-29T07:43:39Z Running `consul-k8s install -set global.logLevel=debug -set global.imageK8S=docker.io/hashicorppreview/consul-k8s-control-plane:2.1.0-dev-pr-5445-69dbda3cfcc29bf404e47ffd1a11e2bf007de8d5 -set global.enterpriseLicense.secretName=license -set global.enterpriseLicense.secretKey=key -set global.tls.enabled=false -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set global.imageConsulDataplane=docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev -set global.image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-dev -set global.openshift.crds.enableTcpRoute=true -set global.openshift.isOcpGreaterthan4_18=true -set server.replicas=1 -set dns.enabled=true -set global.acls.manageSystemACLs=false -set connectInject.enabled=true -set connectInject.apiGateway.manageNonStandardCRDs=true -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.openshift.enabled=true -set connectInject.transparentProxy.defaultEnabled=true -set dns.enableRedirection=true -set connectInject.apiGateway.manageExternalCRDs=false -set server.affinity=null -set server.containerSecurityContext.server.runAsNonRoot=false -timeout 15m -auto-approve -context default/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/***`
+        
+        logger.go:42: 2026-06-29T07:43:42Z error running command `consul-k8s install -set global.logLevel=debug -set global.imageK8S=docker.io/hashicorppreview/consul-k8s-control-plane:2.1.0-dev-pr-5445-69dbda3cfcc29bf404e47ffd1a11e2bf007de8d5 -set global.enterpriseLicense.secretName=license -set global.enterpriseLicense.secretKey=key -set global.tls.enabled=false -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set global.imageConsulDataplane=docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev -set global.image=docker.mirror.hashicorp.services/hashicorppreview/consul-enterprise:2.1.0-dev -set global.openshift.crds.enableTcpRoute=true -set global.openshift.isOcpGreaterthan4_18=true -set server.replicas=1 -set dns.enabled=true -set global.acls.manageSystemACLs=false -set connectInject.enabled=true -set connectInject.apiGateway.manageNonStandardCRDs=true -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.openshift.enabled=true -set connectInject.transparentProxy.defaultEnabled=true -set dns.enableRedirection=true -set connectInject.apiGateway.manageExternalCRDs=false -set server.affinity=null -set server.containerSecurityContext.server.runAsNonRoot=false -timeout 15m -auto-approve`: exit status 1
+        
+        logger.go:42: 2026-06-29T07:43:42Z command stdout: 
+        ==> Checking if Consul can be installed
+         ! Cannot install Consul. A Consul cluster is already installed in namespace default with name test-cwletr.
+            Use the command `consul-k8s uninstall` to uninstall Consul from the cluster.
+        
+        
+        retry.go:39: 
+        	Error Trace:	/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/consul/cli_cluster.go:167
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:183
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:190
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/home/runner/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/consul/cli_cluster.go:152
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/framework/connhelper/connect_helper.go:90
+        	            				/home/runner/actions-runner/_work/consul-k8s-workflows/consul-k8s-workflows/acceptance/tests/cli/cli_upgrade_test.go:31
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestUpgrade

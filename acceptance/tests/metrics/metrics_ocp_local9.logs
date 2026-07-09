@@ -1,0 +1,171 @@
+=== RUN   TestComponentMetrics
+    helm_cluster.go:117: 2026-07-06T20:22:48+05:30 Detected OpenShift cluster version 4.18.32 → isOCPGreaterThan418=false
+    metrics_test.go:69: 2026-07-06T20:22:56+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    metrics_test.go:69: 2026-07-06T20:22:56+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    metrics_test.go:69: 2026-07-06T20:22:56+05:30 Clearing stale finalizers on resources in namespace consul before Helm install
+    metrics_test.go:69: 2026-07-06T20:22:56+05:30 Deleting stale gateway Job test-6m0qnu-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+    metrics_test.go:69: 2026-07-06T20:22:56+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-06T20:23:03+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-06T20:23:03+05:30 Error: unknown flag: --all
+    metrics_test.go:69: 2026-07-06T20:23:03+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-06T20:23:03+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-06T20:23:04+05:30 [{"name":"test-6m0qnu","namespace":"consul","revision":"2","updated":"2026-07-06 14:47:31.471267246 +0000 UTC","status":"pending-upgrade","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    metrics_test.go:69: 2026-07-06T20:23:04+05:30 Deleting stale Helm release test-6m0qnu in namespace consul before install
+    command.go:100: 2026-07-06T20:23:04+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-6m0qnu --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T20:23:07+05:30 release "test-6m0qnu" uninstalled
+    metrics_test.go:69: 2026-07-06T20:23:07+05:30 Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races
+    kubectl.go:72: 2026-07-06T20:23:07+05:30 Output: error: the server doesn't have a resource type "cgateways"
+        .
+    kubectl.go:72: 2026-07-06T20:23:08+05:30 Output: error: the server doesn't have a resource type "cgrpcroutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:08+05:30 Output: error: the server doesn't have a resource type "chttproutes"
+        .
+Finalizers removed from CRD gatewayclassconfigs.consul.hashicorp.com
+    kubectl.go:72: 2026-07-06T20:23:08+05:30 Output: error: the server doesn't have a resource type "controlplanerequestlimits"
+        .
+    helpers.go:493: 2026-07-06T20:23:08+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    kubectl.go:72: 2026-07-06T20:23:09+05:30 Output: error: the server doesn't have a resource type "creferencegrants"
+        .
+    helpers.go:493: 2026-07-06T20:23:09+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    kubectl.go:72: 2026-07-06T20:23:09+05:30 Output: error: the server doesn't have a resource type "ctcproutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:09+05:30 Output: error: the server doesn't have a resource type "ctlsroutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:10+05:30 Output: error: the server doesn't have a resource type "cudproutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:10+05:30 Output: error: the server doesn't have a resource type "customgatewayclasses"
+        .
+    kubectl.go:72: 2026-07-06T20:23:10+05:30 Output: error: the server doesn't have a resource type "customgatewaypolicies"
+        .
+    kubectl.go:72: 2026-07-06T20:23:11+05:30 Output: error: the server doesn't have a resource type "exportedservices"
+        .
+    kubectl.go:72: 2026-07-06T20:23:11+05:30 Output: error: the server doesn't have a resource type "gatewayclassconfigs"
+        .
+    kubectl.go:72: 2026-07-06T20:23:11+05:30 Output: error: the server doesn't have a resource type "gatewaypolicies"
+        .
+    kubectl.go:72: 2026-07-06T20:23:12+05:30 Output: error: the server doesn't have a resource type "gateways"
+        .
+    kubectl.go:72: 2026-07-06T20:23:12+05:30 Output: error: the server doesn't have a resource type "grpcroutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:12+05:30 Output: error: the server doesn't have a resource type "httproutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:13+05:30 Output: error: the server doesn't have a resource type "ingressgateways"
+        .
+    kubectl.go:72: 2026-07-06T20:23:13+05:30 Output: error: the server doesn't have a resource type "jwtproviders"
+        .
+    kubectl.go:72: 2026-07-06T20:23:13+05:30 Output: error: the server doesn't have a resource type "meshes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:14+05:30 Output: error: the server doesn't have a resource type "meshservices"
+        .
+    kubectl.go:72: 2026-07-06T20:23:14+05:30 Output: error: the server doesn't have a resource type "peeringacceptors"
+        .
+    kubectl.go:72: 2026-07-06T20:23:14+05:30 Output: error: the server doesn't have a resource type "peeringdialers"
+        .
+    kubectl.go:72: 2026-07-06T20:23:14+05:30 Output: error: the server doesn't have a resource type "proxydefaults"
+        .
+    kubectl.go:72: 2026-07-06T20:23:15+05:30 Output: error: the server doesn't have a resource type "ratelimits"
+        .
+    kubectl.go:72: 2026-07-06T20:23:15+05:30 Output: error: the server doesn't have a resource type "referencegrants"
+        .
+    kubectl.go:72: 2026-07-06T20:23:15+05:30 Output: error: the server doesn't have a resource type "registrations"
+        .
+    kubectl.go:72: 2026-07-06T20:23:16+05:30 Output: error: the server doesn't have a resource type "routeauthfilters"
+        .
+    kubectl.go:72: 2026-07-06T20:23:16+05:30 Output: error: the server doesn't have a resource type "routeretryfilters"
+        .
+    kubectl.go:72: 2026-07-06T20:23:16+05:30 Output: error: the server doesn't have a resource type "routetimeoutfilters"
+        .
+    kubectl.go:72: 2026-07-06T20:23:17+05:30 Output: error: the server doesn't have a resource type "routetlssdsfilters"
+        .
+    kubectl.go:72: 2026-07-06T20:23:17+05:30 Output: error: the server doesn't have a resource type "samenessgroups"
+        .
+    kubectl.go:72: 2026-07-06T20:23:17+05:30 Output: error: the server doesn't have a resource type "servicedefaults"
+        .
+    kubectl.go:72: 2026-07-06T20:23:18+05:30 Output: error: the server doesn't have a resource type "serviceintentions"
+        .
+    kubectl.go:72: 2026-07-06T20:23:18+05:30 Output: error: the server doesn't have a resource type "serviceresolvers"
+        .
+    kubectl.go:72: 2026-07-06T20:23:18+05:30 Output: error: the server doesn't have a resource type "servicerouters"
+        .
+    kubectl.go:72: 2026-07-06T20:23:19+05:30 Output: error: the server doesn't have a resource type "servicesplitters"
+        .
+    kubectl.go:72: 2026-07-06T20:23:19+05:30 Output: error: the server doesn't have a resource type "tcproutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:19+05:30 Output: error: the server doesn't have a resource type "terminatinggateways"
+        .
+    kubectl.go:72: 2026-07-06T20:23:20+05:30 Output: error: the server doesn't have a resource type "tlsroutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:20+05:30 Output: error: the server doesn't have a resource type "trafficpermissions"
+        .
+    kubectl.go:72: 2026-07-06T20:23:20+05:30 Output: error: the server doesn't have a resource type "udproutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:21+05:30 Output: error: the server doesn't have a resource type "gatewayclasses"
+        .
+    kubectl.go:72: 2026-07-06T20:23:21+05:30 Output: error: the server doesn't have a resource type "gateways"
+        .
+    kubectl.go:72: 2026-07-06T20:23:21+05:30 Output: error: the server doesn't have a resource type "httproutes"
+        .
+    kubectl.go:72: 2026-07-06T20:23:22+05:30 Output: error: the server doesn't have a resource type "referencegrants"
+        .
+    kubectl.go:72: 2026-07-06T20:23:22+05:30 Output: error: the server doesn't have a resource type "tcproutes"
+        .
+    metrics_test.go:69: 2026-07-06T20:23:23+05:30 CRD cgateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:23+05:30 CRD cgrpcroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:23+05:30 CRD chttproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:23+05:30 CRD controlplanerequestlimits.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:23+05:30 CRD creferencegrants.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:23+05:30 CRD ctcproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:23+05:30 CRD ctlsroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD cudproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD customgatewayclasses.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD customgatewaypolicies.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD exportedservices.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD gatewaypolicies.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD gateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:24+05:30 CRD grpcroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:25+05:30 CRD httproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:25+05:30 CRD ingressgateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:25+05:30 CRD jwtproviders.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:25+05:30 CRD meshes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:25+05:30 CRD meshservices.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:25+05:30 CRD peeringacceptors.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:25+05:30 CRD peeringdialers.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:26+05:30 CRD proxydefaults.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:26+05:30 CRD ratelimits.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:26+05:30 CRD referencegrants.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:26+05:30 CRD registrations.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:26+05:30 CRD routeauthfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:26+05:30 CRD routeretryfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD routetimeoutfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD routetlssdsfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD samenessgroups.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD servicedefaults.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD serviceintentions.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD serviceresolvers.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD servicerouters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:27+05:30 CRD servicesplitters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:28+05:30 CRD tcproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:28+05:30 CRD terminatinggateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:28+05:30 CRD tlsroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:28+05:30 CRD trafficpermissions.auth.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:28+05:30 CRD udproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:28+05:30 CRD gatewayclasses.gateway.networking.k8s.io fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:29+05:30 CRD gateways.gateway.networking.k8s.io fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:29+05:30 CRD httproutes.gateway.networking.k8s.io fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:29+05:30 CRD referencegrants.gateway.networking.k8s.io fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:29+05:30 CRD tcproutes.gateway.networking.k8s.io fully deleted
+    metrics_test.go:69: 2026-07-06T20:23:29+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    metrics_test.go:69: 2026-07-06T20:23:30+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:301: 2026-07-06T20:23:31+05:30 Installing Helm chart ../../../charts/consul with release name test-8d7wxp in namespace consul
+    metrics_test.go:69: 2026-07-06T20:23:44+05:30 Waiting 20m0s for pods with label "release=test-8d7wxp" to be ready.
+    metrics_test.go:69: 2026-07-06T20:26:00+05:30 Finished waiting for pods to be ready.
+    metrics_test.go:74: 2026-07-06T20:26:00+05:30 creating static-client
+    metrics_test.go:97: 2026-07-06T20:26:17+05:30 terminating gateway metrics
+    metrics_test.go:100: 2026-07-06T20:26:18+05:30 mesh gateway metrics
+    helpers.go:111: 2026-07-06T20:26:19+05:30 cleaning up resources for TestComponentMetrics
+    helpers.go:111: 2026-07-06T20:26:19+05:30 cleaning up resources for TestComponentMetrics
+    helpers.go:111: 2026-07-06T20:26:37+05:30 cleaning up resources for TestComponentMetrics
+--- PASS: TestComponentMetrics (229.80s)
+PASS
+ok  	github.com/hashicorp/consul-k8s/acceptance/tests/metrics	230.147s

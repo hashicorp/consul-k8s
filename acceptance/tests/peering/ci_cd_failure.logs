@@ -1,0 +1,327 @@
+3h 2m 19s
+Run EXIT_CODE=0
+Running packages: peering
+Testing package: github.com/hashicorp/consul-k8s/acceptance/tests/peering
+FAIL tests/peering.TestPeering_ConnectNamespaces/default_destination_namespace (2153.07s)
+      peering_connect_namespaces_test.go:178: 2026-07-06T21:22:52Z waiting for clusters to start up . . .
+      helm_cluster.go:117: 2026-07-06T21:22:54Z Detected OpenShift cluster version 4.18.32 → isOCPGreaterThan418=false
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:22:54Z logger.go:66: Running command helm with args [version --short]
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:22:55Z logger.go:66: v3.9.4+gdbc6d8e
+      helm_cluster.go:149: 2026-07-06T21:22:55Z Detected Helm version 3.9.4 → --force-conflicts supported: false
+      helm_cluster.go:117: 2026-07-06T21:22:57Z Detected OpenShift cluster version 4.18.32 → isOCPGreaterThan418=false
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:22:57Z logger.go:66: Running command helm with args [version --short]
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:22:57Z logger.go:66: v3.9.4+gdbc6d8e
+      helm_cluster.go:149: 2026-07-06T21:22:57Z Detected Helm version 3.9.4 → --force-conflicts supported: false
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:23:06Z Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:23:06Z Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:23:06Z Resetting stale PSA enforcement label on namespace consul before Helm install
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:23:06Z Clearing stale finalizers on resources in namespace consul before Helm install
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:23:08Z Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:23:08Z Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:23:08Z Resetting stale PSA enforcement label on namespace consul before Helm install
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:23:08Z Clearing stale finalizers on resources in namespace consul before Helm install
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:23:10Z Deleting stale Gateway API and Consul API resources before Helm install
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:23:12Z Deleting stale Gateway API and Consul API resources before Helm install
+      command.go:100: 2026-07-06T21:23:12Z Running command helm with args [list --namespace consul --all --output json]
+      command.go:185: 2026-07-06T21:23:13Z []
+      command.go:100: 2026-07-06T21:23:14Z Running command helm with args [list --namespace consul --all --output json]
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:23:14Z Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races
+      command.go:185: 2026-07-06T21:23:14Z []
+      kubectl.go:72: 2026-07-06T21:23:15Z Output: error: the server doesn't have a resource type "cgateways"
+          .
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:23:15Z Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races
+      kubectl.go:72: 2026-07-06T21:23:16Z Output: error: the server doesn't have a resource type "cgateways"
+          .
+      kubectl.go:72: 2026-07-06T21:23:17Z Output: error: the server doesn't have a resource type "cgrpcroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:18Z Output: error: the server doesn't have a resource type "cgrpcroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:18Z Output: error: the server doesn't have a resource type "chttproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:20Z Output: error: the server doesn't have a resource type "chttproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:20Z Output: error: the server doesn't have a resource type "controlplanerequestlimits"
+          .
+      kubectl.go:72: 2026-07-06T21:23:22Z Output: error: the server doesn't have a resource type "controlplanerequestlimits"
+          .
+      kubectl.go:72: 2026-07-06T21:23:22Z Output: error: the server doesn't have a resource type "creferencegrants"
+          .
+      kubectl.go:72: 2026-07-06T21:23:24Z Output: error: the server doesn't have a resource type "creferencegrants"
+          .
+      kubectl.go:72: 2026-07-06T21:23:24Z Output: error: the server doesn't have a resource type "ctcproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:25Z Output: error: the server doesn't have a resource type "ctcproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:25Z Output: error: the server doesn't have a resource type "ctlsroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:27Z Output: error: the server doesn't have a resource type "ctlsroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:27Z Output: error: the server doesn't have a resource type "cudproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:29Z Output: error: the server doesn't have a resource type "cudproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:29Z Output: error: the server doesn't have a resource type "customgatewayclasses"
+          .
+      kubectl.go:72: 2026-07-06T21:23:31Z Output: error: the server doesn't have a resource type "customgatewayclasses"
+          .
+      kubectl.go:72: 2026-07-06T21:23:31Z Output: error: the server doesn't have a resource type "customgatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-06T21:23:33Z Output: error: the server doesn't have a resource type "customgatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-06T21:23:33Z Output: error: the server doesn't have a resource type "exportedservices"
+          .
+      kubectl.go:72: 2026-07-06T21:23:34Z Output: error: the server doesn't have a resource type "exportedservices"
+          .
+      kubectl.go:72: 2026-07-06T21:23:34Z Output: error: the server doesn't have a resource type "gatewayclassconfigs"
+          .
+      kubectl.go:72: 2026-07-06T21:23:36Z Output: error: the server doesn't have a resource type "gatewayclassconfigs"
+          .
+      kubectl.go:72: 2026-07-06T21:23:36Z Output: error: the server doesn't have a resource type "gatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-06T21:23:38Z Output: error: the server doesn't have a resource type "gatewaypolicies"
+          .
+      kubectl.go:72: 2026-07-06T21:23:38Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-06T21:23:40Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-06T21:23:40Z Output: error: the server doesn't have a resource type "grpcroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:42Z Output: error: the server doesn't have a resource type "grpcroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:42Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:43Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:43Z Output: error: the server doesn't have a resource type "ingressgateways"
+          .
+      kubectl.go:72: 2026-07-06T21:23:45Z Output: error: the server doesn't have a resource type "ingressgateways"
+          .
+      kubectl.go:72: 2026-07-06T21:23:45Z Output: error: the server doesn't have a resource type "jwtproviders"
+          .
+      kubectl.go:72: 2026-07-06T21:23:47Z Output: error: the server doesn't have a resource type "jwtproviders"
+          .
+      kubectl.go:72: 2026-07-06T21:23:47Z Output: error: the server doesn't have a resource type "meshes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:49Z Output: error: the server doesn't have a resource type "meshes"
+          .
+      kubectl.go:72: 2026-07-06T21:23:49Z Output: error: the server doesn't have a resource type "meshservices"
+          .
+      kubectl.go:72: 2026-07-06T21:23:50Z Output: error: the server doesn't have a resource type "meshservices"
+          .
+      kubectl.go:72: 2026-07-06T21:23:51Z Output: error: the server doesn't have a resource type "peeringacceptors"
+          .
+      kubectl.go:72: 2026-07-06T21:23:52Z Output: error: the server doesn't have a resource type "peeringacceptors"
+          .
+      kubectl.go:72: 2026-07-06T21:23:52Z Output: error: the server doesn't have a resource type "peeringdialers"
+          .
+      kubectl.go:72: 2026-07-06T21:23:54Z Output: error: the server doesn't have a resource type "peeringdialers"
+          .
+      kubectl.go:72: 2026-07-06T21:23:54Z Output: error: the server doesn't have a resource type "proxydefaults"
+          .
+      kubectl.go:72: 2026-07-06T21:23:56Z Output: error: the server doesn't have a resource type "proxydefaults"
+          .
+      kubectl.go:72: 2026-07-06T21:23:56Z Output: error: the server doesn't have a resource type "ratelimits"
+          .
+      kubectl.go:72: 2026-07-06T21:23:58Z Output: error: the server doesn't have a resource type "ratelimits"
+          .
+      kubectl.go:72: 2026-07-06T21:23:58Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-06T21:23:59Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-06T21:24:00Z Output: error: the server doesn't have a resource type "registrations"
+          .
+      kubectl.go:72: 2026-07-06T21:24:01Z Output: error: the server doesn't have a resource type "registrations"
+          .
+      kubectl.go:72: 2026-07-06T21:24:01Z Output: error: the server doesn't have a resource type "routeauthfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:03Z Output: error: the server doesn't have a resource type "routeauthfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:03Z Output: error: the server doesn't have a resource type "routeretryfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:05Z Output: error: the server doesn't have a resource type "routeretryfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:05Z Output: error: the server doesn't have a resource type "routetimeoutfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:07Z Output: error: the server doesn't have a resource type "routetimeoutfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:07Z Output: error: the server doesn't have a resource type "routetlssdsfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:08Z Output: error: the server doesn't have a resource type "routetlssdsfilters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:09Z Output: error: the server doesn't have a resource type "samenessgroups"
+          .
+      kubectl.go:72: 2026-07-06T21:24:10Z Output: error: the server doesn't have a resource type "samenessgroups"
+          .
+      kubectl.go:72: 2026-07-06T21:24:10Z Output: error: the server doesn't have a resource type "servicedefaults"
+          .
+      kubectl.go:72: 2026-07-06T21:24:12Z Output: error: the server doesn't have a resource type "servicedefaults"
+          .
+      kubectl.go:72: 2026-07-06T21:24:12Z Output: error: the server doesn't have a resource type "serviceintentions"
+          .
+      kubectl.go:72: 2026-07-06T21:24:14Z Output: error: the server doesn't have a resource type "serviceintentions"
+          .
+      kubectl.go:72: 2026-07-06T21:24:14Z Output: error: the server doesn't have a resource type "serviceresolvers"
+          .
+      kubectl.go:72: 2026-07-06T21:24:16Z Output: error: the server doesn't have a resource type "serviceresolvers"
+          .
+      kubectl.go:72: 2026-07-06T21:24:16Z Output: error: the server doesn't have a resource type "servicerouters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:17Z Output: error: the server doesn't have a resource type "servicerouters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:18Z Output: error: the server doesn't have a resource type "servicesplitters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:19Z Output: error: the server doesn't have a resource type "servicesplitters"
+          .
+      kubectl.go:72: 2026-07-06T21:24:19Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:21Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:21Z Output: error: the server doesn't have a resource type "terminatinggateways"
+          .
+      kubectl.go:72: 2026-07-06T21:24:23Z Output: error: the server doesn't have a resource type "terminatinggateways"
+          .
+      kubectl.go:72: 2026-07-06T21:24:23Z Output: error: the server doesn't have a resource type "tlsroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:25Z Output: error: the server doesn't have a resource type "tlsroutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:25Z Output: error: the server doesn't have a resource type "trafficpermissions"
+          .
+      kubectl.go:72: 2026-07-06T21:24:26Z Output: error: the server doesn't have a resource type "trafficpermissions"
+          .
+      kubectl.go:72: 2026-07-06T21:24:27Z Output: error: the server doesn't have a resource type "udproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:28Z Output: error: the server doesn't have a resource type "udproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:28Z Output: error: the server doesn't have a resource type "gatewayclasses"
+          .
+      kubectl.go:72: 2026-07-06T21:24:30Z Output: error: the server doesn't have a resource type "gatewayclasses"
+          .
+      kubectl.go:72: 2026-07-06T21:24:30Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-06T21:24:32Z Output: error: the server doesn't have a resource type "gateways"
+          .
+      kubectl.go:72: 2026-07-06T21:24:32Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:34Z Output: error: the server doesn't have a resource type "httproutes"
+          .
+      kubectl.go:72: 2026-07-06T21:24:34Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-06T21:24:35Z Output: error: the server doesn't have a resource type "referencegrants"
+          .
+      kubectl.go:72: 2026-07-06T21:24:36Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:37Z CRD cgateways.consul.hashicorp.com fully deleted
+      kubectl.go:72: 2026-07-06T21:24:37Z Output: error: the server doesn't have a resource type "tcproutes"
+          .
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:38Z CRD cgrpcroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:39Z CRD chttproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:39Z CRD cgateways.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:39Z CRD controlplanerequestlimits.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:39Z CRD cgrpcroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:40Z CRD creferencegrants.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:40Z CRD chttproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:41Z CRD ctcproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:41Z CRD controlplanerequestlimits.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:42Z CRD ctlsroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:42Z CRD creferencegrants.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:42Z CRD cudproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:42Z CRD ctcproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:43Z CRD customgatewayclasses.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:43Z CRD ctlsroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:44Z CRD customgatewaypolicies.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:44Z CRD cudproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:45Z CRD exportedservices.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:45Z CRD customgatewayclasses.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:45Z CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:46Z CRD customgatewaypolicies.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:46Z CRD gatewaypolicies.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:46Z CRD exportedservices.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:47Z CRD gateways.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:47Z CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:48Z CRD grpcroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:48Z CRD gatewaypolicies.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:48Z CRD httproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:49Z CRD gateways.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:49Z CRD ingressgateways.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:49Z CRD grpcroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:50Z CRD jwtproviders.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:50Z CRD httproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:51Z CRD meshes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:51Z CRD ingressgateways.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:52Z CRD meshservices.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:52Z CRD jwtproviders.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:52Z CRD peeringacceptors.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:52Z CRD meshes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:53Z CRD peeringdialers.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:53Z CRD meshservices.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:54Z CRD proxydefaults.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:54Z CRD peeringacceptors.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:55Z CRD ratelimits.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:55Z CRD peeringdialers.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:55Z CRD referencegrants.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:55Z CRD proxydefaults.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:56Z CRD registrations.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:56Z CRD ratelimits.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:57Z CRD routeauthfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:57Z CRD referencegrants.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:58Z CRD routeretryfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:58Z CRD registrations.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:58Z CRD routetimeoutfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:58Z CRD routeauthfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:24:59Z CRD routetlssdsfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:24:59Z CRD routeretryfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:00Z CRD samenessgroups.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:00Z CRD routetimeoutfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:01Z CRD servicedefaults.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:01Z CRD routetlssdsfilters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:01Z CRD serviceintentions.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:01Z CRD samenessgroups.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:02Z CRD serviceresolvers.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:02Z CRD servicedefaults.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:03Z CRD servicerouters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:03Z CRD serviceintentions.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:04Z CRD servicesplitters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:04Z CRD serviceresolvers.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:04Z CRD tcproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:05Z CRD servicerouters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:05Z CRD terminatinggateways.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:05Z CRD servicesplitters.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:06Z CRD tlsroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:06Z CRD tcproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:07Z CRD trafficpermissions.auth.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:07Z CRD terminatinggateways.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:08Z CRD udproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:08Z CRD tlsroutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:08Z CRD gatewayclasses.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:08Z CRD trafficpermissions.auth.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:09Z CRD gateways.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:09Z CRD udproutes.consul.hashicorp.com fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:10Z CRD httproutes.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:10Z CRD gatewayclasses.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:11Z CRD referencegrants.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:11Z CRD gateways.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:11Z CRD tcproutes.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:11Z Deleting static resources in deployment, service, serviceaccount and rolebinding
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:11Z CRD httproutes.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:12Z CRD referencegrants.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:13Z CRD tcproutes.gateway.networking.k8s.io fully deleted
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:13Z Deleting static resources in deployment, service, serviceaccount and rolebinding
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:25:14Z Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:25:16Z Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+      helm_cluster.go:337: 2026-07-06T21:25:22Z Installing Helm chart ../../../charts/consul with release name test-oygw6q in namespace consul
+      helm_cluster.go:337: 2026-07-06T21:25:23Z Installing Helm chart ../../../charts/consul with release name test-oygw6q in namespace consul
+      helm_cluster.go:337: 2026-07-06T21:26:09Z Installing Helm chart ../../../charts/consul with release name test-oygw6q in namespace consul
+      peering_connect_namespaces_test.go:149: 2026-07-06T21:26:17Z Waiting 20m0s for pods with label "release=test-oygw6q" to be ready.
+      helm_cluster.go:337: 2026-07-06T21:26:32Z Installing Helm chart ../../../charts/consul with release name test-oygw6q in namespace consul
+      peering_connect_namespaces_test.go:174: 2026-07-06T21:28:08Z Waiting 20m0s for pods with label "release=test-oygw6q" to be ready.
+      retry.go:219: retry.go:39: 3 pods are not ready: test-oygw6q-consul-connect-injector-7fcdd57795-95gpg,test-oygw6q-consul-mesh-gateway-7fc666b7f7-shgnh,test-oygw6q-consul-server-2
+          
+      retry.go:219: retry.go:39: 3 pods are not ready: test-oygw6q-consul-connect-injector-7fcdd57795-95gpg,test-oygw6q-consul-mesh-gateway-7fc666b7f7-shgnh,test-oygw6q-consul-server-2
+          
+      peering_connect_namespaces_test.go:182: 2026-07-06T21:55:34Z creating mesh config
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:55:43Z client.go:45: Configuring Kubernetes client using config file /home/runner/.kube/config with context 
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:55:44Z client.go:45: Configuring Kubernetes client using config file /home/runner/.kube/config with context 
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:55:49Z logger.go:66: Running command kubectl with args [--namespace consul get peeringacceptor server -o jsonpath={.status.secret.name}]
+  TestPeering_ConnectNamespaces/default_destination_namespace 2026-07-06T21:55:50Z logger.go:66: api-token
+      retry.go:219: retry.go:39: secret "api-token" still exists, waiting for deletion
+          

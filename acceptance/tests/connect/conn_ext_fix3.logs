@@ -1,0 +1,98 @@
+=== RUN   TestConnectInject_ExternalServers
+=== RUN   TestConnectInject_ExternalServers/secure:_false
+    connect_external_servers_test.go:58: 2026-06-19T11:23:46+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_external_servers_test.go:58: 2026-06-19T11:23:46+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:23:46+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-19T11:23:54+05:30 Running command helm with args [list --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-19T11:23:54+05:30 Error: unknown flag: --all
+    connect_external_servers_test.go:58: 2026-06-19T11:23:54+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-19T11:23:54+05:30 Running command helm with args [list --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-19T11:23:55+05:30 [{"name":"test-743hcn","namespace":"consul","revision":"2","updated":"2026-06-19 10:06:36.80812 +0530 IST","status":"pending-upgrade","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"},{"name":"test-mote2x","namespace":"consul","revision":"1","updated":"2026-06-19 09:50:11.503458 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_external_servers_test.go:58: 2026-06-19T11:23:55+05:30 Deleting stale Helm release test-743hcn in namespace consul before install
+    command.go:100: 2026-06-19T11:23:55+05:30 Running command helm with args [uninstall --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-743hcn --no-hooks --timeout 30s]
+    command.go:185: 2026-06-19T11:23:58+05:30 release "test-743hcn" uninstalled
+    connect_external_servers_test.go:58: 2026-06-19T11:23:58+05:30 Deleting stale Helm release test-mote2x in namespace consul before install
+    command.go:100: 2026-06-19T11:23:58+05:30 Running command helm with args [uninstall --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-mote2x --no-hooks --timeout 30s]
+    command.go:185: 2026-06-19T11:24:00+05:30 release "test-mote2x" uninstalled
+    connect_external_servers_test.go:58: 2026-06-19T11:24:00+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_external_servers_test.go:58: 2026-06-19T11:24:05+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_external_servers_test.go:58: 2026-06-19T11:24:06+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-19T11:24:07+05:30 Installing Helm chart ../../../charts/consul with release name test-hpmiuq in namespace consul
+    connect_external_servers_test.go:58: 2026-06-19T11:24:10+05:30 Waiting 20m0s for pods with label "release=test-hpmiuq" to be ready.
+    connect_external_servers_test.go:58: 2026-06-19T11:24:26+05:30 Finished waiting for pods to be ready.
+    connect_external_servers_test.go:115: 2026-06-19T11:24:31+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    helm_cluster.go:233: 2026-06-19T11:24:31+05:30 Installing Helm chart ../../../charts/consul with release name test-a5wbqv in namespace consul
+    connect_external_servers_test.go:115: 2026-06-19T11:24:49+05:30 Waiting 20m0s for pods with label "release=test-a5wbqv" to be ready.
+    connect_external_servers_test.go:115: 2026-06-19T11:25:10+05:30 Finished waiting for pods to be ready.
+    connect_external_servers_test.go:117: 2026-06-19T11:25:10+05:30 creating static-server and static-client deployments
+    connect_external_servers_test.go:155: 2026-06-19T11:25:12+05:30 Waiting 20m0s for pods with label "app=static-server" to reach Running phase.
+    connect_external_servers_test.go:155: 2026-06-19T11:26:27+05:30 Pods reached Running phase.
+    connect_external_servers_test.go:156: 2026-06-19T11:26:27+05:30 Waiting 20m0s for pods with label "app=static-client" to reach Running phase.
+    connect_external_servers_test.go:156: 2026-06-19T11:26:27+05:30 Pods reached Running phase.
+    connect_external_servers_test.go:159: 2026-06-19T11:26:27+05:30 Waiting 20m0s for pods with label "app=static-server" to be ready.
+    retry.go:219: retry.go:39: 1 pods are not ready: static-server-578686fdb8-7z46f
+        
+    helpers.go:114: 2026-06-19T11:47:01+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T11:47:01+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T11:47:01+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T11:47:01+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T11:47:01+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T11:47:01+05:30 skipping resource cleanup
+=== RUN   TestConnectInject_ExternalServers/secure:_true
+    connect_external_servers_test.go:58: 2026-06-19T11:47:06+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_external_servers_test.go:58: 2026-06-19T11:47:06+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:06+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-19T11:47:13+05:30 Running command helm with args [list --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-19T11:47:14+05:30 Error: unknown flag: --all
+    connect_external_servers_test.go:58: 2026-06-19T11:47:14+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-19T11:47:14+05:30 Running command helm with args [list --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-19T11:47:15+05:30 [{"name":"test-a5wbqv","namespace":"consul","revision":"1","updated":"2026-06-19 11:24:31.96174 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"},{"name":"test-hpmiuq","namespace":"consul","revision":"1","updated":"2026-06-19 11:24:08.347037 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_external_servers_test.go:58: 2026-06-19T11:47:15+05:30 Deleting stale Helm release test-a5wbqv in namespace consul before install
+    command.go:100: 2026-06-19T11:47:15+05:30 Running command helm with args [uninstall --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-a5wbqv --no-hooks --timeout 30s]
+    command.go:185: 2026-06-19T11:47:17+05:30 release "test-a5wbqv" uninstalled
+    connect_external_servers_test.go:58: 2026-06-19T11:47:17+05:30 Deleting stale Helm release test-hpmiuq in namespace consul before install
+    command.go:100: 2026-06-19T11:47:17+05:30 Running command helm with args [uninstall --kube-context consul/api-ocploc1-kkf3-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-hpmiuq --no-hooks --timeout 30s]
+    command.go:185: 2026-06-19T11:47:18+05:30 release "test-hpmiuq" uninstalled
+    connect_external_servers_test.go:58: 2026-06-19T11:47:18+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_external_servers_test.go:58: 2026-06-19T11:47:19+05:30 Deleting stale CRD customgatewayclasses.consul.hashicorp.com owned by release test-a5wbqv before installing release test-inwi1f
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    helpers.go:484: 2026-06-19T11:47:20+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    connect_external_servers_test.go:58: 2026-06-19T11:47:24+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_external_servers_test.go:58: 2026-06-19T11:47:24+05:30 Deleting stale deployment resource deployment.apps/static-client in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:24+05:30 Deleting stale deployment resource deployment.apps/static-server in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:25+05:30 Deleting stale service resource service/static-client in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:25+05:30 Deleting stale service resource service/static-server in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:25+05:30 Deleting stale serviceaccount resource serviceaccount/static-client in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:25+05:30 Deleting stale serviceaccount resource serviceaccount/static-server in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:25+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:26+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-client-openshift-privileged in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:26+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:26+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged in namespace consul before Helm install
+    connect_external_servers_test.go:58: 2026-06-19T11:47:26+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-19T11:47:27+05:30 Installing Helm chart ../../../charts/consul with release name test-inwi1f in namespace consul
+    connect_external_servers_test.go:58: 2026-06-19T11:48:03+05:30 Waiting 20m0s for pods with label "release=test-inwi1f" to be ready.
+    connect_external_servers_test.go:58: 2026-06-19T11:48:03+05:30 Finished waiting for pods to be ready.
+    connect_external_servers_test.go:115: 2026-06-19T11:48:07+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    helm_cluster.go:233: 2026-06-19T11:48:07+05:30 Installing Helm chart ../../../charts/consul with release name test-nui2se in namespace consul
+    connect_external_servers_test.go:115: 2026-06-19T11:48:29+05:30 Waiting 20m0s for pods with label "release=test-nui2se" to be ready.
+    connect_external_servers_test.go:115: 2026-06-19T11:48:45+05:30 Finished waiting for pods to be ready.
+    connect_external_servers_test.go:117: 2026-06-19T11:48:45+05:30 creating static-server and static-client deployments
+    connect_external_servers_test.go:155: 2026-06-19T11:48:47+05:30 Waiting 20m0s for pods with label "app=static-server" to reach Running phase.
+    connect_external_servers_test.go:155: 2026-06-19T11:50:03+05:30 Pods reached Running phase.
+    connect_external_servers_test.go:156: 2026-06-19T11:50:03+05:30 Waiting 20m0s for pods with label "app=static-client" to reach Running phase.
+    connect_external_servers_test.go:156: 2026-06-19T11:50:03+05:30 Pods reached Running phase.
+    connect_external_servers_test.go:159: 2026-06-19T11:50:03+05:30 Waiting 20m0s for pods with label "app=static-server" to be ready.
+    retry.go:219: retry.go:39: 1 pods are not ready: static-server-578686fdb8-k7nxp
+        
+    helpers.go:114: 2026-06-19T12:10:36+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T12:10:36+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T12:10:36+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T12:10:36+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T12:10:36+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-19T12:10:36+05:30 skipping resource cleanup
+--- FAIL: TestConnectInject_ExternalServers (2815.24s)
+    --- FAIL: TestConnectInject_ExternalServers/secure:_false (1400.12s)
+    --- FAIL: TestConnectInject_ExternalServers/secure:_true (1415.12s)
+FAIL
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/connect	2815.871s
+FAIL

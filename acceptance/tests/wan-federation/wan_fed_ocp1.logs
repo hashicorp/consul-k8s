@@ -1,0 +1,419 @@
+=== RUN   TestWANFederation_Gateway
+    wan_federation_gateway_test.go:42: 2026-07-05T11:34:30+05:30 cleaning up stale WAN test workloads in namespace consul
+    wan_federation_gateway_test.go:43: 2026-07-05T11:34:31+05:30 cleaning up stale WAN test workloads in namespace consul
+    wan_federation_gateway_test.go:44: 2026-07-05T11:34:32+05:30 cleaning up stale WAN test workloads in namespace ns1
+    wan_federation_gateway_test.go:45: 2026-07-05T11:34:33+05:30 cleaning up stale WAN test workloads in namespace ns2
+    wan_federation_gateway_test.go:46: 2026-07-05T11:34:33+05:30 cleaning up stale WAN test workloads in namespace ns1
+    wan_federation_gateway_test.go:47: 2026-07-05T11:34:34+05:30 cleaning up stale WAN test workloads in namespace ns2
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:42+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:42+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:42+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:42+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T11:34:43+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T11:34:44+05:30 Error: unknown flag: --all
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:44+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T11:34:44+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T11:34:44+05:30 []
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:44+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:50+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_gateway_test.go:72: 2026-07-05T11:34:50+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T11:34:51+05:30 Installing Helm chart ../../../charts/consul with release name test-vzblcq in namespace consul
+    wan_federation_gateway_test.go:72: 2026-07-05T11:37:15+05:30 Waiting 20m0s for pods with label "release=test-vzblcq" to be ready.
+    wan_federation_gateway_test.go:72: 2026-07-05T11:37:23+05:30 Finished waiting for pods to be ready.
+    wan_federation_test.go:470: 2026-07-05T11:37:23+05:30 Retrieving federation secret test-vzblcq-consul-federation from the primary cluster and applying to the secondary
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:30+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:30+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:30+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:30+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T11:37:32+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T11:37:32+05:30 Error: unknown flag: --all
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:32+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T11:37:32+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T11:37:32+05:30 []
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:32+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:38+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_gateway_test.go:123: 2026-07-05T11:37:39+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T11:37:40+05:30 Installing Helm chart ../../../charts/consul with release name test-vzblcq in namespace consul
+    wan_federation_gateway_test.go:123: 2026-07-05T11:38:48+05:30 Waiting 20m0s for pods with label "release=test-vzblcq" to be ready.
+    wan_federation_gateway_test.go:123: 2026-07-05T11:40:50+05:30 Finished waiting for pods to be ready.
+TestWANFederation_Gateway 2026-07-05T11:40:50+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin
+TestWANFederation_Gateway 2026-07-05T11:40:50+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin
+    wan_federation_gateway_test.go:129: 2026-07-05T11:40:50+05:30 verifying federation was successful
+    helpers.go:153: 2026-07-05T11:41:07+05:30 Took 17.034742333s to verify federation
+    wan_federation_gateway_test.go:134: 2026-07-05T11:41:07+05:30 creating proxy-defaults config in dc1
+    wan_federation_gateway_test.go:142: 2026-07-05T11:41:08+05:30 creating static-client in dc1
+    wan_federation_gateway_test.go:145: 2026-07-05T11:41:35+05:30 creating static-client in dc2
+=== RUN   TestWANFederation_Gateway/from_primary_to_secondary
+    wan_federation_gateway_test.go:149: 2026-07-05T11:41:39+05:30 creating static-server in dc2
+    wan_federation_gateway_test.go:152: 2026-07-05T11:41:49+05:30 creating api-gateway resources in dc1
+    wan_federation_gateway_test.go:171: 2026-07-05T11:41:50+05:30 waiting for httproute.gateway.networking.k8s.io to be created
+    wan_federation_gateway_test.go:171: 2026-07-05T11:41:50+05:30 httproute.gateway.networking.k8s.io existence check attempt 1/3
+TestWANFederation_Gateway/from_primary_to_secondary 2026-07-05T11:41:50+05:30 logger.go:66: Running command kubectl with args [--context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul get httproute.gateway.networking.k8s.io http-route]
+TestWANFederation_Gateway/from_primary_to_secondary 2026-07-05T11:41:50+05:30 logger.go:66: NAME         HOSTNAMES   AGE
+TestWANFederation_Gateway/from_primary_to_secondary 2026-07-05T11:41:50+05:30 logger.go:66: http-route               1s
+    wan_federation_gateway_test.go:171: 2026-07-05T11:41:50+05:30 httproute.gateway.networking.k8s.io http-route found successfully
+    wan_federation_gateway_test.go:175: 2026-07-05T11:41:50+05:30 patching httproute http-route to target MeshService mesh-service:80
+    wan_federation_gateway_test.go:175: 2026-07-05T11:41:51+05:30 httproute http-route successfully patched to MeshService backend
+    wan_federation_gateway_test.go:250: 2026-07-05T11:41:59+05:30 checking that the connection is not successful because there's no intention
+    wan_federation_gateway_test.go:253: 2026-07-05T11:42:30+05:30 creating intention
+    wan_federation_gateway_test.go:270: 2026-07-05T11:42:30+05:30 checking that connection is successful
+    wan_federation_gateway_test.go:271: 2026-07-05T11:43:02+05:30 Took 31.238231542s to check if static server connection was successful
+    helpers.go:111: 2026-07-05T11:43:02+05:30 cleaning up resources for TestWANFederation_Gateway/from_primary_to_secondary
+    helpers.go:111: 2026-07-05T11:43:02+05:30 cleaning up resources for TestWANFederation_Gateway/from_primary_to_secondary
+    helpers.go:111: 2026-07-05T11:43:03+05:30 cleaning up resources for TestWANFederation_Gateway/from_primary_to_secondary
+=== RUN   TestWANFederation_Gateway/from_secondary_to_primary
+    wan_federation_gateway_test.go:182: 2026-07-05T11:43:03+05:30 creating static-server in dc1
+    wan_federation_gateway_test.go:185: 2026-07-05T11:43:22+05:30 creating api-gateway resources in dc2
+    wan_federation_gateway_test.go:204: 2026-07-05T11:43:24+05:30 waiting for httproute.gateway.networking.k8s.io to be created
+    wan_federation_gateway_test.go:204: 2026-07-05T11:43:24+05:30 httproute.gateway.networking.k8s.io existence check attempt 1/3
+TestWANFederation_Gateway/from_secondary_to_primary 2026-07-05T11:43:24+05:30 logger.go:66: Running command kubectl with args [--context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul get httproute.gateway.networking.k8s.io http-route]
+TestWANFederation_Gateway/from_secondary_to_primary 2026-07-05T11:43:24+05:30 logger.go:66: NAME         HOSTNAMES   AGE
+TestWANFederation_Gateway/from_secondary_to_primary 2026-07-05T11:43:24+05:30 logger.go:66: http-route               1s
+    wan_federation_gateway_test.go:204: 2026-07-05T11:43:24+05:30 httproute.gateway.networking.k8s.io http-route found successfully
+    wan_federation_gateway_test.go:208: 2026-07-05T11:43:24+05:30 patching httproute http-route to target MeshService mesh-service:80
+    wan_federation_gateway_test.go:208: 2026-07-05T11:43:24+05:30 httproute http-route successfully patched to MeshService backend
+    wan_federation_gateway_test.go:250: 2026-07-05T11:43:33+05:30 checking that the connection is not successful because there's no intention
+    wan_federation_gateway_test.go:253: 2026-07-05T11:44:04+05:30 creating intention
+    wan_federation_gateway_test.go:270: 2026-07-05T11:44:04+05:30 checking that connection is successful
+    wan_federation_gateway_test.go:271: 2026-07-05T11:44:35+05:30 Took 31.29777675s to check if static server connection was successful
+    helpers.go:111: 2026-07-05T11:44:35+05:30 cleaning up resources for TestWANFederation_Gateway/from_secondary_to_primary
+    helpers.go:111: 2026-07-05T11:44:35+05:30 cleaning up resources for TestWANFederation_Gateway/from_secondary_to_primary
+    helpers.go:111: 2026-07-05T11:44:37+05:30 cleaning up resources for TestWANFederation_Gateway/from_secondary_to_primary
+=== NAME  TestWANFederation_Gateway
+    helpers.go:111: 2026-07-05T11:44:37+05:30 cleaning up resources for TestWANFederation_Gateway
+    helpers.go:111: 2026-07-05T11:44:38+05:30 cleaning up resources for TestWANFederation_Gateway
+    helpers.go:111: 2026-07-05T11:44:38+05:30 cleaning up resources for TestWANFederation_Gateway
+    helpers.go:111: 2026-07-05T11:44:39+05:30 cleaning up resources for TestWANFederation_Gateway
+    port_forward.go:56: 2026-07-05T11:44:39+05:30 stopping monitor of the port-forwarded server
+    port_forward.go:56: 2026-07-05T11:44:39+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-07-05T11:45:02+05:30 cleaning up resources for TestWANFederation_Gateway
+    helpers.go:111: 2026-07-05T11:45:02+05:30 cleaning up resources for TestWANFederation_Gateway
+    helpers.go:111: 2026-07-05T11:45:26+05:30 cleaning up resources for TestWANFederation_Gateway
+--- PASS: TestWANFederation_Gateway (655.75s)
+    --- PASS: TestWANFederation_Gateway/from_primary_to_secondary (84.27s)
+    --- PASS: TestWANFederation_Gateway/from_secondary_to_primary (94.02s)
+=== RUN   TestWANFederation
+=== RUN   TestWANFederation/secure
+    wan_federation_test.go:70: 2026-07-05T11:45:26+05:30 cleaning up stale WAN test workloads in namespace consul
+    wan_federation_test.go:71: 2026-07-05T11:45:27+05:30 cleaning up stale WAN test workloads in namespace consul
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    wan_federation_test.go:101: 2026-07-05T11:45:34+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:101: 2026-07-05T11:45:34+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:101: 2026-07-05T11:45:34+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:101: 2026-07-05T11:45:34+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T11:45:36+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T11:45:36+05:30 Error: unknown flag: --all
+    wan_federation_test.go:101: 2026-07-05T11:45:36+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T11:45:36+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T11:45:36+05:30 []
+    wan_federation_test.go:101: 2026-07-05T11:45:36+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:101: 2026-07-05T11:45:42+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:101: 2026-07-05T11:45:43+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T11:45:44+05:30 Installing Helm chart ../../../charts/consul with release name test-qkqxuq in namespace consul
+    wan_federation_test.go:101: 2026-07-05T11:48:14+05:30 Waiting 20m0s for pods with label "release=test-qkqxuq" to be ready.
+    wan_federation_test.go:101: 2026-07-05T11:48:24+05:30 Finished waiting for pods to be ready.
+    wan_federation_test.go:470: 2026-07-05T11:48:24+05:30 Retrieving federation secret test-qkqxuq-consul-federation from the primary cluster and applying to the secondary
+    wan_federation_test.go:149: 2026-07-05T11:48:31+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:149: 2026-07-05T11:48:31+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:149: 2026-07-05T11:48:31+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:149: 2026-07-05T11:48:32+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T11:48:33+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T11:48:33+05:30 Error: unknown flag: --all
+    wan_federation_test.go:149: 2026-07-05T11:48:33+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T11:48:33+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T11:48:33+05:30 []
+    wan_federation_test.go:149: 2026-07-05T11:48:33+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:149: 2026-07-05T11:48:39+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:149: 2026-07-05T11:48:40+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T11:48:41+05:30 Installing Helm chart ../../../charts/consul with release name test-qkqxuq in namespace consul
+    wan_federation_test.go:149: 2026-07-05T11:49:54+05:30 Waiting 20m0s for pods with label "release=test-qkqxuq" to be ready.
+    wan_federation_test.go:149: 2026-07-05T11:51:45+05:30 Finished waiting for pods to be ready.
+TestWANFederation/secure 2026-07-05T11:51:45+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin
+TestWANFederation/secure 2026-07-05T11:51:46+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin
+    wan_federation_test.go:155: 2026-07-05T11:51:46+05:30 verifying federation was successful
+    helpers.go:153: 2026-07-05T11:52:09+05:30 Took 22.866348125s to verify federation
+    wan_federation_test.go:160: 2026-07-05T11:52:09+05:30 creating proxy-defaults config
+    wan_federation_test.go:194: 2026-07-05T11:52:09+05:30 creating static-server in dc2
+    wan_federation_test.go:197: 2026-07-05T11:52:20+05:30 creating static-client in dc1
+    connect_helper.go:349: 2026-07-05T11:52:46+05:30 creating intention
+    wan_federation_test.go:204: 2026-07-05T11:52:46+05:30 checking that connection is successful
+    wan_federation_test.go:205: 2026-07-05T11:53:48+05:30 Took 1m1.921453125s to check if static server connection was successful
+    helpers.go:111: 2026-07-05T11:53:48+05:30 cleaning up resources for TestWANFederation/secure
+    helpers.go:111: 2026-07-05T11:53:48+05:30 cleaning up resources for TestWANFederation/secure
+    helpers.go:111: 2026-07-05T11:53:49+05:30 cleaning up resources for TestWANFederation/secure
+    port_forward.go:56: 2026-07-05T11:53:49+05:30 stopping monitor of the port-forwarded server
+    port_forward.go:56: 2026-07-05T11:53:49+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-07-05T11:53:49+05:30 cleaning up resources for TestWANFederation/secure
+    helpers.go:111: 2026-07-05T11:54:15+05:30 cleaning up resources for TestWANFederation/secure
+    helpers.go:111: 2026-07-05T11:54:16+05:30 cleaning up resources for TestWANFederation/secure
+    helpers.go:111: 2026-07-05T11:54:41+05:30 cleaning up resources for TestWANFederation/secure
+=== RUN   TestWANFederation/default
+    wan_federation_test.go:70: 2026-07-05T11:54:41+05:30 cleaning up stale WAN test workloads in namespace consul
+    wan_federation_test.go:71: 2026-07-05T11:54:42+05:30 cleaning up stale WAN test workloads in namespace consul
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    wan_federation_test.go:101: 2026-07-05T11:54:49+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:101: 2026-07-05T11:54:49+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:101: 2026-07-05T11:54:49+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:101: 2026-07-05T11:54:50+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T11:54:51+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T11:54:51+05:30 Error: unknown flag: --all
+    wan_federation_test.go:101: 2026-07-05T11:54:51+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T11:54:51+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T11:54:51+05:30 []
+    wan_federation_test.go:101: 2026-07-05T11:54:51+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:101: 2026-07-05T11:54:57+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:101: 2026-07-05T11:54:58+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T11:54:59+05:30 Installing Helm chart ../../../charts/consul with release name test-nxfu4u in namespace consul
+    wan_federation_test.go:101: 2026-07-05T11:57:29+05:30 Waiting 20m0s for pods with label "release=test-nxfu4u" to be ready.
+    wan_federation_test.go:101: 2026-07-05T11:57:38+05:30 Finished waiting for pods to be ready.
+    wan_federation_test.go:470: 2026-07-05T11:57:38+05:30 Retrieving federation secret test-nxfu4u-consul-federation from the primary cluster and applying to the secondary
+    wan_federation_test.go:149: 2026-07-05T11:57:44+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:149: 2026-07-05T11:57:44+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:149: 2026-07-05T11:57:44+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:149: 2026-07-05T11:57:45+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T11:57:46+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T11:57:46+05:30 Error: unknown flag: --all
+    wan_federation_test.go:149: 2026-07-05T11:57:46+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T11:57:46+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T11:57:46+05:30 []
+    wan_federation_test.go:149: 2026-07-05T11:57:46+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:149: 2026-07-05T11:57:52+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:149: 2026-07-05T11:57:53+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T11:57:54+05:30 Installing Helm chart ../../../charts/consul with release name test-nxfu4u in namespace consul
+    wan_federation_test.go:149: 2026-07-05T11:58:19+05:30 Waiting 20m0s for pods with label "release=test-nxfu4u" to be ready.
+    wan_federation_test.go:149: 2026-07-05T12:00:36+05:30 Finished waiting for pods to be ready.
+TestWANFederation/default 2026-07-05T12:00:36+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin
+TestWANFederation/default 2026-07-05T12:00:36+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin
+    wan_federation_test.go:155: 2026-07-05T12:00:37+05:30 verifying federation was successful
+    helpers.go:153: 2026-07-05T12:03:29+05:30 Took 2m52.408295708s to verify federation
+    wan_federation_test.go:160: 2026-07-05T12:03:29+05:30 creating proxy-defaults config
+    wan_federation_test.go:194: 2026-07-05T12:03:30+05:30 creating static-server in dc2
+    port_forward.go:62: 2026-07-05T12:03:39+05:30 lost connection to port-forwarded server; restarting port-forwarding port 60524
+    tunnel.go:177: 2026-07-05T12:03:39+05:30 Creating a port forwarding tunnel for resource pod/test-nxfu4u-consul-server-0 routing local port 60524 to remote port 8500
+TestWANFederation/default 2026-07-05T12:03:39+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin
+    tunnel.go:209: 2026-07-05T12:03:39+05:30 Selected pod test-nxfu4u-consul-server-0 to open port forward to
+    tunnel.go:222: 2026-07-05T12:03:39+05:30 Using URL https://api.ocptry4.hhz4.p1.openshiftapps.com:6443/api/v1/namespaces/consul/pods/test-nxfu4u-consul-server-0/portforward to create portforward
+    wan_federation_test.go:197: 2026-07-05T12:03:39+05:30 creating static-client in dc1
+    tunnel.go:271: 2026-07-05T12:03:39+05:30 Successfully created port forwarding tunnel
+    wan_federation_test.go:204: 2026-07-05T12:03:43+05:30 checking that connection is successful
+    wan_federation_test.go:205: 2026-07-05T12:03:43+05:30 Took 583.68825ms to check if static server connection was successful
+    helpers.go:111: 2026-07-05T12:03:43+05:30 cleaning up resources for TestWANFederation/default
+    helpers.go:111: 2026-07-05T12:03:44+05:30 cleaning up resources for TestWANFederation/default
+    helpers.go:111: 2026-07-05T12:03:44+05:30 cleaning up resources for TestWANFederation/default
+    port_forward.go:56: 2026-07-05T12:03:44+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-07-05T12:03:44+05:30 cleaning up resources for TestWANFederation/default
+    port_forward.go:56: 2026-07-05T12:03:44+05:30 stopping monitor of the port-forwarded server
+E0705 12:04:08.021871    4499 portforward.go:357] "Unhandled Error" err="error creating error stream for port 60524 -> 8500: Timeout occurred" logger="UnhandledError"
+    helpers.go:111: 2026-07-05T12:04:09+05:30 cleaning up resources for TestWANFederation/default
+    helpers.go:111: 2026-07-05T12:04:09+05:30 cleaning up resources for TestWANFederation/default
+    helpers.go:111: 2026-07-05T12:04:32+05:30 cleaning up resources for TestWANFederation/default
+--- PASS: TestWANFederation (1145.89s)
+    --- PASS: TestWANFederation/secure (555.32s)
+    --- PASS: TestWANFederation/default (590.57s)
+=== RUN   TestWANFederationFailover
+=== RUN   TestWANFederationFailover/secure
+    wan_federation_test.go:246: 2026-07-05T12:04:32+05:30 cleaning up stale WAN test workloads in namespace consul
+    wan_federation_test.go:247: 2026-07-05T12:04:33+05:30 cleaning up stale WAN test workloads in namespace consul
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    wan_federation_test.go:248: 2026-07-05T12:04:33+05:30 cleaning up stale WAN test workloads in namespace ns1
+    wan_federation_test.go:249: 2026-07-05T12:04:34+05:30 cleaning up stale WAN test workloads in namespace ns2
+    wan_federation_test.go:250: 2026-07-05T12:04:35+05:30 cleaning up stale WAN test workloads in namespace ns1
+    wan_federation_test.go:283: 2026-07-05T12:04:42+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:283: 2026-07-05T12:04:42+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:283: 2026-07-05T12:04:42+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:283: 2026-07-05T12:04:43+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T12:04:44+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T12:04:44+05:30 Error: unknown flag: --all
+    wan_federation_test.go:283: 2026-07-05T12:04:44+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T12:04:44+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T12:04:44+05:30 []
+    wan_federation_test.go:283: 2026-07-05T12:04:44+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:283: 2026-07-05T12:04:50+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:283: 2026-07-05T12:04:51+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T12:04:52+05:30 Installing Helm chart ../../../charts/consul with release name test-cjxxrh in namespace consul
+    wan_federation_test.go:283: 2026-07-05T12:07:33+05:30 Waiting 20m0s for pods with label "release=test-cjxxrh" to be ready.
+    wan_federation_test.go:283: 2026-07-05T12:07:41+05:30 Finished waiting for pods to be ready.
+    wan_federation_test.go:470: 2026-07-05T12:07:41+05:30 Retrieving federation secret test-cjxxrh-consul-federation from the primary cluster and applying to the secondary
+    wan_federation_test.go:334: 2026-07-05T12:07:48+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:334: 2026-07-05T12:07:48+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:334: 2026-07-05T12:07:48+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:334: 2026-07-05T12:07:48+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T12:07:50+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T12:07:50+05:30 Error: unknown flag: --all
+    wan_federation_test.go:334: 2026-07-05T12:07:50+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T12:07:50+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T12:07:50+05:30 []
+    wan_federation_test.go:334: 2026-07-05T12:07:50+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:334: 2026-07-05T12:07:56+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:334: 2026-07-05T12:07:57+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T12:07:58+05:30 Installing Helm chart ../../../charts/consul with release name test-cjxxrh in namespace consul
+    wan_federation_test.go:334: 2026-07-05T12:09:08+05:30 Waiting 20m0s for pods with label "release=test-cjxxrh" to be ready.
+    wan_federation_test.go:334: 2026-07-05T12:11:09+05:30 Finished waiting for pods to be ready.
+TestWANFederationFailover/secure 2026-07-05T12:11:09+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin
+TestWANFederationFailover/secure 2026-07-05T12:11:10+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin
+    wan_federation_test.go:340: 2026-07-05T12:11:10+05:30 Verifying federation was successful
+    helpers.go:153: 2026-07-05T12:11:17+05:30 Took 7.771832666s to verify federation
+    wan_federation_test.go:345: 2026-07-05T12:11:17+05:30 Creating proxy-defaults config
+    wan_federation_test.go:382: 2026-07-05T12:11:18+05:30 Creating static-server in dc2
+    wan_federation_test.go:386: 2026-07-05T12:11:29+05:30 Creating static-server in dc1
+    wan_federation_test.go:388: 2026-07-05T12:11:40+05:30 Creating static-client in dc1
+    wan_federation_test.go:392: 2026-07-05T12:11:48+05:30 Creating server on dc1 in namespace ns2
+    connect_helper.go:349: 2026-07-05T12:11:57+05:30 creating intention
+    connect_helper.go:349: 2026-07-05T12:11:57+05:30 creating intention
+    wan_federation_test.go:408: 2026-07-05T12:11:57+05:30 Creating service resolver
+    wan_federation_test.go:412: 2026-07-05T12:11:58+05:30 Verifying static-server in dc1 responds
+    wan_federation_test.go:443: 2026-07-05T12:11:58+05:30 Initial failover check
+    wan_federation_test.go:452: 2026-07-05T12:11:59+05:30 Check failover again to rule out load balancing
+    port_forward.go:62: 2026-07-05T12:21:17+05:30 lost connection to port-forwarded server; restarting port-forwarding port 61134
+    tunnel.go:177: 2026-07-05T12:21:17+05:30 Creating a port forwarding tunnel for resource pod/test-cjxxrh-consul-server-0 routing local port 61134 to remote port 8501
+TestWANFederationFailover/secure 2026-07-05T12:21:17+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin
+    tunnel.go:209: 2026-07-05T12:21:17+05:30 Selected pod test-cjxxrh-consul-server-0 to open port forward to
+    tunnel.go:222: 2026-07-05T12:21:17+05:30 Using URL https://api.ocptry3.vkjo.p1.openshiftapps.com:6443/api/v1/namespaces/consul/pods/test-cjxxrh-consul-server-0/portforward to create portforward
+    port_forward.go:62: 2026-07-05T12:21:17+05:30 lost connection to port-forwarded server; restarting port-forwarding port 61136
+    tunnel.go:177: 2026-07-05T12:21:17+05:30 Creating a port forwarding tunnel for resource pod/test-cjxxrh-consul-server-0 routing local port 61136 to remote port 8501
+TestWANFederationFailover/secure 2026-07-05T12:21:17+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin
+    tunnel.go:209: 2026-07-05T12:21:17+05:30 Selected pod test-cjxxrh-consul-server-0 to open port forward to
+    tunnel.go:222: 2026-07-05T12:21:17+05:30 Using URL https://api.ocptry4.hhz4.p1.openshiftapps.com:6443/api/v1/namespaces/consul/pods/test-cjxxrh-consul-server-0/portforward to create portforward
+    tunnel.go:271: 2026-07-05T12:21:18+05:30 Successfully created port forwarding tunnel
+    tunnel.go:271: 2026-07-05T12:21:18+05:30 Successfully created port forwarding tunnel
+E0705 12:21:46.596791    4499 portforward.go:380] "Unhandled Error" err="error creating forwarding stream for port 61134 -> 8501: Timeout occurred" logger="UnhandledError"
+E0705 12:21:46.894713    4499 portforward.go:357] "Unhandled Error" err="error creating error stream for port 61136 -> 8501: Timeout occurred" logger="UnhandledError"
+    wan_federation_test.go:464: 2026-07-05T12:22:11+05:30   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                         Dload  Upload   Total   Spent    Left  Speed
+          0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0"dc1"
+        100     6  100     6    0     0   3000      0 --:--:-- --:--:-- --:--:--  3000
+        
+    wan_federation_test.go:416: 2026-07-05T12:22:11+05:30 Scale down dc1 static-server
+    wan_federation_test.go:420: 2026-07-05T12:22:12+05:30 Verifying static-server in dc2 responds
+    wan_federation_test.go:443: 2026-07-05T12:22:12+05:30 Initial failover check
+    wan_federation_test.go:452: 2026-07-05T12:22:12+05:30 Check failover again to rule out load balancing
+    wan_federation_test.go:464: 2026-07-05T12:23:14+05:30   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                         Dload  Upload   Total   Spent    Left  Speed
+          0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100     6  100     6    0     0    750      0 --:--:-- --:--:-- --:--:--   750
+        "dc2"
+        
+    wan_federation_test.go:424: 2026-07-05T12:23:14+05:30 Scale down dc2 static-server
+    port_forward.go:62: 2026-07-05T12:23:15+05:30 lost connection to port-forwarded server; restarting port-forwarding port 61134
+    tunnel.go:177: 2026-07-05T12:23:15+05:30 Creating a port forwarding tunnel for resource pod/test-cjxxrh-consul-server-0 routing local port 61134 to remote port 8501
+TestWANFederationFailover/secure 2026-07-05T12:23:15+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin
+    tunnel.go:209: 2026-07-05T12:23:15+05:30 Selected pod test-cjxxrh-consul-server-0 to open port forward to
+    tunnel.go:222: 2026-07-05T12:23:15+05:30 Using URL https://api.ocptry3.vkjo.p1.openshiftapps.com:6443/api/v1/namespaces/consul/pods/test-cjxxrh-consul-server-0/portforward to create portforward
+    tunnel.go:271: 2026-07-05T12:23:15+05:30 Successfully created port forwarding tunnel
+    wan_federation_test.go:428: 2026-07-05T12:23:15+05:30 Verifying static-server in secondary namespace (ns2) responds
+    wan_federation_test.go:443: 2026-07-05T12:23:15+05:30 Initial failover check
+    wan_federation_test.go:452: 2026-07-05T12:23:16+05:30 Check failover again to rule out load balancing
+E0705 12:23:44.554995    4499 portforward.go:357] "Unhandled Error" err="error creating error stream for port 61134 -> 8501: Timeout occurred" logger="UnhandledError"
+    wan_federation_test.go:464: 2026-07-05T12:24:17+05:30   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                         Dload  Upload   Total   Spent    Left  Speed
+          0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100     6  100     6    0     0   6000      0 --:--:-- --:--:-- --:--:--  6000
+        "ns2"
+        
+    helpers.go:111: 2026-07-05T12:24:17+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:17+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:18+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:18+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:19+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:19+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:26+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:32+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:39+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:40+05:30 cleaning up resources for TestWANFederationFailover/secure
+    port_forward.go:56: 2026-07-05T12:24:40+05:30 stopping monitor of the port-forwarded server
+    port_forward.go:56: 2026-07-05T12:24:40+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-07-05T12:24:59+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:24:59+05:30 cleaning up resources for TestWANFederationFailover/secure
+    helpers.go:111: 2026-07-05T12:25:23+05:30 cleaning up resources for TestWANFederationFailover/secure
+=== RUN   TestWANFederationFailover/default
+    wan_federation_test.go:246: 2026-07-05T12:25:23+05:30 cleaning up stale WAN test workloads in namespace consul
+    wan_federation_test.go:247: 2026-07-05T12:25:24+05:30 cleaning up stale WAN test workloads in namespace consul
+    wan_federation_test.go:248: 2026-07-05T12:25:25+05:30 cleaning up stale WAN test workloads in namespace ns1
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    wan_federation_test.go:249: 2026-07-05T12:25:26+05:30 cleaning up stale WAN test workloads in namespace ns2
+    wan_federation_test.go:250: 2026-07-05T12:25:27+05:30 cleaning up stale WAN test workloads in namespace ns1
+    wan_federation_test.go:283: 2026-07-05T12:25:34+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:283: 2026-07-05T12:25:34+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:283: 2026-07-05T12:25:34+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:283: 2026-07-05T12:25:34+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T12:25:36+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T12:25:36+05:30 Error: unknown flag: --all
+    wan_federation_test.go:283: 2026-07-05T12:25:36+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T12:25:36+05:30 Running command helm with args [list --kube-context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T12:25:36+05:30 []
+    wan_federation_test.go:283: 2026-07-05T12:25:36+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:283: 2026-07-05T12:25:42+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:283: 2026-07-05T12:25:43+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T12:25:44+05:30 Installing Helm chart ../../../charts/consul with release name test-n2k8ps in namespace consul
+    wan_federation_test.go:283: 2026-07-05T12:28:07+05:30 Waiting 20m0s for pods with label "release=test-n2k8ps" to be ready.
+    wan_federation_test.go:283: 2026-07-05T12:28:17+05:30 Finished waiting for pods to be ready.
+    wan_federation_test.go:470: 2026-07-05T12:28:17+05:30 Retrieving federation secret test-n2k8ps-consul-federation from the primary cluster and applying to the secondary
+    wan_federation_test.go:334: 2026-07-05T12:28:24+05:30 Unable to get CRDs with finalizers from the targeted list, error parsing JSON: unexpected end of JSON input, output: .
+    wan_federation_test.go:334: 2026-07-05T12:28:24+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    wan_federation_test.go:334: 2026-07-05T12:28:24+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    wan_federation_test.go:334: 2026-07-05T12:28:24+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-05T12:28:27+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-05T12:28:27+05:30 Error: unknown flag: --all
+    wan_federation_test.go:334: 2026-07-05T12:28:27+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-05T12:28:27+05:30 Running command helm with args [list --kube-context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-05T12:28:27+05:30 []
+    wan_federation_test.go:334: 2026-07-05T12:28:27+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    wan_federation_test.go:334: 2026-07-05T12:28:33+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    wan_federation_test.go:334: 2026-07-05T12:28:34+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:239: 2026-07-05T12:28:35+05:30 Installing Helm chart ../../../charts/consul with release name test-n2k8ps in namespace consul
+    wan_federation_test.go:334: 2026-07-05T12:29:01+05:30 Waiting 20m0s for pods with label "release=test-n2k8ps" to be ready.
+    wan_federation_test.go:334: 2026-07-05T12:31:11+05:30 Finished waiting for pods to be ready.
+TestWANFederationFailover/default 2026-07-05T12:31:11+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry3-vkjo-p1-openshiftapps-com:6443/cluster-admin
+TestWANFederationFailover/default 2026-07-05T12:31:11+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocptry4-hhz4-p1-openshiftapps-com:6443/cluster-admin
+    wan_federation_test.go:340: 2026-07-05T12:31:11+05:30 Verifying federation was successful
+    helpers.go:153: 2026-07-05T12:34:47+05:30 Took 3m36.430130291s to verify federation
+    wan_federation_test.go:345: 2026-07-05T12:34:47+05:30 Creating proxy-defaults config
+    wan_federation_test.go:382: 2026-07-05T12:34:48+05:30 Creating static-server in dc2
+    wan_federation_test.go:386: 2026-07-05T12:34:58+05:30 Creating static-server in dc1
+    wan_federation_test.go:388: 2026-07-05T12:35:07+05:30 Creating static-client in dc1
+    wan_federation_test.go:392: 2026-07-05T12:35:13+05:30 Creating server on dc1 in namespace ns2
+    wan_federation_test.go:408: 2026-07-05T12:35:22+05:30 Creating service resolver
+    wan_federation_test.go:412: 2026-07-05T12:35:23+05:30 Verifying static-server in dc1 responds
+    wan_federation_test.go:443: 2026-07-05T12:35:23+05:30 Initial failover check
+    wan_federation_test.go:452: 2026-07-05T12:35:24+05:30 Check failover again to rule out load balancing
+    wan_federation_test.go:464: 2026-07-05T12:36:25+05:30   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                         Dload  Upload   Total   Spent    Left  Speed
+          0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100     6  100     6    0     0   3000      0 --:--:-- --:--:-- --:--:--  3000
+        "dc1"
+        
+    wan_federation_test.go:416: 2026-07-05T12:36:25+05:30 Scale down dc1 static-server
+    wan_federation_test.go:420: 2026-07-05T12:36:26+05:30 Verifying static-server in dc2 responds
+    wan_federation_test.go:443: 2026-07-05T12:36:26+05:30 Initial failover check
+    wan_federation_test.go:452: 2026-07-05T12:36:27+05:30 Check failover again to rule out load balancing
+    wan_federation_test.go:464: 2026-07-05T12:37:28+05:30   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                         Dload  Upload   Total   Spent    Left  Speed
+          0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100     6  100     6    0     0    750      0 --:--:-- --:--:-- --:--:--   750
+        "dc2"
+        
+    wan_federation_test.go:424: 2026-07-05T12:37:28+05:30 Scale down dc2 static-server
+    wan_federation_test.go:428: 2026-07-05T12:37:30+05:30 Verifying static-server in secondary namespace (ns2) responds
+    wan_federation_test.go:443: 2026-07-05T12:37:30+05:30 Initial failover check
+    wan_federation_test.go:452: 2026-07-05T12:37:30+05:30 Check failover again to rule out load balancing
+    wan_federation_test.go:464: 2026-07-05T12:38:31+05:30   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                         Dload  Upload   Total   Spent    Left  Speed
+          0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100     6  100     6    0     0   3000      0 --:--:-- --:--:-- --:--:--  3000
+        "ns2"
+        
+    helpers.go:111: 2026-07-05T12:38:31+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:38:31+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:38:32+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:38:33+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:38:33+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:38:34+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:38:49+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:38:55+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:39:02+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:39:02+05:30 cleaning up resources for TestWANFederationFailover/default
+    port_forward.go:56: 2026-07-05T12:39:02+05:30 stopping monitor of the port-forwarded server
+    port_forward.go:56: 2026-07-05T12:39:02+05:30 stopping monitor of the port-forwarded server
+    helpers.go:111: 2026-07-05T12:39:24+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:39:24+05:30 cleaning up resources for TestWANFederationFailover/default
+    helpers.go:111: 2026-07-05T12:39:49+05:30 cleaning up resources for TestWANFederationFailover/default
+--- PASS: TestWANFederationFailover (1568.35s)
+    --- PASS: TestWANFederationFailover/secure (702.53s)
+    --- PASS: TestWANFederationFailover/default (865.82s)
+PASS
+ok  	github.com/hashicorp/consul-k8s/acceptance/tests/wan-federation	3370.874s

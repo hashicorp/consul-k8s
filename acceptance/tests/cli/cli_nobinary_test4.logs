@@ -1,0 +1,52 @@
+=== RUN   TestInstall
+=== RUN   TestInstall/not-secure
+    connect_helper.go:89: 2026-06-25T08:44:05+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-25T08:44:58+05:30 Waiting 20m0s for pods with label "release=consul" to be ready.
+    connect_helper.go:90: 2026-06-25T08:44:58+05:30 Finished waiting for pods to be ready.
+TestInstall/not-secure 2026-06-25T08:44:58+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-25T08:44:58+05:30 creating static-server and static-client deployments
+    cli.go:44: 2026-06-25T08:46:25+05:30 Running `consul-k8s proxy list -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    cli_install_test.go:67: 2026-06-25T08:46:25+05:30 Namespace: consul
+        
+        Name                          	Type    
+        static-client-6b8c8684dd-6rp48	Sidecar	
+        static-server-69cfbfc7d5-vn4vl	Sidecar	
+        
+    connect_helper.go:413: 2026-06-25T08:46:27+05:30 checking that connection is successful
+    connect_helper.go:425: 2026-06-25T08:46:28+05:30 Took 551.812417ms to check if static server connection was successful
+    connect_helper.go:438: 2026-06-25T08:46:28+05:30 testing k8s -> consul health checks sync by making the static-server unhealthy
+    connect_helper.go:449: 2026-06-25T08:46:28+05:30 checking that connection is unsuccessful
+    helpers.go:111: 2026-06-25T08:47:00+05:30 cleaning up resources for TestInstall/not-secure
+    helpers.go:111: 2026-06-25T08:47:01+05:30 cleaning up resources for TestInstall/not-secure
+    helpers.go:111: 2026-06-25T08:47:01+05:30 cleaning up resources for TestInstall/not-secure
+    cli.go:44: 2026-06-25T08:47:01+05:30 Running `consul-k8s uninstall -auto-approve -wipe-data -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    helpers.go:111: 2026-06-25T08:47:29+05:30 cleaning up resources for TestInstall/not-secure
+=== RUN   TestInstall/secure
+    connect_helper.go:89: 2026-06-25T08:47:30+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-25T08:48:36+05:30 Waiting 20m0s for pods with label "release=consul" to be ready.
+    connect_helper.go:90: 2026-06-25T08:48:36+05:30 Finished waiting for pods to be ready.
+TestInstall/secure 2026-06-25T08:48:36+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-25T08:48:36+05:30 creating static-server and static-client deployments
+    connect_helper.go:324: 2026-06-25T08:50:03+05:30 checking that the connection is not successful because there's no intention
+    connect_helper.go:349: 2026-06-25T08:50:04+05:30 creating intention
+    cli.go:44: 2026-06-25T08:50:04+05:30 Running `consul-k8s proxy list -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    cli_install_test.go:67: 2026-06-25T08:50:05+05:30 Namespace: consul
+        
+        Name                          	Type    
+        static-client-6b8c8684dd-jbzj9	Sidecar	
+        static-server-69cfbfc7d5-d2wh4	Sidecar	
+        
+    connect_helper.go:413: 2026-06-25T08:50:06+05:30 checking that connection is successful
+    connect_helper.go:425: 2026-06-25T08:50:07+05:30 Took 519.100958ms to check if static server connection was successful
+    connect_helper.go:438: 2026-06-25T08:50:07+05:30 testing k8s -> consul health checks sync by making the static-server unhealthy
+    connect_helper.go:449: 2026-06-25T08:50:08+05:30 checking that connection is unsuccessful
+    helpers.go:111: 2026-06-25T08:50:09+05:30 cleaning up resources for TestInstall/secure
+    helpers.go:111: 2026-06-25T08:50:09+05:30 cleaning up resources for TestInstall/secure
+    helpers.go:111: 2026-06-25T08:50:12+05:30 cleaning up resources for TestInstall/secure
+    cli.go:44: 2026-06-25T08:50:12+05:30 Running `consul-k8s uninstall -auto-approve -wipe-data -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    helpers.go:111: 2026-06-25T08:50:45+05:30 cleaning up resources for TestInstall/secure
+--- PASS: TestInstall (400.32s)
+    --- PASS: TestInstall/not-secure (204.58s)
+    --- PASS: TestInstall/secure (195.74s)
+PASS
+ok  	github.com/hashicorp/consul-k8s/acceptance/tests/cli	400.849s

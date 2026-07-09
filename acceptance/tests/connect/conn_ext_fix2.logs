@@ -1,0 +1,39 @@
+=== RUN   TestConnectInject_ExternalServers
+=== RUN   TestConnectInject_ExternalServers/secure:_false
+    retry.go:219: retry.go:39: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:858
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:183
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:190
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:844
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:752
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:96
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/connect/connect_external_servers_test.go:56
+        	Error:      	Received unexpected error:
+        	            	Unauthorized
+        	Test:       	TestConnectInject_ExternalServers/secure:_false
+        
+        
+=== RUN   TestConnectInject_ExternalServers/secure:_true
+    retry.go:219: retry.go:39: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:858
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:183
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:190
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42
+        	            				/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:844
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:752
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:96
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/connect/connect_external_servers_test.go:56
+        	Error:      	Received unexpected error:
+        	            	Unauthorized
+        	Test:       	TestConnectInject_ExternalServers/secure:_true
+        
+        
+--- FAIL: TestConnectInject_ExternalServers (59.65s)
+    --- FAIL: TestConnectInject_ExternalServers/secure:_false (29.82s)
+    --- FAIL: TestConnectInject_ExternalServers/secure:_true (29.83s)
+FAIL
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/connect	60.513s
+FAIL

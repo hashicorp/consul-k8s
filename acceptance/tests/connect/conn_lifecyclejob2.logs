@@ -1,0 +1,53 @@
+=== RUN   TestConnectInject_ProxyLifecycleShutdownJob
+    connect_helper.go:89: 2026-06-23T23:22:37+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T23:22:42+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T23:22:42+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T23:22:42+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T23:22:50+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T23:22:50+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T23:22:50+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T23:22:50+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T23:22:51+05:30 [{"name":"test-j1zfkf","namespace":"consul","revision":"1","updated":"2026-06-23 23:00:33.567226 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_helper.go:90: 2026-06-23T23:22:51+05:30 Deleting stale Helm release test-j1zfkf in namespace consul before install
+    command.go:100: 2026-06-23T23:22:51+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-j1zfkf --no-hooks --timeout 30s]
+    command.go:185: 2026-06-23T23:22:53+05:30 release "test-j1zfkf" uninstalled
+    connect_helper.go:90: 2026-06-23T23:22:53+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T23:22:53+05:30 Deleting stale CRD controlplanerequestlimits.consul.hashicorp.com owned by release test-j1zfkf before installing release test-ynmsoh
+    connect_helper.go:90: 2026-06-23T23:22:54+05:30 Deleting stale CRD gatewayclassconfigs.consul.hashicorp.com owned by release test-j1zfkf before installing release test-ynmsoh
+Finalizers removed from CRD gatewayclassconfigs.consul.hashicorp.com
+    helpers.go:484: 2026-06-23T23:22:54+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    helpers.go:484: 2026-06-23T23:22:55+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    connect_helper.go:90: 2026-06-23T23:22:58+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    connect_helper.go:90: 2026-06-23T23:22:58+05:30 Deleting stale deployment resource deployment.apps/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T23:22:58+05:30 Deleting stale service resource service/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T23:22:59+05:30 Deleting stale serviceaccount resource serviceaccount/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T23:22:59+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T23:22:59+05:30 Deleting stale rolebinding resource rolebinding.rbac.authorization.k8s.io/static-server-openshift-privileged in namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T23:23:00+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:233: 2026-06-23T23:23:01+05:30 Installing Helm chart ../../../charts/consul with release name test-ynmsoh in namespace consul
+    connect_helper.go:90: 2026-06-23T23:23:17+05:30 Waiting 20m0s for pods with label "release=test-ynmsoh" to be ready.
+    connect_helper.go:90: 2026-06-23T23:23:39+05:30 Finished waiting for pods to be ready.
+TestConnectInject_ProxyLifecycleShutdownJob 2026-06-23T23:23:39+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:260: 2026-06-23T23:23:40+05:30 creating static-server deployment
+    connect_proxy_lifecycle_test.go:314: 2026-06-23T23:25:39+05:30 waiting for static-server to be registered with Consul
+    connect_helper.go:222: 2026-06-23T23:25:40+05:30 creating job-client deployment
+    connect_helper.go:223: 2026-06-23T23:25:40+05:30 job deployed
+    kubectl.go:72: 2026-06-23T23:30:41+05:30 Output: error: timed out waiting for the condition on pods/job-client-ldtmm
+        .
+    kubectl.go:151: 
+        	Error Trace:	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/k8s/kubectl.go:151
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/k8s/deploy.go:132
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/connhelper/connect_helper.go:223
+        	            				/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/connect/connect_proxy_lifecycle_test.go:372
+        	Error:      	Received unexpected error:
+        	            	exit status 1
+        	Test:       	TestConnectInject_ProxyLifecycleShutdownJob
+    helpers.go:114: 2026-06-23T23:30:41+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T23:30:41+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T23:30:41+05:30 skipping resource cleanup
+    helpers.go:114: 2026-06-23T23:30:41+05:30 skipping resource cleanup
+    port_forward.go:56: 2026-06-23T23:30:41+05:30 stopping monitor of the port-forwarded server
+--- FAIL: TestConnectInject_ProxyLifecycleShutdownJob (483.58s)
+FAIL
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/connect	484.443s
+FAIL

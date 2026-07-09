@@ -1,0 +1,66 @@
+=== RUN   TestInstall
+=== RUN   TestInstall/not-secure
+    connect_helper.go:89: 2026-06-24T18:24:37+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-24T18:25:32+05:30 Waiting 20m0s for pods with label "release=consul" to be ready.
+    connect_helper.go:90: 2026-06-24T18:25:33+05:30 Finished waiting for pods to be ready.
+TestInstall/not-secure 2026-06-24T18:25:33+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-24T18:25:33+05:30 creating static-server and static-client deployments
+    cli.go:44: 2026-06-24T18:28:08+05:30 Running `consul-k8s proxy list -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    cli_install_test.go:67: 2026-06-24T18:28:08+05:30 Namespace: consul
+        
+        Name                          	Type    
+        static-client-6b8c8684dd-v4bd5	Sidecar	
+        static-server-69cfbfc7d5-45mv4	Sidecar	
+        
+    connect_helper.go:403: 2026-06-24T18:28:10+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-24T18:28:11+05:30 Took 617.529583ms to check if static server connection was successful
+    connect_helper.go:428: 2026-06-24T18:28:11+05:30 testing k8s -> consul health checks sync by making the static-server unhealthy
+    connect_helper.go:439: 2026-06-24T18:28:12+05:30 checking that connection is unsuccessful
+    helpers.go:111: 2026-06-24T18:28:13+05:30 cleaning up resources for TestInstall/not-secure
+    helpers.go:111: 2026-06-24T18:28:13+05:30 cleaning up resources for TestInstall/not-secure
+    helpers.go:111: 2026-06-24T18:28:14+05:30 cleaning up resources for TestInstall/not-secure
+    cli.go:44: 2026-06-24T18:28:14+05:30 Running `consul-k8s uninstall -auto-approve -wipe-data -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    helpers.go:111: 2026-06-24T18:28:41+05:30 cleaning up resources for TestInstall/not-secure
+=== RUN   TestInstall/secure
+    connect_helper.go:89: 2026-06-24T18:28:41+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-24T18:29:49+05:30 Waiting 20m0s for pods with label "release=consul" to be ready.
+    connect_helper.go:90: 2026-06-24T18:29:49+05:30 Finished waiting for pods to be ready.
+TestInstall/secure 2026-06-24T18:29:49+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:138: 2026-06-24T18:29:50+05:30 creating static-server and static-client deployments
+    connect_helper.go:314: 2026-06-24T18:31:11+05:30 checking that the connection is not successful because there's no intention
+    connect_helper.go:339: 2026-06-24T18:31:12+05:30 creating intention
+    cli.go:44: 2026-06-24T18:31:12+05:30 Running `consul-k8s proxy list -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    cli_install_test.go:67: 2026-06-24T18:31:12+05:30 Namespace: consul
+        
+        Name                          	Type    
+        static-client-6b8c8684dd-7gxh4	Sidecar	
+        static-server-69cfbfc7d5-spbst	Sidecar	
+        
+    connect_helper.go:403: 2026-06-24T18:31:15+05:30 checking that connection is successful
+    connect_helper.go:415: 2026-06-24T18:31:15+05:30 Took 626.105ms to check if static server connection was successful
+    connect_helper.go:428: 2026-06-24T18:31:15+05:30 testing k8s -> consul health checks sync by making the static-server unhealthy
+    connect_helper.go:439: 2026-06-24T18:31:16+05:30 checking that connection is unsuccessful
+    helpers.go:111: 2026-06-24T18:31:48+05:30 cleaning up resources for TestInstall/secure
+    helpers.go:111: 2026-06-24T18:31:48+05:30 cleaning up resources for TestInstall/secure
+    helpers.go:111: 2026-06-24T18:31:51+05:30 cleaning up resources for TestInstall/secure
+    cli.go:44: 2026-06-24T18:31:51+05:30 Running `consul-k8s uninstall -auto-approve -wipe-data -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    helpers.go:111: 2026-06-24T18:32:43+05:30 cleaning up resources for TestInstall/secure
+--- PASS: TestInstall (485.75s)
+    --- PASS: TestInstall/not-secure (244.15s)
+    --- PASS: TestInstall/secure (241.59s)
+=== RUN   TestUpgrade
+    connect_helper.go:89: 2026-06-24T18:32:43+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-24T18:33:36+05:30 Waiting 20m0s for pods with label "release=consul" to be ready.
+    connect_helper.go:90: 2026-06-24T18:33:36+05:30 Finished waiting for pods to be ready.
+TestUpgrade 2026-06-24T18:33:36+05:30 client.go:45: Configuring Kubernetes client using config file /Users/manishakumari/.kube/config with context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin
+    connect_helper.go:100: 2026-06-24T18:33:36+05:30 upgrading Consul cluster
+    cli.go:44: 2026-06-24T18:33:36+05:30 Running `consul-k8s upgrade -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin -set server.replicas=1 -set dns.enabled=true -set global.enterpriseLicense.secretName=license -set global.tls.enabled=false -set connectInject.apiGateway.manageNonStandardCRDs=true -set global.openshift.crds.enableTcpRoute=true -set ingressGateways.enabled=true -set connectInject.sidecarProxy.lifecycle.defaultShutdownGracePeriodSeconds=1 -set global.image=registry.connect.redhat.com/hashicorp/consul-enterprise:2.0.0-ent-ubi -set global.imageConsulDataplane=registry.connect.redhat.com/hashicorp/consul-dataplane:2.0.0-ubi -set global.acls.manageSystemACLs=false -set client.extraConfig="{\"log_level\": \"TRACE\"}" -set global.enterpriseLicense.secretKey=key -set connectInject.enabled=true -set connectInject.apiGateway.manageExternalCRDs=false -set global.openshift.isOcpGreaterthan4_18=true -set server.containerSecurityContext.server.runAsNonRoot=false -set ingressGateways.defaults.replicas=1 -set server.extraConfig="{\"log_level\": \"TRACE\"}" -set global.openshift.enabled=true -set connectInject.transparentProxy.defaultEnabled=false -set global.imageK8S=registry.connect.redhat.com/hashicorp/consul-k8s-control-plane:2.0.0-ubi -set dns.enableRedirection=true -set server.affinity=null -set server.containerSecurityContext.server.allowPrivilegeEscalation=false -set global.logLevel=debug -timeout 15m -auto-approve -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    connect_helper.go:101: 2026-06-24T18:35:21+05:30 Waiting 20m0s for pods with label "release=consul" to be ready.
+    connect_helper.go:101: 2026-06-24T18:35:21+05:30 Finished waiting for pods to be ready.
+    cli_upgrade_test.go:41: checking that the ingress gateway was install as a result of the upgrade
+    helpers.go:111: 2026-06-24T18:35:21+05:30 cleaning up resources for TestUpgrade
+    cli.go:44: 2026-06-24T18:35:21+05:30 Running `consul-k8s uninstall -auto-approve -wipe-data -context consul/api-ocpnewloc2-xk4y-p1-openshiftapps-com:6443/cluster-admin`
+    helpers.go:111: 2026-06-24T18:35:51+05:30 cleaning up resources for TestUpgrade
+--- PASS: TestUpgrade (188.14s)
+PASS
+ok  	github.com/hashicorp/consul-k8s/acceptance/tests/cli	674.570s

@@ -1,0 +1,433 @@
+=== RUN   TestComponentMetrics
+    metrics_test.go:69: 2026-07-06T18:37:22+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    metrics_test.go:69: 2026-07-06T18:37:22+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    metrics_test.go:69: 2026-07-06T18:37:22+05:30 Clearing stale finalizers on resources in namespace consul before Helm install
+    metrics_test.go:69: 2026-07-06T18:37:22+05:30 Deleting stale gateway Job test-qqzn3j-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+    metrics_test.go:69: 2026-07-06T18:37:22+05:30 Deleting stale gateway Job test-qqzn3j-consul-gateway-resources-custom in namespace consul to stop it from recreating CRDs
+    metrics_test.go:69: 2026-07-06T18:37:22+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-07-06T18:37:30+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-06T18:37:30+05:30 Error: unknown flag: --all
+    metrics_test.go:69: 2026-07-06T18:37:30+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-06T18:37:30+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-06T18:37:31+05:30 [{"name":"test-qqzn3j","namespace":"consul","revision":"1","updated":"2026-07-06 13:01:15.001456301 +0000 UTC","status":"pending-install","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    metrics_test.go:69: 2026-07-06T18:37:31+05:30 Deleting stale Helm release test-qqzn3j in namespace consul before install
+    command.go:100: 2026-07-06T18:37:31+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-qqzn3j --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T18:37:33+05:30 release "test-qqzn3j" uninstalled
+    metrics_test.go:69: 2026-07-06T18:37:33+05:30 Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races
+    kubectl.go:72: 2026-07-06T18:37:33+05:30 Output: error: the server doesn't have a resource type "cgateways"
+        .
+    kubectl.go:72: 2026-07-06T18:37:34+05:30 Output: error: the server doesn't have a resource type "cgrpcroutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:34+05:30 Output: error: the server doesn't have a resource type "chttproutes"
+        .
+Finalizers removed from CRD customgatewayclasses.consul.hashicorp.com
+    kubectl.go:72: 2026-07-06T18:37:34+05:30 Output: error: the server doesn't have a resource type "controlplanerequestlimits"
+        .
+    helpers.go:493: 2026-07-06T18:37:34+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    helpers.go:493: 2026-07-06T18:37:34+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    helpers.go:493: 2026-07-06T18:37:35+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    helpers.go:493: 2026-07-06T18:37:35+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    kubectl.go:72: 2026-07-06T18:37:35+05:30 Output: error: the server doesn't have a resource type "creferencegrants"
+        .
+    helpers.go:493: 2026-07-06T18:37:35+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    kubectl.go:72: 2026-07-06T18:37:35+05:30 Output: error: the server doesn't have a resource type "ctcproutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:36+05:30 Output: error: the server doesn't have a resource type "ctlsroutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:36+05:30 Output: error: the server doesn't have a resource type "cudproutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:36+05:30 Output: error: the server doesn't have a resource type "customgatewayclasses"
+        .
+    kubectl.go:72: 2026-07-06T18:37:36+05:30 Output: error: the server doesn't have a resource type "customgatewaypolicies"
+        .
+    kubectl.go:72: 2026-07-06T18:37:37+05:30 Output: error: the server doesn't have a resource type "exportedservices"
+        .
+    kubectl.go:72: 2026-07-06T18:37:37+05:30 Output: error: the server doesn't have a resource type "gatewayclassconfigs"
+        .
+    kubectl.go:72: 2026-07-06T18:37:37+05:30 Output: error: the server doesn't have a resource type "gatewaypolicies"
+        .
+    kubectl.go:72: 2026-07-06T18:37:38+05:30 Output: error: the server doesn't have a resource type "gateways"
+        .
+    kubectl.go:72: 2026-07-06T18:37:38+05:30 Output: error: the server doesn't have a resource type "grpcroutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:38+05:30 Output: error: the server doesn't have a resource type "httproutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:39+05:30 Output: error: the server doesn't have a resource type "ingressgateways"
+        .
+    kubectl.go:72: 2026-07-06T18:37:39+05:30 Output: error: the server doesn't have a resource type "jwtproviders"
+        .
+    kubectl.go:72: 2026-07-06T18:37:39+05:30 Output: error: the server doesn't have a resource type "meshes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:40+05:30 Output: error: the server doesn't have a resource type "meshservices"
+        .
+    kubectl.go:72: 2026-07-06T18:37:40+05:30 Output: error: the server doesn't have a resource type "peeringacceptors"
+        .
+    kubectl.go:72: 2026-07-06T18:37:40+05:30 Output: error: the server doesn't have a resource type "peeringdialers"
+        .
+    kubectl.go:72: 2026-07-06T18:37:41+05:30 Output: error: the server doesn't have a resource type "proxydefaults"
+        .
+    kubectl.go:72: 2026-07-06T18:37:41+05:30 Output: error: the server doesn't have a resource type "ratelimits"
+        .
+    kubectl.go:72: 2026-07-06T18:37:41+05:30 Output: error: the server doesn't have a resource type "referencegrants"
+        .
+    kubectl.go:72: 2026-07-06T18:37:41+05:30 Output: error: the server doesn't have a resource type "registrations"
+        .
+    kubectl.go:72: 2026-07-06T18:37:42+05:30 Output: error: the server doesn't have a resource type "routeauthfilters"
+        .
+    kubectl.go:72: 2026-07-06T18:37:42+05:30 Output: error: the server doesn't have a resource type "routeretryfilters"
+        .
+    kubectl.go:72: 2026-07-06T18:37:42+05:30 Output: error: the server doesn't have a resource type "routetimeoutfilters"
+        .
+    kubectl.go:72: 2026-07-06T18:37:43+05:30 Output: error: the server doesn't have a resource type "routetlssdsfilters"
+        .
+    kubectl.go:72: 2026-07-06T18:37:43+05:30 Output: error: the server doesn't have a resource type "samenessgroups"
+        .
+    kubectl.go:72: 2026-07-06T18:37:43+05:30 Output: error: the server doesn't have a resource type "servicedefaults"
+        .
+    kubectl.go:72: 2026-07-06T18:37:44+05:30 Output: error: the server doesn't have a resource type "serviceintentions"
+        .
+    kubectl.go:72: 2026-07-06T18:37:44+05:30 Output: error: the server doesn't have a resource type "serviceresolvers"
+        .
+    kubectl.go:72: 2026-07-06T18:37:44+05:30 Output: error: the server doesn't have a resource type "servicerouters"
+        .
+    kubectl.go:72: 2026-07-06T18:37:45+05:30 Output: error: the server doesn't have a resource type "servicesplitters"
+        .
+    kubectl.go:72: 2026-07-06T18:37:45+05:30 Output: error: the server doesn't have a resource type "tcproutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:45+05:30 Output: error: the server doesn't have a resource type "terminatinggateways"
+        .
+    kubectl.go:72: 2026-07-06T18:37:46+05:30 Output: error: the server doesn't have a resource type "tlsroutes"
+        .
+    kubectl.go:72: 2026-07-06T18:37:46+05:30 Output: error: the server doesn't have a resource type "trafficpermissions"
+        .
+    kubectl.go:72: 2026-07-06T18:37:46+05:30 Output: error: the server doesn't have a resource type "udproutes"
+        .
+    metrics_test.go:69: 2026-07-06T18:37:47+05:30 CRD cgateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:47+05:30 CRD cgrpcroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:47+05:30 CRD chttproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:47+05:30 CRD controlplanerequestlimits.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:47+05:30 CRD creferencegrants.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:47+05:30 CRD ctcproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:47+05:30 CRD ctlsroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:48+05:30 CRD cudproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:48+05:30 CRD customgatewayclasses.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:48+05:30 CRD customgatewaypolicies.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:48+05:30 CRD exportedservices.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:48+05:30 CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:48+05:30 CRD gatewaypolicies.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:48+05:30 CRD gateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:49+05:30 CRD grpcroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:49+05:30 CRD httproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:49+05:30 CRD ingressgateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:49+05:30 CRD jwtproviders.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:49+05:30 CRD meshes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:49+05:30 CRD meshservices.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:49+05:30 CRD peeringacceptors.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:50+05:30 CRD peeringdialers.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:50+05:30 CRD proxydefaults.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:50+05:30 CRD ratelimits.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:50+05:30 CRD referencegrants.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:50+05:30 CRD registrations.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:50+05:30 CRD routeauthfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:50+05:30 CRD routeretryfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:51+05:30 CRD routetimeoutfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:51+05:30 CRD routetlssdsfilters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:51+05:30 CRD samenessgroups.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:51+05:30 CRD servicedefaults.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:51+05:30 CRD serviceintentions.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:51+05:30 CRD serviceresolvers.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 CRD servicerouters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 CRD servicesplitters.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 CRD tcproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 CRD terminatinggateways.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 CRD tlsroutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 CRD trafficpermissions.auth.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 CRD udproutes.consul.hashicorp.com fully deleted
+    metrics_test.go:69: 2026-07-06T18:37:52+05:30 Deleting static resources in deployment, service, serviceaccount and rolebinding
+    metrics_test.go:69: 2026-07-06T18:37:53+05:30 Deleting stale Consul resources with label selector chart=consul-helm before Helm install
+    helm_cluster.go:251: 2026-07-06T18:37:54+05:30 Installing Helm chart ../../../charts/consul with release name test-kvxicd in namespace consul
+    helm_cluster.go:251: 2026-07-06T18:53:22+05:30 Installing Helm chart ../../../charts/consul with release name test-kvxicd in namespace consul
+    helm_cluster.go:251: 2026-07-06T19:08:52+05:30 Installing Helm chart ../../../charts/consul with release name test-kvxicd in namespace consul
+    helm_cluster.go:282: 2026-07-06T19:08:55+05:30 Helm ownership conflict for release test-kvxicd — killing background gateway Jobs and re-running stale CRD cleanup before retry: error while running command: exit status 1; level=DEBUG msg="getting history for release" release=test-kvxicd
+        level=DEBUG msg="Original chart version" version=""
+        level=DEBUG msg="Chart path" path=/Users/manishakumari/Work/single_ocp/consul-k8s/charts/consul
+        level=DEBUG msg="number of dependencies in the chart" chart=consul dependencies=0
+        Error: unable to continue with install: CustomResourceDefinition "customgatewayclasses.consul.hashicorp.com" in namespace "" exists and cannot be imported into the current release: invalid ownership metadata; annotation validation error: key "meta.helm.sh/release-name" must equal "test-kvxicd": current value is "test-lkvnd9"
+    helm_cluster.go:286: 2026-07-06T19:08:55+05:30 Deleting stale gateway Job test-lkvnd9-consul-gateway-resources in namespace consul to stop it from recreating CRDs
+    command.go:100: 2026-07-06T19:08:55+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-kvxicd --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T19:08:55+05:30 Error: uninstall: Release not loaded: test-kvxicd: release: not found
+    command.go:100: 2026-07-06T19:08:55+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-07-06T19:08:55+05:30 Error: unknown flag: --all
+    helm_cluster.go:288: 2026-07-06T19:08:55+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-07-06T19:08:55+05:30 Running command helm with args [list --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-07-06T19:08:56+05:30 [{"name":"test-lkvnd9","namespace":"consul","revision":"1","updated":"2026-07-06 13:32:34.827917125 +0000 UTC","status":"pending-install","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    helm_cluster.go:288: 2026-07-06T19:08:56+05:30 Deleting stale Helm release test-lkvnd9 in namespace consul before install
+    command.go:100: 2026-07-06T19:08:56+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpate2-6hog-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-lkvnd9 --no-hooks --timeout 30s]
+    command.go:185: 2026-07-06T19:09:00+05:30 release "test-lkvnd9" uninstalled
+    helm_cluster.go:290: 2026-07-06T19:09:00+05:30 Unconditionally deleting all consul CRDs before Helm install to eliminate ownership annotation races
+    kubectl.go:72: 2026-07-06T19:09:01+05:30 Output: error: the server doesn't have a resource type "cgateways"
+        .
+    kubectl.go:72: 2026-07-06T19:09:01+05:30 Output: error: the server doesn't have a resource type "cgrpcroutes"
+        .
+Finalizers removed from CRD gatewayclassconfigs.consul.hashicorp.com
+    kubectl.go:72: 2026-07-06T19:09:02+05:30 Output: error: the server doesn't have a resource type "chttproutes"
+        .
+    helpers.go:493: 2026-07-06T19:09:02+05:30 Unable to remove finalizers, proceeding anyway: exit status 1.
+    kubectl.go:72: 2026-07-06T19:09:02+05:30 Output: error: the server doesn't have a resource type "controlplanerequestlimits"
+        .
+    kubectl.go:72: 2026-07-06T19:09:03+05:30 Output: error: the server doesn't have a resource type "creferencegrants"
+        .
+    kubectl.go:72: 2026-07-06T19:09:03+05:30 Output: error: the server doesn't have a resource type "ctcproutes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:04+05:30 Output: error: the server doesn't have a resource type "ctlsroutes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:04+05:30 Output: error: the server doesn't have a resource type "cudproutes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:04+05:30 Output: error: the server doesn't have a resource type "customgatewayclasses"
+        .
+    kubectl.go:72: 2026-07-06T19:09:05+05:30 Output: error: the server doesn't have a resource type "customgatewaypolicies"
+        .
+    kubectl.go:72: 2026-07-06T19:09:05+05:30 Output: error: the server doesn't have a resource type "exportedservices"
+        .
+    kubectl.go:72: 2026-07-06T19:09:06+05:30 Output: error: the server doesn't have a resource type "gatewayclassconfigs"
+        .
+    kubectl.go:72: 2026-07-06T19:09:06+05:30 Output: error: the server doesn't have a resource type "gatewaypolicies"
+        .
+    kubectl.go:72: 2026-07-06T19:09:06+05:30 Output: error: the server doesn't have a resource type "gateways"
+        .
+    kubectl.go:72: 2026-07-06T19:09:07+05:30 Output: error: the server doesn't have a resource type "grpcroutes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:07+05:30 Output: error: the server doesn't have a resource type "httproutes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:08+05:30 Output: error: the server doesn't have a resource type "ingressgateways"
+        .
+    kubectl.go:72: 2026-07-06T19:09:08+05:30 Output: error: the server doesn't have a resource type "jwtproviders"
+        .
+    kubectl.go:72: 2026-07-06T19:09:09+05:30 Output: error: the server doesn't have a resource type "meshes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:09+05:30 Output: error: the server doesn't have a resource type "meshservices"
+        .
+    kubectl.go:72: 2026-07-06T19:09:09+05:30 Output: error: the server doesn't have a resource type "peeringacceptors"
+        .
+    kubectl.go:72: 2026-07-06T19:09:10+05:30 Output: error: the server doesn't have a resource type "peeringdialers"
+        .
+    kubectl.go:72: 2026-07-06T19:09:10+05:30 Output: error: the server doesn't have a resource type "proxydefaults"
+        .
+    kubectl.go:72: 2026-07-06T19:09:11+05:30 Output: error: the server doesn't have a resource type "ratelimits"
+        .
+    kubectl.go:72: 2026-07-06T19:09:11+05:30 Output: error: the server doesn't have a resource type "referencegrants"
+        .
+    kubectl.go:72: 2026-07-06T19:09:12+05:30 Output: error: the server doesn't have a resource type "registrations"
+        .
+    kubectl.go:72: 2026-07-06T19:09:12+05:30 Output: error: the server doesn't have a resource type "routeauthfilters"
+        .
+    kubectl.go:72: 2026-07-06T19:09:12+05:30 Output: error: the server doesn't have a resource type "routeretryfilters"
+        .
+    kubectl.go:72: 2026-07-06T19:09:13+05:30 Output: error: the server doesn't have a resource type "routetimeoutfilters"
+        .
+    kubectl.go:72: 2026-07-06T19:09:13+05:30 Output: error: the server doesn't have a resource type "routetlssdsfilters"
+        .
+    kubectl.go:72: 2026-07-06T19:09:14+05:30 Output: error: the server doesn't have a resource type "samenessgroups"
+        .
+    kubectl.go:72: 2026-07-06T19:09:14+05:30 Output: error: the server doesn't have a resource type "servicedefaults"
+        .
+    kubectl.go:72: 2026-07-06T19:09:15+05:30 Output: error: the server doesn't have a resource type "serviceintentions"
+        .
+    kubectl.go:72: 2026-07-06T19:09:15+05:30 Output: error: the server doesn't have a resource type "serviceresolvers"
+        .
+    kubectl.go:72: 2026-07-06T19:09:16+05:30 Output: error: the server doesn't have a resource type "servicerouters"
+        .
+    kubectl.go:72: 2026-07-06T19:09:16+05:30 Output: error: the server doesn't have a resource type "servicesplitters"
+        .
+    kubectl.go:72: 2026-07-06T19:09:17+05:30 Output: error: the server doesn't have a resource type "tcproutes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:17+05:30 Output: error: the server doesn't have a resource type "terminatinggateways"
+        .
+    kubectl.go:72: 2026-07-06T19:09:17+05:30 Output: error: the server doesn't have a resource type "tlsroutes"
+        .
+    kubectl.go:72: 2026-07-06T19:09:18+05:30 Output: error: the server doesn't have a resource type "trafficpermissions"
+        .
+    kubectl.go:72: 2026-07-06T19:09:18+05:30 Output: error: the server doesn't have a resource type "udproutes"
+        .
+    helm_cluster.go:290: 2026-07-06T19:09:19+05:30 CRD cgateways.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:19+05:30 CRD cgrpcroutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:19+05:30 CRD chttproutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:19+05:30 CRD controlplanerequestlimits.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:19+05:30 CRD creferencegrants.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:19+05:30 CRD ctcproutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:20+05:30 CRD ctlsroutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:20+05:30 CRD cudproutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:20+05:30 CRD customgatewayclasses.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:20+05:30 CRD customgatewaypolicies.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:20+05:30 CRD exportedservices.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:21+05:30 CRD gatewayclassconfigs.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:21+05:30 CRD gatewaypolicies.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:21+05:30 CRD gateways.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:21+05:30 CRD grpcroutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:21+05:30 CRD httproutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:22+05:30 CRD ingressgateways.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:22+05:30 CRD jwtproviders.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:22+05:30 CRD meshes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:22+05:30 CRD meshservices.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:22+05:30 CRD peeringacceptors.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:23+05:30 CRD peeringdialers.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:23+05:30 CRD proxydefaults.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:23+05:30 CRD ratelimits.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:23+05:30 CRD referencegrants.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:23+05:30 CRD registrations.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:24+05:30 CRD routeauthfilters.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:24+05:30 CRD routeretryfilters.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:24+05:30 CRD routetimeoutfilters.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:24+05:30 CRD routetlssdsfilters.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:24+05:30 CRD samenessgroups.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:25+05:30 CRD servicedefaults.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:25+05:30 CRD serviceintentions.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:25+05:30 CRD serviceresolvers.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:25+05:30 CRD servicerouters.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:26+05:30 CRD servicesplitters.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:26+05:30 CRD tcproutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:26+05:30 CRD terminatinggateways.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:26+05:30 CRD tlsroutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:26+05:30 CRD trafficpermissions.auth.consul.hashicorp.com fully deleted
+    helm_cluster.go:290: 2026-07-06T19:09:27+05:30 CRD udproutes.consul.hashicorp.com fully deleted
+    helm_cluster.go:251: 2026-07-06T19:09:47+05:30 Installing Helm chart ../../../charts/consul with release name test-kvxicd in namespace consul
+    helm_cluster.go:251: 2026-07-06T19:25:17+05:30 Installing Helm chart ../../../charts/consul with release name test-kvxicd in namespace consul
+panic: test timed out after 1h0m0s
+	running tests:
+		TestComponentMetrics (1h0m0s)
+
+goroutine 949 [running]:
+testing.(*M).startAlarm.func1()
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2802 +0x2cc
+created by time.goFunc
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/time/sleep.go:215 +0x38
+
+goroutine 1 [chan receive, 60 minutes]:
+testing.(*T).Run(0x23090cc44fc8, {0x100f4c7a3?, 0x172d13300024dc70?}, 0x101ee8a68)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2109 +0x3bc
+testing.runTests.func1(0x23090cc44fc8)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2585 +0x40
+testing.tRunner(0x23090cc44fc8, 0x23090d00fba8)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2036 +0xc4
+testing.runTests({0x100f72155, 0x2a}, {0x100f92bfc, 0x38}, 0x23090c8042a0, {0x102034540, 0x2, 0x2}, {0x1001d5260?, 0x23090d00fc40?, ...})
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2583 +0x3f0
+testing.(*M).Run(0x23090cc51a40)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2443 +0x578
+github.com/hashicorp/consul-k8s/acceptance/framework/suite.(*suite).Run(0x23090cf8cb60)
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/suite/suite.go:62 +0x11c
+github.com/hashicorp/consul-k8s/acceptance/tests/metrics.TestMain(0x101f0cdb8?)
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/metrics/main_test.go:17 +0x54
+main.main()
+	_testmain.go:50 +0x88
+
+goroutine 99 [sync.WaitGroup.Wait, 13 minutes]:
+sync.runtime_SemacquireWaitGroup(0x10018d1c0?, 0x0?)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/runtime/sema.go:114 +0x38
+sync.(*WaitGroup).Wait(0x23090cc5a1e0)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/sync/waitgroup.go:206 +0xa8
+github.com/gruntwork-io/terratest/modules/shell.readStdoutAndStderr({0x101f052b0, 0x23090d4e4580}, 0x23090c851090, {0x101ef6ca8, 0x23090cc92030}, {0x101ef6ca8, 0x23090cc92040})
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:149 +0x450
+github.com/gruntwork-io/terratest/modules/shell.runCommand({0x101f052b0, 0x23090d4e4580}, {{0x100f372ff, 0x4}, {0x23090d20e008, 0x59, 0x5f}, {0x10100a238, 0x1}, 0x0, ...})
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:122 +0x1d0
+github.com/gruntwork-io/terratest/modules/shell.RunCommandAndGetOutputE({0x101f052b0?, 0x23090d4e4580?}, {{0x100f372ff, 0x4}, {0x23090d20e008, 0x59, 0x5f}, {0x10100a238, 0x1}, 0x0, ...})
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:58 +0x48
+github.com/gruntwork-io/terratest/modules/helm.RunHelmCommandAndGetOutputE({0x101f052b0, 0x23090d4e4580}, 0x23090d18a880?, {0x100f3a076?, 0x5?}, {0x23090cdba008?, 0x2?, 0x2?})
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/helm/cmd.go:57 +0x88
+github.com/gruntwork-io/terratest/modules/helm.UpgradeE({0x101f052b0, 0x23090d4e4580}, 0x23090d18a880, {0x100f4fc3e, 0x16}, {0x23090c927ee0, 0xb})
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/helm/upgrade.go:49 +0x2b0
+github.com/hashicorp/consul-k8s/acceptance/framework/consul.(*HelmCluster).Create.func3(0x23090d4e4580)
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:252 +0xe4
+github.com/hashicorp/consul/sdk/testutil/retry.(*R).runAttempt(0x23090d4e4580, 0x23090d03fda0)
+	/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:183 +0x114
+github.com/hashicorp/consul/sdk/testutil/retry.(*R).run(0x23090d4e4580, 0x23090d03fda0)
+	/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/retry.go:190 +0x4c
+github.com/hashicorp/consul/sdk/testutil/retry.Run({0x101f0b730, 0x23090cc45448}, 0x23090d071da0, {0x23090d071c70, 0x1, 0x100edb2dc?})
+	/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:42 +0xec
+github.com/hashicorp/consul/sdk/testutil/retry.RunWith({0x101ef0ba0, 0x23090d47eca8}, {0x101f0b730, 0x23090cc45448}, 0x23090d071da0)
+	/Users/manishakumari/go/pkg/mod/github.com/hashicorp/consul/sdk@v0.18.1/testutil/retry/run.go:47 +0x78
+github.com/hashicorp/consul-k8s/acceptance/framework/consul.(*HelmCluster).Create(0x23090d121d60, 0x23090cc45448)
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/consul/helm_cluster.go:250 +0x400
+github.com/hashicorp/consul-k8s/acceptance/tests/metrics.TestComponentMetrics(0x23090cc45448)
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/tests/metrics/metrics_test.go:69 +0x610
+testing.tRunner(0x23090cc45448, 0x101ee8a68)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2036 +0xc4
+created by testing.(*T).Run in goroutine 1
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/testing/testing.go:2101 +0x3a8
+
+goroutine 108 [syscall, 59 minutes]:
+os/signal.signal_recv()
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/runtime/sigqueue.go:149 +0x108
+os/signal.loop()
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/os/signal/signal_unix.go:23 +0x1c
+created by os/signal.Notify.func1.1 in goroutine 99
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/os/signal/signal.go:152 +0x28
+
+goroutine 109 [chan receive, 59 minutes]:
+github.com/hashicorp/consul-k8s/acceptance/framework/helpers.SetupInterruptHandler.func1()
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/helpers/helpers.go:91 +0x28
+created by github.com/hashicorp/consul-k8s/acceptance/framework/helpers.SetupInterruptHandler in goroutine 99
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/helpers/helpers.go:90 +0xb4
+
+goroutine 944 [IO wait, 9 minutes]:
+internal/poll.runtime_pollWait(0x10b15ee00, 0x72)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0x23090d310180?, 0x23090c811000?, 0x1)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0x23090d310180, {0x23090c811000, 0x1000, 0x1000})
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/internal/poll/fd_unix.go:165 +0x234
+os.(*File).read(...)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/os/file_posix.go:29
+os.(*File).Read(0x23090cc92040, {0x23090c811000?, 0xb2?, 0x100ed4838?})
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/os/file.go:144 +0x68
+bufio.(*Reader).fill(0x23090d3102a0)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:113 +0xe0
+bufio.(*Reader).ReadSlice(0x23090d3102a0, 0xa)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:377 +0x30
+bufio.(*Reader).collectFragments(0x23090d3102a0, 0xa)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:452 +0x78
+bufio.(*Reader).ReadString(0x23090c851090?, 0x60?)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:499 +0x20
+github.com/gruntwork-io/terratest/modules/shell.readData({0x101f052b0, 0x23090d4e4580}, 0x23090c851090, 0x23090d3102a0, {0x101ef2180, 0x23090d16e140})
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:165 +0x44
+github.com/gruntwork-io/terratest/modules/shell.readStdoutAndStderr.func2()
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:147 +0x60
+created by github.com/gruntwork-io/terratest/modules/shell.readStdoutAndStderr in goroutine 99
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:145 +0x448
+
+goroutine 446 [chan receive, 59 minutes]:
+github.com/hashicorp/consul-k8s/acceptance/framework/helpers.SetupInterruptHandler.func1()
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/helpers/helpers.go:91 +0x28
+created by github.com/hashicorp/consul-k8s/acceptance/framework/helpers.SetupInterruptHandler in goroutine 99
+	/Users/manishakumari/Work/single_ocp/consul-k8s/acceptance/framework/helpers/helpers.go:90 +0xb4
+
+goroutine 943 [IO wait, 13 minutes]:
+internal/poll.runtime_pollWait(0x10b15ec00, 0x72)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/runtime/netpoll.go:351 +0xa0
+internal/poll.(*pollDesc).wait(0x23090d3100c0?, 0x23090c810000?, 0x1)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/internal/poll/fd_poll_runtime.go:84 +0x28
+internal/poll.(*pollDesc).waitRead(...)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/internal/poll/fd_poll_runtime.go:89
+internal/poll.(*FD).Read(0x23090d3100c0, {0x23090c810000, 0x1000, 0x1000})
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/internal/poll/fd_unix.go:165 +0x234
+os.(*File).read(...)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/os/file_posix.go:29
+os.(*File).Read(0x23090cc92030, {0x23090c810000?, 0x0?, 0x0?})
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/os/file.go:144 +0x68
+bufio.(*Reader).fill(0x23090d310240)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:113 +0xe0
+bufio.(*Reader).ReadSlice(0x23090d310240, 0xa)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:377 +0x30
+bufio.(*Reader).collectFragments(0x23090d310240, 0xa)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:452 +0x78
+bufio.(*Reader).ReadString(0x101ef0f40?, 0xe0?)
+	/opt/homebrew/Cellar/go/1.26.3/libexec/src/bufio/bufio.go:499 +0x20
+github.com/gruntwork-io/terratest/modules/shell.readData({0x101f052b0, 0x23090d4e4580}, 0x23090c851090, 0x23090d310240, {0x101ef2180, 0x23090d16e120})
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:165 +0x44
+github.com/gruntwork-io/terratest/modules/shell.readStdoutAndStderr.func1()
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:143 +0x60
+created by github.com/gruntwork-io/terratest/modules/shell.readStdoutAndStderr in goroutine 99
+	/Users/manishakumari/go/pkg/mod/github.com/gruntwork-io/terratest@v0.46.7/modules/shell/command.go:141 +0x3c8
+FAIL	github.com/hashicorp/consul-k8s/acceptance/tests/metrics	3600.807s
+FAIL

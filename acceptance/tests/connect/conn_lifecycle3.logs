@@ -1,0 +1,17 @@
+=== RUN   TestConnectInject_ProxyLifecycleShutdown
+=== RUN   TestConnectInject_ProxyLifecycleShutdown/secure:_false,_drainListeners:_true,_gracePeriodSeconds:_5
+    connect_helper.go:89: 2026-06-23T18:10:00+05:30 Installing Consul cluster
+    connect_helper.go:90: 2026-06-23T18:10:05+05:30 Cleaning stale Consul resources before Helm install in OpenShift namespace consul
+    connect_helper.go:90: 2026-06-23T18:10:05+05:30 Resetting stale PSA enforcement label on namespace consul before Helm install
+    connect_helper.go:90: 2026-06-23T18:10:05+05:30 Deleting stale Gateway API and Consul API resources before Helm install
+    command.go:100: 2026-06-23T18:10:13+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --all --output json]
+    command.go:185: 2026-06-23T18:10:13+05:30 Error: unknown flag: --all
+    connect_helper.go:90: 2026-06-23T18:10:13+05:30 helm list --all not supported, falling back to listing deployed releases only
+    command.go:100: 2026-06-23T18:10:13+05:30 Running command helm with args [list --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul --output json]
+    command.go:185: 2026-06-23T18:10:13+05:30 [{"name":"test-gp1luj","namespace":"consul","revision":"1","updated":"2026-06-23 17:58:30.579089 +0530 IST","status":"deployed","chart":"consul-2.1.0-dev","app_version":"2.1.0-dev"}]
+    connect_helper.go:90: 2026-06-23T18:10:13+05:30 Deleting stale Helm release test-gp1luj in namespace consul before install
+    command.go:100: 2026-06-23T18:10:13+05:30 Running command helm with args [uninstall --kube-context consul/api-ocpnewloc1-yyrb-p1-openshiftapps-com:6443/cluster-admin --namespace consul test-gp1luj --no-hooks --timeout 30s]
+    command.go:185: 2026-06-23T18:10:16+05:30 release "test-gp1luj" uninstalled
+    connect_helper.go:90: 2026-06-23T18:10:16+05:30 Delete stale Gateway API CRDs with Helm ownership annotations to prevent install conflicts
+    connect_helper.go:90: 2026-06-23T18:10:16+05:30 Deleting stale CRD gatewayclassconfigs.consul.hashicorp.com owned by release test-gp1luj before installing release test-lth5he
+Finalizers removed from CRD gatewayclassconfigs.consul.hashicorp.com
