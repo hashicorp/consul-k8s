@@ -224,6 +224,19 @@ func TestPeering_ConnectNamespaces(t *testing.T) {
 				require.NoError(r, err)
 			})
 
+			// On OpenShift, delete any stale api-token on both clusters before creating
+			// the PeeringAcceptor. Without this, the controller reuses a leftover secret
+			// from a previous --no-cleanup-on-failure run (which has no chart=consul-helm
+			// label and therefore survives our label-based cleanup), and the PeeringDialer
+			// ends up using an expired token that the new Consul server does not recognize
+			// → "No path to datacenter".
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				_, _ = k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t),
+					"delete", "secret", "api-token", "--ignore-not-found=true")
+				_, _ = k8s.RunKubectlAndGetOutputE(t, staticServerPeerClusterContext.KubectlOptions(t),
+					"delete", "secret", "api-token", "--ignore-not-found=true")
+			}
+
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {

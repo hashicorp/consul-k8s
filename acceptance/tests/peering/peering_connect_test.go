@@ -191,6 +191,15 @@ func TestPeering_Connect(t *testing.T) {
 				require.NoError(r, err)
 			})
 
+			// On OpenShift, delete any stale api-token on both clusters before creating
+			// the PeeringAcceptor so the controller always generates a fresh token.
+			if cfg.EnableOpenshift || cfg.UseOpenshift {
+				_, _ = k8s.RunKubectlAndGetOutputE(t, staticClientPeerClusterContext.KubectlOptions(t),
+					"delete", "secret", "api-token", "--ignore-not-found=true")
+				_, _ = k8s.RunKubectlAndGetOutputE(t, staticServerPeerClusterContext.KubectlOptions(t),
+					"delete", "secret", "api-token", "--ignore-not-found=true")
+			}
+
 			// Create the peering acceptor on the client peer.
 			k8s.KubectlApply(t, staticClientPeerClusterContext.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {

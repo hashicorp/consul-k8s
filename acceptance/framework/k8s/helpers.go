@@ -201,16 +201,18 @@ func CopySecret(t *testing.T, sourceContext, destContext environment.TestContext
 
 	if err != nil && apierrors.IsAlreadyExists(err) {
 		// If the existing secret already has the same data as what we want to copy,
-		// we're done — no need to delete and recreate. This handles the single-cluster
-		// case where both source and dest contexts resolve to the same namespace:
-		// e.g. peering tests where staticClientPeerCluster and staticServerPeerCluster
-		// run on the same OCP cluster. The PeeringAcceptor controller already created
-		// the secret in that namespace; deleting it would cause the controller to
-		// immediately re-create it, looping the 3-minute wait indefinitely.
+		// AND we are on the same cluster/namespace (single-cluster peering on OCP),
+		// we're done — the PeeringAcceptor controller already owns this secret with
+		// current data. Only apply this optimisation for the same-cluster case:
+		// for two-cluster peering a stale leftover secret from a previous
+		// --no-cleanup-on-failure run can have identical bytes if the Consul CA cert
+		// was reused, which would cause the PeeringDialer to use an expired token.
+		sameCluster := sourceContext.KubectlOptions(t).ContextName == destContext.KubectlOptions(t).ContextName &&
+			sourceContext.KubectlOptions(t).Namespace == destContext.KubectlOptions(t).Namespace
 		existingSecret, getErr := destContext.KubernetesClient(t).CoreV1().Secrets(destNamespace).Get(
 			context.Background(), secretName, metav1.GetOptions{})
-		if getErr == nil && reflect.DeepEqual(existingSecret.Data, secretToCopy.Data) {
-			logger.Logf(t, "secret %q already exists in %q with matching data; skipping re-create", secretName, destNamespace)
+		if sameCluster && getErr == nil && reflect.DeepEqual(existingSecret.Data, secretToCopy.Data) {
+			logger.Logf(t, "secret %q already exists in %q with matching data (same cluster); skipping re-create", secretName, destNamespace)
 			return
 		}
 
