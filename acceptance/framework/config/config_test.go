@@ -266,6 +266,18 @@ func Test_KubeEnvListFromStringList(t *testing.T) {
 			kubeNamespaces: []string{"ns1", "ns2"},
 			expKubeEnvList: []KubeTestConfig{{KubeContext: "ctx1", KubeNamespace: "ns1"}, {KubeContext: "ctx2", KubeNamespace: "ns2"}},
 		},
+		{
+			name:           "uneven context and namespace lengths",
+			kubeContexts:   []string{"ctx1", "ctx2", "ctx3", "ctx4"},
+			KubeConfigs:    []string{},
+			kubeNamespaces: []string{"ns1", "ns2"},
+			expKubeEnvList: []KubeTestConfig{
+				{KubeContext: "ctx1", KubeNamespace: "ns1"},
+				{KubeContext: "ctx2", KubeNamespace: "ns2"},
+				{KubeContext: "ctx3"},
+				{KubeContext: "ctx4"},
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -7,17 +7,21 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/vault"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/stretchr/testify/require"
+	authv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -98,6 +102,14 @@ func TestVault_Partitions(t *testing.T) {
 			},
 		}, metav1.CreateOptions{})
 		require.NoError(t, err)
+		if cfg.UseOpenshift || cfg.EnableOpenshift {
+			reviewerTokenTTLSeconds := int64(12 * 60 * 60)
+			tokenReq, err := clientClusterCtx.KubernetesClient(t).CoreV1().ServiceAccounts(ns).CreateToken(context.Background(), authMethodRBACName, &authv1.TokenRequest{
+				Spec: authv1.TokenRequestSpec{ExpirationSeconds: &reviewerTokenTTLSeconds},
+			}, metav1.CreateOptions{})
+			require.NoError(t, err)
+			require.NotEmpty(t, tokenReq.Status.Token)
+		}
 		// In Kubernetes 1.24+ the serviceAccount does not automatically populate secrets with permanent JWT tokens, use this instead.
 		// It will be cleaned up by Kubernetes automatically since it references the ServiceAccount.
 		if len(svcAcct.Secrets) == 0 {
@@ -343,17 +355,55 @@ func TestVault_Partitions(t *testing.T) {
 		"server.extraVolumes[0].load": "false",
 	}
 
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		// Keep gossip/RPC exposure enabled for multi-cluster server<->client connectivity.
+		serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+		// The current OpenShift server StatefulSet path omits pod fsGroup, so run the
+		// server container as root in this test to keep the data PVC writable.
+		serverHelmValues["server.containerSecurityContext.server.runAsUser"] = "0"
+		serverHelmValues["server.containerSecurityContext.server.runAsGroup"] = "0"
+	}
+
 	// On Kind, there are no load balancers but since all clusters
 	// share the same node network (docker bridge), we can use
 	// a NodePort service so that we can access node(s) in a different Kind cluster.
+	// The secondary partition connects to these servers over gRPC/HTTPS via the
+	// exposed-servers service, so expose those ports on fixed NodePorts.
 	if cfg.UseKind {
-		serverHelmValues["meshGateway.service.type"] = "NodePort"
-		serverHelmValues["meshGateway.service.nodePort"] = "30100"
 		serverHelmValues["server.exposeService.type"] = "NodePort"
 		serverHelmValues["server.exposeService.nodePort.https"] = "30000"
+		serverHelmValues["server.exposeService.nodePort.grpc"] = "30100"
 	}
 
 	helpers.MergeMaps(serverHelmValues, commonHelmValues)
+
+	if cfg.UseOpenshift || cfg.EnableOpenshift {
+		// This test enables hostPorts and needs a permissive SCC regardless of the
+		// chart-generated SCC behavior on the target OpenShift version.
+		serverSCCRoleBindingName := fmt.Sprintf("%s-consul-server-privileged-scc", consulReleaseName)
+		_, err = serverClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Create(context.Background(), &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serverSCCRoleBindingName,
+				Namespace: ns,
+			},
+			Subjects: []rbacv1.Subject{{
+				Kind:      rbacv1.ServiceAccountKind,
+				Name:      fmt.Sprintf("%s-consul-server", consulReleaseName),
+				Namespace: ns,
+			}},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "system:openshift:scc:privileged",
+			},
+		}, metav1.CreateOptions{})
+		if err != nil && !k8serrors.IsAlreadyExists(err) {
+			require.NoError(t, err)
+		}
+		t.Cleanup(func() {
+			_ = serverClusterCtx.KubernetesClient(t).RbacV1().RoleBindings(ns).Delete(context.Background(), serverSCCRoleBindingName, metav1.DeleteOptions{})
+		})
+	}
 
 	logger.Log(t, "Installing Consul")
 	consulCluster := consul.NewHelmCluster(t, serverHelmValues, serverClusterCtx, cfg, consulReleaseName)
@@ -361,8 +411,10 @@ func TestVault_Partitions(t *testing.T) {
 
 	partitionServiceName := fmt.Sprintf("%s-consul-expose-servers", consulReleaseName)
 	partitionSvcAddress := k8s.ServiceHost(t, cfg, serverClusterCtx, partitionServiceName)
+	logger.Logf(t, "Resolved external server host for %s: %s", partitionServiceName, partitionSvcAddress)
 
 	k8sAuthMethodHost := k8s.KubernetesAPIServerHost(t, cfg, clientClusterCtx)
+	logger.Logf(t, "Using secondary Kubernetes auth method host: %s", k8sAuthMethodHost)
 
 	// Move Vault CA secret from primary to secondary so that we can mount it to pods in the
 	// secondary cluster.
@@ -392,16 +444,11 @@ func TestVault_Partitions(t *testing.T) {
 		"externalServers.hosts[0]":          partitionSvcAddress,
 		"externalServers.tlsServerName":     "server.dc1.consul",
 		"externalServers.k8sAuthMethodHost": k8sAuthMethodHost,
-
-		"client.enabled":           "true",
-		"client.exposeGossipPorts": "true",
-		"client.join[0]":           partitionSvcAddress,
 	}
 
 	if cfg.UseKind {
 		clientHelmValues["externalServers.httpsPort"] = "30000"
-		clientHelmValues["meshGateway.service.type"] = "NodePort"
-		clientHelmValues["meshGateway.service.nodePort"] = "30100"
+		clientHelmValues["externalServers.grpcPort"] = "30100"
 	}
 
 	helpers.MergeMaps(clientHelmValues, commonHelmValues)
@@ -410,12 +457,19 @@ func TestVault_Partitions(t *testing.T) {
 	clientConsulCluster := consul.NewHelmCluster(t, clientHelmValues, clientClusterCtx, cfg, consulReleaseName)
 	clientConsulCluster.Create(t)
 
-	// Ensure consul clients are created.
-	agentPodList, err := clientClusterCtx.KubernetesClient(t).CoreV1().Pods(clientClusterCtx.KubectlOptions(t).Namespace).List(context.Background(), metav1.ListOptions{LabelSelector: "app=consul,component=client"})
-	require.NoError(t, err)
-	require.NotEmpty(t, agentPodList.Items)
+	// With Consul Dataplane the secondary admin partition runs no client agents and
+	// performs no cross-cluster gossip. Its partition-init job reaches the Consul
+	// servers through the exposed-servers service (externalServers) to create the
+	// partition. Verify the "secondary" partition exists on the servers, which
+	// confirms the secondary cluster connected to the servers via the load balancer
+	// without requiring node-to-node connectivity.
+	consulCluster.ACLToken = bootstrapToken
+	consulClient, _ := consulCluster.SetupConsulClient(t, true)
 
-	output, err := k8s.RunKubectlAndGetOutputE(t, clientClusterCtx.KubectlOptions(t), "logs", agentPodList.Items[0].Name, "consul", "-n", clientClusterCtx.KubectlOptions(t).Namespace)
-	require.NoError(t, err)
-	require.Contains(t, output, "Partition: 'secondary'")
+	retry.RunWith(&retry.Counter{Wait: 5 * time.Second, Count: 60}, t, func(r *retry.R) {
+		partition, _, err := consulClient.Partitions().Read(context.Background(), secondaryPartition, nil)
+		require.NoError(r, err)
+		require.NotNil(r, partition)
+		require.Equal(r, secondaryPartition, partition.Name)
+	})
 }

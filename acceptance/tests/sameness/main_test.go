@@ -17,12 +17,13 @@ func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 
 	expectedNumberOfClusters := 4
+	cfg := suite.Config()
+	supportedClusterType := cfg.UseKind || cfg.UseOpenshift || cfg.EnableOpenshift
 
-	if suite.Config().EnableMultiCluster && suite.Config().IsExpectedClusterCount(expectedNumberOfClusters) && suite.Config().UseKind {
+	if cfg.EnableMultiCluster && cfg.IsExpectedClusterCount(expectedNumberOfClusters) && supportedClusterType {
 		os.Exit(suite.Run())
 	} else {
 		fmt.Println(fmt.Sprintf("Skipping sameness tests because either -enable-multi-cluster is "+
-			"not set, the number of clusters did not match the expected count of %d, or --useKind is false. "+
-			"Sameness acceptance tests are currently only supported on Kind clusters", expectedNumberOfClusters))
+			"not set, the number of clusters did not match the expected count of %d, or neither Kind nor OpenShift is enabled.", expectedNumberOfClusters))
 	}
 }

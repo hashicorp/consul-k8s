@@ -37,7 +37,14 @@ const (
 // Test the endpoints controller cleans up force-killed pods.
 func TestConnectInject_ProxyLifecycleShutdown(t *testing.T) {
 	cfg := suite.Config()
-	cfg.SkipWhenOpenshiftAndCNI(t)
+	// This test verifies proxy graceful-shutdown behavior by exec-ing `curl` into
+	// the static-client pod *while it is terminating*. On OpenShift the container
+	// runtime (CRI-O) rejects exec into a pod that has a deletionTimestamp (the
+	// exec hangs until the pod is fully removed and then errors), even though the
+	// app container is still running for the duration of the termination grace
+	// period. That makes the in-grace-period connectivity checks impossible on
+	// OpenShift, so we skip the test there.
+	cfg.SkipWhenOpenshift(t)
 
 	for _, testCfg := range []LifecycleShutdownConfig{
 		{secure: false, helmValues: map[string]string{
