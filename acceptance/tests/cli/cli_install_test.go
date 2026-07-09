@@ -27,7 +27,7 @@ const ipv6RegEx = `([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){
 const ipRegEx = `(` + ipv4RegEx + `|` + ipv6RegEx + `)`
 
 // TestInstall tests that we can install consul service mesh with the CLI
-// and see that services can connect.
+// and see that services can connect well.
 func TestInstall(t *testing.T) {
 	cases := map[string]struct {
 		secure bool
