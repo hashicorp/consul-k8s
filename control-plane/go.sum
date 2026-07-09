@@ -286,8 +286,8 @@ github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgf
 github.com/grpc-ecosystem/grpc-gateway v1.9.0/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
 github.com/hashicorp/consul v1.11.0-alpha.0.20260112121053-7ee7c79b61f0 h1:a14sOv/zObfDR4lSQebD9o9/6+Qy6yS56RpTQq+3P2A=
 github.com/hashicorp/consul v1.11.0-alpha.0.20260112121053-7ee7c79b61f0/go.mod h1:Q+SsUkHg8Gu+xuMku4nq+VHFYIT581yf8jOBBAW4bvc=
-github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.6 h1:2DMtlXOfhIWJZb0B+LkjXcyz46IZZCcDB7um4MiWStA=
-github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.6/go.mod h1:vQpiSINpXSVWi8O8brEPEEzdeB62LROLLSrGSqImTtg=
+github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.7 h1:ANM2xKPVpOkszd+q/D3PGsp2vxRgMFIneFYX4tYcZ6A=
+github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom v0.1.7/go.mod h1:S7iNhVxysYBV07/4ltuVxOSHwgjLtCX5/3p5kHXpDQM=
 github.com/hashicorp/consul-server-connection-manager v0.1.12 h1:c/7LIghSdVqQKu4v9SPzxeHot0pphQ/FtRzzDlN3Vrg=
 github.com/hashicorp/consul-server-connection-manager v0.1.12/go.mod h1:f1x48hfZMLUTqdwBVPTezV43COWTixtnLmSbxjD0SHg=
 github.com/hashicorp/consul/api v1.34.3 h1:OiZaQnwkS6uvutie3CF6NFXj8uScNezDlsU9MEqKT0s=
@@ -644,9 +644,7 @@ golang.org/x/net v0.0.0-20190522155817-f3200d17e092/go.mod h1:HSz+uSET+XFnRR8LxR
 golang.org/x/net v0.0.0-20190613194153-d28f0bde5980/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20190620200207-3b0461eec859/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
 golang.org/x/net v0.0.0-20200625001655-4c5254603344/go.mod h1:/O7V0waA8r7cgGh81Ro3o1hOxt32SMVPicZroKQ2sZA=
-golang.org/x/net v0.0.0-20201110031124-69a78807bb2b/go.mod h1:sp8m0HH+o8qH0wwXwYZr8TS3Oi6o0r6Gce1SSxlDquU=
 golang.org/x/net v0.0.0-20210226172049-e18ecbb05110/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
-golang.org/x/net v0.0.0-20210410081132-afb366fc7cd1/go.mod h1:9tjilg8BloeKEkVJvy7fQ90B1CfIiPueXVOjqfkSzI8=
 golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/net v0.0.0-20220722155237-a158d28d115b/go.mod h1:XRhObCWvk6IyKnWLug+ECip1KBveYUHfp+8e9klMJ9c=
 golang.org/x/net v0.2.0/go.mod h1:KqCZLdyyvdV855qA2rE3GC2aiw5xGR5TEjj8smXukLY=
