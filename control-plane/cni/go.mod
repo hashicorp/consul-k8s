@@ -5,7 +5,7 @@ go 1.25.9
 replace github.com/hashicorp/consul-k8s/version => ../../version
 
 require (
-	github.com/containernetworking/cni v1.1.2
+	github.com/containernetworking/cni v1.3.0
 	github.com/containernetworking/plugins v1.2.0
 	github.com/hashicorp/consul-k8s/version v0.0.0
 	github.com/hashicorp/go-hclog v1.5.0
@@ -43,6 +43,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/vishvananda/netns v0.0.4 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.28.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
