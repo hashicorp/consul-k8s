@@ -8,6 +8,9 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 func TestEntryComparator_APIGatewayListenerTLSConfigurationsEqual_SDS(t *testing.T) {
@@ -27,6 +30,158 @@ func TestEntryComparator_APIGatewayListenerTLSConfigurationsEqual_SDS(t *testing
 	noSDS := base
 	noSDS.SDS = nil
 	require.False(t, comparator.apiGatewayListenerTLSConfigurationsEqual(base, noSDS))
+}
+
+func TestEntryComparator_ExtProcProcessingDirectionEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcProcessingDirection{
+		HeadersMode:  "SEND",
+		BodyMode:     "BUFFERED",
+		TrailersMode: "SKIP",
+		MaxBodyBytes: 1024,
+	}
+
+	require.True(t, comparator.extProcProcessingDirectionEqual(base, base))
+
+	for name, mutate := range map[string]func(d *api.ExtProcProcessingDirection){
+		"different headers mode":  func(d *api.ExtProcProcessingDirection) { d.HeadersMode = "SKIP" },
+		"different body mode":     func(d *api.ExtProcProcessingDirection) { d.BodyMode = "STREAMED" },
+		"different trailers mode": func(d *api.ExtProcProcessingDirection) { d.TrailersMode = "SEND" },
+		"different max body":      func(d *api.ExtProcProcessingDirection) { d.MaxBodyBytes = 2048 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			other := base
+			mutate(&other)
+			require.False(t, comparator.extProcProcessingDirectionEqual(base, other))
+		})
+	}
+}
+
+func TestEntryComparator_ExtProcProcessingEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcProcessing{
+		Request:  &api.ExtProcProcessingDirection{HeadersMode: "SEND"},
+		Response: &api.ExtProcProcessingDirection{HeadersMode: "SKIP"},
+	}
+
+	require.True(t, comparator.extProcProcessingEqual(base, base))
+
+	differentRequest := base
+	differentRequest.Request = &api.ExtProcProcessingDirection{HeadersMode: "SKIP"}
+	require.False(t, comparator.extProcProcessingEqual(base, differentRequest))
+
+	nilResponse := base
+	nilResponse.Response = nil
+	require.False(t, comparator.extProcProcessingEqual(base, nilResponse))
+
+	bothNil := api.ExtProcProcessing{}
+	require.True(t, comparator.extProcProcessingEqual(bothNil, bothNil))
+}
+
+func TestEntryComparator_ExtProcOverridesEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcOverrides{
+		Processing: &api.ExtProcProcessing{
+			Request: &api.ExtProcProcessingDirection{HeadersMode: "SEND"},
+		},
+	}
+
+	require.True(t, comparator.extProcOverridesEqual(base, base))
+
+	differentProcessing := api.ExtProcOverrides{
+		Processing: &api.ExtProcProcessing{
+			Request: &api.ExtProcProcessingDirection{HeadersMode: "SKIP"},
+		},
+	}
+	require.False(t, comparator.extProcOverridesEqual(base, differentProcessing))
+
+	nilProcessing := api.ExtProcOverrides{}
+	require.False(t, comparator.extProcOverridesEqual(base, nilProcessing))
+	require.True(t, comparator.extProcOverridesEqual(nilProcessing, nilProcessing))
+}
+
+func TestEntryComparator_ExtProcFiltersEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcFilter{
+		StatPrefix: "prefix",
+		Mode:       "override",
+		Overrides: &api.ExtProcOverrides{
+			Processing: &api.ExtProcProcessing{
+				Request: &api.ExtProcProcessingDirection{HeadersMode: "SEND"},
+			},
+		},
+	}
+
+	require.True(t, comparator.extProcFiltersEqual(base, base))
+
+	differentStatPrefix := base
+	differentStatPrefix.StatPrefix = "other"
+	require.False(t, comparator.extProcFiltersEqual(base, differentStatPrefix))
+
+	differentMode := base
+	differentMode.Mode = "enabled"
+	require.False(t, comparator.extProcFiltersEqual(base, differentMode))
+
+	nilOverrides := base
+	nilOverrides.Overrides = nil
+	require.False(t, comparator.extProcFiltersEqual(base, nilOverrides))
+
+	// Filters with no overrides on both sides are equal.
+	noOverrides := api.ExtProcFilter{StatPrefix: "prefix", Mode: "enabled"}
+	require.True(t, comparator.extProcFiltersEqual(noOverrides, noOverrides))
+}
+
+func TestRouteExtProcStatusesEqual(t *testing.T) {
+	t.Parallel()
+
+	base := v1alpha1.Status{
+		Conditions: []v1alpha1.Condition{
+			{
+				Type:    "Accepted",
+				Status:  "True",
+				Reason:  "Accepted",
+				Message: "route ext_proc filter accepted",
+			},
+		},
+	}
+
+	require.True(t, RouteExtProcStatusesEqual(base, base))
+
+	// LastTransitionTime is intentionally ignored.
+	withTime := v1alpha1.Status{
+		Conditions: []v1alpha1.Condition{
+			{
+				Type:               "Accepted",
+				Status:             "True",
+				Reason:             "Accepted",
+				Message:            "route ext_proc filter accepted",
+				LastTransitionTime: metav1.Now(),
+			},
+		},
+	}
+	require.True(t, RouteExtProcStatusesEqual(base, withTime))
+
+	different := v1alpha1.Status{
+		Conditions: []v1alpha1.Condition{
+			{
+				Type:    "Accepted",
+				Status:  "False",
+				Reason:  "Invalid",
+				Message: `route ext_proc filter sets "overrides" but mode is not "override"`,
+			},
+		},
+	}
+	require.False(t, RouteExtProcStatusesEqual(base, different))
+
+	require.False(t, RouteExtProcStatusesEqual(base, v1alpha1.Status{}))
 }
 
 func TestEntriesEqual(t *testing.T) {
