@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -152,15 +151,17 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 
 	randomPorts := freeport.GetN(t, 6)
 
-	// Start the consul agent asynchronously
+	// Start the consul agent asynchronously. Capture the startup error locally and
+	// signal it back to the main goroutine via a channel. Calling require.NoError
+	// from inside the goroutine would only stop the goroutine (via runtime.Goexit),
+	// leaving cmd.Run polling a server that never comes up until the 10-minute test
+	// binary timeout. Signalling the error lets the test fail fast instead.
 	var a *testutil.TestServer
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	serverStartCh := make(chan error, 1)
 	go func() {
-		defer wg.Done()
 		// start the test server after 100ms
 		time.Sleep(100 * time.Millisecond)
-		a, err = testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
+		server, startErr := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
 			c.Ports = &testutil.TestPortConfig{
 				DNS:     randomPorts[0],
 				HTTP:    randomPorts[1],
@@ -176,7 +177,8 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 			c.CertFile = certFile
 			c.KeyFile = keyFile
 		})
-		require.NoError(t, err)
+		a = server
+		serverStartCh <- startErr
 	}()
 	defer func() {
 		if a != nil {
@@ -184,16 +186,35 @@ func TestRun_ConsulServerAvailableLater(t *testing.T) {
 		}
 	}()
 
-	exitCode := cmd.Run([]string{
-		"-server-addr", "localhost",
-		"-server-port", fmt.Sprintf("%d", randomPorts[2]),
-		"-ca-file", caFile,
-		"-output-file", outputFile.Name(),
-		"-consul-api-timeout", "10s",
-	})
+	// Run the command in a goroutine so a server that never starts causes a fast
+	// failure below instead of an indefinite poll.
+	exitCodeCh := make(chan int, 1)
+	go func() {
+		exitCodeCh <- cmd.Run([]string{
+			"-server-addr", "localhost",
+			"-server-port", fmt.Sprintf("%d", randomPorts[2]),
+			"-ca-file", caFile,
+			"-output-file", outputFile.Name(),
+			"-consul-api-timeout", "10s",
+		})
+	}()
+
+	// Fail fast if the test server could not start.
+	select {
+	case startErr := <-serverStartCh:
+		require.NoError(t, startErr, "consul test server failed to start")
+	case <-time.After(60 * time.Second):
+		t.Fatal("timed out waiting for consul test server to start")
+	}
+
+	var exitCode int
+	select {
+	case exitCode = <-exitCodeCh:
+	case <-time.After(60 * time.Second):
+		t.Fatal("timed out waiting for get-consul-client-ca command to finish")
+	}
 	require.Equal(t, 0, exitCode, ui.ErrorWriter)
 
-	wg.Wait()
 	client, err := api.NewClient(&api.Config{
 		Address: a.HTTPSAddr,
 		Scheme:  "https",
