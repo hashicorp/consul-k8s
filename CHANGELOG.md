@@ -1,3 +1,18 @@
+## 1.9.10 (July 10, 2026)
+
+SECURITY:
+
+* go: upgrade go version to 1.26.4
+* Update the Consul Build Go base image to `alpine3.24` [[GH-5474](https://github.com/hashicorp/consul-k8s/issues/5474)]
+
+IMPROVEMENTS:
+
+* cni: version upgrade to 1.3.0 to support protocol version 1.1.0 [[GH-5407](https://github.com/hashicorp/consul-k8s/issues/5407)]
+
+BUG FIXES:
+
+* control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions. [[GH-5423](https://github.com/hashicorp/consul-k8s/issues/5423)]
+
 ## 1.9.8 (May 24, 2026)
 
 SECURITY:
