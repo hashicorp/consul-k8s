@@ -1,4 +1,4 @@
-{{- if and .Values.connectInject.enabled .Values.global.generateManifests }}
+{{- if and .Values.connectInject.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
