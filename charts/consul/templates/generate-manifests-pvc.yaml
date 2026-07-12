@@ -10,10 +10,10 @@ metadata:
     heritage: {{ .Release.Service }}
     release: {{ .Release.Name }}
     component: generate-manifests
-  # annotations:
-  #   "helm.sh/hook": pre-upgrade
-  #   "helm.sh/hook-weight": "-9"
-  #   "helm.sh/resource-policy": keep
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-9"
+    "helm.sh/resource-policy": keep
 spec:
   storageClassName: {{ .Values.global.generateManifestsStorageClassName | default "standard" }}
   accessModes:
