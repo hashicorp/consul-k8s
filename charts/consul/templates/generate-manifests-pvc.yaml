@@ -15,6 +15,7 @@ metadata:
     "helm.sh/hook-weight": "-9"
     "helm.sh/resource-policy": keep
 spec:
+  storageClassName: {{ .Values.global.generateManifestsStorageClassName | default "standard" }}
   accessModes:
     - ReadWriteOnce
   resources:

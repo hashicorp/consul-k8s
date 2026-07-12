@@ -798,7 +798,10 @@ global:
 
   # Disable this once the manifests are generated and subsequent helm upgrades
   
-  generateManifests: false
+  generateManifests: true
+
+  # Uses the provided storage class name for the generated manifests. If not provided, the default storage class will be used.
+  generateManifestsStorageClassName: "standard-imm"
 
   # During the install:
   # custom crds and gateway TCP crd enabling
