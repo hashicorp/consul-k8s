@@ -800,6 +800,12 @@ global:
   
   generateManifests: false
 
+  # Uses the provided storage class name for the generated manifests. If not provided, the default storage class will be used.
+  generateManifestsStorageClassName: "standard-imm"
+
+  # Storage requirement for generateManifests pvc
+  generateManifestsStorage: "1Gi"
+
   # During the install:
   # custom crds and gateway TCP crd enabling
   # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.
