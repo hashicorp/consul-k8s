@@ -800,8 +800,8 @@ global:
   
   generateManifests: false
 
-  # Uses the provided storage class name for the generated manifests- recommended to create SC with volumebinding as Immediate. If not provided, the default storage class will be used.
-  generateManifestsStorageClassName: "standard-imm"
+  # Uses the provided storage class name for the generated manifests - recommended to create SC with volumebinding as Immediate. If not provided, the default storage class will be used.
+  generateManifestsStorageClassName: ""
 
   # Storage requirement for generateManifests pvc
   generateManifestsStorage: "1Gi"

@@ -15,7 +15,9 @@ metadata:
     "helm.sh/hook-weight": "-9"
     "helm.sh/hook-delete-policy": before-hook-creation
 spec:
-  storageClassName: {{ .Values.global.generateManifestsStorageClassName | default "standard" }}
+  {{- if .Values.global.generateManifestsStorageClassName }}
+  storageClassName: {{ .Values.global.generateManifestsStorageClassName }}
+  {{- end }}
   accessModes:
     - ReadWriteOnce
   resources:
