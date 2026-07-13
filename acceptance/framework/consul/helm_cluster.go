@@ -755,6 +755,15 @@ func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestCon
 }
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
+	// CreateK8sSecret only creates the secret when it does not already exist, so
+	// an existing license secret left by a previous test run (which may hold an
+	// expired or otherwise stale license) would never be replaced. Delete it first
+	// so the current license from the test configuration is always applied;
+	// otherwise the Consul server can keep booting with the old license and
+	// crashloop.
+	if err := client.CoreV1().Secrets(namespace).Delete(context.Background(), config.LicenseSecretName, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		require.NoError(t, err)
+	}
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
 }
 

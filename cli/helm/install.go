@@ -6,6 +6,8 @@ package helm
 import (
 	"embed"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
@@ -127,6 +129,19 @@ func InstallHelmRelease(options *InstallOptions) error {
 	install.Wait = options.Wait
 	install.Timeout = options.Timeout
 
+	// Optionally skip Helm's client-side OpenAPI schema validation. Validating the
+	// rendered manifest requires downloading the full OpenAPI schema from the
+	// Kubernetes API server; on large clusters (for example OpenShift, which ships
+	// many CRDs) that is a big, slow transfer that intermittently fails with
+	// "connection reset by peer" over unreliable networks and aborts the install.
+	// The consul-k8s chart is validated in CI and the API server still validates
+	// resources server-side on apply, so skipping the client-side download removes a
+	// flaky failure mode without weakening correctness. Off by default; see
+	// skipOpenAPIValidation.
+	if skipOpenAPIValidation() {
+		install.DisableOpenAPIValidation = true
+	}
+
 	// Load the Helm chart.
 	chart, err := options.HelmActionsRunner.LoadChart(options.EmbeddedChart, options.ChartDirName)
 	if err != nil {
@@ -141,4 +156,18 @@ func InstallHelmRelease(options *InstallOptions) error {
 
 	options.UI.Output("%s installed in namespace %q.", options.ReleaseType, options.Namespace, terminal.WithSuccessStyle())
 	return nil
+}
+
+// skipOpenAPIValidationEnvVar is the environment variable that, when set to a
+// truthy value, disables Helm's client-side OpenAPI schema validation during
+// install and upgrade. See skipOpenAPIValidation.
+const skipOpenAPIValidationEnvVar = "CONSUL_K8S_SKIP_OPENAPI_VALIDATION"
+
+// skipOpenAPIValidation reports whether Helm's client-side OpenAPI schema
+// validation should be disabled. It is controlled by the
+// CONSUL_K8S_SKIP_OPENAPI_VALIDATION environment variable and defaults to false,
+// so normal `consul-k8s install`/`upgrade` behavior is unchanged.
+func skipOpenAPIValidation() bool {
+	enabled, _ := strconv.ParseBool(os.Getenv(skipOpenAPIValidationEnvVar))
+	return enabled
 }
