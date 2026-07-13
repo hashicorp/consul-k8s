@@ -61,7 +61,12 @@ binary {
 
   triage {
     suppress {
-      vulnerabilities = []
+      vulnerabilities = [
+        "GO-2026-5622", // Fix not available yet
+        "GO-2026-5932", // Fix not available yet
+        "GO-2026-5064", // Fix not available yet
+        "GO-2026-5338", // Fix not available yet
+      ]
     }
   }
 }
