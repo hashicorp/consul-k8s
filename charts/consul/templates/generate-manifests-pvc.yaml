@@ -13,7 +13,6 @@ metadata:
   annotations:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-weight": "-9"
-    "helm.sh/resource-policy": keep
     "helm.sh/hook-delete-policy": before-hook-creation
 spec:
   storageClassName: {{ .Values.global.generateManifestsStorageClassName | default "standard" }}
