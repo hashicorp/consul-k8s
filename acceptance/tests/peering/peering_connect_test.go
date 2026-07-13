@@ -239,29 +239,72 @@ func TestPeering_Connect(t *testing.T) {
 				k8s.KubectlDeleteK(t, staticClientPeerClusterContext.KubectlOptions(t), kustomizeDir)
 			})
 
+			// On OpenShift with the CNI, the workloads use the "consul-cni" Multus network
+			// (via the -cni fixtures' k8s.v1.cni.cncf.io/networks annotation) so that the
+			// transparent proxy iptables redirection - including Consul DNS redirection for
+			// ".consul" virtual addresses - is set up. That network references a namespaced
+			// "consul-cni" NetworkAttachmentDefinition, so it must exist in the workload
+			// namespace before the pods are created; otherwise the pod stays stuck in
+			// ContainerCreating (Multus: "consul-cni" not found) and the rollout never finishes.
+			if cfg.EnableOpenshift && cfg.EnableCNI {
+				k8s.KubectlApply(t, staticServerOpts, "../fixtures/bases/openshift/")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDelete(t, staticServerOpts, "../fixtures/bases/openshift/")
+				})
+			}
+
 			logger.Log(t, "creating static-server in server peer")
-			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-server-inject")
+			staticServerFixture := "../fixtures/cases/static-server-inject"
+			if cfg.EnableOpenshift {
+				if cfg.EnableCNI {
+					staticServerFixture = "../fixtures/cases/static-server-openshift-cni"
+				} else {
+					staticServerFixture = "../fixtures/cases/static-server-openshift"
+				}
+			}
+			k8s.DeployKustomize(t, staticServerOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticServerFixture)
 
 			logger.Log(t, "creating static-client deployments in client peer")
+			if cfg.EnableOpenshift && cfg.EnableCNI {
+				k8s.KubectlApply(t, staticClientOpts, "../fixtures/bases/openshift/")
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.KubectlDelete(t, staticClientOpts, "../fixtures/bases/openshift/")
+				})
+			}
 			if cfg.EnableTransparentProxy {
-				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-tproxy")
+				staticClientFixture := "../fixtures/cases/static-client-tproxy"
+				if cfg.EnableOpenshift {
+					if cfg.EnableCNI {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-tproxy-cni"
+					} else {
+						staticClientFixture = "../fixtures/cases/static-client-openshift-tproxy"
+					}
+				}
+				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticClientFixture)
 			} else {
 				k8s.DeployKustomize(t, staticClientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/cases/static-client-peers/default")
 			}
 			// Check that both static-server and static-client have been injected and now have 2 containers.
-			podList, err := staticServerPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app=static-server",
+			// Scope the lookup to the workload namespace and retry so that a rolling update (for
+			// example when re-running over a previous deployment) settles to a single pod before
+			// we assert on the injected container count.
+			retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				podList, err := staticServerPeerClusterContext.KubernetesClient(t).CoreV1().Pods(staticServerNamespace).List(context.Background(), metav1.ListOptions{
+					LabelSelector: "app=static-server",
+				})
+				require.NoError(r, err)
+				require.Len(r, podList.Items, 1)
+				require.Len(r, podList.Items[0].Spec.Containers, 2)
 			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 2)
 
-			podList, err = staticClientPeerClusterContext.KubernetesClient(t).CoreV1().Pods(metav1.NamespaceAll).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app=static-client",
+			retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				podList, err := staticClientPeerClusterContext.KubernetesClient(t).CoreV1().Pods(staticClientNamespace).List(context.Background(), metav1.ListOptions{
+					LabelSelector: "app=static-client",
+				})
+				require.NoError(r, err)
+				require.Len(r, podList.Items, 1)
+				require.Len(r, podList.Items[0].Spec.Containers, 2)
 			})
-			require.NoError(t, err)
-			require.Len(t, podList.Items, 1)
-			require.Len(t, podList.Items[0].Spec.Containers, 2)
 
 			// Make sure that services are registered in the correct namespace.
 			// Server cluster.
