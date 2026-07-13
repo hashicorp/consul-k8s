@@ -20,5 +20,5 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: {{ .Values.global.generateManifestsStorage | default "1Gi" }}
 {{- end }}
