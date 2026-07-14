@@ -24,7 +24,19 @@ container {
 
   triage {
     suppress {
-      vulnerabilites = []
+      vulnerabilites = [
+        "GO-2026-5932", // Fix not available yet
+        "ALPINE-CVE-2021-42376", // False positive in Alpine Linux's busybox@1.37.0-r31
+        // The scanner is flagging this CVE for busybox@1.37.0-r31, but according to NVD - CVE-2021-42376,
+        // this version is not affected by the vulnerability. Hence suppressing it for now.
+        // Similarly below are list of false positive CVE's flagged by the scanner for Alpine Linux's openssl@3.5.7-r0:
+        "ALPINE-CVE-2023-0466",
+        "ALPINE-CVE-2022-20683",
+        "ALPINE-CVE-2023-4807",
+        "ALPINE-CVE-2022-1292",
+        "ALPINE-CVE-2022-2068",
+        // All the above false positives must be discussed with security team and removed from the list once they are fixed in the scanner.
+      ]
       paths = [
         // The OSV scanner will trip on several packages that are included in the
         // the UBI images. This is due to RHEL using the same base version in the
@@ -49,7 +61,12 @@ binary {
 
   triage {
     suppress {
-      vulnerabilites = []
+      vulnerabilites = [
+        "GO-2026-5622", // Fix not available yet
+        "GO-2026-5932", // Fix not available yet
+        "GO-2026-5064", // Fix not available yet
+        "GO-2026-5338", // Fix not available yet
+      ]
     }
   }
 }
