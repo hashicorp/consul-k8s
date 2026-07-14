@@ -10,6 +10,7 @@ IMPROVEMENTS:
 
 BUG FIXES:
 
+* api-gateway: fix argocd sync issue with difference to helm hook and argocd hooks, causing infinte wait time for pvc
 * api-gateway: remove shortNames for routes [[GH-5458](https://github.com/hashicorp/consul-k8s/issues/5458)]
 * control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions. [[GH-5423](https://github.com/hashicorp/consul-k8s/issues/5423)]
 * helm: Exclude OpenShift namespaces from the consul-connect-inject webhook injection by default [[GH-5402](https://github.com/hashicorp/consul-k8s/issues/5402)]
