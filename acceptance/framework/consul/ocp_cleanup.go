@@ -286,6 +286,16 @@ func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
 		require.NoError(t, err)
 
 		logger.Logf(t, "Deleting stale test namespace %s before Helm install", namespace)
+
+		// Force-delete any workloads still present in the namespace BEFORE deleting the
+		// namespace itself (and before force-clearing its finalizers below). Clearing a
+		// namespace's finalizers deletes the namespace object without garbage-collecting
+		// its contents, so a surviving Deployment/Pod would be orphaned and then
+		// re-adopted when the test recreates the namespace - resurfacing, for example, a
+		// static-server left unhealthy by a previous run and breaking the next
+		// DeployKustomize.
+		h.forceDeleteNamespacedWorkloads(t, namespace)
+
 		// Request deletion first so the namespace controller starts terminating the
 		// namespace with its finalizers intact. We must NOT clear the spec finalizers
 		// before issuing the delete: doing so on a namespace that has not yet been
@@ -305,10 +315,14 @@ func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
 			require.NoError(r, err)
 
 			// The namespace is still present, which means it is stuck in the
-			// Terminating phase. Force-clear its finalizers via the finalize
-			// subresource so the API server can complete the deletion. This mirrors
-			// `kubectl replace --raw /api/v1/namespaces/<ns>/finalize` and is safe
-			// because the delete above already set the deletion timestamp.
+			// Terminating phase. Re-clear any workloads that are still lingering so that
+			// force-removing the namespace finalizers below cannot orphan them, then
+			// force-clear its finalizers via the finalize subresource so the API server
+			// can complete the deletion. This mirrors `kubectl replace --raw
+			// /api/v1/namespaces/<ns>/finalize` and is safe because the delete above
+			// already set the deletion timestamp.
+			h.forceDeleteNamespacedWorkloads(t, namespace)
+
 			nsCopy := ns.DeepCopy()
 			nsCopy.Spec.Finalizers = nil
 			if _, ferr := h.kubernetesClient.CoreV1().Namespaces().Finalize(context.Background(), nsCopy, metav1.UpdateOptions{}); ferr != nil && !errors.IsNotFound(ferr) && !errors.IsConflict(ferr) {
@@ -316,6 +330,38 @@ func (h *HelmCluster) deleteStaleTestNamespaces(t *testing.T) {
 			}
 			r.Errorf("namespace %s still terminating, forced finalizer removal and will re-check", namespace)
 		})
+	}
+}
+
+// forceDeleteNamespacedWorkloads best-effort force-deletes the Deployments,
+// ReplicaSets and Pods in the given namespace with a zero grace period. It is used
+// by deleteStaleTestNamespaces before (and while) deleting a stale test namespace
+// so that these workloads cannot be orphaned when the namespace's finalizers are
+// force-cleared: a namespace whose finalizers are removed is deleted without
+// garbage-collecting its contents, so any surviving Deployment/Pod would otherwise
+// persist and be re-adopted when the test recreates the namespace, resurfacing (for
+// example) a static-server pod left unhealthy by a previous run and breaking the
+// next DeployKustomize. Errors are logged but not fatal so that an already-clean or
+// partially-populated namespace does not fail the pre-install cleanup.
+func (h *HelmCluster) forceDeleteNamespacedWorkloads(t *testing.T, namespace string) {
+	t.Helper()
+
+	gracePeriod := int64(0)
+	propagation := metav1.DeletePropagationBackground
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriod,
+		PropagationPolicy:  &propagation,
+	}
+	listOptions := metav1.ListOptions{}
+
+	if err := h.kubernetesClient.AppsV1().Deployments(namespace).DeleteCollection(context.Background(), deleteOptions, listOptions); err != nil && !errors.IsNotFound(err) {
+		logger.Logf(t, "warning: failed to delete stale deployments in namespace %s: %v", namespace, err)
+	}
+	if err := h.kubernetesClient.AppsV1().ReplicaSets(namespace).DeleteCollection(context.Background(), deleteOptions, listOptions); err != nil && !errors.IsNotFound(err) {
+		logger.Logf(t, "warning: failed to delete stale replicasets in namespace %s: %v", namespace, err)
+	}
+	if err := h.kubernetesClient.CoreV1().Pods(namespace).DeleteCollection(context.Background(), deleteOptions, listOptions); err != nil && !errors.IsNotFound(err) {
+		logger.Logf(t, "warning: failed to delete stale pods in namespace %s: %v", namespace, err)
 	}
 }
 
