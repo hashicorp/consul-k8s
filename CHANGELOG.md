@@ -1,3 +1,25 @@
+## 2.0.2 (July 14, 2026)
+
+SECURITY:
+
+* Update the Consul Build Go base image to `alpine3.24` [[GH-5474](https://github.com/hashicorp/consul-k8s/issues/5474)]
+
+FEATURES:
+
+* api-gateway: Add support for external authorization (`ext_authz`) on the API Gateway. A new `extAuthz` block on the `RouteAuthFilter` CRD and a `consul.hashicorp.com/ext-authz` annotation (on `Gateway` and `HTTPRoute`) let you set the gateway-wide ext_authz posture and override it per route. Requires a Consul version with API Gateway `ext_authz` support. [[GH-5444](https://github.com/hashicorp/consul-k8s/issues/5444)]
+* xds: Addition of envoy extensions builtin/ext-proc support and addition of RouteExtProc CRD for Consul ENT [[GH-5449](https://github.com/hashicorp/consul-k8s/issues/5449)]
+
+IMPROVEMENTS:
+
+* cni: version upgrade to 1.3.0 to support protocol version 1.1.0 [[GH-5407](https://github.com/hashicorp/consul-k8s/issues/5407)]
+
+BUG FIXES:
+
+* api-gateway: fix argocd sync issue with difference to helm hook and argocd hooks, causing infinte wait time for pvc [[GH-5491](https://github.com/hashicorp/consul-k8s/issues/5491)]
+* api-gateway: remove shortNames for routes [[GH-5458](https://github.com/hashicorp/consul-k8s/issues/5458)]
+* control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions. [[GH-5423](https://github.com/hashicorp/consul-k8s/issues/5423)]
+* helm: Exclude OpenShift namespaces from the consul-connect-inject webhook injection by default [[GH-5402](https://github.com/hashicorp/consul-k8s/issues/5402)]
+
 ## 2.0.0 (May 24, 2026)
 
 > NOTE: Consul K8s 2.0.x is compatible with Consul 2.0.x and Consul Dataplane 2.0.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
