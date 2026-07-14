@@ -1,3 +1,19 @@
+## 1.8.15 (July 14, 2026)
+
+SECURITY:
+
+* Update the Consul Build Go base image to `alpine3.24` [[GH-5474](https://github.com/hashicorp/consul-k8s/issues/5474)]
+
+IMPROVEMENTS:
+
+* cni: version upgrade to 1.3.0 to support protocol version 1.1.0 [[GH-5407](https://github.com/hashicorp/consul-k8s/issues/5407)]
+
+BUG FIXES:
+
+* api-gateway: remove shortNames for routes [[GH-5458](https://github.com/hashicorp/consul-k8s/issues/5458)]
+* control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions. [[GH-5423](https://github.com/hashicorp/consul-k8s/issues/5423)]
+* helm: Exclude OpenShift namespaces from the consul-connect-inject webhook injection by default [[GH-5402](https://github.com/hashicorp/consul-k8s/issues/5402)]
+
 ## 1.8.13 (May 24, 2026)
 
 SECURITY:
