@@ -2,6 +2,7 @@
 
 SECURITY:
 
+* go: upgrade go version to 1.26.4
 * Update the Consul Build Go base image to `alpine3.24` [[GH-5474](https://github.com/hashicorp/consul-k8s/issues/5474)]
 
 IMPROVEMENTS:
