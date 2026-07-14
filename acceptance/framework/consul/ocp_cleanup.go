@@ -784,6 +784,17 @@ func isServerACLInitCleanupAlreadyExistsError(err error) bool {
 	return strings.Contains(errText, "server-acl-init-cleanup") && strings.Contains(errText, "already exists")
 }
 
+// isAnotherOperationInProgressError reports whether the helm error indicates the
+// release is locked by a pending install/upgrade/rollback. This happens when a
+// previous attempt exited before completing and left the release in a pending
+// state, orphaning the lock so subsequent operations are rejected.
+func isAnotherOperationInProgressError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "another operation (install/upgrade/rollback) is in progress")
+}
+
 func isRetryableHelmInstallError(err error) bool {
 	if err == nil {
 		return false

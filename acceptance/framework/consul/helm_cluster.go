@@ -245,6 +245,15 @@ func (h *HelmCluster) Create(t *testing.T) {
 				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
 				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 			}
+			if err != nil && isAnotherOperationInProgressError(err) {
+				// A prior install/upgrade attempt exited but left the release in a
+				// pending state (e.g. pending-install), so its lock was never released
+				// and helm refuses further operations. Uninstall the stuck release to
+				// clear the orphaned lock, then retry the install.
+				logger.Logf(t, "Release %s has a pending operation lock, uninstalling stuck release and retrying install: %s", h.releaseName, err)
+				_ = h.uninstallReleaseNoHooks(t, h.releaseName)
+				err = helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
+			}
 			if err != nil && isGatewayCleanupAlreadyExistsError(err) {
 				logger.Logf(t, "Gateway cleanup job already exists for release %s, deleting job and retrying install: %s", h.releaseName, err)
 				h.deleteGatewayCleanupJobIfExistsForRelease(r, h.releaseName)
