@@ -1,7 +1,7 @@
 VERSION = $(shell ./control-plane/build-support/scripts/version.sh version/version.go)
 GOLANG_VERSION?=$(shell head -n 1 .go-version)
 CONSUL_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-version.sh charts/consul/values.yaml)
-CONSUL_ENTERPRISE_IMAGE_VERSION = "public.ecr.aws/n9h4m6z2/ajay/consul-enterprise:consul-grpc-failover-1"
+CONSUL_ENTERPRISE_IMAGE_VERSION = "public.ecr.aws/n9h4m6z2/ajay/consul-enterprise:consul-grpc-failover-2"
 CONSUL_DATAPLANE_IMAGE_VERSION = $(shell ./control-plane/build-support/scripts/consul-dataplane-version.sh charts/consul/values.yaml)
 KIND_VERSION= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindVersion)
 KIND_NODE_IMAGE= $(shell ./control-plane/build-support/scripts/read-yaml-config.sh acceptance/ci-inputs/kind-inputs.yaml .kindNodeImage)
