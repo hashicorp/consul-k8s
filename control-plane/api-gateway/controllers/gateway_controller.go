@@ -20,7 +20,6 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,8 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -182,7 +179,7 @@ func (r *GatewayController) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// get all tcp routes referencing this gateway
-	tcpRoutes := []gwv1alpha2.TCPRoute{}
+	tcpRoutes := []gwv1.TCPRoute{}
 	log.Info("TCP supporting " + fmt.Sprintf("%+v", r.supportsTCPRoute))
 	if r.supportsTCPRoute {
 		tcpRoutes, err = r.getRelatedTCPRoutes(ctx, req.NamespacedName, resources)
@@ -476,7 +473,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Pod{}).
 		Watches(
-			&gwv1beta1.ReferenceGrant{},
+			&gwv1.ReferenceGrant{},
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
 		).
 		Watches(
@@ -518,7 +515,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 
 		builder = builder.
 			Watches(
-				&gwv1alpha2.TCPRoute{},
+				&gwv1.TCPRoute{},
 				handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute),
 			).
 			WatchesRawSource(
@@ -628,7 +625,7 @@ func (r *GatewayController) transformHTTPRoute(ctx context.Context, o client.Obj
 // transformTCPRoute will check the TCPRoute object for a matching
 // class, then return a list of reconcile Requests for Gateways referring to it.
 func (r *GatewayController) transformTCPRoute(ctx context.Context, o client.Object) []reconcile.Request {
-	route := o.(*gwv1alpha2.TCPRoute)
+	route := o.(*gwv1.TCPRoute)
 
 	refs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, route.Spec.ParentRefs))
 	statusRefs := refsToRequests(common.ParentRefs(common.BetaGroup, common.KindGateway, route.Namespace, common.ConvertSliceFunc(route.Status.Parents, func(parentStatus gwv1.RouteParentStatus) gwv1.ParentReference {
@@ -873,7 +870,7 @@ func (r *GatewayController) transformEndpoints(ctx context.Context, o client.Obj
 func (r *GatewayController) gatewaysForRoutesReferencing(ctx context.Context, tcpIndex, httpIndex, key string) []reconcile.Request {
 	requestSet := make(map[types.NamespacedName]struct{})
 	if r.supportsTCPRoute && tcpIndex != "" {
-		tcpRouteList := &gwv1alpha2.TCPRouteList{}
+		tcpRouteList := &gwv1.TCPRouteList{}
 		if err := r.Client.List(ctx, tcpRouteList, &client.ListOptions{
 			FieldSelector: fields.OneTermEqualSelector(tcpIndex, key),
 		}); err != nil {
@@ -950,57 +947,11 @@ func (c *GatewayController) getNamespaces(ctx context.Context) (map[string]corev
 func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1.ReferenceGrant, error) {
 	var list gwv1.ReferenceGrantList
 
-	if err := c.Client.List(ctx, &list); err == nil {
-		return list.Items, nil
-	} else if !meta.IsNoMatchError(err) {
+	if err := c.Client.List(ctx, &list); err != nil {
 		return nil, err
 	}
 
-	var betaList gwv1beta1.ReferenceGrantList
-	if err := c.Client.List(ctx, &betaList); err != nil {
-		return nil, err
-	}
-
-	grants := make([]gwv1.ReferenceGrant, 0, len(betaList.Items))
-	for _, grant := range betaList.Items {
-		grants = append(grants, referenceGrantV1beta1ToV1(grant))
-	}
-
-	return grants, nil
-}
-
-func referenceGrantV1beta1ToV1(grant gwv1beta1.ReferenceGrant) gwv1.ReferenceGrant {
-	from := make([]gwv1.ReferenceGrantFrom, 0, len(grant.Spec.From))
-	for _, f := range grant.Spec.From {
-		from = append(from, gwv1.ReferenceGrantFrom{
-			Group:     gwv1.Group(f.Group),
-			Kind:      gwv1.Kind(f.Kind),
-			Namespace: gwv1.Namespace(f.Namespace),
-		})
-	}
-
-	to := make([]gwv1.ReferenceGrantTo, 0, len(grant.Spec.To))
-	for _, t := range grant.Spec.To {
-		var name *gwv1.ObjectName
-		if t.Name != nil {
-			n := gwv1.ObjectName(*t.Name)
-			name = &n
-		}
-
-		to = append(to, gwv1.ReferenceGrantTo{
-			Group: gwv1.Group(t.Group),
-			Kind:  gwv1.Kind(t.Kind),
-			Name:  name,
-		})
-	}
-
-	return gwv1.ReferenceGrant{
-		ObjectMeta: grant.ObjectMeta,
-		Spec: gwv1.ReferenceGrantSpec{
-			From: from,
-			To:   to,
-		},
-	}
+	return list.Items, nil
 }
 
 func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gateway types.NamespacedName) (*corev1.Service, error) {
@@ -1148,8 +1099,8 @@ func (c *GatewayController) getJWTProviders(ctx context.Context, resources *comm
 	return list.Items, nil
 }
 
-func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1alpha2.TCPRoute, error) {
-	var list gwv1alpha2.TCPRouteList
+func (c *GatewayController) getRelatedTCPRoutes(ctx context.Context, gateway types.NamespacedName, resources *common.ResourceMap) ([]gwv1.TCPRoute, error) {
+	var list gwv1.TCPRouteList
 
 	if err := c.Client.List(ctx, &list, &client.ListOptions{
 		FieldSelector: fields.OneTermEqualSelector(TCPRoute_GatewayIndex, gateway.String()),
@@ -1255,7 +1206,7 @@ func (c *GatewayController) fetchSecret(ctx context.Context, resources *common.R
 	return nil
 }
 
-func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1alpha2.TCPRoute, httpRoutes []gwv1.HTTPRoute) error {
+func (c *GatewayController) fetchServicesForRoutes(ctx context.Context, resources *common.ResourceMap, tcpRoutes []gwv1.TCPRoute, httpRoutes []gwv1.HTTPRoute) error {
 	serviceBackends := mapset.NewSet()
 	meshServiceBackends := mapset.NewSet()
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+	// gwv1 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -222,7 +222,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 		canReference       bool
 		err                error
 		ctx                context.Context
-		tcpRoute           gwv1alpha2.TCPRoute
+		tcpRoute           gwv1.TCPRoute
 		backendRef         gwv1.BackendRef
 		k8sReferenceGrants []gwv1.ReferenceGrant
 	}{
@@ -230,7 +230,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 			canReference: true,
 			err:          nil,
 			ctx:          context.TODO(),
-			tcpRoute: gwv1alpha2.TCPRoute{
+			tcpRoute: gwv1.TCPRoute{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       TCPRouteKind,
 					APIVersion: Group + V1Alpha2,
@@ -238,8 +238,8 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: FromNamespace,
 				},
-				Spec:   gwv1alpha2.TCPRouteSpec{},
-				Status: gwv1alpha2.TCPRouteStatus{},
+				Spec:   gwv1.TCPRouteSpec{},
+				Status: gwv1.TCPRouteStatus{},
 			},
 			backendRef: gwv1.BackendRef{
 				BackendObjectReference: gwv1.BackendObjectReference{

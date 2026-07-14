@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1beta "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -374,13 +373,13 @@ func createReferenceGrant(t *testing.T, client client.Client, name, from, to str
 
 	// we just create a reference grant for all combinations in the given namespaces
 
-	require.NoError(t, client.Create(context.Background(), &gwv1beta.ReferenceGrant{
+	require.NoError(t, client.Create(context.Background(), &gwv1.ReferenceGrant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: to,
 		},
-		Spec: gwv1beta.ReferenceGrantSpec{
-			From: []gwv1beta.ReferenceGrantFrom{{
+		Spec: gwv1.ReferenceGrantSpec{
+			From: []gwv1.ReferenceGrantFrom{{
 				Group:     gatewayGroup,
 				Kind:      gatewayKind,
 				Namespace: gwv1.Namespace(from),
@@ -393,7 +392,7 @@ func createReferenceGrant(t *testing.T, client client.Client, name, from, to str
 				Kind:      tcpRouteKind,
 				Namespace: gwv1.Namespace(from),
 			}},
-			To: []gwv1beta.ReferenceGrantTo{{
+			To: []gwv1.ReferenceGrantTo{{
 				Group: gatewayGroup,
 				Kind:  gatewayKind,
 			}, {
