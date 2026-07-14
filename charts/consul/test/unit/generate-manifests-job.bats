@@ -75,7 +75,7 @@ load _helpers
       . | tee /dev/stderr |
       yq -r '.metadata.annotations."helm.sh/hook-delete-policy"' | tee /dev/stderr)
 
-  [ "${actual}" = "hook-succeeded,before-hook-creation" ]
+  [ "${actual}" = "hook-succeeded, before-hook-creation" ]
 }
 
 @test "generateManifests/Job: restartPolicy is Never" {
