@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -29,10 +30,11 @@ import (
 //     /etc/resolv.conf points at 127.0.0.1, not the cluster DNS), so DNS
 //     queries never leave the pod to reach the Consul servers directly.
 //
-//  3. Real traffic works end to end: the client can look up the other
-//     service's "*.virtual.consul" name through its own sidecar and
-//     successfully connect to it. If DNS resolution were still depending on
-//     the servers (and not the sidecar), this lookup-and-connect would fail.
+//  3. Real traffic keeps working even after the Consul server pods are scaled
+//     down. The client must still be able to resolve the other service's
+//     "*.virtual.consul" name and connect to it. If DNS resolution were still
+//     depending on the Consul servers (and not the sidecar), this would fail
+//     once the servers are gone.
 func TestConnectInject_SidecarDNSResolver(t *testing.T) {
 	cfg := suite.Config()
 
@@ -112,12 +114,35 @@ func TestConnectInject_SidecarDNSResolver(t *testing.T) {
 			require.Contains(t, resolvConf, "nameserver 127.0.0.1",
 				"expected the pod's resolv.conf to use the local sidecar resolver at 127.0.0.1, got:\n%s", resolvConf)
 
-			// 3. Verify end-to-end that the client resolves the server's
-			// virtual Consul name through its own sidecar and connects
-			// successfully. If DNS were not being served by the sidecar, this
-			// lookup would not resolve and the connection would fail.
+			// 3. Remove the Consul server pods after the mesh is fully configured.
+			// The local sidecar should still be able to resolve *.virtual.consul
+			// and the client should still be able to connect. If resolution were
+			// still falling back to the Consul servers, these checks would fail.
+			logger.Log(t, "scaling down Consul servers to prove virtual DNS resolution does not depend on server-backed DNS")
+			clusterOpts := ctx.KubectlOptions(t)
+			serverStatefulSet := fmt.Sprintf("statefulset/%s-consul-server", releaseName)
+			k8s.KubectlScale(t, clusterOpts, serverStatefulSet, 0)
+
+			retry.Run(t, func(r *retry.R) {
+				serverPods, listErr := ctx.KubernetesClient(t).CoreV1().Pods(clusterOpts.Namespace).List(context.Background(), metav1.ListOptions{
+					LabelSelector: fmt.Sprintf("app=consul,component=server,release=%s", releaseName),
+				})
+				require.NoError(r, listErr)
+				require.Len(r, serverPods.Items, 0, "expected all Consul server pods to be gone before verifying sidecar-local DNS resolution")
+			})
+
+			virtualHost := "static-server.virtual.consul"
+			logger.Logf(t, "verifying %s still resolves from the client pod after Consul servers are down", virtualHost)
+			retry.Run(t, func(r *retry.R) {
+				lookupOutput, lookupErr := k8s.RunKubectlAndGetOutputE(r, opts,
+					"exec", "deploy/"+connhelper.StaticClientName, "-c", connhelper.StaticClientName,
+					"--", "getent", "hosts", virtualHost)
+				require.NoError(r, lookupErr)
+				require.Contains(r, lookupOutput, virtualHost)
+			})
+
 			virtualServerURL := "http://static-server.virtual.consul"
-			logger.Logf(t, "verifying connection to %s succeeds via sidecar-resolved DNS", virtualServerURL)
+			logger.Logf(t, "verifying connection to %s still succeeds after Consul servers are down", virtualServerURL)
 			k8s.CheckStaticServerConnectionSuccessful(t, opts, connhelper.StaticClientName, virtualServerURL)
 		})
 	}
