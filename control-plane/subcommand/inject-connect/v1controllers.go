@@ -127,7 +127,19 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 		return err
 	}
 
-	if c.flagEnableCustomGatewayCRDController {
+	// The custom consul.hashicorp.com gateway controllers all depend on the CustomGatewayClass
+	// CRD. On some environments (for example OpenShift when the consulapi CRDs are not managed,
+	// or when the CRD is removed out-of-band) the flag can be enabled while the CRD is absent.
+	// Setting up the controllers in that case crash-loops the injector, which also takes down the
+	// endpoints controller and prevents service registration. Only set up the custom gateway
+	// controllers when the CRD is actually present in the cluster.
+	enableCustomGatewayControllers := c.flagEnableCustomGatewayCRDController
+	if enableCustomGatewayControllers && !gatewaycontrollerscustom.CustomGatewayClassCRDInstalled(mgr) {
+		setupLog.Info("custom gateway CRD controller is enabled but the CustomGatewayClass CRD is not present in the cluster; skipping custom gateway controller setup")
+		enableCustomGatewayControllers = false
+	}
+
+	if enableCustomGatewayControllers {
 		// register field indexes for consul.hashicorp.com API controllers for custom
 		if err := gatewaycontrollerscustom.RegisterFieldIndexes(ctx, mgr); err != nil {
 			setupLog.Error(err, "unable to register field indexes for consul.hashicorp.com API ")

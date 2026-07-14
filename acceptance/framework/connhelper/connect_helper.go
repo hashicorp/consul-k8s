@@ -140,6 +140,17 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	c.SetupAppNamespace(t)
 
 	opts := c.KubectlOptsForApp(t)
+
+	// Delete any leftover static-server/static-client deployments before
+	// deploying. On re-runs that reuse a cluster (e.g. with
+	// -no-cleanup-on-failure) these deployments can survive a Consul reinstall.
+	// Their existing sidecars still hold ACL tokens from the previous Consul
+	// installation and can no longer authenticate, and because "kubectl apply" is
+	// a no-op for an unchanged spec the stale pods are never replaced, so the mesh
+	// connectivity checks never converge. Deleting first guarantees fresh pods that
+	// log in against the current Consul. This is a no-op on a clean cluster.
+	k8s.RunKubectl(t, opts, "delete", "deployment", "static-server", "static-client", "--ignore-not-found")
+
 	if c.Cfg.EnableCNI && c.Cfg.EnableOpenshift {
 		// On OpenShift with the CNI, we need to create a network attachment definition in the namespace
 		// where the applications are running, and the app deployment configs need to reference that network
@@ -151,11 +162,17 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 			k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
 		})
 
-		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
+		// Use the CNI fixture variants which carry the
+		// k8s.v1.cni.cncf.io/networks: consul-cni Multus annotation. In Multus
+		// mode (consul-cni installed with -multus=true) the consul-cni plugin only
+		// runs for pods that request the consul-cni network, and without it the
+		// transparent proxy iptables redirection is never applied (traffic bypasses
+		// the Envoy sidecar, so intentions are not enforced).
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift-cni")
 		if c.Cfg.EnableTransparentProxy {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy-cni")
 		} else {
-			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject")
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject-cni")
 		}
 	} else if c.Cfg.EnableOpenshift {
 		// On OpenShift without CNI, use OCP-specific fixtures.

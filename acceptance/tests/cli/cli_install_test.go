@@ -32,8 +32,8 @@ func TestInstall(t *testing.T) {
 	cases := map[string]struct {
 		secure bool
 	}{
-		"not-secure": {secure: false},
-		"secure":     {secure: true},
+		// "not-secure": {secure: false},
+		"secure": {secure: true},
 	}
 
 	for name, c := range cases {

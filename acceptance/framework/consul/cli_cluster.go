@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/portforward"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -315,7 +316,6 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 
 	namespace := c.kubectlOptions.Namespace
 	config := api.DefaultConfig()
-	localPort := terratestk8s.GetAvailablePort(t)
 	remotePort := 8500 // use non-secure by default
 
 	if secure {
@@ -356,24 +356,14 @@ func (c *CLICluster) SetupConsulClient(t *testing.T, secure bool, release ...str
 	if releaseName == CLIReleaseName {
 		serverPod = "consul-server-0"
 	}
-	tunnel := terratestk8s.NewTunnelWithLogger(
-		c.kubectlOptions,
-		terratestk8s.ResourceTypePod,
-		serverPod,
-		localPort,
-		remotePort,
-		c.logger)
 
-	// Retry creating the port forward since it can fail occasionally.
-	retry.RunWith(&retry.Counter{Wait: 3 * time.Second, Count: 60}, t, func(r *retry.R) {
-		require.NoError(r, tunnel.ForwardPortE(r))
-	})
-
-	t.Cleanup(func() {
-		tunnel.Close()
-	})
-
-	config.Address = fmt.Sprintf("localhost:%d", localPort)
+	// Use a monitored port-forward tunnel (as HelmCluster.SetupConsulClient does)
+	// so the Consul API connection self-heals if the port-forward drops. On remote
+	// clusters (e.g. OpenShift/ROSA) an unmonitored tunnel can silently die during a
+	// long-running test step, after which every Consul API call (such as creating an
+	// intention) fails with "connection refused". CreateTunnelToResourcePort spawns a
+	// monitor goroutine that rebuilds the tunnel on the same local port when needed.
+	config.Address = portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, c.kubectlOptions, c.logger)
 	consulClient, err := api.NewClient(config)
 	require.NoError(t, err)
 

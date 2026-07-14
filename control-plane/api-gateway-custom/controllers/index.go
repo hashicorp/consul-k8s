@@ -44,12 +44,55 @@ const (
 // These indexes are similar to indexes used in databases to speed up queries.
 // They allow us to quickly find objects based on a field value.
 func RegisterFieldIndexes(ctx context.Context, mgr ctrl.Manager) error {
+	log := mgr.GetLogger()
+
 	for _, index := range indexes {
+		// Get GVK for the target object.
+		gvks, _, err := mgr.GetScheme().ObjectKinds(index.target)
+		if err != nil || len(gvks) == 0 {
+			return err
+		}
+
+		gvk := gvks[0]
+
+		// Check if the GVK is served by the cluster. The custom consul.hashicorp.com
+		// gateway CRDs (e.g. CustomGatewayClass) are optional and may not be installed
+		// (for example on OpenShift when the consulapi CRDs are not managed). Skipping
+		// registration here avoids crashing the injector when the CRD is absent, mirroring
+		// the behavior of the standard gateway.networking.k8s.io field index registration.
+		if _, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version); err != nil {
+			log.Info("Skipping field index registration - GVK not present",
+				"kind", gvk.Kind,
+				"version", gvk.GroupVersion().String(),
+				"index", index.name,
+			)
+			continue
+		}
+
+		// Safe to register.
 		if err := mgr.GetFieldIndexer().IndexField(ctx, index.target, index.name, index.indexerFunc); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// CustomGatewayClassCRDInstalled reports whether the custom consul.hashicorp.com
+// CustomGatewayClass CRD is served by the API server. The custom gateway controllers
+// all depend on this CRD, so when it is absent (for example on OpenShift when the
+// consulapi CRDs are not managed, or when the CRD is removed out-of-band) their
+// setup must be skipped to avoid crash-looping the connect injector.
+func CustomGatewayClassCRDInstalled(mgr ctrl.Manager) bool {
+	gvks, _, err := mgr.GetScheme().ObjectKinds(&gwv1beta1.CustomGatewayClass{})
+	if err != nil || len(gvks) == 0 {
+		return false
+	}
+
+	gvk := gvks[0]
+	if _, err := mgr.GetRESTMapper().RESTMapping(gvk.GroupKind(), gvk.Version); err != nil {
+		return false
+	}
+	return true
 }
 
 type index struct {
