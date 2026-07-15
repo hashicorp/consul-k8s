@@ -43,7 +43,7 @@ jobs:
       with:
         workflow: cloud.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: shashank/ocp-compatibility-tests
+        ref: manisha/ocp_419_test
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "gotestsum-version":"1.12.3" }'
 
@@ -76,3 +76,4 @@ jobs:
         INPUT_SHA: ${{ env.SHA }}
         INPUT_DETAILS_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         INPUT_OWNER: "hashicorp"
+        
