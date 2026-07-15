@@ -498,17 +498,45 @@ func TestFailover_Connect(t *testing.T) {
 				testClusters[k].pqName = &definition.Name
 			}
 
+			// On OpenShift with the Consul CNI plugin enabled, the consul-cni
+			// DaemonSet runs in Multus mode and only installs the transparent-proxy
+			// iptables (including the Consul DNS redirect used to resolve .consul
+			// virtual addresses) for pods that request the consul-cni network via the
+			// annotation k8s.v1.cni.cncf.io/networks: '[{ "name":"consul-cni" }]'.
+			// Multus resolves that annotation to an unprefixed `consul-cni`
+			// NetworkAttachmentDefinition in the pod's own namespace, but Helm only
+			// creates a release-prefixed NAD in the Consul release namespace. Create
+			// the unprefixed NAD in the client (ns1) and server (ns2) namespaces so the
+			// OpenShift+CNI static-server/static-client fixtures below can attach to it.
+			if cfg.EnableOpenshift && cfg.EnableCNI {
+				for _, v := range testClusters {
+					applyOpenShiftCNINetworkAttachment(t, cfg, v.clientOpts)
+					applyOpenShiftCNINetworkAttachment(t, cfg, v.serverOpts)
+				}
+			}
+
 			// Create static server/client after the rest of the config is setup for a more stable testing experience
 			// Create static server deployments.
 			logger.Log(t, "creating static-server and static-client deployments")
+
+			// On OpenShift+CNI, select the static-server fixture variant that carries
+			// the Multus consul-cni annotation (required for the tproxy iptables/DNS
+			// redirect). The variants overlay the base fixtures so each cluster's
+			// unique -text (used to verify failover) is preserved.
+			staticServerDir := func(dir string) string {
+				if cfg.EnableOpenshift && cfg.EnableCNI {
+					return fmt.Sprintf("%s-%s", dir, "openshift-cni")
+				}
+				return dir
+			}
 			deployCustomizeAsync(t, testClusters[keyCluster01a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc1-default", &wg)
+				staticServerDir("../fixtures/cases/sameness/static-server/dc1-default"), &wg)
 			deployCustomizeAsync(t, testClusters[keyCluster01b].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc1-partition", &wg)
+				staticServerDir("../fixtures/cases/sameness/static-server/dc1-partition"), &wg)
 			deployCustomizeAsync(t, testClusters[keyCluster02a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc2", &wg)
+				staticServerDir("../fixtures/cases/sameness/static-server/dc2"), &wg)
 			deployCustomizeAsync(t, testClusters[keyCluster03a].serverOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
-				"../fixtures/cases/sameness/static-server/dc3", &wg)
+				staticServerDir("../fixtures/cases/sameness/static-server/dc3"), &wg)
 
 			// Create static client deployments.
 			staticClientKustomizeDirDefault := "../fixtures/cases/sameness/static-client/default-partition"
@@ -518,6 +546,14 @@ func TestFailover_Connect(t *testing.T) {
 			if cfg.EnableTransparentProxy {
 				staticClientKustomizeDirDefault = fmt.Sprintf("%s-%s", staticClientKustomizeDirDefault, "tproxy")
 				staticClientKustomizeDirAP1 = fmt.Sprintf("%s-%s", staticClientKustomizeDirAP1, "tproxy")
+
+				// On OpenShift+CNI, use the tproxy client fixture variants that carry
+				// the Multus consul-cni annotation so tproxy DNS resolution of .consul
+				// virtual addresses works.
+				if cfg.EnableOpenshift && cfg.EnableCNI {
+					staticClientKustomizeDirDefault = fmt.Sprintf("%s-%s", staticClientKustomizeDirDefault, "openshift-cni")
+					staticClientKustomizeDirAP1 = fmt.Sprintf("%s-%s", staticClientKustomizeDirAP1, "openshift-cni")
+				}
 			}
 
 			deployCustomizeAsync(t, testClusters[keyCluster01a].clientOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
@@ -1056,6 +1092,21 @@ func applyResources(t *testing.T, cfg *config.TestConfig, kustomizeDir string, o
 	k8s.KubectlApplyK(t, opts, kustomizeDir)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDeleteK(t, opts, kustomizeDir)
+	})
+}
+
+// applyOpenShiftCNINetworkAttachment creates the unprefixed `consul-cni`
+// NetworkAttachmentDefinition in the namespace targeted by opts. On OpenShift the
+// consul-cni DaemonSet runs in Multus mode and only installs the transparent-proxy
+// iptables (including the Consul DNS redirect) for pods whose
+// k8s.v1.cni.cncf.io/networks annotation references a `consul-cni` NAD in their own
+// namespace. Helm only creates a release-prefixed NAD in the Consul release
+// namespace, so the static-client (ns1) and static-server (ns2) workload namespaces
+// need this unprefixed copy for OpenShift+CNI transparent proxy to function.
+func applyOpenShiftCNINetworkAttachment(t *testing.T, cfg *config.TestConfig, opts *terratestk8s.KubectlOptions) {
+	k8s.KubectlApply(t, opts, "../fixtures/bases/openshift/")
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
 	})
 }
 
