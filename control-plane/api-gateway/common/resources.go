@@ -554,6 +554,16 @@ func (s *ResourceMap) GetExternalAuthFilters() []*v1alpha1.RouteAuthFilter {
 	return filters
 }
 
+func (s *ResourceMap) GetExternalExtProcFilters() []*v1alpha1.RouteExtProc {
+	filters := make([]*v1alpha1.RouteExtProc, 0, len(s.externalFilters))
+	for _, filter := range s.externalFilters {
+		if extProcFilter, ok := filter.(*v1alpha1.RouteExtProc); ok {
+			filters = append(filters, extProcFilter)
+		}
+	}
+	return filters
+}
+
 func (s *ResourceMap) AddGatewayPolicy(gatewayPolicy *v1alpha1.GatewayPolicy) *v1alpha1.GatewayPolicy {
 	sectionName := ""
 	if gatewayPolicy.Spec.TargetRef.SectionName != nil {
