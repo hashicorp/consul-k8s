@@ -33,6 +33,7 @@ rules:
   - routetimeoutfilters
   - routeauthfilters
   - routetlssdsfilters
+  - routeupstreamlimitsfilters
   - gatewaypolicies
   - customgatewaypolicies
   - registrations
@@ -74,6 +75,7 @@ rules:
   - jwtproviders/status
   - routeauthfilters/status
   - routetlssdsfilters/status
+  - routeupstreamlimitsfilters/status
   - gatewaypolicies/status
   - customgatewaypolicies/status
   verbs:

@@ -5,7 +5,9 @@ package common
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,7 +76,137 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1.Gateway, resources *Resour
 			constants.MetaKeyKubeName: gateway.Name,
 		}),
 		Listeners: listeners,
+		Defaults:  t.translateGatewayDefaults(gateway),
 	}
+}
+
+// Gateway annotations that configure the gateway-wide upstream limit defaults
+// (api-gateway Defaults *UpstreamLimits). Any unset annotation leaves the
+// corresponding field nil so Envoy falls back to its own default.
+const (
+	annotationDefaultMaxConnections        = "api-gateway.consul.hashicorp.com/default-max-connections"
+	annotationDefaultMaxPendingRequests    = "api-gateway.consul.hashicorp.com/default-max-pending-requests"
+	annotationDefaultMaxConcurrentRequests = "api-gateway.consul.hashicorp.com/default-max-concurrent-requests"
+
+	annotationDefaultPHCInterval              = "api-gateway.consul.hashicorp.com/default-passive-health-check-interval"
+	annotationDefaultPHCMaxFailures           = "api-gateway.consul.hashicorp.com/default-passive-health-check-max-failures"
+	annotationDefaultPHCEnforcingConsecutive5 = "api-gateway.consul.hashicorp.com/default-passive-health-check-enforcing-consecutive-5xx"
+	annotationDefaultPHCMaxEjectionPercent    = "api-gateway.consul.hashicorp.com/default-passive-health-check-max-ejection-percent"
+	annotationDefaultPHCBaseEjectionTime      = "api-gateway.consul.hashicorp.com/default-passive-health-check-base-ejection-time"
+)
+
+// translateGatewayDefaults reads the gateway-wide upstream limit defaults from
+// annotations on the Gateway resource and returns them as an api.UpstreamLimits.
+// It returns nil when no relevant annotation is set.
+func (t ResourceTranslator) translateGatewayDefaults(gateway gwv1.Gateway) *api.UpstreamLimits {
+	annotations := gateway.Annotations
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	limits := &api.UpstreamLimits{}
+	set := false
+
+	if v, ok := annotations[annotationDefaultMaxConnections]; ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			limits.MaxConnections = &n
+			set = true
+		}
+	}
+	if v, ok := annotations[annotationDefaultMaxPendingRequests]; ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			limits.MaxPendingRequests = &n
+			set = true
+		}
+	}
+	if v, ok := annotations[annotationDefaultMaxConcurrentRequests]; ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			limits.MaxConcurrentRequests = &n
+			set = true
+		}
+	}
+
+	if phc := t.translateGatewayDefaultPassiveHealthCheck(annotations); phc != nil {
+		limits.PassiveHealthCheck = phc
+		set = true
+	}
+
+	if !set {
+		return nil
+	}
+	return limits
+}
+
+func (t ResourceTranslator) translateGatewayDefaultPassiveHealthCheck(annotations map[string]string) *api.PassiveHealthCheck {
+	phc := &api.PassiveHealthCheck{}
+	set := false
+
+	if v, ok := annotations[annotationDefaultPHCInterval]; ok {
+		if d, err := time.ParseDuration(v); err == nil {
+			phc.Interval = d
+			set = true
+		}
+	}
+	if v, ok := annotations[annotationDefaultPHCMaxFailures]; ok {
+		if n, err := strconv.ParseUint(v, 10, 32); err == nil {
+			phc.MaxFailures = uint32(n)
+			set = true
+		}
+	}
+	if v, ok := annotations[annotationDefaultPHCEnforcingConsecutive5]; ok {
+		if n, err := strconv.ParseUint(v, 10, 32); err == nil {
+			val := uint32(n)
+			phc.EnforcingConsecutive5xx = &val
+			set = true
+		}
+	}
+	if v, ok := annotations[annotationDefaultPHCMaxEjectionPercent]; ok {
+		if n, err := strconv.ParseUint(v, 10, 32); err == nil {
+			val := uint32(n)
+			phc.MaxEjectionPercent = &val
+			set = true
+		}
+	}
+	if v, ok := annotations[annotationDefaultPHCBaseEjectionTime]; ok {
+		if d, err := time.ParseDuration(v); err == nil {
+			phc.BaseEjectionTime = &d
+			set = true
+		}
+	}
+
+	if !set {
+		return nil
+	}
+	return phc
+}
+
+// toConsulUpstreamLimits converts a RouteUpstreamLimitsFilter spec into the
+// Consul api.UpstreamLimits used on a route service's Limits.
+func toConsulUpstreamLimits(spec v1alpha1.RouteUpstreamLimitsFilterSpec) *api.UpstreamLimits {
+	limits := &api.UpstreamLimits{
+		MaxConnections:        spec.MaxConnections,
+		MaxPendingRequests:    spec.MaxPendingRequests,
+		MaxConcurrentRequests: spec.MaxConcurrentRequests,
+		PassiveHealthCheck:    toConsulPassiveHealthCheck(spec.PassiveHealthCheck),
+	}
+	return limits
+}
+
+func toConsulPassiveHealthCheck(phc *v1alpha1.PassiveHealthCheck) *api.PassiveHealthCheck {
+	if phc == nil {
+		return nil
+	}
+	out := &api.PassiveHealthCheck{
+		Interval:                phc.Interval.Duration,
+		MaxFailures:             phc.MaxFailures,
+		EnforcingConsecutive5xx: phc.EnforcingConsecutive5xx,
+		MaxEjectionPercent:      phc.MaxEjectionPercent,
+	}
+	if phc.BaseEjectionTime != nil {
+		d := phc.BaseEjectionTime.Duration
+		out.BaseEjectionTime = &d
+	}
+	return out
 }
 
 var listenerProtocolMap = map[string]string{
@@ -310,6 +442,7 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1.HTTPRoute, ref gw
 			ResponseFilters: responseFilters,
 			TLS:             tlsConfig,
 			Weight:          DerefIntOr(ref.Weight, 1),
+			Limits:          t.translateBackendRefLimits(ref.Filters, resources, route.Namespace),
 		}, true
 	}
 
@@ -326,10 +459,33 @@ func (t ResourceTranslator) translateHTTPBackendRef(route gwv1.HTTPRoute, ref gw
 			ResponseFilters: responseFilters,
 			TLS:             tlsConfig,
 			Weight:          DerefIntOr(ref.Weight, 1),
+			Limits:          t.translateBackendRefLimits(ref.Filters, resources, route.Namespace),
 		}, true
 	}
 
 	return api.HTTPService{}, false
+}
+
+// translateBackendRefLimits scans a backendRef's filters for a
+// RouteUpstreamLimitsFilter extensionRef and, if present, returns the resolved
+// per-service upstream limits. It returns nil when no such filter is referenced.
+func (t ResourceTranslator) translateBackendRefLimits(filters []gwv1.HTTPRouteFilter, resources *ResourceMap, namespace string) *api.UpstreamLimits {
+	for _, filter := range filters {
+		if filter.Type != gwv1.HTTPRouteFilterExtensionRef || filter.ExtensionRef == nil {
+			continue
+		}
+		if filter.ExtensionRef.Kind != v1alpha1.RouteUpstreamLimitsFilterKind {
+			continue
+		}
+		crdFilter, exists := resources.GetExternalFilter(*filter.ExtensionRef, namespace)
+		if !exists {
+			continue
+		}
+		if limitsFilter, ok := crdFilter.(*v1alpha1.RouteUpstreamLimitsFilter); ok {
+			return toConsulUpstreamLimits(limitsFilter.Spec)
+		}
+	}
+	return nil
 }
 
 var headerMatchTypeTranslation = map[gwv1.HeaderMatchType]api.HTTPHeaderMatchType{
