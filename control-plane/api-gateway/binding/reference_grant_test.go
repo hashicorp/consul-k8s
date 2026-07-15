@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	// gwv1 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,8 +18,7 @@ const (
 	FromNamespace    = "fromNamespace"
 	InvalidNamespace = "invalidNamespace"
 	Group            = "gateway.networking.k8s.io"
-	V1Beta1          = "/v1beta1"
-	V1Alpha2         = "/v1alpha2"
+	V1               = "/v1"
 	HTTPRouteKind    = "HTTPRoute"
 	TCPRouteKind     = "TCPRoute"
 	GatewayKind      = "Gateway"
@@ -75,7 +73,7 @@ func TestGatewayCanReferenceSecret(t *testing.T) {
 			gateway: gwv1.Gateway{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       GatewayKind,
-					APIVersion: Group + V1Beta1,
+					APIVersion: Group + V1,
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: FromNamespace,
@@ -152,7 +150,7 @@ func TestHTTPRouteCanReferenceBackend(t *testing.T) {
 			httpRoute: gwv1.HTTPRoute{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       HTTPRouteKind,
-					APIVersion: Group + V1Beta1,
+					APIVersion: Group + V1,
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: FromNamespace,
@@ -233,7 +231,7 @@ func TestTCPRouteCanReferenceBackend(t *testing.T) {
 			tcpRoute: gwv1.TCPRoute{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       TCPRouteKind,
-					APIVersion: Group + V1Alpha2,
+					APIVersion: Group + V1,
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: FromNamespace,

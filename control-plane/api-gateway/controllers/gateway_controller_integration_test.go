@@ -28,8 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	// gwv1 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -763,7 +761,7 @@ func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient cli
 	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
