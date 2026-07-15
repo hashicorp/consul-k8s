@@ -6,6 +6,7 @@ package consul
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -106,8 +107,13 @@ func NewHelmCluster(
 	helpers.MergeMaps(values, valuesFromConfig)
 	helpers.MergeMaps(values, helmValues)
 
+	isOCPGTE419 := false
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		applyOpenShiftDefaults(t, cfg, values)
+		isOCPGTE419 = detectOCPVersionGTE419(t, ctx.KubernetesClient(t))
+		// Write the detected value back to cfg so that tests reading cfg.IsOpenshiftGreaterThan4_18
+		// directly (e.g. api_gateway_test.go) also see the cluster-detected value.
+		cfg.IsOpenshiftGreaterThan4_18 = isOCPGTE419
+		applyOpenShiftDefaults(t, cfg, values, isOCPGTE419)
 	}
 
 	logger := terratestLogger.New(logger.TestLogger{})
@@ -134,7 +140,7 @@ func NewHelmCluster(
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
 		kubernetesClient:   ctx.KubernetesClient(t),
-		isOpenShiftGTE419:  cfg.IsOpenshiftGreaterThan4_18,
+		isOpenShiftGTE419:  isOCPGTE419,
 		noCleanupOnFailure: cfg.NoCleanupOnFailure,
 		noCleanup:          cfg.NoCleanup,
 		debugDirectory:     cfg.DebugDirectory,
@@ -143,7 +149,30 @@ func NewHelmCluster(
 	}
 }
 
-func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[string]string) {
+// detectOCPVersionGTE419 queries the cluster's Kubernetes server version to determine
+// whether the OpenShift cluster is version 4.19 or later. OCP 4.19 ships with Kubernetes 1.32,
+// so a minor version >= 32 is treated as OCP 4.19+. Returns false on any error.
+func detectOCPVersionGTE419(t *testing.T, client kubernetes.Interface) bool {
+	t.Helper()
+	serverVersion, err := client.Discovery().ServerVersion()
+	if err != nil {
+		t.Logf("WARNING: could not detect OCP version from cluster: %v; defaulting isOCPGreaterThan4_18 to true", err)
+		return true
+	}
+	// Minor version strings can include a trailing '+' (e.g. "32+"), so strip non-numeric chars.
+	minorStr := strings.TrimRight(serverVersion.Minor, "+")
+	minor, err := strconv.Atoi(minorStr)
+	if err != nil {
+		t.Logf("WARNING: could not parse Kubernetes minor version %q: %v; defaulting isOCPGreaterThan4_18 to true", serverVersion.Minor, err)
+		return true
+	}
+	// OCP 4.19 corresponds to Kubernetes 1.32.x (minor == 32).
+	isGTE419 := minor >= 32
+	t.Logf("Detected Kubernetes server version %s.%s; isOCPGreaterThan4_18=%v", serverVersion.Major, serverVersion.Minor, isGTE419)
+	return isGTE419
+}
+
+func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[string]string, isGTE419 bool) {
 	// OpenShift clusters commonly pre-install Gateway API CRDs, so Helm must not
 	// attempt to adopt or create them for per-test releases.
 	//4.18 either manageExternalCRDs or manageNonStandardCRDs will true with enableTcpRoute true
@@ -170,7 +199,7 @@ func applyOpenShiftDefaults(t *testing.T, cfg *config.TestConfig, values map[str
 		}
 	}
 
-	if cfg.IsOpenshiftGreaterThan4_18 {
+	if isGTE419 {
 		// Some values are only necessary to set when running on OpenShift, and some of those are only necessary to set on OpenShift 4.18 and later.
 		values["global.openshift.isOcpGreaterthan4_18"] = "true"
 	}
