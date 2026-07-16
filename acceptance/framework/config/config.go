@@ -126,8 +126,8 @@ func (t *TestConfig) HelmValuesFromConfig() (map[string]string, error) {
 		setIfNotEmpty(helmValues, "global.image", entImage)
 
 		if t.EnterpriseLicense != "" {
-			setIfNotEmpty(helmValues, "global.enterpriseLicense.secretName", LicenseSecretName)
-			setIfNotEmpty(helmValues, "global.enterpriseLicense.secretKey", LicenseSecretKey)
+			setIfNotEmpty(helmValues, "global.enterpriseLicense.secretName", "ajay")
+			setIfNotEmpty(helmValues, "global.enterpriseLicense.secretKey",  "rao")
 		}
 	}
 

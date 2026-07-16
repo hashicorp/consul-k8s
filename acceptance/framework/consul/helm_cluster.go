@@ -593,6 +593,7 @@ func configurePSA(t *testing.T, client kubernetes.Interface, cfg *config.TestCon
 
 func createOrUpdateLicenseSecret(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
 	CreateK8sSecret(t, client, cfg, namespace, config.LicenseSecretName, config.LicenseSecretKey, cfg.EnterpriseLicense)
+	CreateK8sSecret(t, client, cfg, namespace, "ajay", "rao", "test-failover-secret")
 }
 
 func configureNamespace(t *testing.T, client kubernetes.Interface, cfg *config.TestConfig, namespace string) {
