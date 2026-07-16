@@ -1,0 +1,204 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Manually-triggered workflow that builds every release artifact (binaries,
+# packages, and container images) for the latest commit on the selected branch,
+# then runs the HashiCorp security scanner against the built binaries and
+# container images.
+#
+# Trigger it from the Actions tab via "Run workflow" and pick any branch. The
+# build runs against that branch's latest commit and the scan jobs consume its
+# artifacts in the same run.
+name: Scan Binaries and Containers
+
+on:
+  workflow_dispatch:
+
+# Only allow one run of this workflow per ref at a time.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # 1. Build every artifact for the triggering branch's latest commit. build.yml
+  #    is invoked as a reusable workflow (it exposes a `workflow_call` trigger),
+  #    so its uploaded artifacts (binary zips, rpm/deb packages, and container
+  #    image tarballs) are available to the scan jobs below in this same run.
+  build:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  # 2. Resolve the Go toolchain version the scanner uses for go_modules analysis.
+  get-go-version:
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  # 3. Scan the compiled binaries.
+  scan-binaries:
+    name: Scan binaries
+    needs: [build, get-go-version]
+    runs-on: ubuntu-latest
+    # Skip on forks, which lack the PRODSEC_SCANNER_READ_ONLY secret.
+    if: github.repository == 'hashicorp/consul-k8s'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - name: Set up Go
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
+        with:
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
+
+      # Download every artifact produced by the build job into build-artifacts/,
+      # one subdirectory per artifact. The binary zips are named
+      # "<pkg>_<version>_<os>_<arch>.zip".
+      - name: Download build artifacts
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        with:
+          path: build-artifacts
+
+      # Extract the compiled binaries out of the zip artifacts into a single
+      # directory the scanner can point at.
+      - name: Extract binaries
+        run: |
+          set -euo pipefail
+          mkdir -p scan-targets/binaries
+          shopt -s globstar nullglob
+          for zip in build-artifacts/**/*.zip; do
+            echo "Extracting ${zip}"
+            unzip -o -j "${zip}" -d scan-targets/binaries
+          done
+          echo "Binaries staged for scanning:"
+          ls -al scan-targets/binaries
+
+      - name: Clone Security Scanner repo
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+        with:
+          repository: hashicorp/security-scanner
+          token: ${{ secrets.PRODSEC_SCANNER_READ_ONLY }}
+          path: security-scanner
+          ref: main
+
+      # TODO(security-scanner): hashicorp/security-scanner is a private action,
+      # so its exact input for binary targets is not documented publicly. The
+      # existing repository scan (.github/workflows/security-scan.yml) uses the
+      # `repository:` input, which is reproduced below as a runnable scaffold.
+      # Confirm the correct input for binaries -- likely `binary:` pointing at a
+      # file or at the scan-targets/binaries directory -- and switch to it. The
+      # scan rules themselves come from the `binary { ... }` block in
+      # .release/security-scan.hcl (selected via SECURITY_SCANNER_CONFIG_FILE).
+      - name: Scan binaries
+        id: scan
+        uses: ./security-scanner
+        env:
+          SECURITY_SCANNER_CONFIG_FILE: .release/security-scan.hcl
+        with:
+          # --- scaffold (runnable) ---------------------------------------------
+          repository: "$PWD"
+          # --- likely real input; verify the name against the action, then use --
+          # binary: ${{ github.workspace }}/scan-targets/binaries
+
+      - name: Print SARIF output
+        if: always()
+        shell: bash
+        run: cat results.sarif | jq || true
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: sarif-binaries
+          path: results.sarif
+          if-no-files-found: warn
+
+  # 4. Scan the container images.
+  scan-containers:
+    name: Scan containers
+    needs: [build, get-go-version]
+    runs-on: ubuntu-latest
+    # Skip on forks, which lack the PRODSEC_SCANNER_READ_ONLY secret.
+    if: github.repository == 'hashicorp/consul-k8s'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - name: Set up Go
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
+        with:
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
+
+      # hashicorp/actions-docker-build (used by build.yml's build-docker jobs)
+      # uploads each image as a `docker save` tarball artifact. Download all
+      # artifacts and pick out the image tarballs below.
+      - name: Download build artifacts
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
+        with:
+          path: build-artifacts
+
+      # Load the image tarballs into the local docker daemon and collect the
+      # resulting image references so they can be scanned.
+      - name: Load container images
+        id: load
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          images=()
+          for tar in build-artifacts/**/*.tar; do
+            echo "Loading ${tar}"
+            out=$(docker load -i "${tar}")
+            echo "${out}"
+            while IFS= read -r ref; do
+              [ -n "${ref}" ] && images+=("${ref}")
+            done < <(echo "${out}" | sed -n 's/^Loaded image: //p')
+          done
+          if [ ${#images[@]} -eq 0 ]; then
+            echo "No container image tarballs were found in the build artifacts."
+          fi
+          {
+            echo "images<<EOF"
+            [ ${#images[@]} -gt 0 ] && printf '%s\n' "${images[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Images loaded:"
+          [ ${#images[@]} -gt 0 ] && printf '%s\n' "${images[@]}" || true
+
+      - name: Clone Security Scanner repo
+        uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+        with:
+          repository: hashicorp/security-scanner
+          token: ${{ secrets.PRODSEC_SCANNER_READ_ONLY }}
+          path: security-scanner
+          ref: main
+
+      # TODO(security-scanner): confirm the private action's input for a
+      # container target. It likely accepts a `container:` input taking an image
+      # reference (one of steps.load.outputs.images) or an image tarball path,
+      # possibly paired with `local_daemon = true` in the container block of
+      # .release/security-scan.hcl. If the scanner handles one image per run, add
+      # a matrix over the loaded images. The `repository:` scaffold below keeps
+      # this step runnable until the real input is wired up.
+      - name: Scan containers
+        id: scan
+        uses: ./security-scanner
+        env:
+          SECURITY_SCANNER_CONFIG_FILE: .release/security-scan.hcl
+        with:
+          # --- scaffold (runnable) ---------------------------------------------
+          repository: "$PWD"
+          # --- likely real input; verify the name against the action, then use --
+          # container: ${{ steps.load.outputs.images }}
+
+      - name: Print SARIF output
+        if: always()
+        shell: bash
+        run: cat results.sarif | jq || true
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: sarif-containers
+          path: results.sarif
+          if-no-files-found: warn

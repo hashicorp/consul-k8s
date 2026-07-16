@@ -3,6 +3,10 @@
 name: build
 on:
   workflow_dispatch:
+  # Allow this workflow to be invoked by other workflows (e.g.
+  # scan-binaries-containers.yml) as a reusable workflow so its build artifacts
+  # can be reused. This is additive and does not change the push/dispatch behavior.
+  workflow_call:
   push:
     # Sequence of patterns matched against refs/heads
     branches:
