@@ -3,7 +3,7 @@
 
 apiVersion: v2
 name: consul
-version: 2.0.2
+version: 2.0.2-oss
 appVersion: 2.0.2
 kubeVersion: ">=1.22.0-0"
 description: Official HashiCorp Consul Chart
