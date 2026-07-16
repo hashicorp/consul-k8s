@@ -577,14 +577,11 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			// Subscribe to changes in RouteTLSSDSFilter custom resources referenced by HTTPRoutes.
 			&v1alpha1.RouteTLSSDSFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
-		)
-
-	if config.ConsulMeta.IsEnterpriseDistribution {
-		builder = builder.Watches(
+		).
+		Watches(
 			&v1alpha1.RouteExtProc{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteExtProc),
 		)
-	}
 
 	if err := builder.Complete(r); err != nil {
 		return nil, binding.Cleaner{}, err
