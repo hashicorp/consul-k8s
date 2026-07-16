@@ -104,7 +104,9 @@ func NewCLICluster(
 	helpers.MergeMaps(values, helmValues)
 
 	if cfg.UseOpenshift || cfg.EnableOpenshift {
-		applyOpenShiftDefaults(t, cfg, values)
+		isOCPGTE419 := detectOCPVersionGTE419(t, ctx.KubernetesClient(t))
+		cfg.IsOpenshiftGreaterThan4_18 = isOCPGTE419
+		applyOpenShiftDefaults(t, cfg, values, isOCPGTE419)
 	}
 
 	logger := terratestLogger.New(logger.TestLogger{})
