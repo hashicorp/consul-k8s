@@ -62,7 +62,6 @@ jobs:
             **.md
             assets/**
             .changelog/**
-            .release/**
             .github/CODEOWNERS
             .github/ISSUE_TEMPLATE/**
       - name: Print changed files
