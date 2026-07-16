@@ -43,7 +43,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: main
+        ref: pajay.rao/enabling-acceptance-for-ce
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
 
@@ -64,6 +64,9 @@ jobs:
           - check-name: acceptance
           - check-name: acceptance-cni
           - check-name: acceptance-tproxy
+          - check-name: acceptance-ce
+          - check-name: acceptance-ce-cni
+          - check-name: acceptance-ce-tproxy
           # Required patch-coverage gate. When CI is skipped there is no diff
           # to evaluate, so mark it success to keep skip-CI PRs mergeable.
           - check-name: coverage / coverage-gate
