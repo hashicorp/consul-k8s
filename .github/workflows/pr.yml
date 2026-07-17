@@ -17,6 +17,21 @@ jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
 
+  get-go-version:
+    needs: [conditional-skip]
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  coverage:
+    needs:
+      - conditional-skip
+      - get-go-version
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    uses: ./.github/workflows/coverage.yml
+    with:
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
+      pr-number: ${{ github.event_name == 'pull_request' && toJson(github.event.pull_request.number) || '' }}
+
   test:
     name: test
     needs: [ conditional-skip ]
@@ -64,6 +79,9 @@ jobs:
           - check-name: acceptance
           - check-name: acceptance-cni
           - check-name: acceptance-tproxy
+          # Required patch-coverage gate. When CI is skipped there is no diff
+          # to evaluate, so mark it success to keep skip-CI PRs mergeable.
+          - check-name: coverage / coverage-gate
     steps:
     - name: Update final status
       uses: docker://ghcr.io/curtbushko/commit-status-action:e1d661c757934ab35c74210b4b70c44099ec747a
