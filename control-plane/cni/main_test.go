@@ -165,7 +165,7 @@ func Test_cmdAdd(t *testing.T) {
 			expectedRules: true, // Rules will be applied
 		},
 		{
-			name: "Parsing iptables from CNI_ARGs as in Nomad",
+			name: "Parsing nft config from CNI_ARGs as in Nomad",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
 				iptablesProvider: &fakeIptablesProvider{},
@@ -494,7 +494,7 @@ func TestParseAnnotation(t *testing.T) {
 				cfg := iptables.Config{ProxyUserID: "1234"}
 				j, err := json.Marshal(&cfg)
 				if err != nil {
-					t.Fatalf("could not marshal iptables config: %v", err)
+					t.Fatalf("could not marshal nft config: %v", err)
 				}
 				pod.Annotations[annotationRedirectTraffic] = string(j)
 				return pod

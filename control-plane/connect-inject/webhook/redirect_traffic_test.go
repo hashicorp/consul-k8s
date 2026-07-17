@@ -392,7 +392,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
 
-			// Only compare annotation and iptables config on successful runs
+			// Only compare annotation and nft config on successful runs
 			if c.expErr == nil {
 				require.NoError(t, err)
 				anno, ok := c.pod.Annotations[constants.AnnotationRedirectTraffic]

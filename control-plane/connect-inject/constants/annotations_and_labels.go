@@ -191,7 +191,7 @@ const (
 	AnnotationTransparentProxyOverwriteProbes = "consul.hashicorp.com/transparent-proxy-overwrite-probes"
 
 	// AnnotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
-	// iptables rules.
+	// nft traffic redirection rules.
 	AnnotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
 	// AnnotationDualStack stores if pod need to run in dualstack mode.

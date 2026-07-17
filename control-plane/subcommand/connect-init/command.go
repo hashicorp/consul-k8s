@@ -83,7 +83,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "File name where proxy's Consul service ID should be saved.")
 	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
 	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of gateway that is being registered: ingress-gateway, terminating-gateway, or mesh-gateway.")
-	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure iptables for this pod.")
+	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure nftables traffic redirection for this pod.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -399,7 +399,7 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 	}
 
 	// Decode proxy's opaque config so that we can use it later to configure
-	// traffic redirection with iptables.
+	// traffic redirection with nft.
 	var trCfg trafficRedirectProxyConfig
 	if err = mapstructure.WeakDecode(svc.Proxy.Config, &trCfg); err != nil {
 		return fmt.Errorf("failed parsing Proxy.Config: %s", err)

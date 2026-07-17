@@ -274,7 +274,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 				AllowPrivilegeEscalation: ptr.To(false),
 			}
 		} else {
-			// Set redirect traffic config for the container so that we can apply iptables rules.
+			// Set redirect traffic config for the container so that we can apply nft rules.
 			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
 			if err != nil {
 				return corev1.Container{}, err
@@ -285,7 +285,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 					Value: redirectTrafficConfig,
 				})
 
-			// Running consul connect redirect-traffic with iptables
+			// Running consul connect redirect-traffic with nft
 			// requires both being a root user and having NET_ADMIN capability.
 			container.SecurityContext = &corev1.SecurityContext{
 				RunAsUser:  ptr.To(int64(rootUserAndGroupID)),

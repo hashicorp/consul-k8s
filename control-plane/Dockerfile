@@ -57,7 +57,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils libc6-compat nftables
 
 # Create a non-root user to run the software.
 RUN addgroup ${BIN_NAME} && \
@@ -110,7 +110,7 @@ ENV BIN_NAME=${BIN_NAME}
 ENV VERSION=${PRODUCT_VERSION}
 
 # Add --upgrade to ensure the latest security patches for iputils are applied
-RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ iptables
+RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils gcompat libc6-compat libstdc++ nftables
 
 # for FIPS CGO glibc compatibility in alpine
 # see https://github.com/golang/go/issues/59305
@@ -183,7 +183,7 @@ ARG TARGETARCH
 COPY LICENSE /licenses/mozilla.txt
 
 RUN microdnf update -y && \
-    microdnf install -y ca-certificates libcap openssl shadow-utils iptables && \
+    microdnf install -y ca-certificates libcap openssl shadow-utils nftables && \
     microdnf clean all
 
 # Create a non-root user to run the software. On OpenShift, this

@@ -201,7 +201,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 				// cross-partition per-port configuration. Without this ordering, the
 				// proxy may receive an incomplete initial snapshot (missing some port
 				// VIPs/clusters) that never self-corrects — particularly in
-				// ACLs-disabled (default-allow) mode or with CNI where iptables are
+				// ACLs-disabled (default-allow) mode or with CNI where nftables rules are
 				// configured before consul-dataplane starts.
 				consulDefaultQueryOpts := &api.QueryOptions{Partition: defaultPartition, Namespace: "default"}
 				retry.Run(t, func(r *retry.R) {
@@ -255,7 +255,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 
 				// Deploy the client.
 				// CNI + tproxy requires explicit upstream annotations because with
-				// CNI, iptables are set up by the DaemonSet at pod-creation time,
+				// CNI, nftables rules are set up by the DaemonSet at pod-creation time,
 				// before consul-dataplane starts. The initial xDS snapshot therefore
 				// may not include the cross-partition per-port VIP filter chains,
 				// leaving the outbound listener unable to route traffic to 240.0.0.x

@@ -134,13 +134,13 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 
 	iptablesConfigJson, err := json.Marshal(&cfg)
 	if err != nil {
-		return "", fmt.Errorf("could not marshal iptables config: %w", err)
+		return "", fmt.Errorf("could not marshal traffic redirection config: %w", err)
 	}
 
 	return string(iptablesConfigJson), nil
 }
 
-// addRedirectTrafficConfigAnnotation add the created iptables JSON config as an annotation on the provided pod.
+// addRedirectTrafficConfigAnnotation add the created traffic redirection JSON config as an annotation on the provided pod.
 func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
 	iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
 	if err != nil {

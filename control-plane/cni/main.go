@@ -53,7 +53,7 @@ const (
 	complete = "complete"
 
 	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
-	// iptables rules.
+	// nft traffic redirection rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
 	// annotationDualStack stores if pod need to run in dualstack mode
@@ -63,7 +63,7 @@ const (
 type Command struct {
 	// client is a kubernetes client
 	client kubernetes.Interface
-	// iptablesProvider is the Provider that will apply iptables rules. Used for testing.
+	// iptablesProvider is the Provider that will apply nft rules. Used for testing.
 	iptablesProvider iptables.Provider
 }
 
@@ -79,7 +79,7 @@ type CNIArgs struct {
 	// K8S_POD_INFRA_CONTAINER_ID is the runtime container ID that the pod runs under.
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
 
-	// CONSUL_IPTABLES_CONFIG is the runtime iptables configuration passed by
+	// CONSUL_IPTABLES_CONFIG is the runtime traffic redirection configuration passed by
 	// orchestrator (ex. the Nomad client agent)
 	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
@@ -215,7 +215,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 			logger.Info("unable to update %s pod annotation to waiting", keyTransparentProxyStatus)
 		}
 
-		// Parse the cni-proxy-config annotation into an iptables.Config object.
+		// Parse the cni-proxy-config annotation into a traffic redirection Config object.
 		iptablesCfg, err = parseAnnotation(*pod, annotationRedirectTraffic)
 		if err != nil {
 			return err
@@ -230,15 +230,15 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	iptablesCfg.NetNS = args.Netns
 
 	// Set the provider to a fake provider in testing, otherwise use the default
-	// iptables.Provider
+	// nft Provider
 	if c.iptablesProvider != nil {
 		iptablesCfg.IptablesProvider = c.iptablesProvider
 	}
 
-	// Apply the iptables rules.
+	// Apply the nft rules.
 	err = iptables.Setup(iptablesCfg, dualStack)
 	if err != nil {
-		return fmt.Errorf("could not apply iptables setup: %v", err)
+		return fmt.Errorf("could not apply nftables rules: %v", err)
 	}
 
 	if cniArgsIPTablesCfg == "" {
