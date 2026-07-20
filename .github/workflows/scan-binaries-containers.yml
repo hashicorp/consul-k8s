@@ -63,6 +63,11 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
     secrets: inherit
+    with:
+      # This workflow may be triggered by a push to an unprotected feature branch
+      # (for pre-merge testing). Pass the flag through so build.yml's
+      # conditional-skip guard doesn't reject the run.
+      allow-unprotected-branches: true
 
   # 2. Resolve the Go toolchain version the scanner uses for go_modules analysis.
   get-go-version:
