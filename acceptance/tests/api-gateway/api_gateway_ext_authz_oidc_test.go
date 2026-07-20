@@ -86,6 +86,14 @@ func TestAPIGateway_ExtAuthz_OIDC(t *testing.T) {
 	require.NoError(t, err)
 
 	fixturePath := "../fixtures/cases/api-gateways/ext-authz-oidc"
+	staticClientFixture := "../fixtures/bases/static-client"
+	if cfg.EnableOpenshift {
+		if cfg.EnableCNI {
+			staticClientFixture = "../fixtures/cases/static-client-openshift-inject-cni"
+		} else {
+			staticClientFixture = "../fixtures/cases/static-client-openshift-inject"
+		}
+	}
 
 	logger.Log(t, "creating oidc ext-authz api-gateway resources")
 	out, err := k8s.RunKubectlAndGetOutputE(t, k8sOptions, "apply", "-k", fixturePath)
@@ -97,7 +105,7 @@ func TestAPIGateway_ExtAuthz_OIDC(t *testing.T) {
 	// The test client (static-client) is used to mint an OIDC token from Dex and
 	// to drive requests through the gateway from inside the cluster.
 	logger.Log(t, "creating static-client pod")
-	k8s.DeployKustomize(t, k8sOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, "../fixtures/bases/static-client")
+	k8s.DeployKustomize(t, k8sOptions, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory, staticClientFixture)
 
 	// Wait for all backing workloads to be ready.
 	for _, deployment := range []string{"static-server", "dex", "oauth2-proxy", StaticClientName} {
