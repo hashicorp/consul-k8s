@@ -175,11 +175,9 @@ jobs:
       matrix:
         artifact: ${{ fromJSON(needs.discover-artifacts.outputs.binaries) }}
     steps:
-      # The security-scanner action requires a git repository to be present at
-      # the workspace root before it runs (it always initialises a git context
-      # even for binary scans).  Without this checkout the workspace contains
-      # only the unpacked binary and the scanner exits with
-      # "repository does not exist".
+      # Checkout gives the workspace a .git directory. The security-scanner
+      # action requires repository: to point at a valid git repo -- passing
+      # a plain subdirectory (scan-target/) causes "repository does not exist".
       - name: Checkout
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
@@ -222,7 +220,11 @@ jobs:
         id: scan
         uses: ./security-scanner
         with:
-          repository: "${{ github.workspace }}/scan-target"
+          # repository: must be a git repo root -- the workspace root satisfies
+          # this after the Checkout step above.  The inline binary{} config block
+          # tells the scanner to analyse the binary in scan-target/, not the repo
+          # source tree, so the value here is NOT the scan-target subdirectory.
+          repository: "${{ github.workspace }}"
           # Keep in sync with the `binary` block in .release/security-scan.hcl,
           # the config CRT uses to scan release binaries.
           config: |
@@ -267,10 +269,8 @@ jobs:
       matrix:
         artifact: ${{ fromJSON(needs.discover-artifacts.outputs.images) }}
     steps:
-      # The security-scanner action requires a git repository to be present at
-      # the workspace root before it runs.  Without this checkout the workspace
-      # contains only the image tarball and the scanner exits with
-      # "repository does not exist".
+      # Checkout gives the workspace a .git directory so repository: "$PWD"
+      # below resolves to a valid git repo root.
       - name: Checkout
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
