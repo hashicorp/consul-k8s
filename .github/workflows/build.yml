@@ -26,7 +26,11 @@ jobs:
     with:
       # Allow manual runs (workflow_dispatch) on any branch, including unprotected
       # ones, without failing the conditional-skip guard.
-      allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' }}
+      # Also allow workflow_call: when build.yml is called as a reusable workflow
+      # (e.g. from scan-binaries-containers.yml triggered by a push to a feature
+      # branch), github.event_name is 'workflow_call' rather than 'workflow_dispatch',
+      # so we must permit that here too.
+      allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' }}
 
   get-go-version:
     # Cascades down to test jobs

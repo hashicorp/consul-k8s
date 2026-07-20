@@ -32,6 +32,10 @@ name: Scan Binaries and Containers
 
 on:
   workflow_dispatch:
+  # Temporary push trigger for pre-merge testing on unprotected branches.
+  # Remove this before or after merging to main -- workflow_dispatch is the
+  # intended long-term trigger (and the only one that works once the file is on
+  # the default branch).
   push:
     branches:
       - shashank/scan-containers
