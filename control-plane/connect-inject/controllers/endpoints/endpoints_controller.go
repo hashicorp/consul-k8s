@@ -534,6 +534,25 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 			}
 		}
 	}
+
+	// If this pod is an AI agent, fetch the MCP config ConfigMap, parse it into
+	// an api.AgentServiceAI struct, and attach it to the service registration so
+	// Consul receives the full ai {} block.
+	var serviceAI *api.AgentServiceAI
+	if pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole {
+		if cmName := pod.Annotations[constants.AnnotationAIAgentMCPConfig]; cmName != "" {
+			var cm corev1.ConfigMap
+			if err := r.Client.Get(r.Context, types.NamespacedName{Name: cmName, Namespace: pod.Namespace}, &cm); err != nil {
+				return nil, nil, fmt.Errorf("fetching ai-agent mcp configmap %q: %w", cmName, err)
+			}
+			aiConfig, err := aiConfigFromConfigMap(cm)
+			if err != nil {
+				return nil, nil, fmt.Errorf("parsing ai-agent mcp configmap %q: %w", cmName, err)
+			}
+			serviceAI = aiConfig
+		}
+	}
+
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
@@ -552,6 +571,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		Namespace: consulNS,
 		Tags:      tags,
 		Locality:  locality,
+		AI:        serviceAI,
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),

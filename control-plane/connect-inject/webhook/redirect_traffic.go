@@ -103,6 +103,22 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		}
 	}
 
+	// When the pod is an AI agent, exclude the MCP outbound gateway port, the HITL
+	// approval callback port, and the interceptor port from inbound traffic
+	// redirection so those loopback listeners are not captured by iptables.
+	// Also exclude the MCP outbound port from outbound redirection so the
+	// mcp-gateway container can dial MCP tool servers without re-interception.
+	if isAIAgent(pod) {
+		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
+			strconv.Itoa(constants.DefaultAIMCPOutboundPort),
+			strconv.Itoa(constants.DefaultAIHITLPort),
+			strconv.Itoa(constants.DefaultAIInterceptorPort),
+		)
+		cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts,
+			strconv.Itoa(constants.DefaultAIMCPOutboundPort),
+		)
+	}
+
 	// Inbound ports
 	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeInboundPorts, pod)
 	cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, excludeInboundPorts...)
