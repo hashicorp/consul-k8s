@@ -87,13 +87,22 @@ func TestAPIGateway_ExtAuthz_OIDC_Mesh(t *testing.T) {
 	require.NoError(t, err)
 
 	fixturePath := "../fixtures/cases/api-gateways/ext-authz-oidc-mesh"
-	staticClientFixture := "../fixtures/bases/static-client"
 	if cfg.EnableOpenshift {
-		if cfg.EnableCNI {
-			staticClientFixture = "../fixtures/cases/static-client-openshift-inject-cni"
-		} else {
-			staticClientFixture = "../fixtures/cases/static-client-openshift-inject"
+		baseResources := []string{
+			"gatewayclassconfig.yaml",
+			"gatewayclass.yaml",
+			"gateway.yaml",
+			"dex.yaml",
+			"servicedefaults.yaml",
+			"intention.yaml",
+			"oauth2-proxy.yaml",
+			"httproute.yaml",
 		}
+		staticServerBase := "../fixtures/cases/static-server-openshift"
+		if cfg.EnableCNI {
+			staticServerBase = "../fixtures/cases/static-server-openshift-cni"
+		}
+		fixturePath = namespacedKustomizeOverlay(t, staticServerBase, k8sNamespace, nil, baseResources...)
 	}
 
 	logger.Log(t, "creating within-mesh oidc ext-authz api-gateway resources")
@@ -102,6 +111,16 @@ func TestAPIGateway_ExtAuthz_OIDC_Mesh(t *testing.T) {
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		_, _ = k8s.RunKubectlAndGetOutputE(t, k8sOptions, "delete", "-k", fixturePath)
 	})
+
+	staticClientFixture := "../fixtures/bases/static-client"
+	if cfg.EnableOpenshift && cfg.EnableCNI {
+		staticClientFixture = namespacedKustomizeOverlay(t,
+			"../fixtures/bases/static-client",
+			k8sNamespace,
+			nil,
+			"apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: static-client\nspec:\n  template:\n    metadata:\n      annotations:\n        k8s.v1.cni.cncf.io/networks: '[{ \"name\":\"consul-cni\" }]'\n",
+		)
+	}
 
 	// The test client (static-client) is used to mint an OIDC token from Dex and
 	// to drive requests through the gateway from inside the cluster.
