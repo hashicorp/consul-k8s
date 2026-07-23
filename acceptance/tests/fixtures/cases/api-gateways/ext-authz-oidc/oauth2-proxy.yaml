@@ -1,0 +1,84 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# oauth2-proxy is the HTTP ext_authz backend for the OIDC scenario. The gateway's
+# builtin/ext-authz extension calls its root path for every request:
+#
+#   - 200 (allow)   when the request carries a valid OIDC bearer token
+#                   (Authorization: Bearer <id_token>) issued by Dex. On success
+#                   it emits X-Auth-Request-User / X-Auth-Request-Email which the
+#                   extension copies onto the upstream request and (for
+#                   x-auth-request-email) the downstream response.
+#   - 302 (deny)    when there is no valid token -- oauth2-proxy would normally
+#                   start the browser login redirect. Envoy treats any non-200 as
+#                   a DENY, so the client is blocked.
+#
+# --upstream=static://200 makes the authenticated root path return 200 (Envoy's
+# HTTP ext_authz only treats 200 as OK; oauth2-proxy's /oauth2/auth endpoint
+# returns 202, which Envoy would reject).
+#
+# --skip-jwt-bearer-tokens lets a caller authenticate purely with a bearer token
+# minted from Dex, so the whole flow is testable headlessly (no browser).
+#
+# oauth2-proxy is reached by the gateway via Target.URI (plain HTTP, NOT through
+# the mesh), so it does NOT get a Connect sidecar.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  labels:
+    app: oauth2-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url=http://dex:5556/dex
+            - --client-id=oauth2-proxy
+            - --client-secret=oauth2-proxy-secret
+            # Test-only cookie secret (32 bytes, base64). Regenerate for anything real.
+            - --cookie-secret=yK2qNMigE18uYzCcly4bBSI6MW35ZjhXLYfJuK4gGt0=
+            - --email-domain=*
+            - --http-address=0.0.0.0:4180
+            # Envoy's ext_authz check hits oauth2-proxy's root path. On success
+            # the reverse-proxy returns this static upstream's status (200 =
+            # allow); unauthenticated requests get a 302 redirect to Dex instead.
+            - --upstream=static://200
+            # Accept OIDC bearer tokens from the Dex issuer (headless auth).
+            - --skip-jwt-bearer-tokens=true
+            - --skip-provider-button=true
+            - --reverse-proxy=true
+            # Emit X-Auth-Request-User / X-Auth-Request-Email response headers.
+            - --set-xauthrequest=true
+            - --cookie-secure=false
+          ports:
+            - containerPort: 4180
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 4180
+            initialDelaySeconds: 2
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy
+spec:
+  selector:
+    app: oauth2-proxy
+  ports:
+    - port: 4180
+      targetPort: 4180

@@ -71,6 +71,36 @@ func (t ResourceTranslator) ToAPIGateway(gateway gwv1beta1.Gateway, resources *R
 			constants.MetaKeyKubeName: gateway.Name,
 		}),
 		Listeners: listeners,
+		ExtAuthz:  gatewayExtAuthz(gateway.Annotations),
+	}
+}
+
+// gatewayExtAuthz translates the gateway-wide ext_authz annotation into the
+// Consul APIGateway ExtAuthz toggle. When the annotation is absent (or any
+// unrecognized value) it returns nil, which Consul treats as "enabled by
+// default".
+func gatewayExtAuthz(annotations map[string]string) *api.APIGatewayExtAuthz {
+	switch annotations[AnnotationExtAuthz] {
+	case ExtAuthzDisabledValue:
+		return &api.APIGatewayExtAuthz{Enabled: false}
+	case ExtAuthzEnabledValue:
+		return &api.APIGatewayExtAuthz{Enabled: true}
+	default:
+		return nil
+	}
+}
+
+// routeExtAuthzFromAnnotations translates the per-route ext_authz annotation
+// into the Consul http-route ExtAuthz filter. Returns nil when the annotation
+// is absent or unrecognized.
+func routeExtAuthzFromAnnotations(annotations map[string]string) *api.HTTPRouteExtAuthzFilter {
+	switch annotations[AnnotationExtAuthz] {
+	case ExtAuthzEnabledValue:
+		return &api.HTTPRouteExtAuthzFilter{Enabled: true}
+	case ExtAuthzDisabledValue:
+		return &api.HTTPRouteExtAuthzFilter{Enabled: false}
+	default:
+		return nil
 	}
 }
 
@@ -180,6 +210,19 @@ func (t ResourceTranslator) translateRouteJWTFilter(routeJWTFilter *v1alpha1.Rou
 	}
 }
 
+// translateRouteExtAuthzFilter translates the ext_authz portion of a
+// RouteAuthFilter into the Consul http-route ExtAuthz filter. Returns nil when
+// the RouteAuthFilter does not configure ext_authz.
+func (t ResourceTranslator) translateRouteExtAuthzFilter(routeAuthFilter *v1alpha1.RouteAuthFilter) *api.HTTPRouteExtAuthzFilter {
+	if routeAuthFilter.Spec.ExtAuthz == nil {
+		return nil
+	}
+
+	return &api.HTTPRouteExtAuthzFilter{
+		Enabled: routeAuthFilter.Spec.ExtAuthz.Enabled,
+	}
+}
+
 func (t ResourceTranslator) translateGatewayPolicy(policy *v1alpha1.CustomGatewayPolicy) (*api.APIGatewayPolicy, *api.APIGatewayPolicy) {
 	if policy == nil {
 		return nil, nil
@@ -274,6 +317,13 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1beta1.HTTPRoute, ru
 
 	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
 	filters, responseFilters := t.translateHTTPFilters(rule.Filters, resources, route.Namespace)
+
+	// A per-rule ExtAuthz filter (from a RouteAuthFilter ExtensionRef) wins. When
+	// no rule-level override is present, fall back to the route-wide ext_authz
+	// annotation so it applies to every rule in the route.
+	if filters.ExtAuthz == nil {
+		filters.ExtAuthz = routeExtAuthzFromAnnotations(route.Annotations)
+	}
 
 	return api.HTTPRouteRule{
 		Filters:         filters,
@@ -381,6 +431,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		requestHeaderFilters  = []api.HTTPHeaderFilter{}
 		responseHeaderFilters = []api.HTTPHeaderFilter{}
 		jwtFilter             *api.JWTFilter
+		extAuthzFilter        *api.HTTPRouteExtAuthzFilter
 	)
 
 	// Convert Gateway API filters to portions of the Consul request and response filters.
@@ -452,7 +503,11 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 			case v1alpha1.RouteTimeoutFilterKind:
 				timeoutFilter = t.translateRouteTimeoutFilter(crdFilter.(*v1alpha1.RouteTimeoutFilter))
 			case v1alpha1.RouteAuthFilterKind:
-				jwtFilter = t.translateRouteJWTFilter(crdFilter.(*v1alpha1.RouteAuthFilter))
+				authFilter := crdFilter.(*v1alpha1.RouteAuthFilter)
+				jwtFilter = t.translateRouteJWTFilter(authFilter)
+				if ea := t.translateRouteExtAuthzFilter(authFilter); ea != nil {
+					extAuthzFilter = ea
+				}
 			}
 		}
 	}
@@ -463,6 +518,7 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1beta1.HTTPRouteFi
 		RetryFilter:   retryFilter,
 		TimeoutFilter: timeoutFilter,
 		JWT:           jwtFilter,
+		ExtAuthz:      extAuthzFilter,
 	}
 
 	responseFilter := api.HTTPResponseFilters{
