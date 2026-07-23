@@ -27,6 +27,13 @@ RUN mkdir /build && cd /build && \
     go get golang.org/x/crypto@v0.52.0 golang.org/x/net@v0.55.0 google.golang.org/grpc@v1.81.1 && \
     CGO_ENABLED=0 GOFLAGS=-mod=mod go build -o /go/bin/discover github.com/hashicorp/go-discover/cmd/discover
 
+# discover-prebuilt provides the discover binary when it has been pre-built on
+# the host (e.g. for memory-constrained local dev builds on Apple Silicon).
+# The binary must be placed at bin/discover in the Docker build context before
+# invoking `docker buildx build --target=dev`.
+FROM alpine:3.24 AS discover-prebuilt
+COPY bin/discover /go/bin/discover
+
 # dev copies the binary from a local build
 # -----------------------------------
 # BIN_NAME is a requirement in the hashicorp docker github action 
@@ -63,7 +70,7 @@ RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils 
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
-COPY --from=go-discover /go/bin/discover /bin/
+COPY --from=discover-prebuilt /go/bin/discover /bin/
 COPY pkg/bin/linux_${TARGETARCH}/${BIN_NAME} /bin
 COPY cni/pkg/bin/linux_${TARGETARCH}/${CNI_BIN_NAME} /bin
 
