@@ -104,36 +104,6 @@ func routeExtAuthzFromAnnotations(annotations map[string]string) *api.HTTPRouteE
 		return &api.HTTPRouteExtAuthzFilter{Enabled: false}
 	default:
 		return nil
-		ExtAuthz:  gatewayExtAuthz(gateway.Annotations),
-	}
-}
-
-// gatewayExtAuthz translates the gateway-wide ext_authz annotation into the
-// Consul APIGateway ExtAuthz toggle. When the annotation is absent (or any
-// unrecognized value) it returns nil, which Consul treats as "enabled by
-// default".
-func gatewayExtAuthz(annotations map[string]string) *api.APIGatewayExtAuthz {
-	switch annotations[AnnotationExtAuthz] {
-	case ExtAuthzDisabledValue:
-		return &api.APIGatewayExtAuthz{Enabled: false}
-	case ExtAuthzEnabledValue:
-		return &api.APIGatewayExtAuthz{Enabled: true}
-	default:
-		return nil
-	}
-}
-
-// routeExtAuthzFromAnnotations translates the per-route ext_authz annotation
-// into the Consul http-route ExtAuthz filter. Returns nil when the annotation
-// is absent or unrecognized.
-func routeExtAuthzFromAnnotations(annotations map[string]string) *api.HTTPRouteExtAuthzFilter {
-	switch annotations[AnnotationExtAuthz] {
-	case ExtAuthzEnabledValue:
-		return &api.HTTPRouteExtAuthzFilter{Enabled: true}
-	case ExtAuthzDisabledValue:
-		return &api.HTTPRouteExtAuthzFilter{Enabled: false}
-	default:
-		return nil
 	}
 }
 
