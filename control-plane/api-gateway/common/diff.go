@@ -242,7 +242,12 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		slices.EqualFunc(a.Services, b.Services, e.httpServicesEqual) &&
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
-		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual)
+		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual) &&
+		bothNilOrEqualFunc(a.Filters.ExtAuthz, b.Filters.ExtAuthz, extAuthzFiltersEqual)
+}
+
+func extAuthzFiltersEqual(a, b api.HTTPRouteExtAuthzFilter) bool {
+	return a.Enabled == b.Enabled
 }
 
 func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {

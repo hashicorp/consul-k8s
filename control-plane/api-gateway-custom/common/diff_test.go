@@ -2153,3 +2153,84 @@ func TestEntriesEqual(t *testing.T) {
 		})
 	}
 }
+
+// TestEntriesEqual_HTTPRoute_ExtAuthz exercises the bug-fix path: changes to
+// Filters.ExtAuthz on an HTTPRouteConfigEntry rule must be detected as unequal
+// so the reconciler writes the updated config entry to Consul.
+func TestEntriesEqual_HTTPRoute_ExtAuthz(t *testing.T) {
+	t.Parallel()
+
+	baseRule := func(extAuthz *api.HTTPRouteExtAuthzFilter) api.HTTPRouteRule {
+		return api.HTTPRouteRule{
+			Matches: []api.HTTPMatch{
+				{Path: api.HTTPPathMatch{Match: api.HTTPPathMatchPrefix, Value: "/"}},
+			},
+			Services: []api.HTTPService{{Name: "echo", Namespace: "default", Weight: 1}},
+			Filters:  api.HTTPFilters{ExtAuthz: extAuthz},
+		}
+	}
+
+	enabled := &api.HTTPRouteExtAuthzFilter{Enabled: true}
+	disabled := &api.HTTPRouteExtAuthzFilter{Enabled: false}
+
+	makeEntry := func(extAuthz *api.HTTPRouteExtAuthzFilter) *api.HTTPRouteConfigEntry {
+		return &api.HTTPRouteConfigEntry{
+			Kind:      api.HTTPRoute,
+			Name:      "test-route",
+			Namespace: "default",
+			Partition: "default",
+			Rules:     []api.HTTPRouteRule{baseRule(extAuthz)},
+		}
+	}
+
+	testCases := map[string]struct {
+		a, b           *api.HTTPRouteConfigEntry
+		expectedResult bool
+	}{
+		"both nil ExtAuthz are equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(nil),
+			expectedResult: true,
+		},
+		"both enabled are equal": {
+			a:              makeEntry(enabled),
+			b:              makeEntry(enabled),
+			expectedResult: true,
+		},
+		"both disabled are equal": {
+			a:              makeEntry(disabled),
+			b:              makeEntry(disabled),
+			expectedResult: true,
+		},
+		// This was the regression: toggling enabled→disabled was not detected.
+		"enabled vs disabled are NOT equal": {
+			a:              makeEntry(enabled),
+			b:              makeEntry(disabled),
+			expectedResult: false,
+		},
+		"disabled vs enabled are NOT equal": {
+			a:              makeEntry(disabled),
+			b:              makeEntry(enabled),
+			expectedResult: false,
+		},
+		// nil ExtAuthz (inherit gateway default) vs explicit override are NOT equal.
+		"nil vs enabled are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(enabled),
+			expectedResult: false,
+		},
+		"nil vs disabled are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(disabled),
+			expectedResult: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}
