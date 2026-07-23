@@ -63,7 +63,7 @@ RUN apk add --no-cache --upgrade ca-certificates libcap openssl su-exec iputils 
 RUN addgroup ${BIN_NAME} && \
     adduser -S -G ${BIN_NAME} 100
 
-COPY --from=discover-prebuilt /go/bin/discover /bin/
+COPY --from=go-discover /go/bin/discover /bin/
 COPY pkg/bin/linux_${TARGETARCH}/${BIN_NAME} /bin
 COPY cni/pkg/bin/linux_${TARGETARCH}/${CNI_BIN_NAME} /bin
 
