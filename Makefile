@@ -48,15 +48,9 @@ dev-docker: control-plane-dev-docker ## build dev local dev docker image
 .PHONY: control-plane-dev-docker
 control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
-	@mkdir -p $(CURDIR)/control-plane/bin
-	@cd $(CURDIR)/control-plane && \
-	   CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) go build \
-	   -o $(CURDIR)/control-plane/bin/discover \
-	   github.com/hashicorp/go-discover/cmd/discover
 	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
 	   --no-cache \
-	   --load \
-	      --target=dev \
+	   --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
