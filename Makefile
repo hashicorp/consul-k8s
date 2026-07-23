@@ -50,6 +50,7 @@ control-plane-dev-docker: ## Build consul-k8s-control-plane dev Docker image.
 	@$(SHELL) $(CURDIR)/control-plane/build-support/scripts/build-local.sh --os linux --arch $(GOARCH)
 	@docker buildx build --debug --platform $(GOOS)/$(GOARCH) -t '$(DEV_IMAGE)' \
 	   --no-cache \
+	   --target=dev \
        --build-arg 'GOLANG_VERSION=$(GOLANG_VERSION)' \
        --build-arg 'TARGETARCH=$(GOARCH)' \
        --build-arg 'GIT_COMMIT=$(GIT_COMMIT)' \
