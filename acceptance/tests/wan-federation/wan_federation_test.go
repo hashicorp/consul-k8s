@@ -215,6 +215,12 @@ func TestWANFederation(t *testing.T) {
 	dc1-static-client -- failover --> dc1-static-server in namespace ns2
 */
 func TestWANFederationFailover(t *testing.T) {
+	cfg := suite.Config()
+
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	cases := []struct {
 		name   string
 		secure bool
