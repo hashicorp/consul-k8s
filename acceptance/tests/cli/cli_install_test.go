@@ -24,6 +24,12 @@ const ipv4RegEx = "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]
 // TestInstall tests that we can install consul service mesh with the CLI
 // and see that services can connect.
 func TestInstall(t *testing.T) {
+
+	cfg := suite.Config()
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	cases := map[string]struct {
 		secure bool
 	}{
