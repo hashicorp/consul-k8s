@@ -52,9 +52,6 @@ jobs:
           - check-name: acceptance-ce
           - check-name: acceptance-ce-cni
           - check-name: acceptance-ce-tproxy
-          # Required patch-coverage gate. When CI is skipped there is no diff
-          # to evaluate, so mark it success to keep skip-CI PRs mergeable.
-          - check-name: coverage / coverage-gate
     steps:
     - name: Update final status
       uses: docker://ghcr.io/curtbushko/commit-status-action:e1d661c757934ab35c74210b4b70c44099ec747a
