@@ -658,6 +658,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		Tags:      tags,
 		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
 		Locality: locality,
+		AI:       serviceAI,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.

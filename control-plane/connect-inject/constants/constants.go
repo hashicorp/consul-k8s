@@ -108,8 +108,12 @@ const (
 	DefaultAIInterceptorPort = 21101
 
 	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the
-	// consul-k8s image, used as the -gateway-binary argument.
+	// consul-mcp-gateway image, used as the -gateway-binary argument.
 	DefaultGatewayBinary = "/app/consul-mcp-gateway"
+	// ConsulBinarypath is the path to the consulbinary inside the
+	// consul-mcp-gateway image.
+	ConsulBinarypath = "/app/consul"
+
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

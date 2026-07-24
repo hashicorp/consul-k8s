@@ -107,6 +107,7 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 				ReadOnly:  true,
 			},
 		},
+		Command: []string{constants.ConsulBinarypath},
 		Args: []string{
 		"connect",
 		"mcp-gateway",
