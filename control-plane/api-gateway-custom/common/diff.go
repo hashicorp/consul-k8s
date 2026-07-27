@@ -261,6 +261,12 @@ func (e entryComparator) httpPathMatchesEqual(a, b api.HTTPPathMatch) bool {
 	return a.Match == b.Match && a.Value == b.Value
 }
 
+func (e entryComparator) extProcFiltersEqual(a, b api.ExtProcFilter) bool {
+	return a.StatPrefix == b.StatPrefix &&
+		a.Mode == b.Mode &&
+		bothNilOrEqualFunc(a.Overrides, b.Overrides, e.extProcOverridesEqual)
+}
+
 func (e entryComparator) httpHeaderMatchesEqual(a, b api.HTTPHeaderMatch) bool {
 	return a.Match == b.Match && a.Name == b.Name && a.Value == b.Value
 }
