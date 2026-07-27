@@ -267,6 +267,22 @@ func (e entryComparator) extProcFiltersEqual(a, b api.ExtProcFilter) bool {
 		bothNilOrEqualFunc(a.Overrides, b.Overrides, e.extProcOverridesEqual)
 }
 
+func (e entryComparator) extProcOverridesEqual(a, b api.ExtProcOverrides) bool {
+	return bothNilOrEqualFunc(a.Processing, b.Processing, e.extProcProcessingEqual)
+}
+
+func (e entryComparator) extProcProcessingEqual(a, b api.ExtProcProcessing) bool {
+	return bothNilOrEqualFunc(a.Request, b.Request, e.extProcProcessingDirectionEqual) &&
+		bothNilOrEqualFunc(a.Response, b.Response, e.extProcProcessingDirectionEqual)
+}
+
+func (e entryComparator) extProcProcessingDirectionEqual(a, b api.ExtProcProcessingDirection) bool {
+	return a.HeadersMode == b.HeadersMode &&
+		a.BodyMode == b.BodyMode &&
+		a.TrailersMode == b.TrailersMode &&
+		a.MaxBodyBytes == b.MaxBodyBytes
+}
+
 func (e entryComparator) httpHeaderMatchesEqual(a, b api.HTTPHeaderMatch) bool {
 	return a.Match == b.Match && a.Name == b.Name && a.Value == b.Value
 }
