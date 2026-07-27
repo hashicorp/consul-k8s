@@ -24,6 +24,12 @@ import (
 
 // TestConnectInject tests that Connect works in a default and a secure installation using Helm CLI.
 func TestConnectInject(t *testing.T) {
+
+	cfg := suite.Config()
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+
 	cases := map[string]struct {
 		secure bool
 	}{
