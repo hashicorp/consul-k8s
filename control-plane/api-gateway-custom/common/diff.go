@@ -232,6 +232,7 @@ func (e entryComparator) httpRouteRulesEqual(a, b api.HTTPRouteRule) bool {
 		bothNilOrEqualFunc(a.Filters.RetryFilter, b.Filters.RetryFilter, e.retryFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.TimeoutFilter, b.Filters.TimeoutFilter, e.timeoutFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.JWT, b.Filters.JWT, e.jwtFiltersEqual) &&
+		slices.EqualFunc(a.Filters.ExtProc, b.Filters.ExtProc, e.extProcFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.ExtAuthz, b.Filters.ExtAuthz, extAuthzFiltersEqual)
 }
 
