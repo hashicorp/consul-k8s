@@ -64,6 +64,9 @@ jobs:
           - check-name: acceptance
           - check-name: acceptance-cni
           - check-name: acceptance-tproxy
+          - check-name: acceptance-ce
+          - check-name: acceptance-ce-cni
+          - check-name: acceptance-ce-tproxy
           # Required patch-coverage gate. When CI is skipped there is no diff
           # to evaluate, so mark it success to keep skip-CI PRs mergeable.
           - check-name: coverage / coverage-gate
