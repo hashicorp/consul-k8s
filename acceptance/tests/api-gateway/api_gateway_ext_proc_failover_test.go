@@ -4,10 +4,12 @@
 package apigateway
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -212,9 +214,20 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 
 	logger.Log(t, "waiting for both clusters to start up")
 	wg.Wait()
+	logger.Log(t, "both clusters are up")
 
+	logger.Log(t, "setting up Consul API clients")
 	serverClient, _ := serverCluster.SetupConsulClient(t, false)
 	clientClient, _ := clientCluster.SetupConsulClient(t, false)
+
+	// Wait for the Consul HTTP API to be ready on both clusters before making
+	// any API calls. The port-forward tunnel may succeed before the Consul
+	// agent is actually accepting HTTP connections, causing immediate
+	// "connection refused" errors that drain the subsequent retry timers.
+	logger.Log(t, "waiting for Consul API to be ready on both clusters (agent.Self)")
+	waitForConsulAPIReady(t, serverClient, "dc1")
+	waitForConsulAPIReady(t, clientClient, "dc2")
+	logger.Log(t, "Consul API ready on both clusters")
 
 	serverOpts := extProcKubectlOptions(t, serverCtx)
 	clientOpts := extProcKubectlOptions(t, clientCtx)
@@ -230,7 +243,8 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	})
 
 	// Wait for the Mesh config entries to land in Consul on both clusters.
-	timer := &retry.Timer{Timeout: 2 * time.Minute, Wait: 1 * time.Second}
+	logger.Log(t, "waiting for Mesh config entries to propagate on both clusters")
+	timer := &retry.Timer{Timeout: 3 * time.Minute, Wait: 3 * time.Second}
 	retry.RunWith(timer, t, func(r *retry.R) {
 		for _, c := range []*api.Client{serverClient, clientClient} {
 			entry, _, err := c.ConfigEntries().Get(api.MeshConfig, "mesh", nil)
@@ -240,6 +254,7 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 			require.Equal(r, "mesh", mesh.GetName())
 		}
 	})
+	logger.Log(t, "Mesh config entries present on both clusters")
 
 	// Establish peering: acceptor on the client cluster, dialer on the server
 	// cluster, copying the generated token secret between them.
@@ -259,12 +274,15 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	})
 
 	// Wait for the peering to become ACTIVE on both sides.
+	logger.Log(t, "waiting for cluster peering to become ACTIVE")
 	retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 		peering, _, err := serverClient.Peerings().Read(context.Background(), extProcClientPeer, nil)
 		require.NoError(r, err)
 		require.NotNil(r, peering)
+		logger.Logf(t, "peering %q state: %s", extProcClientPeer, peering.State)
 		require.Equal(r, api.PeeringStateActive, peering.State)
 	})
+	logger.Log(t, "cluster peering is ACTIVE")
 
 	// Route mesh traffic through the mesh gateways on both clusters.
 	logger.Log(t, "creating mesh-gateway proxy-defaults")
@@ -283,33 +301,49 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 
 	// Deploy the ext-proc stack (common + single + two) + a static-client into
 	// BOTH clusters.
-	logger.Log(t, "deploying ext-proc stack (common + single + two) into both clusters")
+	logger.Log(t, "deploying ext-proc stack into server cluster (dc1)")
 	deployExtProcStack(t, serverOpts)
+	logger.Log(t, "deploying ext-proc stack into client cluster (dc2)")
 	deployExtProcStack(t, clientOpts)
+	logger.Log(t, "ext-proc stack applied to both clusters")
 
 	// Wait for all workloads to be Ready in both clusters.
 	for _, opts := range []*terratestk8s.KubectlOptions{serverOpts, clientOpts} {
+		logger.Logf(t, "waiting for workloads to be ready in cluster %s", opts.ContextName)
 		for _, deployment := range extProcDeployments {
+			logger.Logf(t, "  waiting for deploy/%s in %s", deployment, opts.ContextName)
 			k8s.RunKubectl(t, opts, "wait", "--for=condition=available", "--timeout=5m", "deploy/"+deployment)
+			logger.Logf(t, "  deploy/%s is available in %s", deployment, opts.ContextName)
 		}
 	}
+	logger.Log(t, "all workloads ready in both clusters")
 
 	// Export services and wire cross-cluster failover on both clusters. The peer
 	// name differs per cluster (server->client, client->server).
-	logger.Log(t, "wiring cross-cluster failover on both clusters")
+	logger.Logf(t, "wiring cross-cluster failover: server cluster -> peer %q", extProcClientPeer)
 	applyExtProcFailover(t, serverClient, extProcClientPeer)
+	logger.Logf(t, "wiring cross-cluster failover: client cluster -> peer %q", extProcServerPeer)
 	applyExtProcFailover(t, clientClient, extProcServerPeer)
+	logger.Log(t, "failover config applied to both clusters")
 
 	// Wait for the gateway backends to register in each cluster's catalog.
+	logger.Log(t, "waiting for service-a and service-d1 to register in both cluster catalogs")
 	for _, c := range []*api.Client{serverClient, clientClient} {
 		waitForConsulServiceRegistered(t, c, "service-a")
 		waitForConsulServiceRegistered(t, c, "service-d1")
 	}
+	logger.Log(t, "services registered in both cluster catalogs")
 
 	// Resolve each gateway's address once it is Accepted.
+	logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcSingleGateway)
 	serverSingleURL := extProcGatewayURL(t, serverCtx, extProcSingleGateway)
+	logger.Logf(t, "server single gateway URL: %s", serverSingleURL)
+	logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcTwoGateway)
 	serverTwoURL := extProcGatewayURL(t, serverCtx, extProcTwoGateway)
+	logger.Logf(t, "server two gateway URL: %s", serverTwoURL)
+	logger.Logf(t, "waiting for gateway %q to be Accepted in client cluster", extProcTwoGateway)
 	clientTwoURL := extProcGatewayURL(t, clientCtx, extProcTwoGateway)
+	logger.Logf(t, "client two gateway URL: %s", clientTwoURL)
 
 	// ── SINGLE gateway: positive routing ─────────────────────────────────────
 	t.Run("single/routing", func(t *testing.T) {
@@ -454,6 +488,12 @@ func buildAndLoadExtProcImages(t *testing.T, contexts ...environment.TestContext
 	_, thisFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "runtime.Caller failed")
 	appsDir := filepath.Join(filepath.Dir(thisFile), extProcAppsPath)
+	logger.Logf(t, "ext-proc apps directory: %s", appsDir)
+
+	// Verify the apps directory exists before attempting any builds.
+	if _, statErr := os.Stat(appsDir); statErr != nil {
+		t.Fatalf("ext-proc apps directory not found at %q: %v", appsDir, statErr)
+	}
 
 	// Derive the kind cluster name from each context's kubectl context name.
 	// kind always names contexts "kind-<clustername>".
@@ -465,20 +505,63 @@ func buildAndLoadExtProcImages(t *testing.T, contexts ...environment.TestContext
 			t.Fatalf("cannot derive kind cluster name from context %q; expected 'kind-<name>'", contextName)
 		}
 		clusterNames = append(clusterNames, clusterName)
+		logger.Logf(t, "will load images into kind cluster %q (context %q)", clusterName, contextName)
 	}
 
-	for _, img := range extProcImages {
+	for i, img := range extProcImages {
 		buildCtx := filepath.Join(appsDir, img.dir)
-		logger.Logf(t, "building image %s from %s", img.tag, buildCtx)
-		out, err := exec.Command("docker", "build", "-t", img.tag, buildCtx).CombinedOutput()
-		require.NoErrorf(t, err, "docker build %s failed:\n%s", img.tag, out)
+
+		// Verify the Dockerfile exists before invoking docker.
+		if _, statErr := os.Stat(filepath.Join(buildCtx, "Dockerfile")); statErr != nil {
+			t.Fatalf("[%d/%d] Dockerfile not found for %s at %q: %v",
+				i+1, len(extProcImages), img.tag, buildCtx, statErr)
+		}
+
+		logger.Logf(t, "[%d/%d] docker build -t %s %s", i+1, len(extProcImages), img.tag, buildCtx)
+		buildCmd := exec.Command("docker", "build", "-t", img.tag, buildCtx)
+		var buildOut bytes.Buffer
+		buildCmd.Stdout = &buildOut
+		buildCmd.Stderr = &buildOut
+		buildErr := buildCmd.Run()
+		// Always print build output so failures are diagnosable in CI logs.
+		logger.Logf(t, "docker build output for %s:\n%s", img.tag, buildOut.String())
+		if buildErr != nil {
+			t.Fatalf("[%d/%d] docker build %s failed (%v):\n%s",
+				i+1, len(extProcImages), img.tag, buildErr, buildOut.String())
+		}
+		logger.Logf(t, "[%d/%d] docker build %s succeeded", i+1, len(extProcImages), img.tag)
 
 		for _, cluster := range clusterNames {
-			logger.Logf(t, "kind load %s -> cluster %s", img.tag, cluster)
-			out, err = exec.Command("kind", "load", "docker-image", img.tag, "--name", cluster).CombinedOutput()
-			require.NoErrorf(t, err, "kind load %s into %s failed:\n%s", img.tag, cluster, out)
+			logger.Logf(t, "[%d/%d] kind load docker-image %s --name %s",
+				i+1, len(extProcImages), img.tag, cluster)
+			loadCmd := exec.Command("kind", "load", "docker-image", img.tag, "--name", cluster)
+			var loadOut bytes.Buffer
+			loadCmd.Stdout = &loadOut
+			loadCmd.Stderr = &loadOut
+			loadErr := loadCmd.Run()
+			logger.Logf(t, "kind load output for %s -> %s:\n%s", img.tag, cluster, loadOut.String())
+			if loadErr != nil {
+				t.Fatalf("[%d/%d] kind load %s into cluster %s failed (%v):\n%s",
+					i+1, len(extProcImages), img.tag, cluster, loadErr, loadOut.String())
+			}
+			logger.Logf(t, "[%d/%d] kind load %s -> %s succeeded", i+1, len(extProcImages), img.tag, cluster)
 		}
 	}
+	logger.Logf(t, "all %d images built and loaded into %v", len(extProcImages), clusterNames)
+}
+
+// waitForConsulAPIReady blocks until the Consul agent on the given client
+// responds to agent.Self(). This is called after SetupConsulClient to ensure
+// the port-forward tunnel is fully functional and the Consul HTTP server has
+// finished bootstrapping before any config-entry or peering API calls are made.
+func waitForConsulAPIReady(t *testing.T, client *api.Client, label string) {
+	t.Helper()
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		info, err := client.Agent().Self()
+		require.NoErrorf(r, err, "[%s] Consul agent.Self() not yet ready", label)
+		dc, _ := info["Config"]["Datacenter"].(string)
+		logger.Logf(t, "[%s] Consul API ready, datacenter=%q", label, dc)
+	})
 }
 
 // extProcKubectlOptions returns kubectl options scoped to the "default"
@@ -502,14 +585,18 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 	c := suite.Config()
 	for _, dir := range []string{extProcCommonPath, extProcSinglePath, extProcTwoPath} {
 		dir := dir
+		logger.Logf(t, "[%s] kubectl apply -k %s", opts.ContextName, dir)
 		out, err := k8s.RunKubectlAndGetOutputE(t, opts, "apply", "-k", dir)
-		require.NoError(t, err, out)
+		logger.Logf(t, "[%s] apply -k %s output:\n%s", opts.ContextName, dir, out)
+		require.NoErrorf(t, err, "[%s] kubectl apply -k %s failed:\n%s", opts.ContextName, dir, out)
 		helpers.Cleanup(t, c.NoCleanupOnFailure, c.NoCleanup, func() {
 			_, _ = k8s.RunKubectlAndGetOutputE(t, opts, "delete", "-k", dir, "--ignore-not-found=true")
 		})
 	}
 
+	logger.Logf(t, "[%s] deploying static-client", opts.ContextName)
 	k8s.DeployKustomize(t, opts, c.NoCleanupOnFailure, c.NoCleanup, c.DebugDirectory, "../fixtures/bases/static-client")
+	logger.Logf(t, "[%s] static-client deployed", opts.ContextName)
 }
 
 // applyExtProcFailover exports every service to the peer, gives every in-mesh
@@ -521,6 +608,7 @@ func applyExtProcFailover(t *testing.T, consulClient *api.Client, peer string) {
 
 	cfg := suite.Config()
 
+	logger.Logf(t, "[peer=%s] setting ExportedServices default -> *", peer)
 	_, _, err := consulClient.ConfigEntries().Set(&api.ExportedServicesConfigEntry{
 		Name: "default",
 		Services: []api.ExportedService{
@@ -530,13 +618,14 @@ func applyExtProcFailover(t *testing.T, consulClient *api.Client, peer string) {
 			},
 		},
 	}, nil)
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "[peer=%s] failed to set ExportedServices", peer)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		_, _ = consulClient.ConfigEntries().Delete(api.ExportedServices, "default", nil)
 	})
 
 	for _, svc := range extProcFailoverServices {
 		svc := svc
+		logger.Logf(t, "[peer=%s] setting ServiceResolver failover for %s", peer, svc)
 		_, _, err := consulClient.ConfigEntries().Set(&api.ServiceResolverConfigEntry{
 			Kind: api.ServiceResolver,
 			Name: svc,
@@ -546,7 +635,7 @@ func applyExtProcFailover(t *testing.T, consulClient *api.Client, peer string) {
 				},
 			},
 		}, nil)
-		require.NoErrorf(t, err, "failed to set failover resolver for %s", svc)
+		require.NoErrorf(t, err, "[peer=%s] failed to set failover resolver for %s", peer, svc)
 		helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 			_, _ = consulClient.ConfigEntries().Delete(api.ServiceResolver, svc, nil)
 		})
@@ -555,6 +644,7 @@ func applyExtProcFailover(t *testing.T, consulClient *api.Client, peer string) {
 	// Wildcard intention allowing any service imported from the peer to call any
 	// local service (peered failover traffic carries the original caller's
 	// identity from the peer datacenter).
+	logger.Logf(t, "[peer=%s] setting wildcard peer intention", peer)
 	_, _, err = consulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
 		Kind: api.ServiceIntentions,
 		Name: "*",
@@ -566,10 +656,11 @@ func applyExtProcFailover(t *testing.T, consulClient *api.Client, peer string) {
 			},
 		},
 	}, nil)
-	require.NoError(t, err)
+	require.NoErrorf(t, err, "[peer=%s] failed to set wildcard peer intention", peer)
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		_, _ = consulClient.ConfigEntries().Delete(api.ServiceIntentions, "*", nil)
 	})
+	logger.Logf(t, "[peer=%s] failover config complete", peer)
 }
 
 // extProcGatewayURL waits for the named gateway to be Accepted in the given
