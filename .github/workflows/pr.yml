@@ -7,6 +7,17 @@ on:
       - main
       - "release/**"
 
+# These permissions are required by the nested coverage-report job inside
+# coverage.yml, which posts a PR comment (pull-requests: write), may update
+# a coverage badge file (contents: write), and uses OIDC publishing
+# (id-token: write). GitHub does not allow a reusable-workflow call job to
+# exceed the permissions granted at the workflow level, so they must be set
+# here rather than on the individual job.
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -29,14 +40,6 @@ jobs:
       - get-go-version
     if: needs.conditional-skip.outputs.skip-ci != 'true'
     uses: ./.github/workflows/coverage.yml
-    # The nested coverage-report job requests contents:write, pull-requests:write
-    # and id-token:write. GitHub requires the *caller* to explicitly grant any
-    # permissions that a reusable workflow's jobs need; the callee cannot exceed
-    # the caller's grant.
-    permissions:
-      contents: write
-      pull-requests: write
-      id-token: write
     with:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       pr-number: ${{ github.event_name == 'pull_request' && toJson(github.event.pull_request.number) || '' }}
