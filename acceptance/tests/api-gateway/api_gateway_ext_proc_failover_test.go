@@ -216,9 +216,67 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	wg.Wait()
 	logger.Log(t, "both clusters are up")
 
-	logger.Log(t, "setting up Consul API clients")
-	serverClient, _ := serverCluster.SetupConsulClient(t, false)
-	clientClient, _ := clientCluster.SetupConsulClient(t, false)
+	// Wait for the connect-injector Deployment to be fully rolled out on both
+	// clusters before touching any Gateway / mesh objects. The injector hosts
+	// the Gateway controller; its leader-election lease is only acquired after
+	// controller-runtime finishes its cache sync, which can take 60-120s after
+	// pod readiness on kind. Applying GatewayClass / mesh objects before the
+	// controller is watching results in objects never being reconciled (they
+	// land between pod-ready and leader-elected, missing the initial list).
+	for _, pair := range []struct {
+		ctx  environment.TestContext
+		name string
+	}{
+		{serverCtx, "dc1"},
+		{clientCtx, "dc2"},
+	} {
+		deploy := releaseName + "-consul-connect-injector"
+		logger.Logf(t, "[%s] waiting for connect-injector rollout: deploy/%s", pair.name, deploy)
+		retry.RunWith(&retry.Timer{Timeout: 5 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+			out, err := k8s.RunKubectlAndGetOutputE(r, pair.ctx.KubectlOptions(t),
+				"rollout", "status", "deploy/"+deploy, "--timeout=10s")
+			if err != nil {
+				logger.Logf(t, "[%s] connect-injector rollout not ready yet: %s", pair.name, out)
+				r.Errorf("[%s] connect-injector rollout status: %v\n%s", pair.name, err, out)
+				return
+			}
+			logger.Logf(t, "[%s] connect-injector rollout: %s", pair.name, strings.TrimSpace(out))
+		})
+		logger.Logf(t, "[%s] connect-injector is fully rolled out", pair.name)
+	}
+
+	// Now that the Gateway controller is running and watching on both clusters,
+	// wait for the connect-injector webhook endpoint to have a ready address so
+	// sidecar injection is available for all subsequent pod creates.
+	for _, pair := range []struct {
+		ctx  environment.TestContext
+		name string
+	}{
+		{serverCtx, "dc1"},
+		{clientCtx, "dc2"},
+	} {
+		epName := releaseName + "-consul-connect-injector"
+		logger.Logf(t, "[%s] waiting for connect-injector webhook endpoint: %s", pair.name, epName)
+		retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+			out, err := k8s.RunKubectlAndGetOutputE(r, pair.ctx.KubectlOptions(t),
+				"get", "endpoints", epName,
+				"-o", "jsonpath={.subsets[0].addresses[0].ip}")
+			if err != nil || strings.TrimSpace(out) == "" {
+				logger.Logf(t, "[%s] injector endpoint not ready yet (ip=%q err=%v)", pair.name, out, err)
+				r.Errorf("[%s] injector endpoint not ready: ip=%q err=%v", pair.name, out, err)
+				return
+			}
+			logger.Logf(t, "[%s] injector endpoint ready at %s", pair.name, strings.TrimSpace(out))
+		})
+	}
+
+	// TLS is enabled in commonHelmValues ("global.tls.enabled": "true"), so
+	// the Consul server only listens on port 8501 (HTTPS). Pass secure=true so
+	// SetupConsulClient uses port 8501 and skips TLS verification for the
+	// local port-forward tunnel.
+	logger.Log(t, "setting up Consul API clients (TLS/secure)")
+	serverClient, _ := serverCluster.SetupConsulClient(t, true)
+	clientClient, _ := clientCluster.SetupConsulClient(t, true)
 
 	// Wait for the Consul HTTP API to be ready on both clusters before making
 	// any API calls. The port-forward tunnel may succeed before the Consul
@@ -293,6 +351,36 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 		k8s.KubectlDeleteK(t, serverCtx.KubectlOptions(t), meshGatewayDir)
 		k8s.KubectlDeleteK(t, clientCtx.KubectlOptions(t), meshGatewayDir)
 	})
+
+	// Wait for the proxy-defaults config entry to land in Consul on both
+	// clusters. The mesh-gateway kustomize writes a ProxyDefaults CRD which
+	// the injector controller syncs to Consul; if it hasn't landed before
+	// Envoy bootstraps it won't use mesh-gateway mode.
+	logger.Log(t, "waiting for proxy-defaults config entry to land on both clusters")
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+		for _, pair := range []struct {
+			c    *api.Client
+			name string
+		}{
+			{serverClient, "dc1"},
+			{clientClient, "dc2"},
+		} {
+			entry, _, err := pair.c.ConfigEntries().Get(api.ProxyDefaults, api.ProxyConfigGlobal, nil)
+			if err != nil {
+				logger.Logf(t, "[%s] proxy-defaults not yet in Consul: %v", pair.name, err)
+				r.Errorf("[%s] proxy-defaults not yet in Consul: %v", pair.name, err)
+				return
+			}
+			pd, ok := entry.(*api.ProxyConfigEntry)
+			if !ok || pd.MeshGateway.Mode == "" {
+				logger.Logf(t, "[%s] proxy-defaults present but MeshGateway.Mode not yet set", pair.name)
+				r.Errorf("[%s] proxy-defaults MeshGateway.Mode not yet set", pair.name)
+				return
+			}
+			logger.Logf(t, "[%s] proxy-defaults MeshGateway.Mode=%s", pair.name, pd.MeshGateway.Mode)
+		}
+	})
+	logger.Log(t, "proxy-defaults config entries present on both clusters")
 
 	// Build the six ext-proc app images from source and load them into both
 	// kind clusters so the image cache is warm before any Deployment is created.
