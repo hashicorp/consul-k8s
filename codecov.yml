@@ -1,0 +1,24 @@
+# Codecov configuration for consul-k8s.
+# Status checks are informational only — they will not block PRs.
+# https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+ignore:
+  # Generated mock files
+  - "control-plane/**/mock_*.go"
+  - "control-plane/**/mocks/**"
+  - "cli/helm/mock.go"
+  # Acceptance / integration tests (not unit-tested in this workflow)
+  - "acceptance/**"
+  # Helm chart templates and generated assets
+  - "charts/**"
+  # Version-only package with no logic to test
+  - "version/**"

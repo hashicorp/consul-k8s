@@ -67,7 +67,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:1.23.0-dev
+  image: docker.mirror.hashicorp.services/hashicorppreview/consul:2.1.0-dev
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -87,7 +87,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:1.10.0-dev
+  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:2.1.0-dev
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -794,11 +794,17 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:1.10.0-dev
+  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev
 
   # Disable this once the manifests are generated and subsequent helm upgrades
   
   generateManifests: false
+
+  # Uses the provided storage class name for the generated manifests - recommended to create SC with volumebinding as Immediate. If not provided, the default storage class will be used.
+  generateManifestsStorageClassName: ""
+
+  # Storage requirement for generateManifests pvc
+  generateManifestsStorage: "1Gi"
 
   # During the install:
   # custom crds and gateway TCP crd enabling
@@ -812,6 +818,11 @@ global:
     enableTcpRoute: true
     consulapi:
       enabled: false
+
+  # Add additional pod-level securityContext for the generate-manifests Job when volume permissions require it.
+  podSecurityContext:
+    enabled: false
+
   # Configuration for running this Helm chart on the Red Hat OpenShift platform.
   # This Helm chart currently supports OpenShift v4.x+.
   openshift:
@@ -2541,18 +2552,18 @@ connectInject:
 
       # DEPRECATED: These values are deprecated and will be removed in a future release.
       # Use Gateway annotations instead for per-gateway scaling configuration.
-      # See: https://developer.hashicorp.com/consul/docs/k8s/api-gateway/scaling
+      # See: [API Gateway Scaling](https://developer.hashicorp.com/consul/docs/north-south/api-gateway/k8s/scale)
       #
-      # For static replica count, use: consul.hashicorp.com/default-replicas: "<N>"
-      # For HPA, use: consul.hashicorp.com/hpa-enabled: "true" with min/max replicas annotations
+      # For static replica count, use: `consul.hashicorp.com/default-replicas: "<N>"`.
+      # For HPA, use: `consul.hashicorp.com/hpa-enabled: "true"` with min/max replicas annotations.
       deployment:
-        # Default number of gateway instances
+        # Default number of gateway instances.
         # DEPRECATED: Use consul.hashicorp.com/default-replicas annotation on Gateway resource
         defaultInstances: 1
-        # Maximum number of gateway instances
+        # Maximum number of gateway instances.
         # DEPRECATED: No longer enforced. Use HPA maxReplicas via annotations instead
         maxInstances: 1
-        # Minimum number of gateway instances
+        # Minimum number of gateway instances.
         # DEPRECATED: Use HPA minReplicas via annotations instead
         minInstances: 1
 
@@ -2833,6 +2844,7 @@ connectInject:
   # want those pods injected and local-path-storage and openebs so that
   # Kind (Kubernetes In Docker) and [OpenEBS](https://openebs.io/) respectively can provision Pods used to create PVCs.
   # We also exclude gmp-system and gke-managed-cim namespaces that are used by GKE for managing the cluster.
+  # We also exclude any namespaces with the label `openshift.io/cluster-monitoring` since those are used by OpenShift for cluster monitoring and typically should not be injected.
   # Note that this exclusion is only supported in Kubernetes v1.21.1+.
   #
   # Example:
@@ -2848,6 +2860,8 @@ connectInject:
       - key: "kubernetes.io/metadata.name"
         operator: "NotIn"
         values: ["kube-system","local-path-storage","openebs","gmp-system","gke-managed-cim"]
+      - key: "openshift.io/cluster-monitoring"
+        operator: "DoesNotExist"
 
   # List of k8s namespaces to allow Connect sidecar
   # injection in. If a k8s namespace is not included or is listed in `k8sDenyNamespaces`,

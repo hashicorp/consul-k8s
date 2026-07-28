@@ -1,0 +1,20 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Within-mesh OIDC ext_authz scenario. The Dex identity provider, gateway,
+# gateway class, and HTTPRoute are identical to the out-of-mesh scenario and are
+# reused from ../ext-authz-oidc. Only the ext_authz backend wiring differs:
+#   - oauth2-proxy.yaml    oauth2-proxy WITH a Connect sidecar (mesh service)
+#   - servicedefaults.yaml builtin/ext-authz via HttpService.Target.Service (mesh)
+#   - intention.yaml       adds the gateway -> oauth2-proxy intention
+resources:
+- ../../static-server-inject
+- gatewayclassconfig.yaml
+- gatewayclass.yaml
+- gateway.yaml
+- dex.yaml
+- servicedefaults.yaml
+- intention.yaml
+- oauth2-proxy.yaml

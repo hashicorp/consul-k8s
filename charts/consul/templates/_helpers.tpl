@@ -15,6 +15,42 @@ as well as the global.name setting.
 {{- end -}}
 {{- end -}}
 
+{{/*
+Resolve the Consul namespace that a terminating gateway service should be
+registered into. Resolution order:
+  1. Per-gateway consulNamespace.
+  2. terminatingGateways.defaults.consulNamespace, unless it is the bare
+     "default" sentinel (treated as unset so mirroring can take precedence).
+  3. The mirrored Consul namespace derived from the release namespace when
+     namespace mirroring is enabled.
+  4. The terminatingGateways.defaults.consulNamespace value (i.e. "default").
+
+Note: This intentionally does NOT consult
+connectInject.consulNamespaces.consulDestinationNamespace. Terminating gateways have
+historically only resolved their namespace from terminatingGateways.defaults.consulNamespace
+/ the per-gateway consulNamespace, and the gateway's ACL policy (created by server-acl-init)
+is scoped to that same namespace. Following the connect destination namespace here would
+register the service into a namespace its ACL token is not authorized for. Mirroring is the
+only additional case we resolve, matching connect-injected services and the API gateway.
+
+Usage:
+  {{ include "consul.terminatingGatewayNamespace" (dict "root" $root "gatewayNamespace" .consulNamespace "defaultsNamespace" $defaults.consulNamespace) }}
+*/}}
+{{- define "consul.terminatingGatewayNamespace" -}}
+{{- $root := .root -}}
+{{- $gatewayNamespace := .gatewayNamespace -}}
+{{- $defaultsNamespace := .defaultsNamespace -}}
+{{- if $gatewayNamespace -}}
+{{- $gatewayNamespace -}}
+{{- else if (and $defaultsNamespace (ne $defaultsNamespace "default")) -}}
+{{- $defaultsNamespace -}}
+{{- else if $root.Values.connectInject.consulNamespaces.mirroringK8S -}}
+{{- printf "%s%s" $root.Values.connectInject.consulNamespaces.mirroringK8SPrefix $root.Release.Namespace -}}
+{{- else -}}
+{{- default "default" $defaultsNamespace -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "consul.restrictedSecurityContext" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}
 securityContext:
@@ -39,6 +75,13 @@ and consul-k8s-control-plane images.
 {{- end -}}
 {{- end -}}
 
+{{- define "consul.podSecurityContext" -}}
+{{- if and .Values.global.podSecurityContext.enabled (not .Values.global.openshift.enabled) -}}
+securityContext:
+  fsGroup: 100
+  fsGroupChangePolicy: OnRootMismatch
+{{- end -}}
+{{- end -}}
 
 {{- define "consul.restrictedSecurityContextWithNetBindService" -}}
 {{- if not .Values.global.enablePodSecurityPolicies -}}

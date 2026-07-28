@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.27.0"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12.0"
+    }
   }
 }
 
@@ -289,4 +293,111 @@ resource "aws_route" "peering_public_1" {
   route_table_id            = module.vpc[1].public_route_table_ids[count.index]
   destination_cidr_block    = module.vpc[0].vpc_cidr_block
   vpc_peering_connection_id = aws_vpc_peering_connection.peer[0].id
+}
+
+# Deploy IBM Uptycs EDR agent to each EKS cluster.
+provider "helm" {
+  alias = "cluster_0"
+  kubernetes {
+    host                   = module.eks[0].cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks[0].cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.cluster[0].token
+  }
+}
+
+provider "helm" {
+  alias = "cluster_1"
+  kubernetes {
+    host                   = var.cluster_count > 1 ? module.eks[1].cluster_endpoint : module.eks[0].cluster_endpoint
+    cluster_ca_certificate = base64decode(var.cluster_count > 1 ? module.eks[1].cluster_certificate_authority_data : module.eks[0].cluster_certificate_authority_data)
+    token                  = var.cluster_count > 1 ? data.aws_eks_cluster_auth.cluster[1].token : data.aws_eks_cluster_auth.cluster[0].token
+  }
+}
+
+# Cluster 0 EDR
+resource "helm_release" "uptycs_0" {
+  provider         = helm.cluster_0
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_0" {
+  depends_on       = [helm_release.uptycs_0]
+  provider         = helm.cluster_0
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = module.eks[0].cluster_id
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
+}
+
+# Cluster 1 EDR (only when cluster_count > 1)
+resource "helm_release" "uptycs_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  provider         = helm.cluster_1
+  name             = "k8sosquery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "k8sosquery"
+  namespace        = "uptycs"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  values = [
+    templatefile("${path.module}/k8sosquery-values.yaml", {
+      owner         = var.uptycs_owner
+      enroll_secret = var.uptycs_enroll_secret
+    })
+  ]
+}
+
+resource "helm_release" "kubequery_1" {
+  count            = var.cluster_count > 1 ? 1 : 0
+  depends_on       = [helm_release.uptycs_1]
+  provider         = helm.cluster_1
+  name             = "kubequery"
+  repository       = "https://uptycslabs.github.io/kspm-helm-charts"
+  chart            = "kubequery"
+  namespace        = "kubequery"
+  create_namespace = true
+  cleanup_on_fail  = true
+
+  set {
+    name  = "deployment.spec.hostname"
+    value = module.eks[1].cluster_id
+  }
+
+  values = [
+    templatefile("${path.module}/kubequery-values.yaml", {
+      enroll_secret     = var.uptycs_enroll_secret
+      webhook_ca_bundle = var.uptycs_webhook_ca_bundle
+      webhook_tls_crt   = var.uptycs_webhook_tls_crt
+      webhook_tls_key   = var.uptycs_webhook_tls_key
+    })
+  ]
 }

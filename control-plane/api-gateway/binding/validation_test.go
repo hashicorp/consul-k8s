@@ -1597,6 +1597,17 @@ func TestValidateAuthFilters(t *testing.T) {
 			}}),
 			expected: authFilterValidationResults{authFilterValidationResult{}},
 		},
+		"auth filter with only ext_authz and no JWT is valid": {
+			authFilters: []*v1alpha1.RouteAuthFilter{
+				{
+					Spec: v1alpha1.RouteAuthFilterSpec{
+						ExtAuthz: &v1alpha1.RouteAuthFilterExtAuthz{Enabled: true},
+					},
+				},
+			},
+			resources: newTestResourceMap(t, resourceMapResources{}),
+			expected:  authFilterValidationResults{authFilterValidationResult{}},
+		},
 		"auth filter references missing JWT Provider": {
 			authFilters: []*v1alpha1.RouteAuthFilter{
 				{
@@ -1634,6 +1645,112 @@ func TestValidateAuthFilters(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, tc.expected, validateAuthFilters(tc.authFilters, tc.resources))
+		})
+	}
+}
+
+func TestValidateExtProcFilters(t *testing.T) {
+	for name, tc := range map[string]struct {
+		extProcFilters []*v1alpha1.RouteExtProc
+		expected       extProcFilterValidationResults
+	}{
+		"nil filter produces accepted result": {
+			extProcFilters: []*v1alpha1.RouteExtProc{nil},
+			expected:       extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"override mode with overrides is valid": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "override",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"enabled mode without overrides is valid": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode: "enabled",
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"disabled mode without overrides is valid": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode: "disabled",
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{extProcFilterValidationResult{}},
+		},
+		"enabled mode with overrides is not accepted": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "enabled",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+		"disabled mode with overrides is not accepted": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "disabled",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+		"mode comparison is case-insensitive": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "ENABLED",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+		"multiple filters are index-aligned": {
+			extProcFilters: []*v1alpha1.RouteExtProc{
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "override",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+				{
+					Spec: v1alpha1.RouteExtProcSpec{
+						Mode:      "enabled",
+						Overrides: &v1alpha1.RouteExtProcOverrides{},
+					},
+				},
+			},
+			expected: extProcFilterValidationResults{
+				extProcFilterValidationResult{},
+				extProcFilterValidationResult{acceptedErr: errRouteExtProcOverridesWithoutOverrideMode},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, validateExtProcFilters(tc.extProcFilters))
 		})
 	}
 }

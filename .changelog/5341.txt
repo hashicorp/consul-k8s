@@ -1,0 +1,3 @@
+```release-note:bug
+helm: add pod level securityContext to get write access to the PVC.
+```

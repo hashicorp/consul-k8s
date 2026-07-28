@@ -31,6 +31,11 @@ import (
 // a command line arg or an environment variable.
 func TestSnapshotAgent_Vault(t *testing.T) {
 	cfg := suite.Config()
+
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
+	
 	if cfg.EnableCNI {
 		t.Skipf("skipping because -enable-cni is set and snapshot agent is already tested with regular tproxy")
 	}
