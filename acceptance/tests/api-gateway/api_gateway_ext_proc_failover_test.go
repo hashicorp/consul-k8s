@@ -9,6 +9,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,7 +43,23 @@ const (
 	extProcCommonPath = "../fixtures/cases/api-gateways/ext-proc-failover/common"
 	extProcSinglePath = "../fixtures/cases/api-gateways/ext-proc-failover/single"
 	extProcTwoPath    = "../fixtures/cases/api-gateways/ext-proc-failover/two"
+	// extProcAppsPath is the directory that contains each app's Dockerfile and
+	// source. It is resolved at runtime relative to this file using
+	// runtime.Caller so it is correct regardless of the working directory the
+	// test binary is invoked from.
+	extProcAppsPath = "../fixtures/cases/api-gateways/ext-proc-failover/apps"
 )
+
+// extProcImages is the ordered list of (subdirectory, image tag) pairs that
+// buildAndLoadExtProcImages must build and kind-load.
+var extProcImages = []struct{ dir, tag string }{
+	{"ext-proc-http", "local/ext-proc-http:0.1"},
+	{"route-decider", "local/route-decider:0.1"},
+	{"service-d", "local/service-d:0.1"},
+	{"service-e", "local/service-e:0.1"},
+	{"ext-proc-http-connect-proxy", "local/ext-proc-http-connect-proxy:0.1"},
+	{"http-decider-connect-proxy", "local/http-decider-connect-proxy:0.1"},
+}
 
 // Gateway names for the two topologies under test.
 const (
@@ -131,6 +150,9 @@ var extProcDeployments = []string{
 //	./build-images.sh <server-cluster-name> <client-cluster-name>
 func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	cfg := suite.Config()
+	if !cfg.EnableEnterprise {
+		t.Skipf("skipping this test because -enable-enterprise is not set")
+	}
 	env := suite.Environment()
 
 	if !cfg.UseKind {
@@ -258,6 +280,11 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 		k8s.KubectlDeleteK(t, serverCtx.KubectlOptions(t), meshGatewayDir)
 		k8s.KubectlDeleteK(t, clientCtx.KubectlOptions(t), meshGatewayDir)
 	})
+
+	// Build the six ext-proc app images from source and load them into both
+	// kind clusters so the image cache is warm before any Deployment is created.
+	logger.Log(t, "building and loading ext-proc app images into both kind clusters")
+	buildAndLoadExtProcImages(t, serverCtx, clientCtx)
 
 	// Deploy the ext-proc stack (common + single + two) + a static-client into
 	// BOTH clusters.
@@ -413,6 +440,50 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 			})
 		})
 	})
+}
+
+// buildAndLoadExtProcImages builds all six ext-proc app images from the vendored
+// Dockerfiles under extProcAppsPath and loads each one into every kind cluster
+// whose name is derived from the given contexts. The kind cluster name is the
+// context name with the "kind-" prefix stripped (kind always names contexts
+// "kind-<clustername>").
+//
+// This must be called before deployExtProcStack so that the images are present
+// in the cluster nodes' local image cache when the Deployments are created.
+func buildAndLoadExtProcImages(t *testing.T, contexts ...environment.TestContext) {
+	t.Helper()
+
+	// Resolve the absolute path to the apps directory relative to this source
+	// file, so the path is correct regardless of the working directory used
+	// when invoking the test binary.
+	_, thisFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "runtime.Caller failed")
+	appsDir := filepath.Join(filepath.Dir(thisFile), extProcAppsPath)
+
+	// Derive the kind cluster name from each context's kubectl context name.
+	// kind always names contexts "kind-<clustername>".
+	var clusterNames []string
+	for _, ctx := range contexts {
+		contextName := ctx.KubectlOptions(t).ContextName
+		clusterName := strings.TrimPrefix(contextName, "kind-")
+		if clusterName == "" {
+			t.Fatalf("cannot derive kind cluster name from context %q; expected 'kind-<name>'", contextName)
+		}
+		clusterNames = append(clusterNames, clusterName)
+	}
+
+	for _, img := range extProcImages {
+		buildCtx := filepath.Join(appsDir, img.dir)
+		logger.Logf(t, "building image %s from %s", img.tag, buildCtx)
+		out, err := exec.Command("docker", "build", "-t", img.tag, buildCtx).CombinedOutput()
+		require.NoErrorf(t, err, "docker build %s failed:\n%s", img.tag, out)
+
+		for _, cluster := range clusterNames {
+			logger.Logf(t, "kind load %s -> cluster %s", img.tag, cluster)
+			out, err = exec.Command("kind", "load", "docker-image", img.tag, "--name", cluster).CombinedOutput()
+			require.NoErrorf(t, err, "kind load %s into %s failed:\n%s", img.tag, cluster, out)
+		}
+	}
 }
 
 // extProcKubectlOptions returns kubectl options scoped to the "default"
