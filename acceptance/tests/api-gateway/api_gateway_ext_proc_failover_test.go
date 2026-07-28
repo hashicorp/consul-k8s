@@ -142,9 +142,7 @@ var extProcDeployments = []string{
 // ext-proc is Consul Enterprise only, and the processor/decider apps are the
 // small stdlib HTTP services vendored (with their Dockerfiles) under
 // ../fixtures/cases/api-gateways/ext-proc-failover/apps. This test is therefore
-// opt-in: it is skipped unless an enterprise license is configured AND
-// EXT_PROC_LOCAL_DEV=true, which signals that those images have been built and
-// loaded into BOTH kind clusters. Build + load them with the provided script:
+// opt-in: it is skipped unless an enterprise license is configured
 //
 //	cd ../fixtures/cases/api-gateways/ext-proc-failover/apps
 //	./build-images.sh <server-cluster-name> <client-cluster-name>
@@ -158,9 +156,7 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	if !cfg.UseKind {
 		t.Skip("skipping because -use-kind is not set; cross-cluster peering in this test relies on kind NodePort mesh gateways")
 	}
-	if enabled, _ := strconv.ParseBool(os.Getenv("EXT_PROC_LOCAL_DEV")); !enabled {
-		t.Skip("skipping because EXT_PROC_LOCAL_DEV is not set; this test requires the reference ext-proc images loaded into both kind clusters")
-	}
+
 	skipUnlessEnterpriseLicenseConfigured(t)
 
 	serverCtx := env.DefaultContext(t)
