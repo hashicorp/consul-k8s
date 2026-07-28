@@ -29,6 +29,14 @@ jobs:
       - get-go-version
     if: needs.conditional-skip.outputs.skip-ci != 'true'
     uses: ./.github/workflows/coverage.yml
+    # The nested coverage-report job requests contents:write, pull-requests:write
+    # and id-token:write. GitHub requires the *caller* to explicitly grant any
+    # permissions that a reusable workflow's jobs need; the callee cannot exceed
+    # the caller's grant.
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     with:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
       pr-number: ${{ github.event_name == 'pull_request' && toJson(github.event.pull_request.number) || '' }}
