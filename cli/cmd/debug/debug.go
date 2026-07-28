@@ -18,9 +18,9 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/posener/complete"
-	"helm.sh/helm/v3/pkg/action"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/release"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/validation"

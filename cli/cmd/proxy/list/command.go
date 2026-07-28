@@ -13,7 +13,7 @@ import (
 
 	"github.com/posener/complete"
 	"golang.org/x/exp/maps"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

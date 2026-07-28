@@ -20,9 +20,9 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/helm"
 	"github.com/hashicorp/consul-k8s/cli/preset"
 	"github.com/posener/complete"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/getter"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/getter"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/strings/slices"
 )

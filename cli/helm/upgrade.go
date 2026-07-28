@@ -12,8 +12,8 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"helm.sh/helm/v3/pkg/action"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/action"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
 )
 
 // UpgradeOptions is used when calling UpgradeHelmRelease.

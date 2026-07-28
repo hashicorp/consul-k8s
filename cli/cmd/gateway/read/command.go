@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	helmcli "helm.sh/helm/v3/pkg/cli"
+	helmcli "helm.sh/helm/v4/pkg/cli"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"

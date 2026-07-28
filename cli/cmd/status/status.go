@@ -12,15 +12,15 @@ import (
 	"time"
 
 	"github.com/posener/complete"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 )

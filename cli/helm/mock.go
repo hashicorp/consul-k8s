@@ -8,9 +8,9 @@ import (
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart"
+	"helm.sh/helm/v4/pkg/release"
 )
 
 type MockActionRunner struct {

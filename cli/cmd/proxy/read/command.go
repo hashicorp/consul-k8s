@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/posener/complete"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"

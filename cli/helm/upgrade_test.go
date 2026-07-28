@@ -13,10 +13,10 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/release"
 )
 
 func TestUpgrade(t *testing.T) {

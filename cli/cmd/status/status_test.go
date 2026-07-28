@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
@@ -21,10 +22,9 @@ import (
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	helmRelease "helm.sh/helm/v3/pkg/release"
-	helmTime "helm.sh/helm/v3/pkg/time"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart"
+	helmRelease "helm.sh/helm/v4/pkg/release"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -176,7 +176,7 @@ func TestCheckConsulDeployments(t *testing.T) {
 
 // TestStatus creates a fake stateful set and tests the checkConsulServers function.
 func TestStatus(t *testing.T) {
-	nowTime := helmTime.Now()
+	nowTime := time.Now()
 	timezone, _ := nowTime.Zone()
 	notImeStr := nowTime.Format("2006/01/02 15:04:05") + " " + timezone
 	cases := map[string]struct {

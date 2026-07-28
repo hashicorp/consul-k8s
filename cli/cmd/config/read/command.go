@@ -14,8 +14,8 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	"github.com/hashicorp/consul-k8s/cli/helm"
-	"helm.sh/helm/v3/pkg/action"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/action"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/yaml"
 )

@@ -13,6 +13,8 @@ import (
 	"os"
 	"testing"
 
+	"time"
+
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
@@ -21,15 +23,14 @@ import (
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	helmRelease "helm.sh/helm/v3/pkg/release"
-	helmTime "helm.sh/helm/v3/pkg/time"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart"
+	helmRelease "helm.sh/helm/v4/pkg/release"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestConfigRead(t *testing.T) {
-	nowTime := helmTime.Now()
+	nowTime := time.Now()
 	cases := map[string]struct {
 		messages           []string
 		helmActionsRunner  *helm.MockActionRunner

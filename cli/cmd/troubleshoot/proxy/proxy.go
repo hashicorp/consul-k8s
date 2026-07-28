@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/consul-k8s/cli/common/terminal"
 	troubleshoot "github.com/hashicorp/consul/troubleshoot/proxy"
 	"github.com/posener/complete"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
 	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"

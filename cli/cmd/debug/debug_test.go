@@ -13,15 +13,16 @@ import (
 	"strconv"
 	"testing"
 
+	"time"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/posener/complete"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
-	helmRelease "helm.sh/helm/v3/pkg/release"
-	helmTime "helm.sh/helm/v3/pkg/time"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
+	helmRelease "helm.sh/helm/v4/pkg/release"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -179,7 +180,7 @@ func TestAutocompleteArgs(t *testing.T) {
 	assert.Equal(t, complete.PredictNothing, c)
 }
 func TestCaptureHelmConfig(t *testing.T) {
-	nowTime := helmTime.Now()
+	nowTime := time.Now()
 	cases := map[string]struct {
 		messages          []string
 		helmActionsRunner *helm.MockActionRunner

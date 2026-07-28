@@ -6,18 +6,19 @@ package stats
 import (
 	"errors"
 	"fmt"
-	"github.com/hashicorp/consul-k8s/cli/common"
-	"github.com/hashicorp/consul-k8s/cli/common/flag"
-	"github.com/hashicorp/consul-k8s/cli/common/terminal"
-	"github.com/hashicorp/consul-k8s/cli/helm"
-	helmCLI "helm.sh/helm/v3/pkg/cli"
 	"io"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/hashicorp/consul-k8s/cli/common"
+	"github.com/hashicorp/consul-k8s/cli/common/flag"
+	"github.com/hashicorp/consul-k8s/cli/common/terminal"
+	"github.com/hashicorp/consul-k8s/cli/helm"
+	helmCLI "helm.sh/helm/v4/pkg/cli"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 const envoyAdminPort = 19000
