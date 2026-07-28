@@ -206,6 +206,8 @@ spec:
           cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
           {{- $cert | nindent 10 }}
           EOF
+          CERT_HASH=$(openssl x509 -subject_hash -noout -in /trusted-cas/custom-ca-{{$i}}.pem)
+          ln -sf /trusted-cas/custom-ca-{{$i}}.pem /trusted-cas/${CERT_HASH}.0
           {{- end }}
           {{- end }}
 

@@ -684,6 +684,18 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
 }
 
+@test "telemetryCollector/Deployment: trustedCAs: if trustedCAs is set symlink is created for trusted CA" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("ln -sf /trusted-cas/custom-ca-0.pem /trusted-cas/${CERT_HASH}.0")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
 @test "telemetryCollector/Deployment: trustedCAs: if multiple Trusted cas were set" {
   cd `chart_dir`
   local object=$(helm template \
@@ -700,6 +712,10 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-0.pem")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
   local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-1.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object | jq '.command[2] | contains("ln -sf /trusted-cas/custom-ca-0.pem /trusted-cas/${CERT_HASH}.0")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+  local actual=$(echo $object | jq '.command[2] | contains("ln -sf /trusted-cas/custom-ca-1.pem /trusted-cas/${CERT_HASH}.0")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 
