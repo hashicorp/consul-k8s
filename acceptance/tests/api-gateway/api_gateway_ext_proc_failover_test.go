@@ -687,6 +687,24 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 			_, _ = k8s.RunKubectlAndGetOutputE(t, opts, "delete", "-k", dir, "--ignore-not-found=true")
 		})
 
+		// After applying the common base, wait until the GatewayClass is Accepted
+		// before applying gateway overlays. The controller marks the GatewayClass
+		// Accepted only after its cache has synced the GatewayClassConfig; without
+		// this wait the first Gateway reconcile may see GatewayClassConfig==nil,
+		// treat the gateway as deleted, and never create the Deployment.
+		if dir == extProcCommonPath {
+			logger.Logf(t, "[%s] waiting for GatewayClass gateway-class to be Accepted", opts.ContextName)
+			retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 3 * time.Second}, t, func(r *retry.R) {
+				out, err := k8s.RunKubectlAndGetOutputE(r, opts,
+					"get", "gatewayclass", "gateway-class",
+					"-o", "jsonpath={.status.conditions[?(@.type=='Accepted')].status}")
+				if err != nil || strings.TrimSpace(out) != "True" {
+					r.Errorf("[%s] GatewayClass not yet Accepted (status=%q): %v", opts.ContextName, out, err)
+				}
+			})
+			logger.Logf(t, "[%s] GatewayClass gateway-class is Accepted", opts.ContextName)
+		}
+
 		// After each gateway overlay, wait for the controller-managed Deployment to
 		// become available. This is the definitive signal that the controller resolved
 		// the GatewayClassConfig, created the Deployment, and the pod is running.
