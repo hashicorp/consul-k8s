@@ -164,8 +164,10 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	clientCtx := env.Context(t, 1)
 
 	commonHelmValues := map[string]string{
-		"global.peering.enabled": "true",
-		"global.tls.enabled":     "true",
+		"global.peering.enabled":       "true",
+		"global.tls.enabled":           "true",
+		"global.tls.httpsOnly":         "true",
+		"global.acls.manageSystemACLs": "true",
 
 		"connectInject.enabled": "true",
 
