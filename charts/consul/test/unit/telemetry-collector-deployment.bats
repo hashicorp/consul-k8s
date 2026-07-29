@@ -692,8 +692,52 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
 MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
       . | tee /dev/stderr |
-      yq -r '.spec.template.spec.containers[0].command[2] | contains("ln -sf /trusted-cas/custom-ca-0.pem /trusted-cas/${CERT_HASH}.0")' | tee /dev/stderr)
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("ln -sf \"${CERT_FILE}\" \"/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
+}
+
+@test "telemetryCollector/Deployment: trustedCAs: rehash is guarded on openssl being available" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("if command -v openssl > /dev/null 2>&1; then")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "telemetryCollector/Deployment: trustedCAs: vault server CA is copied into /trusted-cas when vault is enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.secretsBackend.vault.enabled=true' \
+      --set 'global.secretsBackend.vault.consulServerRole=test' \
+      --set 'global.secretsBackend.vault.consulClientRole=foo' \
+      --set 'global.secretsBackend.vault.consulCARole=carole' \
+      --set 'global.tls.enabled=true' \
+      --set 'global.tls.enableAutoEncrypt=true' \
+      --set 'global.tls.caCert.secretName=foo' \
+      --set 'server.serverCert.secretName=pki_int/issue/test' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cp /vault/secrets/serverca.crt /trusted-cas/custom-ca-server.pem")' | tee /dev/stderr)
+  [ "${actual}" = "true" ]
+}
+
+@test "telemetryCollector/Deployment: trustedCAs: vault server CA is not copied when vault is disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/telemetry-collector-deployment.yaml  \
+      --set 'telemetryCollector.enabled=true' \
+      --set 'global.trustedCAs[0]=-----BEGIN CERTIFICATE-----
+MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.containers[0].command[2] | contains("cp /vault/secrets/serverca.crt")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
 }
 
 @test "telemetryCollector/Deployment: trustedCAs: if multiple Trusted cas were set" {
@@ -713,9 +757,9 @@ MIICFjCCAZsCCQCdwLtdjbzlYzAKBggqhkjOPQQDAjB0MQswCQYDVQQGEwJDQTEL' \
   [ "${actual}" = "true" ]
   local actual=$(echo $object | jq '.command[2] | contains("cat <<EOF > /trusted-cas/custom-ca-1.pem")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-  local actual=$(echo $object | jq '.command[2] | contains("ln -sf /trusted-cas/custom-ca-0.pem /trusted-cas/${CERT_HASH}.0")' | tee /dev/stderr)
+  local actual=$(echo $object | jq '.command[2] | contains("for CERT_FILE in /trusted-cas/custom-ca-*.pem; do")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
-  local actual=$(echo $object | jq '.command[2] | contains("ln -sf /trusted-cas/custom-ca-1.pem /trusted-cas/${CERT_HASH}.0")' | tee /dev/stderr)
+  local actual=$(echo $object | jq '.command[2] | contains("ln -sf \"${CERT_FILE}\" \"/trusted-cas/${CERT_HASH}.${CERT_SUFFIX}\"")' | tee /dev/stderr)
   [ "${actual}" = "true" ]
 }
 

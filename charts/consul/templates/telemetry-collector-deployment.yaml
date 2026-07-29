@@ -206,9 +206,11 @@ spec:
           cat <<EOF > /trusted-cas/custom-ca-{{$i}}.pem
           {{- $cert | nindent 10 }}
           EOF
-          CERT_HASH=$(openssl x509 -subject_hash -noout -in /trusted-cas/custom-ca-{{$i}}.pem)
-          ln -sf /trusted-cas/custom-ca-{{$i}}.pem /trusted-cas/${CERT_HASH}.0
           {{- end }}
+          {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled }}
+          cp /vault/secrets/serverca.crt /trusted-cas/custom-ca-server.pem
+          {{- end }}
+          {{- include "consul.trustedCAsRehash" . | nindent 10 }}
           {{- end }}
 
           exec consul-telemetry-collector agent \
