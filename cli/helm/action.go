@@ -18,7 +18,7 @@ import (
 // InitActionConfig initializes a Helm Go SDK action configuration. This
 // function currently uses a hack to override the namespace field that gets set
 // in the K8s client set up by the SDK.
-func InitActionConfig(actionConfig *action.Configuration, namespace string, settings *helmCLI.EnvSettings, logger action.DebugLog) (*action.Configuration, error) {
+func InitActionConfig(actionConfig *action.Configuration, namespace string, settings *helmCLI.EnvSettings, logger func(string, ...interface{})) (*action.Configuration, error) {
 	getter := settings.RESTClientGetter()
 	configFlags := getter.(*genericclioptions.ConfigFlags)
 	configFlags.Namespace = &namespace
@@ -64,7 +64,7 @@ func (h *ActionRunner) Install(install *action.Install, chrt *chart.Chart, vals 
 type CheckForInstallationsOptions struct {
 	Settings              *helmCLI.EnvSettings
 	ReleaseName           string
-	DebugLog              action.DebugLog
+	DebugLog              func(string, ...interface{})
 	SkipErrorWhenNotFound bool
 }
 
@@ -74,7 +74,7 @@ func (h *ActionRunner) CheckForInstallations(options *CheckForInstallationsOptio
 	// Need a specific action config to call helm list, where namespace is NOT specified.
 	listConfig := new(action.Configuration)
 	if err := listConfig.Init(options.Settings.RESTClientGetter(), "",
-		os.Getenv("HELM_DRIVER"), options.DebugLog); err != nil {
+		os.Getenv("HELM_DRIVER")); err != nil {
 		return false, "", "", fmt.Errorf("couldn't initialize helm config: %s", err)
 	}
 

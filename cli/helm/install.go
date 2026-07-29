@@ -35,7 +35,7 @@ type InstallOptions struct {
 	// ChartDirName is the top level directory name fo the EmbeddedChart.
 	ChartDirName string
 	// UILogger is a DebugLog used to return messages from Helm to the UI.
-	UILogger action.DebugLog
+	UILogger func(string, ...interface{})
 	// DryRun specifies whether the install/upgrade should actually modify the
 	// Kubernetes cluster.
 	DryRun bool

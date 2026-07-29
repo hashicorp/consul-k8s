@@ -344,7 +344,7 @@ func (c *Command) initKubernetes(settings *helmCLI.EnvSettings) error {
 }
 
 func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType string, settings *helmCLI.EnvSettings,
-	uiLogger action.DebugLog, actionConfig *action.Configuration) error {
+	uiLogger func(string, ...interface{}), actionConfig *action.Configuration) error {
 	c.UI.Output(fmt.Sprintf("Existing %s installation found.", releaseType), terminal.WithSuccessStyle())
 	c.UI.Output(fmt.Sprintf("%s Uninstall Summary", cases.Title(language.English).String(releaseType)), terminal.WithHeaderStyle())
 	c.UI.Output("Name: %s", releaseName, terminal.WithInfoStyle())
@@ -400,7 +400,7 @@ func (c *Command) uninstallHelmRelease(releaseName, namespace, releaseType strin
 // by Consul and attempts to delete every custom resource for each definition.
 // If the resources cannot be deleted directly, the finalizers on each resource
 // are patched to be an empty list, freeing them to be deleted by Kubernetes.
-func (c *Command) removeCustomResources(uiLogger action.DebugLog) error {
+func (c *Command) removeCustomResources(uiLogger func(string, ...interface{})) error {
 	uiLogger("Deleting custom resources managed by Consul")
 
 	crds, err := c.fetchCustomResourceDefinitions()
@@ -495,7 +495,7 @@ func (c *Command) fetchCustomResources(crds *apiextv1.CustomResourceDefinitionLi
 
 // deleteCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to be deleted.
-func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string, uiLogger action.DebugLog) error {
+func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string, uiLogger func(string, ...interface{})) error {
 	for _, cr := range crs {
 		gv, err := schema.ParseGroupVersion(cr.GetAPIVersion())
 		if err != nil {
@@ -523,7 +523,7 @@ func (c *Command) deleteCustomResources(crs []unstructured.Unstructured, kindToR
 
 // patchCustomResources takes a list of unstructured custom resources and
 // sends a request to each one to patch its finalizers to an empty list.
-func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string, uiLogger action.DebugLog) error {
+func (c *Command) patchCustomResources(crs []unstructured.Unstructured, kindToResource map[string]string, uiLogger func(string, ...interface{})) error {
 	finalizerPatch := []byte(`[{
 		"op": "replace",
 		"path": "/metadata/finalizers",

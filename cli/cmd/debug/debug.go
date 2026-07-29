@@ -589,7 +589,7 @@ func (c *DebugCommand) captureHelmConfig() error {
 
 // getHelmRelease uses the helm Go SDK to depict the status of a named release.
 // This function returns the helm release object.
-func (c *DebugCommand) getHelmRelease(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) (*release.Release, error) {
+func (c *DebugCommand) getHelmRelease(settings *helmCLI.EnvSettings, uiLogger func(string, ...interface{}), releaseName, namespace string) (*release.Release, error) {
 	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
 	statusConfig := new(action.Configuration)
 	statusConfig, err := helm.InitActionConfig(statusConfig, namespace, settings, uiLogger)

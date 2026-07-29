@@ -32,7 +32,7 @@ func LoadChart(chart embed.FS, chartDirName string) (*chart.Chart, error) {
 
 // FetchChartValues will attempt to fetch the values from the currently
 // installed Helm chart.
-func FetchChartValues(actionRunner HelmActionsRunner, namespace, name string, settings *helmCLI.EnvSettings, uiLogger action.DebugLog) (map[string]interface{}, error) {
+func FetchChartValues(actionRunner HelmActionsRunner, namespace, name string, settings *helmCLI.EnvSettings, uiLogger func(string, ...interface{})) (map[string]interface{}, error) {
 	cfg := new(action.Configuration)
 	cfg, err := InitActionConfig(cfg, namespace, settings, uiLogger)
 	if err != nil {

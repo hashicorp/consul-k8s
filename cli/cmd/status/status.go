@@ -160,7 +160,7 @@ func (c *Command) AutocompleteArgs() complete.Predictor {
 
 // checkHelmInstallation uses the helm Go SDK to depict the status of a named release. This function then prints
 // the version of the release, it's status (unknown, deployed, uninstalled, ...), and the overwritten values.
-func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger action.DebugLog, releaseName, namespace string) error {
+func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger func(string, ...interface{}), releaseName, namespace string) error {
 	// Need a specific action config to call helm status, where namespace comes from the previous call to list.
 	statusConfig := new(action.Configuration)
 	statusConfig, err := helm.InitActionConfig(statusConfig, namespace, settings, uiLogger)

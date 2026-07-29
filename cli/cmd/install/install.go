@@ -24,7 +24,6 @@ import (
 	"github.com/posener/complete"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"helm.sh/helm/v4/pkg/action"
 	helmCLI "helm.sh/helm/v4/pkg/cli"
 	"helm.sh/helm/v4/pkg/cli/values"
 	"helm.sh/helm/v4/pkg/getter"
@@ -385,7 +384,7 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-func (c *Command) installConsul(valuesYaml []byte, vals map[string]interface{}, settings *helmCLI.EnvSettings, uiLogger action.DebugLog) error {
+func (c *Command) installConsul(valuesYaml []byte, vals map[string]interface{}, settings *helmCLI.EnvSettings, uiLogger func(string, ...interface{})) error {
 	// Print out the installation summary.
 	c.UI.Output("Consul Installation Summary", terminal.WithHeaderStyle())
 	c.UI.Output("Name: %s", common.DefaultReleaseName, terminal.WithInfoStyle())
