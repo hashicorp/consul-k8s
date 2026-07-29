@@ -4,6 +4,12 @@
 #
 # Triggers a consul-k8s release promotion to staging or production via `bob`.
 #
+# You provide just two things:
+#   CONSUL_K8S_RELEASE_VERSION  the MAJOR.MINOR.PATCH version to promote (e.g. 1.2.3)
+#   promotion target            staging | production  (positional; defaults to staging)
+# Everything else - the product version, the release branch, and the
+# release-branch commit SHA - is derived from the version.
+#
 # Usage:
 #   ./release-scripts/trigger-promotion.sh [staging|production] [options]
 #
@@ -13,12 +19,20 @@
 #   -n, --dry-run   Resolve all inputs and print the exact `bob` command WITHOUT
 #                   executing it (also enabled by setting DRY_RUN=true).
 #   -y, --yes       Non-interactive: skip the prompts/confirmation and use the
-#                   values from the environment (or the DEFAULT_* values below).
+#                   values from the environment (or the derived defaults).
 #   -h, --help      Show this help and exit.
 #
-# Values are prompted interactively with a [default]; press Enter to accept.
-# Each prompt is seeded from its matching environment variable when set, else the
-# DEFAULT_* value below.
+# The version is prompted interactively with a [default]; press Enter to accept.
+# It is seeded from CONSUL_K8S_RELEASE_VERSION when set, else the DEFAULT_* value below.
+# REMOTE is an env-only override (default origin).
+#
+# Derived from the version (not prompted):
+#   CONSUL_K8S_PRODUCT_VERSION = <CONSUL_K8S_RELEASE_VERSION>
+#   CONSUL_K8S_RELEASE_BRANCH  = release/<CONSUL_K8S_RELEASE_VERSION>
+#   CONSUL_K8S_RELEASE_SHA     = latest commit of <REMOTE>/<CONSUL_K8S_RELEASE_BRANCH>
+# Setting CONSUL_K8S_PRODUCT_VERSION or CONSUL_K8S_RELEASE_BRANCH in the environment
+# overrides the value derived from the version.
+#
 
 set -euo pipefail
 
@@ -77,59 +91,64 @@ fail_or_warn() {
   fi
 }
 
-# -----------------------------------------------------------------------------
-# Release variables (defaults offered at each prompt; edit to change them)
-# -----------------------------------------------------------------------------
-DEFAULT_CONSUL_K8S_RELEASE_VERSION=2.0.2
-# DEFAULT_CONSUL_K8S_PRERELEASE_VERSION=rc1
-DEFAULT_CONSUL_K8S_PRODUCT_VERSION=2.0.2
-DEFAULT_CONSUL_K8S_RELEASE_BRANCH=release/2.0.2
-DEFAULT_CONSUL_K8S_RELEASE_DATE="July 8, 2026"
-DEFAULT_CONSUL_K8S_LAST_RELEASE_GIT_TAG=v2.0.1
-DEFAULT_CONSUL_K8S_CONSUL_DATAPLANE_VERSION=2.0.2
-# NOTE!: This should be the latest Consul **CE** version this release supports.
-DEFAULT_CONSUL_K8S_CONSUL_VERSION=2.0.2
-
-# prompt_var VAR_NAME DEFAULT_VALUE
-# Prompts for a value, showing the default; an empty reply keeps the default.
+# prompt_var VAR_NAME DEFAULT_VALUE [required]
+# Shows the value that will be used and lets the user accept or override it.
 prompt_var() {
   local var_name="$1"
   local default_value="$2"
+  local required="${3:-}"
   local input
-  read -r -p "  ${var_name} [${default_value}]: " input || true
-  printf -v "${var_name}" '%s' "${input:-${default_value}}"
-  export "${var_name}"
+  while :; do
+    read -r -p "  ${var_name} [${default_value}]: " input || true
+    input="${input:-${default_value}}"
+    if [[ -z "${input}" && "${required}" == "required" ]]; then
+      echo "  ${var_name} is required; please enter a value." >&2
+      continue
+    fi
+    break
+  done
+  printf -v "${var_name}" '%s' "${input}"
 }
 
+REMOTE="${REMOTE:-origin}"
+
 # -----------------------------------------------------------------------------
-# Collect inputs (seeded from the environment or the DEFAULT_* values above;
-# prompts are shown only in interactive mode)
+# Defaults offered at the prompt. Edit this to change the default.
+# -----------------------------------------------------------------------------
+DEFAULT_CONSUL_K8S_RELEASE_VERSION=""
+
+# -----------------------------------------------------------------------------
+# Collect the version to promote (seeded from the environment or the DEFAULT_*
+# value above; the prompt is shown only in interactive mode). The promotion
+# target is the positional argument resolved above.
 # -----------------------------------------------------------------------------
 CONSUL_K8S_RELEASE_VERSION="${CONSUL_K8S_RELEASE_VERSION:-${DEFAULT_CONSUL_K8S_RELEASE_VERSION}}"
-CONSUL_K8S_PRODUCT_VERSION="${CONSUL_K8S_PRODUCT_VERSION:-${DEFAULT_CONSUL_K8S_PRODUCT_VERSION}}"
-CONSUL_K8S_RELEASE_BRANCH="${CONSUL_K8S_RELEASE_BRANCH:-${DEFAULT_CONSUL_K8S_RELEASE_BRANCH}}"
-CONSUL_K8S_RELEASE_DATE="${CONSUL_K8S_RELEASE_DATE:-${DEFAULT_CONSUL_K8S_RELEASE_DATE}}"
-CONSUL_K8S_LAST_RELEASE_GIT_TAG="${CONSUL_K8S_LAST_RELEASE_GIT_TAG:-${DEFAULT_CONSUL_K8S_LAST_RELEASE_GIT_TAG}}"
-CONSUL_K8S_CONSUL_DATAPLANE_VERSION="${CONSUL_K8S_CONSUL_DATAPLANE_VERSION:-${DEFAULT_CONSUL_K8S_CONSUL_DATAPLANE_VERSION}}"
-CONSUL_K8S_CONSUL_VERSION="${CONSUL_K8S_CONSUL_VERSION:-${DEFAULT_CONSUL_K8S_CONSUL_VERSION}}"
-
 if [[ "${INTERACTIVE}" == "true" ]]; then
-  echo "Enter release values (press Enter to accept each [default]):"
+  echo "Enter the version to promote (press Enter to accept the [default]):"
   echo
-  prompt_var CONSUL_K8S_RELEASE_VERSION          "${CONSUL_K8S_RELEASE_VERSION}"
-  prompt_var CONSUL_K8S_PRODUCT_VERSION          "${CONSUL_K8S_PRODUCT_VERSION}"
-  prompt_var CONSUL_K8S_RELEASE_BRANCH           "${CONSUL_K8S_RELEASE_BRANCH}"
-  prompt_var CONSUL_K8S_RELEASE_DATE             "${CONSUL_K8S_RELEASE_DATE}"
-  prompt_var CONSUL_K8S_LAST_RELEASE_GIT_TAG     "${CONSUL_K8S_LAST_RELEASE_GIT_TAG}"
-  prompt_var CONSUL_K8S_CONSUL_DATAPLANE_VERSION "${CONSUL_K8S_CONSUL_DATAPLANE_VERSION}"
-  prompt_var CONSUL_K8S_CONSUL_VERSION           "${CONSUL_K8S_CONSUL_VERSION}"
+  prompt_var CONSUL_K8S_RELEASE_VERSION "${CONSUL_K8S_RELEASE_VERSION}" required
   echo
 fi
+: "${CONSUL_K8S_RELEASE_VERSION:?CONSUL_K8S_RELEASE_VERSION is required (set it or run interactively)}"
+# Normalize: strip any leading "v" so we compose them consistently.
+CONSUL_K8S_RELEASE_VERSION="${CONSUL_K8S_RELEASE_VERSION#v}"
+
+# Validate the version (bad input is fatal even in dry-run). A prerelease suffix
+# (e.g. 1.22.9-rc1) is allowed for release-candidate promotions.
+if [[ ! "${CONSUL_K8S_RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+  echo "Error: CONSUL_K8S_RELEASE_VERSION must be MAJOR.MINOR.PATCH (e.g. 1.2.3), got '${CONSUL_K8S_RELEASE_VERSION}'." >&2
+  exit 1
+fi
+
+# Derive everything else from the version.
+# Both accept an env override for unusual cases.
+CONSUL_K8S_PRODUCT_VERSION="${CONSUL_K8S_PRODUCT_VERSION:-${CONSUL_K8S_RELEASE_VERSION}}"
+CONSUL_K8S_RELEASE_BRANCH="${CONSUL_K8S_RELEASE_BRANCH:-release/${CONSUL_K8S_RELEASE_VERSION}}"
+# Ensure the product version strips a leading "v".
+CONSUL_K8S_PRODUCT_VERSION="${CONSUL_K8S_PRODUCT_VERSION#v}"
 
 # Export so child processes (e.g. bob) inherit the resolved values.
-export CONSUL_K8S_RELEASE_VERSION CONSUL_K8S_PRODUCT_VERSION CONSUL_K8S_RELEASE_BRANCH \
-  CONSUL_K8S_RELEASE_DATE CONSUL_K8S_LAST_RELEASE_GIT_TAG \
-  CONSUL_K8S_CONSUL_DATAPLANE_VERSION CONSUL_K8S_CONSUL_VERSION
+export CONSUL_K8S_RELEASE_VERSION CONSUL_K8S_PRODUCT_VERSION CONSUL_K8S_RELEASE_BRANCH REMOTE
 
 # -----------------------------------------------------------------------------
 # Prerequisite checks (git is always required; bob only for a real promotion)
@@ -142,16 +161,17 @@ if ! command -v bob >/dev/null 2>&1; then
   fail_or_warn "required command 'bob' not found in PATH."
 fi
 
-# Ensure the remote ref is current so we resolve the latest commit SHA.
-echo "Fetching latest refs for ${CONSUL_K8S_RELEASE_BRANCH} from origin..."
-if ! git fetch origin "${CONSUL_K8S_RELEASE_BRANCH}"; then
+# Ensure the remote ref is current so we resolve the latest commit SHA. This is a
+# read-only operation, so it runs even in dry-run to print an accurate command.
+echo "Fetching latest refs for ${CONSUL_K8S_RELEASE_BRANCH} from ${REMOTE}..."
+if ! git fetch "${REMOTE}" "${CONSUL_K8S_RELEASE_BRANCH}"; then
   fail_or_warn "'git fetch' failed for ${CONSUL_K8S_RELEASE_BRANCH}."
 fi
 
 # Resolve the latest commit SHA of the release branch.
-if ! CONSUL_K8S_RELEASE_SHA="$(git rev-parse "origin/${CONSUL_K8S_RELEASE_BRANCH}" 2>/dev/null)"; then
-  fail_or_warn "unable to resolve origin/${CONSUL_K8S_RELEASE_BRANCH}. Does the branch exist on origin?"
-  CONSUL_K8S_RELEASE_SHA="<unresolved-sha-for-origin/${CONSUL_K8S_RELEASE_BRANCH}>"
+if ! CONSUL_K8S_RELEASE_SHA="$(git rev-parse "${REMOTE}/${CONSUL_K8S_RELEASE_BRANCH}" 2>/dev/null)"; then
+  fail_or_warn "unable to resolve ${REMOTE}/${CONSUL_K8S_RELEASE_BRANCH}. Does the branch exist on ${REMOTE}?"
+  CONSUL_K8S_RELEASE_SHA="<unresolved-sha-for-${REMOTE}/${CONSUL_K8S_RELEASE_BRANCH}>"
 fi
 export CONSUL_K8S_RELEASE_SHA
 
@@ -165,11 +185,8 @@ The following variables are set:
   CONSUL_K8S_RELEASE_VERSION           = ${CONSUL_K8S_RELEASE_VERSION}
   CONSUL_K8S_PRODUCT_VERSION           = ${CONSUL_K8S_PRODUCT_VERSION}
   CONSUL_K8S_RELEASE_BRANCH            = ${CONSUL_K8S_RELEASE_BRANCH}
-  CONSUL_K8S_RELEASE_DATE              = ${CONSUL_K8S_RELEASE_DATE}
-  CONSUL_K8S_LAST_RELEASE_GIT_TAG      = ${CONSUL_K8S_LAST_RELEASE_GIT_TAG}
-  CONSUL_K8S_CONSUL_DATAPLANE_VERSION  = ${CONSUL_K8S_CONSUL_DATAPLANE_VERSION}
-  CONSUL_K8S_CONSUL_VERSION            = ${CONSUL_K8S_CONSUL_VERSION}
   CONSUL_K8S_RELEASE_SHA               = ${CONSUL_K8S_RELEASE_SHA}
+  REMOTE                               = ${REMOTE}
 
   Promotion target                     = ${PROMOTION_TARGET}
   Dry run                              = ${DRY_RUN}
