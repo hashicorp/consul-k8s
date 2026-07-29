@@ -859,14 +859,6 @@ func requireProcessorLogContains(t *testing.T, opts *terratestk8s.KubectlOptions
 	})
 }
 
-// requireProcessorLogAbsent asserts the processor's logs do NOT contain notWant,
-// proving a bypass route never reached it.
-func requireProcessorLogAbsent(t *testing.T, opts *terratestk8s.KubectlOptions, app, notWant string) {
-	t.Helper()
-	logs := processorLogs(t, opts, app)
-	require.NotContainsf(t, logs, notWant, "expected %s logs to NOT contain %q (route should have bypassed the processor)", app, notWant)
-}
-
 // requireGatewayExtProcFilters port-forwards to the named gateway's Envoy admin
 // interface (:19000) and asserts the ext_proc filter names in its config_dump:
 //   - mode "two":    both envoy.filters.http.ext_proc/base and .../path present.
