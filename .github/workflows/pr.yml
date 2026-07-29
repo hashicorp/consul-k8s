@@ -7,18 +7,6 @@ on:
       - main
       - "release/**"
 
-# These permissions are required by the nested coverage-report job inside
-# coverage.yml, which posts a PR comment (pull-requests: write), may update
-# a coverage badge file (contents: write), and uses OIDC publishing
-# (id-token: write). GitHub does not allow a reusable-workflow call job to
-# exceed the permissions granted at the workflow level, so they must be set
-# here rather than on the individual job.
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
-
-  
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -34,7 +22,6 @@ jobs:
     if: needs.conditional-skip.outputs.skip-ci != 'true'
     uses: ./.github/workflows/reusable-get-go-version.yml
 
-    
   coverage:
     needs:
       - conditional-skip
@@ -56,7 +43,7 @@ jobs:
       with:
         workflow: test.yml
         repo: hashicorp/consul-k8s-workflows
-        ref: pajay.rao/enabling-acceptance-for-ce
+        ref: main
         token: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}", "json_params":"{\"gotestsum-version\":\"1.12.3\", \"terraform-version\":\"latest\", \"test-ce\":true, \"test-type\":\"short\", \"dual-stack\":true}" }'
 
