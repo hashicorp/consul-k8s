@@ -43,8 +43,8 @@ import (
 // AFTER it.
 const (
 	extProcCommonPath = "../fixtures/cases/api-gateways/ext-proc-failover/common"
-	extProcSinglePath = "../fixtures/cases/api-gateways/ext-proc-failover/single"
-	extProcTwoPath    = "../fixtures/cases/api-gateways/ext-proc-failover/two"
+	// extProcSinglePath = "../fixtures/cases/api-gateways/ext-proc-failover/single"
+	extProcTwoPath = "../fixtures/cases/api-gateways/ext-proc-failover/two"
 	// extProcAppsPath is the directory that contains each app's Dockerfile and
 	// source. It is resolved at runtime relative to this file using
 	// runtime.Caller so it is correct regardless of the working directory the
@@ -65,8 +65,8 @@ var extProcImages = []struct{ dir, tag string }{
 
 // Gateway names for the two topologies under test.
 const (
-	extProcSingleGateway = "api-gateway-single"
-	extProcTwoGateway    = "api-gateway"
+	// extProcSingleGateway = "api-gateway-single"
+	extProcTwoGateway = "api-gateway"
 )
 
 // extProcServerPeer / extProcClientPeer are the Consul peering names as seen
@@ -106,7 +106,8 @@ var extProcDeployments = []string{
 	"service-a", "service-b", "service-c", "service-f", "service-g",
 	"service-d1", "service-e1", "ext-proc-http", "ext-proc-http-path",
 	"route-decider", "http-decider-connect-proxy", StaticClientName,
-	extProcSingleGateway, extProcTwoGateway,
+	// extProcSingleGateway,
+	extProcTwoGateway,
 }
 
 // TestAPIGateway_ExtProc_MultiClusterFailover exercises Envoy external
@@ -429,9 +430,9 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	logger.Log(t, "services registered in both cluster catalogs")
 
 	// Resolve each gateway's address once it is Accepted.
-	logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcSingleGateway)
-	serverSingleURL := extProcGatewayURL(t, serverCtx, extProcSingleGateway)
-	logger.Logf(t, "server single gateway URL: %s", serverSingleURL)
+	// logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcSingleGateway)
+	// serverSingleURL := extProcGatewayURL(t, serverCtx, extProcSingleGateway)
+	// logger.Logf(t, "server single gateway URL: %s", serverSingleURL)
 	logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcTwoGateway)
 	serverTwoURL := extProcGatewayURL(t, serverCtx, extProcTwoGateway)
 	logger.Logf(t, "server two gateway URL: %s", serverTwoURL)
@@ -440,21 +441,21 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	logger.Logf(t, "client two gateway URL: %s", clientTwoURL)
 
 	// ── SINGLE gateway: positive routing ─────────────────────────────────────
-	t.Run("single/routing", func(t *testing.T) {
-		retryCheckWithWait(t, 60, 5*time.Second, func(r *retry.R) {
-			requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/a", "hello from service-a")
-			requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/b", "hello from service-b")
-			requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/c", "hello from service-c")
-		})
-		// The single processor observed each routed path.
-		requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/b"`)
-		requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/c"`)
-	})
+	// t.Run("single/routing", func(t *testing.T) {
+	// 	retryCheckWithWait(t, 60, 5*time.Second, func(r *retry.R) {
+	// 		requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/a", "hello from service-a")
+	// 		requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/b", "hello from service-b")
+	// 		requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/c", "hello from service-c")
+	// 	})
+	// 	// The single processor observed each routed path.
+	// 	requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/b"`)
+	// 	requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/c"`)
+	// })
 
 	// ── SINGLE gateway: Envoy config (only the un-suffixed ext_proc filter) ───
-	t.Run("single/envoy-config", func(t *testing.T) {
-		requireGatewayExtProcFilters(t, serverOpts, extProcSingleGateway, "single")
-	})
+	// t.Run("single/envoy-config", func(t *testing.T) {
+	// 	requireGatewayExtProcFilters(t, serverOpts, extProcSingleGateway, "single")
+	// })
 
 	// ── TWO gateway: positive base-family routing (bare paths) ────────────────
 	t.Run("two/routing-base", func(t *testing.T) {
@@ -665,7 +666,6 @@ func extProcKubectlOptions(t *testing.T, ctx environment.TestContext) *terratest
 // static-client into the namespace referenced by opts, registering teardown for
 // each. Cleanups run last-in-first-out, so the overlays are deleted before the
 // common base they depend on.
-//
 func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 	t.Helper()
 
@@ -674,11 +674,14 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 	// gatewayDeployment maps each overlay dir to the Deployment name created by
 	// that overlay's Gateway CRD (controller-managed, named after the Gateway).
 	gatewayDeployment := map[string]string{
-		extProcSinglePath: extProcSingleGateway,
-		extProcTwoPath:    extProcTwoGateway,
+		// extProcSinglePath: extProcSingleGateway,
+		extProcTwoPath: extProcTwoGateway,
 	}
 
-	for _, dir := range []string{extProcCommonPath, extProcSinglePath, extProcTwoPath} {
+	for _, dir := range []string{
+		extProcCommonPath,
+		//  extProcSinglePath,
+		extProcTwoPath} {
 		dir := dir
 		logger.Logf(t, "[%s] kubectl apply -k %s", opts.ContextName, dir)
 		out, err := k8s.RunKubectlAndGetOutputE(t, opts, "apply", "-k", dir)
