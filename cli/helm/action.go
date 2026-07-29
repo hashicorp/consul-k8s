@@ -23,7 +23,7 @@ func InitActionConfig(actionConfig *action.Configuration, namespace string, sett
 	configFlags := getter.(*genericclioptions.ConfigFlags)
 	configFlags.Namespace = &namespace
 	err := actionConfig.Init(settings.RESTClientGetter(), namespace,
-		os.Getenv("HELM_DRIVER"), logger)
+		os.Getenv("HELM_DRIVER"))
 	if err != nil {
 		return nil, fmt.Errorf("error setting up helm action configuration to find existing installations: %s", err)
 	}
@@ -87,8 +87,19 @@ func (h *ActionRunner) CheckForInstallations(options *CheckForInstallationsOptio
 	}
 
 	for _, rel := range res {
-		if rel.Chart.Metadata.Name == options.ReleaseName {
-			return true, rel.Name, rel.Namespace, nil
+
+		relAccessor, err := release.NewAccessor(rel)
+		if err != nil {
+			return false, "", "", fmt.Errorf("failed to access release: %w", err)
+		}
+
+		chartAccessor, err := chart.NewAccessor(relAccessor.Chart())
+		if err != nil {
+			return false, "", "", fmt.Errorf("failed to access chart: %w", err)
+		}
+
+		if chartAccessor.Name() == options.ReleaseName {
+			return true, relAccessor.Name(), relAccessor.Namespace(), nil
 		}
 	}
 	var notFoundError error
