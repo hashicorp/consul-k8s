@@ -706,11 +706,24 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 		}
 
 		// After each gateway overlay, wait for the controller-managed Deployment to
-		// become available. This is the definitive signal that the controller resolved
-		// the GatewayClassConfig, created the Deployment, and the pod is running.
+		// become available. We use a two-phase approach because the controller's
+		// informer cache may not have propagated the GatewayClassConfig yet on the
+		// first reconcile, causing UpsertGatewayDeployment:false and no Deployment.
+		// Calling "kubectl wait --for=condition=available" on a non-existent object
+		// returns an error immediately (not-found), which would call t.Fatal and
+		// trigger t.Cleanup, deleting the just-applied resources before the controller
+		// gets a chance to retry. Instead we first poll until the Deployment exists,
+		// then wait for it to become available once it does.
 		if gw, ok := gatewayDeployment[dir]; ok {
-			logger.Logf(t, "[%s] waiting for gateway Deployment %q to be available", opts.ContextName, gw)
-			k8s.RunKubectl(t, opts, "wait", "--for=condition=available", "--timeout=3m", "deploy/"+gw)
+			logger.Logf(t, "[%s] waiting for gateway Deployment %q to be created by controller", opts.ContextName, gw)
+			retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+				out, err := k8s.RunKubectlAndGetOutputE(r, opts, "get", "deploy/"+gw)
+				if err != nil {
+					r.Errorf("[%s] gateway Deployment %q not yet created (controller cache may be stale): %v\n%s", opts.ContextName, gw, err, out)
+				}
+			})
+			logger.Logf(t, "[%s] gateway Deployment %q exists, waiting for it to be available", opts.ContextName, gw)
+			k8s.RunKubectl(t, opts, "wait", "--for=condition=available", "--timeout=5m", "deploy/"+gw)
 			logger.Logf(t, "[%s] gateway Deployment %q is available", opts.ContextName, gw)
 		}
 	}
