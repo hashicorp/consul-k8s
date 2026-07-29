@@ -98,11 +98,14 @@ var extProcFailoverServices = []string{
 }
 
 // extProcDeployments are the workloads that must be Ready in each cluster before
-// the test drives traffic.
+// the test drives traffic. The gateway pods are controller-managed and created
+// asynchronously from the Gateway CRD, so they are included here to ensure the
+// pods are scheduled and running before extProcGatewayURL waits for Accepted.
 var extProcDeployments = []string{
 	"service-a", "service-b", "service-c", "service-f", "service-g",
 	"service-d1", "service-e1", "ext-proc-http", "ext-proc-http-path",
 	"route-decider", "http-decider-connect-proxy", StaticClientName,
+	extProcSingleGateway, extProcTwoGateway,
 }
 
 // TestAPIGateway_ExtProc_MultiClusterFailover exercises Envoy external
@@ -323,7 +326,7 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
 		k8s.KubectlDelete(t, clientCtx.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 	})
-	retry.RunWith(timer, t, func(r *retry.R) {
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
 		helpers.EnsurePeeringAcceptorSecret(t, r, clientCtx.KubectlOptions(t), "../fixtures/bases/peering/peering-acceptor.yaml")
 	})
 	k8s.CopySecret(t, clientCtx, serverCtx, "api-token")
@@ -661,10 +664,19 @@ func extProcKubectlOptions(t *testing.T, ctx environment.TestContext) *terratest
 // static-client into the namespace referenced by opts, registering teardown for
 // each. Cleanups run last-in-first-out, so the overlays are deleted before the
 // common base they depend on.
+//
 func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 	t.Helper()
 
 	c := suite.Config()
+
+	// gatewayDeployment maps each overlay dir to the Deployment name created by
+	// that overlay's Gateway CRD (controller-managed, named after the Gateway).
+	gatewayDeployment := map[string]string{
+		extProcSinglePath: extProcSingleGateway,
+		extProcTwoPath:    extProcTwoGateway,
+	}
+
 	for _, dir := range []string{extProcCommonPath, extProcSinglePath, extProcTwoPath} {
 		dir := dir
 		logger.Logf(t, "[%s] kubectl apply -k %s", opts.ContextName, dir)
@@ -674,6 +686,15 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 		helpers.Cleanup(t, c.NoCleanupOnFailure, c.NoCleanup, func() {
 			_, _ = k8s.RunKubectlAndGetOutputE(t, opts, "delete", "-k", dir, "--ignore-not-found=true")
 		})
+
+		// After each gateway overlay, wait for the controller-managed Deployment to
+		// become available. This is the definitive signal that the controller resolved
+		// the GatewayClassConfig, created the Deployment, and the pod is running.
+		if gw, ok := gatewayDeployment[dir]; ok {
+			logger.Logf(t, "[%s] waiting for gateway Deployment %q to be available", opts.ContextName, gw)
+			k8s.RunKubectl(t, opts, "wait", "--for=condition=available", "--timeout=3m", "deploy/"+gw)
+			logger.Logf(t, "[%s] gateway Deployment %q is available", opts.ContextName, gw)
+		}
 	}
 
 	logger.Logf(t, "[%s] deploying static-client", opts.ContextName)
