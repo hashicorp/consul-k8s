@@ -156,12 +156,19 @@ func (c *ReadCommand) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLog
 	}
 
 	statuser := action.NewStatus(statusConfig)
-	rel, err := c.helmActionsRunner.GetStatus(statuser, releaseName)
+	_, err = c.helmActionsRunner.GetStatus(statuser, releaseName)
 	if err != nil {
 		return fmt.Errorf("couldn't check for installations: %s", err)
 	}
 
-	valuesYaml, err := yaml.Marshal(rel.Config)
+	getValues := action.NewGetValues(statusConfig)
+
+	values, err := getValues.Run(releaseName)
+	if err != nil {
+		return fmt.Errorf("couldn't get release values: %s", err)
+	}
+
+	valuesYaml, err := yaml.Marshal(values)
 	if err != nil {
 		return err
 	}

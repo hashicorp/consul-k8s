@@ -13,6 +13,7 @@ import (
 
 	"github.com/posener/complete"
 	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart"
 	"helm.sh/helm/v4/pkg/release"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -174,32 +175,62 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 		return fmt.Errorf("couldn't check for installations: %s", err)
 	}
 
-	timezone, _ := rel.Info.LastDeployed.Zone()
+	relAccessor, err := release.NewAccessor(rel)
+	if err != nil {
+		return err
+	}
+
+	timezone, _ := relAccessor.DeployedAt().Zone()
+
+	chartAccessor, err := chart.NewAccessor(relAccessor.Chart())
+	if err != nil {
+		return err
+	}
+
+	metadata := chartAccessor.MetadataAsMap()
+	chartVersion := metadata["version"].(string)
+	appVersion := metadata["appVersion"].(string)
 
 	tbl := terminal.NewTable("Name", "Namespace", "Status", "Chart Version", "AppVersion", "Revision", "Last Updated")
-	tbl.AddRow([]string{releaseName, namespace, string(rel.Info.Status), rel.Chart.Metadata.Version,
-		rel.Chart.Metadata.AppVersion, strconv.Itoa(rel.Version),
-		rel.Info.LastDeployed.Format("2006/01/02 15:04:05") + " " + timezone}, []string{})
+	tbl.AddRow([]string{releaseName, namespace, relAccessor.Status(), chartVersion,
+		appVersion, strconv.Itoa(relAccessor.Version()),
+		relAccessor.DeployedAt().Format("2006/01/02 15:04:05") + " " + timezone}, []string{})
 	c.UI.Table(tbl)
 
-	valuesYaml, err := yaml.Marshal(rel.Config)
+	getValues := action.NewGetValues(statusConfig)
+
+	values, err := getValues.Run(releaseName)
+	if err != nil {
+		return fmt.Errorf("couldn't get release values: %s", err)
+	}
+
+	valuesYaml, err := yaml.Marshal(values)
 	c.UI.Output("Config:", terminal.WithHeaderStyle())
 	if err != nil {
 		c.UI.Output("%+v", err, terminal.WithInfoStyle())
-	} else if len(rel.Config) == 0 {
+	} else if len(values) == 0 {
 		c.UI.Output(string(valuesYaml), terminal.WithInfoStyle())
 	} else {
 		c.UI.Output(string(valuesYaml), terminal.WithInfoStyle())
 	}
 
 	// Check the status of the hooks.
-	if len(rel.Hooks) > 1 {
+	if len(relAccessor.Hooks()) > 1 {
 		c.UI.Output("Status Of Helm Hooks:", terminal.WithHeaderStyle())
 
-		for _, hook := range rel.Hooks {
+		for _, hook := range relAccessor.Hooks() {
 			// Remember that we only report the status of pre-install or pre-upgrade hooks.
-			if validEvent(hook.Events) {
-				c.UI.Output("%s %s: %s", hook.Name, hook.Kind, hook.LastRun.Phase.String())
+			// if validEvent(hook.Events) {
+			// 	c.UI.Output("%s %s: %s", hook.Name, hook.Kind, hook.LastRun.Phase.String())
+			// }
+
+			hookAccessor, err := release.NewHookAccessor(hook)
+			if err != nil {
+				return err
+			}
+
+			if validHookManifest(hookAccessor.Manifest()) {
+				c.UI.Output("%s", hookAccessor.Path())
 			}
 		}
 		fmt.Println("")
@@ -211,12 +242,39 @@ func (c *Command) checkHelmInstallation(settings *helmCLI.EnvSettings, uiLogger 
 // validEvent is a helper function that checks if the given hook's events are pre-install or pre-upgrade.
 // Only pre-install and pre-upgrade hooks are expected to have run when using the status command against
 // a running installation.
-func validEvent(events []release.HookEvent) bool {
-	for _, event := range events {
-		if event.String() == "pre-install" || event.String() == "pre-upgrade" {
+// func validEvent(events []release.HookEvent) bool {
+// 	for _, event := range events {
+// 		if event.String() == "pre-install" || event.String() == "pre-upgrade" {
+// 			return true
+// 		}
+// 	}
+// 	return false
+// }
+
+type HookManifest struct {
+	Metadata struct {
+		Annotations map[string]string `json:"annotations"`
+	} `json:"metadata"`
+}
+
+func validHookManifest(manifest string) bool {
+	var hook HookManifest
+
+	err := yaml.Unmarshal([]byte(manifest), &hook)
+	if err != nil {
+		return false
+	}
+
+	hookEvent := hook.Metadata.Annotations["helm.sh/hook"]
+
+	for _, event := range strings.Split(hookEvent, ",") {
+		event = strings.TrimSpace(event)
+
+		if event == "pre-install" || event == "pre-upgrade" {
 			return true
 		}
 	}
+
 	return false
 }
 

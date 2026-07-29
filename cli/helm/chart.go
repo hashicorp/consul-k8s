@@ -40,12 +40,19 @@ func FetchChartValues(actionRunner HelmActionsRunner, namespace, name string, se
 	}
 
 	status := action.NewStatus(cfg)
-	release, err := actionRunner.GetStatus(status, name)
+	_, err = actionRunner.GetStatus(status, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return release.Config, nil
+	getValues := action.NewGetValues(cfg)
+
+	values, err := getValues.Run(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return values, nil
 }
 
 // readChartFiles reads the chart files from the embedded file system, and loads
