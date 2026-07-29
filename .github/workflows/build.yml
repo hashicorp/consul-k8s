@@ -9,7 +9,7 @@ on:
   workflow_call:
     inputs:
       allow-unprotected-branches:
-        description: "Pass true to allow the conditional-skip guard to run on unprotected branches. Callers triggered by a push to a feature branch must set this."
+        description: "Pass true to allow the conditional-skip guard to run on unprotected branches."
         type: boolean
         required: false
         default: false
@@ -32,7 +32,7 @@ jobs:
     with:
       # Allow manual runs (workflow_dispatch) on any branch, including unprotected
       # ones, without failing the conditional-skip guard.
-      # Also allow callers (e.g. scan-binaries-containers.yml on a feature branch)
+      # Also allow callers (e.g. scan-binaries-containers.yml)
       # to pass allow-unprotected-branches=true via the workflow_call input above.
       allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' || inputs.allow-unprotected-branches == true }}
 
