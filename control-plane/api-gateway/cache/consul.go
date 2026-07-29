@@ -578,9 +578,15 @@ func (c *Cache) EnsureRoleBinding(authMethod, service, namespace string) error {
 	}
 
 	if bindingRule.ID == "" {
-		_, _, err := client.ACL().BindingRuleCreate(bindingRule, &api.WriteOptions{})
+		createdRule, _, err := client.ACL().BindingRuleCreate(bindingRule, &api.WriteOptions{})
 		if err != nil {
 			return err
+		}
+		// Use the server-returned rule so that bindingRule.ID is populated;
+		// without this the cache stores an ID-less rule and any subsequent
+		// delete attempt fails with "400 Missing binding rule ID".
+		if createdRule != nil {
+			bindingRule = createdRule
 		}
 
 		c.bindingRuleMutex.Lock()
@@ -654,6 +660,13 @@ func (c *Cache) RemoveRoleBinding(authMethod, service, namespace string) error {
 
 func (c *Cache) bindingRuleDelete(client *api.Client, rule *api.ACLBindingRule, serviceCacheKey string) func() error {
 	return func() error {
+		// An empty ID means the rule was never persisted in Consul (e.g. the
+		// gateway was deleted before BindingRuleCreate returned its ID).
+		// Treat this as not-found: nothing to delete.
+		if rule.ID == "" {
+			delete(c.gatewayToACLBindingRule, serviceCacheKey)
+			return nil
+		}
 		_, err := client.ACL().BindingRuleDelete(rule.ID, &api.WriteOptions{})
 		if err != nil {
 			if ignoreNotFound(err) == nil {
