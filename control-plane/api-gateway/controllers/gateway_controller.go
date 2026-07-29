@@ -20,6 +20,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul/api"
 
@@ -69,9 +71,10 @@ type GatewayController struct {
 	allowK8sNamespacesSet mapset.Set
 	denyK8sNamespacesSet  mapset.Set
 	client.Client
-	ConsulConfig     *consul.Config
-	ApiReader        client.Reader
-	supportsTCPRoute bool
+	ConsulConfig             *consul.Config
+	ApiReader                client.Reader
+	supportsTCPRoute         bool
+	supportsV1ReferenceGrant bool
 
 	ConsulMeta apicommon.ConsulMeta
 }
@@ -466,16 +469,37 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		AuthMethod:   config.HelmConfig.AuthMethod,
 	}
 
-	builder := ctrl.NewControllerManagedBy(mgr).
+	// Detect whether the gwv1 ReferenceGrant CRD is installed in the cluster.
+	// If not, fall back to watching the gwv1beta1 ReferenceGrant instead.
+	v1ReferenceGrantGVKs, _, _ := mgr.GetScheme().ObjectKinds(&gwv1.ReferenceGrant{})
+	if len(v1ReferenceGrantGVKs) > 0 {
+		if _, err := mgr.GetRESTMapper().RESTMapping(v1ReferenceGrantGVKs[0].GroupKind(), v1ReferenceGrantGVKs[0].Version); err == nil {
+			r.supportsV1ReferenceGrant = true
+		}
+	}
+
+	controllerBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("gateway-v1").
 		For(&gwv1.Gateway{}, builder.WithPredicates(gwPredicate)).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
-		Owns(&corev1.Pod{}).
-		Watches(
+		Owns(&corev1.Pod{})
+
+	if r.supportsV1ReferenceGrant {
+		mgr.GetLogger().Info("gwv1 ReferenceGrant CRD detected - watching gwv1 ReferenceGrant")
+		controllerBuilder = controllerBuilder.Watches(
 			&gwv1.ReferenceGrant{},
 			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
-		).
+		)
+	} else {
+		mgr.GetLogger().Info("gwv1 ReferenceGrant CRD not found - falling back to gwv1beta1 ReferenceGrant")
+		controllerBuilder = controllerBuilder.Watches(
+			&gwv1beta1.ReferenceGrant{},
+			handler.EnqueueRequestsFromMapFunc(r.transformReferenceGrant),
+		)
+	}
+
+	controllerBuilder = controllerBuilder.
 		Watches(
 			&gwv1.GatewayClass{},
 			handler.EnqueueRequestsFromMapFunc(r.transformGatewayClass),
@@ -503,7 +527,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		)
 
 	if config.HelmConfig.EnableGatewayScaling && config.ConsulMeta.IsEnterpriseDistribution {
-		builder = builder.Watches(
+		controllerBuilder = controllerBuilder.Watches(
 			&autoscalingv2.HorizontalPodAutoscaler{},
 			handler.EnqueueRequestsFromMapFunc(r.transformHPA),
 		)
@@ -513,7 +537,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		r.supportsTCPRoute = true
 		mgr.GetLogger().Info("TCPRoute CRD detected - enabling TCPRoute support")
 
-		builder = builder.
+		controllerBuilder = controllerBuilder.
 			Watches(
 				&gwv1.TCPRoute{},
 				handler.EnqueueRequestsFromMapFunc(r.transformTCPRoute),
@@ -529,7 +553,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 		mgr.GetLogger().Info("TCPRoute CRD not found - skipping TCPRoute watch")
 	}
 
-	builder = builder.
+	controllerBuilder = controllerBuilder.
 		WatchesRawSource(
 			source.Channel(
 				c.Subscribe(ctx, api.APIGateway, r.transformConsulGateway).Events(),
@@ -576,7 +600,7 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
 		)
 
-	if err := builder.Complete(r); err != nil {
+	if err := controllerBuilder.Complete(r); err != nil {
 		return nil, binding.Cleaner{}, err
 	}
 	return c, cleaner, nil
@@ -947,11 +971,57 @@ func (c *GatewayController) getNamespaces(ctx context.Context) (map[string]corev
 func (c *GatewayController) getReferenceGrants(ctx context.Context) ([]gwv1.ReferenceGrant, error) {
 	var list gwv1.ReferenceGrantList
 
-	if err := c.Client.List(ctx, &list); err != nil {
+	if err := c.Client.List(ctx, &list); err == nil {
+		return list.Items, nil
+	} else if !meta.IsNoMatchError(err) {
 		return nil, err
 	}
 
-	return list.Items, nil
+	var betaList gwv1beta1.ReferenceGrantList
+	if err := c.Client.List(ctx, &betaList); err != nil {
+		return nil, err
+	}
+
+	grants := make([]gwv1.ReferenceGrant, 0, len(betaList.Items))
+	for _, grant := range betaList.Items {
+		grants = append(grants, referenceGrantV1beta1ToV1(grant))
+	}
+
+	return grants, nil
+}
+
+func referenceGrantV1beta1ToV1(grant gwv1beta1.ReferenceGrant) gwv1.ReferenceGrant {
+	from := make([]gwv1.ReferenceGrantFrom, 0, len(grant.Spec.From))
+	for _, f := range grant.Spec.From {
+		from = append(from, gwv1.ReferenceGrantFrom{
+			Group:     gwv1.Group(f.Group),
+			Kind:      gwv1.Kind(f.Kind),
+			Namespace: gwv1.Namespace(f.Namespace),
+		})
+	}
+
+	to := make([]gwv1.ReferenceGrantTo, 0, len(grant.Spec.To))
+	for _, t := range grant.Spec.To {
+		var name *gwv1.ObjectName
+		if t.Name != nil {
+			n := gwv1.ObjectName(*t.Name)
+			name = &n
+		}
+
+		to = append(to, gwv1.ReferenceGrantTo{
+			Group: gwv1.Group(t.Group),
+			Kind:  gwv1.Kind(t.Kind),
+			Name:  name,
+		})
+	}
+
+	return gwv1.ReferenceGrant{
+		ObjectMeta: grant.ObjectMeta,
+		Spec: gwv1.ReferenceGrantSpec{
+			From: from,
+			To:   to,
+		},
+	}
 }
 
 func (c *GatewayController) getDeployedGatewayService(ctx context.Context, gateway types.NamespacedName) (*corev1.Service, error) {
