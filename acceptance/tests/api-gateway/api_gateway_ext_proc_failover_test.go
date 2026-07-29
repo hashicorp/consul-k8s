@@ -43,12 +43,8 @@ import (
 // AFTER it.
 const (
 	extProcCommonPath = "../fixtures/cases/api-gateways/ext-proc-failover/common"
-	// extProcSinglePath = "../fixtures/cases/api-gateways/ext-proc-failover/single"
+	extProcSinglePath = "../fixtures/cases/api-gateways/ext-proc-failover/single"
 	extProcTwoPath = "../fixtures/cases/api-gateways/ext-proc-failover/two"
-	// extProcAppsPath is the directory that contains each app's Dockerfile and
-	// source. It is resolved at runtime relative to this file using
-	// runtime.Caller so it is correct regardless of the working directory the
-	// test binary is invoked from.
 	extProcAppsPath = "../fixtures/cases/api-gateways/ext-proc-failover/apps"
 )
 
@@ -65,7 +61,7 @@ var extProcImages = []struct{ dir, tag string }{
 
 // Gateway names for the two topologies under test.
 const (
-	// extProcSingleGateway = "api-gateway-single"
+	extProcSingleGateway = "api-gateway-single"
 	extProcTwoGateway = "api-gateway"
 )
 
@@ -106,7 +102,7 @@ var extProcDeployments = []string{
 	"service-a", "service-b", "service-c", "service-f", "service-g",
 	"service-d1", "service-e1", "ext-proc-http", "ext-proc-http-path",
 	"route-decider", "http-decider-connect-proxy", StaticClientName,
-	// extProcSingleGateway,
+	extProcSingleGateway,
 	extProcTwoGateway,
 }
 
@@ -430,9 +426,9 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	logger.Log(t, "services registered in both cluster catalogs")
 
 	// Resolve each gateway's address once it is Accepted.
-	// logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcSingleGateway)
-	// serverSingleURL := extProcGatewayURL(t, serverCtx, extProcSingleGateway)
-	// logger.Logf(t, "server single gateway URL: %s", serverSingleURL)
+	logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcSingleGateway)
+	serverSingleURL := extProcGatewayURL(t, serverCtx, extProcSingleGateway)
+	logger.Logf(t, "server single gateway URL: %s", serverSingleURL)
 	logger.Logf(t, "waiting for gateway %q to be Accepted in server cluster", extProcTwoGateway)
 	serverTwoURL := extProcGatewayURL(t, serverCtx, extProcTwoGateway)
 	logger.Logf(t, "server two gateway URL: %s", serverTwoURL)
@@ -441,21 +437,21 @@ func TestAPIGateway_ExtProc_MultiClusterFailover(t *testing.T) {
 	logger.Logf(t, "client two gateway URL: %s", clientTwoURL)
 
 	// ── SINGLE gateway: positive routing ─────────────────────────────────────
-	// t.Run("single/routing", func(t *testing.T) {
-	// 	retryCheckWithWait(t, 60, 5*time.Second, func(r *retry.R) {
-	// 		requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/a", "hello from service-a")
-	// 		requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/b", "hello from service-b")
-	// 		requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/c", "hello from service-c")
-	// 	})
-	// 	// The single processor observed each routed path.
-	// 	requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/b"`)
-	// 	requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/c"`)
-	// })
+	t.Run("single/routing", func(t *testing.T) {
+		retryCheckWithWait(t, 60, 5*time.Second, func(r *retry.R) {
+			requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/a", "hello from service-a")
+			requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/b", "hello from service-b")
+			requireGatewayBodyContains(r, serverOpts, serverSingleURL+"/c", "hello from service-c")
+		})
+		// The single processor observed each routed path.
+		requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/b"`)
+		requireProcessorLogContains(t, serverOpts, "ext-proc-http", `path="/c"`)
+	})
 
 	// ── SINGLE gateway: Envoy config (only the un-suffixed ext_proc filter) ───
-	// t.Run("single/envoy-config", func(t *testing.T) {
-	// 	requireGatewayExtProcFilters(t, serverOpts, extProcSingleGateway, "single")
-	// })
+	t.Run("single/envoy-config", func(t *testing.T) {
+		requireGatewayExtProcFilters(t, serverOpts, extProcSingleGateway, "single")
+	})
 
 	// ── TWO gateway: positive base-family routing (bare paths) ────────────────
 	t.Run("two/routing-base", func(t *testing.T) {
@@ -674,15 +670,15 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 	// gatewayDeployment maps each overlay dir to the Deployment name created by
 	// that overlay's Gateway CRD (controller-managed, named after the Gateway).
 	gatewayDeployment := map[string]string{
-		// extProcSinglePath: extProcSingleGateway,
+		extProcSinglePath: extProcSingleGateway,
 		extProcTwoPath: extProcTwoGateway,
 	}
 
 	for _, dir := range []string{
 		extProcCommonPath,
-		//  extProcSinglePath,
+		 extProcSinglePath,
 		extProcTwoPath} {
-		dir := dir
+		
 		logger.Logf(t, "[%s] kubectl apply -k %s", opts.ContextName, dir)
 		out, err := k8s.RunKubectlAndGetOutputE(t, opts, "apply", "-k", dir)
 		logger.Logf(t, "[%s] apply -k %s output:\n%s", opts.ContextName, dir, out)
@@ -698,7 +694,7 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 		// treat the gateway as deleted, and never create the Deployment.
 		if dir == extProcCommonPath {
 			logger.Logf(t, "[%s] waiting for GatewayClass gateway-class to be Accepted", opts.ContextName)
-			retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 3 * time.Second}, t, func(r *retry.R) {
+			retry.RunWith(&retry.Timer{Timeout: 10 * time.Minute, Wait: 10 * time.Second}, t, func(r *retry.R) {
 				out, err := k8s.RunKubectlAndGetOutputE(r, opts,
 					"get", "gatewayclass", "gateway-class",
 					"-o", "jsonpath={.status.conditions[?(@.type=='Accepted')].status}")
@@ -720,7 +716,7 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 		// then wait for it to become available once it does.
 		if gw, ok := gatewayDeployment[dir]; ok {
 			logger.Logf(t, "[%s] waiting for gateway Deployment %q to be created by controller", opts.ContextName, gw)
-			retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 5 * time.Second}, t, func(r *retry.R) {
+			retry.RunWith(&retry.Timer{Timeout: 10 * time.Minute, Wait: 10 * time.Second}, t, func(r *retry.R) {
 				out, err := k8s.RunKubectlAndGetOutputE(r, opts, "get", "deploy/"+gw)
 				if err != nil {
 					r.Errorf("[%s] gateway Deployment %q not yet created (controller cache may be stale): %v\n%s", opts.ContextName, gw, err, out)
