@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -815,7 +816,7 @@ func extProcGatewayURL(t *testing.T, ctx environment.TestContext, gatewayName st
 		require.Len(r, gateway.Status.Addresses, 1)
 		address = gateway.Status.Addresses[0].Value
 	})
-	return fmt.Sprintf("http://%s:8080", address)
+	return fmt.Sprintf("http://%s", net.JoinHostPort(address, "8080"))
 }
 
 // curlGatewayBody execs a curl against the gateway from the static-client pod and
