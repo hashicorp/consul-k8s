@@ -598,6 +598,10 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			// Subscribe to changes in RouteTLSSDSFilter custom resources referenced by HTTPRoutes.
 			&v1alpha1.RouteTLSSDSFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteTLSSDSFilter),
+		).
+		Watches(
+			&v1alpha1.RouteExtProc{},
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteExtProc),
 		)
 
 	if err := controllerBuilder.Complete(r); err != nil {
@@ -756,6 +760,9 @@ func (r *GatewayController) transformRouteAuthFilter(ctx context.Context, o clie
 
 func (r *GatewayController) transformRouteTLSSDSFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTLSSDSFilterIndex, client.ObjectKeyFromObject(o).String())
+}
+func (r *GatewayController) transformRouteExtProc(ctx context.Context, o client.Object) []reconcile.Request {
+	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteExtProcIndex, client.ObjectKeyFromObject(o).String())
 }
 
 func (r *GatewayController) transformConsulTCPRoute(ctx context.Context) func(entry api.ConfigEntry) []types.NamespacedName {
@@ -1111,6 +1118,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteAuthFilter{}
 		case v1alpha1.RouteTLSSDSFilterKind:
 			externalFilter = &v1alpha1.RouteTLSSDSFilter{}
+		case v1alpha1.RouteExtProcKind:
+			externalFilter = &v1alpha1.RouteExtProc{}
 		default:
 			continue
 		}

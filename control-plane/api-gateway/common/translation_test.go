@@ -1807,6 +1807,161 @@ func TestResourceTranslator_translateHTTPFilters(t1 *testing.T) {
 	}
 }
 
+func TestResourceTranslator_translateRouteExtProcFilter(t *testing.T) {
+	translator := ResourceTranslator{}
+
+	for name, tc := range map[string]struct {
+		routeExtProc *v1alpha1.RouteExtProc
+		expected     api.ExtProcFilter
+	}{
+		"minimal filter without overrides": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					StatPrefix: "my-prefix",
+					Mode:       "enabled",
+				},
+			},
+			expected: api.ExtProcFilter{
+				StatPrefix: "my-prefix",
+				Mode:       "enabled",
+			},
+		},
+		"override mode with empty overrides": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode:      "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode:      "override",
+				Overrides: &api.ExtProcOverrides{},
+			},
+		},
+		"override mode with nil processing": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode: "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: nil,
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode:      "override",
+				Overrides: &api.ExtProcOverrides{},
+			},
+		},
+		"override mode with full processing directions": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					StatPrefix: "prefix",
+					Mode:       "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: &v1alpha1.RouteExtProcProcessing{
+							Request: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode:  "SEND",
+								BodyMode:     "BUFFERED",
+								TrailersMode: "SKIP",
+								MaxBodyBytes: 1024,
+							},
+							Response: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode:  "SKIP",
+								BodyMode:     "STREAMED",
+								TrailersMode: "SEND",
+								MaxBodyBytes: 2048,
+							},
+						},
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				StatPrefix: "prefix",
+				Mode:       "override",
+				Overrides: &api.ExtProcOverrides{
+					Processing: &api.ExtProcProcessing{
+						Request: &api.ExtProcProcessingDirection{
+							HeadersMode:  "SEND",
+							BodyMode:     "BUFFERED",
+							TrailersMode: "SKIP",
+							MaxBodyBytes: 1024,
+						},
+						Response: &api.ExtProcProcessingDirection{
+							HeadersMode:  "SKIP",
+							BodyMode:     "STREAMED",
+							TrailersMode: "SEND",
+							MaxBodyBytes: 2048,
+						},
+					},
+				},
+			},
+		},
+		"override mode with only request processing": {
+			routeExtProc: &v1alpha1.RouteExtProc{
+				Spec: v1alpha1.RouteExtProcSpec{
+					Mode: "override",
+					Overrides: &v1alpha1.RouteExtProcOverrides{
+						Processing: &v1alpha1.RouteExtProcProcessing{
+							Request: &v1alpha1.RouteExtProcProcessingDirection{
+								HeadersMode: "SEND",
+							},
+						},
+					},
+				},
+			},
+			expected: api.ExtProcFilter{
+				Mode: "override",
+				Overrides: &api.ExtProcOverrides{
+					Processing: &api.ExtProcProcessing{
+						Request: &api.ExtProcProcessingDirection{
+							HeadersMode: "SEND",
+						},
+						Response: nil,
+					},
+				},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, translator.translateRouteExtProcFilter(tc.routeExtProc))
+		})
+	}
+}
+
+func TestTranslateExtProcProcessingDirection(t *testing.T) {
+	for name, tc := range map[string]struct {
+		direction *v1alpha1.RouteExtProcProcessingDirection
+		expected  *api.ExtProcProcessingDirection
+	}{
+		"nil direction returns nil": {
+			direction: nil,
+			expected:  nil,
+		},
+		"empty direction": {
+			direction: &v1alpha1.RouteExtProcProcessingDirection{},
+			expected:  &api.ExtProcProcessingDirection{},
+		},
+		"fully populated direction": {
+			direction: &v1alpha1.RouteExtProcProcessingDirection{
+				HeadersMode:  "SEND",
+				BodyMode:     "BUFFERED_PARTIAL",
+				TrailersMode: "SKIP",
+				MaxBodyBytes: 4096,
+			},
+			expected: &api.ExtProcProcessingDirection{
+				HeadersMode:  "SEND",
+				BodyMode:     "BUFFERED_PARTIAL",
+				TrailersMode: "SKIP",
+				MaxBodyBytes: 4096,
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, tc.expected, translateExtProcProcessingDirection(tc.direction))
+		})
+	}
+}
+
 func TestTranslator_ToHTTPRoute_BackendTLSSDSFilter(t *testing.T) {
 	t.Parallel()
 

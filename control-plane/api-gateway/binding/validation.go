@@ -606,6 +606,12 @@ func checkIfReferencesMissingJWTProvider(filter gwv1.HTTPRouteFilter, resources 
 		return
 	}
 
+	// A RouteAuthFilter may configure only ext_authz (no JWT), in which case
+	// there are no JWT providers to validate.
+	if authFilter.Spec.JWT == nil {
+		return
+	}
+
 	for _, provider := range authFilter.Spec.JWT.Providers {
 		_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 		if !ok {
@@ -785,9 +791,13 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 		}
 		var result authFilterValidationResult
 		missingJWTProviders := make([]string, 0)
-		for _, provider := range filter.Spec.JWT.Providers {
-			if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
-				missingJWTProviders = append(missingJWTProviders, provider.Name)
+		// A RouteAuthFilter may configure only ext_authz (no JWT), so guard
+		// against a nil JWT spec before validating JWT providers.
+		if filter.Spec.JWT != nil {
+			for _, provider := range filter.Spec.JWT.Providers {
+				if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
+					missingJWTProviders = append(missingJWTProviders, provider.Name)
+				}
 			}
 		}
 
@@ -800,6 +810,28 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 			result.acceptedErr = errRouteFilterNotAcceptedDueToInvalidRefs
 		}
 
+		results = append(results, result)
+	}
+	return results
+}
+
+// validateExtProcFilters checks each RouteExtProc for internal consistency between
+// its Mode and Overrides. Invalid filters are surfaced as an unaccepted status
+// condition rather than being silently dropped. Results are index-aligned with the
+// input slice (nil entries produce a zero-value, accepted result).
+func validateExtProcFilters(extProcFilters []*v1alpha1.RouteExtProc) extProcFilterValidationResults {
+	results := make(extProcFilterValidationResults, 0, len(extProcFilters))
+
+	for _, filter := range extProcFilters {
+		var result extProcFilterValidationResult
+		if filter != nil {
+			switch strings.ToLower(filter.Spec.Mode) {
+			case "enabled", "disabled":
+				if filter.Spec.Overrides != nil {
+					result.acceptedErr = errRouteExtProcOverridesWithoutOverrideMode
+				}
+			}
+		}
 		results = append(results, result)
 	}
 	return results
