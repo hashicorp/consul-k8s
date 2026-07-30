@@ -9,7 +9,7 @@ kind: Gateway
 metadata:
   name: api-gateway-single
   labels:
-    component: api-gateway-single
+    component: api-gateway
 spec:
   gatewayClassName: gateway-class
   listeners:
