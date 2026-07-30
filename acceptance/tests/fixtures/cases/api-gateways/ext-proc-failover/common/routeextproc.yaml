@@ -1,0 +1,28 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# RouteExtProc objects provide per-route control of the two-ext-proc gateway's
+# two ext-proc instances (statPrefix base + path). The gateway's connect-proxy
+# (cp) policy is ENABLED-by-default, so routes attach these to DISABLE the
+# instance that should not run on them. The StatPrefix targets the instance;
+# mode=disabled skips it for matching routes.
+#
+# Only the two-ext-proc gateway references these. The single-ext-proc gateway
+# uses one always-on instance and attaches no RouteExtProc filters.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteExtProc
+metadata:
+  name: disable-base
+  namespace: default
+spec:
+  statPrefix: base
+  mode: disabled
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteExtProc
+metadata:
+  name: disable-path
+  namespace: default
+spec:
+  statPrefix: path
+  mode: disabled
