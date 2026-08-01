@@ -1,0 +1,21 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# api-gateway-single: the SINGLE-ext-proc gateway. Its Consul service name matches
+# the ServiceDefaults that wires ONE builtin/ext-proc instance (empty statPrefix)
+# onto its inbound listener (see servicedefaults-single.yaml).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: api-gateway-single
+  labels:
+    component: api-gateway
+spec:
+  gatewayClassName: gateway-class
+  listeners:
+    - protocol: HTTP
+      port: 80
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: "All"
