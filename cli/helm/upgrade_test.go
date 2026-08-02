@@ -72,7 +72,7 @@ func TestUpgradeHelmRelease(t *testing.T) {
 				"\n==> Consul Upgrade Summary\n",
 			},
 			helmActionsRunner: &MockActionRunner{
-				LoadChartFunc: func(chrt embed.FS, chartDirName string) (*chart.Chart, error) {
+				LoadChartFunc: func(chrt embed.FS, chartDirName string) (chart.Charter, error) {
 					return nil, errors.New("sad trombone!")
 				},
 			},
@@ -83,7 +83,7 @@ func TestUpgradeHelmRelease(t *testing.T) {
 				"\n==> Consul Upgrade Summary\n",
 			},
 			helmActionsRunner: &MockActionRunner{
-				UpgradeFunc: func(upgrade *action.Upgrade, name string, chart *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+				UpgradeFunc: func(upgrade *action.Upgrade, name string, chart chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
 					return nil, errors.New("sad trombone!")
 				},
 			},

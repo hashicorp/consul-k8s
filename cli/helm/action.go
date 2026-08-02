@@ -37,15 +37,15 @@ type HelmActionsRunner interface {
 	// A thin wrapper around the Helm list function.
 	CheckForInstallations(options *CheckForInstallationsOptions) (bool, string, string, error)
 	// A thin wrapper around the Helm status function.
-	GetStatus(status *action.Status, name string) (*release.Release, error)
+	GetStatus(status *action.Status, name string) (release.Releaser, error)
 	// A thin wrapper around the Helm install function.
-	Install(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error)
+	Install(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error)
 	// A thin wrapper around the LoadChart function in consul-k8s CLI that reads the charts withing the embedded fle system.
-	LoadChart(chart embed.FS, chartDirName string) (*chart.Chart, error)
+	LoadChart(chart embed.FS, chartDirName string) (chart.Charter, error)
 	// A thin wrapper around the Helm uninstall function.
 	Uninstall(uninstall *action.Uninstall, name string) (*release.UninstallReleaseResponse, error)
 	// A thin wrapper around the Helm upgrade function.
-	Upgrade(upgrade *action.Upgrade, name string, chart *chart.Chart, vals map[string]interface{}) (*release.Release, error)
+	Upgrade(upgrade *action.Upgrade, name string, chart chart.Charter, vals map[string]interface{}) (release.Releaser, error)
 }
 
 // ActionRunner is the implementation of HelmActionsRunner interface that
@@ -57,7 +57,7 @@ func (h *ActionRunner) Uninstall(uninstall *action.Uninstall, name string) (*rel
 	return uninstall.Run(name)
 }
 
-func (h *ActionRunner) Install(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+func (h *ActionRunner) Install(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
 	return install.Run(chrt, vals)
 }
 
@@ -109,14 +109,14 @@ func (h *ActionRunner) CheckForInstallations(options *CheckForInstallationsOptio
 	return false, "", "", notFoundError
 }
 
-func (h *ActionRunner) GetStatus(status *action.Status, name string) (*release.Release, error) {
+func (h *ActionRunner) GetStatus(status *action.Status, name string) (release.Releaser, error) {
 	return status.Run(name)
 }
 
-func (h *ActionRunner) Upgrade(upgrade *action.Upgrade, name string, chart *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+func (h *ActionRunner) Upgrade(upgrade *action.Upgrade, name string, chart chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
 	return upgrade.Run(name, chart, vals)
 }
 
-func (h *ActionRunner) LoadChart(chart embed.FS, chartDirName string) (*chart.Chart, error) {
+func (h *ActionRunner) LoadChart(chart embed.FS, chartDirName string) (chart.Charter, error) {
 	return LoadChart(chart, chartDirName)
 }

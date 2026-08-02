@@ -14,6 +14,7 @@ import (
 	"golang.org/x/text/language"
 	"helm.sh/helm/v4/pkg/action"
 	helmCLI "helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/kube"
 )
 
 // UpgradeOptions is used when calling UpgradeHelmRelease.
@@ -117,8 +118,31 @@ func UpgradeHelmRelease(options *UpgradeOptions) error {
 	// Setup the upgrade action.
 	upgrade := action.NewUpgrade(actionConfig)
 	upgrade.Namespace = options.Namespace
-	upgrade.DryRun = options.DryRun
-	upgrade.Wait = options.Wait
+
+	if options.DryRun {
+		// Replaces legacy upgrade.DryRun = true
+		upgrade.DryRunStrategy = action.DryRunClient
+	} else {
+		upgrade.DryRunStrategy = action.DryRunNone
+	}
+
+	// * StatusWatcherStrategy WaitStrategy = "watcher"
+	// StatusWatcherStrategy: event-driven waits using kstatus (watches + aggregated readers).
+	// Default for --wait. More accurate and responsive; waits CRs and full reconciliation.
+	// Requires: reachable API server, list+watch RBAC on deployed resources, and a non-zero timeout.
+
+	// * LegacyStrategy WaitStrategy = "legacy"
+	// LegacyStrategy: Helm 3-style periodic polling until ready or timeout.
+	// Use when watches aren’t available/reliable, or for compatibility/simple CI.
+	// Requires only list RBAC for polled resources.
+
+	// * HookOnlyStrategy WaitStrategy = "hookOnly"
+	// HookOnlyStrategy: wait only for hook Pods/Jobs to complete; does not wait for general chart resources.
+
+	if options.Wait {
+		upgrade.WaitStrategy = kube.StatusWatcherStrategy
+	}
+
 	upgrade.Timeout = options.Timeout
 
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.

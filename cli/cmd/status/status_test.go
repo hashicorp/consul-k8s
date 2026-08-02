@@ -212,7 +212,7 @@ func TestStatus(t *testing.T) {
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return &helmRelease.Release{
 						Name: "consul", Namespace: "consul",
 						Info: &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
@@ -253,7 +253,7 @@ func TestStatus(t *testing.T) {
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return &helmRelease.Release{
 						Name: "consul", Namespace: "consul",
 						Info: &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
@@ -322,7 +322,7 @@ func TestStatus(t *testing.T) {
 			},
 
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return nil, errors.New("kaboom!")
 				},
 			},

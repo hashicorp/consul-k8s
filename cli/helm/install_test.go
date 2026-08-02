@@ -38,7 +38,7 @@ func TestInstallDemoApp(t *testing.T) {
 				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: default\n    \n    \n\n==> Installing Consul\n",
 			},
 			helmActionsRunner: &MockActionRunner{
-				LoadChartFunc: func(chrt embed.FS, chartDirName string) (*chart.Chart, error) {
+				LoadChartFunc: func(chrt embed.FS, chartDirName string) (chart.Charter, error) {
 					return nil, errors.New("sad trombone!")
 				},
 			},
@@ -49,7 +49,7 @@ func TestInstallDemoApp(t *testing.T) {
 				"\n==> Consul Demo Application Installation Summary\n    Name: consul-demo\n    Namespace: default\n    \n    \n\n==> Installing Consul\n",
 			},
 			helmActionsRunner: &MockActionRunner{
-				InstallFunc: func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
+				InstallFunc: func(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
 					return nil, errors.New("sad trombone!")
 				},
 			},

@@ -14,6 +14,7 @@ import (
 	"golang.org/x/text/language"
 	"helm.sh/helm/v4/pkg/action"
 	helmCLI "helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/kube"
 )
 
 // InstallOptions is used when calling InstallHelmRelease.
@@ -124,7 +125,24 @@ func InstallHelmRelease(options *InstallOptions) error {
 	install.ReleaseName = options.ReleaseName
 	install.Namespace = options.Namespace
 	install.CreateNamespace = true
-	install.Wait = options.Wait
+
+	// * StatusWatcherStrategy WaitStrategy = "watcher"
+	// StatusWatcherStrategy: event-driven waits using kstatus (watches + aggregated readers).
+	// Default for --wait. More accurate and responsive; waits CRs and full reconciliation.
+	// Requires: reachable API server, list+watch RBAC on deployed resources, and a non-zero timeout.
+
+	// * LegacyStrategy WaitStrategy = "legacy"
+	// LegacyStrategy: Helm 3-style periodic polling until ready or timeout.
+	// Use when watches aren’t available/reliable, or for compatibility/simple CI.
+	// Requires only list RBAC for polled resources.
+
+	// * HookOnlyStrategy WaitStrategy = "hookOnly"
+	// HookOnlyStrategy: wait only for hook Pods/Jobs to complete; does not wait for general chart resources.
+
+	if options.Wait {
+		install.WaitStrategy = kube.StatusWatcherStrategy
+	}
+
 	install.Timeout = options.Timeout
 
 	// Load the Helm chart.

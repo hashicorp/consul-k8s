@@ -5,6 +5,7 @@ package helm
 
 import (
 	"embed"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 
@@ -13,13 +14,29 @@ import (
 	"helm.sh/helm/v4/pkg/release"
 )
 
+type fakeReleaser struct{}
+
+func (fakeReleaser) Name() string              { return "" }
+func (fakeReleaser) Namespace() string         { return "" }
+func (fakeReleaser) Version() int              { return 0 }
+func (fakeReleaser) Hooks() []release.Hook     { return nil }
+func (fakeReleaser) Manifest() string          { return "" }
+func (fakeReleaser) Notes() string             { return "" }
+func (fakeReleaser) Labels() map[string]string { return nil }
+func (fakeReleaser) Chart() chart.Charter      { return nil }
+func (fakeReleaser) Status() string            { return "" }
+func (fakeReleaser) ApplyMethod() string       { return "" }
+func (fakeReleaser) DeployedAt() time.Time     { return time.Time{} }
+
+type fakeChart struct{}
+
 type MockActionRunner struct {
 	CheckForInstallationsFunc         func(options *CheckForInstallationsOptions) (bool, string, string, error)
-	GetStatusFunc                     func(status *action.Status, name string) (*release.Release, error)
-	InstallFunc                       func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error)
-	LoadChartFunc                     func(chrt embed.FS, chartDirName string) (*chart.Chart, error)
+	GetStatusFunc                     func(status *action.Status, name string) (release.Releaser, error)
+	InstallFunc                       func(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error)
+	LoadChartFunc                     func(chrt embed.FS, chartDirName string) (chart.Charter, error)
 	UninstallFunc                     func(uninstall *action.Uninstall, name string) (*release.UninstallReleaseResponse, error)
-	UpgradeFunc                       func(upgrade *action.Upgrade, name string, chart *chart.Chart, vals map[string]interface{}) (*release.Release, error)
+	UpgradeFunc                       func(upgrade *action.Upgrade, name string, chart chart.Charter, vals map[string]interface{}) (release.Releaser, error)
 	CheckedForConsulInstallations     bool
 	CheckedForConsulDemoInstallations bool
 	GotStatusConsulRelease            bool
@@ -32,11 +49,11 @@ type MockActionRunner struct {
 	ConsulDemoUpgraded                bool
 }
 
-func (m *MockActionRunner) Install(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
-	var installFunc func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error)
+func (m *MockActionRunner) Install(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
+	var installFunc func(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error)
 	if m.InstallFunc == nil {
-		installFunc = func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
-			return &release.Release{}, nil
+		installFunc = func(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
+			return fakeReleaser{}, nil
 		}
 	} else {
 		installFunc = m.InstallFunc
@@ -88,7 +105,7 @@ func (m *MockActionRunner) CheckForInstallations(options *CheckForInstallationsO
 	return m.CheckForInstallationsFunc(options)
 }
 
-func (m *MockActionRunner) GetStatus(status *action.Status, name string) (*release.Release, error) {
+func (m *MockActionRunner) GetStatus(status *action.Status, name string) (release.Releaser, error) {
 	if name == common.DefaultReleaseName {
 		m.GotStatusConsulRelease = true
 	} else if name == common.ConsulDemoAppReleaseName {
@@ -96,17 +113,17 @@ func (m *MockActionRunner) GetStatus(status *action.Status, name string) (*relea
 	}
 
 	if m.GetStatusFunc == nil {
-		return &release.Release{}, nil
+		return fakeReleaser{}, nil
 	}
 	return m.GetStatusFunc(status, name)
 }
 
-func (m *MockActionRunner) Upgrade(upgrade *action.Upgrade, name string, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
-	var upgradeFunc func(upgrade *action.Upgrade, name string, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error)
+func (m *MockActionRunner) Upgrade(upgrade *action.Upgrade, name string, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
+	var upgradeFunc func(upgrade *action.Upgrade, name string, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error)
 
 	if m.UpgradeFunc == nil {
-		upgradeFunc = func(upgrade *action.Upgrade, name string, chrt *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
-			return &release.Release{}, nil
+		upgradeFunc = func(upgrade *action.Upgrade, name string, chrt chart.Charter, vals map[string]interface{}) (release.Releaser, error) {
+			return fakeReleaser{}, nil
 		}
 	} else {
 		upgradeFunc = m.UpgradeFunc
@@ -123,12 +140,12 @@ func (m *MockActionRunner) Upgrade(upgrade *action.Upgrade, name string, chrt *c
 	return release, err
 }
 
-func (m *MockActionRunner) LoadChart(chrt embed.FS, chartDirName string) (*chart.Chart, error) {
-	var loadChartFunc func(chrt embed.FS, chartDirName string) (*chart.Chart, error)
+func (m *MockActionRunner) LoadChart(chrt embed.FS, chartDirName string) (chart.Charter, error) {
+	var loadChartFunc func(chrt embed.FS, chartDirName string) (chart.Charter, error)
 
 	if m.LoadChartFunc == nil {
-		loadChartFunc = func(chrt embed.FS, chartDirName string) (*chart.Chart, error) {
-			return &chart.Chart{}, nil
+		loadChartFunc = func(chrt embed.FS, chartDirName string) (chart.Charter, error) {
+			return fakeChart{}, nil
 		}
 	} else {
 		loadChartFunc = m.LoadChartFunc

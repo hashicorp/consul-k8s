@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
@@ -24,10 +25,25 @@ import (
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/chart"
+	"helm.sh/helm/v4/pkg/release"
 	helmRelease "helm.sh/helm/v4/pkg/release"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+type fakeReleaser struct{}
+
+func (fakeReleaser) Name() string              { return "" }
+func (fakeReleaser) Namespace() string         { return "" }
+func (fakeReleaser) Version() int              { return 0 }
+func (fakeReleaser) Hooks() []release.Hook     { return nil }
+func (fakeReleaser) Manifest() string          { return "" }
+func (fakeReleaser) Notes() string             { return "" }
+func (fakeReleaser) Labels() map[string]string { return nil }
+func (fakeReleaser) Chart() chart.Charter      { return nil }
+func (fakeReleaser) Status() string            { return "" }
+func (fakeReleaser) ApplyMethod() string       { return "" }
+func (fakeReleaser) DeployedAt() time.Time     { return time.Time{} }
 
 // TestValidateFlags tests the validate flags function.
 func TestValidateFlags(t *testing.T) {
@@ -226,7 +242,7 @@ func TestUpgrade(t *testing.T) {
 						return false, "", "", nil
 					}
 				},
-				UpgradeFunc: func(upgrade *action.Upgrade, name string, chart *chart.Chart, vals map[string]interface{}) (*helmRelease.Release, error) {
+				UpgradeFunc: func(upgrade *action.Upgrade, name string, chart chart.Charter, vals map[string]interface{}) (helmRelease.Releaser, error) {
 					return nil, errors.New("Helm returned an error.")
 				},
 			},
@@ -337,9 +353,9 @@ func TestUpgrade(t *testing.T) {
 						return true, "consul-demo", "consul-demo", nil
 					}
 				},
-				UpgradeFunc: func(upgrade *action.Upgrade, name string, chart *chart.Chart, vals map[string]interface{}) (*helmRelease.Release, error) {
+				UpgradeFunc: func(upgrade *action.Upgrade, name string, chart chart.Charter, vals map[string]interface{}) (helmRelease.Releaser, error) {
 					if name == "consul" {
-						return &helmRelease.Release{}, nil
+						return fakeReleaser{}, nil
 					} else {
 						return nil, errors.New("Helm returned an error.")
 					}

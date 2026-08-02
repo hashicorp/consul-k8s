@@ -189,7 +189,7 @@ func TestCaptureHelmConfig(t *testing.T) {
 		"empty config": {
 			messages: []string{"\n"},
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return &helmRelease.Release{
 						Name: "consul", Namespace: "consul",
 						Info:   &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
@@ -201,7 +201,7 @@ func TestCaptureHelmConfig(t *testing.T) {
 		},
 		"error": {
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return nil, errors.New("dummy-error")
 				},
 			},
@@ -210,7 +210,7 @@ func TestCaptureHelmConfig(t *testing.T) {
 		"some config": {
 			messages: []string{"\"global\": \"true\"", "\n", "\"name\": \"consul\""},
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return &helmRelease.Release{
 						Name: "consul", Namespace: "consul",
 						Info: &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
@@ -495,7 +495,7 @@ func TestDebugRun(t *testing.T) {
 		"success case with all targets with duration": {
 			args: []string{"-archive=true", "-duration=10s", "-output=tc1"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return testHelmRelease, nil
 				},
 			},
@@ -515,7 +515,7 @@ func TestDebugRun(t *testing.T) {
 		"success case with all targets with since": {
 			args: []string{"-archive=false", "-since=10s", "-output=tc2"}, // Default is all capture targets
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return testHelmRelease, nil
 				},
 			},
@@ -535,7 +535,7 @@ func TestDebugRun(t *testing.T) {
 		"helm capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc3"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return nil, errors.New("testing helm error")
 				},
 			},
@@ -555,7 +555,7 @@ func TestDebugRun(t *testing.T) {
 		"envoy proxy data capture fail": {
 			args: []string{"-archive=false", "-duration=10s", "-output=tc4"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return testHelmRelease, nil
 				},
 			},
@@ -575,7 +575,7 @@ func TestDebugRun(t *testing.T) {
 		"log capture fail": {
 			args: []string{"-archive=true", "-duration=10s", "-output=tc5"},
 			helmRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return testHelmRelease, nil
 				},
 			},

@@ -40,7 +40,7 @@ func TestConfigRead(t *testing.T) {
 			messages: []string{"\n"},
 
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return &helmRelease.Release{
 						Name: "consul", Namespace: "consul",
 						Info:   &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},
@@ -54,7 +54,7 @@ func TestConfigRead(t *testing.T) {
 			messages: []string{"error", "\n"},
 
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return nil, errors.New("error")
 				},
 			},
@@ -64,7 +64,7 @@ func TestConfigRead(t *testing.T) {
 			messages: []string{"global: \"true\"", "\n"},
 
 			helmActionsRunner: &helm.MockActionRunner{
-				GetStatusFunc: func(status *action.Status, name string) (*helmRelease.Release, error) {
+				GetStatusFunc: func(status *action.Status, name string) (helmRelease.Releaser, error) {
 					return &helmRelease.Release{
 						Name: "consul", Namespace: "consul",
 						Info: &helmRelease.Info{LastDeployed: nowTime, Status: "READY"},

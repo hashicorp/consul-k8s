@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/consul-k8s/cli/common"
 	cmnFlag "github.com/hashicorp/consul-k8s/cli/common/flag"
@@ -31,6 +32,22 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
+
+type fakeReleaser struct {
+	name string
+}
+
+func (f fakeReleaser) Name() string            { return f.name }
+func (fakeReleaser) Namespace() string         { return "" }
+func (fakeReleaser) Version() int              { return 0 }
+func (fakeReleaser) Hooks() []helmRelease.Hook { return nil }
+func (fakeReleaser) Manifest() string          { return "" }
+func (fakeReleaser) Notes() string             { return "" }
+func (fakeReleaser) Labels() map[string]string { return nil }
+func (fakeReleaser) Chart() chart.Charter      { return nil }
+func (fakeReleaser) Status() string            { return "" }
+func (fakeReleaser) ApplyMethod() string       { return "" }
+func (fakeReleaser) DeployedAt() time.Time     { return time.Time{} }
 
 func TestCheckForPreviousPVCs(t *testing.T) {
 	c := getInitializedCommand(t, nil)
@@ -361,7 +378,7 @@ func TestInstall(t *testing.T) {
 				"\n==> Installing Consul\n ✓ Downloaded charts.\n ! Helm returned an error.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
-				InstallFunc: func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*helmRelease.Release, error) {
+				InstallFunc: func(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (helmRelease.Releaser, error) {
 					return nil, errors.New("Helm returned an error.")
 				},
 			},
@@ -529,9 +546,10 @@ func TestInstall(t *testing.T) {
 				"\n==> Installing Consul demo application\n ✓ Downloaded charts.\n ! Helm returned an error.\n",
 			},
 			helmActionsRunner: &helm.MockActionRunner{
-				InstallFunc: func(install *action.Install, chrt *chart.Chart, vals map[string]interface{}) (*helmRelease.Release, error) {
+				InstallFunc: func(install *action.Install, chrt chart.Charter, vals map[string]interface{}) (helmRelease.Releaser, error) {
 					if install.ReleaseName == "consul" {
-						return &helmRelease.Release{Name: install.ReleaseName}, nil
+
+						return fakeReleaser{name: install.ReleaseName}, nil
 					}
 					return nil, errors.New("Helm returned an error.")
 				},
