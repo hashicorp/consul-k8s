@@ -24,9 +24,9 @@ jobs:
     uses: ./.github/workflows/reusable-conditional-skip.yml
 
   # Detect PRs whose changes are limited to the .release/ directory (CRT release
-  # orchestration). These files don't affect acceptance tests, so we skip
-  # dispatching test.yml for them (see the `test` job below). This is scoped to
-  # this workflow only, so build.yml and coverage.yml are unaffected.
+  # orchestration). These files don't affect acceptance tests or coverage, so we
+  # skip both for them (see the `test` and `coverage` jobs below). This is scoped
+  # to this workflow only, so build.yml is unaffected.
   check-release-only:
     runs-on: ubuntu-latest
     name: Check whether only .release files changed
@@ -51,8 +51,9 @@ jobs:
   coverage:
     needs:
       - conditional-skip
+      - check-release-only
       - get-go-version
-    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.check-release-only.outputs.release-only != 'true'
     uses: ./.github/workflows/coverage.yml
     with:
       go-version: ${{ needs.get-go-version.outputs.go-version }}
