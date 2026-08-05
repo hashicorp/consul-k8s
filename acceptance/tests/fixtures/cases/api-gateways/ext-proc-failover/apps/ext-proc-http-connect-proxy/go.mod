@@ -1,3 +1,3 @@
 module ext-proc-http-connect-proxy
 
-go 1.22
+go 1.26.5
