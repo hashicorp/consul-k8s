@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func TestGatewayPolicyWebhook_Handle(t *testing.T) {
@@ -32,13 +32,13 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 	}{
 		"valid - no other policy targets listener": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-gateway",
 						Namespace: "default",
 					},
-					Spec: gwv1beta1.GatewaySpec{
-						Listeners: []gwv1beta1.Listener{
+					Spec: gwv1.GatewaySpec{
+						Listeners: []gwv1.Listener{
 							{
 								Name: "l1",
 							},
@@ -53,10 +53,10 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
-						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
+						SectionName: ptrTo(gwv1.SectionName("l1")),
 					},
 				},
 			},
@@ -64,14 +64,14 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 		},
 		"valid - existing policy targets different gateway": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-gateway",
 						Namespace: "default",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: "",
-						Listeners: []gwv1beta1.Listener{
+						Listeners: []gwv1.Listener{
 							{
 								Name: "l1",
 							},
@@ -85,10 +85,10 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 					},
 					Spec: GatewayPolicySpec{
 						TargetRef: PolicyTargetReference{
-							Group:       gwv1beta1.GroupVersion.String(),
+							Group:       gwv1.GroupVersion.String(),
 							Kind:        "Gateway",
 							Name:        "another-gateway",
-							SectionName: ptrTo(gwv1beta1.SectionName("l1")),
+							SectionName: ptrTo(gwv1.SectionName("l1")),
 						},
 					},
 				},
@@ -100,10 +100,10 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
-						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
+						SectionName: ptrTo(gwv1.SectionName("l1")),
 					},
 				},
 			},
@@ -112,14 +112,14 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 
 		"valid - existing policy targets different listener on the same gateway": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "my-gateway",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: "",
-						Listeners: []gwv1beta1.Listener{
+						Listeners: []gwv1.Listener{
 							{
 								Name: "l1",
 							},
@@ -136,10 +136,10 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 					},
 					Spec: GatewayPolicySpec{
 						TargetRef: PolicyTargetReference{
-							Group:       gwv1beta1.GroupVersion.String(),
+							Group:       gwv1.GroupVersion.String(),
 							Kind:        "Gateway",
 							Name:        "my-gateway",
-							SectionName: ptrTo(gwv1beta1.SectionName("l2")),
+							SectionName: ptrTo(gwv1.SectionName("l2")),
 						},
 					},
 				},
@@ -151,10 +151,10 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
-						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
+						SectionName: ptrTo(gwv1.SectionName("l1")),
 					},
 				},
 			},
@@ -162,14 +162,14 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 		},
 		"invalid - existing policy targets same listener on same gateway": {
 			existingResources: []runtime.Object{
-				&gwv1beta1.Gateway{
+				&gwv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my-gateway",
 						Namespace: "default",
 					},
-					Spec: gwv1beta1.GatewaySpec{
+					Spec: gwv1.GatewaySpec{
 						GatewayClassName: "",
-						Listeners: []gwv1beta1.Listener{
+						Listeners: []gwv1.Listener{
 							{
 								Name: "l1",
 							},
@@ -186,10 +186,10 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 					},
 					Spec: GatewayPolicySpec{
 						TargetRef: PolicyTargetReference{
-							Group:       gwv1beta1.GroupVersion.String(),
+							Group:       gwv1.GroupVersion.String(),
 							Kind:        "Gateway",
 							Name:        "my-gateway",
-							SectionName: ptrTo(gwv1beta1.SectionName("l1")),
+							SectionName: ptrTo(gwv1.SectionName("l1")),
 						},
 					},
 				},
@@ -201,10 +201,10 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 				},
 				Spec: GatewayPolicySpec{
 					TargetRef: PolicyTargetReference{
-						Group:       gwv1beta1.GroupVersion.String(),
+						Group:       gwv1.GroupVersion.String(),
 						Kind:        "Gateway",
 						Name:        "my-gateway",
-						SectionName: ptrTo(gwv1beta1.SectionName("l1")),
+						SectionName: ptrTo(gwv1.SectionName("l1")),
 					},
 				},
 			},
@@ -223,7 +223,7 @@ func TestGatewayPolicyWebhook_Handle(t *testing.T) {
 			require.NoError(t, err)
 			s := runtime.NewScheme()
 			s.AddKnownTypes(GroupVersion, &GatewayPolicy{}, &GatewayPolicyList{})
-			s.AddKnownTypes(gwv1beta1.SchemeGroupVersion, &gwv1beta1.Gateway{})
+			s.AddKnownTypes(gwv1.SchemeGroupVersion, &gwv1.Gateway{})
 			fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(tt.existingResources...).WithIndex(&GatewayPolicy{}, Gatewaypolicy_GatewayIndex, gatewayForGatewayPolicy).Build()
 
 			var list GatewayPolicyList
@@ -272,7 +272,7 @@ func gatewayForGatewayPolicy(o client.Object) []string {
 
 	targetGateway := gatewayPolicy.Spec.TargetRef
 	// gateway policy is 1to1
-	if targetGateway.Group == "gateway.networking.k8s.io/v1beta1" && targetGateway.Kind == "Gateway" {
+	if targetGateway.Group == "gateway.networking.k8s.io/v1" && targetGateway.Kind == "Gateway" {
 		policyNamespace := gatewayPolicy.Namespace
 		if policyNamespace == "" {
 			policyNamespace = "default"

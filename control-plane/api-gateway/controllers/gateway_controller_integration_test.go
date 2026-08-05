@@ -27,8 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
@@ -42,9 +40,8 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 	netutil.GetAgentBindAddrFunc = netutil.GetMockGetAgentBindAddrFunc("0.0.0.0")
 	s := runtime.NewScheme()
 	require.NoError(t, clientgoscheme.AddToScheme(s))
-	require.NoError(t, gwv1alpha2.Install(s))
 	require.NoError(t, gwv1.Install(s))
-	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	testCases := map[string]struct {
@@ -52,7 +49,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 		certFn           func(*testing.T, context.Context, client.WithWatch, string) *corev1.Secret
 		gwFn             func(*testing.T, context.Context, client.WithWatch, string) *gwv1.Gateway
 		httpRouteFn      func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, *v1alpha1.RouteAuthFilter) *gwv1.HTTPRoute
-		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway) *gwv1alpha2.TCPRoute
+		tcpRouteFn       func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway) *gwv1.TCPRoute
 		externalFilterFn func(*testing.T, context.Context, client.WithWatch, string) *v1alpha1.RouteAuthFilter
 		policyFn         func(*testing.T, context.Context, client.WithWatch, *gwv1.Gateway, string)
 	}{
@@ -117,7 +114,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 				WithStatusSubresource(
 					&gwv1.Gateway{},
 					&gwv1.HTTPRoute{},
-					&gwv1alpha2.TCPRoute{},
+					&gwv1.TCPRoute{},
 					&v1alpha1.RouteAuthFilter{},
 				)
 			fclient := registerFieldIndexersForTest(fakeClient)
@@ -218,7 +215,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			// ✅ Wait for routes to be created before reconciling
 			require.Eventually(t, func() bool {
 				httpRoute := &gwv1.HTTPRoute{}
-				tcpRoute := &gwv1alpha2.TCPRoute{}
+				tcpRoute := &gwv1.TCPRoute{}
 				httpErr := k8sClient.Get(ctx, types.NamespacedName{
 					Namespace: httpRouteObj.Namespace,
 					Name:      httpRouteObj.Name,
@@ -340,7 +337,7 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			require.Eventually(t, func() bool {
 				gwObj := &gwv1.Gateway{}
 				httpRouteObjCheck := &gwv1.HTTPRoute{}
-				tcpRouteObjCheck := &gwv1alpha2.TCPRoute{}
+				tcpRouteObjCheck := &gwv1.TCPRoute{}
 				certCheck := &corev1.Secret{}
 
 				gwErr := k8sClient.Get(ctx, gwNamespaceName, gwObj)
@@ -760,16 +757,16 @@ func createJWTAuthHTTPRoute(t *testing.T, ctx context.Context, k8sClient client.
 	return route
 }
 
-func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
-	route := &gwv1alpha2.TCPRoute{
+func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1.TCPRoute {
+	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
-			APIVersion: "gateway.networking.k8s.io/v1alpha2",
+			APIVersion: "gateway.networking.k8s.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
 		},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: []gwv1.ParentReference{
 					{
@@ -781,7 +778,7 @@ func createAllFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient cli
 					},
 				},
 			},
-			Rules: []gwv1alpha2.TCPRouteRule{
+			Rules: []gwv1.TCPRouteRule{
 				{
 					BackendRefs: []gwv1.BackendRef{
 						{
@@ -1071,8 +1068,8 @@ func minimalFieldsSetHTTPRoute(t *testing.T, ctx context.Context, k8sClient clie
 	return route
 }
 
-func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
-	route := &gwv1alpha2.TCPRoute{
+func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1.TCPRoute {
+	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -1080,7 +1077,7 @@ func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient clien
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
 		},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: []gwv1.ParentReference{
 					{
@@ -1092,7 +1089,7 @@ func minimalFieldsSetTCPRoute(t *testing.T, ctx context.Context, k8sClient clien
 					},
 				},
 			},
-			Rules: []gwv1alpha2.TCPRouteRule{
+			Rules: []gwv1.TCPRouteRule{
 				{
 					BackendRefs: []gwv1.BackendRef{
 						{
@@ -1434,8 +1431,8 @@ func createFunkyCasingFieldsHTTPRoute(t *testing.T, ctx context.Context, k8sClie
 	return route
 }
 
-func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1alpha2.TCPRoute {
-	route := &gwv1alpha2.TCPRoute{
+func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClient client.WithWatch, gw *gwv1.Gateway) *gwv1.TCPRoute {
+	route := &gwv1.TCPRoute{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "TCPRoute",
 			APIVersion: "gateway.networking.k8s.io/v1alpha2",
@@ -1443,7 +1440,7 @@ func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClien
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tcp-route",
 		},
-		Spec: gwv1alpha2.TCPRouteSpec{
+		Spec: gwv1.TCPRouteSpec{
 			CommonRouteSpec: gwv1.CommonRouteSpec{
 				ParentRefs: []gwv1.ParentReference{
 					{
@@ -1454,7 +1451,7 @@ func createFunkyCasingFieldsTCPRoute(t *testing.T, ctx context.Context, k8sClien
 					},
 				},
 			},
-			Rules: []gwv1alpha2.TCPRouteRule{
+			Rules: []gwv1.TCPRouteRule{
 				{
 					BackendRefs: []gwv1.BackendRef{
 						{

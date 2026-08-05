@@ -10,7 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+
+	// gwv1 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	"github.com/hashicorp/consul/api"
 
@@ -591,12 +592,12 @@ func (t ResourceTranslator) translateHTTPFilters(filters []gwv1.HTTPRouteFilter,
 	return requestFilter, responseFilter, tlsConfig
 }
 
-func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {
+func (t ResourceTranslator) ToTCPRoute(route gwv1.TCPRoute, resources *ResourceMap) *api.TCPRouteConfigEntry {
 	namespace := t.Namespace(route.Namespace)
 
 	// we don't translate parent refs
 
-	backendRefs := ConvertSliceFunc(route.Spec.Rules, func(rule gwv1alpha2.TCPRouteRule) []gwv1.BackendRef { return rule.BackendRefs })
+	backendRefs := ConvertSliceFunc(route.Spec.Rules, func(rule gwv1.TCPRouteRule) []gwv1.BackendRef { return rule.BackendRefs })
 	flattenedRefs := Flatten(backendRefs)
 	services := ConvertSliceFuncIf(flattenedRefs, func(ref gwv1.BackendRef) (api.TCPService, bool) {
 		return t.translateTCPRouteRule(route, ref, resources)
@@ -615,7 +616,7 @@ func (t ResourceTranslator) ToTCPRoute(route gwv1alpha2.TCPRoute, resources *Res
 	}
 }
 
-func (t ResourceTranslator) translateTCPRouteRule(route gwv1alpha2.TCPRoute, ref gwv1.BackendRef, resources *ResourceMap) (api.TCPService, bool) {
+func (t ResourceTranslator) translateTCPRouteRule(route gwv1.TCPRoute, ref gwv1.BackendRef, resources *ResourceMap) (api.TCPService, bool) {
 	// we ignore weight for now
 
 	id := types.NamespacedName{

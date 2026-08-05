@@ -13,8 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-
 	"github.com/hashicorp/consul-k8s/control-plane/api-gateway/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -50,7 +48,7 @@ type BinderConfig struct {
 	// HTTPRoutes is a list of HTTPRoute objects that ought to be bound to the Gateway.
 	HTTPRoutes []gwv1.HTTPRoute
 	// TCPRoutes is a list of TCPRoute objects that ought to be bound to the Gateway.
-	TCPRoutes []gwv1alpha2.TCPRoute
+	TCPRoutes []gwv1.TCPRoute
 	// Pods are any pods that are part of the Gateway deployment.
 	Pods []corev1.Pod
 	// Service is the deployed service associated with the Gateway deployment.
