@@ -1743,3 +1743,62 @@ func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatc
 	err := k8sClient.Create(ctx, policy)
 	require.NoError(t, err)
 }
+
+// TestListenerProtocolAnnotation_TranslatorProducesCorrectProtocol verifies that
+// when a Gateway carries the listener-protocol annotation, the ResourceTranslator
+// produces a Consul api-gateway config entry with the annotated listener protocol
+// (RFC-0002, consul-k8s annotation-based protocol selection).
+//
+// Note: this test uses the ResourceTranslator directly (the same code path used
+// during reconciliation). The Consul server-side validation of the new protocol
+// values is exercised in the consul-core tests.
+func TestListenerProtocolAnnotation_TranslatorProducesCorrectProtocol(t *testing.T) {
+	for _, tc := range []struct {
+		annotation   string
+		wantProtocol string
+	}{
+		{"grpc", "grpc"},
+		{"http2", "http2"},
+	} {
+		tc := tc
+		t.Run(tc.annotation, func(t *testing.T) {
+			t.Parallel()
+
+			translator := common.ResourceTranslator{}
+			listenerName := "grpc-listener"
+			annotationKey := common.ListenerProtocolAnnotationPrefix + listenerName + common.ListenerProtocolAnnotationSuffix
+
+			gw := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "gw-" + tc.annotation,
+					Namespace: "default",
+					Annotations: map[string]string{
+						annotationKey: tc.annotation,
+					},
+				},
+				Spec: gwv1.GatewaySpec{
+					GatewayClassName: "gwclass",
+					Listeners: []gwv1.Listener{
+						{
+							Name:     gwv1.SectionName(listenerName),
+							Port:     9080,
+							Protocol: gwv1.HTTPProtocolType,
+						},
+					},
+				},
+			}
+
+			// ToAPIGateway drives the same translation path used during reconciliation.
+			consulEntry := translator.ToAPIGateway(gw, common.NewResourceMap(
+				translator,
+				common.NoopReferenceValidator,
+				logrtest.New(t),
+			), nil)
+
+			require.Len(t, consulEntry.Listeners, 1,
+				"expected exactly one listener in the translated config entry")
+			require.Equal(t, tc.wantProtocol, consulEntry.Listeners[0].Protocol,
+				"Consul listener Protocol should be %q from annotation %q", tc.wantProtocol, tc.annotation)
+		})
+	}
+}

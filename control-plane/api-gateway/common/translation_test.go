@@ -2302,3 +2302,140 @@ func TestResourceTranslator_toAPIGatewayListener_WithSDSAndCertificateRefs(t *te
 	expectedCert := translator.NonNormalizedConfigEntryReference(api.FileSystemCertificate, types.NamespacedName{Name: "gw-cert", Namespace: "default"})
 	require.Contains(t, got.TLS.Certificates, expectedCert)
 }
+
+// TestResolveListenerProtocol verifies that the annotation-based protocol
+// override selects the correct Consul listener protocol (RFC-0002).
+func TestResolveListenerProtocol(t *testing.T) {
+	t.Parallel()
+
+	makeGateway := func(annotations map[string]string) gwv1.Gateway {
+		return gwv1.Gateway{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "edge",
+				Namespace:   "default",
+				Annotations: annotations,
+			},
+		}
+	}
+	makeListener := func(name string, protocol gwv1.ProtocolType) gwv1.Listener {
+		return gwv1.Listener{Name: gwv1.SectionName(name), Protocol: protocol}
+	}
+
+	tests := []struct {
+		name             string
+		gatewayAnnotations map[string]string
+		listener         gwv1.Listener
+		wantProtocol     string
+	}{
+		{
+			name:         "grpc annotation overrides HTTP listener protocol",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "grpc",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "grpc",
+		},
+		{
+			name:         "http2 annotation overrides HTTP listener protocol",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "h2" + ListenerProtocolAnnotationSuffix: "http2",
+			},
+			listener:     makeListener("h2", gwv1.HTTPProtocolType),
+			wantProtocol: "http2",
+		},
+		{
+			name:         "annotation is case-insensitive",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "GRPC",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "grpc",
+		},
+		{
+			name:         "invalid annotation value falls back to protocol map",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "grpc-listener" + ListenerProtocolAnnotationSuffix: "invalid-protocol",
+			},
+			listener:     makeListener("grpc-listener", gwv1.HTTPProtocolType),
+			wantProtocol: "http", // falls back to listenerProtocolMap["http"]
+		},
+		{
+			name:         "no annotation uses protocol map — HTTP",
+			listener:     makeListener("web", gwv1.HTTPProtocolType),
+			wantProtocol: "http",
+		},
+		{
+			name:         "no annotation uses protocol map — HTTPS",
+			listener:     makeListener("secure", gwv1.HTTPSProtocolType),
+			wantProtocol: "http",
+		},
+		{
+			name:         "no annotation uses protocol map — TCP",
+			listener:     makeListener("tcp", gwv1.TCPProtocolType),
+			wantProtocol: "tcp",
+		},
+		{
+			name:         "annotation on different section does not affect this listener",
+			gatewayAnnotations: map[string]string{
+				ListenerProtocolAnnotationPrefix + "other-listener" + ListenerProtocolAnnotationSuffix: "grpc",
+			},
+			listener:     makeListener("web", gwv1.HTTPProtocolType),
+			wantProtocol: "http",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gw := makeGateway(tt.gatewayAnnotations)
+			got := resolveListenerProtocol(gw, tt.listener)
+			require.Equal(t, tt.wantProtocol, got)
+		})
+	}
+}
+
+// TestToAPIGatewayListener_ProtocolAnnotation verifies that the annotation-based
+// protocol selection is propagated into the Consul api-gateway listener (RFC-0002).
+func TestToAPIGatewayListener_ProtocolAnnotation(t *testing.T) {
+	t.Parallel()
+
+	translator := ResourceTranslator{
+		EnableConsulNamespaces: false,
+		ConsulDestNamespace:    "default",
+	}
+
+	for _, tc := range []struct {
+		annotation   string
+		wantProtocol string
+	}{
+		{"grpc", "grpc"},
+		{"http2", "http2"},
+	} {
+		tc := tc
+		t.Run(tc.annotation, func(t *testing.T) {
+			t.Parallel()
+
+			gateway := gwv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "edge",
+					Namespace: "default",
+					Annotations: map[string]string{
+						ListenerProtocolAnnotationPrefix + "listener" + ListenerProtocolAnnotationSuffix: tc.annotation,
+					},
+				},
+			}
+			listener := gwv1.Listener{
+				Name:     "listener",
+				Port:     9080,
+				Protocol: gwv1.HTTPProtocolType,
+			}
+
+			resources := NewResourceMap(translator, fakeReferenceValidator{}, logrtest.NewTestLogger(t))
+			got, ok := translator.toAPIGatewayListener(gateway, listener, resources, nil)
+			require.True(t, ok)
+			require.Equal(t, tc.wantProtocol, got.Protocol,
+				"expected Consul listener protocol %q from annotation %q", tc.wantProtocol, tc.annotation)
+		})
+	}
+}

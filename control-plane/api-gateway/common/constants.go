@@ -24,4 +24,18 @@ const (
 	TLSMinVersionAnnotationKey      = "api-gateway.consul.hashicorp.com/tls_min_version"
 	TLSSDSClusterNameAnnotationKey  = "api-gateway.consul.hashicorp.com/tls_sds_cluster_name"
 	TLSSDSCertResourceAnnotationKey = "api-gateway.consul.hashicorp.com/tls_sds_cert_resource"
+
+	// ListenerProtocolAnnotationKey selects the Consul api-gateway listener
+	// protocol for a specific listener section. It is set on the Kubernetes
+	// Gateway object's Annotations map and its value must be a valid Consul
+	// APIGatewayListenerProtocol string: "http", "http2", "grpc", or "tcp".
+	//
+	// Example:
+	//   annotations:
+	//     api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol: "grpc"
+	//
+	// The annotation key is constructed at runtime as:
+	//   ListenerProtocolAnnotationPrefix + sectionName + ListenerProtocolAnnotationSuffix
+	ListenerProtocolAnnotationPrefix = "api-gateway.consul.hashicorp.com/listener-"
+	ListenerProtocolAnnotationSuffix = "-protocol"
 )
