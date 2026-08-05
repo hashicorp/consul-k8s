@@ -43,6 +43,7 @@ permissions:
   # Required for the discover-artifacts job to list this run's artifacts, and
   # for the scan jobs to download them, via the GitHub Actions API.
   actions: read
+  security-events: write
 
 jobs:
   # 1. Build every artifact for the triggering branch's latest commit. build.yml
@@ -55,7 +56,6 @@ jobs:
   #    any branch.
   build:
     uses: ./.github/workflows/build.yml
-    secrets: inherit
     with:
       # This workflow may be triggered via workflow_dispatch on an unprotected branch.
       # Pass the flag through so build.yml's conditional-skip guard doesn't reject the run.
@@ -112,6 +112,12 @@ jobs:
           name: sarif-repository
           path: results.sarif
           if-no-files-found: warn
+
+      - name: Upload SARIF file
+        if: always()
+        uses: github/codeql-action/upload-sarif@c4fb451437765abf5018c6fbf22cce1a7da1e5cc # codeql-bundle-v2.17.1
+        with:
+          sarif_file: results.sarif
 
   # 4. Enumerate the build artifacts so the scan jobs below can fan out over
   #    them with a matrix. The reusable build workflow shares this run's id, so
@@ -248,11 +254,18 @@ jobs:
           path: results.sarif
           if-no-files-found: warn
 
+      - name: Upload SARIF file
+        if: always()
+        uses: github/codeql-action/upload-sarif@c4fb451437765abf5018c6fbf22cce1a7da1e5cc # codeql-bundle-v2.17.1
+        with:
+          sarif_file: results.sarif
+          category: binary-${{ matrix.artifact }}
+
   # 6. Scan each container image -- one matrix job per image tarball. Each job
   #    loads exactly one image into the local daemon and scans it.
   scan-containers:
     name: Scan ${{ matrix.artifact }}
-    needs: [discover-artifacts]
+    needs: [discover-artifacts, get-go-version]
     runs-on: ubuntu-latest
     # Needs the PRODSEC_SCANNER_READ_ONLY secret, so skip on forks.
     if: github.repository == 'hashicorp/consul-k8s' && needs.discover-artifacts.outputs.images != '[]'
@@ -265,6 +278,11 @@ jobs:
       # below resolves to a valid git repo root.
       - name: Checkout
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+
+      - name: Set up Go
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
+        with:
+          go-version: ${{ needs.get-go-version.outputs.go-version }}
 
       # Download just this matrix entry's image tarball.
       - name: Download image artifact
@@ -339,3 +357,10 @@ jobs:
           name: sarif-container-${{ matrix.artifact }}
           path: results.sarif
           if-no-files-found: warn
+
+      - name: Upload SARIF file
+        if: always()
+        uses: github/codeql-action/upload-sarif@c4fb451437765abf5018c6fbf22cce1a7da1e5cc # codeql-bundle-v2.17.1
+        with:
+          sarif_file: results.sarif
+          category: container-${{ matrix.artifact }}
