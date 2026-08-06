@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -121,7 +121,7 @@ func Test_cmdAdd(t *testing.T) {
 			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
 				pod.Annotations[keyInjectStatus] = "true"
 				pod.Annotations[keyTransparentProxyStatus] = "enabled"
-				cfg := iptables.Config{
+				cfg := nftables.Config{
 					ProxyUserID:      "123",
 					ProxyInboundPort: 20000,
 				}
@@ -148,7 +148,7 @@ func Test_cmdAdd(t *testing.T) {
 			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
 				pod.Annotations[keyInjectStatus] = "true"
 				pod.Annotations[keyTransparentProxyStatus] = "enabled"
-				cfg := iptables.Config{
+				cfg := nftables.Config{
 					ProxyUserID:      "123",
 					ProxyInboundPort: 20000,
 				}
@@ -483,15 +483,15 @@ func TestParseAnnotation(t *testing.T) {
 		name         string
 		annotation   string
 		configurePod func(*corev1.Pod) *corev1.Pod
-		expected     iptables.Config
+		expected     nftables.Config
 		err          error
 	}{
 		{
-			name:       "Pod with iptables.Config annotation",
+			name:       "Pod with nftables.Config annotation",
 			annotation: annotationRedirectTraffic,
 			configurePod: func(pod *corev1.Pod) *corev1.Pod {
-				// Use iptables.Config so that if the Config struct ever changes that the test is still valid
-				cfg := iptables.Config{ProxyUserID: "1234"}
+				// Use nftables.Config so that if the Config struct ever changes that the test is still valid
+				cfg := nftables.Config{ProxyUserID: "1234"}
 				j, err := json.Marshal(&cfg)
 				if err != nil {
 					t.Fatalf("could not marshal nft config: %v", err)
@@ -499,18 +499,18 @@ func TestParseAnnotation(t *testing.T) {
 				pod.Annotations[annotationRedirectTraffic] = string(j)
 				return pod
 			},
-			expected: iptables.Config{
+			expected: nftables.Config{
 				ProxyUserID: "1234",
 			},
 			err: nil,
 		},
 		{
-			name:       "Pod without iptables.Config annotation",
+			name:       "Pod without nftables.Config annotation",
 			annotation: annotationRedirectTraffic,
 			configurePod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			expected: iptables.Config{},
+			expected: nftables.Config{},
 			err:      fmt.Errorf("could not find %s annotation for %s pod", annotationRedirectTraffic, defaultPodName),
 		},
 	}
@@ -722,7 +722,7 @@ const nomadStdinData = `{
 `
 
 func minimalIPTablesJSON(t *testing.T) string {
-	cfg := iptables.Config{
+	cfg := nftables.Config{
 		ConsulDNSIP:          "127.0.0.1",
 		ConsulDNSPort:        8600,
 		ProxyUserID:          "101",

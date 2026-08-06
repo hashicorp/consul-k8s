@@ -19,7 +19,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/mapstructure"
@@ -69,8 +69,8 @@ type Command struct {
 	nonRetryableError error
 
 	// Only used in tests.
-	iptablesProvider iptables.Provider
-	iptablesConfig   iptables.Config
+	iptablesProvider nftables.Provider
+	iptablesConfig   nftables.Config
 }
 
 func (c *Command) init() {
@@ -391,7 +391,7 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 		return err
 	}
 	if c.iptablesProvider != nil {
-		c.iptablesConfig.IptablesProvider = c.iptablesProvider
+		c.iptablesConfig.NftablesProvider = c.iptablesProvider
 	}
 
 	if svc.Proxy.TransparentProxy != nil && svc.Proxy.TransparentProxy.OutboundListenerPort != 0 {
@@ -418,7 +418,7 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 	}
 
 	// Configure any relevant information from the proxy service
-	err = iptables.Setup(c.iptablesConfig, dualStack)
+	err = nftables.Setup(c.iptablesConfig, dualStack)
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -1436,7 +1436,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				return
 			}
 
-			var iptablesCfg iptables.Config
+			var iptablesCfg nftables.Config
 			var overwritePorts []string
 			actual := resp.Patches
 			if len(actual) > 0 {

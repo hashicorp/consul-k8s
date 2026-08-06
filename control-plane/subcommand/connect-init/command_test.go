@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -743,12 +743,12 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		proxyConfig           map[string]interface{}
 		tproxyConfig          api.TransparentProxyConfig
 		registerProxyDefaults bool
-		expIptablesParamsFunc func(actual iptables.Config) (bool, string)
+		expIptablesParamsFunc func(actual nftables.Config) (bool, string)
 	}{
 		"no extra proxy config provided": {},
 		"envoy bind port is provided in service proxy config": {
 			proxyConfig: map[string]interface{}{"bind_port": "21000"},
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
@@ -761,7 +761,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		"envoy bind port is provided in a config entry": {
 			proxyConfig:           map[string]interface{}{"bind_port": "21000"},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
@@ -771,7 +771,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		},
 		"tproxy outbound listener port is provided in service proxy config": {
 			tproxyConfig: api.TransparentProxyConfig{OutboundListenerPort: 16000},
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
@@ -782,7 +782,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		"tproxy outbound listener port is provided in a config entry": {
 			tproxyConfig:          api.TransparentProxyConfig{OutboundListenerPort: 16000},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
@@ -792,7 +792,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		},
 		"envoy stats addr is provided in service proxy config": {
 			proxyConfig: map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
@@ -803,7 +803,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		"envoy stats addr is provided in a config entry": {
 			proxyConfig:           map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
@@ -860,7 +860,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			ui := cli.NewMockUi()
 
 			iptablesProvider := &fakeIptablesProvider{}
-			iptablesCfg := iptables.Config{
+			iptablesCfg := nftables.Config{
 				ProxyUserID:      "5995",
 				ProxyInboundPort: 20000,
 			}

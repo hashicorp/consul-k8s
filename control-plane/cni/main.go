@@ -17,7 +17,7 @@ import (
 	current "github.com/containernetworking/cni/pkg/types/100"
 	cniv "github.com/containernetworking/cni/pkg/version"
 	"github.com/hashicorp/consul-k8s/version"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,7 +52,7 @@ const (
 	// indicate the status of the CNI plugin.
 	complete = "complete"
 
-	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
+	// annotationRedirectTraffic stores nftables.Config information so that the CNI plugin can use it to apply
 	// nft traffic redirection rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
@@ -64,7 +64,7 @@ type Command struct {
 	// client is a kubernetes client
 	client kubernetes.Interface
 	// iptablesProvider is the Provider that will apply nft rules. Used for testing.
-	iptablesProvider iptables.Provider
+	iptablesProvider nftables.Provider
 }
 
 type CNIArgs struct {
@@ -178,7 +178,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		result = prevResult
 	}
 
-	var iptablesCfg iptables.Config
+	var iptablesCfg nftables.Config
 	dualStack := false
 	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
 	if cniArgsIPTablesCfg != "" {
@@ -232,11 +232,11 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	// Set the provider to a fake provider in testing, otherwise use the default
 	// nft Provider
 	if c.iptablesProvider != nil {
-		iptablesCfg.IptablesProvider = c.iptablesProvider
+		iptablesCfg.NftablesProvider = c.iptablesProvider
 	}
 
 	// Apply the nft rules.
-	err = iptables.Setup(iptablesCfg, dualStack)
+	err = nftables.Setup(iptablesCfg, dualStack)
 	if err != nil {
 		return fmt.Errorf("could not apply nftables rules: %v", err)
 	}
@@ -369,8 +369,8 @@ func skipTrafficRedirection(pod corev1.Pod) bool {
 	return false
 }
 
-func parseIPTablesFromCNIArgs(args string) (iptables.Config, error) {
-	cfg := iptables.Config{}
+func parseIPTablesFromCNIArgs(args string) (nftables.Config, error) {
+	cfg := nftables.Config{}
 	err := json.Unmarshal([]byte(args), &cfg)
 	if err != nil {
 		return cfg, fmt.Errorf("could not unmarshal CNI args: %w", err)
@@ -378,16 +378,16 @@ func parseIPTablesFromCNIArgs(args string) (iptables.Config, error) {
 	return cfg, nil
 }
 
-// parseAnnotation parses the cni-proxy-config annotation into an iptables.Config object.
-func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error) {
+// parseAnnotation parses the cni-proxy-config annotation into a nftables.Config object.
+func parseAnnotation(pod corev1.Pod, annotation string) (nftables.Config, error) {
 	anno, ok := pod.Annotations[annotation]
 	if !ok {
-		return iptables.Config{}, fmt.Errorf("could not find %s annotation for %s pod", annotation, pod.Name)
+		return nftables.Config{}, fmt.Errorf("could not find %s annotation for %s pod", annotation, pod.Name)
 	}
-	cfg := iptables.Config{}
+	cfg := nftables.Config{}
 	err := json.Unmarshal([]byte(anno), &cfg)
 	if err != nil {
-		return iptables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
+		return nftables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
 	}
 	return cfg, nil
 }
