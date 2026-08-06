@@ -1,0 +1,505 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: inferencepoolconfigs.consul.hashicorp.com
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: InferencePoolConfig
+    listKind: InferencePoolConfigList
+    plural: inferencepoolconfigs
+    singular: inferencepoolconfig
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Whether the controller has successfully reconciled this resource.
+      jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Synced
+      type: string
+    - description: The age of the resource
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          InferencePoolConfig defines a namespace-scoped pool of inference backends
+          (models/upstreams) that can be referenced by AI workloads in the same
+          namespace. The pool is attached to one or more parent resources (e.g. an
+          InferenceModelConfig or an Envoy virtual-host) via parentRefs. The Consul
+          connect-inject controller reconciles the pool state and exposes the
+          validated configuration to Consul; Consul is responsible for the actual
+          xDS cluster/route generation.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: InferencePoolConfigSpec specifies the desired state of the InferencePoolConfig.
+            properties:
+              enabled:
+                default: false
+                description: |-
+                  Enabled controls whether this pool is active. When false the controller
+                  marks the pool as standing-by and Consul will not advertise the backends.
+                type: boolean
+              parentRefs:
+                description: |-
+                  ParentRefs attaches this pool to one or more InferenceGateway resources.
+                  Each entry must resolve to an InferenceGateway object (to be introduced as
+                  a separate CRD and operator). The InferenceGateway operator discovers all
+                  InferencePoolConfigs that reference it and composes their rateLimit and
+                  routing rules into the gateway's xDS configuration. The controller for
+                  this resource validates that every referenced parent exists before marking
+                  the pool Ready.
+                items:
+                  description: |-
+                    InferencePoolParentRef identifies the InferenceGateway to which this pool
+                    is attached. When the InferenceGateway CRD and operator are introduced, the
+                    gateway operator will watch all InferencePoolConfigs whose parentRefs point
+                    to it and compose their rateLimit and routing rules into the gateway's xDS.
+                  properties:
+                    kind:
+                      description: |-
+                        Kind is the Kind of the parent resource.
+                        Expected value once the gateway CRD is available: "InferenceGateway".
+                      minLength: 1
+                      type: string
+                    name:
+                      description: Name is the name of the parent InferenceGateway resource.
+                      minLength: 1
+                      type: string
+                    namespace:
+                      description: |-
+                        Namespace is the namespace of the parent InferenceGateway. When omitted
+                        defaults to "default". Cross-namespace references require both resources
+                        to share the same Consul admin partition.
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
+                minItems: 1
+                type: array
+              rateLimit:
+                description: |-
+                  RateLimit defines optional token- and request-rate-limiting rules for
+                  this pool. When omitted, no rate limiting is applied.
+                properties:
+                  countMode:
+                    description: 'CountMode determines what is counted against limits.
+                      Typical values: "request", "token".'
+                    type: string
+                  default:
+                    description: Default is the fallback limit pair applied to requests
+                      that do not match a more specific tier or model limit.
+                    properties:
+                      requests:
+                        description: Requests defines the request-count rate limit.
+                        properties:
+                          count:
+                            description: Count is the maximum allowed number of requests
+                              or tokens in the window.
+                            format: int64
+                            type: integer
+                          window:
+                            description: Window is the duration of the sliding or fixed
+                              window as a Go duration string (e.g. "1s", "1m", "1h").
+                            type: string
+                        type: object
+                      tokens:
+                        description: Tokens defines the token-count rate limit.
+                        properties:
+                          count:
+                            format: int64
+                            type: integer
+                          window:
+                            type: string
+                        type: object
+                    type: object
+                  degradeMode:
+                    description: 'DegradeMode controls degradation when the rate-limit
+                      store is unavailable (e.g. "allow", "deny").'
+                    type: string
+                  dimensions:
+                    description: Dimensions lists request attributes used to partition
+                      rate-limit counters (e.g. ["identity", "model"]).
+                    items:
+                      type: string
+                    type: array
+                  enabled:
+                    description: Enabled controls whether rate limiting is active
+                      for this pool.
+                    type: boolean
+                  enforcement:
+                    description: 'Enforcement sets the enforcement mode for rate-limit
+                      violations. Typical values: "enforce", "shadow".'
+                    type: string
+                  global:
+                    description: Global is an aggregate limit pair applied across
+                      all identities and models for this pool.
+                    properties:
+                      requests:
+                        properties:
+                          count:
+                            format: int64
+                            type: integer
+                          window:
+                            type: string
+                        type: object
+                      tokens:
+                        properties:
+                          count:
+                            format: int64
+                            type: integer
+                          window:
+                            type: string
+                        type: object
+                    type: object
+                  modelLimits:
+                    description: ModelLimits sets per-model request and token limits.
+                    items:
+                      properties:
+                        model:
+                          description: Model is the LLM model identifier this limit
+                            applies to (e.g. "gpt-4o").
+                          type: string
+                        requests:
+                          properties:
+                            count:
+                              format: int64
+                              type: integer
+                            window:
+                              type: string
+                          type: object
+                        tokens:
+                          properties:
+                            count:
+                              format: int64
+                              type: integer
+                            window:
+                              type: string
+                          type: object
+                      type: object
+                    type: array
+                  mode:
+                    description: 'Mode selects the rate-limit algorithm (e.g. "local",
+                      "global").'
+                    type: string
+                  tierBindings:
+                    description: TierBindings maps SPIFFE identities to rate-limit
+                      tiers.
+                    items:
+                      properties:
+                        namespace:
+                          description: Namespace scopes this binding to a Consul namespace.
+                          type: string
+                        partition:
+                          description: Partition scopes this binding to a Consul admin
+                            partition.
+                          type: string
+                        spiffeIDs:
+                          description: SPIFFEIDs is the list of SPIFFE IDs assigned
+                            this tier.
+                          items:
+                            type: string
+                          type: array
+                        tier:
+                          description: Tier is the rate-limit tier name.
+                          type: string
+                      type: object
+                    type: array
+                  tierLimits:
+                    description: TierLimits sets per-tier request and token limits.
+                    items:
+                      properties:
+                        maxCompletionTokensCap:
+                          description: MaxCompletionTokensCap caps the max_completion_tokens
+                            field for requests from this tier. 0 means no cap.
+                          type: integer
+                        requests:
+                          properties:
+                            count:
+                              format: int64
+                              type: integer
+                            window:
+                              type: string
+                          type: object
+                        tier:
+                          description: Tier is the name of the rate-limit tier.
+                          type: string
+                        tokens:
+                          properties:
+                            count:
+                              format: int64
+                              type: integer
+                            window:
+                              type: string
+                          type: object
+                      type: object
+                    type: array
+                type: object
+              routing:
+                description: |-
+                  Routing defines optional traffic-routing, failover, retry, and caching
+                  rules for this pool. When omitted, Consul applies its built-in defaults.
+                properties:
+                  budget:
+                    description: Budget is an open-ended JSON object for cost/token-budget
+                      settings passed to Consul without further validation.
+                    x-kubernetes-preserve-unknown-fields: true
+                  cache:
+                    description: Cache is an open-ended JSON object for semantic-cache
+                      settings passed to Consul without further validation.
+                    x-kubernetes-preserve-unknown-fields: true
+                  complianceMap:
+                    additionalProperties:
+                      properties:
+                        allowedRegions:
+                          description: AllowedRegions is the list of cloud regions
+                            allowed under this compliance regime.
+                          items:
+                            type: string
+                          type: array
+                        denyModels:
+                          description: DenyModels explicitly forbids specific model
+                            identifiers under this compliance regime.
+                          items:
+                            type: string
+                          type: array
+                      type: object
+                    description: ComplianceMap maps a compliance label to its configuration.
+                    type: object
+                  configValidation:
+                    description: 'ConfigValidation sets the strictness of config validation
+                      at admission time (e.g. "strict", "warn", "off").'
+                    type: string
+                  fallback:
+                    description: Fallback tunes cross-provider failover behaviour for
+                      capability pools.
+                    properties:
+                      maxTiers:
+                        description: MaxTiers is the maximum number of provider-level
+                          failover hops before the request is failed.
+                        type: integer
+                      perTryTimeout:
+                        description: PerTryTimeout is the timeout per failover attempt
+                          as a Go duration string (e.g. "30s").
+                        type: string
+                      retryOn:
+                        description: RetryOn is the list of conditions that trigger a
+                          failover attempt to the next provider (e.g. ["5xx", "reset"]).
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  fallbackChain:
+                    description: |-
+                      FallbackChain lists backend names in priority order for cross-provider
+                      failover. Deprecated; retained for backward compatibility.
+                    items:
+                      type: string
+                    type: array
+                  matchRules:
+                    description: MatchRules is an ordered list of request-matching
+                      rules. The first matching rule wins.
+                    items:
+                      properties:
+                        candidates:
+                          description: Candidates explicitly lists backend names eligible
+                            for matching requests.
+                          items:
+                            type: string
+                          type: array
+                        fallbackChain:
+                          description: FallbackChain lists backend names to try when
+                            every candidate is unavailable.
+                          items:
+                            type: string
+                          type: array
+                        requireCapabilities:
+                          description: RequireCapabilities filters candidates to only
+                            those advertising all listed capability labels.
+                          items:
+                            type: string
+                          type: array
+                        when:
+                          description: When defines the predicate for this rule.
+                          properties:
+                            bodyHas:
+                              description: BodyHas is a list of JSON pointer expressions
+                                that must be present in the request body.
+                              items:
+                                type: string
+                              type: array
+                            identity:
+                              description: Identity matches requests based on the
+                                caller's SPIFFE identity.
+                              properties:
+                                namespace:
+                                  type: string
+                                partition:
+                                  type: string
+                                service:
+                                  type: string
+                              type: object
+                            path:
+                              description: Path matches requests whose URL path has
+                                this prefix or exact value.
+                              type: string
+                          type: object
+                      type: object
+                    type: array
+                  mirror:
+                    description: Mirror is an open-ended JSON object for traffic-mirroring
+                      settings passed to Consul without further validation.
+                    x-kubernetes-preserve-unknown-fields: true
+                  retry:
+                    description: Retry configures automatic retry behaviour for upstream
+                      requests.
+                    properties:
+                      maxAttempts:
+                        description: MaxAttempts is the maximum number of retry attempts
+                          per request.
+                        type: integer
+                      retryOn:
+                        description: RetryOn is the list of conditions that trigger a
+                          retry attempt (e.g. ["5xx", "reset", "connect-failure"]).
+                        items:
+                          type: string
+                        type: array
+                    type: object
+                  scoring:
+                    description: Scoring tunes the backend-selection scoring model used
+                      by Consul when choosing between candidates.
+                    properties:
+                      scorers:
+                        description: Scorers is the ordered list of scoring strategies
+                          to apply (e.g. ["latency-aware", "round-robin"]).
+                        items:
+                          type: string
+                        type: array
+                      weightedSplit:
+                        description: WeightedSplit defines an explicit weighted split
+                          across backend clusters.
+                        items:
+                          description: InferencePoolWeightedTarget declares a backend
+                            cluster and its relative traffic weight.
+                          properties:
+                            cluster:
+                              description: Cluster is the Consul upstream service name
+                                for this target.
+                              type: string
+                            weight:
+                              description: Weight is the relative traffic weight assigned
+                                to this cluster.
+                              type: integer
+                          required:
+                          - cluster
+                          - weight
+                          type: object
+                        type: array
+                    type: object
+                  timeout:
+                    description: Timeout configures connection and request timeouts for
+                      pool traffic.
+                    properties:
+                      connect:
+                        description: Connect is the timeout for establishing a connection
+                          to the upstream as a Go duration string (e.g. "5s").
+                        type: string
+                      request:
+                        description: Request is the end-to-end request/response cycle
+                          timeout as a Go duration string (e.g. "120s").
+                        type: string
+                    type: object
+                type: object
+            required:
+            - enabled
+            - parentRefs
+            type: object
+          status:
+            description: InferencePoolConfigStatus records the observed state set by the controller.
+            properties:
+              conditions:
+                description: Conditions describe the current conditions of the InferencePoolConfig.
+                items:
+                  description: |-
+                    Condition contains details for one aspect of the current state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        LastTransitionTime is the last time the condition transitioned from one
+                        status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about the transition.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        ObservedGeneration represents the .metadata.generation that the condition
+                        was set based upon.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: The reason for the condition's last transition in CamelCase.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: Type of condition in CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              lastSyncedTime:
+                description: LastSyncedTime is the last time the controller successfully reconciled this resource.
+                format: date-time
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

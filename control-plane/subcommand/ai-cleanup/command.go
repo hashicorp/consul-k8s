@@ -3,10 +3,11 @@
 
 // Package aicleanup implements the "ai-cleanup" subcommand.
 // It is invoked by a pre-upgrade/pre-delete Helm hook when ai.enabled is
-// flipped to false. It strips finalizers from all InferenceModelConfig and
-// McpServerConfig CRs so that Helm can subsequently delete the CRDs cleanly.
-// If neither CRD exists in the cluster the command exits successfully — it is
-// safe to run multiple times (idempotent).
+// flipped to false. It strips finalizers from all InferenceModelConfig,
+// McpServerConfig, AgentConfig, and InferencePoolConfig CRs so that Helm can
+// subsequently delete the CRDs cleanly. If none of the CRDs exist in the
+// cluster the command exits successfully — it is safe to run multiple times
+// (idempotent).
 package aicleanup
 
 import (
@@ -99,6 +100,11 @@ func (c *Command) Run(args []string) int {
 		return 1
 	}
 
+	if err := c.cleanupInferencePoolConfigs(); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	c.UI.Info("AI CRD cleanup complete.")
 	return 0
 }
@@ -164,6 +170,29 @@ func (c *Command) cleanupAgentConfigs() error {
 		obj := &list.Items[i]
 		if err := c.stripFinalizersAndDelete(obj); err != nil {
 			return fmt.Errorf("cleanup AgentConfig %q: %w", obj.Name, err)
+		}
+	}
+	return nil
+}
+
+// cleanupInferencePoolConfigs strips finalizers from all InferencePoolConfig
+// CRs and deletes them so the CRD can be removed. If the CRD is not registered
+// the function returns nil immediately.
+func (c *Command) cleanupInferencePoolConfigs() error {
+	list := &v1alpha1.InferencePoolConfigList{}
+	if err := c.k8sClient.List(c.ctx, list); err != nil {
+		if isCRDAbsent(err) {
+			c.UI.Info("InferencePoolConfig CRD not found, skipping.")
+			return nil
+		}
+		return fmt.Errorf("list InferencePoolConfigs: %w", err)
+	}
+
+	c.UI.Info(fmt.Sprintf("Found %d InferencePoolConfig(s), stripping finalizers and deleting.", len(list.Items)))
+	for i := range list.Items {
+		obj := &list.Items[i]
+		if err := c.stripFinalizersAndDelete(obj); err != nil {
+			return fmt.Errorf("cleanup InferencePoolConfig %q in namespace %q: %w", obj.Name, obj.Namespace, err)
 		}
 	}
 	return nil
@@ -238,9 +267,10 @@ const synopsis = "Strip finalizers and delete AI CRs prior to CRD removal."
 const help = `
 Usage: consul-k8s-control-plane ai-cleanup [options]
 
-  Strips finalizers from all InferenceModelConfig and McpServerConfig custom
-  resources then deletes them, allowing Helm to cleanly remove the CRDs when
-  ai.enabled is set to false. If neither CRD exists the command exits
-  successfully. This command is idempotent and safe to run multiple times.
+  Strips finalizers from all InferenceModelConfig, McpServerConfig, AgentConfig,
+  and InferencePoolConfig custom resources then deletes them, allowing Helm to
+  cleanly remove the CRDs when ai.enabled is set to false. If none of the CRDs
+  exist the command exits successfully. This command is idempotent and safe to
+  run multiple times.
 
 `
