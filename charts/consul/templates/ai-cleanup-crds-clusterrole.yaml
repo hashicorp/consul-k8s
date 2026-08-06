@@ -1,0 +1,31 @@
+{{- if not (and .Values.ai .Values.ai.enabled) }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-cleanup
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-cleanup
+  annotations:
+    "helm.sh/hook": pre-delete,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+rules:
+  - apiGroups:
+      - consul.hashicorp.com
+    resources:
+      - inferencemodelconfigs
+      - mcpserverconfigs
+      - agentconfigs
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - delete
+{{- end }}

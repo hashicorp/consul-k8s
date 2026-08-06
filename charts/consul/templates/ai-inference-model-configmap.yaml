@@ -1,0 +1,21 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-inference-model-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-inference-model
+data:
+  config.json: |
+    {
+      "interceptorPort": {{ .Values.ai.inferenceModel.defaults.interceptorPort }},
+      "inferencePath": {{ .Values.ai.inferenceModel.defaults.inferencePath | quote }},
+      "inferenceProtocol": {{ .Values.ai.inferenceModel.defaults.inferenceProtocol | quote }},
+      "resources": {{ .Values.ai.inferenceModel.defaults.resources | toJson }}
+    }
+{{- end }}

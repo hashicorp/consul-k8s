@@ -9,6 +9,10 @@ import (
 	"github.com/mitchellh/cli"
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
+	cmdAICleanup "github.com/hashicorp/consul-k8s/control-plane/subcommand/ai-cleanup"
+	cmdAgentResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/agent-resources"
+	cmdAIInferenceResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/ai-inference-resources"
+	cmdMCPServerResources "github.com/hashicorp/consul-k8s/control-plane/subcommand/mcp-server-resources"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
@@ -41,6 +45,22 @@ func init() {
 	Commands = map[string]cli.CommandFactory{
 		"acl-init": func() (cli.Command, error) {
 			return &cmdACLInit.Command{UI: ui}, nil
+		},
+
+		"ai-cleanup": func() (cli.Command, error) {
+			return &cmdAICleanup.Command{UI: ui}, nil
+		},
+
+		"agent-resources": func() (cli.Command, error) {
+			return &cmdAgentResources.Command{UI: ui}, nil
+		},
+
+		"ai-inference-resources": func() (cli.Command, error) {
+			return &cmdAIInferenceResources.Command{UI: ui}, nil
+		},
+
+		"mcp-server-resources": func() (cli.Command, error) {
+			return &cmdMCPServerResources.Command{UI: ui}, nil
 		},
 
 		"connect-init": func() (cli.Command, error) {

@@ -1,0 +1,18 @@
+{{- /*
+  ai-validate.yaml
+  Triggers consul.validateAIConfig on every helm install / upgrade / template
+  render. Produces no Kubernetes resource — the template body is empty.
+  All validation logic lives in _helpers.tpl.
+
+  Gate: only runs when ai block is present AND ai.enabled=true.
+  When ai.enabled=true but connectInject.enabled=false we fail here with a
+  clear error before any resource is rendered.
+*/ -}}
+{{- if and .Values.ai .Values.ai.enabled -}}
+  {{- $ciEnabled       := (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) -}}
+  {{- $ciGlobalEnabled := (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) -}}
+  {{- if not (or $ciEnabled $ciGlobalEnabled) -}}
+    {{- fail "ai.enabled=true requires connectInject.enabled=true — the AI controllers run inside the connect-inject deployment." -}}
+  {{- end -}}
+  {{- template "consul.validateAIConfig" . -}}
+{{- end -}}

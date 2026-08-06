@@ -315,7 +315,10 @@ spec:
                   (and (default false .Values.global.openshift.enabled)
                        (not (default false .Values.global.openshift.isOcpGreaterthan4_18))
                        (default false .Values.global.openshift.crds.enableTcpRoute))  }}
-                -enabe-tcp-route=true
+                -enabe-tcp-route=true \
+                {{- end }}
+                {{- if and .Values.ai .Values.ai.enabled }}
+                -enable-ai=true
                 {{- end }}
 
 

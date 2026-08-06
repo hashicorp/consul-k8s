@@ -1,0 +1,24 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-agent-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-agent
+data:
+  config.json: |
+    {
+      "interceptorPort": {{ .Values.ai.agent.defaults.interceptorPort }},
+      "mcpPort": {{ .Values.ai.agent.defaults.mcpPort }},
+      "hitl": {
+        "port": {{ .Values.ai.agent.defaults.hitl.port }},
+        "approvalTimeout": {{ .Values.ai.agent.defaults.hitl.approvalTimeout | quote }}
+      },
+      "resources": {{ .Values.ai.agent.defaults.resources | toJson }}
+    }
+{{- end }}

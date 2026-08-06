@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Consul Helm Chart Values",
+  "type": "object",
+  "properties": {
+    "ai": {
+      "type": "object",
+      "description": "AI feature configuration. All sub-sections are only active when ai.enabled=true.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Master switch for all AI features."
+        },
+        "inferenceModel": {
+          "type": "object",
+          "properties": {
+            "defaults": {
+              "type": "object",
+              "properties": {
+                "interceptorPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "description": "TCP port the inference interceptor container listens on. Must not conflict with 20000 (Envoy)."
+                },
+                "inferencePath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Base URL path forwarded to the upstream LLM endpoint."
+                },
+                "inferenceProtocol": {
+                  "type": "string",
+                  "enum": ["openai", "anthropic", "bedrock"],
+                  "description": "Wire protocol used to communicate with the upstream LLM."
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "requests": { "$ref": "#/definitions/resourceList" },
+                    "limits":   { "$ref": "#/definitions/resourceList" }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcpServer": {
+          "type": "object",
+          "properties": {
+            "defaults": {
+              "type": "object",
+              "properties": {
+                "interceptorPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "description": "TCP port the MCP server container listens on. Must not conflict with 20000 (Envoy)."
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": ["streamable-http", "sse", "stdio"],
+                  "description": "MCP wire transport."
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "HTTP path the MCP server listens on."
+                },
+                "protocolVersion": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "MCP protocol version the server advertises."
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "requests": { "$ref": "#/definitions/resourceList" },
+                    "limits":   { "$ref": "#/definitions/resourceList" }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "agent": {
+          "type": "object",
+          "properties": {
+            "defaults": {
+              "type": "object",
+              "properties": {
+                "interceptorPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "description": "TCP port the agent interceptor listens on. Must not conflict with 20000 (Envoy)."
+                },
+                "mcpPort": {
+                  "type": "integer",
+                  "minimum": 1024,
+                  "maximum": 65535,
+                  "description": "TCP port used for MCP connectivity within the pod."
+                },
+                "hitl": {
+                  "type": "object",
+                  "properties": {
+                    "port": {
+                      "type": "integer",
+                      "minimum": 1024,
+                      "maximum": 65535,
+                      "description": "TCP port the HITL approval server listens on."
+                    },
+                    "approvalTimeout": {
+                      "type": "string",
+                      "minLength": 2,
+                      "pattern": "^[0-9]+(ms|s|m|h)$",
+                      "description": "Duration string (e.g. 60s, 5m) the agent waits for human approval."
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "requests": { "$ref": "#/definitions/resourceList" },
+                    "limits":   { "$ref": "#/definitions/resourceList" }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "resourceList": {
+      "type": "object",
+      "properties": {
+        "memory": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?$",
+          "description": "Memory quantity (e.g. 128Mi, 1Gi)."
+        },
+        "cpu": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?(m)?$",
+          "description": "CPU quantity (e.g. 250m, 1)."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

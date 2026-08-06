@@ -1,0 +1,78 @@
+{{- if not (and .Values.ai .Values.ai.enabled) }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# This pre-upgrade/pre-delete hook Job runs the "ai-cleanup" subcommand.
+# It only renders when ai.enabled=false, so it fires exactly on the upgrade
+# that disables the AI feature (or on helm uninstall).
+#
+# The subcommand:
+#   1. Lists all InferenceModelConfig CRs — skips if CRD absent.
+#   2. Strips finalizers from each CR and deletes it.
+#   3. Waits for the CR to be fully gone.
+#   4. Repeats for McpServerConfig CRs.
+#
+# This unblocks Helm from deleting the CRDs (which Kubernetes would otherwise
+# refuse while CRs with finalizers exist). The command is idempotent — running
+# it when no CRs exist is a no-op that exits 0.
+#
+# Execution order (Helm hook-weight):
+#   -10 = SA + ClusterRole + ClusterRoleBinding created first
+#    -5 = this Job runs (strips finalizers + deletes CRs)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-cleanup
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": pre-delete,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ template "consul.fullname" . }}-ai-cleanup
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: ai-cleanup
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-ai-cleanup
+      containers:
+        - name: ai-cleanup
+          image: {{ .Values.global.imageK8S }}
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - ai-cleanup
+          resources:
+            requests:
+              memory: "50Mi"
+              cpu: "50m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+      {{- if .Values.global.acls.tolerations }}
+      tolerations:
+        {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
+      {{- end }}
+{{- end }}

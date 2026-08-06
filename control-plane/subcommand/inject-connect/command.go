@@ -175,6 +175,8 @@ type Command struct {
 	flagEnableCustomGatewayCRDController bool
 	//enable tcp routes
 	flagEnableTCPRoute bool
+	// enable AI inference model feature
+	flagEnableAI bool
 }
 
 var (
@@ -270,6 +272,9 @@ func (c *Command) init() {
 
 	// enable TCP watch
 	c.flagSet.BoolVar(&c.flagEnableTCPRoute, "enabe-tcp-route", false, "Enables TCP Watch under gateway.networkings.k8s.io API Group")
+
+	// AI inference model feature flag — mirrors ai.enabled from values.yaml
+	c.flagSet.BoolVar(&c.flagEnableAI, "enable-ai", false, "Enables the AI InferenceModelConfig controller and CRD watcher.")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")

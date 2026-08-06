@@ -687,3 +687,75 @@ Usage: {{ template "consul.ingressGatewayHasPrivilegedPorts" (dict "service" .se
 {{- end -}}
 {{- $hasPrivilegedPorts -}}
 {{- end -}}
+
+{{/*
+Validates the ai.* section of values.yaml.
+
+The entire template is a no-op unless BOTH of these are true:
+  - ai.enabled=true
+  - connectInject.enabled=true  (or connectInject.enabled="-" with global.enabled=true)
+
+This means:
+  - No ai block in values.yaml at all → skipped (ai.enabled is nil/falsy)
+  - ai.enabled=false                  → skipped
+  - ai.enabled=true, connectInject=false → skipped (the connectInject gate
+    is checked at the template level; the error from the _helpers rule below
+    fires instead via the ai-validate.yaml trigger)
+
+Cross-field rules validated when both gates pass:
+  1. No AI port may be 20000 (reserved for the Envoy sidecar proxy).
+  2. All three ai.agent.defaults ports must be distinct from each other.
+
+Each port is resolved through `default` matching values.yaml defaults:
+  inferenceModel.interceptorPort  default 21101
+  mcpServer.interceptorPort       default 21102
+  agent.interceptorPort           default 21101
+  agent.mcpPort                   default 15101
+  agent.hitl.port                 default 16101
+
+Usage: {{ template "consul.validateAIConfig" . }}
+*/}}
+{{- define "consul.validateAIConfig" -}}
+{{- $ciEnabled       := (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) -}}
+{{- $ciGlobalEnabled := (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) -}}
+{{- $connectInject   := (or $ciEnabled $ciGlobalEnabled) -}}
+{{- if and .Values.ai .Values.ai.enabled $connectInject -}}
+
+  {{- /* Resolve every port with its values.yaml default so partially-omitted
+         ai blocks never cause a nil-dereference inside the template engine. */}}
+  {{- $imcPort   := int (default 21101 .Values.ai.inferenceModel.defaults.interceptorPort) }}
+  {{- $mcpPort   := int (default 21102 .Values.ai.mcpServer.defaults.interceptorPort) }}
+  {{- $agentInt  := int (default 21101 .Values.ai.agent.defaults.interceptorPort) }}
+  {{- $agentMcp  := int (default 15101 .Values.ai.agent.defaults.mcpPort) }}
+  {{- $agentHitl := int (default 16101 .Values.ai.agent.defaults.hitl.port) }}
+
+  {{- /* 1. No port may be 20000 (reserved for the Envoy sidecar proxy) */}}
+  {{- if eq $imcPort 20000 }}
+    {{- fail "ai.inferenceModel.defaults.interceptorPort must not be 20000 (reserved for the Envoy proxy). Default: 21101." }}
+  {{- end }}
+  {{- if eq $mcpPort 20000 }}
+    {{- fail "ai.mcpServer.defaults.interceptorPort must not be 20000 (reserved for the Envoy proxy). Default: 21102." }}
+  {{- end }}
+  {{- if eq $agentInt 20000 }}
+    {{- fail "ai.agent.defaults.interceptorPort must not be 20000 (reserved for the Envoy proxy). Default: 21101." }}
+  {{- end }}
+  {{- if eq $agentMcp 20000 }}
+    {{- fail "ai.agent.defaults.mcpPort must not be 20000 (reserved for the Envoy proxy). Default: 15101." }}
+  {{- end }}
+  {{- if eq $agentHitl 20000 }}
+    {{- fail "ai.agent.defaults.hitl.port must not be 20000 (reserved for the Envoy proxy). Default: 16101." }}
+  {{- end }}
+
+  {{- /* 2. All three agent ports must be distinct from each other */}}
+  {{- if eq $agentInt $agentMcp }}
+    {{- fail (cat "ai.agent.defaults.interceptorPort (" $agentInt ") and ai.agent.defaults.mcpPort (" $agentMcp ") must be different ports. Defaults: 21101 / 15101.") }}
+  {{- end }}
+  {{- if eq $agentInt $agentHitl }}
+    {{- fail (cat "ai.agent.defaults.interceptorPort (" $agentInt ") and ai.agent.defaults.hitl.port (" $agentHitl ") must be different ports. Defaults: 21101 / 16101.") }}
+  {{- end }}
+  {{- if eq $agentMcp $agentHitl }}
+    {{- fail (cat "ai.agent.defaults.mcpPort (" $agentMcp ") and ai.agent.defaults.hitl.port (" $agentHitl ") must be different ports. Defaults: 15101 / 16101.") }}
+  {{- end }}
+
+{{- end -}}
+{{- end -}}

@@ -87,7 +87,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.mirror.hashicorp.services/hashicorppreview/consul-k8s-control-plane:2.1.0-dev
+  imageK8S: docker.io/library/consul-k8s-control-plane:local
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -794,8 +794,7 @@ global:
   # The name (and tag) of the consul-dataplane Docker image used for the
   # connect-injected sidecar proxies and mesh, terminating, and ingress gateways.
   # @default: hashicorp/consul-dataplane:<latest supported version>
-  imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev
-
+  imageConsulDataplane: hashicorp/consul-dataplane:2.0.2
   # Disable this once the manifests are generated and subsequent helm upgrades
   
   generateManifests: false
@@ -3780,3 +3779,104 @@ telemetryCollector:
   # it could be used to configure custom consul parameters.
   # @type: map
   extraEnvironmentVars: {}
+
+# Configures the AI Inference Model feature for Consul service mesh.
+# When enabled, an interceptor sidecar is injected alongside application
+# pods to handle AI inference traffic (e.g. proxying OpenAI-compatible calls).
+ai:
+  # Master switch for all AI features. When false:
+  #   - The InferenceModelConfig CRD is not installed.
+  #   - The post-install Job, ServiceAccount, ClusterRole, and ClusterRoleBinding
+  #     are not created.
+  #   - The connect-inject controller does NOT start the InferenceModelConfig watcher.
+  # @type: boolean
+  enabled: false
+
+  inferenceModel:
+    defaults:
+      # The port the interceptor container listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21101
+
+      # The base URL path forwarded to the upstream LLM endpoint.
+      # @type: string
+      inferencePath: "/v1"
+
+      # The wire protocol used to communicate with the upstream LLM.
+      # Supported values: "openai", "anthropic", "bedrock"
+      # @type: string
+      inferenceProtocol: "openai"
+
+      # Resource requests and limits for the AI interceptor init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "500m"
+        limits:
+          memory: "512Mi"
+          cpu: "1000m"
+
+  mcpServer:
+    defaults:
+      # The port the MCP server container listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21102
+
+      # MCP wire transport: streamable-http | sse | stdio
+      # @type: string
+      transport: "streamable-http"
+
+      # HTTP path the MCP server listens on.
+      # @type: string
+      path: "/mcp"
+
+      # MCP protocol version the server advertises.
+      # @type: string
+      protocolVersion: "2025-03-26"
+
+      # Resource requests and limits for the MCP server init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+  agent:
+    defaults:
+      # The port the agent interceptor listens on inside the pod.
+      # Must not conflict with application ports or the Envoy proxy port (20000).
+      # @type: integer
+      interceptorPort: 21101
+
+      # TCP port used for MCP connectivity within the pod.
+      # @type: integer
+      mcpPort: 15101
+
+      # Human-in-the-loop (HITL) approval settings.
+      hitl:
+        # TCP port the HITL approval server listens on inside the pod.
+        # @type: integer
+        port: 16101
+
+        # Duration the agent waits for a human approval before timing out.
+        # @type: string
+        approvalTimeout: "60s"
+
+      # Resource requests and limits for the agent init-container.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"

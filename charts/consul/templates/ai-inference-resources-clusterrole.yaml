@@ -1,0 +1,23 @@
+{{- if and .Values.ai .Values.ai.enabled .Values.connectInject.enabled }}
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-ai-inference-resources
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: ai-inference-model
+rules:
+  - apiGroups:
+      - consul.hashicorp.com
+    resources:
+      - inferencemodelconfigs
+    verbs:
+      - get
+      - create
+      - update
+{{- end }}

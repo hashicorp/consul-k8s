@@ -18,6 +18,7 @@ import (
 	apicommon "github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/catalog/registration"
+	aicontrollers "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/ai"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/endpoints"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/peering"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -217,6 +218,32 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	}).SetupWithManager(ctx, mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", gatewaycontrollers.GatewayClassConfigController{})
 		return err
+	}
+
+	// AI controllers — only registered when ai.enabled=true.
+	// When false: no watches are set up, no RBAC is consumed, the CRDs are not installed.
+	if c.flagEnableAI {
+		if err := (&aicontrollers.InferenceModelConfigController{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controller").WithName("inference-model-config"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferenceModelConfig")
+			return err
+		}
+		if err := (&aicontrollers.McpServerConfigController{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controller").WithName("mcp-server-config"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "McpServerConfig")
+			return err
+		}
+		if err := (&aicontrollers.AgentConfigController{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controller").WithName("agent-config"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "AgentConfig")
+			return err
+		}
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassController{

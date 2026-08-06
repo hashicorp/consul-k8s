@@ -82,6 +82,39 @@ rules:
   - get
   - patch
   - update
+  # AI CRDs — always present so the running controller can remove finalizers and
+  # clean up CRs even after ai.enabled is flipped to false.
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - inferencemodelconfigs
+  - mcpserverconfigs
+  - agentconfigs
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  # Status patch — syncStatus() calls r.Client.Status().Patch()
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - inferencemodelconfigs/status
+  - mcpserverconfigs/status
+  - agentconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+  # Finalizer writes — ensureFinalizer/removeFinalizer are routed through /finalizers
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - inferencemodelconfigs/finalizers
+  - mcpserverconfigs/finalizers
+  - agentconfigs/finalizers
+  verbs:
+  - update
 - apiGroups: [""]
   resources: ["secrets", "serviceaccounts", "services"]
   verbs:
