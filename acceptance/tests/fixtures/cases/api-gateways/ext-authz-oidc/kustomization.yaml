@@ -8,6 +8,7 @@ resources:
 - gatewayclassconfig.yaml
 - gatewayclass.yaml
 - gateway.yaml
+- routeauthfilters.yaml
 - servicedefaults.yaml
 - intention.yaml
 - dex.yaml
