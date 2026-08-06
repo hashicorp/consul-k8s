@@ -7,6 +7,12 @@ on:
       - main
       - "release/**"
 
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}

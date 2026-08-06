@@ -207,6 +207,10 @@ spec:
           {{- $cert | nindent 10 }}
           EOF
           {{- end }}
+          {{- if and .Values.global.secretsBackend.vault.enabled .Values.global.tls.enabled }}
+          cp /vault/secrets/serverca.crt /trusted-cas/custom-ca-server.pem
+          {{- end }}
+          {{- include "consul.trustedCAsRehash" . | nindent 10 }}
           {{- end }}
 
           exec consul-telemetry-collector agent \

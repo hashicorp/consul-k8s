@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: Fix ext_authz filter updates not being propagated to Consul when an HTTPRoute's RouteAuthFilter reference is changed in-place.
+```

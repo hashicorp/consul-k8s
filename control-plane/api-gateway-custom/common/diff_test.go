@@ -2153,3 +2153,191 @@ func TestEntriesEqual(t *testing.T) {
 		})
 	}
 }
+
+func TestEntryComparator_ExtProcProcessingDirectionEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcProcessingDirection{
+		HeadersMode:  "SEND",
+		BodyMode:     "BUFFERED",
+		TrailersMode: "SKIP",
+		MaxBodyBytes: 1024,
+	}
+
+	require.True(t, comparator.extProcProcessingDirectionEqual(base, base))
+
+	for name, mutate := range map[string]func(d *api.ExtProcProcessingDirection){
+		"different headers mode":  func(d *api.ExtProcProcessingDirection) { d.HeadersMode = "SKIP" },
+		"different body mode":     func(d *api.ExtProcProcessingDirection) { d.BodyMode = "STREAMED" },
+		"different trailers mode": func(d *api.ExtProcProcessingDirection) { d.TrailersMode = "SEND" },
+		"different max body":      func(d *api.ExtProcProcessingDirection) { d.MaxBodyBytes = 2048 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			other := base
+			mutate(&other)
+			require.False(t, comparator.extProcProcessingDirectionEqual(base, other))
+		})
+	}
+}
+
+func TestEntryComparator_ExtProcProcessingEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcProcessing{
+		Request:  &api.ExtProcProcessingDirection{HeadersMode: "SEND"},
+		Response: &api.ExtProcProcessingDirection{HeadersMode: "SKIP"},
+	}
+
+	require.True(t, comparator.extProcProcessingEqual(base, base))
+
+	differentRequest := base
+	differentRequest.Request = &api.ExtProcProcessingDirection{HeadersMode: "SKIP"}
+	require.False(t, comparator.extProcProcessingEqual(base, differentRequest))
+
+	nilResponse := base
+	nilResponse.Response = nil
+	require.False(t, comparator.extProcProcessingEqual(base, nilResponse))
+
+	bothNil := api.ExtProcProcessing{}
+	require.True(t, comparator.extProcProcessingEqual(bothNil, bothNil))
+}
+
+func TestEntryComparator_ExtProcOverridesEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcOverrides{
+		Processing: &api.ExtProcProcessing{
+			Request: &api.ExtProcProcessingDirection{HeadersMode: "SEND"},
+		},
+	}
+
+	require.True(t, comparator.extProcOverridesEqual(base, base))
+
+	differentProcessing := api.ExtProcOverrides{
+		Processing: &api.ExtProcProcessing{
+			Request: &api.ExtProcProcessingDirection{HeadersMode: "SKIP"},
+		},
+	}
+	require.False(t, comparator.extProcOverridesEqual(base, differentProcessing))
+
+	nilProcessing := api.ExtProcOverrides{}
+	require.False(t, comparator.extProcOverridesEqual(base, nilProcessing))
+	require.True(t, comparator.extProcOverridesEqual(nilProcessing, nilProcessing))
+}
+
+func TestEntryComparator_ExtProcFiltersEqual(t *testing.T) {
+	t.Parallel()
+
+	comparator := entryComparator{}
+	base := api.ExtProcFilter{
+		StatPrefix: "prefix",
+		Mode:       "override",
+		Overrides: &api.ExtProcOverrides{
+			Processing: &api.ExtProcProcessing{
+				Request: &api.ExtProcProcessingDirection{HeadersMode: "SEND"},
+			},
+		},
+	}
+
+	require.True(t, comparator.extProcFiltersEqual(base, base))
+
+	differentStatPrefix := base
+	differentStatPrefix.StatPrefix = "other"
+	require.False(t, comparator.extProcFiltersEqual(base, differentStatPrefix))
+
+	differentMode := base
+	differentMode.Mode = "enabled"
+	require.False(t, comparator.extProcFiltersEqual(base, differentMode))
+
+	nilOverrides := base
+	nilOverrides.Overrides = nil
+	require.False(t, comparator.extProcFiltersEqual(base, nilOverrides))
+
+	// Filters with no overrides on both sides are equal.
+	noOverrides := api.ExtProcFilter{StatPrefix: "prefix", Mode: "enabled"}
+	require.True(t, comparator.extProcFiltersEqual(noOverrides, noOverrides))
+}
+
+// TestEntriesEqual_HTTPRoute_ExtAuthz exercises the bug-fix path: changes to
+// Filters.ExtAuthz on an HTTPRouteConfigEntry rule must be detected as unequal
+// so the reconciler writes the updated config entry to Consul.
+func TestEntriesEqual_HTTPRoute_ExtAuthz(t *testing.T) {
+	t.Parallel()
+
+	baseRule := func(extAuthz *api.HTTPRouteExtAuthzFilter) api.HTTPRouteRule {
+		return api.HTTPRouteRule{
+			Matches: []api.HTTPMatch{
+				{Path: api.HTTPPathMatch{Match: api.HTTPPathMatchPrefix, Value: "/"}},
+			},
+			Services: []api.HTTPService{{Name: "echo", Namespace: "default", Weight: 1}},
+			Filters:  api.HTTPFilters{ExtAuthz: extAuthz},
+		}
+	}
+
+	enabled := &api.HTTPRouteExtAuthzFilter{Enabled: true}
+	disabled := &api.HTTPRouteExtAuthzFilter{Enabled: false}
+
+	makeEntry := func(extAuthz *api.HTTPRouteExtAuthzFilter) *api.HTTPRouteConfigEntry {
+		return &api.HTTPRouteConfigEntry{
+			Kind:      api.HTTPRoute,
+			Name:      "test-route",
+			Namespace: "default",
+			Partition: "default",
+			Rules:     []api.HTTPRouteRule{baseRule(extAuthz)},
+		}
+	}
+
+	testCases := map[string]struct {
+		a, b           *api.HTTPRouteConfigEntry
+		expectedResult bool
+	}{
+		"both nil ExtAuthz are equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(nil),
+			expectedResult: true,
+		},
+		"both enabled are equal": {
+			a:              makeEntry(enabled),
+			b:              makeEntry(enabled),
+			expectedResult: true,
+		},
+		"both disabled are equal": {
+			a:              makeEntry(disabled),
+			b:              makeEntry(disabled),
+			expectedResult: true,
+		},
+		// This was the regression: toggling enabled→disabled was not detected.
+		"enabled vs disabled are NOT equal": {
+			a:              makeEntry(enabled),
+			b:              makeEntry(disabled),
+			expectedResult: false,
+		},
+		"disabled vs enabled are NOT equal": {
+			a:              makeEntry(disabled),
+			b:              makeEntry(enabled),
+			expectedResult: false,
+		},
+		// nil ExtAuthz (inherit gateway default) vs explicit override are NOT equal.
+		"nil vs enabled are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(enabled),
+			expectedResult: false,
+		},
+		"nil vs disabled are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(disabled),
+			expectedResult: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}

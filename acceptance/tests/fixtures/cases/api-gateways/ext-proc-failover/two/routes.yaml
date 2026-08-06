@@ -1,0 +1,410 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# HTTPRoutes for the TWO-ext-proc gateway (api-gateway). Both ext-proc instances
+# (base + path) are enabled-by-default, so every route disables the instance it
+# does not want via a RouteExtProc ExtensionRef (../common/routeextproc.yaml).
+#
+# Path families:
+#   bare  /a|/b|/c            -> base processor (ext-proc-http) decides; disable-path
+#   /ext_proc/a|/b|/c         -> path processor (ext-proc-http-path) decides; disable-base
+#   /aa|/bb|/cc               -> static bypass (disable base AND path)
+#   /ext_proc/aa|/bb|/cc      -> static bypass (disable base AND path)
+#   /dd1                      -> connect-proxy ext-proc chain (disable base AND path)
+
+# ── base family (bare paths, base processor) ─────────────────────────────────
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-base-service-a-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          headers:
+            - name: x-route-target
+              value: service-a
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-base-service-b-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          headers:
+            - name: x-route-target
+              value: service-b
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-b-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-base-service-c-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          headers:
+            - name: x-route-target
+              value: service-c
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-c-mesh
+          namespace: default
+          port: 8080
+---
+# Base default: carries the initial (header-less) bare request into the base
+# processor (only path is disabled) and is the fallback target.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-base-default-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080
+---
+# ── bare bypass (/aa|/bb|/cc) — negative case for the base processor ──────────
+# More specific than "/", so Envoy matches these first and routes statically.
+# Both instances are disabled, so neither processor is consulted.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-bypass-aa-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /aa
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-bypass-bb-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bb
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-b-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-bypass-cc-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /cc
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-c-mesh
+          namespace: default
+          port: 8080
+---
+# ── path family (/ext_proc/*, path processor) ────────────────────────────────
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-path-service-a-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ext_proc
+          headers:
+            - name: x-route-target
+              value: service-a
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-path-service-b-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ext_proc
+          headers:
+            - name: x-route-target
+              value: service-b
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-b-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-path-service-c-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ext_proc
+          headers:
+            - name: x-route-target
+              value: service-c
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-c-mesh
+          namespace: default
+          port: 8080
+---
+# Path default: carries the initial (header-less) /ext_proc request into the path
+# processor (only base is disabled).
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-path-default-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ext_proc
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080
+---
+# ── /ext_proc bypass (/ext_proc/aa|/bb|/cc) — negative case for path processor ─
+# More specific than "/ext_proc", so these match first and route statically with
+# BOTH instances disabled. The path processor must NOT be consulted for these
+# (proven by inspecting the ext-proc-http-path logs). Note /ext_proc/bb routes to
+# service-b and /ext_proc/cc to service-c: had the path processor run, its suffix
+# rule (/bb, /cc are not /b or /c) would have chosen service-a instead — so the
+# response body alone distinguishes the bypass for bb/cc.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-path-bypass-aa-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ext_proc/aa
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-a-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-path-bypass-bb-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ext_proc/bb
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-b-mesh
+          namespace: default
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-path-bypass-cc-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ext_proc/cc
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-c-mesh
+          namespace: default
+          port: 8080
+---
+# ── connect-proxy ext-proc chain (/dd1) ──────────────────────────────────────
+# /dd1 -> service-d1 (forwarder) -> service-e1. service-e1's inbound connect-proxy
+# runs the HTTP ext-proc sidecar which fans out to service-f/service-g. Both
+# gateway instances are disabled here so only the connect-proxy ext-proc runs.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: two-service-d1-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: api-gateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /dd1
+      filters:
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-base }
+        - type: ExtensionRef
+          extensionRef: { group: consul.hashicorp.com, kind: RouteExtProc, name: disable-path }
+      backendRefs:
+        - group: consul.hashicorp.com
+          kind: MeshService
+          name: service-d1-mesh
+          namespace: default
+          port: 8080
