@@ -859,7 +859,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			}
 			ui := cli.NewMockUi()
 
-			nftablesProvider := &fakeIptablesProvider{}
+			nftablesProvider := &fakeNftablesProvider{}
 			nftCfg := nftables.Config{
 				ProxyUserID:      "5995",
 				ProxyInboundPort: 20000,
@@ -956,24 +956,24 @@ var (
 	}
 )
 
-type fakeIptablesProvider struct {
+type fakeNftablesProvider struct {
 	applyCalled bool
 	rules       []string
 }
 
-func (f *fakeIptablesProvider) AddRule(_ string, args ...string) {
+func (f *fakeNftablesProvider) AddRule(_ string, args ...string) {
 	f.rules = append(f.rules, strings.Join(args, " "))
 }
 
-func (f *fakeIptablesProvider) ApplyRules(command string) error {
+func (f *fakeNftablesProvider) ApplyRules(command string) error {
 	f.applyCalled = true
 	return nil
 }
 
-func (f *fakeIptablesProvider) Rules() []string {
+func (f *fakeNftablesProvider) Rules() []string {
 	return f.rules
 }
 
-func (f *fakeIptablesProvider) ClearAllRules() {
+func (f *fakeNftablesProvider) ClearAllRules() {
 	f.rules = nil
 }

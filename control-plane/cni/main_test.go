@@ -27,11 +27,11 @@ const (
 	defaultNamespace = "default"
 )
 
-type fakeIptablesProvider struct {
+type fakeNftablesProvider struct {
 	rules []string
 }
 
-func (f *fakeIptablesProvider) AddRule(name string, args ...string) {
+func (f *fakeNftablesProvider) AddRule(name string, args ...string) {
 	var rule []string
 	rule = append(rule, name)
 	rule = append(rule, args...)
@@ -39,15 +39,15 @@ func (f *fakeIptablesProvider) AddRule(name string, args ...string) {
 	f.rules = append(f.rules, strings.Join(rule, " "))
 }
 
-func (f *fakeIptablesProvider) ApplyRules(command string) error {
+func (f *fakeNftablesProvider) ApplyRules(command string) error {
 	return nil
 }
 
-func (f *fakeIptablesProvider) Rules() []string {
+func (f *fakeNftablesProvider) Rules() []string {
 	return f.rules
 }
 
-func (f *fakeIptablesProvider) ClearAllRules() {
+func (f *fakeNftablesProvider) ClearAllRules() {
 	f.rules = nil
 }
 
@@ -114,7 +114,7 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Pod with correct annotations, should create redirect traffic rules",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				nftablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeNftablesProvider{},
 			},
 			podName:   "pod-no-proxy-outbound-port",
 			stdInData: goodStdinData,
@@ -141,7 +141,7 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Pod with correct annotations, using projected tokens should create redirect traffic rules",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				nftablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeNftablesProvider{},
 			},
 			podName:   "pod-no-proxy-outbound-port",
 			stdInData: goodStdinDataWithProjectedToken,
@@ -168,7 +168,7 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Parsing nft config from CNI_ARGs as in Nomad",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				nftablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeNftablesProvider{},
 			},
 			cmdArgs: &skel.CmdArgs{ContainerID: "some-container-id",
 				IfName: "eth0",
