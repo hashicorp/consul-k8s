@@ -63,8 +63,8 @@ const (
 type Command struct {
 	// client is a kubernetes client
 	client kubernetes.Interface
-	// iptablesProvider is the Provider that will apply nft rules. Used for testing.
-	iptablesProvider nftables.Provider
+	// nftablesProvider is the Provider that will apply nft rules. Used for testing.
+	nftablesProvider nftables.Provider
 }
 
 type CNIArgs struct {
@@ -81,6 +81,7 @@ type CNIArgs struct {
 
 	// CONSUL_IPTABLES_CONFIG is the runtime traffic redirection configuration passed by
 	// orchestrator (ex. the Nomad client agent)
+	//Manisha TODO: rename to CONSUL_NFTABLES_CONFIG once Nomad sender is updated as per the abv comment
 	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
 
@@ -141,11 +142,11 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	podNamespace := string(cniArgs.K8S_POD_NAMESPACE)
 	podName := string(cniArgs.K8S_POD_NAME)
-	cniArgsIPTablesCfg := string(cniArgs.CONSUL_IPTABLES_CONFIG)
+	cniArgsNftCfg := string(cniArgs.CONSUL_IPTABLES_CONFIG)
 
 	// We should never encounter this unless there has been an error in the
 	// kubelet. A good safeguard.
-	if (podNamespace == "" || podName == "") && cniArgsIPTablesCfg == "" {
+	if (podNamespace == "" || podName == "") && cniArgsNftCfg == "" {
 		return fmt.Errorf("not running in a pod, namespace and pod should have values")
 	}
 
@@ -178,12 +179,12 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		result = prevResult
 	}
 
-	var iptablesCfg nftables.Config
+	var nftCfg nftables.Config
 	dualStack := false
-	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
-	if cniArgsIPTablesCfg != "" {
+	// If cniArgsNftCfg is populated we're on Nomad, otherwise we're on K8s
+	if cniArgsNftCfg != "" {
 		var err error
-		iptablesCfg, err = parseIPTablesFromCNIArgs(cniArgsIPTablesCfg)
+		nftCfg, err = parseNftCfgFromCNIArgs(cniArgsNftCfg)
 		if err != nil {
 			return err
 		}
@@ -216,7 +217,7 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		}
 
 		// Parse the cni-proxy-config annotation into a traffic redirection Config object.
-		iptablesCfg, err = parseAnnotation(*pod, annotationRedirectTraffic)
+		nftCfg, err = parseAnnotation(*pod, annotationRedirectTraffic)
 		if err != nil {
 			return err
 		}
@@ -227,21 +228,21 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Set NetNS passed through the CNI.
-	iptablesCfg.NetNS = args.Netns
+	nftCfg.NetNS = args.Netns
 
 	// Set the provider to a fake provider in testing, otherwise use the default
 	// nft Provider
-	if c.iptablesProvider != nil {
-		iptablesCfg.NftablesProvider = c.iptablesProvider
+	if c.nftablesProvider != nil {
+		nftCfg.NftablesProvider = c.nftablesProvider
 	}
 
 	// Apply the nft rules.
-	err = nftables.Setup(iptablesCfg, dualStack)
+	err = nftables.Setup(nftCfg, dualStack)
 	if err != nil {
 		return fmt.Errorf("could not apply nftables rules: %v", err)
 	}
 
-	if cniArgsIPTablesCfg == "" {
+	if cniArgsNftCfg == "" {
 		// We do not throw an error here because kubernetes will often throw a
 		// benign error where the pod has been updated in between the get and update
 		// of the annotation. Eventually kubernetes will update the annotation
@@ -369,7 +370,7 @@ func skipTrafficRedirection(pod corev1.Pod) bool {
 	return false
 }
 
-func parseIPTablesFromCNIArgs(args string) (nftables.Config, error) {
+func parseNftCfgFromCNIArgs(args string) (nftables.Config, error) {
 	cfg := nftables.Config{}
 	err := json.Unmarshal([]byte(args), &cfg)
 	if err != nil {

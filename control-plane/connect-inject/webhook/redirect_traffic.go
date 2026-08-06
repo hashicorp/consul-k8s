@@ -26,7 +26,7 @@ import (
 //	ExcludeOutboundPorts: pod annotations
 //	ExcludeOutboundCIDRs: pod annotations
 //	ExcludeUIDs: pod annotations
-func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
+func (w *MeshWebhook) nftablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
 	cfg := nftables.Config{}
 
 	if !w.EnableOpenShift {
@@ -132,22 +132,22 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		cfg.ConsulDNSPort = consulDataplaneDNSBindPort
 	}
 
-	iptablesConfigJson, err := json.Marshal(&cfg)
+	nftCfgJSON, err := json.Marshal(&cfg)
 	if err != nil {
 		return "", fmt.Errorf("could not marshal traffic redirection config: %w", err)
 	}
 
-	return string(iptablesConfigJson), nil
+	return string(nftCfgJSON), nil
 }
 
 // addRedirectTrafficConfigAnnotation add the created traffic redirection JSON config as an annotation on the provided pod.
 func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
-	iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+	nftCfg, err := w.nftablesConfigJSON(*pod, ns)
 	if err != nil {
 		return err
 	}
 
-	pod.Annotations[constants.AnnotationRedirectTraffic] = iptablesConfig
+	pod.Annotations[constants.AnnotationRedirectTraffic] = nftCfg
 
 	return nil
 }

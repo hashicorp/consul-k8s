@@ -752,7 +752,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+					return false, fmt.Sprintf("ProxyInboundPort in nftables.Config was %d, but should be 21000", actual.ProxyInboundPort)
 				}
 			},
 		},
@@ -765,7 +765,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+					return false, fmt.Sprintf("ProxyInboundPort in nftables.Config was %d, but should be 21000", actual.ProxyInboundPort)
 				}
 			},
 		},
@@ -775,7 +775,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+					return false, fmt.Sprintf("ProxyOutboundPort in nftables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
 				}
 			},
 		},
@@ -786,7 +786,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+					return false, fmt.Sprintf("ProxyOutboundPort in nftables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
 				}
 			},
 		},
@@ -796,7 +796,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+					return false, fmt.Sprintf("ExcludeInboundPorts in nftables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
 				}
 			},
 		},
@@ -807,7 +807,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+					return false, fmt.Sprintf("ExcludeInboundPorts in nftables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
 				}
 			},
 		},
@@ -859,17 +859,17 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			}
 			ui := cli.NewMockUi()
 
-			iptablesProvider := &fakeIptablesProvider{}
-			iptablesCfg := nftables.Config{
+			nftablesProvider := &fakeIptablesProvider{}
+			nftCfg := nftables.Config{
 				ProxyUserID:      "5995",
 				ProxyInboundPort: 20000,
 			}
 			cmd := Command{
 				UI:                                 ui,
 				serviceRegistrationPollingAttempts: 3,
-				iptablesProvider:                   iptablesProvider,
+				nftablesProvider:                   nftablesProvider,
 			}
-			iptablesCfgJSON, err := json.Marshal(iptablesCfg)
+			nftCfgJSON, err := json.Marshal(nftCfg)
 			require.NoError(t, err)
 			flags := []string{
 				"-pod-name", testPodName,
@@ -879,13 +879,13 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
-				"-redirect-traffic-config", string(iptablesCfgJSON),
+				"-redirect-traffic-config", string(nftCfgJSON),
 			}
 			code := cmd.Run(flags)
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
-			require.Truef(t, iptablesProvider.applyCalled, "redirect traffic rules were not applied")
+			require.Truef(t, nftablesProvider.applyCalled, "redirect traffic rules were not applied")
 			if c.expIptablesParamsFunc != nil {
-				actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.iptablesConfig)
+				actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.nftCfg)
 				require.Truef(t, actualIptablesConfigParamsEqualExpected, errMsg)
 			}
 		})

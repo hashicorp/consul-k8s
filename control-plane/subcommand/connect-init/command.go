@@ -69,8 +69,8 @@ type Command struct {
 	nonRetryableError error
 
 	// Only used in tests.
-	iptablesProvider nftables.Provider
-	iptablesConfig   nftables.Config
+	nftablesProvider nftables.Provider
+	nftCfg           nftables.Config
 }
 
 func (c *Command) init() {
@@ -386,16 +386,16 @@ type trafficRedirectProxyConfig struct {
 }
 
 func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack bool) error {
-	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.iptablesConfig)
+	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.nftCfg)
 	if err != nil {
 		return err
 	}
-	if c.iptablesProvider != nil {
-		c.iptablesConfig.NftablesProvider = c.iptablesProvider
+	if c.nftablesProvider != nil {
+		c.nftCfg.NftablesProvider = c.nftablesProvider
 	}
 
 	if svc.Proxy.TransparentProxy != nil && svc.Proxy.TransparentProxy.OutboundListenerPort != 0 {
-		c.iptablesConfig.ProxyOutboundPort = svc.Proxy.TransparentProxy.OutboundListenerPort
+		c.nftCfg.ProxyOutboundPort = svc.Proxy.TransparentProxy.OutboundListenerPort
 	}
 
 	// Decode proxy's opaque config so that we can use it later to configure
@@ -405,7 +405,7 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 		return fmt.Errorf("failed parsing Proxy.Config: %s", err)
 	}
 	if trCfg.BindPort != 0 {
-		c.iptablesConfig.ProxyInboundPort = trCfg.BindPort
+		c.nftCfg.ProxyInboundPort = trCfg.BindPort
 	}
 
 	if trCfg.StatsBindAddr != "" {
@@ -414,11 +414,11 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 			return fmt.Errorf("failed parsing host and port from envoy_stats_bind_addr: %s", err)
 		}
 
-		c.iptablesConfig.ExcludeInboundPorts = append(c.iptablesConfig.ExcludeInboundPorts, port)
+		c.nftCfg.ExcludeInboundPorts = append(c.nftCfg.ExcludeInboundPorts, port)
 	}
 
 	// Configure any relevant information from the proxy service
-	err = nftables.Setup(c.iptablesConfig, dualStack)
+	err = nftables.Setup(c.nftCfg, dualStack)
 	if err != nil {
 		return err
 	}

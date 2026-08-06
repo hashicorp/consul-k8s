@@ -1265,7 +1265,7 @@ func TestHandlerHandle(t *testing.T) {
 	}
 }
 
-// This test validates that overwrite probes match the nft configuration from iptablesConfigJSON()
+// This test validates that overwrite probes match the nft configuration from nftablesConfigJSON()
 // Because they happen at different points in the injection, the port numbers can get out of sync.
 func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 	t.Parallel()
@@ -1436,7 +1436,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				return
 			}
 
-			var iptablesCfg nftables.Config
+			var nftCfg nftables.Config
 			var overwritePorts []string
 			actual := resp.Patches
 			if len(actual) > 0 {
@@ -1450,9 +1450,9 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 						envs := valueMap["env"].([]any)
 						redirectEnv := envs[9].(map[string]any)
 						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
-						iptablesJson := redirectEnv["value"].(string)
+						nftCfgJSON := redirectEnv["value"].(string)
 
-						err := json.Unmarshal([]byte(iptablesJson), &iptablesCfg)
+						err := json.Unmarshal([]byte(nftCfgJSON), &nftCfg)
 						require.NoError(t, err)
 					}
 
@@ -1487,7 +1487,7 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				}
 			}
 			// Make sure the nft excluded ports match the ports on the container
-			require.ElementsMatch(t, iptablesCfg.ExcludeInboundPorts, overwritePorts)
+			require.ElementsMatch(t, nftCfg.ExcludeInboundPorts, overwritePorts)
 			require.ElementsMatch(t, tt.Patches, actual)
 		})
 	}

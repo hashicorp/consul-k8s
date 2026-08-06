@@ -114,7 +114,7 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Pod with correct annotations, should create redirect traffic rules",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				iptablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeIptablesProvider{},
 			},
 			podName:   "pod-no-proxy-outbound-port",
 			stdInData: goodStdinData,
@@ -125,9 +125,9 @@ func Test_cmdAdd(t *testing.T) {
 					ProxyUserID:      "123",
 					ProxyInboundPort: 20000,
 				}
-				iptablesConfigJson, err := json.Marshal(&cfg)
+				nftCfgJSON, err := json.Marshal(&cfg)
 				require.NoError(t, err)
-				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				pod.Annotations[annotationRedirectTraffic] = string(nftCfgJSON)
 				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
@@ -141,7 +141,7 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Pod with correct annotations, using projected tokens should create redirect traffic rules",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				iptablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeIptablesProvider{},
 			},
 			podName:   "pod-no-proxy-outbound-port",
 			stdInData: goodStdinDataWithProjectedToken,
@@ -152,9 +152,9 @@ func Test_cmdAdd(t *testing.T) {
 					ProxyUserID:      "123",
 					ProxyInboundPort: 20000,
 				}
-				iptablesConfigJson, err := json.Marshal(&cfg)
+				nftCfgJSON, err := json.Marshal(&cfg)
 				require.NoError(t, err)
-				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				pod.Annotations[annotationRedirectTraffic] = string(nftCfgJSON)
 				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
@@ -168,7 +168,7 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Parsing nft config from CNI_ARGs as in Nomad",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				iptablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeIptablesProvider{},
 			},
 			cmdArgs: &skel.CmdArgs{ContainerID: "some-container-id",
 				IfName: "eth0",
@@ -194,7 +194,7 @@ func Test_cmdAdd(t *testing.T) {
 
 			// Check to see that rules have been generated
 			if c.expectedErr == nil && c.expectedRules {
-				require.NotEmpty(t, c.cmd.iptablesProvider.Rules())
+				require.NotEmpty(t, c.cmd.nftablesProvider.Rules())
 			}
 		})
 	}

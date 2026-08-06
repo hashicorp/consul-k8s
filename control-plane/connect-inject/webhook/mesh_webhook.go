@@ -569,7 +569,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		// We don't use the loop index because this needs to line up w.withiptablesConfigJSON,
+		// We don't use the loop index because this needs to line up w.nftablesConfigJSON,
 		// which is performed before the sidecar is injected.
 		idx := 0
 		for _, container := range pod.Spec.Containers {

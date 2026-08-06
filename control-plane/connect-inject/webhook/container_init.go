@@ -275,7 +275,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			}
 		} else {
 			// Set redirect traffic config for the container so that we can apply nft rules.
-			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
+			redirectTrafficConfig, err := w.nftablesConfigJSON(pod, namespace)
 			if err != nil {
 				return corev1.Container{}, err
 			}

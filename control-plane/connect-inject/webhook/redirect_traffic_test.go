@@ -464,11 +464,11 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 
 			ns := testNS
 			ns.Labels = c.namespaceLabel
-			iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+			nftCfg, err := w.nftablesConfigJSON(*pod, ns)
 			require.NoError(t, err)
 
 			actualConfig := nftables.Config{}
-			err = json.Unmarshal([]byte(iptablesConfig), &actualConfig)
+			err = json.Unmarshal([]byte(nftCfg), &actualConfig)
 			require.NoError(t, err)
 			if c.expectConsulDNSConfig {
 				require.Equal(t, "127.0.0.1", actualConfig.ConsulDNSIP)
