@@ -383,7 +383,6 @@ jobs:
       matrix:
         include:
           - { arch: "amd64" }
-          - { arch: "s390x" }
           - { arch: "amd64", fips: "+fips1402" }
     env:
       repo: ${{ github.event.repository.name }}
