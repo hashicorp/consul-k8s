@@ -95,7 +95,7 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", "skip_packaging": "true", gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" , gotags: "hashicorpmetrics" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "s390x", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "hashicorpmetrics" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "s390x", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", "skip_packaging": "true", gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" , gotags: "hashicorpmetrics" }
