@@ -13,11 +13,6 @@ on:
         type: boolean
         required: false
         default: false
-  pull_request:
-    # Sequence of patterns matched against refs/heads
-    branches:
-      # Pull request events on main branch
-      - main
   push:
     # Sequence of patterns matched against refs/heads
     branches:
