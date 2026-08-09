@@ -3,6 +3,16 @@
 name: build
 on:
   workflow_dispatch:
+  # Allow this workflow to be invoked by other workflows (e.g.
+  # scan-binaries-containers.yml) as a reusable workflow so its build artifacts
+  # can be reused. This is additive and does not change the push/dispatch behavior.
+  workflow_call:
+    inputs:
+      allow-unprotected-branches:
+        description: "Pass true to allow the conditional-skip guard to run on unprotected branches."
+        type: boolean
+        required: false
+        default: false
   push:
     # Sequence of patterns matched against refs/heads
     branches:
@@ -22,7 +32,9 @@ jobs:
     with:
       # Allow manual runs (workflow_dispatch) on any branch, including unprotected
       # ones, without failing the conditional-skip guard.
-      allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' }}
+      # Also allow callers (e.g. scan-binaries-containers.yml)
+      # to pass allow-unprotected-branches=true via the workflow_call input above.
+      allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' || inputs.allow-unprotected-branches == true }}
 
   get-go-version:
     # Cascades down to test jobs
