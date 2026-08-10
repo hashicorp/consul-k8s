@@ -90,6 +90,7 @@ rules:
   - inferencemodelconfigs
   - mcpserverconfigs
   - agentconfigs
+  - inferencepoolconfigs
   verbs:
   - get
   - list
@@ -102,6 +103,7 @@ rules:
   - inferencemodelconfigs/status
   - mcpserverconfigs/status
   - agentconfigs/status
+  - inferencepoolconfigs/status
   verbs:
   - get
   - patch
@@ -113,6 +115,7 @@ rules:
   - inferencemodelconfigs/finalizers
   - mcpserverconfigs/finalizers
   - agentconfigs/finalizers
+  - inferencepoolconfigs/finalizers
   verbs:
   - update
 - apiGroups: [""]

@@ -22,6 +22,7 @@ rules:
       - inferencemodelconfigs
       - mcpserverconfigs
       - agentconfigs
+      - inferencepoolconfigs
     verbs:
       - get
       - list

@@ -263,6 +263,16 @@ base_flags=(--set 'connectInject.enabled=true' --set 'ai.enabled=true')
     [ "$actual" = "inferencepoolconfigs" ]
 }
 
+@test "ai/CRD/InferencePoolConfig: shortName is ipc" {
+    cd `chart_dir`
+    local actual=$(helm template \
+        -s templates/crd-inferencepoolconfigs.yaml \
+        "${base_flags[@]}" \
+        . | tee /dev/stderr |
+        yq '.spec.names.shortNames[0]' | tee /dev/stderr)
+    [ "$actual" = "ipc" ]
+}
+
 @test "ai/CRD/InferencePoolConfig: served and storage version is v1alpha1" {
     cd `chart_dir`
     local actual=$(helm template \

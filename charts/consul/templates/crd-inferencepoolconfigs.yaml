@@ -21,6 +21,8 @@ spec:
     listKind: InferencePoolConfigList
     plural: inferencepoolconfigs
     singular: inferencepoolconfig
+    shortNames:
+      - ipc
   scope: Namespaced
   versions:
     - name: v1alpha1

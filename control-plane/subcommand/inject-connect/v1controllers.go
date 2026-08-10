@@ -244,6 +244,13 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			setupLog.Error(err, "unable to create controller", "controller", "AgentConfig")
 			return err
 		}
+		if err := (&aicontrollers.InferencePoolConfigController{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controller").WithName("inference-pool-config"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferencePoolConfig")
+			return err
+		}
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassController{
