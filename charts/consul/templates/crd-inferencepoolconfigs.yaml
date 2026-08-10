@@ -23,6 +23,8 @@ spec:
     singular: inferencepoolconfig
     shortNames:
       - ipc
+    categories:
+      - all
   scope: Namespaced
   versions:
     - name: v1alpha1

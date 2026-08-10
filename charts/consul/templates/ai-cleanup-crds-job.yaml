@@ -1,20 +1,24 @@
-{{- if not (and .Values.ai .Values.ai.enabled) }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 #
-# This pre-upgrade/pre-delete hook Job runs the "ai-cleanup" subcommand.
-# It only renders when ai.enabled=false, so it fires exactly on the upgrade
-# that disables the AI feature (or on helm uninstall).
+# This hook Job runs the "ai-cleanup" subcommand to strip finalizers from AI CRs
+# so that Kubernetes allows their deletion before CRDs are removed.
+#
+# Hook trigger logic:
+#   • helm uninstall (pre-delete)  — always runs, regardless of ai.enabled.
+#   • helm upgrade   (pre-upgrade) — only runs when ai.enabled is false/absent,
+#                                    i.e. when the operator is being disabled and
+#                                    the CRDs are about to be removed.
+#     When ai.enabled=true an upgrade keeps the operator running, so we must NOT
+#     strip finalizers — the controller itself manages CR lifecycle.
 #
 # The subcommand:
-#   1. Lists all InferenceModelConfig CRs — skips if CRD absent.
+#   1. Lists all InferenceModelConfig / McpServerConfig / AgentConfig /
+#      InferencePoolConfig CRs — skips each resource type if its CRD is absent.
 #   2. Strips finalizers from each CR and deletes it.
 #   3. Waits for the CR to be fully gone.
-#   4. Repeats for McpServerConfig CRs.
 #
-# This unblocks Helm from deleting the CRDs (which Kubernetes would otherwise
-# refuse while CRs with finalizers exist). The command is idempotent — running
-# it when no CRs exist is a no-op that exits 0.
+# The command is idempotent — running it when no CRs exist is a no-op (exit 0).
 #
 # Execution order (Helm hook-weight):
 #   -10 = SA + ClusterRole + ClusterRoleBinding created first
@@ -34,7 +38,11 @@ metadata:
       {{- toYaml .Values.global.extraLabels | nindent 4 }}
     {{- end }}
   annotations:
+    {{- if and .Values.ai .Values.ai.enabled }}
+    "helm.sh/hook": pre-delete
+    {{- else }}
     "helm.sh/hook": pre-delete,pre-upgrade
+    {{- end }}
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
 spec:
@@ -75,4 +83,3 @@ spec:
       tolerations:
         {{ tpl .Values.global.acls.tolerations . | indent 8 | trim }}
       {{- end }}
-{{- end }}

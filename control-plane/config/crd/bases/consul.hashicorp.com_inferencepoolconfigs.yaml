@@ -16,6 +16,8 @@ spec:
     singular: inferencepoolconfig
     shortNames:
       - ipc
+    categories:
+      - all
   scope: Namespaced
   versions:
   - additionalPrinterColumns:

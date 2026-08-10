@@ -23,6 +23,8 @@ spec:
     singular: agentconfig
     shortNames:
       - agc
+    categories:
+      - all
   scope: Cluster
   versions:
     - name: v1alpha1

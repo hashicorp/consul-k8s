@@ -1,4 +1,3 @@
-{{- if not (and .Values.ai .Values.ai.enabled) }}
 # Copyright (c) HashiCorp, Inc.
 # SPDX-License-Identifier: MPL-2.0
 apiVersion: rbac.authorization.k8s.io/v1
@@ -12,7 +11,11 @@ metadata:
     release: {{ .Release.Name }}
     component: ai-cleanup
   annotations:
+    {{- if and .Values.ai .Values.ai.enabled }}
+    "helm.sh/hook": pre-delete
+    {{- else }}
     "helm.sh/hook": pre-delete,pre-upgrade
+    {{- end }}
     "helm.sh/hook-weight": "-10"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
 rules:
@@ -29,4 +32,3 @@ rules:
       - patch
       - update
       - delete
-{{- end }}

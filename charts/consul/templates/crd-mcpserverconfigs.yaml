@@ -23,6 +23,8 @@ spec:
     singular: mcpserverconfig
     shortNames:
       - msc
+    categories:
+      - all
   scope: Cluster
   versions:
     - name: v1alpha1
