@@ -1,0 +1,25 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Minimal InferencePoolConfig — only the required fields.
+# The controller will set:
+#   Accepted=True, ParentResolved=False (InferenceGateway CRD not yet available),
+#   Ready=False
+#
+# Apply:
+#   kubectl apply -f inferencepoolconfig-minimal.yaml
+# Watch status:
+#   kubectl get ipc test-pool-minimal -n default -w
+# Describe:
+#   kubectl describe ipc test-pool-minimal -n default
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferencePoolConfig
+metadata:
+  name: test-pool-minimal
+  namespace: default
+spec:
+  enabled: true
+  parentRefs:
+    - kind: InferenceModelConfig    # replace with the actual Kind once InferenceGateway is available
+      name: consul-ai-gateway       # replace with a real InferenceModelConfig name in your cluster
+      namespace: default

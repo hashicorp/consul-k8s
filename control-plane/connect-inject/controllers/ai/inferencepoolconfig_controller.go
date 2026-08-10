@@ -6,6 +6,7 @@ package ai
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -27,7 +28,8 @@ const (
 	// located in the API server, or False when one or more parents are missing.
 	conditionTypeParentResolved = "ParentResolved"
 
-	reasonParentNotFound = "ParentNotFound"
+	reasonParentNotFound    = "ParentNotFound"
+	reasonParentCRDNotFound = "ParentCRDNotFound"
 )
 
 // InferencePoolConfigController reconciles InferencePoolConfig objects.
@@ -38,6 +40,9 @@ const (
 //   - Updating the Ready condition to reflect whether the pool is active and
 //     all parents are resolved.
 //   - Removing the finalizer and allowing deletion when requested.
+//
+// NOTE: ownerReference writes and InferenceGateway Watches will be added once
+// the InferenceGateway CRD and operator are introduced.
 type InferencePoolConfigController struct {
 	client.Client
 	Log logr.Logger
@@ -133,6 +138,7 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 
 	// --- Resolve parentRefs ---
 	parentResolved := metav1.ConditionTrue
+	parentResolvedReason := reasonReconciled
 	parentResolvedMsg := fmt.Sprintf("all %d parentRef(s) resolved successfully", len(ipc.Spec.ParentRefs))
 
 	for _, ref := range ipc.Spec.ParentRefs {
@@ -157,11 +163,24 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 		if err := r.Client.Get(ctx, key, parentObj); err != nil {
 			if k8serrors.IsNotFound(err) {
 				parentResolved = metav1.ConditionFalse
+				parentResolvedReason = reasonParentNotFound
 				parentResolvedMsg = fmt.Sprintf("parentRef %q (kind=%s, namespace=%s) not found", ref.Name, ref.Kind, ns)
 				log.Info("parentRef not found", "name", ref.Name, "kind", ref.Kind, "namespace", ns)
 				break
 			}
-			// Treat transient API errors as a temporary failure — requeue.
+			if isParentCRDAbsent(err) {
+				// The CRD for the referenced Kind is not installed in this cluster
+				// yet (e.g. InferenceGateway). Treat this as a soft not-found so
+				// the pool is marked ParentResolved=False without an error log or
+				// requeue storm.
+				parentResolved = metav1.ConditionFalse
+				parentResolvedReason = reasonParentCRDNotFound
+				parentResolvedMsg = fmt.Sprintf("CRD for parentRef kind %q is not installed in this cluster", ref.Kind)
+				log.Info("parentRef CRD not installed, marking ParentResolved=False",
+					"name", ref.Name, "kind", ref.Kind, "namespace", ns)
+				break
+			}
+			// Genuine transient API error — requeue.
 			return fmt.Errorf("looking up parentRef %q: %w", ref.Name, err)
 		}
 		log.V(1).Info("parentRef resolved", "name", ref.Name, "kind", ref.Kind, "namespace", ns)
@@ -198,13 +217,8 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 			Status:             parentResolved,
 			ObservedGeneration: ipc.Generation,
 			LastTransitionTime: now,
-			Reason:             func() string {
-				if parentResolved == metav1.ConditionTrue {
-					return reasonReconciled
-				}
-				return reasonParentNotFound
-			}(),
-			Message: parentResolvedMsg,
+			Reason:             parentResolvedReason,
+			Message:            parentResolvedMsg,
 		},
 		{
 			Type:               conditionTypeReady,
@@ -227,6 +241,21 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 
 	log.Info("status conditions patched successfully", "lastSyncedTime", now)
 	return nil
+}
+
+// isParentCRDAbsent returns true when err indicates the API server does not
+// know the resource kind at all — meaning the CRD has not been installed yet.
+// This covers both "no matches for kind" (meta.NoMatchError) and
+// "no kind is registered" (runtime.IsNotRegisteredError), neither of which is
+// exported, so we match on the error message text.
+func isParentCRDAbsent(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "no matches for kind") ||
+		strings.Contains(msg, "no kind is registered") ||
+		strings.Contains(msg, "is not registered")
 }
 
 func (r *InferencePoolConfigController) SetupWithManager(mgr ctrl.Manager) error {

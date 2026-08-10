@@ -1,0 +1,212 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Full InferencePoolConfig sample — exercises every optional field.
+# Demonstrates: parentRefs, rateLimit (tiers, models, bindings), routing
+# (fallback, retry, timeout, scoring, matchRules, complianceMap, budget,
+# cache, mirror).
+#
+# Apply:
+#   kubectl apply -f inferencepoolconfig-full.yaml
+# Watch status:
+#   kubectl get ipc test-pool-full -n default -w
+# Query conditions:
+#   kubectl get ipc test-pool-full -n default \
+#     -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
+# Delete:
+#   kubectl delete ipc test-pool-full -n default
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferencePoolConfig
+metadata:
+  name: test-pool-full
+  namespace: default
+  labels:
+    app: test
+    env: kind
+spec:
+  enabled: true
+
+  # ---------------------------------------------------------------------------
+  # parentRefs — attach this pool to one or more InferenceGateway resources.
+  # The controller resolves each ref and sets ParentResolved=True only when
+  # every referenced object exists in the cluster.
+  # ---------------------------------------------------------------------------
+  parentRefs:
+    - kind: InferenceModelConfig    # replace with InferenceGateway once that CRD is available
+      name: consul-ai-gateway       # replace with a real InferenceModelConfig name
+      namespace: default
+
+  # ---------------------------------------------------------------------------
+  # rateLimit — optional token- and request-rate-limiting rules.
+  # ---------------------------------------------------------------------------
+  rateLimit:
+    enabled: true
+    mode: global          # "local" | "global"
+    enforcement: enforce  # "enforce" | "shadow"
+    countMode: token      # "request" | "token"
+    degradeMode: allow    # "allow" | "deny"
+    dimensions:
+      - identity
+      - model
+
+    # Fallback limit for requests not matched by a tier or model rule.
+    default:
+      requests:
+        count: 200
+        window: 1m
+      tokens:
+        count: 100000
+        window: 1h
+
+    # Aggregate limit across all callers for this pool.
+    global:
+      requests:
+        count: 2000
+        window: 1m
+      tokens:
+        count: 5000000
+        window: 1h
+
+    # Per-tier limits.
+    tierLimits:
+      - tier: gold
+        maxCompletionTokensCap: 8192
+        requests:
+          count: 500
+          window: 1m
+        tokens:
+          count: 500000
+          window: 1h
+      - tier: silver
+        maxCompletionTokensCap: 4096
+        requests:
+          count: 100
+          window: 1m
+        tokens:
+          count: 100000
+          window: 1h
+
+    # Map SPIFFE identities to tiers.
+    tierBindings:
+      - tier: gold
+        spiffeIDs:
+          - spiffe://cluster.local/ns/prod/sa/frontend
+        namespace: prod
+        partition: default
+      - tier: silver
+        spiffeIDs:
+          - spiffe://cluster.local/ns/staging/sa/frontend
+        namespace: staging
+
+    # Per-model limits override tier/global limits.
+    modelLimits:
+      - model: gpt-4o
+        requests:
+          count: 50
+          window: 1m
+        tokens:
+          count: 200000
+          window: 1h
+      - model: claude-3-sonnet
+        requests:
+          count: 30
+          window: 1m
+        tokens:
+          count: 150000
+          window: 1h
+
+  # ---------------------------------------------------------------------------
+  # routing — optional traffic-routing, failover, retry, and caching rules.
+  # ---------------------------------------------------------------------------
+  routing:
+    # Deprecated ordered fallback list (kept for backward compat).
+    fallbackChain:
+      - backend-us-east
+      - backend-eu-west
+
+    # Structured cross-provider failover.
+    fallback:
+      retryOn:
+        - 5xx
+        - reset
+        - connect-failure
+      maxTiers: 3
+      perTryTimeout: 30s
+
+    # Automatic retry on the same backend.
+    retry:
+      maxAttempts: 3
+      retryOn:
+        - 5xx
+        - reset
+
+    # Connection and end-to-end timeouts.
+    timeout:
+      connect: 5s
+      request: 120s
+
+    # Backend-selection scoring.
+    scoring:
+      scorers:
+        - latency-aware
+        - round-robin
+      weightedSplit:
+        - cluster: backend-us-east
+          weight: 70
+        - cluster: backend-eu-west
+          weight: 30
+
+    # Request-matching rules — first match wins.
+    matchRules:
+      - when:
+          path: /v1/chat/completions
+          bodyHas:
+            - /model
+            - /messages
+          identity:
+            service: frontend
+            namespace: prod
+            partition: default
+        candidates:
+          - backend-us-east
+        fallbackChain:
+          - backend-eu-west
+        requireCapabilities:
+          - vision
+          - function-calling
+      - when:
+          path: /v1/embeddings
+        candidates:
+          - backend-embeddings
+        requireCapabilities:
+          - embeddings
+
+    # Compliance restrictions keyed by label.
+    complianceMap:
+      gdpr:
+        allowedRegions:
+          - eu-west-1
+          - eu-central-1
+        denyModels:
+          - gpt-4
+      hipaa:
+        allowedRegions:
+          - us-east-1
+        denyModels: []
+
+    # Open-ended passthrough fields — raw JSON forwarded to Consul unchanged.
+    budget:
+      maxDailyUSD: 50.00
+      alertThresholdPct: 80
+
+    cache:
+      enabled: true
+      ttlSeconds: 300
+      similarityThreshold: 0.95
+
+    mirror:
+      enabled: false
+      destination: backend-shadow
+      percentage: 5
+
+    configValidation: strict   # "strict" | "warn" | "off"
