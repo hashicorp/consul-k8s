@@ -6,6 +6,8 @@ SECURITY:
 Containerd: Removed
 CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs [[GH-5572](https://github.com/hashicorp/consul-k8s/issues/5572)]
 
+* security: upgrade `net` and `grpc` packages to address a few CVEs [[GH-5584](https://github.com/hashicorp/consul-k8s/issues/5584)]
+
 IMPROVEMENTS:
 
 * Upgrade to use Go 1.26.5. [[GH-5542](https://github.com/hashicorp/consul-k8s/issues/5542)]
