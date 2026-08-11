@@ -19,12 +19,12 @@
 ARG GOLANG_VERSION
 FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
 # Build go-discover in a synthetic module so we can pin patched versions of
-# golang.org/x/crypto (>=v0.52.0) and golang.org/x/net (>=v0.55.0) via MVS,
+# golang.org/x/crypto (>=v0.54.0) and golang.org/x/net (>=v0.57.0) via MVS,
 # overriding the older versions bundled with go-discover v1.2.0.
 RUN mkdir /build && cd /build && \
     go mod init godisc_builder && \
     go get github.com/hashicorp/go-discover/cmd/discover@v1.2.0 && \
-    go get golang.org/x/crypto@v0.52.0 golang.org/x/net@v0.55.0 google.golang.org/grpc@v1.81.1 && \
+    go get golang.org/x/crypto@v0.54.0 golang.org/x/net@v0.57.0 google.golang.org/grpc@v1.83.0 && \
     CGO_ENABLED=0 GOFLAGS=-mod=mod go build -o /go/bin/discover github.com/hashicorp/go-discover/cmd/discover
 
 # dev copies the binary from a local build
@@ -42,13 +42,13 @@ ARG TARGETOS
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=${VERSION} \
-      release=${VERSION} \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=${VERSION} \
+    release=${VERSION} \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -95,13 +95,13 @@ ARG PRODUCT_VERSION
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=${BIN_NAME} \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=${PRODUCT_VERSION} \
-      release=${PRODUCT_VERSION} \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=${PRODUCT_VERSION} \
+    release=${PRODUCT_VERSION} \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
@@ -161,13 +161,13 @@ ENV PRODUCT_VERSION=$PRODUCT_VERSION
 ENV PRODUCT_NAME=$BIN_NAME
 
 LABEL name=$PRODUCT_NAME \
-      maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
-      vendor="HashiCorp" \
-      version=$PRODUCT_VERSION \
-      release=$PRODUCT_VERSION \
-      summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
-      org.opencontainers.image.licenses="MPL-2.0"
+    maintainer="Team Consul Kubernetes <team-consul-kubernetes@hashicorp.com>" \
+    vendor="HashiCorp" \
+    version=$PRODUCT_VERSION \
+    release=$PRODUCT_VERSION \
+    summary="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    description="consul-k8s-control-plane provides first-class integrations between Consul and Kubernetes." \
+    org.opencontainers.image.licenses="MPL-2.0"
 
 COPY LICENSE /usr/share/doc/$PRODUCT_NAME/LICENSE.txt
 
