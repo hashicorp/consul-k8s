@@ -1,3 +1,20 @@
+## 2.0.3 (August 11, 2026)
+
+SECURITY:
+
+* Helm: Upgraded to v3.21.3
+Containerd: Removed
+CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs [[GH-5572](https://github.com/hashicorp/consul-k8s/issues/5572)]
+
+IMPROVEMENTS:
+
+* Upgrade to use Go 1.26.5. [[GH-5542](https://github.com/hashicorp/consul-k8s/issues/5542)]
+
+BUG FIXES:
+
+* api-gateway: Fix ext_authz filter updates not being propagated to Consul when an HTTPRoute's RouteAuthFilter reference is changed in-place. [[GH-5516](https://github.com/hashicorp/consul-k8s/issues/5516)]
+* helm: create OpenSSL subject-hash symlinks (`<hash>.N`) for the CA certificates written to `/trusted-cas` by `global.trustedCAs`, so that they are actually trusted via `SSL_CERT_DIR`. Certificates that share a subject are given sequential suffixes instead of overwriting each other, and the Vault-injected Consul server CA is included when `global.secretsBackend.vault.enabled` is set. [[GH-5527](https://github.com/hashicorp/consul-k8s/issues/5527)]
+
 ## 2.0.0 (May 24, 2026)
 
 > NOTE: Consul K8s 2.0.x is compatible with Consul 2.0.x and Consul Dataplane 2.0.x. Refer to our [compatibility matrix](https://developer.hashicorp.com/consul/docs/k8s/compatibility) for more info.
