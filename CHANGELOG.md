@@ -5,6 +5,7 @@ SECURITY:
 * Helm: Upgraded to v3.21.3
 Containerd: Removed
 CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs [[GH-5572](https://github.com/hashicorp/consul-k8s/issues/5572)]
+* security: upgrade `net` and `grpc` packages to address a few CVEs [[GH-5581](https://github.com/hashicorp/consul-k8s/issues/5581)]
 
 IMPROVEMENTS:
 
