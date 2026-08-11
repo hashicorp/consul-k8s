@@ -24,6 +24,12 @@ metadata:
     gateway.networking.k8s.io/channel: standard
   creationTimestamp: null
   name: httproutes.gateway.networking.k8s.io
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: crd
 spec:
   group: gateway.networking.k8s.io
   names:
