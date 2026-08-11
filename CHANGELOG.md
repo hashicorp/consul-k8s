@@ -1,3 +1,21 @@
+## 1.8.16 (August 11, 2026)
+
+SECURITY:
+
+* Helm: Upgraded to v3.21.3
+Containerd: Removed
+CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs [[GH-5572](https://github.com/hashicorp/consul-k8s/issues/5572)]
+
+* security: upgrade `net` and `grpc` packages to address a few CVEs [[GH-5583](https://github.com/hashicorp/consul-k8s/issues/5583)]
+
+IMPROVEMENTS:
+
+* Upgrade to use Go 1.26.5. [[GH-5542](https://github.com/hashicorp/consul-k8s/issues/5542)]
+
+BUG FIXES:
+
+* helm: create OpenSSL subject-hash symlinks (`<hash>.N`) for the CA certificates written to `/trusted-cas` by `global.trustedCAs`, so that they are actually trusted via `SSL_CERT_DIR`. Certificates that share a subject are given sequential suffixes instead of overwriting each other, and the Vault-injected Consul server CA is included when `global.secretsBackend.vault.enabled` is set. [[GH-5527](https://github.com/hashicorp/consul-k8s/issues/5527)]
+
 ## 1.8.13 (May 24, 2026)
 
 SECURITY:
