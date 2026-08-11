@@ -2701,6 +2701,13 @@ connectInject:
       runAsGroup: 0
       runAsUser: 0
 
+    # Toleration settings for the CNI installer DaemonSet pods.
+    # This should be a multi-line string matching the Tolerations
+    # array in a Pod spec. If not set, defaults to tolerating
+    # CriticalAddonsOnly and NoExecute taints.
+    # @type: string
+    tolerations: null
+
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.
     #

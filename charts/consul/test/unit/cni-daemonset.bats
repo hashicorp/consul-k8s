@@ -375,3 +375,76 @@ rollingUpdate:
   [ "${actualTemplateFoo}" = "bar" ]
   [ "${actualTemplateBaz}" = "qux" ]
 }
+
+#--------------------------------------------------------------------
+# tolerations
+
+@test "cni/DaemonSet: tolerations not set by default renders default entries" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = '[{"key":"CriticalAddonsOnly","operator":"Exists"},{"effect":"NoExecute","operator":"Exists"}]' ]
+}
+
+@test "cni/DaemonSet: tolerations can be overridden with a custom list" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.cni.tolerations=- key: node-role.kubernetes.io/worker
+  operator: Exists
+  effect: NoSchedule' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = '[{"effect":"NoSchedule","key":"node-role.kubernetes.io/worker","operator":"Exists"}]' ]
+}
+
+@test "cni/DaemonSet: tolerations custom value excludes master and infra node taints" {
+  cd `chart_dir`
+  local tolerations=$(helm template \
+      -s templates/cni-daemonset.yaml \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.cni.tolerations=- key: CriticalAddonsOnly
+  operator: Exists
+- key: node.kubernetes.io/not-ready
+  operator: Exists
+  effect: NoExecute
+- key: node.kubernetes.io/unreachable
+  operator: Exists
+  effect: NoExecute' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.tolerations' | tee /dev/stderr)
+
+  # master:NoSchedule wildcard must not be present
+  local hasMasterWildcard=$(echo "${tolerations}" | \
+      jq 'any(.[]; .key == null and .effect == "NoSchedule")' | tee /dev/stderr)
+  [ "${hasMasterWildcard}" = "false" ]
+
+  # scoped not-ready NoExecute entry must be present
+  local hasNotReady=$(echo "${tolerations}" | \
+      jq 'any(.[]; .key == "node.kubernetes.io/not-ready" and .effect == "NoExecute")' | tee /dev/stderr)
+  [ "${hasNotReady}" = "true" ]
+
+  # scoped unreachable NoExecute entry must be present
+  local hasUnreachable=$(echo "${tolerations}" | \
+      jq 'any(.[]; .key == "node.kubernetes.io/unreachable" and .effect == "NoExecute")' | tee /dev/stderr)
+  [ "${hasUnreachable}" = "true" ]
+}
+
+@test "cni/DaemonSet: tolerations null value renders default entries" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/cni-daemonset.yaml \
+      --set 'connectInject.cni.enabled=true' \
+      --set 'connectInject.enabled=true' \
+      --set 'connectInject.cni.tolerations=null' \
+      . | tee /dev/stderr |
+      yq -rc '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = '[{"key":"CriticalAddonsOnly","operator":"Exists"},{"effect":"NoExecute","operator":"Exists"}]' ]
+}
