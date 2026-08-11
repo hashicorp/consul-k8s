@@ -1,0 +1,3 @@
+```release-note:improvement
+Helm: Expose `connectInject.cni.tolerations` as a configurable Helm value to allow operators to override CNI DaemonSet tolerations. Defaults to tolerating `CriticalAddonsOnly` and `NoExecute` taints when not set.
+```
