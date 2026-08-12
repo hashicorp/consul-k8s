@@ -8,4 +8,7 @@ if [[ "${VERSION}" == *"consul-enterprise:"* ]]; then
 	VERSION=$(echo ${VERSION} | sed "s/consul-enterprise:/consul:/g")
 fi
 
+CONSUL_CE_VERSION="1.22.7"
+VERSION=$(echo ${VERSION} | sed -E "s/consul:1\.22\.[0-9]+/consul:${CONSUL_CE_VERSION}/g")
+
 echo "${VERSION}"
