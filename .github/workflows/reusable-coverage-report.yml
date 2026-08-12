@@ -37,12 +37,6 @@ on:
       patch_coverable:
         description: Number of changed coverable lines in the PR.
         value: ${{ jobs.report.outputs.patch_coverable }}
-      pkg_summary:
-        description: >-
-          Newline-separated "PACKAGE PCT%" lines from pkg-summary.txt encoded
-          with %0A, or empty string when no profiles were found. Consumed by
-          the coverage-regression-gate job to check per-package regressions.
-        value: ${{ jobs.report.outputs.pkg_summary }}
 
 jobs:
   report:
@@ -56,7 +50,6 @@ jobs:
       patch: ${{ steps.patch.outputs.patch }}
       patch_covered: ${{ steps.patch.outputs.covered }}
       patch_coverable: ${{ steps.patch.outputs.coverable }}
-      pkg_summary: ${{ steps.coverage.outputs.pkg_summary }}
     steps:
       - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
 
@@ -87,7 +80,6 @@ jobs:
           if [ "$COUNT" -eq 0 ]; then
             echo "No coverage profiles found"
             echo "total=N/A" >> "$GITHUB_OUTPUT"
-            echo "pkg_summary=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -146,10 +138,6 @@ jobs:
 
           go tool cover -html=merged-coverage.out -o coverage.html
 
-          # Export pkg-summary content as a single-line output (newlines → %0A)
-          # so it can be passed between jobs via workflow outputs.
-          PKG_SUMMARY_ENCODED=$(python3 -c "import sys; c=open('pkg-summary.txt').read().rstrip('\n'); print(c.replace('\n','%0A'))")
-          echo "pkg_summary=${PKG_SUMMARY_ENCODED}" >> "$GITHUB_OUTPUT"
 
       - name: Upload pkg-summary artifact
         # Upload pkg-summary.txt so the regression gate job can download it
@@ -399,7 +387,7 @@ jobs:
 
           # Pull latest main to avoid conflicts with concurrent badge commits.
           git fetch origin main --depth=1
-          git reset --hard origin/main
+          git pull --ff-only origin main
 
           mkdir -p .github
           cp pkg-summary.txt .github/coverage-baseline.txt
