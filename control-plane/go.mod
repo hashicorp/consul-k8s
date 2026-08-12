@@ -1,6 +1,6 @@
 module github.com/hashicorp/consul-k8s/control-plane
 
-go 1.26
+go 1.26.5
 
 replace github.com/hashicorp/consul-k8s/version => ../version
 
@@ -8,9 +8,9 @@ replace github.com/hashicorp/consul-k8s/control-plane/cni => ./cni
 
 replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.34.4
 
-replace github.com/hashicorp/consul/sdk => ../../consul/sdk
+replace github.com/hashicorp/consul/sdk => github.com/hashicorp/consul/sdk v0.0.0-20260812192939-f9d09e74dd70
 
-replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260112121053-7ee7c79b61f0
+replace github.com/hashicorp/consul => github.com/hashicorp/consul v1.11.0-alpha.0.20260812192939-f9d09e74dd70
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
@@ -30,7 +30,7 @@ require (
 	github.com/hashicorp/consul/api v1.34.4
 	github.com/hashicorp/consul/sdk v0.18.1
 	github.com/hashicorp/go-bexpr v0.1.16
-	github.com/hashicorp/go-discover v1.1.0
+	github.com/hashicorp/go-discover v1.2.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-metrics v0.6.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -49,10 +49,10 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.28.0
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.39.0
 	golang.org/x/time v0.15.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.2
@@ -86,22 +86,22 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.41.11 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.32.22 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.21 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.27 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.27 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.27 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.28 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.43.0 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.32.31 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.30 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.31 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.32 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.305.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.82.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.11 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.27 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.1.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.31.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.36.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.43.1 // indirect
-	github.com/aws/smithy-go v1.27.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.31 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.5.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.33.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.38.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.45.0 // indirect
+	github.com/aws/smithy-go v1.27.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bgentry/speakeasy v0.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
