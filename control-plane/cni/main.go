@@ -80,8 +80,9 @@ type CNIArgs struct {
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
 
 	// CONSUL_IPTABLES_CONFIG is the runtime traffic redirection configuration passed by
-	// orchestrator (ex. the Nomad client agent)
-	//Manisha TODO: rename to CONSUL_NFTABLES_CONFIG once Nomad sender is updated as per the abv comment
+	// the orchestrator (e.g. the Nomad client agent). The field name is kept as-is for
+	// backward compatibility with existing Nomad senders.
+	// TODO: rename to CONSUL_NFTABLES_CONFIG once the Nomad sender is updated.
 	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
 
