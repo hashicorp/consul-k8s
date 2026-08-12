@@ -17,7 +17,7 @@ import (
 	current "github.com/containernetworking/cni/pkg/types/100"
 	cniv "github.com/containernetworking/cni/pkg/version"
 	"github.com/hashicorp/consul-k8s/version"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,8 +52,8 @@ const (
 	// indicate the status of the CNI plugin.
 	complete = "complete"
 
-	// annotationRedirectTraffic stores iptables.Config information so that the CNI plugin can use it to apply
-	// iptables rules.
+	// annotationRedirectTraffic stores nftables.Config information so that the CNI plugin can use it to apply
+	// nft traffic redirection rules.
 	annotationRedirectTraffic = "consul.hashicorp.com/redirect-traffic-config"
 
 	// annotationDualStack stores if pod need to run in dualstack mode
@@ -63,8 +63,8 @@ const (
 type Command struct {
 	// client is a kubernetes client
 	client kubernetes.Interface
-	// iptablesProvider is the Provider that will apply iptables rules. Used for testing.
-	iptablesProvider iptables.Provider
+	// nftablesProvider is the Provider that will apply nft rules. Used for testing.
+	nftablesProvider nftables.Provider
 }
 
 type CNIArgs struct {
@@ -79,8 +79,10 @@ type CNIArgs struct {
 	// K8S_POD_INFRA_CONTAINER_ID is the runtime container ID that the pod runs under.
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
 
-	// CONSUL_IPTABLES_CONFIG is the runtime iptables configuration passed by
-	// orchestrator (ex. the Nomad client agent)
+	// CONSUL_IPTABLES_CONFIG is the runtime traffic redirection configuration passed by
+	// the orchestrator (e.g. the Nomad client agent). The field name is kept as-is for
+	// backward compatibility with existing Nomad senders.
+	// TODO: rename to CONSUL_NFTABLES_CONFIG once the Nomad sender is updated.
 	CONSUL_IPTABLES_CONFIG types.UnmarshallableString
 }
 
@@ -141,11 +143,11 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 
 	podNamespace := string(cniArgs.K8S_POD_NAMESPACE)
 	podName := string(cniArgs.K8S_POD_NAME)
-	cniArgsIPTablesCfg := string(cniArgs.CONSUL_IPTABLES_CONFIG)
+	cniArgsNftCfg := string(cniArgs.CONSUL_IPTABLES_CONFIG)
 
 	// We should never encounter this unless there has been an error in the
 	// kubelet. A good safeguard.
-	if (podNamespace == "" || podName == "") && cniArgsIPTablesCfg == "" {
+	if (podNamespace == "" || podName == "") && cniArgsNftCfg == "" {
 		return fmt.Errorf("not running in a pod, namespace and pod should have values")
 	}
 
@@ -178,12 +180,12 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 		result = prevResult
 	}
 
-	var iptablesCfg iptables.Config
+	var nftCfg nftables.Config
 	dualStack := false
-	// If cniArgsIPTablesCfg is populated we're on Nomad, otherwise we're on K8s
-	if cniArgsIPTablesCfg != "" {
+	// If cniArgsNftCfg is populated we're on Nomad, otherwise we're on K8s
+	if cniArgsNftCfg != "" {
 		var err error
-		iptablesCfg, err = parseIPTablesFromCNIArgs(cniArgsIPTablesCfg)
+		nftCfg, err = parseNftCfgFromCNIArgs(cniArgsNftCfg)
 		if err != nil {
 			return err
 		}
@@ -215,8 +217,8 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 			logger.Info("unable to update %s pod annotation to waiting", keyTransparentProxyStatus)
 		}
 
-		// Parse the cni-proxy-config annotation into an iptables.Config object.
-		iptablesCfg, err = parseAnnotation(*pod, annotationRedirectTraffic)
+		// Parse the cni-proxy-config annotation into a traffic redirection Config object.
+		nftCfg, err = parseAnnotation(*pod, annotationRedirectTraffic)
 		if err != nil {
 			return err
 		}
@@ -227,21 +229,21 @@ func (c *Command) cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// Set NetNS passed through the CNI.
-	iptablesCfg.NetNS = args.Netns
+	nftCfg.NetNS = args.Netns
 
 	// Set the provider to a fake provider in testing, otherwise use the default
-	// iptables.Provider
-	if c.iptablesProvider != nil {
-		iptablesCfg.IptablesProvider = c.iptablesProvider
+	// nft Provider
+	if c.nftablesProvider != nil {
+		nftCfg.NftablesProvider = c.nftablesProvider
 	}
 
-	// Apply the iptables rules.
-	err = iptables.Setup(iptablesCfg, dualStack)
+	// Apply the nft rules.
+	err = nftables.Setup(nftCfg, dualStack)
 	if err != nil {
-		return fmt.Errorf("could not apply iptables setup: %v", err)
+		return fmt.Errorf("could not apply nftables rules: %v", err)
 	}
 
-	if cniArgsIPTablesCfg == "" {
+	if cniArgsNftCfg == "" {
 		// We do not throw an error here because kubernetes will often throw a
 		// benign error where the pod has been updated in between the get and update
 		// of the annotation. Eventually kubernetes will update the annotation
@@ -369,8 +371,8 @@ func skipTrafficRedirection(pod corev1.Pod) bool {
 	return false
 }
 
-func parseIPTablesFromCNIArgs(args string) (iptables.Config, error) {
-	cfg := iptables.Config{}
+func parseNftCfgFromCNIArgs(args string) (nftables.Config, error) {
+	cfg := nftables.Config{}
 	err := json.Unmarshal([]byte(args), &cfg)
 	if err != nil {
 		return cfg, fmt.Errorf("could not unmarshal CNI args: %w", err)
@@ -378,16 +380,16 @@ func parseIPTablesFromCNIArgs(args string) (iptables.Config, error) {
 	return cfg, nil
 }
 
-// parseAnnotation parses the cni-proxy-config annotation into an iptables.Config object.
-func parseAnnotation(pod corev1.Pod, annotation string) (iptables.Config, error) {
+// parseAnnotation parses the cni-proxy-config annotation into a nftables.Config object.
+func parseAnnotation(pod corev1.Pod, annotation string) (nftables.Config, error) {
 	anno, ok := pod.Annotations[annotation]
 	if !ok {
-		return iptables.Config{}, fmt.Errorf("could not find %s annotation for %s pod", annotation, pod.Name)
+		return nftables.Config{}, fmt.Errorf("could not find %s annotation for %s pod", annotation, pod.Name)
 	}
-	cfg := iptables.Config{}
+	cfg := nftables.Config{}
 	err := json.Unmarshal([]byte(anno), &cfg)
 	if err != nil {
-		return iptables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
+		return nftables.Config{}, fmt.Errorf("could not unmarshal %s annotation for %s pod", annotation, pod.Name)
 	}
 	return cfg, nil
 }

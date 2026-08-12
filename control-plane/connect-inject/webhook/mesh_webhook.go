@@ -497,7 +497,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error overwriting readiness or liveness probes: %s", err))
 	}
 
-	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
+	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the traffic redirection config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
 		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
@@ -569,7 +569,7 @@ func (w *MeshWebhook) overwriteProbes(ns corev1.Namespace, pod *corev1.Pod) erro
 	}
 
 	if tproxyEnabled && overwriteProbes {
-		// We don't use the loop index because this needs to line up w.withiptablesConfigJSON,
+		// We don't use the loop index because this needs to line up w.nftablesConfigJSON,
 		// which is performed before the sidecar is injected.
 		idx := 0
 		for _, container := range pod.Spec.Containers {
