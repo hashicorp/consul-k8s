@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -27,11 +27,11 @@ const (
 	defaultNamespace = "default"
 )
 
-type fakeIptablesProvider struct {
+type fakeNftablesProvider struct {
 	rules []string
 }
 
-func (f *fakeIptablesProvider) AddRule(name string, args ...string) {
+func (f *fakeNftablesProvider) AddRule(name string, args ...string) {
 	var rule []string
 	rule = append(rule, name)
 	rule = append(rule, args...)
@@ -39,15 +39,15 @@ func (f *fakeIptablesProvider) AddRule(name string, args ...string) {
 	f.rules = append(f.rules, strings.Join(rule, " "))
 }
 
-func (f *fakeIptablesProvider) ApplyRules(command string) error {
+func (f *fakeNftablesProvider) ApplyRules(command string) error {
 	return nil
 }
 
-func (f *fakeIptablesProvider) Rules() []string {
+func (f *fakeNftablesProvider) Rules() []string {
 	return f.rules
 }
 
-func (f *fakeIptablesProvider) ClearAllRules() {
+func (f *fakeNftablesProvider) ClearAllRules() {
 	f.rules = nil
 }
 
@@ -114,20 +114,20 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Pod with correct annotations, should create redirect traffic rules",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				iptablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeNftablesProvider{},
 			},
 			podName:   "pod-no-proxy-outbound-port",
 			stdInData: goodStdinData,
 			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
 				pod.Annotations[keyInjectStatus] = "true"
 				pod.Annotations[keyTransparentProxyStatus] = "enabled"
-				cfg := iptables.Config{
+				cfg := nftables.Config{
 					ProxyUserID:      "123",
 					ProxyInboundPort: 20000,
 				}
-				iptablesConfigJson, err := json.Marshal(&cfg)
+				nftCfgJSON, err := json.Marshal(&cfg)
 				require.NoError(t, err)
-				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				pod.Annotations[annotationRedirectTraffic] = string(nftCfgJSON)
 				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
@@ -141,20 +141,20 @@ func Test_cmdAdd(t *testing.T) {
 			name: "Pod with correct annotations, using projected tokens should create redirect traffic rules",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				iptablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeNftablesProvider{},
 			},
 			podName:   "pod-no-proxy-outbound-port",
 			stdInData: goodStdinDataWithProjectedToken,
 			configuredPod: func(pod *corev1.Pod, cmd *Command) *corev1.Pod {
 				pod.Annotations[keyInjectStatus] = "true"
 				pod.Annotations[keyTransparentProxyStatus] = "enabled"
-				cfg := iptables.Config{
+				cfg := nftables.Config{
 					ProxyUserID:      "123",
 					ProxyInboundPort: 20000,
 				}
-				iptablesConfigJson, err := json.Marshal(&cfg)
+				nftCfgJSON, err := json.Marshal(&cfg)
 				require.NoError(t, err)
-				pod.Annotations[annotationRedirectTraffic] = string(iptablesConfigJson)
+				pod.Annotations[annotationRedirectTraffic] = string(nftCfgJSON)
 				pod.Annotations[annotationDualStack] = "consul.hashicorp.com/dual-stack"
 				_, err = cmd.client.CoreV1().Pods(defaultNamespace).Create(context.Background(), pod, metav1.CreateOptions{})
 				require.NoError(t, err)
@@ -165,10 +165,10 @@ func Test_cmdAdd(t *testing.T) {
 			expectedRules: true, // Rules will be applied
 		},
 		{
-			name: "Parsing iptables from CNI_ARGs as in Nomad",
+			name: "Parsing nft config from CNI_ARGs as in Nomad",
 			cmd: &Command{
 				client:           fake.NewSimpleClientset(),
-				iptablesProvider: &fakeIptablesProvider{},
+				nftablesProvider: &fakeNftablesProvider{},
 			},
 			cmdArgs: &skel.CmdArgs{ContainerID: "some-container-id",
 				IfName: "eth0",
@@ -194,7 +194,7 @@ func Test_cmdAdd(t *testing.T) {
 
 			// Check to see that rules have been generated
 			if c.expectedErr == nil && c.expectedRules {
-				require.NotEmpty(t, c.cmd.iptablesProvider.Rules())
+				require.NotEmpty(t, c.cmd.nftablesProvider.Rules())
 			}
 		})
 	}
@@ -483,34 +483,34 @@ func TestParseAnnotation(t *testing.T) {
 		name         string
 		annotation   string
 		configurePod func(*corev1.Pod) *corev1.Pod
-		expected     iptables.Config
+		expected     nftables.Config
 		err          error
 	}{
 		{
-			name:       "Pod with iptables.Config annotation",
+			name:       "Pod with nftables.Config annotation",
 			annotation: annotationRedirectTraffic,
 			configurePod: func(pod *corev1.Pod) *corev1.Pod {
-				// Use iptables.Config so that if the Config struct ever changes that the test is still valid
-				cfg := iptables.Config{ProxyUserID: "1234"}
+				// Use nftables.Config so that if the Config struct ever changes that the test is still valid
+				cfg := nftables.Config{ProxyUserID: "1234"}
 				j, err := json.Marshal(&cfg)
 				if err != nil {
-					t.Fatalf("could not marshal iptables config: %v", err)
+					t.Fatalf("could not marshal nft config: %v", err)
 				}
 				pod.Annotations[annotationRedirectTraffic] = string(j)
 				return pod
 			},
-			expected: iptables.Config{
+			expected: nftables.Config{
 				ProxyUserID: "1234",
 			},
 			err: nil,
 		},
 		{
-			name:       "Pod without iptables.Config annotation",
+			name:       "Pod without nftables.Config annotation",
 			annotation: annotationRedirectTraffic,
 			configurePod: func(pod *corev1.Pod) *corev1.Pod {
 				return pod
 			},
-			expected: iptables.Config{},
+			expected: nftables.Config{},
 			err:      fmt.Errorf("could not find %s annotation for %s pod", annotationRedirectTraffic, defaultPodName),
 		},
 	}
@@ -722,7 +722,7 @@ const nomadStdinData = `{
 `
 
 func minimalIPTablesJSON(t *testing.T) string {
-	cfg := iptables.Config{
+	cfg := nftables.Config{
 		ConsulDNSIP:          "127.0.0.1",
 		ConsulDNSPort:        8600,
 		ProxyUserID:          "101",
