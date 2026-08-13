@@ -12,6 +12,11 @@ import (
 
 var suite testsuite.Suite
 
+const (
+	gatewayGatewayResource   = "gateways.gateway.networking.k8s.io"
+	gatewayHTTPRouteResource = "httproutes.gateway.networking.k8s.io"
+)
+
 func TestMain(m *testing.M) {
 	suite = testsuite.NewSuite(m)
 	os.Exit(suite.Run())
