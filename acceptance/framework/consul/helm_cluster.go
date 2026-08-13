@@ -101,7 +101,7 @@ func NewHelmCluster(
 	// like AKS where volumes take a long time to mount.
 	extraArgs := map[string][]string{
 		"install": {"--timeout", "15m", "--debug", "--skip-crds"},
-		"upgrade": {"--timeout", "15m", "--debug", "--skip-crds"},
+		"upgrade": {"--timeout", "15m", "--skip-crds"},
 		"delete":  {"--timeout", "15m", "--debug"},
 	}
 
@@ -158,7 +158,7 @@ func (h *HelmCluster) Create(t *testing.T) {
 	}
 
 	// Retry the install in case previous tests have not finished cleaning up.
-	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
+	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 3}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
 		require.NoError(r, err)
 	})
