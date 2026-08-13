@@ -211,6 +211,15 @@ func (c *Controller) processSingle(
 	return true
 }
 
+// GetByIndex allows querying the informer's indexer to avoid extra calls to k8s
+func (c *Controller) GetByIndex(indexName, indexedValue string) ([]interface{}, error) {
+	if c.informer == nil {
+		return nil, nil
+	}
+
+	return c.informer.GetIndexer().ByIndex(indexName, indexedValue)
+}
+
 // informerDeleteHandler returns a function that implements
 // `DeleteFunc` from the `ResourceEventHandlerFuncs` interface.
 // It is split out as its own method to aid in testing.
