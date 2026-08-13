@@ -150,6 +150,9 @@ spec:
                 -consul-image="{{ default .Values.global.image .Values.connectInject.imageConsul }}" \
                 -consul-dataplane-image="{{ .Values.global.imageConsulDataplane }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \
+                {{- if .Values.global.imagePullPolicy }}
+                -global-image-pull-policy={{ .Values.global.imagePullPolicy }} \
+                {{- end }}
                 -release-name="{{ .Release.Name }}" \
                 -release-namespace="{{ .Release.Namespace }}" \
                 -resource-prefix={{ template "consul.fullname" . }} \
