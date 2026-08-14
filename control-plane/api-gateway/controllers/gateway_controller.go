@@ -582,6 +582,8 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			// Subscribe to changes in RouteUpstreamLimitsFilter custom resources referenced by HTTPRoutes.
 			&v1alpha1.RouteUpstreamLimitsFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteUpstreamLimitsFilter),
+			&v1alpha1.RouteExtProc{},
+			handler.EnqueueRequestsFromMapFunc(r.transformRouteExtProc),
 		)
 
 	if err := builder.Complete(r); err != nil {
@@ -740,6 +742,9 @@ func (r *GatewayController) transformRouteAuthFilter(ctx context.Context, o clie
 
 func (r *GatewayController) transformRouteTLSSDSFilter(ctx context.Context, o client.Object) []reconcile.Request {
 	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteTLSSDSFilterIndex, client.ObjectKeyFromObject(o).String())
+}
+func (r *GatewayController) transformRouteExtProc(ctx context.Context, o client.Object) []reconcile.Request {
+	return r.gatewaysForRoutesReferencing(ctx, "", HTTPRoute_RouteExtProcIndex, client.ObjectKeyFromObject(o).String())
 }
 
 // transformRouteUpstreamLimitsFilter will return a list of routes that need to be reconciled.
@@ -1102,6 +1107,8 @@ func (c *GatewayController) filterFiltersForExternalRefs(ctx context.Context, ro
 			externalFilter = &v1alpha1.RouteTLSSDSFilter{}
 		case v1alpha1.RouteUpstreamLimitsFilterKind:
 			externalFilter = &v1alpha1.RouteUpstreamLimitsFilter{}
+		case v1alpha1.RouteExtProcKind:
+			externalFilter = &v1alpha1.RouteExtProc{}
 		default:
 			continue
 		}

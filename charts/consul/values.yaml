@@ -800,6 +800,12 @@ global:
   
   generateManifests: false
 
+  # Uses the provided storage class name for the generated manifests - recommended to create SC with volumebinding as Immediate. If not provided, the default storage class will be used.
+  generateManifestsStorageClassName: ""
+
+  # Storage requirement for generateManifests pvc
+  generateManifestsStorage: "1Gi"
+
   # During the install:
   # custom crds and gateway TCP crd enabling
   # enableTcpRoute installs the TCP GVK under gateway.networking.k8s.io and enables the stable gatewaycontroller to watch for the resources.
@@ -2546,18 +2552,18 @@ connectInject:
 
       # DEPRECATED: These values are deprecated and will be removed in a future release.
       # Use Gateway annotations instead for per-gateway scaling configuration.
-      # See: https://developer.hashicorp.com/consul/docs/k8s/api-gateway/scaling
+      # See: [API Gateway Scaling](https://developer.hashicorp.com/consul/docs/north-south/api-gateway/k8s/scale)
       #
-      # For static replica count, use: consul.hashicorp.com/default-replicas: "<N>"
-      # For HPA, use: consul.hashicorp.com/hpa-enabled: "true" with min/max replicas annotations
+      # For static replica count, use: `consul.hashicorp.com/default-replicas: "<N>"`.
+      # For HPA, use: `consul.hashicorp.com/hpa-enabled: "true"` with min/max replicas annotations.
       deployment:
-        # Default number of gateway instances
+        # Default number of gateway instances.
         # DEPRECATED: Use consul.hashicorp.com/default-replicas annotation on Gateway resource
         defaultInstances: 1
-        # Maximum number of gateway instances
+        # Maximum number of gateway instances.
         # DEPRECATED: No longer enforced. Use HPA maxReplicas via annotations instead
         maxInstances: 1
-        # Minimum number of gateway instances
+        # Minimum number of gateway instances.
         # DEPRECATED: Use HPA minReplicas via annotations instead
         minInstances: 1
 

@@ -599,6 +599,12 @@ func checkIfReferencesMissingJWTProvider(filter gwv1beta1.HTTPRouteFilter, resou
 		return
 	}
 
+	// A RouteAuthFilter may configure only ext_authz (no JWT), in which case
+	// there are no JWT providers to validate.
+	if authFilter.Spec.JWT == nil {
+		return
+	}
+
 	for _, provider := range authFilter.Spec.JWT.Providers {
 		_, ok := resources.GetJWTProviderForGatewayJWTProvider(provider)
 		if !ok {
@@ -714,9 +720,13 @@ func validateAuthFilters(authFilters []*v1alpha1.RouteAuthFilter, resources *com
 		}
 		var result authFilterValidationResult
 		missingJWTProviders := make([]string, 0)
-		for _, provider := range filter.Spec.JWT.Providers {
-			if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
-				missingJWTProviders = append(missingJWTProviders, provider.Name)
+		// A RouteAuthFilter may configure only ext_authz (no JWT), so guard
+		// against a nil JWT spec before validating JWT providers.
+		if filter.Spec.JWT != nil {
+			for _, provider := range filter.Spec.JWT.Providers {
+				if _, ok := resources.GetJWTProviderForGatewayJWTProvider(provider); !ok {
+					missingJWTProviders = append(missingJWTProviders, provider.Name)
+				}
 			}
 		}
 

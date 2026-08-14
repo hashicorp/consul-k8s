@@ -34,6 +34,7 @@ rules:
   - routeauthfilters
   - routetlssdsfilters
   - routeupstreamlimitsfilters
+  - routeextprocs
   - gatewaypolicies
   - customgatewaypolicies
   - registrations
@@ -76,6 +77,7 @@ rules:
   - routeauthfilters/status
   - routetlssdsfilters/status
   - routeupstreamlimitsfilters/status
+  - routeextprocs/status
   - gatewaypolicies/status
   - customgatewaypolicies/status
   verbs:
