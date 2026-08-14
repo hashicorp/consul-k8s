@@ -252,6 +252,7 @@ func translateExtProcProcessingDirection(d *v1alpha1.RouteExtProcProcessingDirec
 		MaxBodyBytes: d.MaxBodyBytes,
 	}
 }
+
 // translateRouteExtAuthzFilter translates the ext_authz portion of a
 // RouteAuthFilter into the Consul http-route ExtAuthz filter. Returns nil when
 // the RouteAuthFilter does not configure ext_authz.
@@ -357,7 +358,13 @@ func (t ResourceTranslator) translateHTTPRouteRule(route gwv1.HTTPRoute, rule gw
 		return api.HTTPRouteRule{}, false
 	}
 
-	matches := ConvertSliceFunc(rule.Matches, t.translateHTTPMatch)
+	// Build the set of header names to invert from a RouteHeaderMatchInvertFilter
+	// ExtensionRef, if one is present in this rule's filters.
+	invertedHeaders := t.invertedHeaderNamesForRule(rule.Filters, resources, route.Namespace)
+
+	matches := ConvertSliceFunc(rule.Matches, func(m gwv1.HTTPRouteMatch) api.HTTPMatch {
+		return t.translateHTTPMatchWithInvert(m, invertedHeaders)
+	})
 	filters, responseFilters, _ := t.translateHTTPFilters(rule.Filters, resources, route.Namespace, &route)
 
 	// A per-rule ExtAuthz filter (from a RouteAuthFilter ExtensionRef) wins. When
@@ -433,7 +440,16 @@ var queryMatchTypeTranslation = map[gwv1.QueryParamMatchType]api.HTTPQueryMatchT
 }
 
 func (t ResourceTranslator) translateHTTPMatch(match gwv1.HTTPRouteMatch) api.HTTPMatch {
-	headers := ConvertSliceFunc(match.Headers, t.translateHTTPHeaderMatch)
+	return t.translateHTTPMatchWithInvert(match, nil)
+}
+
+// translateHTTPMatchWithInvert translates an HTTPRouteMatch into an api.HTTPMatch,
+// honouring invertedHeaders: a set of lowercase header names whose Invert flag
+// should be set to true in the translated output.
+func (t ResourceTranslator) translateHTTPMatchWithInvert(match gwv1.HTTPRouteMatch, invertedHeaders map[string]struct{}) api.HTTPMatch {
+	headers := ConvertSliceFunc(match.Headers, func(h gwv1.HTTPHeaderMatch) api.HTTPHeaderMatch {
+		return t.translateHTTPHeaderMatchWithInvert(h, invertedHeaders)
+	})
 	queries := ConvertSliceFunc(match.QueryParams, t.translateHTTPQueryMatch)
 
 	return api.HTTPMatch{
@@ -452,11 +468,47 @@ func (t ResourceTranslator) translateHTTPPathMatch(match gwv1.HTTPPathMatch) api
 }
 
 func (t ResourceTranslator) translateHTTPHeaderMatch(match gwv1.HTTPHeaderMatch) api.HTTPHeaderMatch {
+	return t.translateHTTPHeaderMatchWithInvert(match, nil)
+}
+
+// translateHTTPHeaderMatchWithInvert translates a single HTTPHeaderMatch,
+// setting Invert=true when the header name (lowercased) appears in invertedHeaders.
+func (t ResourceTranslator) translateHTTPHeaderMatchWithInvert(match gwv1.HTTPHeaderMatch, invertedHeaders map[string]struct{}) api.HTTPHeaderMatch {
+	_, invert := invertedHeaders[strings.ToLower(string(match.Name))]
 	return api.HTTPHeaderMatch{
-		Name:  string(match.Name),
-		Value: match.Value,
-		Match: DerefLookup(match.Type, headerMatchTypeTranslation),
+		Name:   string(match.Name),
+		Value:  match.Value,
+		Match:  DerefLookup(match.Type, headerMatchTypeTranslation),
+		Invert: invert,
 	}
+}
+
+// invertedHeaderNamesForRule scans a rule's filters for a RouteHeaderMatchInvertFilter
+// ExtensionRef and returns a lowercase set of the header names it declares.
+// Returns nil when no such filter is present.
+func (t ResourceTranslator) invertedHeaderNamesForRule(filters []gwv1.HTTPRouteFilter, resources *ResourceMap, namespace string) map[string]struct{} {
+	for _, f := range filters {
+		if f.Type != gwv1.HTTPRouteFilterExtensionRef || f.ExtensionRef == nil {
+			continue
+		}
+		if string(f.ExtensionRef.Kind) != v1alpha1.RouteHeaderMatchInvertFilterKind {
+			continue
+		}
+		obj, ok := resources.GetExternalFilter(*f.ExtensionRef, namespace)
+		if !ok {
+			continue
+		}
+		invertFilter, ok := obj.(*v1alpha1.RouteHeaderMatchInvertFilter)
+		if !ok {
+			continue
+		}
+		set := make(map[string]struct{}, len(invertFilter.Spec.HeaderNames))
+		for _, name := range invertFilter.Spec.HeaderNames {
+			set[strings.ToLower(name)] = struct{}{}
+		}
+		return set
+	}
+	return nil
 }
 
 func (t ResourceTranslator) translateHTTPQueryMatch(match gwv1.HTTPQueryParamMatch) api.HTTPQueryMatch {

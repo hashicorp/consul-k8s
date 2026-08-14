@@ -287,7 +287,7 @@ func (e entryComparator) httpPathMatchesEqual(a, b api.HTTPPathMatch) bool {
 }
 
 func (e entryComparator) httpHeaderMatchesEqual(a, b api.HTTPHeaderMatch) bool {
-	return a.Match == b.Match && a.Name == b.Name && a.Value == b.Value
+	return a.Match == b.Match && a.Name == b.Name && a.Value == b.Value && a.Invert == b.Invert
 }
 
 func (e entryComparator) httpQueryMatchesEqual(a, b api.HTTPQueryMatch) bool {
