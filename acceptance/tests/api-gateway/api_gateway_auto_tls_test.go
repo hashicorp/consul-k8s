@@ -5,7 +5,6 @@ package apigateway
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
@@ -494,18 +493,3 @@ func fetchGatewayCert(t *testing.T, opts *terratestk8s.KubectlOptions, host, por
 	return pemOut
 }
 
-// fetchGatewayCertViaTLS dials the gateway directly and returns the leaf cert.
-// Only usable when the gateway is reachable from the test host (LoadBalancer).
-func fetchGatewayCertViaTLS(t *testing.T, address string) *x509.Certificate {
-	t.Helper()
-	var cert *x509.Certificate
-	retryCheckWithWait(t, 30, 3*time.Second, func(r *retry.R) {
-		conn, err := tls.Dial("tcp", address, &tls.Config{InsecureSkipVerify: true}) //nolint:gosec
-		require.NoError(r, err)
-		defer conn.Close()
-		state := conn.ConnectionState()
-		require.NotEmpty(r, state.PeerCertificates)
-		cert = state.PeerCertificates[0]
-	})
-	return cert
-}
