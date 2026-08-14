@@ -1,0 +1,22 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# RouteUpstreamLimitsFilter – per-service circuit-breaker + passive health check
+# settings applied to the static-server backend via the backendRef extensionRef.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteUpstreamLimitsFilter
+metadata:
+  name: static-server-limits
+  namespace: default
+spec:
+  # Circuit-breaker thresholds
+  maxConnections: 25
+  maxPendingRequests: 50
+  maxConcurrentRequests: 100
+  # Passive health check (Envoy outlier detection)
+  passiveHealthCheck:
+    interval: 10s
+    maxFailures: 3
+    enforcingConsecutive5xx: 100
+    maxEjectionPercent: 50
+    baseEjectionTime: 30s

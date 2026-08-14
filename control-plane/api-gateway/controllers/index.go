@@ -31,7 +31,7 @@ const (
 	HTTPRoute_RouteTimeoutFilterIndex        = "__httproute_referencing_timeoutfilter"
 	HTTPRoute_RouteAuthFilterIndex           = "__httproute_referencing_routeauthfilter"
 	HTTPRoute_RouteTLSSDSFilterIndex         = "__httproute_referencing_routetlssdsfilter"
-  HTTPRoute_RouteExtProcIndex              = "__httproute_referencing_routeextproc"
+	HTTPRoute_RouteExtProcIndex              = "__httproute_referencing_routeextproc"
 	HTTPRoute_RouteUpstreamLimitsFilterIndex = "__httproute_referencing_upstreamlimitsfilter"
 
 	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
@@ -165,11 +165,11 @@ var indexes = []index{
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
-  {
-    name:        HTTPRoute_RouteUpstreamLimitsFilterIndex,
-    target:      &gwv1.HTTPRoute{},
+	{
+		name:        HTTPRoute_RouteUpstreamLimitsFilterIndex,
+		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
-  },
+	},
 	{
 		name:        Gatewaypolicy_GatewayIndex,
 		target:      &v1alpha1.GatewayPolicy{},

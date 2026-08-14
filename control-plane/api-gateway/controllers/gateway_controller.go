@@ -582,6 +582,8 @@ func SetupGatewayControllerWithManager(ctx context.Context,
 			// Subscribe to changes in RouteUpstreamLimitsFilter custom resources referenced by HTTPRoutes.
 			&v1alpha1.RouteUpstreamLimitsFilter{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteUpstreamLimitsFilter),
+		).
+		Watches(
 			&v1alpha1.RouteExtProc{},
 			handler.EnqueueRequestsFromMapFunc(r.transformRouteExtProc),
 		)

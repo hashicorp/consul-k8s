@@ -118,7 +118,8 @@ func (e entryComparator) apiGatewaysEqual(a, b api.APIGatewayConfigEntry) bool {
 		e.namespaceA == e.namespaceB &&
 		e.partitionA == e.partitionB &&
 		maps.Equal(a.Meta, b.Meta) &&
-		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual)
+		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual) &&
+		e.upstreamLimitsEqual(a.Defaults, b.Defaults)
 }
 
 func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) bool {
@@ -272,7 +273,8 @@ func (e entryComparator) httpServicesEqual(a, b api.HTTPService) bool {
 		orDefault(a.Partition, e.partitionA) == orDefault(b.Partition, e.partitionB) &&
 		slices.EqualFunc(a.Filters.Headers, b.Filters.Headers, e.httpHeaderFiltersEqual) &&
 		bothNilOrEqualFunc(a.Filters.URLRewrite, b.Filters.URLRewrite, e.urlRewritesEqual) &&
-		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual)
+		slices.EqualFunc(a.ResponseFilters.Headers, b.ResponseFilters.Headers, e.httpHeaderFiltersEqual) &&
+		e.upstreamLimitsEqual(a.Limits, b.Limits)
 }
 
 func (e entryComparator) httpMatchesEqual(a, b api.HTTPMatch) bool {
@@ -400,6 +402,33 @@ func (e entryComparator) certificatesEqual(a, b api.FileSystemCertificateConfigE
 		maps.Equal(a.Meta, b.Meta) &&
 		a.Certificate == b.Certificate &&
 		a.PrivateKey == b.PrivateKey
+}
+
+func (e entryComparator) upstreamLimitsEqual(a, b *api.UpstreamLimits) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return BothNilOrEqual(a.MaxConnections, b.MaxConnections) &&
+		BothNilOrEqual(a.MaxPendingRequests, b.MaxPendingRequests) &&
+		BothNilOrEqual(a.MaxConcurrentRequests, b.MaxConcurrentRequests) &&
+		e.passiveHealthCheckEqual(a.PassiveHealthCheck, b.PassiveHealthCheck)
+}
+
+func (e entryComparator) passiveHealthCheckEqual(a, b *api.PassiveHealthCheck) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Interval == b.Interval &&
+		a.MaxFailures == b.MaxFailures &&
+		BothNilOrEqual(a.EnforcingConsecutive5xx, b.EnforcingConsecutive5xx) &&
+		BothNilOrEqual(a.MaxEjectionPercent, b.MaxEjectionPercent) &&
+		BothNilOrEqual(a.BaseEjectionTime, b.BaseEjectionTime)
 }
 
 func bothNilOrEqualFunc[T any](one, two *T, fn func(T, T) bool) bool {
