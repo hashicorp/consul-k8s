@@ -56,7 +56,6 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -479,88 +478,4 @@ func extractStaticServerClusterJSON(t require.TestingT, body []byte, gatewayName
 		}
 	}
 	return ""
-}
-
-// requireEnvoyConfigDumpContains port-forwards to the Envoy admin and checks
-// /config_dump for an arbitrary substring.  Useful for one-off assertions.
-func requireEnvoyConfigDumpContains(t *testing.T, opts *terratestk8s.KubectlOptions, gatewayName, substring string) {
-	t.Helper()
-
-	podName, err := k8s.RunKubectlAndGetOutputE(t, opts,
-		"get", "pods",
-		"-l", "gateway.consul.hashicorp.com/name="+gatewayName,
-		"-o", "jsonpath={.items[0].metadata.name}")
-	require.NoError(t, err)
-	podName = strings.TrimSpace(podName)
-	require.NotEmpty(t, podName)
-
-	addr := portforward.CreateTunnelToResourcePort(t, podName, 19000, opts, terratestLogger.Discard)
-
-	retryCheckWithWait(t, 30, 2*time.Second, func(r *retry.R) {
-		resp, httpErr := http.Get(fmt.Sprintf("http://%s/config_dump", addr))
-		require.NoError(r, httpErr)
-		defer func() { _ = resp.Body.Close() }()
-		require.Equal(r, http.StatusOK, resp.StatusCode)
-		body, readErr := io.ReadAll(resp.Body)
-		require.NoError(r, readErr)
-		require.Containsf(r, string(body), substring,
-			"gateway %s: config_dump missing expected substring", gatewayName)
-	})
-}
-
-// getEnvoyClustersDump port-forwards to the Envoy admin and returns the parsed
-// /clusters?format=json response.  Use together with findEnvoyClusterByName.
-func getEnvoyClustersDump(t *testing.T, opts *terratestk8s.KubectlOptions, gatewayName string) map[string]interface{} {
-	t.Helper()
-
-	podName, err := k8s.RunKubectlAndGetOutputE(t, opts,
-		"get", "pods",
-		"-l", "gateway.consul.hashicorp.com/name="+gatewayName,
-		"-o", "jsonpath={.items[0].metadata.name}")
-	require.NoError(t, err)
-	podName = strings.TrimSpace(podName)
-	require.NotEmpty(t, podName)
-
-	addr := portforward.CreateTunnelToResourcePort(t, podName, 19000, opts, terratestLogger.Discard)
-
-	resp, err := http.Get(fmt.Sprintf("http://%s/clusters?format=json", addr))
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-
-	var dump map[string]interface{}
-	require.NoError(t, json.Unmarshal(body, &dump))
-	return dump
-}
-
-// upstreamLimitsFilterFixture builds the in-memory RouteUpstreamLimitsFilter
-// that the test creates directly (when not using kustomize fixtures).
-func upstreamLimitsFilterFixture(name, namespace string) *v1alpha1.RouteUpstreamLimitsFilter {
-	maxConns := 25
-	maxPending := 50
-	maxConcurrent := 100
-	maxFailures := uint32(3)
-
-	return &v1alpha1.RouteUpstreamLimitsFilter{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "consul.hashicorp.com/v1alpha1",
-			Kind:       v1alpha1.RouteUpstreamLimitsFilterKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: v1alpha1.RouteUpstreamLimitsFilterSpec{
-			MaxConnections:        &maxConns,
-			MaxPendingRequests:    &maxPending,
-			MaxConcurrentRequests: &maxConcurrent,
-			PassiveHealthCheck: &v1alpha1.PassiveHealthCheck{
-				Interval:    metav1.Duration{Duration: 10 * time.Second},
-				MaxFailures: maxFailures,
-			},
-		},
-	}
 }
