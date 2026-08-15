@@ -57,10 +57,13 @@ jobs:
             LICENSE
             .copywrite.hcl
             .gitignore
+            .golangci.yml
+            codecov.yml
             **.md
             assets/**
             .changelog/**
             .github/CODEOWNERS
+            .github/ISSUE_TEMPLATE/**
       - name: Print changed files
         env:
           SKIPPABLE_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
