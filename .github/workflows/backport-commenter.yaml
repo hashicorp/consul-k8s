@@ -32,32 +32,15 @@ env:
   BPA_COMMENTER_VERSIONS: ${{ github.event.inputs.versions || '1.8,1.9,2.0' }}
 
 jobs:
-
   validate-backports:
     container: hashicorpdev/backport-assistant:v0.6.3
-    runs-on: [ self-hosted, linux ]
-    permissions:
-      id-token: write  # Note: this permission is explicitly required for Vault auth
-      contents:
-        read
+    runs-on: ubuntu-latest
     steps:
-      - name: Fetch Secrets
-        id: secrets
-        uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
-
-        with:
-          url: ${{ vars.CI_VAULT_URL }}
-          method: ${{ vars.CI_VAULT_METHOD }}
-          path: ${{ vars.CI_VAULT_PATH }}
-          jwtGithubAudience: ${{ vars.CI_VAULT_AUD }}
-          secrets:
-            kv/data/github/${{ github.repository }}/ghactions github_token ;
-
       - name: backport commenter
         env:
           OWNER: hashicorp
           REPO: consul-k8s
-          GITHUB_TOKEN: ${{ steps.secrets.outputs.github_token }}
+          GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
         run: |
           backport-assistant validate \
             --owner ${OWNER} --repo ${REPO} --versions "${BPA_COMMENTER_VERSIONS}" \
