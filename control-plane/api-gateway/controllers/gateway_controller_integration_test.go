@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -138,6 +139,14 @@ func TestControllerDoesNotInfinitelyReconcile(t *testing.T) {
 			fclient := registerFieldIndexersForTest(fakeClient)
 			k8sClient := fclient.Build()
 			consulTestServerClient := test.TestServerWithMockConnMgrWatcher(t, nil)
+
+			// The grpc/http2 listener protocol sub-case requires Consul ≥ 2.1.0
+			// (post-PR-23784).  CI typically runs against the latest released
+			// binary (≥ 2.0.x, < 2.1.0) which rejects those protocols in the
+			// config entry API and exits with code 1.  Skip rather than fail.
+			if strings.Contains(name, "grpc listener protocol") {
+				skipIfConsulLacksGRPCListenerSupport(t, consulTestServerClient.APIClient)
+			}
 			ctx, cancel := context.WithCancel(context.Background())
 
 			t.Cleanup(func() {
@@ -1767,6 +1776,25 @@ func createGWPolicy(t *testing.T, ctx context.Context, k8sClient client.WithWatc
 // Note: this test uses the ResourceTranslator directly (the same code path used
 // during reconciliation). The Consul server-side validation of the new protocol
 // values is exercised in the consul-core tests.
+// skipIfConsulLacksGRPCListenerSupport skips the test if the Consul agent
+// binary on $PATH does not support grpc/http2 as APIGateway listener protocols.
+// Support was added in Consul 2.1.0 (consul-core PR #23784).  Running this
+// sub-case against an older binary causes the test server to reject the config
+// entry and exit with code 1, making the test fail for the wrong reason.
+func skipIfConsulLacksGRPCListenerSupport(t *testing.T, client *api.Client) {
+	t.Helper()
+	info, err := client.Agent().Self()
+	if err != nil {
+		t.Skipf("could not query Consul agent version (agent may not be ready): %v — skipping grpc listener test", err)
+	}
+	versionStr, _ := info["Config"]["Version"].(string)
+	// Version strings look like "2.1.0" or "2.1.0-dev". We need ≥ 2.1.0.
+	// A simple prefix check suffices: anything starting with "2.0" or "1." is too old.
+	if strings.HasPrefix(versionStr, "1.") || strings.HasPrefix(versionStr, "2.0") {
+		t.Skipf("skipping grpc listener protocol test: Consul %q does not support grpc/http2 listener protocols (requires ≥ 2.1.0)", versionStr)
+	}
+}
+
 func TestListenerProtocolAnnotation_TranslatorProducesCorrectProtocol(t *testing.T) {
 	for _, tc := range []struct {
 		annotation   string
