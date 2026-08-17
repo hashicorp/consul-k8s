@@ -401,7 +401,7 @@ rollingUpdate:
   effect: NoSchedule' \
       . | tee /dev/stderr |
       yq -rc '.spec.template.spec.tolerations' | tee /dev/stderr)
-  [ "${actual}" = '[{"effect":"NoSchedule","key":"node-role.kubernetes.io/worker","operator":"Exists"}]' ]
+  [ "${actual}" = '[{"key":"node-role.kubernetes.io/worker","operator":"Exists","effect":"NoSchedule"}]' ]
 }
 
 @test "cni/DaemonSet: tolerations custom value excludes master and infra node taints" {
