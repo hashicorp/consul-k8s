@@ -41,6 +41,8 @@ jobs:
           OWNER: hashicorp
           REPO: consul-k8s
           GITHUB_TOKEN: ${{ secrets.ELEVATED_GITHUB_TOKEN }}
+          BACKPORT_LABEL_REGEXP: "backport/(?P<target>\\d+\\.\\d+\\.x)"
+          BACKPORT_TARGET_TEMPLATE: "release/{{.target}}"
         run: |
           backport-assistant validate \
             --owner ${OWNER} --repo ${REPO} --versions "${BPA_COMMENTER_VERSIONS}" \
