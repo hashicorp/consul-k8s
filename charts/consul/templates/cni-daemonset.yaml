@@ -43,7 +43,6 @@ spec:
       # consul-cni only runs on linux operating systems
       nodeSelector:
         kubernetes.io/os: linux
-
       {{- if .Values.connectInject.cni.tolerations }}
       tolerations:
         {{ tpl .Values.connectInject.cni.tolerations . | nindent 8 | trim }}
@@ -55,7 +54,6 @@ spec:
         - effect: NoExecute
           operator: Exists
       {{- end }}
-          
       # Tell kubernetes that this daemonset is critical so that it will be scheduled on a new node before other pods
       priorityClassName: system-node-critical
       serviceAccountName: {{ template "consul.fullname" . }}-cni
