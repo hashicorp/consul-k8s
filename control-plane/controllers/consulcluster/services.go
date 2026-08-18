@@ -16,61 +16,49 @@ import (
 )
 
 func (r *ConsulClusterReconciler) ensureHeadlessService(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
-	svc := &corev1.Service{}
-	name := headlessServiceName(cluster)
-	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: name}, svc)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return err
-	}
-
 	desired := buildHeadlessService(cluster)
-	if setErr := r.setOwner(ctx, cluster, desired); setErr != nil {
-		return setErr
+	if err := r.setOwner(ctx, cluster, desired); err != nil {
+		return err
 	}
-	return r.Create(ctx, desired)
+	return r.applyService(ctx, desired)
 }
 
-func (r *ConsulClusterReconciler) ensureClientService(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
-	svc := &corev1.Service{}
-	name := clientServiceName(cluster)
-	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: name}, svc)
-	if err == nil {
-		return nil
+// applyService creates the Service or updates the fields the operator owns.
+// ClusterIP and the allocated NodePorts are assigned by the API server and must
+// be carried over from the live object, or the update is rejected.
+func (r *ConsulClusterReconciler) applyService(ctx context.Context, desired *corev1.Service) error {
+	existing := &corev1.Service{}
+	err := r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
+	if k8serrors.IsNotFound(err) {
+		return r.Create(ctx, desired)
 	}
-	if !k8serrors.IsNotFound(err) {
+	if err != nil {
 		return err
 	}
 
-	desired := buildClientService(cluster)
-	if setErr := r.setOwner(ctx, cluster, desired); setErr != nil {
-		return setErr
-	}
-	return r.Create(ctx, desired)
+	patch := client.MergeFrom(existing.DeepCopy())
+	existing.Labels = desired.Labels
+	existing.Annotations = desired.Annotations
+	existing.Spec.Selector = desired.Spec.Selector
+	existing.Spec.Type = desired.Spec.Type
+	existing.Spec.PublishNotReadyAddresses = desired.Spec.PublishNotReadyAddresses
+	existing.Spec.Ports = mergeServicePorts(existing.Spec.Ports, desired.Spec.Ports)
+	return r.Patch(ctx, existing, patch)
 }
 
-func (r *ConsulClusterReconciler) ensureExposeService(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
-	if cluster.Spec.ExposeService == nil || !cluster.Spec.ExposeService.Enabled {
-		return nil
+// mergeServicePorts keeps the NodePort the API server allocated for a port
+// unless the spec asks for a specific one.
+func mergeServicePorts(existing, desired []corev1.ServicePort) []corev1.ServicePort {
+	allocated := make(map[string]int32, len(existing))
+	for _, p := range existing {
+		allocated[p.Name] = p.NodePort
 	}
-
-	svc := &corev1.Service{}
-	name := exposeServiceName(cluster)
-	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: name}, svc)
-	if err == nil {
-		return nil
+	for i := range desired {
+		if desired[i].NodePort == 0 {
+			desired[i].NodePort = allocated[desired[i].Name]
+		}
 	}
-	if !k8serrors.IsNotFound(err) {
-		return err
-	}
-
-	desired := buildExposeService(cluster)
-	if setErr := r.setOwner(ctx, cluster, desired); setErr != nil {
-		return setErr
-	}
-	return r.Create(ctx, desired)
+	return desired
 }
 
 func (r *ConsulClusterReconciler) setOwner(_ context.Context, cluster *v1alpha1.ConsulCluster, obj client.Object) error {
@@ -79,9 +67,9 @@ func (r *ConsulClusterReconciler) setOwner(_ context.Context, cluster *v1alpha1.
 }
 
 func buildHeadlessService(cluster *v1alpha1.ConsulCluster) *corev1.Service {
-	annotations := map[string]string{
-		"service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
-	}
+	// PublishNotReadyAddresses covers this; the alpha annotation it replaced has
+	// been ignored since Kubernetes 1.11.
+	annotations := map[string]string{}
 	for k, v := range cluster.Spec.ServiceAnnotations {
 		annotations[k] = v
 	}
@@ -97,80 +85,7 @@ func buildHeadlessService(cluster *v1alpha1.ConsulCluster) *corev1.Service {
 			ClusterIP:                corev1.ClusterIPNone,
 			PublishNotReadyAddresses: true,
 			Selector:                 serverPodLabels(cluster),
-			Ports:                    serverServicePorts(),
-		},
-	}
-}
-
-func buildClientService(cluster *v1alpha1.ConsulCluster) *corev1.Service {
-	annotations := map[string]string{}
-	for k, v := range cluster.Spec.ServiceAnnotations {
-		annotations[k] = v
-	}
-
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        clientServiceName(cluster),
-			Namespace:   cluster.Namespace,
-			Labels:      serviceLabels(cluster),
-			Annotations: annotations,
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
-			Selector: serverPodLabels(cluster),
-			Ports: []corev1.ServicePort{
-				{Name: "http", Port: 8500, TargetPort: intstr.FromString("http"), Protocol: corev1.ProtocolTCP},
-				{Name: "https", Port: 8501, TargetPort: intstr.FromString("https"), Protocol: corev1.ProtocolTCP},
-				{Name: "grpc", Port: 8502, TargetPort: intstr.FromString("grpc"), Protocol: corev1.ProtocolTCP},
-				{Name: "dns-tcp", Port: 8600, TargetPort: intstr.FromString("dns-tcp"), Protocol: corev1.ProtocolTCP},
-				{Name: "dns-udp", Port: 8600, TargetPort: intstr.FromString("dns-udp"), Protocol: corev1.ProtocolUDP},
-			},
-		},
-	}
-}
-
-func buildExposeService(cluster *v1alpha1.ConsulCluster) *corev1.Service {
-	es := cluster.Spec.ExposeService
-
-	svcType := corev1.ServiceTypeLoadBalancer
-	if es.Type == "NodePort" {
-		svcType = corev1.ServiceTypeNodePort
-	}
-
-	annotations := map[string]string{}
-	for k, v := range es.Annotations {
-		annotations[k] = v
-	}
-
-	ports := []corev1.ServicePort{
-		{Name: "http", Port: 8500, TargetPort: intstr.FromString("http"), Protocol: corev1.ProtocolTCP},
-		{Name: "https", Port: 8501, TargetPort: intstr.FromString("https"), Protocol: corev1.ProtocolTCP},
-		{Name: "grpc", Port: 8502, TargetPort: intstr.FromString("grpc"), Protocol: corev1.ProtocolTCP},
-		{Name: "serf", Port: 8301, TargetPort: intstr.FromString("serflan-tcp"), Protocol: corev1.ProtocolTCP},
-		{Name: "rpc", Port: 8300, TargetPort: intstr.FromString("server"), Protocol: corev1.ProtocolTCP},
-	}
-
-	if es.NodePort != nil && svcType == corev1.ServiceTypeNodePort {
-		np := es.NodePort
-		nodePorts := []int32{np.HTTP, np.HTTPS, np.GRPC, np.Serf, np.RPC}
-		for i, v := range nodePorts {
-			if v != 0 {
-				ports[i].NodePort = v
-			}
-		}
-	}
-
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        exposeServiceName(cluster),
-			Namespace:   cluster.Namespace,
-			Labels:      serviceLabels(cluster),
-			Annotations: annotations,
-		},
-		Spec: corev1.ServiceSpec{
-			Type:     svcType,
-			Selector: serverPodLabels(cluster),
-			Ports:    ports,
+			Ports:                    serverServicePorts(cluster),
 		},
 	}
 }
@@ -183,10 +98,26 @@ func serviceLabels(cluster *v1alpha1.ConsulCluster) map[string]string {
 	}
 }
 
-func serverServicePorts() []corev1.ServicePort {
-	return []corev1.ServicePort{
-		{Name: "http", Port: 8500, TargetPort: intstr.FromString("http"), Protocol: corev1.ProtocolTCP},
-		{Name: "https", Port: 8501, TargetPort: intstr.FromString("https"), Protocol: corev1.ProtocolTCP},
+// apiServicePorts returns the HTTP and HTTPS ports the cluster actually serves.
+// Publishing a port the agent has disabled leaves an endpoint that refuses every
+// connection.
+func apiServicePorts(cluster *v1alpha1.ConsulCluster) []corev1.ServicePort {
+	var ports []corev1.ServicePort
+	if !tlsEnabled(cluster) || !cluster.Spec.TLS.HTTPSOnly {
+		ports = append(ports, corev1.ServicePort{
+			Name: "http", Port: 8500, TargetPort: intstr.FromString("http"), Protocol: corev1.ProtocolTCP,
+		})
+	}
+	if tlsEnabled(cluster) {
+		ports = append(ports, corev1.ServicePort{
+			Name: "https", Port: 8501, TargetPort: intstr.FromString("https"), Protocol: corev1.ProtocolTCP,
+		})
+	}
+	return ports
+}
+
+func serverServicePorts(cluster *v1alpha1.ConsulCluster) []corev1.ServicePort {
+	return append(apiServicePorts(cluster), []corev1.ServicePort{
 		{Name: "grpc", Port: 8502, TargetPort: intstr.FromString("grpc"), Protocol: corev1.ProtocolTCP},
 		{Name: "serflan-tcp", Port: 8301, TargetPort: intstr.FromString("serflan-tcp"), Protocol: corev1.ProtocolTCP},
 		{Name: "serflan-udp", Port: 8301, TargetPort: intstr.FromString("serflan-udp"), Protocol: corev1.ProtocolUDP},
@@ -195,9 +126,5 @@ func serverServicePorts() []corev1.ServicePort {
 		{Name: "server", Port: 8300, TargetPort: intstr.FromString("server"), Protocol: corev1.ProtocolTCP},
 		{Name: "dns-tcp", Port: 8600, TargetPort: intstr.FromString("dns-tcp"), Protocol: corev1.ProtocolTCP},
 		{Name: "dns-udp", Port: 8600, TargetPort: intstr.FromString("dns-udp"), Protocol: corev1.ProtocolUDP},
-	}
-}
-
-func exposeServiceName(cluster *v1alpha1.ConsulCluster) string {
-	return cluster.Name + "-expose"
+	}...)
 }

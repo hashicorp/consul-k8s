@@ -20,6 +20,13 @@ spec:
   {{- if .Values.global.datacenter }}
   datacenterName: {{ .Values.global.datacenter | quote }}
   {{- end }}
+  {{- if .Values.global.domain }}
+  domain: {{ .Values.global.domain | quote }}
+  {{- end }}
+  {{- if .Values.global.recursors }}
+  recursors:
+    {{- toYaml .Values.global.recursors | nindent 4 }}
+  {{- end }}
   {{- if .Values.server.logLevel }}
   logLevel: {{ .Values.server.logLevel | quote }}
   {{- end }}
@@ -56,6 +63,17 @@ spec:
     secretName: {{ .Values.global.gossipEncryption.secretName | quote }}
     secretKey: {{ .Values.global.gossipEncryption.secretKey | quote }}
   {{- end }}
+  {{- if .Values.global.acls.manageSystemACLs }}
+  acls:
+    enabled: true
+    {{- /* The operator reads the raft configuration and autopilot health to gate
+           rolling updates, so it needs a token once the default policy is deny. */}}
+    {{- if (and .Values.global.acls.bootstrapToken.secretName .Values.global.acls.bootstrapToken.secretKey) }}
+    token:
+      secretName: {{ .Values.global.acls.bootstrapToken.secretName | quote }}
+      secretKey: {{ .Values.global.acls.bootstrapToken.secretKey | quote }}
+    {{- end }}
+  {{- end }}
   {{- if .Values.global.tls.enabled }}
   tls:
     enabled: true
@@ -79,31 +97,18 @@ spec:
     {{- toYaml .Values.server.serviceAccount.annotations | nindent 4 }}
   {{- end }}
   {{- end }}
-  {{- if .Values.server.disruptionBudget.enabled }}
   podDisruptionBudget:
-    enabled: true
-    {{- if .Values.server.disruptionBudget.maxUnavailable }}
+    enabled: {{ .Values.server.disruptionBudget.enabled }}
+    {{- /* Left unset for a single-server cluster on purpose: the operator
+           computes maxUnavailable: 0 there, so a drain blocks rather than
+           taking the only server down. */}}
+    {{- if (and .Values.server.disruptionBudget.maxUnavailable (gt (int .Values.server.replicas) 1)) }}
     maxUnavailable: {{ .Values.server.disruptionBudget.maxUnavailable }}
     {{- end }}
-  {{- end }}
-  {{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) false) -}}
-  {{- if $serverExposeServiceEnabled }}
-  exposeService:
-    enabled: true
-    type: {{ .Values.server.exposeService.type | default "LoadBalancer" | quote }}
-    {{- if .Values.server.exposeService.annotations }}
-    annotations:
-      {{- toYaml .Values.server.exposeService.annotations | nindent 6 }}
-    {{- end }}
-    {{- if .Values.server.exposeService.nodePort }}
-    nodePort:
-      http: {{ .Values.server.exposeService.nodePort.http | default 0 }}
-      https: {{ .Values.server.exposeService.nodePort.https | default 0 }}
-      grpc: {{ .Values.server.exposeService.nodePort.grpc | default 0 }}
-      serf: {{ .Values.server.exposeService.nodePort.serf | default 0 }}
-      rpc: {{ .Values.server.exposeService.nodePort.rpc | default 0 }}
-    {{- end }}
-  {{- end }}
+  {{- /* The expose Service (expose-servers-service.yaml) and the UI Service
+         (ui-service.yaml) stay Helm-owned — Helm remains the delivery
+         mechanism for cross-cutting objects, so the CR does not carry
+         config for them. */}}
   {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
   metrics:
     enabled: true

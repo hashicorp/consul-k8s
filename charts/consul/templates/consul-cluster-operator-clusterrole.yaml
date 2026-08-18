@@ -38,10 +38,20 @@ rules:
   verbs:
   - update
 - apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - ""
   resources:
-  - pods
-  - persistentvolumeclaims
   - services
   - configmaps
   - serviceaccounts
@@ -52,6 +62,35 @@ rules:
   - list
   - patch
   - update
+  - watch
+# Pods and PVCs belong to the StatefulSet. The operator reads pods to find a
+# server to query and to clean up volumes the StatefulSet retention policy does
+# not cover on older Kubernetes, but never creates either.
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - delete
+  - get
+  - list
+  - watch
+# The CA certificate and the ACL token the operator uses to reach the Consul API.
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - policy

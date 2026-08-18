@@ -15,32 +15,41 @@ import (
 )
 
 func (r *ConsulClusterReconciler) ensureServiceAccount(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
-	sa := &corev1.ServiceAccount{}
-	name := serviceAccountName(cluster)
-	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: name}, sa)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return err
-	}
-
 	annotations := map[string]string{}
 	for k, v := range cluster.Spec.ServiceAccountAnnotations {
 		annotations[k] = v
 	}
 
+	var pullSecrets []corev1.LocalObjectReference
+	if cluster.Spec.Pod != nil {
+		pullSecrets = cluster.Spec.Pod.ImagePullSecrets
+	}
+
 	desired := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name,
+			Name:            serviceAccountName(cluster),
 			Namespace:       cluster.Namespace,
 			Labels:          serviceLabels(cluster),
 			Annotations:     annotations,
 			OwnerReferences: []metav1.OwnerReference{ownerRef(cluster, r.Scheme)},
 		},
+		ImagePullSecrets: pullSecrets,
 	}
 
-	return r.Create(ctx, desired)
+	existing := &corev1.ServiceAccount{}
+	err := r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
+	if k8serrors.IsNotFound(err) {
+		return r.Create(ctx, desired)
+	}
+	if err != nil {
+		return err
+	}
+
+	patch := client.MergeFrom(existing.DeepCopy())
+	existing.Labels = desired.Labels
+	existing.Annotations = desired.Annotations
+	existing.ImagePullSecrets = desired.ImagePullSecrets
+	return r.Patch(ctx, existing, patch)
 }
 
 func serviceAccountName(cluster *v1alpha1.ConsulCluster) string {

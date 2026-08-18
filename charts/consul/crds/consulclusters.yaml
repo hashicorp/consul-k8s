@@ -59,6 +59,43 @@ spec:
               connect:
                 description: Enable the Consul service mesh on server agents.
                 type: boolean
+              acls:
+                description: |-
+                  Credentials the operator uses to talk to the Consul API. Required when
+                  the cluster runs with ACLs enabled, because the operator reads the Raft
+                  configuration and autopilot health to gate rolling updates.
+                properties:
+                  enabled:
+                    description: Whether the server cluster runs with ACLs enabled.
+                    type: boolean
+                  token:
+                    description: Secret holding a token with operator:read privileges.
+                    properties:
+                      secretKey:
+                        type: string
+                      secretName:
+                        type: string
+                    required:
+                    - secretKey
+                    - secretName
+                    type: object
+                type: object
+              dataVolumeName:
+                description: |-
+                  Name of the StatefulSet volume claim template, which fixes the PVC name
+                  each server ordinal binds to ("<dataVolumeName>-<statefulset>-<ordinal>").
+                  Defaults to "data". Set this to match an existing installation's claim
+                  name so servers adopt the volumes they already have. Immutable once the
+                  StatefulSet exists.
+                type: string
+              domain:
+                description: Consul DNS domain. Defaults to "consul".
+                type: string
+              recursors:
+                description: Upstream DNS servers Consul forwards unresolved queries to.
+                items:
+                  type: string
+                type: array
               datacenterName:
                 description: Consul datacenter name. Defaults to "dc1".
                 type: string
@@ -68,40 +105,6 @@ spec:
               exposeGossipAndRPCPorts:
                 description: Expose gossip and RPC ports as hostPorts.
                 type: boolean
-              exposeService:
-                description: Creates an additional LoadBalancer or NodePort Service exposing the Consul API outside the cluster.
-                properties:
-                  annotations:
-                    additionalProperties:
-                      type: string
-                    description: Extra annotations for the expose service.
-                    type: object
-                  enabled:
-                    description: Enabled creates the expose service.
-                    type: boolean
-                  nodePort:
-                    description: Per-port NodePort values when type is NodePort.
-                    properties:
-                      grpc:
-                        format: int32
-                        type: integer
-                      http:
-                        format: int32
-                        type: integer
-                      https:
-                        format: int32
-                        type: integer
-                      rpc:
-                        format: int32
-                        type: integer
-                      serf:
-                        format: int32
-                        type: integer
-                    type: object
-                  type:
-                    description: Kubernetes Service type - LoadBalancer or NodePort.
-                    type: string
-                type: object
               extraConfig:
                 description: Raw JSON string merged into the server configuration.
                 type: string
@@ -314,23 +317,67 @@ spec:
               conditions:
                 description: Latest available observations of the cluster's state.
                 items:
+                  description: Condition contains details for one aspect of the current state of this API Resource.
                   properties:
                     lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
                       format: date-time
                       type: string
                     message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
                       type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
                     reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                       type: string
                     status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
                       type: string
                     type:
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
                   required:
+                  - lastTransitionTime
+                  - message
+                  - reason
                   - status
                   - type
                   type: object
                 type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
               currentVersion:
                 description: Consul image version running across the cluster.
                 type: string

@@ -49,12 +49,12 @@ type Command struct {
 	flags *flag.FlagSet
 	k8s   *flags.K8SFlags
 
-	flagLogLevel            string
-	flagLogJSON             bool
-	flagMetricsBindAddress  string
-	flagHealthBindAddress   string
-	flagLeaderElectionID    string
-	flagLeaderElectionNS    string
+	flagLogLevel           string
+	flagLogJSON            bool
+	flagMetricsBindAddress string
+	flagHealthBindAddress  string
+	flagLeaderElectionID   string
+	flagLeaderElectionNS   string
 
 	once sync.Once
 	help string

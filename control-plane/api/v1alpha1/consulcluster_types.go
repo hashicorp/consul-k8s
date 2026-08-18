@@ -66,6 +66,30 @@ type ConsulGossipSpec struct {
 	SecretKey string `json:"secretKey,omitempty"`
 }
 
+// ConsulSecretRef points at a single key within a Kubernetes Secret.
+type ConsulSecretRef struct {
+	// SecretName is the name of the Kubernetes Secret.
+	SecretName string `json:"secretName"`
+
+	// SecretKey is the key within the Secret that holds the value.
+	SecretKey string `json:"secretKey"`
+}
+
+// ConsulACLSpec configures how the operator authenticates to the Consul API.
+// The operator needs a token to read the Raft configuration and autopilot
+// health endpoints, which it uses to gate rolling updates and to reap Raft
+// peers left behind by servers that died without leaving cleanly.
+type ConsulACLSpec struct {
+	// Enabled indicates the server cluster has ACLs enabled with a default deny
+	// policy. When true, Token must also be set or the operator cannot perform
+	// health-gated rollouts.
+	Enabled bool `json:"enabled,omitempty"`
+
+	// Token references a Secret holding a token with operator:read privileges.
+	// The ACL bootstrap token satisfies this.
+	Token *ConsulSecretRef `json:"token,omitempty"`
+}
+
 // ConsulMetricsSpec configures Prometheus metrics exposure.
 type ConsulMetricsSpec struct {
 	// Enabled adds Prometheus scrape annotations to server pods.
@@ -91,31 +115,6 @@ type ConsulRequestLimitsSpec struct {
 type ConsulLimitsSpec struct {
 	// RequestLimits configures per-request rate limits on the server.
 	RequestLimits *ConsulRequestLimitsSpec `json:"requestLimits,omitempty"`
-}
-
-// ConsulExposeServiceSpec configures an optional LoadBalancer/NodePort Service
-// that exposes the Consul API outside the cluster.
-type ConsulExposeServiceSpec struct {
-	// Enabled creates the expose service.
-	Enabled bool `json:"enabled,omitempty"`
-
-	// Type is the Kubernetes Service type: LoadBalancer or NodePort.
-	Type string `json:"type,omitempty"`
-
-	// Annotations are extra annotations for the expose service.
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// NodePort configures per-port NodePort values when Type is NodePort.
-	NodePort *ConsulExposeServiceNodePorts `json:"nodePort,omitempty"`
-}
-
-// ConsulExposeServiceNodePorts holds explicit NodePort values.
-type ConsulExposeServiceNodePorts struct {
-	HTTP  int32 `json:"http,omitempty"`
-	HTTPS int32 `json:"https,omitempty"`
-	GRPC  int32 `json:"grpc,omitempty"`
-	Serf  int32 `json:"serf,omitempty"`
-	RPC   int32 `json:"rpc,omitempty"`
 }
 
 // ConsulPodDisruptionBudgetSpec configures the PodDisruptionBudget for server pods.
@@ -211,7 +210,9 @@ type ConsulClusterSpec struct {
 	// PriorityClassName assigns a PriorityClass to server pods.
 	PriorityClassName string `json:"priorityClassName,omitempty"`
 
-	// ServiceAnnotations are extra annotations applied to the headless and client services.
+	// ServiceAnnotations are extra annotations applied to the headless service.
+	// The client (UI) and expose Services remain Helm-owned; annotate them via
+	// the chart's ui.service.annotations / server.exposeService.annotations.
 	ServiceAnnotations map[string]string `json:"serviceAnnotations,omitempty"`
 
 	// ServiceAccountAnnotations are extra annotations applied to the server ServiceAccount.
@@ -227,6 +228,12 @@ type ConsulClusterSpec struct {
 	// default when unset.
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
+	// DataVolumeName is the name of the StatefulSet volume claim template, which
+	// determines the PVC name each server ordinal binds to
+	// ("<dataVolumeName>-<statefulset>-<ordinal>"). Defaults to "data".
+	// Immutable once the StatefulSet exists.
+	DataVolumeName string `json:"dataVolumeName,omitempty"`
+
 	// PersistentVolumeClaimRetentionPolicy controls PVC lifecycle on scale-down
 	// and cluster deletion. Defaults to Delete for both.
 	PersistentVolumeClaimRetentionPolicy *ConsulClusterPVCRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
@@ -237,6 +244,16 @@ type ConsulClusterSpec struct {
 	// GossipEncryption configures the gossip encryption key.
 	GossipEncryption *ConsulGossipSpec `json:"gossipEncryption,omitempty"`
 
+	// ACLs configures the credentials the operator uses to talk to the Consul
+	// API. Required when the server cluster runs with ACLs enabled.
+	ACLs *ConsulACLSpec `json:"acls,omitempty"`
+
+	// Domain is the Consul DNS domain, e.g. "consul". Defaults to "consul".
+	Domain string `json:"domain,omitempty"`
+
+	// Recursors are upstream DNS servers Consul forwards unresolved queries to.
+	Recursors []string `json:"recursors,omitempty"`
+
 	// ExposeGossipAndRPCPorts exposes gossip and RPC ports as hostPorts.
 	ExposeGossipAndRPCPorts bool `json:"exposeGossipAndRPCPorts,omitempty"`
 
@@ -245,10 +262,6 @@ type ConsulClusterSpec struct {
 
 	// Limits configures rate limiting on the Consul server agents.
 	Limits *ConsulLimitsSpec `json:"limits,omitempty"`
-
-	// ExposeService creates an additional LoadBalancer or NodePort Service
-	// that exposes the Consul API outside the cluster.
-	ExposeService *ConsulExposeServiceSpec `json:"exposeService,omitempty"`
 
 	// PodDisruptionBudget configures a PodDisruptionBudget for the server pods.
 	PodDisruptionBudget *ConsulPodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
@@ -269,7 +282,9 @@ type ConsulClusterStatus struct {
 	CurrentVersion string `json:"currentVersion,omitempty"`
 
 	// Conditions holds the latest available observations of the cluster's state.
-	Conditions Conditions `json:"conditions,omitempty"`
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 // ConsulCluster manages a Consul server cluster as individual pods and PVCs.

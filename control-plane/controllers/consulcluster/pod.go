@@ -4,89 +4,32 @@
 package consulcluster
 
 import (
-	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
-func (r *ConsulClusterReconciler) createServerPod(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
-	podName, err := generatePodName(cluster.Name)
-	if err != nil {
-		return err
-	}
+const (
+	consulContainerName = "consul"
 
-	pvc, err := r.ensurePVC(ctx, cluster, podName)
-	if err != nil {
-		return fmt.Errorf("creating PVC for pod %s: %w", podName, err)
-	}
+	defaultDataVolumeName = "data"
 
-	pod := buildServerPod(cluster, podName, pvc.Name)
-	pod.OwnerReferences = []metav1.OwnerReference{ownerRef(cluster, r.Scheme)}
+	// configChecksumAnnotation carries a hash of the generated server config so
+	// that a config change produces a new pod template revision, which rolls the
+	// servers. Consul only reloads a subset of its configuration at runtime, so
+	// a restart is the only way to guarantee a change takes effect.
+	configChecksumAnnotation = "consul.hashicorp.com/config-checksum"
+)
 
-	if err := r.Create(ctx, pod); err != nil {
-		return fmt.Errorf("creating pod %s: %w", podName, err)
-	}
-	return nil
-}
-
-func (r *ConsulClusterReconciler) ensurePVC(ctx context.Context, cluster *v1alpha1.ConsulCluster, podName string) (*corev1.PersistentVolumeClaim, error) {
-	pvcName := pvcNameForPod(podName)
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: pvcName}, pvc)
-	if err == nil {
-		return pvc, nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	storageQty := cluster.Spec.Storage
-	if storageQty.IsZero() {
-		storageQty = resource.MustParse("10Gi")
-	}
-
-	newPVC := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pvcName,
-			Namespace: cluster.Namespace,
-			Labels:    serverPodLabels(cluster),
-			OwnerReferences: []metav1.OwnerReference{
-				ownerRef(cluster, r.Scheme),
-			},
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceStorage: storageQty,
-				},
-			},
-			StorageClassName: cluster.Spec.StorageClassName,
-		},
-	}
-
-	if err := ctrl.SetControllerReference(cluster, newPVC, r.Scheme); err != nil {
-		return nil, err
-	}
-
-	if err := r.Create(ctx, newPVC); err != nil {
-		return nil, err
-	}
-	return newPVC, nil
-}
-
-func buildServerPod(cluster *v1alpha1.ConsulCluster, podName, pvcName string) *corev1.Pod {
+// buildServerPodTemplate builds the pod template for the server StatefulSet.
+// The data volume is supplied by the StatefulSet's volumeClaimTemplate, and
+// hostname/subdomain come from the StatefulSet's serviceName, so neither is set
+// here.
+func buildServerPodTemplate(cluster *v1alpha1.ConsulCluster, configChecksum string) corev1.PodTemplateSpec {
 	labels := serverPodLabels(cluster)
 	labels[labelVersion] = cluster.Spec.Version
 
@@ -98,11 +41,19 @@ func buildServerPod(cluster *v1alpha1.ConsulCluster, podName, pvcName string) *c
 
 	annotations := map[string]string{
 		"consul.hashicorp.com/connect-inject": "false",
+		"consul.hashicorp.com/mesh-inject":    "false",
+		configChecksumAnnotation:              configChecksum,
 	}
 	if cluster.Spec.Metrics != nil && cluster.Spec.Metrics.Enabled {
 		annotations["prometheus.io/scrape"] = "true"
-		annotations["prometheus.io/port"] = "8500"
 		annotations["prometheus.io/path"] = "/v1/agent/metrics"
+		if tlsEnabled(cluster) {
+			annotations["prometheus.io/port"] = "8501"
+			annotations["prometheus.io/scheme"] = "https"
+		} else {
+			annotations["prometheus.io/port"] = "8500"
+			annotations["prometheus.io/scheme"] = "http"
+		}
 	}
 	if cluster.Spec.Pod != nil {
 		for k, v := range cluster.Spec.Pod.Annotations {
@@ -110,134 +61,23 @@ func buildServerPod(cluster *v1alpha1.ConsulCluster, podName, pvcName string) *c
 		}
 	}
 
-	bootstrapExpect := cluster.Spec.Size
-	if cluster.Spec.BootstrapExpect != nil {
-		bootstrapExpect = *cluster.Spec.BootstrapExpect
-	}
-
-	datacenter := cluster.Spec.DatacenterName
-	if datacenter == "" {
-		datacenter = "dc1"
-	}
-
-	retryJoin := fmt.Sprintf("%s.%s.svc", headlessServiceName(cluster), cluster.Namespace)
-
-	env := []corev1.EnvVar{
-		{
-			Name: "ADVERTISE_IP",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-			},
-		},
-		{
-			Name: "POD_IP",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
-			},
-		},
-		{
-			Name: "NAMESPACE",
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
-			},
-		},
-	}
-	if cluster.Spec.Pod != nil {
-		env = append(env, cluster.Spec.Pod.ExtraEnvVars...)
-	}
-
-	args := []string{
-		"agent",
-		"-advertise=$(ADVERTISE_IP)",
-		"-bind=0.0.0.0",
-		"-bootstrap-expect=" + fmt.Sprintf("%d", bootstrapExpect),
-		"-client=0.0.0.0",
-		"-config-dir=/consul/config",
-		"-datacenter=" + datacenter,
-		"-data-dir=/consul/data",
-		"-domain=cluster.local",
-		"-retry-join=" + retryJoin,
-		"-server",
-		"-ui",
-	}
-
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.Enabled {
-		args = append(args, "-config-dir=/consul/tls-config")
-	}
-
-	if cluster.Spec.GossipEncryption != nil {
-		args = append(args, "-encrypt=$(GOSSIP_KEY)")
-		env = append(env, corev1.EnvVar{
-			Name: "GOSSIP_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: cluster.Spec.GossipEncryption.SecretName,
-					},
-					Key: cluster.Spec.GossipEncryption.SecretKey,
-				},
-			},
-		})
-	}
+	env := buildServerEnv(cluster)
+	args := buildServerArgs(cluster)
 
 	image := consulImage(cluster)
 
-	containerPorts := []corev1.ContainerPort{
-		{Name: "http", ContainerPort: 8500, Protocol: corev1.ProtocolTCP},
-		{Name: "https", ContainerPort: 8501, Protocol: corev1.ProtocolTCP},
-		{Name: "grpc", ContainerPort: 8502, Protocol: corev1.ProtocolTCP},
-		{Name: "serflan-tcp", ContainerPort: 8301, Protocol: corev1.ProtocolTCP},
-		{Name: "serflan-udp", ContainerPort: 8301, Protocol: corev1.ProtocolUDP},
-		{Name: "serfwan-tcp", ContainerPort: 8302, Protocol: corev1.ProtocolTCP},
-		{Name: "serfwan-udp", ContainerPort: 8302, Protocol: corev1.ProtocolUDP},
-		{Name: "server", ContainerPort: 8300, Protocol: corev1.ProtocolTCP},
-		{Name: "dns-tcp", ContainerPort: 8600, Protocol: corev1.ProtocolTCP},
-		{Name: "dns-udp", ContainerPort: 8600, Protocol: corev1.ProtocolUDP},
-	}
-
-	if cluster.Spec.ExposeGossipAndRPCPorts {
-		for i := range containerPorts {
-			containerPorts[i].HostPort = containerPorts[i].ContainerPort
-		}
-	}
-
-	readinessScheme := corev1.URISchemeHTTP
-	readinessPort := intstr.FromString("http")
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.Enabled && !cluster.Spec.TLS.HTTPSOnly {
-		readinessScheme = corev1.URISchemeHTTPS
-		readinessPort = intstr.FromString("https")
-	}
-
-	readinessProbe := &corev1.Probe{
-		ProbeHandler: corev1.ProbeHandler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path:   "/v1/status/leader",
-				Port:   readinessPort,
-				Scheme: readinessScheme,
-			},
-		},
-		FailureThreshold:    3,
-		InitialDelaySeconds: 30,
-		PeriodSeconds:       10,
-		SuccessThreshold:    1,
-		TimeoutSeconds:      5,
-	}
+	containerPorts := buildContainerPorts(cluster)
 
 	volumeMounts := []corev1.VolumeMount{
-		{Name: "data", MountPath: "/consul/data"},
+		{Name: dataVolumeName(cluster), MountPath: "/consul/data"},
 		{Name: "config", MountPath: "/consul/config"},
 		{Name: "extra-config", MountPath: "/consul/extra-config"},
+		// The container runs with a read-only root filesystem, so Consul needs a
+		// writable /tmp for its own scratch files.
+		{Name: "tmp", MountPath: "/tmp"},
 	}
 
 	volumes := []corev1.Volume{
-		{
-			Name: "data",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: pvcName,
-				},
-			},
-		},
 		{
 			Name: "config",
 			VolumeSource: corev1.VolumeSource{
@@ -249,14 +89,16 @@ func buildServerPod(cluster *v1alpha1.ConsulCluster, podName, pvcName string) *c
 			},
 		},
 		{
-			Name: "extra-config",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
+			Name:         "extra-config",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+		},
+		{
+			Name:         "tmp",
+			VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 		},
 	}
 
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.Enabled {
+	if tlsEnabled(cluster) {
 		volumes = append(volumes,
 			corev1.Volume{
 				Name: "tls-ca",
@@ -286,37 +128,17 @@ func buildServerPod(cluster *v1alpha1.ConsulCluster, podName, pvcName string) *c
 		volumes = append(volumes, cluster.Spec.Pod.ExtraVolumes...)
 	}
 
-	drop := corev1.Capability("ALL")
-	defaultSecurityContext := &corev1.SecurityContext{
-		AllowPrivilegeEscalation: boolPtr(false),
-		ReadOnlyRootFilesystem:   boolPtr(true),
-		RunAsNonRoot:             boolPtr(true),
-		RunAsUser:                int64Ptr(100),
-		Capabilities: &corev1.Capabilities{
-			Drop: []corev1.Capability{drop},
-		},
-		SeccompProfile: &corev1.SeccompProfile{
-			Type: corev1.SeccompProfileTypeRuntimeDefault,
-		},
-	}
-	securityContext := defaultSecurityContext
-	if cluster.Spec.Pod != nil && cluster.Spec.Pod.ContainerSecurityContext != nil {
-		securityContext = cluster.Spec.Pod.ContainerSecurityContext
-	}
-
 	container := corev1.Container{
-		Name:            "consul",
+		Name:            consulContainerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Env:             env,
 		Command:         []string{"/bin/sh", "-ec"},
-		Args: []string{
-			fmt.Sprintf(`exec /bin/consul %s`, joinArgs(args)),
-		},
+		Args:            []string{fmt.Sprintf("exec /bin/consul %s", strings.Join(args, " "))},
 		Ports:           containerPorts,
-		ReadinessProbe:  readinessProbe,
+		ReadinessProbe:  buildReadinessProbe(cluster),
 		VolumeMounts:    volumeMounts,
-		SecurityContext: securityContext,
+		SecurityContext: serverSecurityContext(cluster),
 		Lifecycle: &corev1.Lifecycle{
 			PreStop: &corev1.LifecycleHandler{
 				Exec: &corev1.ExecAction{
@@ -335,22 +157,12 @@ func buildServerPod(cluster *v1alpha1.ConsulCluster, podName, pvcName string) *c
 		containers = append(containers, cluster.Spec.Pod.ExtraContainers...)
 	}
 
-	defaultPodSecurityContext := &corev1.PodSecurityContext{
-		RunAsNonRoot: boolPtr(true),
-	}
-	podSecurityContext := defaultPodSecurityContext
-	if cluster.Spec.Pod != nil && cluster.Spec.Pod.SecurityContext != nil {
-		podSecurityContext = cluster.Spec.Pod.SecurityContext
-	}
-
 	podSpec := corev1.PodSpec{
 		Containers:                    containers,
 		Volumes:                       volumes,
-		Hostname:                      podName,
-		Subdomain:                     headlessServiceName(cluster),
 		RestartPolicy:                 corev1.RestartPolicyAlways,
 		TerminationGracePeriodSeconds: int64Ptr(60),
-		SecurityContext:               podSecurityContext,
+		SecurityContext:               serverPodSecurityContext(cluster),
 		PriorityClassName:             cluster.Spec.PriorityClassName,
 		ServiceAccountName:            serviceAccountName(cluster),
 	}
@@ -363,36 +175,211 @@ func buildServerPod(cluster *v1alpha1.ConsulCluster, podName, pvcName string) *c
 		podSpec.ImagePullSecrets = cluster.Spec.Pod.ImagePullSecrets
 	}
 
-	pod := &corev1.Pod{
+	return corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        podName,
-			Namespace:   cluster.Namespace,
 			Labels:      labels,
 			Annotations: annotations,
 		},
 		Spec: podSpec,
 	}
-
-	return pod
 }
 
-func generatePodName(clusterName string) (string, error) {
-	b := make([]byte, 3)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("generating pod name suffix: %w", err)
+func buildServerEnv(cluster *v1alpha1.ConsulCluster) []corev1.EnvVar {
+	// When gossip and RPC ports are published as hostPorts the servers are
+	// reachable at the node's address, not the pod's, so that is what they must
+	// advertise. Advertising the pod IP would defeat the purpose of exposing the
+	// ports at all, since external client agents cannot route to it.
+	advertiseField := "status.podIP"
+	if cluster.Spec.ExposeGossipAndRPCPorts {
+		advertiseField = "status.hostIP"
 	}
-	return fmt.Sprintf("%s-server-%s", clusterName, hex.EncodeToString(b)), nil
+
+	env := []corev1.EnvVar{
+		{
+			Name: "ADVERTISE_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: advertiseField},
+			},
+		},
+		{
+			Name: "POD_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.podIP"},
+			},
+		},
+		{
+			Name: "HOST_IP",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "status.hostIP"},
+			},
+		},
+		{
+			Name: "NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+			},
+		},
+		// The image entrypoint chowns /consul/data on startup, which fails under
+		// a read-only root filesystem and a non-root user. We invoke the binary
+		// directly, but set this so any wrapper in the image skips it too.
+		{Name: "CONSUL_DISABLE_PERM_MGMT", Value: "true"},
+	}
+
+	if tlsEnabled(cluster) {
+		env = append(env,
+			corev1.EnvVar{Name: "CONSUL_HTTP_ADDR", Value: "https://127.0.0.1:8501"},
+			corev1.EnvVar{Name: "CONSUL_CACERT", Value: "/consul/tls/ca/tls.crt"},
+		)
+	}
+
+	if cluster.Spec.GossipEncryption != nil {
+		env = append(env, corev1.EnvVar{
+			Name: "GOSSIP_KEY",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: cluster.Spec.GossipEncryption.SecretName,
+					},
+					Key: cluster.Spec.GossipEncryption.SecretKey,
+				},
+			},
+		})
+	}
+
+	if cluster.Spec.Pod != nil {
+		env = append(env, cluster.Spec.Pod.ExtraEnvVars...)
+	}
+
+	return env
 }
 
-func joinArgs(args []string) string {
-	result := ""
-	for _, a := range args {
-		if result != "" {
-			result += " "
+func buildServerArgs(cluster *v1alpha1.ConsulCluster) []string {
+	// Everything that can live in the config file does, so that a change shows
+	// up in the config checksum and rolls the servers. These flags cover only
+	// what must be resolved from the pod's own environment.
+	args := []string{
+		"agent",
+		"-advertise=$(ADVERTISE_IP)",
+		"-config-dir=/consul/config",
+		"-config-dir=/consul/extra-config",
+	}
+
+	if cluster.Spec.GossipEncryption != nil {
+		args = append(args, "-encrypt=$(GOSSIP_KEY)")
+	}
+
+	// User-supplied config directories are loaded last so they can override
+	// anything the operator generated.
+	if cluster.Spec.Pod != nil {
+		for _, mount := range cluster.Spec.Pod.ExtraVolumeMounts {
+			if strings.HasPrefix(mount.MountPath, "/consul/userconfig/") {
+				args = append(args, "-config-dir="+mount.MountPath)
+			}
 		}
-		result += a
 	}
-	return result
+
+	return args
+}
+
+func buildContainerPorts(cluster *v1alpha1.ConsulCluster) []corev1.ContainerPort {
+	ports := []corev1.ContainerPort{
+		{Name: "http", ContainerPort: 8500, Protocol: corev1.ProtocolTCP},
+		{Name: "https", ContainerPort: 8501, Protocol: corev1.ProtocolTCP},
+		{Name: "grpc", ContainerPort: 8502, Protocol: corev1.ProtocolTCP},
+		{Name: "serflan-tcp", ContainerPort: 8301, Protocol: corev1.ProtocolTCP},
+		{Name: "serflan-udp", ContainerPort: 8301, Protocol: corev1.ProtocolUDP},
+		{Name: "serfwan-tcp", ContainerPort: 8302, Protocol: corev1.ProtocolTCP},
+		{Name: "serfwan-udp", ContainerPort: 8302, Protocol: corev1.ProtocolUDP},
+		{Name: "server", ContainerPort: 8300, Protocol: corev1.ProtocolTCP},
+		{Name: "dns-tcp", ContainerPort: 8600, Protocol: corev1.ProtocolTCP},
+		{Name: "dns-udp", ContainerPort: 8600, Protocol: corev1.ProtocolUDP},
+	}
+
+	if !cluster.Spec.ExposeGossipAndRPCPorts {
+		return ports
+	}
+
+	// Only gossip and RPC are published on the host; the HTTP and DNS ports are
+	// reached through Services.
+	hostPorted := map[string]bool{
+		"serflan-tcp": true, "serflan-udp": true,
+		"serfwan-tcp": true, "serfwan-udp": true,
+		"server": true, "grpc": true,
+	}
+	for i := range ports {
+		if hostPorted[ports[i].Name] {
+			ports[i].HostPort = ports[i].ContainerPort
+		}
+	}
+	return ports
+}
+
+// buildReadinessProbe returns a probe that only passes once the agent reports a
+// leader. /v1/status/leader answers 200 with an empty body while an election is
+// in progress, so an HTTP probe against it would call a leaderless server Ready.
+// Grepping for a non-empty quoted address is what distinguishes the two.
+func buildReadinessProbe(cluster *v1alpha1.ConsulCluster) *corev1.Probe {
+	url := "http://127.0.0.1:8500/v1/status/leader"
+	curl := "curl"
+	if tlsEnabled(cluster) {
+		url = "https://127.0.0.1:8501/v1/status/leader"
+		curl = "curl -k"
+	}
+
+	return &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			Exec: &corev1.ExecAction{
+				Command: []string{
+					"/bin/sh", "-ec",
+					fmt.Sprintf("%s %s 2>/dev/null | grep -E '\".+\"'", curl, url),
+				},
+			},
+		},
+		FailureThreshold:    2,
+		InitialDelaySeconds: 5,
+		PeriodSeconds:       3,
+		SuccessThreshold:    1,
+		TimeoutSeconds:      5,
+	}
+}
+
+func serverSecurityContext(cluster *v1alpha1.ConsulCluster) *corev1.SecurityContext {
+	if cluster.Spec.Pod != nil && cluster.Spec.Pod.ContainerSecurityContext != nil {
+		return cluster.Spec.Pod.ContainerSecurityContext
+	}
+	return &corev1.SecurityContext{
+		AllowPrivilegeEscalation: boolPtr(false),
+		ReadOnlyRootFilesystem:   boolPtr(true),
+		RunAsNonRoot:             boolPtr(true),
+		RunAsUser:                int64Ptr(100),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{corev1.Capability("ALL")},
+		},
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+}
+
+func serverPodSecurityContext(cluster *v1alpha1.ConsulCluster) *corev1.PodSecurityContext {
+	if cluster.Spec.Pod != nil && cluster.Spec.Pod.SecurityContext != nil {
+		return cluster.Spec.Pod.SecurityContext
+	}
+	return &corev1.PodSecurityContext{RunAsNonRoot: boolPtr(true)}
+}
+
+// dataVolumeName is the StatefulSet volume claim template name, which fixes the
+// PVC name each ordinal binds to. Existing installations override it so their
+// servers adopt the volumes they already have.
+func dataVolumeName(cluster *v1alpha1.ConsulCluster) string {
+	if cluster.Spec.DataVolumeName != "" {
+		return cluster.Spec.DataVolumeName
+	}
+	return defaultDataVolumeName
+}
+
+func tlsEnabled(cluster *v1alpha1.ConsulCluster) bool {
+	return cluster.Spec.TLS != nil && cluster.Spec.TLS.Enabled
 }
 
 func int64Ptr(i int64) *int64 { return &i }

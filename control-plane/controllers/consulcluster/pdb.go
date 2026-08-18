@@ -16,25 +16,23 @@ import (
 )
 
 func (r *ConsulClusterReconciler) ensurePodDisruptionBudget(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
+	name := statefulSetName(cluster)
+
 	if cluster.Spec.PodDisruptionBudget == nil || !cluster.Spec.PodDisruptionBudget.Enabled {
-		return nil
+		// Remove a budget left behind by a previous spec that enabled it,
+		// otherwise it keeps blocking drains after the user turned it off.
+		existing := &policyv1.PodDisruptionBudget{}
+		err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: name}, existing)
+		if k8serrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		return r.Delete(ctx, existing)
 	}
 
-	pdb := &policyv1.PodDisruptionBudget{}
-	name := cluster.Name + "-server"
-	err := r.Get(ctx, client.ObjectKey{Namespace: cluster.Namespace, Name: name}, pdb)
-	if err == nil {
-		return nil
-	}
-	if !k8serrors.IsNotFound(err) {
-		return err
-	}
-
-	maxUnavailable := 1
-	if cluster.Spec.PodDisruptionBudget.MaxUnavailable != nil {
-		maxUnavailable = *cluster.Spec.PodDisruptionBudget.MaxUnavailable
-	}
-	maxUnavailableVal := intstr.FromInt(maxUnavailable)
+	maxUnavailableVal := intstr.FromInt(serverMaxUnavailable(cluster))
 
 	desired := &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -51,5 +49,31 @@ func (r *ConsulClusterReconciler) ensurePodDisruptionBudget(ctx context.Context,
 		},
 	}
 
-	return r.Create(ctx, desired)
+	existing := &policyv1.PodDisruptionBudget{}
+	err := r.Get(ctx, client.ObjectKeyFromObject(desired), existing)
+	if k8serrors.IsNotFound(err) {
+		return r.Create(ctx, desired)
+	}
+	if err != nil {
+		return err
+	}
+
+	patch := client.MergeFrom(existing.DeepCopy())
+	existing.Labels = desired.Labels
+	existing.Spec = desired.Spec
+	return r.Patch(ctx, existing, patch)
+}
+
+// serverMaxUnavailable returns how many servers may be voluntarily disrupted at
+// once. A single-server cluster returns 0: there is no redundancy, so any
+// eviction is a full outage and a drain should block rather than take the
+// datastore down.
+func serverMaxUnavailable(cluster *v1alpha1.ConsulCluster) int {
+	if cluster.Spec.Size <= 1 {
+		return 0
+	}
+	if cluster.Spec.PodDisruptionBudget != nil && cluster.Spec.PodDisruptionBudget.MaxUnavailable != nil {
+		return *cluster.Spec.PodDisruptionBudget.MaxUnavailable
+	}
+	return 1
 }

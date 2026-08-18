@@ -6,17 +6,15 @@ package consulcluster
 import (
 	"context"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/go-logr/logr"
-	capi "github.com/hashicorp/consul/api"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -36,7 +34,11 @@ const (
 	labelComponentValue = "server"
 
 	requeueAfterSafetyNet = 30 * time.Second
-	requeueAfterPending   = 5 * time.Second
+
+	// requeueAfterRollout is the poll interval while a rollout is in flight.
+	// StatefulSet and Pod events wake the reconciler too; this covers the
+	// autopilot health check, which nothing in Kubernetes notifies us about.
+	requeueAfterRollout = 10 * time.Second
 )
 
 // ConsulClusterReconciler reconciles ConsulCluster objects.
@@ -50,12 +52,14 @@ type ConsulClusterReconciler struct {
 func (r *ConsulClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.ConsulCluster{}).
-		Owns(&corev1.Pod{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&policyv1.PodDisruptionBudget{}).
+		// Pods belong to the StatefulSet rather than to us, but watching them
+		// means a server going unready wakes the dead-peer reaper promptly.
+		Owns(&corev1.Pod{}).
 		Complete(r)
 }
 
@@ -86,22 +90,18 @@ func (r *ConsulClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	if cluster.Spec.Paused {
 		log.Info("cluster is paused, skipping reconciliation")
-		if err := r.updateStatus(ctx, cluster, v1alpha1.ConsulClusterPhaseRunning, 0, nil, ""); err != nil {
-			return ctrl.Result{}, err
-		}
 		return ctrl.Result{RequeueAfter: requeueAfterSafetyNet}, nil
 	}
 
+	// The UI (client) and expose Services remain Helm-owned (ui-service.yaml,
+	// expose-servers-service.yaml) — Helm is still the delivery mechanism for
+	// cross-cutting objects, so the operator only owns the headless Service,
+	// which the StatefulSet requires to exist.
 	if err := r.ensureHeadlessService(ctx, cluster); err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring headless service: %w", err)
 	}
-	if err := r.ensureClientService(ctx, cluster); err != nil {
-		return ctrl.Result{}, fmt.Errorf("ensuring client service: %w", err)
-	}
-	if err := r.ensureExposeService(ctx, cluster); err != nil {
-		return ctrl.Result{}, fmt.Errorf("ensuring expose service: %w", err)
-	}
-	if err := r.ensureConfigMap(ctx, cluster); err != nil {
+	configChecksum, err := r.ensureConfigMap(ctx, cluster)
+	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("ensuring config map: %w", err)
 	}
 	if err := r.ensureServiceAccount(ctx, cluster); err != nil {
@@ -111,87 +111,29 @@ func (r *ConsulClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, fmt.Errorf("ensuring pod disruption budget: %w", err)
 	}
 
-	podList := &corev1.PodList{}
-	if err := r.List(ctx, podList,
-		client.InNamespace(cluster.Namespace),
-		client.MatchingLabels(serverPodLabels(cluster)),
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("listing pods: %w", err)
+	sts, err := r.ensureStatefulSet(ctx, cluster, configChecksum)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("ensuring statefulset: %w", err)
 	}
 
-	var running, pending, terminating []*corev1.Pod
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		if pod.DeletionTimestamp != nil {
-			terminating = append(terminating, pod)
-		} else if pod.Status.Phase == corev1.PodPending || pod.Status.Phase == "" {
-			pending = append(pending, pod)
-		} else {
-			running = append(running, pod)
-		}
+	rolloutDone, err := r.reconcileRollout(ctx, log, cluster, sts)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("reconciling rollout: %w", err)
 	}
 
-	log.Info("pod state", "running", len(running), "pending", len(pending), "terminating", len(terminating))
-
-	if len(pending) > 0 || len(terminating) > 0 {
-		if err := r.updateStatus(ctx, cluster, v1alpha1.ConsulClusterPhaseCreating, countReady(running), memberNames(running), ""); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{RequeueAfter: requeueAfterPending}, nil
+	// Best effort: a transient Consul API error must not fail the reconcile,
+	// because the cluster is otherwise converged.
+	if err := r.reapDeadRaftPeers(ctx, log, cluster); err != nil {
+		log.Info("dead raft peer cleanup failed, will retry", "err", err)
 	}
 
-	active := len(running)
-
-	if active < cluster.Spec.Size {
-		log.Info("scaling up", "current", active, "desired", cluster.Spec.Size)
-		if err := r.createServerPod(ctx, cluster); err != nil {
-			return ctrl.Result{}, fmt.Errorf("creating server pod: %w", err)
-		}
-		if err := r.updateStatus(ctx, cluster, v1alpha1.ConsulClusterPhaseCreating, countReady(running), memberNames(running), ""); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{RequeueAfter: requeueAfterPending}, nil
-	}
-
-	if active > cluster.Spec.Size {
-		log.Info("scaling down", "current", active, "desired", cluster.Spec.Size)
-		if err := r.deleteOneServerPod(ctx, log, cluster, running); err != nil {
-			return ctrl.Result{}, fmt.Errorf("deleting server pod: %w", err)
-		}
-		if err := r.updateStatus(ctx, cluster, v1alpha1.ConsulClusterPhaseRunning, countReady(running), memberNames(running), ""); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{RequeueAfter: requeueAfterPending}, nil
-	}
-
-	if len(running) > 0 {
-		if err := r.removeDeadRaftPeers(ctx, log, cluster, running); err != nil {
-			log.Info("dead raft peer cleanup encountered an error, will retry", "err", err)
-		}
-	}
-
-	desiredImage := consulImage(cluster)
-	for _, pod := range running {
-		if pod.Labels[labelVersion] != cluster.Spec.Version {
-			log.Info("upgrading pod", "pod", pod.Name, "from", pod.Labels[labelVersion], "to", cluster.Spec.Version)
-			if err := r.upgradeOnePod(ctx, cluster, pod, desiredImage); err != nil {
-				return ctrl.Result{}, fmt.Errorf("upgrading pod %s: %w", pod.Name, err)
-			}
-			if err := r.updateStatus(ctx, cluster, v1alpha1.ConsulClusterPhaseUpgrading, countReady(running), memberNames(running), cluster.Spec.Version); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{RequeueAfter: requeueAfterPending}, nil
-		}
-	}
-
-	phase := v1alpha1.ConsulClusterPhaseRunning
-	if countReady(running) == 0 && cluster.Spec.Size > 0 {
-		phase = v1alpha1.ConsulClusterPhaseCreating
-	}
-	if err := r.updateStatus(ctx, cluster, phase, countReady(running), memberNames(running), cluster.Spec.Version); err != nil {
+	if err := r.updateStatus(ctx, cluster, sts, rolloutDone); err != nil {
 		return ctrl.Result{}, err
 	}
 
+	if !rolloutDone {
+		return ctrl.Result{RequeueAfter: requeueAfterRollout}, nil
+	}
 	return ctrl.Result{RequeueAfter: requeueAfterSafetyNet}, nil
 }
 
@@ -202,22 +144,11 @@ func (r *ConsulClusterReconciler) reconcileDelete(ctx context.Context, log logr.
 
 	log.Info("deleting ConsulCluster", "name", cluster.Name)
 
-	podList := &corev1.PodList{}
-	if err := r.List(ctx, podList,
-		client.InNamespace(cluster.Namespace),
-		client.MatchingLabels(serverPodLabels(cluster)),
-	); err != nil {
-		return ctrl.Result{}, fmt.Errorf("listing server pods for deletion: %w", err)
-	}
-	for i := range podList.Items {
-		pod := &podList.Items[i]
-		if err := r.Delete(ctx, pod); err != nil && !k8serrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("deleting pod %s: %w", pod.Name, err)
-		}
-	}
-
-	retentionPolicy := pvcRetentionPolicy(cluster)
-	if retentionPolicy.WhenDeleted == v1alpha1.PVCRetentionPolicyDelete {
+	// Garbage collection removes the StatefulSet along with its pods, and the
+	// StatefulSet's own retention policy handles the PVCs. That policy is only
+	// honoured from Kubernetes 1.27 onward, so delete the claims here too when
+	// the cluster asks for it. Deleting an already-deleted PVC is a no-op.
+	if pvcRetentionPolicy(cluster).WhenDeleted == v1alpha1.PVCRetentionPolicyDelete {
 		if err := r.deleteAllPVCs(ctx, cluster); err != nil {
 			return ctrl.Result{}, fmt.Errorf("deleting PVCs on cluster delete: %w", err)
 		}
@@ -229,90 +160,6 @@ func (r *ConsulClusterReconciler) reconcileDelete(ctx context.Context, log logr.
 		return ctrl.Result{}, fmt.Errorf("removing finalizer: %w", err)
 	}
 	return ctrl.Result{}, nil
-}
-
-func (r *ConsulClusterReconciler) deleteOneServerPod(ctx context.Context, log logr.Logger, cluster *v1alpha1.ConsulCluster, running []*corev1.Pod) error {
-	pod := running[len(running)-1]
-
-	remainingPeers := running[:len(running)-1]
-
-	if err := r.Delete(ctx, pod); err != nil && !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("deleting pod %s: %w", pod.Name, err)
-	}
-
-	if len(remainingPeers) > 0 {
-		if err := waitForGossipLeave(ctx, remainingPeers[0], pod.Name); err != nil {
-			log.Info("gossip leave wait timed out, continuing", "pod", pod.Name, "err", err)
-		}
-	}
-
-	retentionPolicy := pvcRetentionPolicy(cluster)
-	if retentionPolicy.WhenScaled == v1alpha1.PVCRetentionPolicyDelete {
-		pvc := &corev1.PersistentVolumeClaim{}
-		pvcName := types.NamespacedName{Namespace: cluster.Namespace, Name: pvcNameForPod(pod.Name)}
-		if err := r.Get(ctx, pvcName, pvc); err == nil {
-			if delErr := r.Delete(ctx, pvc); delErr != nil && !k8serrors.IsNotFound(delErr) {
-				return fmt.Errorf("deleting PVC %s: %w", pvc.Name, delErr)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (r *ConsulClusterReconciler) removeDeadRaftPeers(ctx context.Context, log logr.Logger, cluster *v1alpha1.ConsulCluster, running []*corev1.Pod) error {
-	livePod := running[0]
-	consulClient, err := consulClientForPod(livePod)
-	if err != nil {
-		return err
-	}
-
-	raftCfg, err := consulClient.Operator().RaftGetConfiguration(&capi.QueryOptions{})
-	if err != nil {
-		return fmt.Errorf("getting raft configuration: %w", err)
-	}
-
-	runningIPs := map[string]bool{}
-	for _, pod := range running {
-		runningIPs[pod.Status.PodIP] = true
-	}
-
-	for _, srv := range raftCfg.Servers {
-		if srv.Leader {
-			continue
-		}
-		ip, _, err := splitHostPort(srv.Address)
-		if err != nil {
-			continue
-		}
-		if !runningIPs[ip] {
-			log.Info("removing dead raft peer", "address", srv.Address, "id", srv.ID)
-			if err := consulClient.Operator().RaftRemovePeerByAddress(srv.Address, &capi.WriteOptions{}); err != nil {
-				return fmt.Errorf("removing dead raft peer %s: %w", srv.Address, err)
-			}
-		}
-	}
-	return nil
-}
-
-func splitHostPort(address string) (string, string, error) {
-	host, port, err := net.SplitHostPort(address)
-	return host, port, err
-}
-
-func (r *ConsulClusterReconciler) upgradeOnePod(ctx context.Context, cluster *v1alpha1.ConsulCluster, pod *corev1.Pod, desiredImage string) error {
-	patch := client.MergeFrom(pod.DeepCopy())
-	for i, c := range pod.Spec.Containers {
-		if c.Name == "consul" {
-			pod.Spec.Containers[i].Image = desiredImage
-			break
-		}
-	}
-	if pod.Labels == nil {
-		pod.Labels = map[string]string{}
-	}
-	pod.Labels[labelVersion] = cluster.Spec.Version
-	return r.Patch(ctx, pod, patch)
 }
 
 func (r *ConsulClusterReconciler) deleteAllPVCs(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
@@ -332,13 +179,55 @@ func (r *ConsulClusterReconciler) deleteAllPVCs(ctx context.Context, cluster *v1
 	return nil
 }
 
-func (r *ConsulClusterReconciler) updateStatus(ctx context.Context, cluster *v1alpha1.ConsulCluster, phase v1alpha1.ConsulClusterPhase, readyCount int, members []string, version string) error {
+// readyServerPods returns the ready, non-terminating server pods for a cluster.
+func (r *ConsulClusterReconciler) readyServerPods(ctx context.Context, cluster *v1alpha1.ConsulCluster) ([]*corev1.Pod, error) {
+	podList := &corev1.PodList{}
+	if err := r.List(ctx, podList,
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels(serverPodLabels(cluster)),
+	); err != nil {
+		return nil, fmt.Errorf("listing server pods: %w", err)
+	}
+
+	var ready []*corev1.Pod
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+		if pod.DeletionTimestamp == nil && isPodReady(pod) && pod.Status.PodIP != "" {
+			ready = append(ready, pod)
+		}
+	}
+	return ready, nil
+}
+
+// updateStatus derives status from the StatefulSet rather than from the
+// reconciler's own bookkeeping.
+func (r *ConsulClusterReconciler) updateStatus(
+	ctx context.Context,
+	cluster *v1alpha1.ConsulCluster,
+	sts *appsv1.StatefulSet,
+	rolloutDone bool,
+) error {
+	phase := v1alpha1.ConsulClusterPhaseCreating
+	switch {
+	case !rolloutDone:
+		phase = v1alpha1.ConsulClusterPhaseUpgrading
+	case sts.Status.ReadyReplicas >= int32(cluster.Spec.Size):
+		phase = v1alpha1.ConsulClusterPhaseRunning
+	}
+
+	// StatefulSet pod names are deterministic, so the member list no longer
+	// depends on querying the pods.
+	members := make([]string, 0, cluster.Spec.Size)
+	for i := 0; i < cluster.Spec.Size; i++ {
+		members = append(members, fmt.Sprintf("%s-%d", statefulSetName(cluster), i))
+	}
+
 	patch := client.MergeFrom(cluster.DeepCopy())
 	cluster.Status.Phase = phase
-	cluster.Status.ReadyCount = readyCount
+	cluster.Status.ReadyCount = int(sts.Status.ReadyReplicas)
 	cluster.Status.Members = members
-	if version != "" {
-		cluster.Status.CurrentVersion = version
+	if rolloutDone {
+		cluster.Status.CurrentVersion = cluster.Spec.Version
 	}
 	return r.Status().Patch(ctx, cluster, patch)
 }
@@ -367,20 +256,6 @@ func serverPodLabels(cluster *v1alpha1.ConsulCluster) map[string]string {
 	return labels
 }
 
-func pvcNameForPod(podName string) string {
-	return "data-" + podName
-}
-
-func countReady(pods []*corev1.Pod) int {
-	count := 0
-	for _, pod := range pods {
-		if isPodReady(pod) {
-			count++
-		}
-	}
-	return count
-}
-
 func isPodReady(pod *corev1.Pod) bool {
 	for _, cond := range pod.Status.Conditions {
 		if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
@@ -390,14 +265,6 @@ func isPodReady(pod *corev1.Pod) bool {
 	return false
 }
 
-func memberNames(pods []*corev1.Pod) []string {
-	names := make([]string, 0, len(pods))
-	for _, pod := range pods {
-		names = append(names, pod.Name)
-	}
-	return names
-}
-
 func consulImage(cluster *v1alpha1.ConsulCluster) string {
 	if cluster.Spec.Image != "" {
 		return cluster.Spec.Image
@@ -405,19 +272,32 @@ func consulImage(cluster *v1alpha1.ConsulCluster) string {
 	return fmt.Sprintf("hashicorp/consul:%s", cluster.Spec.Version)
 }
 
-func headlessServiceName(cluster *v1alpha1.ConsulCluster) string {
-	return cluster.Name + "-server"
+func datacenterName(cluster *v1alpha1.ConsulCluster) string {
+	if cluster.Spec.DatacenterName != "" {
+		return cluster.Spec.DatacenterName
+	}
+	return "dc1"
 }
 
-func clientServiceName(cluster *v1alpha1.ConsulCluster) string {
-	return cluster.Name + "-ui"
+// consulDomain is Consul's own DNS domain, not the Kubernetes cluster domain.
+// It defaults to "consul", which is what every *.service.consul lookup depends
+// on.
+func consulDomain(cluster *v1alpha1.ConsulCluster) string {
+	if cluster.Spec.Domain != "" {
+		return cluster.Spec.Domain
+	}
+	return "consul"
+}
+
+func headlessServiceName(cluster *v1alpha1.ConsulCluster) string {
+	return cluster.Name + "-server"
 }
 
 func configMapName(cluster *v1alpha1.ConsulCluster) string {
 	return cluster.Name + "-server-config"
 }
 
-func ownerRef(cluster *v1alpha1.ConsulCluster, scheme *runtime.Scheme) metav1.OwnerReference {
+func ownerRef(cluster *v1alpha1.ConsulCluster, _ *runtime.Scheme) metav1.OwnerReference {
 	gvk := v1alpha1.GroupVersion.WithKind("ConsulCluster")
 	return metav1.OwnerReference{
 		APIVersion:         gvk.GroupVersion().String(),

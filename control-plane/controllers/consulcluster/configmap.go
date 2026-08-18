@@ -5,6 +5,8 @@ package consulcluster
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -17,7 +19,13 @@ import (
 )
 
 type serverConfig struct {
+	// AutoReloadConfig lets Consul pick up the subset of settings it can reload
+	// without a restart. The pod template also carries a checksum of this file,
+	// so anything Consul cannot reload still rolls the servers.
+	AutoReloadConfig bool            `json:"auto_reload_config"`
 	Datacenter       string          `json:"datacenter"`
+	Domain           string          `json:"domain"`
+	Recursors        []string        `json:"recursors,omitempty"`
 	DataDir          string          `json:"data_dir"`
 	Server           bool            `json:"server"`
 	BootstrapExpect  int             `json:"bootstrap_expect"`
@@ -35,6 +43,22 @@ type serverConfig struct {
 	UI               uiConfig        `json:"ui_config"`
 	Telemetry        telemetryConfig `json:"telemetry"`
 	Limits           limitsConfig    `json:"limits"`
+	Peering          peeringConfig   `json:"peering"`
+	// EnableCentralServiceConfig is required for service-defaults and the rest
+	// of the config-entry system to take effect.
+	EnableCentralServiceConfig bool       `json:"enable_central_service_config"`
+	ACL                        *aclConfig `json:"acl,omitempty"`
+}
+
+type peeringConfig struct {
+	Enabled bool `json:"enabled"`
+}
+
+type aclConfig struct {
+	Enabled                bool   `json:"enabled"`
+	DefaultPolicy          string `json:"default_policy"`
+	DownPolicy             string `json:"down_policy"`
+	EnableTokenPersistence bool   `json:"enable_token_persistence"`
 }
 
 type connectConfig struct {
@@ -42,10 +66,11 @@ type connectConfig struct {
 }
 
 type portConfig struct {
-	HTTP  int `json:"http"`
-	HTTPS int `json:"https,omitempty"`
-	GRPC  int `json:"grpc"`
-	DNS   int `json:"dns"`
+	HTTP    int `json:"http"`
+	HTTPS   int `json:"https,omitempty"`
+	GRPC    int `json:"grpc"`
+	GRPCTLS int `json:"grpc_tls"`
+	DNS     int `json:"dns"`
 }
 
 type autopilotConfig struct {
@@ -59,10 +84,12 @@ type tlsConfig struct {
 }
 
 type tlsDefaults struct {
-	CAFile         string `json:"ca_file,omitempty"`
-	CertFile       string `json:"cert_file,omitempty"`
-	KeyFile        string `json:"key_file,omitempty"`
-	VerifyIncoming bool   `json:"verify_incoming,omitempty"`
+	CAFile               string `json:"ca_file,omitempty"`
+	CertFile             string `json:"cert_file,omitempty"`
+	KeyFile              string `json:"key_file,omitempty"`
+	VerifyIncoming       bool   `json:"verify_incoming,omitempty"`
+	VerifyOutgoing       bool   `json:"verify_outgoing,omitempty"`
+	VerifyServerHostname bool   `json:"verify_server_hostname,omitempty"`
 }
 
 type uiConfig struct {
@@ -83,11 +110,19 @@ type requestLimitsConfig struct {
 	WriteRate float64 `json:"write_rate,omitempty"`
 }
 
-func (r *ConsulClusterReconciler) ensureConfigMap(ctx context.Context, cluster *v1alpha1.ConsulCluster) error {
+// ensureConfigMap writes the generated server config and returns a checksum of
+// it. The checksum goes onto the pod template so that a config change produces a
+// new StatefulSet revision and rolls the servers; Consul reloads only a subset
+// of its settings at runtime, so a restart is the only way to guarantee a change
+// takes effect.
+func (r *ConsulClusterReconciler) ensureConfigMap(ctx context.Context, cluster *v1alpha1.ConsulCluster) (string, error) {
 	desired, err := buildServerConfigJSON(cluster)
 	if err != nil {
-		return fmt.Errorf("building server config: %w", err)
+		return "", fmt.Errorf("building server config: %w", err)
 	}
+
+	sum := sha256.Sum256([]byte(desired))
+	checksum := hex.EncodeToString(sum[:])
 
 	name := configMapName(cluster)
 	cm := &corev1.ConfigMap{}
@@ -95,25 +130,21 @@ func (r *ConsulClusterReconciler) ensureConfigMap(ctx context.Context, cluster *
 	if k8serrors.IsNotFound(err) {
 		newCM := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: cluster.Namespace,
-				Labels: map[string]string{
-					labelApp:       labelAppValue,
-					labelComponent: labelComponentValue,
-					labelCluster:   cluster.Name,
-				},
+				Name:            name,
+				Namespace:       cluster.Namespace,
+				Labels:          serverPodLabels(cluster),
 				OwnerReferences: []metav1.OwnerReference{ownerRef(cluster, r.Scheme)},
 			},
 			Data: map[string]string{"server.json": desired},
 		}
-		return r.Create(ctx, newCM)
+		return checksum, r.Create(ctx, newCM)
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if cm.Data["server.json"] == desired {
-		return nil
+		return checksum, nil
 	}
 
 	patch := client.MergeFrom(cm.DeepCopy())
@@ -121,15 +152,10 @@ func (r *ConsulClusterReconciler) ensureConfigMap(ctx context.Context, cluster *
 		cm.Data = map[string]string{}
 	}
 	cm.Data["server.json"] = desired
-	return r.Patch(ctx, cm, patch)
+	return checksum, r.Patch(ctx, cm, patch)
 }
 
 func buildServerConfigJSON(cluster *v1alpha1.ConsulCluster) (string, error) {
-	datacenter := cluster.Spec.DatacenterName
-	if datacenter == "" {
-		datacenter = "dc1"
-	}
-
 	bootstrapExpect := cluster.Spec.Size
 	if cluster.Spec.BootstrapExpect != nil {
 		bootstrapExpect = *cluster.Spec.BootstrapExpect
@@ -156,21 +182,29 @@ func buildServerConfigJSON(cluster *v1alpha1.ConsulCluster) (string, error) {
 	}
 
 	cfg := serverConfig{
-		Datacenter:       datacenter,
-		DataDir:          "/consul/data",
-		Server:           true,
-		BootstrapExpect:  bootstrapExpect,
-		RetryJoin:        []string{retryJoin},
-		BindAddr:         "0.0.0.0",
-		ClientAddr:       "0.0.0.0",
-		LeaveOnTerminate: true,
-		LogLevel:         cluster.Spec.LogLevel,
-		EnableDebug:      cluster.Spec.EnableAgentDebug,
+		AutoReloadConfig:           true,
+		Datacenter:                 datacenterName(cluster),
+		Domain:                     consulDomain(cluster),
+		Recursors:                  cluster.Spec.Recursors,
+		DataDir:                    "/consul/data",
+		Server:                     true,
+		BootstrapExpect:            bootstrapExpect,
+		RetryJoin:                  []string{retryJoin},
+		BindAddr:                   "0.0.0.0",
+		ClientAddr:                 "0.0.0.0",
+		LeaveOnTerminate:           true,
+		LogLevel:                   cluster.Spec.LogLevel,
+		EnableDebug:                cluster.Spec.EnableAgentDebug,
+		Peering:                    peeringConfig{Enabled: true},
+		EnableCentralServiceConfig: true,
 		Ports: portConfig{
-			HTTP:  8500,
-			HTTPS: 8501,
-			GRPC:  8502,
-			DNS:   8600,
+			HTTP: 8500,
+			DNS:  8600,
+			// gRPC is served either in plaintext or over TLS, never both. The
+			// disabled one must be set to -1 rather than left unset, which
+			// would default it back on.
+			GRPC:    8502,
+			GRPCTLS: -1,
 		},
 		Autopilot: autopilotConfig{
 			MinQuorum:               minQuorum,
@@ -193,16 +227,29 @@ func buildServerConfigJSON(cluster *v1alpha1.ConsulCluster) (string, error) {
 		cfg.Connect = &connectConfig{Enabled: true}
 	}
 
-	if cluster.Spec.TLS != nil && cluster.Spec.TLS.Enabled {
+	if cluster.Spec.ACLs != nil && cluster.Spec.ACLs.Enabled {
+		cfg.ACL = &aclConfig{
+			Enabled:                true,
+			DefaultPolicy:          "deny",
+			DownPolicy:             "extend-cache",
+			EnableTokenPersistence: true,
+		}
+	}
+
+	if tlsEnabled(cluster) {
+		cfg.Ports.HTTPS = 8501
+		cfg.Ports.GRPC = -1
+		cfg.Ports.GRPCTLS = 8502
 		cfg.TLS = &tlsConfig{
 			Defaults: tlsDefaults{
 				CAFile:         "/consul/tls/ca/tls.crt",
 				CertFile:       "/consul/tls/server/tls.crt",
 				KeyFile:        "/consul/tls/server/tls.key",
-				VerifyIncoming: false,
+				VerifyOutgoing: true,
 			},
 			Internal: tlsDefaults{
-				VerifyIncoming: true,
+				VerifyIncoming:       true,
+				VerifyServerHostname: true,
 			},
 		}
 		if cluster.Spec.TLS.HTTPSOnly {

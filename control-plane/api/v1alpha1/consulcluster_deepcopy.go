@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -43,6 +44,37 @@ func (in *ConsulGossipSpec) DeepCopy() *ConsulGossipSpec {
 		return nil
 	}
 	out := new(ConsulGossipSpec)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *ConsulSecretRef) DeepCopyInto(out *ConsulSecretRef) {
+	*out = *in
+}
+
+func (in *ConsulSecretRef) DeepCopy() *ConsulSecretRef {
+	if in == nil {
+		return nil
+	}
+	out := new(ConsulSecretRef)
+	in.DeepCopyInto(out)
+	return out
+}
+
+func (in *ConsulACLSpec) DeepCopyInto(out *ConsulACLSpec) {
+	*out = *in
+	if in.Token != nil {
+		in, out := &in.Token, &out.Token
+		*out = new(ConsulSecretRef)
+		**out = **in
+	}
+}
+
+func (in *ConsulACLSpec) DeepCopy() *ConsulACLSpec {
+	if in == nil {
+		return nil
+	}
+	out := new(ConsulACLSpec)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -86,42 +118,6 @@ func (in *ConsulLimitsSpec) DeepCopy() *ConsulLimitsSpec {
 		return nil
 	}
 	out := new(ConsulLimitsSpec)
-	in.DeepCopyInto(out)
-	return out
-}
-
-func (in *ConsulExposeServiceNodePorts) DeepCopyInto(out *ConsulExposeServiceNodePorts) {
-	*out = *in
-}
-
-func (in *ConsulExposeServiceNodePorts) DeepCopy() *ConsulExposeServiceNodePorts {
-	if in == nil {
-		return nil
-	}
-	out := new(ConsulExposeServiceNodePorts)
-	in.DeepCopyInto(out)
-	return out
-}
-
-func (in *ConsulExposeServiceSpec) DeepCopyInto(out *ConsulExposeServiceSpec) {
-	*out = *in
-	if in.Annotations != nil {
-		out.Annotations = make(map[string]string, len(in.Annotations))
-		for k, v := range in.Annotations {
-			out.Annotations[k] = v
-		}
-	}
-	if in.NodePort != nil {
-		v := *in.NodePort
-		out.NodePort = &v
-	}
-}
-
-func (in *ConsulExposeServiceSpec) DeepCopy() *ConsulExposeServiceSpec {
-	if in == nil {
-		return nil
-	}
-	out := new(ConsulExposeServiceSpec)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -265,6 +261,15 @@ func (in *ConsulClusterSpec) DeepCopyInto(out *ConsulClusterSpec) {
 		*out = new(ConsulGossipSpec)
 		**out = **in
 	}
+	if in.ACLs != nil {
+		in, out := &in.ACLs, &out.ACLs
+		*out = new(ConsulACLSpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Recursors != nil {
+		out.Recursors = make([]string, len(in.Recursors))
+		copy(out.Recursors, in.Recursors)
+	}
 	if in.Metrics != nil {
 		in, out := &in.Metrics, &out.Metrics
 		*out = new(ConsulMetricsSpec)
@@ -273,11 +278,6 @@ func (in *ConsulClusterSpec) DeepCopyInto(out *ConsulClusterSpec) {
 	if in.Limits != nil {
 		in, out := &in.Limits, &out.Limits
 		*out = new(ConsulLimitsSpec)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.ExposeService != nil {
-		in, out := &in.ExposeService, &out.ExposeService
-		*out = new(ConsulExposeServiceSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.PodDisruptionBudget != nil {
@@ -315,7 +315,11 @@ func (in *ConsulClusterStatus) DeepCopyInto(out *ConsulClusterStatus) {
 		copy(out.Members, in.Members)
 	}
 	if in.Conditions != nil {
-		in.Conditions.DeepCopyInto(&out.Conditions)
+		in, out := &in.Conditions, &out.Conditions
+		*out = make([]metav1.Condition, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 
