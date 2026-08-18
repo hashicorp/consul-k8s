@@ -1,3 +1,144 @@
+## 2.0.3 (August 11, 2026)
+
+SECURITY:
+
+* Helm: Upgraded to v3.21.3
+Containerd: Removed
+CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs [[GH-5572](https://github.com/hashicorp/consul-k8s/issues/5572)]
+* security: upgrade `net` and `grpc` packages to address a few CVEs [[GH-5581](https://github.com/hashicorp/consul-k8s/issues/5581)]
+
+IMPROVEMENTS:
+
+* Upgrade to use Go 1.26.5. [[GH-5542](https://github.com/hashicorp/consul-k8s/issues/5542)]
+
+BUG FIXES:
+
+* api-gateway: Fix ext_authz filter updates not being propagated to Consul when an HTTPRoute's RouteAuthFilter reference is changed in-place. [[GH-5516](https://github.com/hashicorp/consul-k8s/issues/5516)]
+* helm: create OpenSSL subject-hash symlinks (`<hash>.N`) for the CA certificates written to `/trusted-cas` by `global.trustedCAs`, so that they are actually trusted via `SSL_CERT_DIR`. Certificates that share a subject are given sequential suffixes instead of overwriting each other, and the Vault-injected Consul server CA is included when `global.secretsBackend.vault.enabled` is set. [[GH-5527](https://github.com/hashicorp/consul-k8s/issues/5527)]
+
+## 1.9.11 (August 11, 2026)
+
+SECURITY:
+
+* Helm: Upgraded to v3.21.3
+Containerd: Removed
+CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs [[GH-5572](https://github.com/hashicorp/consul-k8s/issues/5572)]
+
+* security: upgrade `net` and `grpc` packages to address a few CVEs [[GH-5584](https://github.com/hashicorp/consul-k8s/issues/5584)]
+
+IMPROVEMENTS:
+
+* Upgrade to use Go 1.26.5. [[GH-5542](https://github.com/hashicorp/consul-k8s/issues/5542)]
+
+BUG FIXES:
+
+* helm: create OpenSSL subject-hash symlinks (`<hash>.N`) for the CA certificates written to `/trusted-cas` by `global.trustedCAs`, so that they are actually trusted via `SSL_CERT_DIR`. Certificates that share a subject are given sequential suffixes instead of overwriting each other, and the Vault-injected Consul server CA is included when `global.secretsBackend.vault.enabled` is set. [[GH-5527](https://github.com/hashicorp/consul-k8s/issues/5527)]
+
+## 1.8.16 (August 11, 2026)
+
+SECURITY:
+
+* Helm: Upgraded to v3.21.3
+Containerd: Removed
+CVEs: Upgraded Helm packages (*to remove containerd packages) to address a few CVEs [[GH-5572](https://github.com/hashicorp/consul-k8s/issues/5572)]
+
+* security: upgrade `net` and `grpc` packages to address a few CVEs [[GH-5583](https://github.com/hashicorp/consul-k8s/issues/5583)]
+
+IMPROVEMENTS:
+
+* Upgrade to use Go 1.26.5. [[GH-5542](https://github.com/hashicorp/consul-k8s/issues/5542)]
+
+BUG FIXES:
+
+* helm: create OpenSSL subject-hash symlinks (`<hash>.N`) for the CA certificates written to `/trusted-cas` by `global.trustedCAs`, so that they are actually trusted via `SSL_CERT_DIR`. Certificates that share a subject are given sequential suffixes instead of overwriting each other, and the Vault-injected Consul server CA is included when `global.secretsBackend.vault.enabled` is set. [[GH-5527](https://github.com/hashicorp/consul-k8s/issues/5527)]
+
+## 2.0.2 (July 14, 2026)
+
+SECURITY:
+
+* go: upgrade go version to 1.26.4
+* Update the Consul Build Go base image to `alpine3.24` [[GH-5474](https://github.com/hashicorp/consul-k8s/issues/5474)]
+
+FEATURES:
+
+* api-gateway: Add support for external authorization (`ext_authz`) on the API Gateway. A new `extAuthz` block on the `RouteAuthFilter` CRD and a `consul.hashicorp.com/ext-authz` annotation (on `Gateway` and `HTTPRoute`) let you set the gateway-wide ext_authz posture and override it per route. Requires a Consul version with API Gateway `ext_authz` support. [[GH-5444](https://github.com/hashicorp/consul-k8s/issues/5444)]
+* xds: Addition of envoy extensions builtin/ext-proc support and addition of RouteExtProc CRD for Consul ENT [[GH-5449](https://github.com/hashicorp/consul-k8s/issues/5449)]
+
+IMPROVEMENTS:
+
+* cni: version upgrade to 1.3.0 to support protocol version 1.1.0 [[GH-5407](https://github.com/hashicorp/consul-k8s/issues/5407)]
+
+BUG FIXES:
+
+* api-gateway: fix argocd sync issue with difference to helm hook and argocd hooks, causing infinte wait time for pvc [[GH-5491](https://github.com/hashicorp/consul-k8s/issues/5491)]
+* api-gateway: remove shortNames for routes [[GH-5458](https://github.com/hashicorp/consul-k8s/issues/5458)]
+* control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions. [[GH-5423](https://github.com/hashicorp/consul-k8s/issues/5423)]
+* helm: Exclude OpenShift namespaces from the consul-connect-inject webhook injection by default [[GH-5402](https://github.com/hashicorp/consul-k8s/issues/5402)]
+
+## 1.9.10 (July 10, 2026)
+
+SECURITY:
+
+* go: upgrade go version to 1.26.4
+* Update the Consul Build Go base image to `alpine3.24` [[GH-5474](https://github.com/hashicorp/consul-k8s/issues/5474)]
+
+IMPROVEMENTS:
+
+* cni: version upgrade to 1.3.0 to support protocol version 1.1.0 [[GH-5407](https://github.com/hashicorp/consul-k8s/issues/5407)]
+
+BUG FIXES:
+
+* control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions. [[GH-5423](https://github.com/hashicorp/consul-k8s/issues/5423)]
+
+## 1.8.15 (July 14, 2026)
+
+SECURITY:
+
+* go: upgrade go version to 1.26.4
+* Update the Consul Build Go base image to `alpine3.24` [[GH-5474](https://github.com/hashicorp/consul-k8s/issues/5474)]
+
+IMPROVEMENTS:
+
+* cni: version upgrade to 1.3.0 to support protocol version 1.1.0 [[GH-5407](https://github.com/hashicorp/consul-k8s/issues/5407)]
+
+BUG FIXES:
+
+* api-gateway: fix argocd sync issue with difference to helm hook and argocd hooks, causing infinte wait time for pvc
+* api-gateway: remove shortNames for routes [[GH-5458](https://github.com/hashicorp/consul-k8s/issues/5458)]
+* control-plane: fix mesh-gateway ACL policy generation for Admin Partition failover so Sameness Group clusters can form across local partitions. [[GH-5423](https://github.com/hashicorp/consul-k8s/issues/5423)]
+* helm: Exclude OpenShift namespaces from the consul-connect-inject webhook injection by default [[GH-5402](https://github.com/hashicorp/consul-k8s/issues/5402)]
+
+## 2.0.1 (June 24, 2026)
+
+BUG FIXES:
+
+* control-plane: fix a race during startup where pod registration could be permanently skipped when the Kubernetes Endpoints object lagged behind Pod IP assignment. The endpoints controller now requeues reconciliation until the Endpoints address is populated. [[GH-5386](https://github.com/hashicorp/consul-k8s/issues/5386)]
+* snapshot-agent: Fix bug where the `consul-snapshot` service was registered into the `default` Consul namespace instead of the namespace mirrored from the Kubernetes namespace it is deployed in when `global.enableConsulNamespaces` is enabled. The snapshot agent now also registers into the configured admin partition. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+* terminating-gateways: Fix bug where the terminating gateway service was registered into the `default` Consul namespace instead of the mirrored Consul namespace (matching its Kubernetes namespace) when `global.enableConsulNamespaces` and namespace mirroring were enabled. Applies to both the Helm-managed terminating gateway deployment and the `TerminatingGateway` CRD controller. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+
+## 1.9.9 (June 24, 2026)
+
+BUG FIXES:
+
+* control-plane: fix a race during startup where pod registration could be permanently skipped when the Kubernetes Endpoints object lagged behind Pod IP assignment. The endpoints controller now requeues reconciliation until the Endpoints address is populated. [[GH-5386](https://github.com/hashicorp/consul-k8s/issues/5386)]
+* snapshot-agent: Fix bug where the `consul-snapshot` service was registered into the `default` Consul namespace instead of the namespace mirrored from the Kubernetes namespace it is deployed in when `global.enableConsulNamespaces` is enabled. The snapshot agent now also registers into the configured admin partition. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+* terminating-gateways: Fix bug where the terminating gateway service was registered into the `default` Consul namespace instead of the mirrored Consul namespace (matching its Kubernetes namespace) when `global.enableConsulNamespaces` and namespace mirroring were enabled. Applies to both the Helm-managed terminating gateway deployment and the `TerminatingGateway` CRD controller. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+
+## 1.8.14 (June 24, 2026)
+BREAKING CHANGES:
+
+* api-gateway: upgrade the old-stable controller to use `gateway.networking.k8s.io` v1.5.1. [[GH-5370](https://github.com/hashicorp/consul-k8s/issues/5370)]
+
+FEATURES:
+
+* api-gateway: add a dual-controller architecture that runs a custom controller alongside the old-stable controller, limit controller watches to Consul-managed Gateways, and add a Helm flag (`enableTcpRoute`) to enable or disable TCPRoute GVK watch/reconciliation in the old-stable controller. [[GH-5370](https://github.com/hashicorp/consul-k8s/issues/5370)]
+
+BUG FIXES:
+
+* control-plane: fix a race during startup where pod registration could be permanently skipped when the Kubernetes Endpoints object lagged behind Pod IP assignment. The endpoints controller now requeues reconciliation until the Endpoints address is populated. [[GH-5386](https://github.com/hashicorp/consul-k8s/issues/5386)]
+* snapshot-agent: Fix bug where the `consul-snapshot` service was registered into the `default` Consul namespace instead of the namespace mirrored from the Kubernetes namespace it is deployed in when `global.enableConsulNamespaces` is enabled. The snapshot agent now also registers into the configured admin partition. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+* terminating-gateways: Fix bug where the terminating gateway service was registered into the `default` Consul namespace instead of the mirrored Consul namespace (matching its Kubernetes namespace) when `global.enableConsulNamespaces` and namespace mirroring were enabled. Applies to both the Helm-managed terminating gateway deployment and the `TerminatingGateway` CRD controller. [[GH-5401](https://github.com/hashicorp/consul-k8s/issues/5401)]
+
 ## 1.8.13 (May 24, 2026)
 
 SECURITY:
