@@ -1,0 +1,7 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ConsulCluster
+metadata:
+  name: consul
+spec:
+  size: 3
+  version: "1.18.0"

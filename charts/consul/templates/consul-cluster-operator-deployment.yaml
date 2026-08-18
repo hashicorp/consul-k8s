@@ -1,0 +1,99 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if $serverEnabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "consul.fullname" . }}-cluster-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: consul-cluster-operator
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.server.clusterOperator.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "consul.name" . }}
+      chart: {{ template "consul.chart" . }}
+      release: {{ .Release.Name }}
+      component: consul-cluster-operator
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: consul-cluster-operator
+        {{- if .Values.global.extraLabels }}
+          {{- toYaml .Values.global.extraLabels | nindent 8 }}
+        {{- end }}
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+        {{- if .Values.server.clusterOperator.annotations }}
+        {{- tpl .Values.server.clusterOperator.annotations . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ template "consul.fullname" . }}-cluster-operator
+      {{- if .Values.server.clusterOperator.priorityClassName }}
+      priorityClassName: {{ .Values.server.clusterOperator.priorityClassName | quote }}
+      {{- end }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ .name }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: consul-cluster-operator
+          image: "{{ default .Values.global.imageK8S .Values.server.clusterOperator.image }}"
+          {{ template "consul.imagePullPolicy" . }}
+          ports:
+            - name: metrics
+              containerPort: 9446
+              protocol: TCP
+            - name: health
+              containerPort: 9447
+              protocol: TCP
+          command:
+            - "/bin/consul-k8s-control-plane"
+          args:
+            - "consul-cluster-operator"
+            - "-log-level={{ default .Values.global.logLevel "info" }}"
+            - "-log-json={{ .Values.global.logJSON }}"
+            - "-metrics-bind-address=0.0.0.0:9446"
+            - "-health-probe-bind-address=0.0.0.0:9447"
+            - "-leader-election-id={{ template "consul.fullname" . }}-cluster-operator-lock"
+            - "-leader-election-namespace={{ .Release.Namespace }}"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.server.clusterOperator.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+      securityContext:
+        runAsNonRoot: true
+      terminationGracePeriodSeconds: 30
+{{- end }}

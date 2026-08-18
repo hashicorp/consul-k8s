@@ -157,6 +157,13 @@ func (h *HelmCluster) Create(t *testing.T) {
 		chartName = h.ChartPath
 	}
 
+	// Apply CRDs from the chart's crds/ directory before helm install so that
+	// the ConsulCluster CR in the chart templates passes API server validation.
+	crdsDir := fmt.Sprintf("%s/crds", chartName)
+	if _, err := k8s.RunKubectlAndGetOutputE(t, h.helmOptions.KubectlOptions, "apply", "-f", crdsDir); err != nil {
+		logger.Logf(t, "Unable to apply CRDs from %s (may not exist): %s", crdsDir, err)
+	}
+
 	// Retry the install in case previous tests have not finished cleaning up.
 	retry.RunWith(&retry.Counter{Wait: 2 * time.Second, Count: 30}, t, func(r *retry.R) {
 		err := helm.UpgradeE(r, h.helmOptions, chartName, h.releaseName)
@@ -476,10 +483,16 @@ func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, rele
 	if len(release) > 0 {
 		releaseName = release[0]
 	}
-	serverPod := fmt.Sprintf("%s-consul-server-0", releaseName)
-	if releaseName == "" {
-		serverPod = "consul-server-0"
-	}
+
+	namespace := h.helmOptions.KubectlOptions.Namespace
+	labelSelector := fmt.Sprintf("app=consul,component=server,release=%s", releaseName)
+	pods, err := h.kubernetesClient.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, pods.Items, "no server pods found with selector %q", labelSelector)
+
+	serverPod := pods.Items[0].Name
 	return portforward.CreateTunnelToResourcePort(t, serverPod, remotePort, h.helmOptions.KubectlOptions, h.logger)
 }
 

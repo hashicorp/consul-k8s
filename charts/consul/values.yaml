@@ -1555,6 +1555,41 @@ server:
       # @type: integer
       writeRate: -1
 
+  # clusterOperator configures the ConsulCluster operator Deployment that
+  # manages the server pods when server.enabled is true.
+  clusterOperator:
+    # The number of operator replicas. Only one will hold the leader-election
+    # lease at a time.
+    replicas: 1
+
+    # Override the consul-k8s-control-plane image used for the operator.
+    # Defaults to global.imageK8S.
+    # @type: string
+    image: null
+
+    # Optional priorityClassName for the operator pods.
+    # @type: string
+    priorityClassName: ""
+
+    # Annotations to apply to the operator pods.
+    # @type: string
+    annotations: null
+
+    # Resource requests and limits for the operator container.
+    # @type: map
+    resources:
+      requests:
+        memory: "50Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+
+    # Annotations to add to the operator ServiceAccount.
+    serviceAccount:
+      # @type: string
+      annotations: null
+
 # Configuration for Consul servers when the servers are running outside of Kubernetes.
 # When running external servers, configuring these values is recommended
 # if setting `global.tls.enableAutoEncrypt` to true
@@ -3780,3 +3815,7 @@ telemetryCollector:
   # it could be used to configure custom consul parameters.
   # @type: map
   extraEnvironmentVars: {}
+
+# server.clusterOperator configures the ConsulCluster operator deployment,
+# which provisions Consul server clusters from ConsulCluster custom resources.
+# These settings are used when server.enabled is true.

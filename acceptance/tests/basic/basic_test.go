@@ -49,11 +49,15 @@ func TestBasicInstallation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			releaseName := helpers.RandomName()
 			helmValues := map[string]string{
+				"server.enabled":                       "true",
 				"global.acls.manageSystemACLs":         strconv.FormatBool(c.secure),
 				"global.tls.enabled":                   strconv.FormatBool(c.secure),
 				"global.gossipEncryption.autoGenerate": strconv.FormatBool(c.secure),
 				"global.tls.enableAutoEncrypt":         strconv.FormatBool(c.autoEncrypt),
 				"client.enabled":                       "true",
+			}
+			if suite.Config().ConsulImage == "" {
+				helmValues["global.image"] = "hashicorp/consul:1.20.0"
 			}
 			consulCluster := consul.NewHelmCluster(t, helmValues, suite.Environment().DefaultContext(t), suite.Config(), releaseName)
 

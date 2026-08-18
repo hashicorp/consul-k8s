@@ -1,0 +1,68 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if $serverEnabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "consul.fullname" . }}-cluster-operator
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: consul-cluster-operator
+rules:
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - consulclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - consulclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - consul.hashicorp.com
+  resources:
+  - consulclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - persistentvolumeclaims
+  - services
+  - configmaps
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+{{- end }}

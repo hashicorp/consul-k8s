@@ -1,0 +1,10 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ConsulCluster
+metadata:
+  name: consul
+  namespace: consul
+spec:
+  size: 3
+  version: "1.18.0"
+  storage: "10Gi"
+  datacenterName: "dc1"

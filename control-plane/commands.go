@@ -10,6 +10,7 @@ import (
 
 	cmdACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/acl-init"
 	cmdConnectInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/connect-init"
+	cmdConsulClusterOperator "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-cluster-operator"
 	cmdConsulLogout "github.com/hashicorp/consul-k8s/control-plane/subcommand/consul-logout"
 	cmdCreateFederationSecret "github.com/hashicorp/consul-k8s/control-plane/subcommand/create-federation-secret"
 	cmdDeleteCompletedJob "github.com/hashicorp/consul-k8s/control-plane/subcommand/delete-completed-job"
@@ -53,6 +54,10 @@ func init() {
 
 		"consul-logout": func() (cli.Command, error) {
 			return &cmdConsulLogout.Command{UI: ui}, nil
+		},
+
+		"consul-cluster-operator": func() (cli.Command, error) {
+			return &cmdConsulClusterOperator.Command{UI: ui}, nil
 		},
 
 		"gateway-cleanup": func() (cli.Command, error) {

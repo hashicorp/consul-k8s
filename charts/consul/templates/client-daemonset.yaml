@@ -391,9 +391,7 @@ spec:
                 {{- else }}
                 {{- if .Values.server.enabled }}
                 {{- $serverSerfLANPort  := .Values.server.ports.serflan.port -}}
-                {{- range $index := until (.Values.server.replicas | int) }}
-                -retry-join="${CONSUL_FULLNAME}-server-{{ $index }}.${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \
-                {{- end }}
+                -retry-join="${CONSUL_FULLNAME}-server.${NAMESPACE}.svc:{{ $serverSerfLANPort }}" \
                 {{- end }}
                 {{- end }}
                 {{- range $value := .Values.global.recursors }}

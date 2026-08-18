@@ -1,0 +1,194 @@
+{{- $serverEnabled := (or (and (ne (.Values.server.enabled | toString) "-") .Values.server.enabled) (and (eq (.Values.server.enabled | toString) "-") .Values.global.enabled)) -}}
+{{- if $serverEnabled }}
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ConsulCluster
+metadata:
+  name: {{ template "consul.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+spec:
+  size: {{ .Values.server.replicas }}
+  version: {{ .Values.global.image | default "hashicorp/consul:1.18.0" | splitList ":" | last }}
+  image: {{ .Values.server.image | default .Values.global.image | quote }}
+  {{- if .Values.server.bootstrapExpect }}
+  bootstrapExpect: {{ .Values.server.bootstrapExpect }}
+  {{- end }}
+  {{- if .Values.global.datacenter }}
+  datacenterName: {{ .Values.global.datacenter | quote }}
+  {{- end }}
+  {{- if .Values.server.logLevel }}
+  logLevel: {{ .Values.server.logLevel | quote }}
+  {{- end }}
+  {{- if .Values.server.connect }}
+  connect: {{ .Values.server.connect }}
+  {{- end }}
+  {{- if .Values.server.enableAgentDebug }}
+  enableAgentDebug: {{ .Values.server.enableAgentDebug }}
+  {{- end }}
+  {{- $extraConfig := .Values.server.extraConfig | trim | trimAll "\"" | replace "\\\"" "\"" }}
+  {{- if (and $extraConfig (ne $extraConfig "{}")) }}
+  extraConfig: |-
+    {{ $extraConfig }}
+  {{- end }}
+  {{- if .Values.server.priorityClassName }}
+  priorityClassName: {{ .Values.server.priorityClassName | quote }}
+  {{- end }}
+  {{- if .Values.server.exposeGossipAndRPCPorts }}
+  exposeGossipAndRPCPorts: {{ .Values.server.exposeGossipAndRPCPorts }}
+  {{- end }}
+  {{- if .Values.server.storage }}
+  storage: {{ .Values.server.storage | quote }}
+  {{- end }}
+  {{- if .Values.server.storageClass }}
+  storageClassName: {{ .Values.server.storageClass | quote }}
+  {{- end }}
+  {{- if .Values.server.persistentVolumeClaimRetentionPolicy }}
+  persistentVolumeClaimRetentionPolicy:
+    whenScaled: {{ .Values.server.persistentVolumeClaimRetentionPolicy.whenScaled | default "Delete" | quote }}
+    whenDeleted: {{ .Values.server.persistentVolumeClaimRetentionPolicy.whenDeleted | default "Delete" | quote }}
+  {{- end }}
+  {{- if (and .Values.global.gossipEncryption.secretName .Values.global.gossipEncryption.secretKey) }}
+  gossipEncryption:
+    secretName: {{ .Values.global.gossipEncryption.secretName | quote }}
+    secretKey: {{ .Values.global.gossipEncryption.secretKey | quote }}
+  {{- end }}
+  {{- if .Values.global.tls.enabled }}
+  tls:
+    enabled: true
+    {{- if .Values.global.tls.caCert.secretName }}
+    caSecretName: {{ .Values.global.tls.caCert.secretName | quote }}
+    {{- end }}
+    {{- if .Values.server.serverCert.secretName }}
+    serverCertSecretName: {{ .Values.server.serverCert.secretName | quote }}
+    {{- end }}
+    {{- if .Values.global.tls.httpsOnly }}
+    httpsOnly: {{ .Values.global.tls.httpsOnly }}
+    {{- end }}
+  {{- end }}
+  {{- if (or .Values.server.service.annotations .Values.server.serviceAccount.annotations) }}
+  {{- if .Values.server.service.annotations }}
+  serviceAnnotations:
+    {{- toYaml .Values.server.service.annotations | nindent 4 }}
+  {{- end }}
+  {{- if .Values.server.serviceAccount.annotations }}
+  serviceAccountAnnotations:
+    {{- toYaml .Values.server.serviceAccount.annotations | nindent 4 }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.server.disruptionBudget.enabled }}
+  podDisruptionBudget:
+    enabled: true
+    {{- if .Values.server.disruptionBudget.maxUnavailable }}
+    maxUnavailable: {{ .Values.server.disruptionBudget.maxUnavailable }}
+    {{- end }}
+  {{- end }}
+  {{- $serverExposeServiceEnabled := (or (and (ne (.Values.server.exposeService.enabled | toString) "-") .Values.server.exposeService.enabled) false) -}}
+  {{- if $serverExposeServiceEnabled }}
+  exposeService:
+    enabled: true
+    type: {{ .Values.server.exposeService.type | default "LoadBalancer" | quote }}
+    {{- if .Values.server.exposeService.annotations }}
+    annotations:
+      {{- toYaml .Values.server.exposeService.annotations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.exposeService.nodePort }}
+    nodePort:
+      http: {{ .Values.server.exposeService.nodePort.http | default 0 }}
+      https: {{ .Values.server.exposeService.nodePort.https | default 0 }}
+      grpc: {{ .Values.server.exposeService.nodePort.grpc | default 0 }}
+      serf: {{ .Values.server.exposeService.nodePort.serf | default 0 }}
+      rpc: {{ .Values.server.exposeService.nodePort.rpc | default 0 }}
+    {{- end }}
+  {{- end }}
+  {{- if (and .Values.global.metrics.enabled .Values.global.metrics.enableAgentMetrics) }}
+  metrics:
+    enabled: true
+    {{- if .Values.global.metrics.agentMetricsRetentionTime }}
+    retentionTime: {{ .Values.global.metrics.agentMetricsRetentionTime | quote }}
+    {{- end }}
+  {{- end }}
+  {{- if or (ne .Values.server.limits.requestLimits.mode "disabled") (gt (.Values.server.limits.requestLimits.readRate | float64) 0.0) (gt (.Values.server.limits.requestLimits.writeRate | float64) 0.0) }}
+  limits:
+    requestLimits:
+      mode: {{ .Values.server.limits.requestLimits.mode | quote }}
+      readRate: {{ .Values.server.limits.requestLimits.readRate | float64 }}
+      writeRate: {{ .Values.server.limits.requestLimits.writeRate | float64 }}
+  {{- end }}
+  pod:
+    {{- if .Values.server.annotations }}
+    annotations:
+      {{- toYaml .Values.server.annotations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.extraLabels }}
+    labels:
+      {{- toYaml .Values.server.extraLabels | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.nodeSelector }}
+    nodeSelector:
+      {{- toYaml .Values.server.nodeSelector | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.affinity }}
+    affinity:
+      {{- tpl .Values.server.affinity . | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.tolerations }}
+    tolerations:
+      {{- toYaml .Values.server.tolerations | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.topologySpreadConstraints }}
+    topologySpreadConstraints:
+      {{- toYaml .Values.server.topologySpreadConstraints | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.resources }}
+    resources:
+      {{- toYaml .Values.server.resources | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.securityContext }}
+    securityContext:
+      {{- toYaml .Values.server.securityContext | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.containerSecurityContext.server }}
+    containerSecurityContext:
+      {{- toYaml .Values.server.containerSecurityContext.server | nindent 6 }}
+    {{- end }}
+    {{- if .Values.server.extraEnvironmentVars }}
+    extraEnvVars:
+      {{- range $key, $value := .Values.server.extraEnvironmentVars }}
+      - name: {{ $key }}
+        value: {{ $value | quote }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.server.extraVolumes }}
+    extraVolumes:
+      {{- range .Values.server.extraVolumes }}
+      - name: userconfig-{{ .name }}
+        {{- if (eq .type "configMap") }}
+        configMap:
+          name: {{ .name }}
+        {{- else if (eq .type "secret") }}
+        secret:
+          secretName: {{ .name }}
+        {{- end }}
+      {{- end }}
+    extraVolumeMounts:
+      {{- range .Values.server.extraVolumes }}
+      - name: userconfig-{{ .name }}
+        mountPath: /consul/userconfig/{{ .name }}
+        readOnly: true
+      {{- end }}
+    {{- end }}
+    {{- if .Values.server.extraContainers }}
+    extraContainers:
+      {{- toYaml .Values.server.extraContainers | nindent 6 }}
+    {{- end }}
+    {{- if .Values.global.imagePullSecrets }}
+    imagePullSecrets:
+      {{- range .Values.global.imagePullSecrets }}
+      - name: {{ .name }}
+      {{- end }}
+    {{- end }}
+{{- end }}
