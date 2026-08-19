@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -33,8 +34,6 @@ func TestInferenceModelConfigReconcile(t *testing.T) {
 		expErr       string
 		requeue      bool
 		requeueAfter time.Duration
-		// assertions run after Reconcile returns.
-		verify func(t *testing.T, c *fake.ClientBuilder)
 	}{
 		{
 			name: "resource not found returns no error",
@@ -43,16 +42,18 @@ func TestInferenceModelConfigReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "new enabled resource gets finalizer and Ready=True",
+			name: "new enabled resource gets finalizer and requeues",
 			k8sObjects: func() []runtime.Object {
 				return []runtime.Object{enabledIMC("consul-ai-gateway")}
 			},
+			requeue: true,
 		},
 		{
-			name: "disabled resource gets Accepted=False and Ready=False",
+			name: "disabled resource with finalizer gets Ready=False",
 			k8sObjects: func() []runtime.Object {
 				imc := enabledIMC("consul-ai-gateway")
 				imc.Spec.Enabled = false
+				imc.Finalizers = []string{inferenceModelConfigFinalizer}
 				return []runtime.Object{imc}
 			},
 		},
@@ -80,8 +81,9 @@ func TestInferenceModelConfigReconcile(t *testing.T) {
 				Build()
 
 			controller := &InferenceModelConfigController{
-				Client: fakeClient,
-				Log:    logrtest.New(t),
+				Client:   fakeClient,
+				Log:      logrtest.New(t),
+				Recorder: record.NewFakeRecorder(10),
 			}
 
 			resp, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -99,6 +101,131 @@ func TestInferenceModelConfigReconcile(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestInferenceModelConfigReconcile_Finalizer verifies the finalizer lifecycle.
+func TestInferenceModelConfigReconcile_Finalizer(t *testing.T) {
+	t.Parallel()
+
+	t.Run("finalizer is added on first reconcile", func(t *testing.T) {
+		s := runtime.NewScheme()
+		require.NoError(t, clientgoscheme.AddToScheme(s))
+		require.NoError(t, v1alpha1.AddToScheme(s))
+
+		imc := enabledIMC("consul-ai-gateway")
+		require.Empty(t, imc.Finalizers)
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(imc).
+			WithStatusSubresource(&v1alpha1.InferenceModelConfig{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferenceModelConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
+
+		resp, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "consul-ai-gateway"},
+		})
+		require.NoError(t, err)
+		require.True(t, resp.Requeue, "should requeue after adding finalizer")
+
+		got := &v1alpha1.InferenceModelConfig{}
+		require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: "consul-ai-gateway"}, got))
+		require.Contains(t, got.Finalizers, inferenceModelConfigFinalizer)
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonFinalizerAdded)
+	})
+
+	t.Run("finalizer is idempotent on subsequent reconciles", func(t *testing.T) {
+		s := runtime.NewScheme()
+		require.NoError(t, clientgoscheme.AddToScheme(s))
+		require.NoError(t, v1alpha1.AddToScheme(s))
+
+		imc := enabledIMC("consul-ai-gateway")
+		imc.Finalizers = []string{inferenceModelConfigFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(imc).
+			WithStatusSubresource(&v1alpha1.InferenceModelConfig{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferenceModelConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "consul-ai-gateway"},
+		})
+		require.NoError(t, err)
+
+		got := &v1alpha1.InferenceModelConfig{}
+		require.NoError(t, fakeClient.Get(context.Background(), types.NamespacedName{Name: "consul-ai-gateway"}, got))
+		count := 0
+		for _, f := range got.Finalizers {
+			if f == inferenceModelConfigFinalizer {
+				count++
+			}
+		}
+		require.Equal(t, 1, count, "finalizer must appear exactly once")
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonSynced)
+	})
+
+	t.Run("finalizer is removed on deletion", func(t *testing.T) {
+		s := runtime.NewScheme()
+		require.NoError(t, clientgoscheme.AddToScheme(s))
+		require.NoError(t, v1alpha1.AddToScheme(s))
+
+		ts := metav1.Now()
+		imc := enabledIMC("consul-ai-gateway")
+		imc.Finalizers = []string{inferenceModelConfigFinalizer}
+		imc.DeletionTimestamp = &ts
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(imc).
+			WithStatusSubresource(&v1alpha1.InferenceModelConfig{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferenceModelConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "consul-ai-gateway"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonFinalizerRemoved)
+	})
+}
+
+// TestInferenceModelConfigReconcile_Events verifies Synced and Normal event type.
+func TestInferenceModelConfigReconcile_Events(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successful reconcile emits Synced event", func(t *testing.T) {
+		s := runtime.NewScheme()
+		require.NoError(t, clientgoscheme.AddToScheme(s))
+		require.NoError(t, v1alpha1.AddToScheme(s))
+
+		imc := enabledIMC("consul-ai-gateway")
+		imc.Finalizers = []string{inferenceModelConfigFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(imc).
+			WithStatusSubresource(&v1alpha1.InferenceModelConfig{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferenceModelConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "consul-ai-gateway"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, recorder.Events, 1)
+		event := <-recorder.Events
+		require.Contains(t, event, string(corev1.EventTypeNormal))
+		require.Contains(t, event, eventReasonSynced)
+	})
 }
 
 // TestMergeConditions verifies the condition merge helper preserves

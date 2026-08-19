@@ -8,22 +8,32 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
 
 const (
 	agentConfigFinalizer = "agent-config-exists-finalizer.consul.hashicorp.com"
+
+	// Event reasons.
+	eventReasonFinalizerAdded   = "FinalizerAdded"
+	eventReasonFinalizerRemoved = "FinalizerRemoved"
+	eventReasonSyncFailed       = "SyncFailed"
+	eventReasonSynced           = "Synced"
 )
 
 // AgentConfigController reconciles AgentConfig objects.
 type AgentConfigController struct {
 	client.Client
-	Log logr.Logger
+	Log      logr.Logger
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=agentconfigs,verbs=get;list;watch;update
@@ -54,50 +64,54 @@ func (r *AgentConfigController) Reconcile(ctx context.Context, req ctrl.Request)
 		"hitlApprovalTimeout", ac.Spec.Defaults.HITL.ApprovalTimeout,
 	)
 
-	// --- Deletion path ---
-	if !ac.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("AgentConfig is marked for deletion",
-			"deletionTimestamp", ac.ObjectMeta.DeletionTimestamp,
-		)
-		removed, err := ensureFinalizer(ctx, r.Client, ac, agentConfigFinalizer)
-		if err != nil {
-			if k8serrors.IsConflict(err) {
-				log.Info("conflict removing finalizer, requeueing")
-				return ctrl.Result{Requeue: true}, nil
+	// 1. Normal path: object is not being deleted — ensure finalizer exists.
+
+	if ac.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(ac, agentConfigFinalizer) {
+			controllerutil.AddFinalizer(ac, agentConfigFinalizer)
+			if err := r.Client.Update(ctx, ac); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict adding finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to add finalizer")
+				r.Recorder.Eventf(ac, corev1.EventTypeWarning, eventReasonFinalizerAdded, "failed to add finalizer: %v", err)
+				return ctrl.Result{}, err
 			}
-			log.Error(err, "failed to remove finalizer")
-			return ctrl.Result{}, err
+			log.Info("finalizer added", "finalizer", agentConfigFinalizer)
+			r.Recorder.Event(ac, corev1.EventTypeNormal, eventReasonFinalizerAdded, "finalizer added successfully")
+			// Requeue so we operate on the updated object next pass.
+			return ctrl.Result{Requeue: true}, nil
 		}
-		if removed {
+	}
+
+	// 2. Deletion path: object is being deleted — run cleanup and remove finalizer.
+	if !ac.DeletionTimestamp.IsZero() {
+		log.Info("AgentConfig is marked for deletion",
+			"deletionTimestamp", ac.DeletionTimestamp,
+		)
+		if controllerutil.ContainsFinalizer(ac, agentConfigFinalizer) {
+			controllerutil.RemoveFinalizer(ac, agentConfigFinalizer)
+			if err := r.Client.Update(ctx, ac); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict removing finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to remove finalizer")
+				r.Recorder.Eventf(ac, corev1.EventTypeWarning, eventReasonFinalizerRemoved, "failed to remove finalizer: %v", err)
+				return ctrl.Result{}, err
+			}
 			log.Info("finalizer removed, deletion will proceed")
-		} else {
-			log.Info("finalizer was already absent")
+			r.Recorder.Event(ac, corev1.EventTypeNormal, eventReasonFinalizerRemoved, "finalizer removed, deletion will proceed")
 		}
 		return ctrl.Result{}, nil
 	}
 
-	// --- Normal path ---
-
-	// 1. Ensure finalizer.
-	added, err := ensureFinalizer(ctx, r.Client, ac, agentConfigFinalizer)
-	if err != nil {
-		if k8serrors.IsConflict(err) {
-			log.Info("conflict adding finalizer, requeueing")
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "failed to add finalizer")
-		return ctrl.Result{}, err
-	}
-	if added {
-		log.Info("finalizer added", "finalizer", agentConfigFinalizer)
-	} else {
-		log.V(1).Info("finalizer already present")
-	}
-
-	// 2. Sync status.
+	// 3. Sync status.
 	log.Info("syncing status conditions", "specEnabled", ac.Spec.Enabled)
 	if err := r.syncAgentStatus(ctx, ac); err != nil {
 		log.Error(err, "failed to sync status conditions")
+		r.Recorder.Eventf(ac, corev1.EventTypeWarning, eventReasonSyncFailed, "failed to sync status: %v", err)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
@@ -107,6 +121,7 @@ func (r *AgentConfigController) Reconcile(ctx context.Context, req ctrl.Request)
 		"mcpPort", ac.Spec.Defaults.McpPort,
 		"hitlPort", ac.Spec.Defaults.HITL.Port,
 	)
+	r.Recorder.Event(ac, corev1.EventTypeNormal, eventReasonSynced, "AgentConfig synced successfully")
 	return ctrl.Result{}, nil
 }
 

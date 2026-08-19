@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -28,7 +31,8 @@ const (
 //   - Removing the finalizer and allowing deletion when requested.
 type McpServerConfigController struct {
 	client.Client
-	Log logr.Logger
+	Log      logr.Logger
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=mcpserverconfigs,verbs=get;list;watch;update
@@ -59,50 +63,53 @@ func (r *McpServerConfigController) Reconcile(ctx context.Context, req ctrl.Requ
 		"protocolVersion", mcp.Spec.Defaults.ProtocolVersion,
 	)
 
-	// --- Deletion path ---
-	if !mcp.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("McpServerConfig is marked for deletion",
-			"deletionTimestamp", mcp.ObjectMeta.DeletionTimestamp,
-		)
-		removed, err := ensureMcpFinalizer(ctx, r.Client, mcp, mcpServerConfigFinalizer, true)
-		if err != nil {
-			if k8serrors.IsConflict(err) {
-				log.Info("conflict removing finalizer, requeueing")
-				return ctrl.Result{Requeue: true}, nil
+	// 1. Normal path: object is not being deleted — ensure finalizer exists.
+	if mcp.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(mcp, mcpServerConfigFinalizer) {
+			controllerutil.AddFinalizer(mcp, mcpServerConfigFinalizer)
+			if err := r.Client.Update(ctx, mcp); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict adding finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to add finalizer")
+				r.Recorder.Eventf(mcp, corev1.EventTypeWarning, eventReasonFinalizerAdded, "failed to add finalizer: %v", err)
+				return ctrl.Result{}, err
 			}
-			log.Error(err, "failed to remove finalizer")
-			return ctrl.Result{}, err
+			log.Info("finalizer added", "finalizer", mcpServerConfigFinalizer)
+			r.Recorder.Event(mcp, corev1.EventTypeNormal, eventReasonFinalizerAdded, "finalizer added successfully")
+			// Requeue so we operate on the updated object next pass.
+			return ctrl.Result{Requeue: true}, nil
 		}
-		if removed {
+	}
+
+	// 2. Deletion path: object is being deleted — run cleanup and remove finalizer.
+	if !mcp.DeletionTimestamp.IsZero() {
+		log.Info("McpServerConfig is marked for deletion",
+			"deletionTimestamp", mcp.DeletionTimestamp,
+		)
+		if controllerutil.ContainsFinalizer(mcp, mcpServerConfigFinalizer) {
+			controllerutil.RemoveFinalizer(mcp, mcpServerConfigFinalizer)
+			if err := r.Client.Update(ctx, mcp); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict removing finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to remove finalizer")
+				r.Recorder.Eventf(mcp, corev1.EventTypeWarning, eventReasonFinalizerRemoved, "failed to remove finalizer: %v", err)
+				return ctrl.Result{}, err
+			}
 			log.Info("finalizer removed, deletion will proceed")
-		} else {
-			log.Info("finalizer was already absent")
+			r.Recorder.Event(mcp, corev1.EventTypeNormal, eventReasonFinalizerRemoved, "finalizer removed, deletion will proceed")
 		}
 		return ctrl.Result{}, nil
 	}
 
-	// --- Normal path ---
-
-	// 1. Ensure finalizer.
-	added, err := ensureMcpFinalizer(ctx, r.Client, mcp, mcpServerConfigFinalizer, false)
-	if err != nil {
-		if k8serrors.IsConflict(err) {
-			log.Info("conflict adding finalizer, requeueing")
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "failed to add finalizer")
-		return ctrl.Result{}, err
-	}
-	if added {
-		log.Info("finalizer added", "finalizer", mcpServerConfigFinalizer)
-	} else {
-		log.V(1).Info("finalizer already present")
-	}
-
-	// 2. Sync status.
+	// 3. Sync status.
 	log.Info("syncing status conditions", "specEnabled", mcp.Spec.Enabled)
 	if err := r.syncMcpStatus(ctx, mcp); err != nil {
 		log.Error(err, "failed to sync status conditions")
+		r.Recorder.Eventf(mcp, corev1.EventTypeWarning, eventReasonSyncFailed, "failed to sync status: %v", err)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
@@ -112,6 +119,7 @@ func (r *McpServerConfigController) Reconcile(ctx context.Context, req ctrl.Requ
 		"transport", mcp.Spec.Defaults.Transport,
 		"protocolVersion", mcp.Spec.Defaults.ProtocolVersion,
 	)
+	r.Recorder.Event(mcp, corev1.EventTypeNormal, eventReasonSynced, "McpServerConfig synced successfully")
 	return ctrl.Result{}, nil
 }
 
@@ -173,26 +181,4 @@ func (r *McpServerConfigController) SetupWithManager(mgr ctrl.Manager) error {
 		Named("mcpserverconfig").
 		For(&v1alpha1.McpServerConfig{}).
 		Complete(r)
-}
-
-// ensureMcpFinalizer adds (remove=false) or removes (remove=true) the given
-// finalizer on obj. Returns true if the object was actually mutated.
-func ensureMcpFinalizer(ctx context.Context, c client.Client, obj client.Object, finalizer string, remove bool) (bool, error) {
-	finalizers := obj.GetFinalizers()
-	if remove {
-		for i, f := range finalizers {
-			if f == finalizer {
-				obj.SetFinalizers(append(finalizers[:i], finalizers[i+1:]...))
-				return true, c.Update(ctx, obj)
-			}
-		}
-		return false, nil
-	}
-	for _, f := range finalizers {
-		if f == finalizer {
-			return false, nil
-		}
-	}
-	obj.SetFinalizers(append(finalizers, finalizer))
-	return true, c.Update(ctx, obj)
 }

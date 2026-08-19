@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -38,8 +41,8 @@ const (
 //     longer enabled.
 type InferenceModelConfigController struct {
 	client.Client
-
-	Log logr.Logger
+	Log      logr.Logger
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=inferencemodelconfigs,verbs=get;list;watch;create;update;patch;delete
@@ -72,50 +75,53 @@ func (r *InferenceModelConfigController) Reconcile(ctx context.Context, req ctrl
 		"inferencePath", imc.Spec.Defaults.InferencePath,
 	)
 
-	// --- Deletion path ---
-	if !imc.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("InferenceModelConfig is marked for deletion",
-			"deletionTimestamp", imc.ObjectMeta.DeletionTimestamp,
-		)
-		removed, err := removeFinalizer(ctx, r.Client, imc, inferenceModelConfigFinalizer)
-		if err != nil {
-			if k8serrors.IsConflict(err) {
-				log.Info("conflict removing finalizer, requeueing")
-				return ctrl.Result{Requeue: true}, nil
+	// 1. Normal path: object is not being deleted — ensure finalizer exists.
+	if imc.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(imc, inferenceModelConfigFinalizer) {
+			controllerutil.AddFinalizer(imc, inferenceModelConfigFinalizer)
+			if err := r.Client.Update(ctx, imc); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict adding finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to add finalizer")
+				r.Recorder.Eventf(imc, corev1.EventTypeWarning, eventReasonFinalizerAdded, "failed to add finalizer: %v", err)
+				return ctrl.Result{}, err
 			}
-			log.Error(err, "failed to remove finalizer")
-			return ctrl.Result{}, err
+			log.Info("finalizer added", "finalizer", inferenceModelConfigFinalizer)
+			r.Recorder.Event(imc, corev1.EventTypeNormal, eventReasonFinalizerAdded, "finalizer added successfully")
+			// Requeue so we operate on the updated object next pass.
+			return ctrl.Result{Requeue: true}, nil
 		}
-		if removed {
+	}
+
+	// 2. Deletion path: object is being deleted — run cleanup and remove finalizer.
+	if !imc.DeletionTimestamp.IsZero() {
+		log.Info("InferenceModelConfig is marked for deletion",
+			"deletionTimestamp", imc.DeletionTimestamp,
+		)
+		if controllerutil.ContainsFinalizer(imc, inferenceModelConfigFinalizer) {
+			controllerutil.RemoveFinalizer(imc, inferenceModelConfigFinalizer)
+			if err := r.Client.Update(ctx, imc); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict removing finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to remove finalizer")
+				r.Recorder.Eventf(imc, corev1.EventTypeWarning, eventReasonFinalizerRemoved, "failed to remove finalizer: %v", err)
+				return ctrl.Result{}, err
+			}
 			log.Info("finalizer removed, deletion will proceed")
-		} else {
-			log.Info("finalizer was already absent")
+			r.Recorder.Event(imc, corev1.EventTypeNormal, eventReasonFinalizerRemoved, "finalizer removed, deletion will proceed")
 		}
 		return ctrl.Result{}, nil
 	}
 
-	// --- Normal path ---
-
-	// 1. Ensure finalizer.
-	added, err := ensureFinalizer(ctx, r.Client, imc, inferenceModelConfigFinalizer)
-	if err != nil {
-		if k8serrors.IsConflict(err) {
-			log.Info("conflict adding finalizer, requeueing")
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "failed to add finalizer")
-		return ctrl.Result{}, err
-	}
-	if added {
-		log.Info("finalizer added", "finalizer", inferenceModelConfigFinalizer)
-	} else {
-		log.V(1).Info("finalizer already present")
-	}
-
-	// 2. Sync status.
+	// 3. Sync status.
 	log.Info("syncing status conditions", "specEnabled", imc.Spec.Enabled)
 	if err := r.syncStatus(ctx, imc); err != nil {
 		log.Error(err, "failed to sync status conditions")
+		r.Recorder.Eventf(imc, corev1.EventTypeWarning, eventReasonSyncFailed, "failed to sync status: %v", err)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
@@ -124,6 +130,7 @@ func (r *InferenceModelConfigController) Reconcile(ctx context.Context, req ctrl
 		"interceptorPort", imc.Spec.Defaults.InterceptorPort,
 		"inferenceProtocol", imc.Spec.Defaults.InferenceProtocol,
 	)
+	r.Recorder.Event(imc, corev1.EventTypeNormal, eventReasonSynced, "InferenceModelConfig synced successfully")
 	return ctrl.Result{}, nil
 }
 
@@ -197,33 +204,6 @@ func (r *InferenceModelConfigController) SetupWithManager(mgr ctrl.Manager) erro
 		Complete(r)
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// ensureFinalizer adds the given finalizer to obj if not already present.
-func ensureFinalizer(ctx context.Context, c client.Client, obj client.Object, finalizer string) (bool, error) {
-	for _, f := range obj.GetFinalizers() {
-		if f == finalizer {
-			return false, nil
-		}
-	}
-	obj.SetFinalizers(append(obj.GetFinalizers(), finalizer))
-	return true, c.Update(ctx, obj)
-}
-
-// removeFinalizer strips the given finalizer from obj.
-func removeFinalizer(ctx context.Context, c client.Client, obj client.Object, finalizer string) (bool, error) {
-	finalizers := obj.GetFinalizers()
-	for i, f := range finalizers {
-		if f == finalizer {
-			obj.SetFinalizers(append(finalizers[:i], finalizers[i+1:]...))
-			return true, c.Update(ctx, obj)
-		}
-	}
-	return false, nil
-}
-
 // mergeConditions upserts newConditions into existing, preserving
 // LastTransitionTime when the Status has not changed.
 func mergeConditions(existing, newConditions []metav1.Condition) []metav1.Condition {
@@ -253,3 +233,4 @@ func mergeConditions(existing, newConditions []metav1.Condition) []metav1.Condit
 	}
 	return result
 }
+

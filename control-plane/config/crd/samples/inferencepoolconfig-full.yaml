@@ -25,6 +25,7 @@ metadata:
     env: kind
 spec:
   enabled: true
+  # priority: 1000 # to be implemented
 
   # ---------------------------------------------------------------------------
   # parentRefs — attach this pool to one or more InferenceGateway resources.
@@ -33,7 +34,7 @@ spec:
   # ---------------------------------------------------------------------------
   parentRefs:
     - kind: InferenceModelConfig    # replace with InferenceGateway once that CRD is available
-      name: consul-ai-gateway       # replace with a real InferenceModelConfig name
+      name: consul-ai-gateway      # replace with a real InferenceModelConfig name
       namespace: default
 
   # ---------------------------------------------------------------------------

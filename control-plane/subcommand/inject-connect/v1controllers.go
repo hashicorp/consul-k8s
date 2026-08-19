@@ -224,29 +224,33 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 	// When false: no watches are set up, no RBAC is consumed, the CRDs are not installed.
 	if c.flagEnableAI {
 		if err := (&aicontrollers.InferenceModelConfigController{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("inference-model-config"),
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("inference-model-config"),
+			Recorder: mgr.GetEventRecorderFor("inferencemodelconfig-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InferenceModelConfig")
 			return err
 		}
 		if err := (&aicontrollers.McpServerConfigController{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("mcp-server-config"),
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("mcp-server-config"),
+			Recorder: mgr.GetEventRecorderFor("mcpserverconfig-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "McpServerConfig")
 			return err
 		}
 		if err := (&aicontrollers.AgentConfigController{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("agent-config"),
+			Client:   mgr.GetClient(),
+			Recorder: mgr.GetEventRecorderFor("agentconfig-controller"),
+			Log:      ctrl.Log.WithName("controller").WithName("agent-config"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "AgentConfig")
 			return err
 		}
 		if err := (&aicontrollers.InferencePoolConfigController{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controller").WithName("inference-pool-config"),
+			Client:   mgr.GetClient(),
+			Log:      ctrl.Log.WithName("controller").WithName("inference-pool-config"),
+			Recorder: mgr.GetEventRecorderFor("inferencepoolconfig-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "InferencePoolConfig")
 			return err

@@ -10,13 +10,16 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 )
@@ -45,7 +48,8 @@ const (
 // the InferenceGateway CRD and operator are introduced.
 type InferencePoolConfigController struct {
 	client.Client
-	Log logr.Logger
+	Log      logr.Logger
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=consul.hashicorp.com,resources=inferencepoolconfigs,verbs=get;list;watch;update
@@ -73,53 +77,56 @@ func (r *InferencePoolConfigController) Reconcile(ctx context.Context, req ctrl.
 		"parentRefsCount", len(ipc.Spec.ParentRefs),
 	)
 
-	// --- Deletion path ---
-	if !ipc.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("InferencePoolConfig is marked for deletion",
-			"deletionTimestamp", ipc.ObjectMeta.DeletionTimestamp,
-		)
-		removed, err := removeFinalizer(ctx, r.Client, ipc, inferencePoolConfigFinalizer)
-		if err != nil {
-			if k8serrors.IsConflict(err) {
-				log.Info("conflict removing finalizer, requeueing")
-				return ctrl.Result{Requeue: true}, nil
+	// 1. Normal path: object is not being deleted — ensure finalizer exists.
+	if ipc.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(ipc, inferencePoolConfigFinalizer) {
+			controllerutil.AddFinalizer(ipc, inferencePoolConfigFinalizer)
+			if err := r.Client.Update(ctx, ipc); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict adding finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to add finalizer")
+				r.Recorder.Eventf(ipc, corev1.EventTypeWarning, eventReasonFinalizerAdded, "failed to add finalizer: %v", err)
+				return ctrl.Result{}, err
 			}
-			log.Error(err, "failed to remove finalizer")
-			return ctrl.Result{}, err
+			log.Info("finalizer added", "finalizer", inferencePoolConfigFinalizer)
+			r.Recorder.Event(ipc, corev1.EventTypeNormal, eventReasonFinalizerAdded, "finalizer added successfully")
+			// Requeue so we operate on the updated object next pass.
+			return ctrl.Result{Requeue: true}, nil
 		}
-		if removed {
+	}
+
+	// 2. Deletion path: object is being deleted — run cleanup and remove finalizer.
+	if !ipc.DeletionTimestamp.IsZero() {
+		log.Info("InferencePoolConfig is marked for deletion",
+			"deletionTimestamp", ipc.DeletionTimestamp,
+		)
+		if controllerutil.ContainsFinalizer(ipc, inferencePoolConfigFinalizer) {
+			controllerutil.RemoveFinalizer(ipc, inferencePoolConfigFinalizer)
+			if err := r.Client.Update(ctx, ipc); err != nil {
+				if k8serrors.IsConflict(err) {
+					log.Info("conflict removing finalizer, requeueing")
+					return ctrl.Result{Requeue: true}, nil
+				}
+				log.Error(err, "failed to remove finalizer")
+				r.Recorder.Eventf(ipc, corev1.EventTypeWarning, eventReasonFinalizerRemoved, "failed to remove finalizer: %v", err)
+				return ctrl.Result{}, err
+			}
 			log.Info("finalizer removed, deletion will proceed")
-		} else {
-			log.Info("finalizer was already absent")
+			r.Recorder.Event(ipc, corev1.EventTypeNormal, eventReasonFinalizerRemoved, "finalizer removed, deletion will proceed")
 		}
 		return ctrl.Result{}, nil
 	}
 
-	// --- Normal path ---
-
-	// 1. Ensure finalizer.
-	added, err := ensureFinalizer(ctx, r.Client, ipc, inferencePoolConfigFinalizer)
-	if err != nil {
-		if k8serrors.IsConflict(err) {
-			log.Info("conflict adding finalizer, requeueing")
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.Error(err, "failed to add finalizer")
-		return ctrl.Result{}, err
-	}
-	if added {
-		log.Info("finalizer added", "finalizer", inferencePoolConfigFinalizer)
-	} else {
-		log.V(1).Info("finalizer already present")
-	}
-
-	// 2. Resolve parentRefs and sync status.
+	// 3. Resolve parentRefs and sync status.
 	log.Info("syncing status conditions",
 		"specEnabled", ipc.Spec.Enabled,
 		"parentRefsCount", len(ipc.Spec.ParentRefs),
 	)
 	if err := r.syncPoolStatus(ctx, ipc); err != nil {
 		log.Error(err, "failed to sync status conditions")
+		r.Recorder.Eventf(ipc, corev1.EventTypeWarning, eventReasonSyncFailed, "failed to sync status: %v", err)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
@@ -127,6 +134,7 @@ func (r *InferencePoolConfigController) Reconcile(ctx context.Context, req ctrl.
 		"enabled", ipc.Spec.Enabled,
 		"parentRefsCount", len(ipc.Spec.ParentRefs),
 	)
+	r.Recorder.Event(ipc, corev1.EventTypeNormal, eventReasonSynced, "InferencePoolConfig synced successfully")
 	return ctrl.Result{}, nil
 }
 

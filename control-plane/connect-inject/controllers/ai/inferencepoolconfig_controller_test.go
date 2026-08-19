@@ -11,6 +11,7 @@ import (
 
 	logrtest "github.com/go-logr/logr/testr"
 	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -52,10 +54,10 @@ func TestInferencePoolConfigReconcile(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				parent := makeUnstructuredParent("my-inference-model", "default",
 					"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
-				return []runtime.Object{
-					enabledIPC("my-pool", "default", "my-inference-model"),
-					parent,
-				}
+				ipc := enabledIPC("my-pool", "default", "my-inference-model")
+				// Pre-set finalizer so reconcile proceeds to status sync.
+				ipc.Finalizers = []string{inferencePoolConfigFinalizer}
+				return []runtime.Object{ipc, parent}
 			},
 		},
 		{
@@ -63,15 +65,16 @@ func TestInferencePoolConfigReconcile(t *testing.T) {
 			k8sObjects: func() []runtime.Object {
 				ipc := enabledIPC("my-pool", "default", "my-inference-model")
 				ipc.Spec.Enabled = false
+				ipc.Finalizers = []string{inferencePoolConfigFinalizer}
 				return []runtime.Object{ipc}
 			},
 		},
 		{
 			name: "missing parent gets ParentResolved=False and Ready=False",
 			k8sObjects: func() []runtime.Object {
-				return []runtime.Object{
-					enabledIPC("my-pool", "default", "non-existent-parent"),
-				}
+				ipc := enabledIPC("my-pool", "default", "non-existent-parent")
+				ipc.Finalizers = []string{inferencePoolConfigFinalizer}
+				return []runtime.Object{ipc}
 			},
 		},
 		{
@@ -91,6 +94,7 @@ func TestInferencePoolConfigReconcile(t *testing.T) {
 				parent2 := makeUnstructuredParent("parent-b", "default",
 					"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
 				ipc := enabledIPC("my-pool", "default", "parent-a")
+				ipc.Finalizers = []string{inferencePoolConfigFinalizer}
 				ipc.Spec.ParentRefs = append(ipc.Spec.ParentRefs, v1alpha1.InferencePoolParentRef{
 					Kind: v1alpha1.InferenceModelConfigKind,
 					Name: "parent-b",
@@ -104,6 +108,7 @@ func TestInferencePoolConfigReconcile(t *testing.T) {
 				parent1 := makeUnstructuredParent("parent-a", "default",
 					"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
 				ipc := enabledIPC("my-pool", "default", "parent-a")
+				ipc.Finalizers = []string{inferencePoolConfigFinalizer}
 				ipc.Spec.ParentRefs = append(ipc.Spec.ParentRefs, v1alpha1.InferencePoolParentRef{
 					Kind: v1alpha1.InferenceModelConfigKind,
 					Name: "parent-missing",
@@ -137,8 +142,9 @@ func TestInferencePoolConfigReconcile(t *testing.T) {
 				Build()
 
 			controller := &InferencePoolConfigController{
-				Client: fakeClient,
-				Log:    logrtest.New(t),
+				Client:   fakeClient,
+				Log:      logrtest.New(t),
+				Recorder: record.NewFakeRecorder(10),
 			}
 
 			resp, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -238,6 +244,8 @@ func TestInferencePoolConfigReconcile_StatusConditions(t *testing.T) {
 			require.NoError(t, v1alpha1.AddToScheme(s))
 
 			ipc := tt.buildIPC()
+			// Pre-set finalizer so reconcile proceeds directly to status sync.
+			ipc.Finalizers = []string{inferencePoolConfigFinalizer}
 			extra := tt.buildExtra()
 
 			fakeClient := fake.NewClientBuilder().
@@ -248,8 +256,9 @@ func TestInferencePoolConfigReconcile_StatusConditions(t *testing.T) {
 				Build()
 
 			controller := &InferencePoolConfigController{
-				Client: fakeClient,
-				Log:    logrtest.New(t),
+				Client:   fakeClient,
+				Log:      logrtest.New(t),
+				Recorder: record.NewFakeRecorder(10),
 			}
 
 			_, err := controller.Reconcile(context.Background(), ctrl.Request{
@@ -300,16 +309,21 @@ func TestInferencePoolConfigReconcile_Finalizer(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
-		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
+		resp, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
 		require.NoError(t, err)
+		require.True(t, resp.Requeue, "should requeue after adding finalizer")
 
 		got := &v1alpha1.InferencePoolConfig{}
 		require.NoError(t, fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "pool", Namespace: "default"}, got))
 		require.Contains(t, got.Finalizers, inferencePoolConfigFinalizer)
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonFinalizerAdded)
 	})
 
 	t.Run("finalizer is idempotent on subsequent reconciles", func(t *testing.T) {
@@ -329,7 +343,8 @@ func TestInferencePoolConfigReconcile_Finalizer(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
 		_, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
@@ -346,6 +361,9 @@ func TestInferencePoolConfigReconcile_Finalizer(t *testing.T) {
 			}
 		}
 		require.Equal(t, 1, count, "finalizer must appear exactly once")
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonSynced)
 	})
 
 	t.Run("finalizer is removed when resource is deleted", func(t *testing.T) {
@@ -353,10 +371,6 @@ func TestInferencePoolConfigReconcile_Finalizer(t *testing.T) {
 		require.NoError(t, clientgoscheme.AddToScheme(s))
 		require.NoError(t, v1alpha1.AddToScheme(s))
 
-		// Load the object with both DeletionTimestamp and the finalizer already
-		// set via WithRuntimeObjects — the fake client accepts this at load time.
-		// The reconciler will strip the finalizer, causing the fake client to
-		// garbage-collect the object (Get returns not-found).
 		ts := metav1.Now()
 		ipc := enabledIPC("pool", "default", "gw")
 		ipc.Finalizers = []string{inferencePoolConfigFinalizer}
@@ -368,24 +382,25 @@ func TestInferencePoolConfigReconcile_Finalizer(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
 		_, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
 		require.NoError(t, err)
 
-		// After the finalizer is removed the fake client garbage-collects the object.
 		got := &v1alpha1.InferencePoolConfig{}
 		getErr := fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "pool", Namespace: "default"}, got)
 		if getErr == nil {
-			// Object still present — finalizer must have been stripped.
 			require.NotContains(t, got.Finalizers, inferencePoolConfigFinalizer)
 		} else {
-			// Object garbage-collected after finalizer removal — also acceptable.
 			require.True(t, k8serrors.IsNotFound(getErr),
 				"expected not-found after finalizer removal, got: %v", getErr)
 		}
+
+		require.Len(t, recorder.Events, 1)
+		require.Contains(t, <-recorder.Events, eventReasonFinalizerRemoved)
 	})
 
 	t.Run("deletion without finalizer is a no-op", func(t *testing.T) {
@@ -393,8 +408,6 @@ func TestInferencePoolConfigReconcile_Finalizer(t *testing.T) {
 		require.NoError(t, clientgoscheme.AddToScheme(s))
 		require.NoError(t, v1alpha1.AddToScheme(s))
 
-		// Store the object first (no finalizer, no DeletionTimestamp — fake client
-		// only rejects DeletionTimestamp objects that have no finalizers).
 		ipc := enabledIPC("pool", "default", "gw")
 
 		fakeClient := fake.NewClientBuilder().
@@ -403,17 +416,51 @@ func TestInferencePoolConfigReconcile_Finalizer(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		// Now delete it via the client so the fake marks it with DeletionTimestamp.
-		// Because there are no finalizers the fake will hard-delete immediately.
 		require.NoError(t, fakeClient.Delete(context.Background(), ipc))
 
-		// Reconcile against the now-gone object — should be a clean no-op.
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
 		result, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
 		require.NoError(t, err)
 		require.False(t, result.Requeue)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferencePoolConfigReconcile_Events — verifies event emission
+// ---------------------------------------------------------------------------
+
+func TestInferencePoolConfigReconcile_Events(t *testing.T) {
+	t.Parallel()
+
+	t.Run("successful reconcile emits Synced event", func(t *testing.T) {
+		s := runtime.NewScheme()
+		require.NoError(t, clientgoscheme.AddToScheme(s))
+		require.NoError(t, v1alpha1.AddToScheme(s))
+
+		parent := makeUnstructuredParent("gw", "default",
+			"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
+		ipc := enabledIPC("pool", "default", "gw")
+		ipc.Finalizers = []string{inferencePoolConfigFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(ipc).WithObjects(parent).
+			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).Build()
+
+		recorder := record.NewFakeRecorder(10)
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: recorder}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, recorder.Events, 1)
+		event := <-recorder.Events
+		require.Contains(t, event, string(corev1.EventTypeNormal))
+		require.Contains(t, event, eventReasonSynced)
 	})
 }
 
@@ -433,7 +480,11 @@ func TestInferencePoolConfigReconcile_ParentRefNamespace(t *testing.T) {
 		parent := makeUnstructuredParent("gw", "default",
 			"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
 		ipc := &v1alpha1.InferencePoolConfig{
-			ObjectMeta: metav1.ObjectMeta{Name: "pool", Namespace: "team-a"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pool",
+				Namespace:  "team-a",
+				Finalizers: []string{inferencePoolConfigFinalizer},
+			},
 			Spec: v1alpha1.InferencePoolConfigSpec{
 				Enabled: true,
 				ParentRefs: []v1alpha1.InferencePoolParentRef{
@@ -450,7 +501,7 @@ func TestInferencePoolConfigReconcile_ParentRefNamespace(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
 		_, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "team-a"},
 		})
@@ -475,7 +526,11 @@ func TestInferencePoolConfigReconcile_ParentRefNamespace(t *testing.T) {
 		parent := makeUnstructuredParent("gw", "infra",
 			"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
 		ipc := &v1alpha1.InferencePoolConfig{
-			ObjectMeta: metav1.ObjectMeta{Name: "pool", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pool",
+				Namespace:  "default",
+				Finalizers: []string{inferencePoolConfigFinalizer},
+			},
 			Spec: v1alpha1.InferencePoolConfigSpec{
 				Enabled: true,
 				ParentRefs: []v1alpha1.InferencePoolParentRef{
@@ -491,7 +546,7 @@ func TestInferencePoolConfigReconcile_ParentRefNamespace(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
 		_, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
@@ -511,11 +566,14 @@ func TestInferencePoolConfigReconcile_ParentRefNamespace(t *testing.T) {
 		require.NoError(t, clientgoscheme.AddToScheme(s))
 		require.NoError(t, v1alpha1.AddToScheme(s))
 
-		// Parent lives in 'infra', but parentRef.namespace says 'other'.
 		parent := makeUnstructuredParent("gw", "infra",
 			"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
 		ipc := &v1alpha1.InferencePoolConfig{
-			ObjectMeta: metav1.ObjectMeta{Name: "pool", Namespace: "default"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "pool",
+				Namespace:  "default",
+				Finalizers: []string{inferencePoolConfigFinalizer},
+			},
 			Spec: v1alpha1.InferencePoolConfigSpec{
 				Enabled: true,
 				ParentRefs: []v1alpha1.InferencePoolParentRef{
@@ -531,7 +589,7 @@ func TestInferencePoolConfigReconcile_ParentRefNamespace(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
 		_, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
@@ -597,7 +655,7 @@ func TestInferencePoolConfigReconcile_SpecFields(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
 		_, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
@@ -675,7 +733,7 @@ func TestInferencePoolConfigReconcile_SpecFields(t *testing.T) {
 			WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 			Build()
 
-		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+		controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
 		_, err := controller.Reconcile(context.Background(), ctrl.Request{
 			NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},
 		})
@@ -728,29 +786,35 @@ func TestInferencePoolConfigReconcile_ConditionStability(t *testing.T) {
 		WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 		Build()
 
-	controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+	controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
 	req := ctrl.Request{NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"}}
 
-	// First reconcile — establishes conditions.
+	// First reconcile — adds finalizer+requeues; second reconcile sets conditions.
 	_, err := controller.Reconcile(context.Background(), req)
+	require.NoError(t, err)
+	_, err = controller.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 
 	got1 := &v1alpha1.InferencePoolConfig{}
 	require.NoError(t, fakeClient.Get(context.Background(),
 		types.NamespacedName{Name: "pool", Namespace: "default"}, got1))
-	firstTransition := findCondition(got1.Status.Conditions, conditionTypeReady).LastTransitionTime
+	cond1 := findCondition(got1.Status.Conditions, conditionTypeReady)
+	require.NotNil(t, cond1, "Ready condition must be set after second reconcile")
+	firstTransition := cond1.LastTransitionTime
 
 	// Wait a moment so time would differ if incorrectly updated.
 	time.Sleep(5 * time.Millisecond)
 
-	// Second reconcile — same spec, same status.
+	// Third reconcile — same spec, same status — LastTransitionTime must be stable.
 	_, err = controller.Reconcile(context.Background(), req)
 	require.NoError(t, err)
 
 	got2 := &v1alpha1.InferencePoolConfig{}
 	require.NoError(t, fakeClient.Get(context.Background(),
 		types.NamespacedName{Name: "pool", Namespace: "default"}, got2))
-	secondTransition := findCondition(got2.Status.Conditions, conditionTypeReady).LastTransitionTime
+	cond2 := findCondition(got2.Status.Conditions, conditionTypeReady)
+	require.NotNil(t, cond2)
+	secondTransition := cond2.LastTransitionTime
 
 	require.Equal(t, firstTransition, secondTransition,
 		"LastTransitionTime must not change when condition Status is stable")
@@ -770,6 +834,7 @@ func TestInferencePoolConfigReconcile_LastSyncedTime(t *testing.T) {
 	parent := makeUnstructuredParent("gw", "default",
 		"consul.hashicorp.com/v1alpha1", v1alpha1.InferenceModelConfigKind)
 	ipc := enabledIPC("pool", "default", "gw")
+	ipc.Finalizers = []string{inferencePoolConfigFinalizer}
 
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(s).
@@ -778,7 +843,7 @@ func TestInferencePoolConfigReconcile_LastSyncedTime(t *testing.T) {
 		WithStatusSubresource(&v1alpha1.InferencePoolConfig{}).
 		Build()
 
-	controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t)}
+	controller := &InferencePoolConfigController{Client: fakeClient, Log: logrtest.New(t), Recorder: record.NewFakeRecorder(10)}
 
 	_, err := controller.Reconcile(context.Background(), ctrl.Request{
 		NamespacedName: types.NamespacedName{Name: "pool", Namespace: "default"},

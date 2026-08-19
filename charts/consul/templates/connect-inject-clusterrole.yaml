@@ -119,6 +119,11 @@ rules:
   verbs:
   - update
 - apiGroups: [""]
+  resources: ["events"]
+  verbs:
+    - create
+    - patch
+- apiGroups: [""]
   resources: ["secrets", "serviceaccounts", "services"]
   verbs:
     - get
