@@ -24,14 +24,15 @@ const (
 
 	Gateway_GatewayClassIndex = "__gateway_referencing_gatewayclass"
 
-	HTTPRoute_GatewayIndex            = "__httproute_referencing_gateway"
-	HTTPRoute_ServiceIndex            = "__httproute_referencing_service"
-	HTTPRoute_MeshServiceIndex        = "__httproute_referencing_mesh_service"
-	HTTPRoute_RouteRetryFilterIndex   = "__httproute_referencing_retryfilter"
-	HTTPRoute_RouteTimeoutFilterIndex = "__httproute_referencing_timeoutfilter"
-	HTTPRoute_RouteAuthFilterIndex    = "__httproute_referencing_routeauthfilter"
-	HTTPRoute_RouteTLSSDSFilterIndex  = "__httproute_referencing_routetlssdsfilter"
-	HTTPRoute_RouteExtProcIndex       = "__httproute_referencing_routeextproc"
+	HTTPRoute_GatewayIndex                      = "__httproute_referencing_gateway"
+	HTTPRoute_ServiceIndex                      = "__httproute_referencing_service"
+	HTTPRoute_MeshServiceIndex                  = "__httproute_referencing_mesh_service"
+	HTTPRoute_RouteRetryFilterIndex             = "__httproute_referencing_retryfilter"
+	HTTPRoute_RouteTimeoutFilterIndex           = "__httproute_referencing_timeoutfilter"
+	HTTPRoute_RouteAuthFilterIndex              = "__httproute_referencing_routeauthfilter"
+	HTTPRoute_RouteTLSSDSFilterIndex            = "__httproute_referencing_routetlssdsfilter"
+	HTTPRoute_RouteExtProcIndex                 = "__httproute_referencing_routeextproc"
+	HTTPRoute_RouteHeaderMatchInvertFilterIndex = "__httproute_referencing_routeheadermatchinvertfilter"
 
 	TCPRoute_GatewayIndex     = "__tcproute_referencing_gateway"
 	TCPRoute_ServiceIndex     = "__tcproute_referencing_service"
@@ -161,6 +162,11 @@ var indexes = []index{
 	},
 	{
 		name:        HTTPRoute_RouteExtProcIndex,
+		target:      &gwv1.HTTPRoute{},
+		indexerFunc: filtersForHTTPRoute,
+	},
+	{
+		name:        HTTPRoute_RouteHeaderMatchInvertFilterIndex,
 		target:      &gwv1.HTTPRoute{},
 		indexerFunc: filtersForHTTPRoute,
 	},
