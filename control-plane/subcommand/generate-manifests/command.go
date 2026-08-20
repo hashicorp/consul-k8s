@@ -52,6 +52,7 @@ const (
 	kindTCPRoute                     = "TCPRoute"
 	kindTLSRoute                     = "TLSRoute"
 	kindUDPRoute                     = "UDPRoute"
+	kindGatewayPolicy                = "GatewayPolicy"
 	consulAPIGroup                   = "consul.hashicorp.com"
 	consulAPIVersionV1Beta1          = "v1beta1"
 	consulAPIVersionV1Alpha2         = "v1alpha2"
@@ -283,6 +284,11 @@ func (c *Command) dumpGatewayAPIObjects() error {
 		c.UI.Info(fmt.Sprintf("Skipping UDPRoute dump: %v", err))
 	}
 
+	// fetch gatewaypolicies from consul.hashicorp.com/v1alpha1
+	if err := c.dumpTypedList(ctx, "gatewaypolicies", &v1alpha1.GatewayPolicyList{}); err != nil {
+		c.UI.Info(fmt.Sprintf("Skipping GatewayPolicy dump: %v", err))
+	}
+
 	return nil
 }
 
@@ -505,6 +511,23 @@ func convertToConsulRoute(raw map[string]interface{}) {
 	meta["name"] = meta["name"].(string) + "-consul"
 }
 
+// convertGatewayPolicyTargetRef rewrites spec.targetRef.group from
+// gateway.networking.k8s.io/v1beta1 to gateway.networking.k8s.io/v1
+// to match the graduated Gateway API version.
+func convertGatewayPolicyTargetRef(raw map[string]interface{}) {
+	spec := getSpec(raw)
+	if spec == nil {
+		return
+	}
+	targetRef, ok := spec["targetRef"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	if targetRef["group"] == K8sGatewayAPIGroup+"/"+K8sGatewayAPIVersionV1Beta1 {
+		targetRef["group"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
+	}
+}
+
 func convertReferenceGrant(raw map[string]interface{}) {
 	meta := getMetadata(raw)
 	spec := getSpec(raw)
@@ -565,6 +588,9 @@ func enforceConsulApiVersion(raw map[string]interface{}) bool {
 			return false
 		}
 		convertToConsulRoute(raw)
+
+	case kindGatewayPolicy:
+		convertGatewayPolicyTargetRef(raw)
 
 	case kindReferenceGrant:
 		convertReferenceGrant(raw)
@@ -654,6 +680,13 @@ func extractItems(list client.ObjectList) ([]client.Object, error) {
 		return out, nil
 
 	case *gwv1alpha2.UDPRouteList:
+		out := make([]client.Object, 0, len(v.Items))
+		for i := range v.Items {
+			out = append(out, &v.Items[i])
+		}
+		return out, nil
+
+	case *v1alpha1.GatewayPolicyList:
 		out := make([]client.Object, 0, len(v.Items))
 		for i := range v.Items {
 			out = append(out, &v.Items[i])
