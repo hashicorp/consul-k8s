@@ -500,6 +500,41 @@ func validateListeners(gateway gwv1.Gateway, listeners []gwv1.Listener, resource
 	return results
 }
 
+// orphanedProtocolAnnotations returns the annotation keys on gateway whose
+// embedded listener name does not match any listener in gateway.Spec.Listeners.
+//
+// The ListenerProtocol annotation is keyed as:
+//
+//	"api-gateway.consul.hashicorp.com/listener-<sectionName>-protocol"
+//
+// If a user writes a typo in <sectionName> the annotation is silently ignored
+// by resolveListenerProtocol.  This function surfaces those cases so the
+// controller can log a warning, making the misconfiguration visible without
+// blocking reconciliation.
+func orphanedProtocolAnnotations(gateway gwv1.Gateway) []string {
+	// Build a set of known listener names for O(1) lookup.
+	known := make(map[string]struct{}, len(gateway.Spec.Listeners))
+	for _, l := range gateway.Spec.Listeners {
+		known[string(l.Name)] = struct{}{}
+	}
+
+	var orphans []string
+	for key := range gateway.Annotations {
+		if !strings.HasPrefix(key, common.ListenerProtocolAnnotationPrefix) {
+			continue
+		}
+		if !strings.HasSuffix(key, common.ListenerProtocolAnnotationSuffix) {
+			continue
+		}
+		// Extract the embedded section name between the prefix and suffix.
+		inner := key[len(common.ListenerProtocolAnnotationPrefix) : len(key)-len(common.ListenerProtocolAnnotationSuffix)]
+		if _, ok := known[inner]; !ok {
+			orphans = append(orphans, key)
+		}
+	}
+	return orphans
+}
+
 func validateListenerAllowedRouteKinds(allowedRoutes *gwv1.AllowedRoutes) error {
 	if allowedRoutes == nil {
 		return nil
