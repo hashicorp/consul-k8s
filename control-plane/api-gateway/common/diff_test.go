@@ -2408,3 +2408,168 @@ func TestEntriesEqual_HTTPRoute_ExtAuthz(t *testing.T) {
 		})
 	}
 }
+
+// TestEntriesEqual_APIGateway_Defaults exercises that changes to the gateway-wide
+// UpstreamLimits Defaults (set via annotations) are detected as unequal so the
+// reconciler writes the updated config entry to Consul.
+func TestEntriesEqual_APIGateway_Defaults(t *testing.T) {
+	t.Parallel()
+
+	makeEntry := func(defaults *api.UpstreamLimits) *api.APIGatewayConfigEntry {
+		return &api.APIGatewayConfigEntry{
+			Kind:      api.APIGateway,
+			Name:      "gw",
+			Namespace: "default",
+			Partition: "default",
+			Defaults:  defaults,
+		}
+	}
+	conn := intPtr(10)
+	conn2 := intPtr(20)
+
+	testCases := map[string]struct {
+		a, b           *api.APIGatewayConfigEntry
+		expectedResult bool
+	}{
+		"both nil Defaults are equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(nil),
+			expectedResult: true,
+		},
+		"identical Defaults are equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			expectedResult: true,
+		},
+		"nil vs non-nil Defaults are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			expectedResult: false,
+		},
+		"different MaxConnections are NOT equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn2}),
+			expectedResult: false,
+		},
+		"Defaults with PassiveHealthCheck equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			expectedResult: true,
+		},
+		"Defaults with different PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 5},
+			}),
+			expectedResult: false,
+		},
+		"Defaults with nil vs set PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 1},
+			}),
+			expectedResult: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}
+
+// TestEntriesEqual_HTTPRoute_Limits exercises that per-service UpstreamLimits
+// (set via a RouteUpstreamLimitsFilter backendRef) are detected as unequal so
+// the reconciler writes the updated config entry to Consul.
+func TestEntriesEqual_HTTPRoute_Limits(t *testing.T) {
+	t.Parallel()
+
+	makeEntry := func(limits *api.UpstreamLimits) *api.HTTPRouteConfigEntry {
+		return &api.HTTPRouteConfigEntry{
+			Kind:      api.HTTPRoute,
+			Name:      "test-route",
+			Namespace: "default",
+			Partition: "default",
+			Rules: []api.HTTPRouteRule{
+				{
+					Matches: []api.HTTPMatch{
+						{Path: api.HTTPPathMatch{Match: api.HTTPPathMatchPrefix, Value: "/"}},
+					},
+					Services: []api.HTTPService{
+						{Name: "svc", Namespace: "default", Weight: 1, Limits: limits},
+					},
+				},
+			},
+		}
+	}
+	conn := intPtr(50)
+	conn2 := intPtr(100)
+
+	testCases := map[string]struct {
+		a, b           *api.HTTPRouteConfigEntry
+		expectedResult bool
+	}{
+		"both nil Limits are equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(nil),
+			expectedResult: true,
+		},
+		"identical Limits are equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			expectedResult: true,
+		},
+		"nil vs non-nil Limits are NOT equal": {
+			a:              makeEntry(nil),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			expectedResult: false,
+		},
+		"different MaxConnections are NOT equal": {
+			a:              makeEntry(&api.UpstreamLimits{MaxConnections: conn}),
+			b:              makeEntry(&api.UpstreamLimits{MaxConnections: conn2}),
+			expectedResult: false,
+		},
+		"Limits with PassiveHealthCheck equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			expectedResult: true,
+		},
+		"Limits with different PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 3},
+			}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 5},
+			}),
+			expectedResult: false,
+		},
+		"Limits with nil vs set PassiveHealthCheck are NOT equal": {
+			a: makeEntry(&api.UpstreamLimits{}),
+			b: makeEntry(&api.UpstreamLimits{
+				PassiveHealthCheck: &api.PassiveHealthCheck{MaxFailures: 1},
+			}),
+			expectedResult: false,
+		},
+	}
+
+	for name, tc := range testCases {
+		name, tc := name, tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tc.expectedResult, EntriesEqual(tc.a, tc.b))
+		})
+	}
+}
