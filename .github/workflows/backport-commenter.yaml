@@ -7,9 +7,6 @@
 name: Backport Commenter
 run-name: Validate backports and notify PRs owners
 on:
-  push:
-    branches:
-      - shashank/add-backport-commenter
   schedule:
    - cron: "0 9 * * *"
   workflow_dispatch:
