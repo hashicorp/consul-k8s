@@ -400,6 +400,9 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	// UDP/TLS/TCP -> v1alpha2
 	case kindUDPRoute, kindTLSRoute, kindTCPRoute:
 		raw["apiVersion"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1Alpha2
+	// GatewayPolicy -> rewrite targetRef.group from v1beta1 to v1
+	case kindGatewayPolicy:
+		convertGatewayPolicyTargetRef(raw)
 	}
 }
 
