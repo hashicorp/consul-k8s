@@ -63,6 +63,51 @@ load _helpers
 }
 
 #--------------------------------------------------------------------
+# global.gossipEncryption.tolerations and global.gossipEncryption.nodeSelector
+
+@test "gossipEncryptionAutogenerate/Job: tolerations not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "gossipEncryptionAutogenerate/Job: tolerations can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.gossipEncryption.tolerations=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.tolerations[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+@test "gossipEncryptionAutogenerate/Job: nodeSelector not set by default" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector' | tee /dev/stderr)
+  [ "${actual}" = "null" ]
+}
+
+@test "gossipEncryptionAutogenerate/Job: nodeSelector can be set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/gossip-encryption-autogenerate-job.yaml  \
+      --set 'global.gossipEncryption.autoGenerate=true' \
+      --set 'global.gossipEncryption.nodeSelector=- key: value' \
+      . | tee /dev/stderr |
+      yq -r '.spec.template.spec.nodeSelector[0].key' | tee /dev/stderr)
+  [ "${actual}" = "value" ]
+}
+
+#--------------------------------------------------------------------
 # extraLabels
 
 @test "gossipEncryptionAutogenerate/Job: no extra labels defined by default" {
