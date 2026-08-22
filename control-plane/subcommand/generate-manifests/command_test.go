@@ -495,3 +495,54 @@ func TestWriteObjects(t *testing.T) {
 	require.Equal(t, "https", l2["name"])
 	require.Equal(t, "consul-custom-class", spec["gatewayClassName"])
 }
+
+func TestConvertGatewayPolicyTargetRef(t *testing.T) {
+	cases := []struct {
+		name          string
+		inputGroup    string
+		wantTargetRef string
+	}{
+		{
+			name:          "v1beta1 rewritten to v1",
+			inputGroup:    "gateway.networking.k8s.io/v1beta1",
+			wantTargetRef: "gateway.networking.k8s.io/v1",
+		},
+		{
+			name:          "v1 unchanged",
+			inputGroup:    "gateway.networking.k8s.io/v1",
+			wantTargetRef: "gateway.networking.k8s.io/v1",
+		},
+		{
+			name:          "unrelated group unchanged",
+			inputGroup:    "some.other.group/v1",
+			wantTargetRef: "some.other.group/v1",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := map[string]interface{}{
+				"kind":       "GatewayPolicy",
+				"apiVersion": "consul.hashicorp.com/v1alpha1",
+				"metadata": map[string]interface{}{
+					"name":      "my-policy",
+					"namespace": "default",
+				},
+				"spec": map[string]interface{}{
+					"targetRef": map[string]interface{}{
+						"group": tc.inputGroup,
+						"kind":  "Gateway",
+						"name":  "my-gateway",
+					},
+				},
+			}
+			convertGatewayPolicyTargetRef(raw)
+			spec := raw["spec"].(map[string]interface{})
+			targetRef := spec["targetRef"].(map[string]interface{})
+			// targetRef.group must be rewritten (or left alone) as expected
+			require.Equal(t, tc.wantTargetRef, targetRef["group"])
+			// the GatewayPolicy's own apiVersion must never be touched
+			require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
+		})
+	}
+}
