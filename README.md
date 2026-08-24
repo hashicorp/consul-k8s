@@ -155,17 +155,12 @@ file. These are also fully documented directly on the
   ```
 3. Re-apply all the objs of refGrants
   ``` bash
-  k1 get referencegrant -A -o name |
-  while read obj; do
-    k1 get "$obj" -o yaml | k1 replace -f -
-  done
-  
-  (Or)
-
-  k1 get referencegrant -A -o name |
-  while read obj; do
-    k1 get "$obj" -o yaml |
-      k1 replace --server-side -f -
+  k1 get referencegrant.gateway.networking.k8s.io -A -o json |
+  jq -r '.items[] | [.metadata.namespace, .metadata.name] | @tsv' |
+  while IFS=$'\t' read -r ns name; do
+      echo "Migrating $ns/$name"
+      k1 get referencegrant.gateway.networking.k8s.io "$name" -n "$ns" -o yaml |
+        k1 replace -f -
   done
   ```
 
@@ -179,7 +174,19 @@ file. These are also fully documented directly on the
     -p '{"status":{"storedVersions":["v1beta1"]}}'
   ```
 
-5. perform helm upgrade.
+5. 
+  ``` bash
+  idx=$(k1 get crd referencegrants.gateway.networking.k8s.io -o json |
+    jq -r '.spec.versions
+      | to_entries[]
+      | select(.value.name == "v1alpha2")
+      | .key')
+
+  k1 patch crd referencegrants.gateway.networking.k8s.io \
+    --type=json \
+    -p="[{\"op\":\"remove\",\"path\":\"/spec/versions/$idx\"}]"
+  ```
+6. perform helm upgrade.
 
 
 ## Tutorials
