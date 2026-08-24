@@ -3,6 +3,16 @@
 name: build
 on:
   workflow_dispatch:
+  # Allow this workflow to be invoked by other workflows (e.g.
+  # scan-binaries-containers.yml) as a reusable workflow so its build artifacts
+  # can be reused. This is additive and does not change the push/dispatch behavior.
+  workflow_call:
+    inputs:
+      allow-unprotected-branches:
+        description: "Pass true to allow the conditional-skip guard to run on unprotected branches."
+        type: boolean
+        required: false
+        default: false
   push:
     # Sequence of patterns matched against refs/heads
     branches:
@@ -22,7 +32,9 @@ jobs:
     with:
       # Allow manual runs (workflow_dispatch) on any branch, including unprotected
       # ones, without failing the conditional-skip guard.
-      allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' }}
+      # Also allow callers (e.g. scan-binaries-containers.yml)
+      # to pass allow-unprotected-branches=true via the workflow_call input above.
+      allow-unprotected-branches: ${{ github.event_name == 'workflow_dispatch' || inputs.allow-unprotected-branches == true }}
 
   get-go-version:
     # Cascades down to test jobs
@@ -78,6 +90,7 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", "skip_packaging": "true", gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" , gotags: "hashicorpmetrics" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "s390x", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", "skip_packaging": "true", gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" , gotags: "hashicorpmetrics" }
@@ -93,6 +106,7 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "s390x", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
           # solaris is only built for the control plane
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "solaris", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
@@ -108,6 +122,7 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" , gotags: "hashicorpmetrics" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "s390x", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true", gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips" }
 
@@ -256,6 +271,7 @@ jobs:
         include:
           - { goos: "linux", goarch: "arm" }
           - { goos: "linux", goarch: "arm64" }
+          - { goos: "linux", goarch: "s390x" }
           - { goos: "linux", goarch: "386" }
           - { goos: "linux", goarch: "amd64" }
           - { goos: "linux", goarch: "amd64", fips: "+fips1403" }
