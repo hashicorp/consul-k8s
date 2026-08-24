@@ -255,6 +255,21 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			setupLog.Error(err, "unable to create controller", "controller", "InferencePoolConfig")
 			return err
 		}
+		if err := (&aicontrollers.InferenceGatewayController{
+			Client:                 mgr.GetClient(),
+			Log:                    ctrl.Log.WithName("controller").WithName("inference-gateway"),
+			Recorder:               mgr.GetEventRecorderFor("inferencegateway-controller"),
+			GatewayImage:           c.flagAIInferenceGatewayImage,
+			ConsulClientConfig:     consulConfig,
+			ConsulServerConnMgr:    watcher,
+			ConsulPartition:        c.consul.Partition,
+			ConsulNamespace:        c.flagConsulDestinationNamespace,
+			EnableConsulNamespaces: c.flagEnableNamespaces,
+			Datacenter:             c.consul.Datacenter,
+		}).SetupWithManager(ctx, mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InferenceGateway")
+			return err
+		}
 	}
 
 	if err := (&gatewaycontrollers.GatewayClassController{

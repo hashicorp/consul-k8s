@@ -42,10 +42,9 @@ const (
 //     resource and surfacing the result as a ParentResolved status condition.
 //   - Updating the Ready condition to reflect whether the pool is active and
 //     all parents are resolved.
+//   - Requeuing every 10 s while at least one parentRef is unresolved, so the
+//     pool self-heals as soon as the parent InferenceGateway is created.
 //   - Removing the finalizer and allowing deletion when requested.
-//
-// NOTE: ownerReference writes and InferenceGateway Watches will be added once
-// the InferenceGateway CRD and operator are introduced.
 type InferencePoolConfigController struct {
 	client.Client
 	Log      logr.Logger
@@ -124,10 +123,23 @@ func (r *InferencePoolConfigController) Reconcile(ctx context.Context, req ctrl.
 		"specEnabled", ipc.Spec.Enabled,
 		"parentRefsCount", len(ipc.Spec.ParentRefs),
 	)
-	if err := r.syncPoolStatus(ctx, ipc); err != nil {
+	allParentsResolved, err := r.syncPoolStatus(ctx, ipc)
+	if err != nil {
 		log.Error(err, "failed to sync status conditions")
 		r.Recorder.Eventf(ipc, corev1.EventTypeWarning, eventReasonSyncFailed, "failed to sync status: %v", err)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
+	}
+
+	// If one or more parentRefs could not be found, keep requeuing every 10 s
+	// so the pool self-heals as soon as the parent InferenceGateway appears —
+	// without relying on an external watch trigger.
+	if !allParentsResolved {
+		log.Info("one or more parentRefs unresolved; requeueing in 10s",
+			"parentRefsCount", len(ipc.Spec.ParentRefs),
+		)
+		r.Recorder.Eventf(ipc, corev1.EventTypeWarning, eventReasonSyncFailed,
+			"one or more parentRefs not yet resolved; will retry in 10s")
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
 
 	log.Info("reconcile complete",
@@ -140,7 +152,10 @@ func (r *InferencePoolConfigController) Reconcile(ctx context.Context, req ctrl.
 
 // syncPoolStatus resolves every parentRef and writes Accepted, ParentResolved,
 // and Ready conditions onto the InferencePoolConfig status sub-resource.
-func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc *v1alpha1.InferencePoolConfig) error {
+// It returns (allParentsResolved, error):
+//   - allParentsResolved=true  → every parentRef was found; caller can stop requeueing.
+//   - allParentsResolved=false → at least one parentRef is missing; caller must requeue.
+func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc *v1alpha1.InferencePoolConfig) (bool, error) {
 	log := r.Log.WithValues("inferencePoolConfig", ipc.Name, "namespace", ipc.Namespace)
 	now := metav1.Now()
 
@@ -156,8 +171,7 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 		}
 
 		// Use Unstructured so the controller is decoupled from parent Go types
-		// and works with any Kind registered in the cluster. The fake client
-		// in tests resolves Unstructured objects by GVK + namespace/name.
+		// and works with any Kind registered in the cluster.
 		// Group is always consul.hashicorp.com — parentRefs only target
 		// resources in the same API group.
 		parentObj := &unstructured.Unstructured{}
@@ -177,10 +191,7 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 				break
 			}
 			if isParentCRDAbsent(err) {
-				// The CRD for the referenced Kind is not installed in this cluster
-				// yet (e.g. InferenceGateway). Treat this as a soft not-found so
-				// the pool is marked ParentResolved=False without an error log or
-				// requeue storm.
+				// CRD for the referenced Kind not installed yet — soft not-found.
 				parentResolved = metav1.ConditionFalse
 				parentResolvedReason = reasonParentCRDNotFound
 				parentResolvedMsg = fmt.Sprintf("CRD for parentRef kind %q is not installed in this cluster", ref.Kind)
@@ -188,8 +199,8 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 					"name", ref.Name, "kind", ref.Kind, "namespace", ns)
 				break
 			}
-			// Genuine transient API error — requeue.
-			return fmt.Errorf("looking up parentRef %q: %w", ref.Name, err)
+			// Genuine transient API error — bubble up, caller requeues.
+			return false, fmt.Errorf("looking up parentRef %q: %w", ref.Name, err)
 		}
 		log.V(1).Info("parentRef resolved", "name", ref.Name, "kind", ref.Kind, "namespace", ns)
 	}
@@ -244,11 +255,12 @@ func (r *InferencePoolConfigController) syncPoolStatus(ctx context.Context, ipc 
 
 	if err := r.Client.Status().Patch(ctx, ipc, patch); err != nil {
 		log.Error(err, "failed to patch status")
-		return err
+		return false, err
 	}
 
 	log.Info("status conditions patched successfully", "lastSyncedTime", now)
-	return nil
+	// allParentsResolved=true stops the 10s requeue loop in Reconcile.
+	return parentResolved == metav1.ConditionTrue, nil
 }
 
 // isParentCRDAbsent returns true when err indicates the API server does not

@@ -176,7 +176,8 @@ type Command struct {
 	//enable tcp routes
 	flagEnableTCPRoute bool
 	// enable AI inference model feature
-	flagEnableAI bool
+	flagEnableAI                  bool
+	flagAIInferenceGatewayImage   string // Docker image for the InferenceGateway Deployment
 }
 
 var (
@@ -275,6 +276,9 @@ func (c *Command) init() {
 
 	// AI inference model feature flag — mirrors ai.enabled from values.yaml
 	c.flagSet.BoolVar(&c.flagEnableAI, "enable-ai", false, "Enables the AI InferenceModelConfig controller and CRD watcher.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayImage, "ai-inference-gateway-image", "",
+		"Docker image for the InferenceGateway Deployment created by the AI controller. "+
+			"Mirrors ai.inferenceGateway.image from values.yaml.")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")

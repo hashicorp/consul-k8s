@@ -121,6 +121,32 @@ spec:
                           When omitted defaults to "default". Cross-namespace references
                           require both resources to share the same Consul admin partition.
                         type: string
+                stateStore:
+                  description: >-
+                    StateStore locates the shared rate-limit counter as a Consul mesh
+                    service. Required when rateLimit.enabled=true — Consul rejects
+                    the config entry with HTTP 500 if rateLimit is enabled but no
+                    StateStore is provided.
+                  type: object
+                  required:
+                    - service
+                    - localBindPort
+                  properties:
+                    service:
+                      description: >-
+                        Service is the Consul mesh service name of the rate-limit
+                        counter store (e.g. "valkey", "redis"). Must be registered
+                        in the Consul catalog and reachable via service-mesh mTLS.
+                      type: string
+                      minLength: 1
+                    localBindPort:
+                      description: >-
+                        LocalBindPort is the loopback port the gateway's Envoy binds
+                        and the rate-limit processor dials to reach the counter store
+                        (range 1-65535).
+                      type: integer
+                      minimum: 1
+                      maximum: 65535
                 rateLimit:
                   description: >-
                     RateLimit defines optional token- and request-rate-limiting rules
@@ -131,23 +157,44 @@ spec:
                       description: Enabled controls whether rate limiting is active for this pool.
                       type: boolean
                     mode:
-                      description: 'Mode selects the rate-limit algorithm (e.g. "local", "global").'
+                      description: >-
+                        Mode selects the rate-limit algorithm.
+                        soft — V1; per-instance counters with best-effort global sync. Default.
+                        Note: "strict" (V2) is not yet implemented and is rejected by Consul
+                        with HTTP 500. Only "soft" is accepted.
                       type: string
+                      enum:
+                        - soft
                     enforcement:
                       description: >-
                         Enforcement sets the enforcement mode for rate-limit violations.
-                        Typical values: "enforce", "shadow".
+                        deny — requests over limit are rejected (HTTP 429). Default.
+                        shadow — limits tracked but never enforced (dry-run).
                       type: string
+                      enum:
+                        - deny
+                        - shadow
                     countMode:
                       description: >-
                         CountMode determines what is counted against limits.
-                        Typical values: "request", "token".
+                        total — count every request regardless of token direction. Default.
+                        input — count only prompt/input tokens.
+                        output — count only completion/output tokens.
                       type: string
+                      enum:
+                        - total
+                        - input
+                        - output
                     degradeMode:
                       description: >-
-                        DegradeMode controls degradation when the rate-limit store is
-                        unavailable (e.g. "allow", "deny").
+                        DegradeMode controls degradation when the rate-limit StateStore is
+                        unavailable.
+                        fail_closed — reject all requests (HTTP 503). Default.
+                        fail_open_unlimited — admit all requests and emit audit log.
                       type: string
+                      enum:
+                        - fail_closed
+                        - fail_open_unlimited
                     dimensions:
                       description: >-
                         Dimensions lists request attributes used to partition rate-limit
@@ -170,8 +217,9 @@ spec:
                               type: integer
                               format: int64
                             window:
-                              description: Window is the duration of the sliding or fixed window as a Go duration string (e.g. "1s", "1m", "1h").
+                              description: Time unit for the counter window (second, minute, hour, or day).
                               type: string
+                              enum: [second, minute, hour, day]
                         tokens:
                           description: Tokens defines the token-count rate limit.
                           type: object
@@ -181,6 +229,7 @@ spec:
                               format: int64
                             window:
                               type: string
+                              enum: [second, minute, hour, day]
                     global:
                       description: >-
                         Global is an aggregate limit pair applied across all identities
@@ -195,6 +244,7 @@ spec:
                               format: int64
                             window:
                               type: string
+                              enum: [second, minute, hour, day]
                         tokens:
                           type: object
                           properties:
@@ -203,6 +253,7 @@ spec:
                               format: int64
                             window:
                               type: string
+                              enum: [second, minute, hour, day]
                     tierLimits:
                       description: TierLimits sets per-tier request and token limits.
                       type: array
@@ -225,6 +276,7 @@ spec:
                                 format: int64
                               window:
                                 type: string
+                                enum: [second, minute, hour, day]
                           tokens:
                             type: object
                             properties:
@@ -233,6 +285,7 @@ spec:
                                 format: int64
                               window:
                                 type: string
+                                enum: [second, minute, hour, day]
                     tierBindings:
                       description: TierBindings maps SPIFFE identities to rate-limit tiers.
                       type: array
@@ -270,6 +323,7 @@ spec:
                                 format: int64
                               window:
                                 type: string
+                                enum: [second, minute, hour, day]
                           tokens:
                             type: object
                             properties:
@@ -278,6 +332,7 @@ spec:
                                 format: int64
                               window:
                                 type: string
+                                enum: [second, minute, hour, day]
                 routing:
                   description: >-
                     Routing defines optional traffic-routing, failover, retry, and

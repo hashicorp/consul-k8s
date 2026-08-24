@@ -1,0 +1,20 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+#
+# Minimal InferenceGateway — only required fields.
+# References an InferencePoolConfig in the same namespace.
+#
+# Apply:
+#   kubectl apply -f inferencegateway-minimal.yaml
+# Watch status:
+#   kubectl get igw my-inference-gateway -n default -w
+# Describe:
+#   kubectl describe igw my-inference-gateway -n default
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: InferenceGateway
+metadata:
+  name: my-inference-gateway
+  namespace: default
+spec:
+  poolRef:
+    name: test-pool-full   # must match an InferencePoolConfig in the same namespace

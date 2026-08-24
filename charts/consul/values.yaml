@@ -3849,6 +3849,33 @@ ai:
           memory: "256Mi"
           cpu: "500m"
 
+  inferenceGateway:
+    # The container image used by the InferenceGateway Deployment.
+    # The controller creates one Deployment per InferenceGateway resource in the
+    # cluster; this image is the process that receives inference traffic and
+    # forwards it to the backing InferencePoolConfig backends.
+    #
+    # Examples:
+    #
+    # ```yaml
+    # image: "hashicorp/consul-inference-gateway:0.1.0"
+    # image: "myregistry/my-inference-gateway:latest"
+    # ```
+    # @default: hashicorp/consul-inference-gateway:<latest version>
+    # @type: string
+    image: "hashicorp/consul-inference-gateway:0.1.0"
+
+    # Resource requests and limits for the InferenceGateway Deployment containers.
+    # @recurse: false
+    # @type: map
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+
   agent:
     defaults:
       # The port the agent interceptor listens on inside the pod.

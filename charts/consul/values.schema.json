@@ -30,14 +30,22 @@
                 },
                 "inferenceProtocol": {
                   "type": "string",
-                  "enum": ["openai", "anthropic", "bedrock"],
+                  "enum": [
+                    "openai",
+                    "anthropic",
+                    "bedrock"
+                  ],
                   "description": "Wire protocol used to communicate with the upstream LLM."
                 },
                 "resources": {
                   "type": "object",
                   "properties": {
-                    "requests": { "$ref": "#/definitions/resourceList" },
-                    "limits":   { "$ref": "#/definitions/resourceList" }
+                    "requests": {
+                      "$ref": "#/definitions/resourceList"
+                    },
+                    "limits": {
+                      "$ref": "#/definitions/resourceList"
+                    }
                   }
                 }
               },
@@ -60,7 +68,11 @@
                 },
                 "transport": {
                   "type": "string",
-                  "enum": ["streamable-http", "sse", "stdio"],
+                  "enum": [
+                    "streamable-http",
+                    "sse",
+                    "stdio"
+                  ],
                   "description": "MCP wire transport."
                 },
                 "path": {
@@ -76,8 +88,12 @@
                 "resources": {
                   "type": "object",
                   "properties": {
-                    "requests": { "$ref": "#/definitions/resourceList" },
-                    "limits":   { "$ref": "#/definitions/resourceList" }
+                    "requests": {
+                      "$ref": "#/definitions/resourceList"
+                    },
+                    "limits": {
+                      "$ref": "#/definitions/resourceList"
+                    }
                   }
                 }
               },
@@ -125,9 +141,38 @@
                 "resources": {
                   "type": "object",
                   "properties": {
-                    "requests": { "$ref": "#/definitions/resourceList" },
-                    "limits":   { "$ref": "#/definitions/resourceList" }
+                    "requests": {
+                      "$ref": "#/definitions/resourceList"
+                    },
+                    "limits": {
+                      "$ref": "#/definitions/resourceList"
+                    }
                   }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "inferenceGateway": {
+          "type": "object",
+          "description": "InferenceGateway feature configuration. Controls the container image and resources for Deployments created by the InferenceGatewayController.",
+          "properties": {
+            "image": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Container image used by the InferenceGateway Deployment."
+            },
+            "resources": {
+              "type": "object",
+              "description": "Resource requests and limits for the InferenceGateway Deployment containers.",
+              "properties": {
+                "requests": {
+                  "$ref": "#/definitions/resourceList"
+                },
+                "limits": {
+                  "$ref": "#/definitions/resourceList"
                 }
               },
               "additionalProperties": false

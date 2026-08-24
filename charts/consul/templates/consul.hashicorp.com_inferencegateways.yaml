@@ -1,0 +1,161 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: inferencegateways.consul.hashicorp.com
+spec:
+  group: consul.hashicorp.com
+  names:
+    kind: InferenceGateway
+    listKind: InferenceGatewayList
+    plural: inferencegateways
+    singular: inferencegateway
+    shortNames:
+      - igw
+    categories:
+      - all
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Whether the controller has successfully reconciled this resource.
+      jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Synced
+      type: string
+    - description: The InferencePoolConfig this gateway references.
+      jsonPath: .spec.poolRef.name
+      name: Pool
+      type: string
+    - description: The age of the resource.
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          InferenceGateway is the entry-point for AI inference traffic in a namespace.
+          It references an InferencePoolConfig (via spec.poolRef) that defines the
+          pool of backends, rate-limit rules, and routing policy the gateway enforces.
+          The controller resolves the reference at reconcile time to access the full
+          pool configuration. The Consul connect-inject controller reconciles the
+          gateway state and surfaces the result as status conditions.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: InferenceGatewaySpec defines the desired state of InferenceGateway.
+            properties:
+              poolRef:
+                description: |-
+                  poolRef references the InferencePoolConfig this gateway fronts.
+                  The controller uses this reference to look up the full pool configuration
+                  (backends, rate-limit rules, routing policy) at reconcile time.
+                  The referenced pool must exist in the same namespace.
+                properties:
+                  name:
+                    description: name is the name of the InferencePoolConfig to attach to.
+                    minLength: 1
+                    type: string
+                required:
+                  - name
+                type: object
+            required:
+              - poolRef
+            type: object
+          status:
+            description: InferenceGatewayStatus defines the observed state of InferenceGateway.
+            properties:
+              conditions:
+                description: |-
+                  conditions represent the current state of the InferenceGateway resource.
+                  Each condition has a unique type and reflects the status of a specific
+                  aspect of the resource.
+
+                  Standard condition types include:
+                    - "Available":   the resource is fully functional.
+                    - "Progressing": the resource is being created or updated.
+                    - "Degraded":    the resource failed to reach or maintain its desired state.
+
+                  The status of each condition is one of True, False, or Unknown.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                        - "True"
+                        - "False"
+                        - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                    - lastTransitionTime
+                    - message
+                    - reason
+                    - status
+                    - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                  - type
+                x-kubernetes-list-type: map
+              lastSyncedTime:
+                description: lastSyncedTime is the last time the controller successfully
+                  reconciled this resource.
+                format: date-time
+                type: string
+            type: object
+        required:
+          - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

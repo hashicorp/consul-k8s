@@ -19,7 +19,9 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -146,14 +148,16 @@ type Controller struct {
 	NodeMeta             map[string]string
 }
 
-// Reconcile reads the state of an Endpoints object for a Kubernetes Service and reconciles Consul services which
-// correspond to the Kubernetes Service. These events are driven by changes to the Pods backing the Kube service.
+// +kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch
+
+// Reconcile reads the state of a Service's EndpointSlices and reconciles Consul
+// services which correspond to the Kubernetes Service. These events are driven
+// by changes to the Pods backing the Kube service.
 func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var errs error
-	var serviceEndpoints corev1.Endpoints
 
 	// requeueForEndpointsLag is set to true when registration is skipped because the
-	// Endpoints object hasn't yet been populated with a Pod's IP, even though the Pod
+	// EndpointSlice object hasn't yet been populated with a Pod's IP, even though the Pod
 	// already has one. This is a transient startup condition, so we requeue to retry.
 	requeueForEndpointsLag := false
 
@@ -174,39 +178,54 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 		return ctrl.Result{}, err
 	}
 
-	err = r.Client.Get(ctx, req.NamespacedName, &serviceEndpoints)
+	serviceName := req.Name
+	serviceNamespace := req.Namespace
 
-	// If the endpoints object has been deleted (and we get an IsNotFound
-	// error), we need to deregister all instances in Consul for that service.
-	if k8serrors.IsNotFound(err) {
+	var endpointSliceList discoveryv1.EndpointSliceList
+	if err := r.Client.List(ctx, &endpointSliceList, client.InNamespace(req.Namespace), client.MatchingLabels{
+		discoveryv1.LabelServiceName: req.Name,
+	}); err != nil {
+		r.Log.Error(err, "failed to list EndpointSlices", "name", req.Name, "ns", req.Namespace)
+		return ctrl.Result{}, err
+	}
+
+	if len(endpointSliceList.Items) == 0 {
 		// Deregister all instances in Consul for this service. The function deregisterService handles
 		// the case where the Consul service name is different from the Kubernetes service name.
 		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
 		return ctrl.Result{RequeueAfter: requeueAfter}, err
-	} else if err != nil {
-		r.Log.Error(err, "failed to get Endpoints", "name", req.Name, "ns", req.Namespace)
-		return ctrl.Result{}, err
 	}
 
-	r.Log.Info("retrieved", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
-
-	// If the endpoints object has the label "consul.hashicorp.com/service-ignore" set to true, deregister all instances in Consul for this service.
-	// It is possible that the endpoints object has never been registered, in which case deregistration is a no-op.
-	if isLabeledIgnore(serviceEndpoints.Labels) {
-		// We always deregister the service to handle the case where a user has registered the service, then added the label later.
-		r.Log.Info("ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", req.Name, "namespace", req.Namespace)
-		requeueAfter, err := r.deregisterService(ctx, apiClient, req.Name, req.Namespace, nil)
-		return ctrl.Result{RequeueAfter: requeueAfter}, err
+	for _, endpointSlice := range endpointSliceList.Items {
+		if endpointSlice.Namespace != "" {
+			serviceNamespace = endpointSlice.Namespace
+		}
+		if endpointSlice.Labels[discoveryv1.LabelServiceName] != "" {
+			serviceName = endpointSlice.Labels[discoveryv1.LabelServiceName]
+		}
+		if isLabeledIgnore(endpointSlice.Labels) {
+			r.Log.Info("ignoring endpoint labeled with `consul.hashicorp.com/service-ignore: \"true\"`", "name", serviceName, "namespace", serviceNamespace)
+			requeueAfter, err := r.deregisterService(ctx, apiClient, serviceName, serviceNamespace, nil)
+			return ctrl.Result{RequeueAfter: requeueAfter}, err
+		}
 	}
 
-	// deregisterEndpointAddress stores every IP that corresponds to a Pod in the Endpoints object. It is used to compare
+	r.Log.Info("retrieved", "name", serviceName, "ns", serviceNamespace)
+
+	// deregisterEndpointAddress stores every IP that corresponds to a Pod in the EndpointSlice objects. It is used to compare
 	// against service instances in Consul to deregister them if they are not in the map.
 	deregisterEndpointAddress := map[string]bool{}
 
-	// Register all addresses of this Endpoints object as service instances in Consul.
-	for _, subset := range serviceEndpoints.Subsets {
-		for address, healthStatus := range mapAddresses(subset) {
-			if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+	// Register all addresses of this service's EndpointSlices as service instances in Consul.
+	for _, endpointSlice := range endpointSliceList.Items {
+		for _, endpoint := range endpointSlice.Endpoints {
+			for _, addressIP := range endpoint.Addresses {
+				address := corev1.EndpointAddress{IP: addressIP, TargetRef: endpoint.TargetRef}
+				healthStatus := api.HealthPassing
+				if endpoint.Conditions.Ready != nil && !*endpoint.Conditions.Ready {
+					healthStatus = api.HealthCritical
+				}
+				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
 				var pod corev1.Pod
 				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
 				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
@@ -225,8 +244,8 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				}
 
 				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
-				if ok && serviceEndpoints.Name != svcName {
-					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+				if ok && serviceName != svcName {
+					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceName, "ns", serviceNamespace)
 					// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
 					deregisterEndpointAddress[address.IP] = true
 					continue
@@ -240,7 +259,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					// instead of treating this as a terminal skip.
 					if address.IP == "" && pod.Status.PodIP != "" {
 						requeueForEndpointsLag = true
-						r.Log.Info("Endpoints address not yet populated for pod with valid IP; will requeue",
+						r.Log.Info("EndpointSlice address not yet populated for pod with valid IP; will requeue",
 							"pod", pod.Name, "namespace", pod.Namespace,
 							"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
 						continue
@@ -262,23 +281,25 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 				if hasBeenInjected(pod) {
 					if isConsulDataplaneSupported(pod) {
+						serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
 						if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
-							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+							r.Log.Error(err, "failed to register services or health check", "name", serviceName, "ns", serviceNamespace)
 							errs = multierror.Append(errs, err)
 						}
 						// Build the deregisterEndpointAddress map up for deregistering service instances later.
 						deregisterEndpointAddress[address.IP] = false
 					} else {
-						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceName, "ns", serviceNamespace)
 						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
 						if err != nil {
-							r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+							r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceName, "ns", serviceNamespace)
 							errs = multierror.Append(errs, err)
 							continue
 						}
-						r.Log.Info("updating health check on the Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+						r.Log.Info("updating health check on the Consul client", "name", serviceName, "ns", serviceNamespace)
 						if err = r.updateHealthCheckOnConsulClient(nodeAgentClientCfg, pod, serviceEndpoints, healthStatus); err != nil {
-							r.Log.Error(err, "failed to update health check on Consul client", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace, "consul-client-ip", pod.Status.HostIP)
+							r.Log.Error(err, "failed to update health check on Consul client", "name", serviceName, "ns", serviceNamespace, "consul-client-ip", pod.Status.HostIP)
 							errs = multierror.Append(errs, err)
 						}
 						// We want to skip the rest of the reconciliation because we only care about updating health checks for existing services
@@ -290,28 +311,30 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 				}
 
 				if isGateway(pod) {
+					serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
 					if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
-						r.Log.Error(err, "failed to register gateway or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+						r.Log.Error(err, "failed to register gateway or health check", "name", serviceName, "ns", serviceNamespace)
 						errs = multierror.Append(errs, err)
 					}
 					// Build the deregisterEndpointAddress map up for deregistering service instances later.
 					deregisterEndpointAddress[address.IP] = false
 				}
-			}
-		}
-	}
+				} // end if address.TargetRef != nil
+			} // end for _, addressIP
+			} // end for _, endpoint
+		} // end for _, endpointSlice
 
-	// Compare service instances in Consul with addresses in Endpoints. If an address is not in Endpoints, deregister
-	// from Consul. This uses deregisterEndpointAddress which is populated with the addresses in the Endpoints object to
+	// Compare service instances in Consul with addresses in EndpointSlices. If an address is not in EndpointSlices, deregister
+	// from Consul. This uses deregisterEndpointAddress which is populated with the addresses in the EndpointSlice objects to
 	// either deregister or keep during the registration codepath.
-	requeueAfter, err := r.deregisterService(ctx, apiClient, serviceEndpoints.Name, serviceEndpoints.Namespace, deregisterEndpointAddress)
+	requeueAfter, err := r.deregisterService(ctx, apiClient, serviceName, serviceNamespace, deregisterEndpointAddress)
 	if err != nil {
-		r.Log.Error(err, "failed to deregister endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
+		r.Log.Error(err, "failed to deregister endpoints", "name", serviceName, "ns", serviceNamespace)
 		errs = multierror.Append(errs, err)
 	}
 
-	// If we skipped registering a pod because its Endpoints address wasn't populated yet,
-	// requeue so we retry once the Endpoints object catches up. Use the shorter of the two
+	// If we skipped registering a pod because its EndpointSlice address wasn't populated yet,
+	// requeue so we retry once the EndpointSlice object catches up. Use the shorter of the two
 	// intervals (the existing deregister requeue vs. our lag requeue) so neither is delayed.
 	if requeueForEndpointsLag {
 		if requeueAfter == 0 || endpointsLagRequeueInterval < requeueAfter {
@@ -328,7 +351,7 @@ func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
 
 func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Endpoints{}).
+		For(&discoveryv1.EndpointSlice{}).
 		Complete(r)
 }
 

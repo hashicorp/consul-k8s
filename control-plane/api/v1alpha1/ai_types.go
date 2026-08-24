@@ -21,6 +21,9 @@ const (
 
 	// InferencePoolConfigKind is the Kind string for the InferencePoolConfig CRD.
 	InferencePoolConfigKind = "InferencePoolConfig"
+
+	// InferenceGatewayKind is the Kind string for the InferenceGateway CRD.
+	InferenceGatewayKind = "InferenceGateway"
 )
 
 func init() {
@@ -28,6 +31,7 @@ func init() {
 	SchemeBuilder.Register(&McpServerConfig{}, &McpServerConfigList{})
 	SchemeBuilder.Register(&AgentConfig{}, &AgentConfigList{})
 	SchemeBuilder.Register(&InferencePoolConfig{}, &InferencePoolConfigList{})
+	SchemeBuilder.Register(&InferenceGateway{}, &InferenceGatewayList{})
 }
 
 // +genclient
@@ -394,6 +398,15 @@ type InferencePoolConfigSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	ParentRefs []InferencePoolParentRef `json:"parentRefs"`
 
+	// StateStore locates the shared rate-limit counter as a Consul mesh service.
+	// Required when rateLimit.enabled=true — Consul rejects the config entry
+	// with HTTP 500 if rateLimit is enabled but no StateStore is provided.
+	// Consul renders the StateStore as an mTLS, intention-gated outbound TCP
+	// upstream in the gateway's Envoy; the rate-limit processor dials it on
+	// LocalBindPort using the plain RESP protocol.
+	// +optional
+	StateStore *InferencePoolStateStore `json:"stateStore,omitempty"`
+
 	// RateLimit defines optional token- and request-rate-limiting rules for
 	// this pool. When omitted, no rate limiting is applied.
 	// +optional
@@ -403,6 +416,25 @@ type InferencePoolConfigSpec struct {
 	// rules for this pool. When omitted, Consul applies its built-in defaults.
 	// +optional
 	Routing *InferencePoolRouting `json:"routing,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolStateStore locates the shared rate-limit counter as a Consul
+// mesh service. Both fields are required when rateLimit.enabled=true.
+type InferencePoolStateStore struct {
+	// Service is the Consul mesh service name of the rate-limit counter store
+	// (e.g. "valkey", "redis"). Must be registered in the Consul service catalog
+	// and reachable via service-mesh mTLS from the gateway.
+	// +kubebuilder:validation:MinLength=1
+	Service string `json:"service"`
+
+	// LocalBindPort is the loopback port that the gateway's Envoy binds and that
+	// the rate-limit processor dials to reach the counter store.
+	// Store endpoint failover is handled by Envoy (EDS), so this port is stable.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	LocalBindPort int `json:"localBindPort"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -472,26 +504,40 @@ type InferencePoolRateLimit struct {
 	Enabled bool `json:"enabled,omitempty"`
 
 	// Enforcement sets the enforcement mode for rate-limit violations.
-	// Typical values: "enforce" (hard-block), "shadow" (observe only).
+	//   deny   — requests over limit are rejected (HTTP 429). Default.
+	//   shadow — limits are tracked but never enforced (dry-run / observe only).
+	// +kubebuilder:validation:Enum=deny;shadow
 	// +optional
 	Enforcement string `json:"enforcement,omitempty"`
 
-	// Mode selects the rate-limit algorithm (e.g. "local", "global").
+	// Mode selects the rate-limit algorithm.
+	//   soft — V1 processor; per-instance counters with best-effort global
+	//          sync. Currently the only implemented option. Default.
+	// Note: "strict" (V2) is defined in the Consul API but not yet implemented;
+	// the server rejects it with HTTP 500. Only "soft" is accepted.
+	// +kubebuilder:validation:Enum=soft
 	// +optional
 	Mode string `json:"mode,omitempty"`
 
 	// CountMode determines what is counted against limits.
-	// Typical values: "request", "token".
+	//   total  — count every request regardless of token direction. Default.
+	//   input  — count only prompt/input tokens.
+	//   output — count only completion/output tokens.
+	// +kubebuilder:validation:Enum=total;input;output
 	// +optional
 	CountMode string `json:"countMode,omitempty"`
 
 	// Dimensions lists the request attributes used to partition rate-limit
-	// counters (e.g. ["identity", "model"]).
+	// counters. Valid entries: agent, tier, global, model.
+	// An empty list defaults (processor-side) to [tier, global].
 	// +optional
 	Dimensions []string `json:"dimensions,omitempty"`
 
 	// DegradeMode controls the degradation behaviour when the rate-limit
-	// store is unavailable (e.g. "allow", "deny").
+	// StateStore is unavailable.
+	//   fail_closed          — reject all requests (HTTP 503). Default.
+	//   fail_open_unlimited  — admit all requests and emit a loud audit log.
+	// +kubebuilder:validation:Enum=fail_closed;fail_open_unlimited
 	// +optional
 	DegradeMode string `json:"degradeMode,omitempty"`
 
@@ -521,14 +567,16 @@ type InferencePoolRateLimit struct {
 // +k8s:deepcopy-gen=true
 
 // InferencePoolLimit defines a single rate-limit threshold expressed as a count
-// over a time window.
+// over a named time window understood by the Consul AI Gateway.
 type InferencePoolLimit struct {
 	// Count is the maximum allowed number of requests or tokens in the window.
 	// +optional
 	Count int64 `json:"count,omitempty"`
 
-	// Window is the duration of the sliding or fixed window expressed as a
-	// Go duration string (e.g. "1s", "1m", "1h").
+	// Window is the time-unit for the rate-limit counter.
+	// Must be one of: second, minute, hour, day.
+	// Defaults to minute when omitted.
+	// +kubebuilder:validation:Enum=second;minute;hour;day
 	// +optional
 	Window string `json:"window,omitempty"`
 }
@@ -832,4 +880,99 @@ type InferencePoolWeightedTarget struct {
 
 	// Weight is the relative traffic weight assigned to this cluster.
 	Weight int `json:"weight"`
+}
+
+// ---------------------------------------------------------------------------
+// InferenceGateway
+// ---------------------------------------------------------------------------
+
+// +genclient
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Namespaced,shortName=igw,categories=all
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`,description="Number of gateway Deployment replicas that are ready."
+// +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=='Ready')].status`,description="Whether the controller has successfully reconciled this resource."
+// +kubebuilder:printcolumn:name="Pool",type=string,JSONPath=`.spec.poolRef.name`,description="The InferencePoolConfig this gateway references."
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+
+// InferenceGateway is the entry-point for AI inference traffic in a namespace.
+// It references an InferencePoolConfig (via spec.poolRef) that defines the
+// pool of backends, rate-limit rules, and routing policy the gateway enforces.
+// The controller resolves the reference at reconcile time to access the full
+// pool configuration. The Consul connect-inject controller reconciles the
+// gateway state and surfaces the result as status conditions.
+type InferenceGateway struct {
+	// Standard Kubernetes type metadata.
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is standard object metadata.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// spec defines the desired state of InferenceGateway.
+	// +required
+	Spec InferenceGatewaySpec `json:"spec"`
+
+	// status defines the observed state of InferenceGateway.
+	// +optional
+	Status InferenceGatewayStatus `json:"status,omitempty"`
+}
+
+// InferenceGatewaySpec defines the desired state of InferenceGateway.
+type InferenceGatewaySpec struct {
+	// poolRef references the InferencePoolConfig this gateway fronts.
+	// The controller uses this reference to look up the full pool configuration
+	// (backends, rate-limit rules, routing policy) at reconcile time.
+	// The referenced pool must exist in the same namespace.
+	// +required
+	PoolRef InferencePoolRef `json:"poolRef"`
+}
+
+// InferencePoolRef is a reference to an InferencePoolConfig in the same
+// namespace as the InferenceGateway.
+type InferencePoolRef struct {
+	// name is the name of the InferencePoolConfig to attach to.
+	// +required
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+}
+
+// InferenceGatewayStatus defines the observed state of InferenceGateway.
+type InferenceGatewayStatus struct {
+	// conditions represent the current state of the InferenceGateway resource.
+	// Each condition has a unique type and reflects the status of a specific
+	// aspect of the resource.
+	//
+	// Standard condition types include:
+	//   - "Available":    the resource is fully functional.
+	//   - "Progressing":  the resource is being created or updated.
+	//   - "Degraded":     the resource failed to reach or maintain its desired state.
+	//
+	// The status of each condition is one of True, False, or Unknown.
+	// +listType=map
+	// +listMapKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// readyReplicas is the number of gateway Deployment replicas that are
+	// currently Ready, as reported by the Deployment status. Mirrors
+	// apps/v1.DeploymentStatus.ReadyReplicas so consumers can read gateway
+	// readiness directly from the InferenceGateway object without querying
+	// the Deployment separately.
+	// +optional
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
+
+	// lastSyncedTime is the last time the controller successfully reconciled
+	// this resource.
+	// +optional
+	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// InferenceGatewayList contains a list of InferenceGateway resources.
+type InferenceGatewayList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []InferenceGateway `json:"items"`
 }

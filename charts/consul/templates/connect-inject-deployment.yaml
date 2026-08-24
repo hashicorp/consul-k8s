@@ -318,7 +318,8 @@ spec:
                 -enabe-tcp-route=true \
                 {{- end }}
                 {{- if and .Values.ai .Values.ai.enabled }}
-                -enable-ai=true
+                -enable-ai=true \
+                -ai-inference-gateway-image="{{ .Values.ai.inferenceGateway.image }}" \
                 {{- end }}
 
 

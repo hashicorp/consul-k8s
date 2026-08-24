@@ -2,19 +2,64 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # Full InferencePoolConfig sample — exercises every optional field.
-# Demonstrates: parentRefs, rateLimit (tiers, models, bindings), routing
-# (fallback, retry, timeout, scoring, matchRules, complianceMap, budget,
-# cache, mirror).
 #
-# Apply:
-#   kubectl apply -f inferencepoolconfig-full.yaml
-# Watch status:
-#   kubectl get ipc test-pool-full -n default -w
-# Query conditions:
-#   kubectl get ipc test-pool-full -n default \
-#     -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
-# Delete:
-#   kubectl delete ipc test-pool-full -n default
+# ── Consul AI Gateway rate-limit field reference ─────────────────────────────
+#
+#  enforcement  : deny (default — HTTP 429) | shadow (dry-run only)
+#  mode         : soft (default — V1, per-instance) | strict (V2, global)
+#  countMode    : total (default) | input | output
+#  degradeMode  : fail_closed (default — HTTP 503) | fail_open_unlimited
+#  dimensions   : subset of { agent, tier, global, model }
+#
+#  window (Unit in Consul structs):
+#    second | minute | hour | day
+#    ↑ THESE ARE THE ONLY VALID VALUES. Do NOT use Go-duration strings
+#    like "1m", "1h", "1s" — Consul rejects them with HTTP 500.
+#
+#    When window is OMITTED entirely the Consul processor defaults to
+#    "minute" — NOT "second". Empty = minute is intentional by design
+#    (see agent/structs/config_entry_ai_gateway.go:validateAIGatewayLimitUnit).
+#
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Lifecycle behaviour:
+#   • Controller resolves every parentRef every reconcile.
+#   • While ANY parentRef is not found the controller sets:
+#       ParentResolved=False  (reason: ParentNotFound)
+#       Ready=False
+#     and requeues after 10 s — so the pool self-heals automatically
+#     once the parent InferenceGateway is created, with no manual
+#     intervention required.
+#   • Once all parentRefs exist AND spec.enabled=true all three conditions
+#     flip to True and reconciliation stops requeuing.
+#
+# Quick commands:
+#   Apply:
+#     kubectl apply -f inferencepoolconfig-full.yaml
+#
+#   Watch status (live):
+#     kubectl get ipc test-pool-full -n default -w
+#
+#   Query conditions:
+#     kubectl get ipc test-pool-full -n default \
+#       -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}'
+#
+#   Force reconcile (touch):
+#     kubectl annotate ipc test-pool-full -n default trigger/reconcile="$(date +%s)" --overwrite
+#
+#   Delete:
+#     kubectl delete ipc test-pool-full -n default
+#
+# Expected happy-path conditions (once my-inference-gateway exists):
+#   Accepted=True
+#   ParentResolved=True (reason: Reconciled)
+#   Ready=True          (reason: Reconciled)
+#
+# While parent is missing (requeues every 10s):
+#   Accepted=True
+#   ParentResolved=False (reason: ParentNotFound)
+#   Ready=False
+# ---------------------------------------------------------------------------
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: InferencePoolConfig
 metadata:
@@ -24,70 +69,105 @@ metadata:
     app: test
     env: kind
 spec:
+  # ---------------------------------------------------------------------------
+  # enabled — master switch for this pool.
+  # false → pool is parked; Ready=False, Consul entry is still written.
+  # ---------------------------------------------------------------------------
   enabled: true
-  # priority: 1000 # to be implemented
 
   # ---------------------------------------------------------------------------
   # parentRefs — attach this pool to one or more InferenceGateway resources.
-  # The controller resolves each ref and sets ParentResolved=True only when
-  # every referenced object exists in the cluster.
   # ---------------------------------------------------------------------------
   parentRefs:
-    - kind: InferenceModelConfig    # replace with InferenceGateway once that CRD is available
-      name: consul-ai-gateway      # replace with a real InferenceModelConfig name
+    - kind: InferenceGateway
+      name: my-inference-gateway   # must exist in namespace below
       namespace: default
 
   # ---------------------------------------------------------------------------
-  # rateLimit — optional token- and request-rate-limiting rules.
+  # stateStore — REQUIRED when rateLimit.enabled=true.
+  # Identifies the Consul mesh service that holds rate-limit counters.
+  # Consul rejects the config entry with HTTP 500 if rateLimit.enabled=true
+  # and stateStore is missing or has an empty service name.
+  #
+  # service       : Consul catalog service name of the counter store.
+  #                 The service must be registered and reachable via mTLS.
+  #                 Common choices: "valkey" (recommended), "redis".
+  # localBindPort : Loopback port the gateway's Envoy binds so the rate-limit
+  #                 processor can dial 127.0.0.1:<localBindPort> using RESP.
+  #                 Choose any free port not used by the gateway process.
+  # ---------------------------------------------------------------------------
+  stateStore:
+    service: valkey          # must match a Consul service catalog entry
+    localBindPort: 6379      # loopback port for the rate-limit processor
+
+  # ---------------------------------------------------------------------------
+  # rateLimit
   # ---------------------------------------------------------------------------
   rateLimit:
     enabled: true
-    mode: global          # "local" | "global"
-    enforcement: enforce  # "enforce" | "shadow"
-    countMode: token      # "request" | "token"
-    degradeMode: allow    # "allow" | "deny"
-    dimensions:
-      - identity
-      - model
 
-    # Fallback limit for requests not matched by a tier or model rule.
+    # soft   = V1 per-instance counters (Consul default)
+    # strict = V2 strongly-consistent global counters
+    mode: soft
+
+    # deny   = reject over-limit requests HTTP 429 (Consul default)
+    # shadow = track but never enforce (dry-run)
+    enforcement: deny
+
+    # total  = count every request (Consul default)
+    # input  = count only prompt tokens
+    # output = count only completion tokens
+    countMode: total
+
+    # fail_closed         = HTTP 503 when StateStore unavailable (Consul default)
+    # fail_open_unlimited = admit all + audit log
+    degradeMode: fail_closed
+
+    # Valid entries: agent | tier | global | model
+    # Omit → processor defaults to [tier, global]
+    dimensions:
+      - tier
+      - global
+
+    # default — fallback budget for identities that match no tier.
+    # window values: second | minute (Consul default when omitted) | hour | day
     default:
       requests:
         count: 200
-        window: 1m
+        window: minute
       tokens:
         count: 100000
-        window: 1h
+        window: hour
 
-    # Aggregate limit across all callers for this pool.
+    # global — aggregate cap across ALL callers.
     global:
       requests:
         count: 2000
-        window: 1m
+        window: minute
       tokens:
         count: 5000000
-        window: 1h
+        window: hour
 
-    # Per-tier limits.
+    # tierLimits — per-tier allocations.
     tierLimits:
       - tier: gold
         maxCompletionTokensCap: 8192
         requests:
           count: 500
-          window: 1m
+          window: minute
         tokens:
           count: 500000
-          window: 1h
+          window: hour
       - tier: silver
         maxCompletionTokensCap: 4096
         requests:
           count: 100
-          window: 1m
+          window: minute
         tokens:
           count: 100000
-          window: 1h
+          window: hour
 
-    # Map SPIFFE identities to tiers.
+    # tierBindings — map SPIFFE identities to tiers.
     tierBindings:
       - tier: gold
         spiffeIDs:
@@ -99,33 +179,33 @@ spec:
           - spiffe://cluster.local/ns/staging/sa/frontend
         namespace: staging
 
-    # Per-model limits override tier/global limits.
+    # modelLimits — per-model overrides.
     modelLimits:
       - model: gpt-4o
         requests:
           count: 50
-          window: 1m
+          window: minute
         tokens:
           count: 200000
-          window: 1h
+          window: hour
       - model: claude-3-sonnet
         requests:
           count: 30
-          window: 1m
+          window: minute
         tokens:
           count: 150000
-          window: 1h
+          window: hour
 
   # ---------------------------------------------------------------------------
-  # routing — optional traffic-routing, failover, retry, and caching rules.
+  # routing
   # ---------------------------------------------------------------------------
   routing:
-    # Deprecated ordered fallback list (kept for backward compat).
+    configValidation: strict
+
     fallbackChain:
       - backend-us-east
       - backend-eu-west
 
-    # Structured cross-provider failover.
     fallback:
       retryOn:
         - 5xx
@@ -134,19 +214,16 @@ spec:
       maxTiers: 3
       perTryTimeout: 30s
 
-    # Automatic retry on the same backend.
     retry:
       maxAttempts: 3
       retryOn:
         - 5xx
         - reset
 
-    # Connection and end-to-end timeouts.
     timeout:
       connect: 5s
       request: 120s
 
-    # Backend-selection scoring.
     scoring:
       scorers:
         - latency-aware
@@ -157,7 +234,6 @@ spec:
         - cluster: backend-eu-west
           weight: 30
 
-    # Request-matching rules — first match wins.
     matchRules:
       - when:
           path: /v1/chat/completions
@@ -182,7 +258,6 @@ spec:
         requireCapabilities:
           - embeddings
 
-    # Compliance restrictions keyed by label.
     complianceMap:
       gdpr:
         allowedRegions:
@@ -195,7 +270,6 @@ spec:
           - us-east-1
         denyModels: []
 
-    # Open-ended passthrough fields — raw JSON forwarded to Consul unchanged.
     budget:
       maxDailyUSD: 50.00
       alertThresholdPct: 80
@@ -209,5 +283,3 @@ spec:
       enabled: false
       destination: backend-shadow
       percentage: 5
-
-    configValidation: strict   # "strict" | "warn" | "off"
