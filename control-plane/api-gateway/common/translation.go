@@ -11,8 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	// gwv1 "sigs.k8s.io/gateway-api/apis/v1alpha2"
-
 	"github.com/hashicorp/consul/api"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -253,6 +251,7 @@ func translateExtProcProcessingDirection(d *v1alpha1.RouteExtProcProcessingDirec
 		MaxBodyBytes: d.MaxBodyBytes,
 	}
 }
+
 // translateRouteExtAuthzFilter translates the ext_authz portion of a
 // RouteAuthFilter into the Consul http-route ExtAuthz filter. Returns nil when
 // the RouteAuthFilter does not configure ext_authz.

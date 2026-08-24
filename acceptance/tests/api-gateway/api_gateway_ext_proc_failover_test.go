@@ -27,7 +27,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -44,8 +44,8 @@ import (
 const (
 	extProcCommonPath = "../fixtures/cases/api-gateways/ext-proc-failover/common"
 	extProcSinglePath = "../fixtures/cases/api-gateways/ext-proc-failover/single"
-	extProcTwoPath = "../fixtures/cases/api-gateways/ext-proc-failover/two"
-	extProcAppsPath = "../fixtures/cases/api-gateways/ext-proc-failover/apps"
+	extProcTwoPath    = "../fixtures/cases/api-gateways/ext-proc-failover/two"
+	extProcAppsPath   = "../fixtures/cases/api-gateways/ext-proc-failover/apps"
 )
 
 // extProcImages is the ordered list of (subdirectory, image tag) pairs that
@@ -62,7 +62,7 @@ var extProcImages = []struct{ dir, tag string }{
 // Gateway names for the two topologies under test.
 const (
 	extProcSingleGateway = "api-gateway-single"
-	extProcTwoGateway = "api-gateway"
+	extProcTwoGateway    = "api-gateway"
 )
 
 // extProcServerPeer / extProcClientPeer are the Consul peering names as seen
@@ -671,14 +671,14 @@ func deployExtProcStack(t *testing.T, opts *terratestk8s.KubectlOptions) {
 	// that overlay's Gateway CRD (controller-managed, named after the Gateway).
 	gatewayDeployment := map[string]string{
 		extProcSinglePath: extProcSingleGateway,
-		extProcTwoPath: extProcTwoGateway,
+		extProcTwoPath:    extProcTwoGateway,
 	}
 
 	for _, dir := range []string{
 		extProcCommonPath,
-		 extProcSinglePath,
+		extProcSinglePath,
 		extProcTwoPath} {
-		
+
 		logger.Logf(t, "[%s] kubectl apply -k %s", opts.ContextName, dir)
 		out, err := k8s.RunKubectlAndGetOutputE(t, opts, "apply", "-k", dir)
 		logger.Logf(t, "[%s] apply -k %s output:\n%s", opts.ContextName, dir, out)
@@ -807,7 +807,7 @@ func extProcGatewayURL(t *testing.T, ctx environment.TestContext, gatewayName st
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	var address string
 	retryCheckWithWait(t, 120, 2*time.Second, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: gatewayName, Namespace: "default"}, &gateway)
 		require.NoError(r, err)
 		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))

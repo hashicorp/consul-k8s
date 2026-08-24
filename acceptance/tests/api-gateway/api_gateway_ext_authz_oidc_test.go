@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
@@ -139,7 +138,7 @@ func TestAPIGateway_ExtAuthz_OIDC(t *testing.T) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
 	var gatewayAddress string
 	retryCheckWithWait(t, 120, 2*time.Second, func(r *retry.R) {
-		var gateway gwv1beta1.Gateway
+		var gateway gwv1.Gateway
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: k8sNamespace}, &gateway)
 		require.NoError(r, err)
 		checkStatusCondition(r, gateway.Status.Conditions, trueCondition("Accepted", "Accepted"))
@@ -147,7 +146,7 @@ func TestAPIGateway_ExtAuthz_OIDC(t *testing.T) {
 		require.Len(r, gateway.Status.Addresses, 1)
 		gatewayAddress = gateway.Status.Addresses[0].Value
 
-		var route gwv1beta1.HTTPRoute
+		var route gwv1.HTTPRoute
 		err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "static-server-route", Namespace: k8sNamespace}, &route)
 		require.NoError(r, err)
 		require.Len(r, route.Status.Parents, 1)
