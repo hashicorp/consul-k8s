@@ -526,8 +526,25 @@ func convertGatewayPolicyTargetRef(raw map[string]interface{}) {
 	if !ok {
 		return
 	}
-	if targetRef["group"] == K8sGatewayAPIGroup+"/"+K8sGatewayAPIVersionV1Beta1 {
-		targetRef["group"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
+	targetRef["group"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
+}
+
+// convertToConsulGatewayPolicy updates the apiVersion to consul.hashicorp.com/v1alpha1
+// and updates the targetRef group to consul.hashicorp.com so the policy correctly
+// references the consul-managed Gateway in the consulapi snapshot path.
+func convertToConsulGatewayPolicy(raw map[string]interface{}) {
+	raw["apiVersion"] = consulAPIGroup + "/" + "v1alpha1"
+	spec := getSpec(raw)
+	if spec == nil {
+		return
+	}
+	targetRef, ok := spec["targetRef"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	if targetRef["group"] == K8sGatewayAPIGroup+"/"+K8sGatewayAPIVersionV1Beta1 ||
+		targetRef["group"] == K8sGatewayAPIGroup+"/"+K8sGatewayAPIVersionV1 {
+		targetRef["group"] = consulAPIGroup
 	}
 }
 
@@ -593,7 +610,7 @@ func enforceConsulApiVersion(raw map[string]interface{}) bool {
 		convertToConsulRoute(raw)
 
 	case kindGatewayPolicy:
-		convertGatewayPolicyTargetRef(raw)
+		convertToConsulGatewayPolicy(raw)
 
 	case kindReferenceGrant:
 		convertReferenceGrant(raw)

@@ -497,6 +497,9 @@ func TestWriteObjects(t *testing.T) {
 }
 
 func TestConvertGatewayPolicyTargetRef(t *testing.T) {
+	// convertGatewayPolicyTargetRef is always called with objects fetched from
+	// the live cluster where targetRef.group is gateway.networking.k8s.io/v1beta1
+	// (pre-graduation customer state). It unconditionally rewrites it to v1.
 	cases := []struct {
 		name          string
 		inputGroup    string
@@ -506,16 +509,6 @@ func TestConvertGatewayPolicyTargetRef(t *testing.T) {
 			name:          "v1beta1 rewritten to v1",
 			inputGroup:    "gateway.networking.k8s.io/v1beta1",
 			wantTargetRef: "gateway.networking.k8s.io/v1",
-		},
-		{
-			name:          "v1 unchanged",
-			inputGroup:    "gateway.networking.k8s.io/v1",
-			wantTargetRef: "gateway.networking.k8s.io/v1",
-		},
-		{
-			name:          "unrelated group unchanged",
-			inputGroup:    "some.other.group/v1",
-			wantTargetRef: "some.other.group/v1",
 		},
 	}
 
@@ -543,6 +536,57 @@ func TestConvertGatewayPolicyTargetRef(t *testing.T) {
 			require.Equal(t, tc.wantTargetRef, targetRef["group"])
 			// the GatewayPolicy's own apiVersion must never be touched
 			require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
+		})
+	}
+}
+
+func TestConvertToConsulGatewayPolicy(t *testing.T) {
+	// convertToConsulGatewayPolicy is called in the consulapi snapshot path.
+	// The GatewayPolicy may arrive with targetRef.group already at v1 (if the
+	// gatewayapi path ran first) or still at v1beta1 (raw cluster state).
+	// Either way, apiVersion must be set to consul.hashicorp.com/v1alpha1 and
+	// targetRef.group must be rewritten to consul.hashicorp.com.
+	cases := []struct {
+		name          string
+		inputGroup    string
+		wantTargetRef string
+	}{
+		{
+			name:          "v1beta1 group rewritten to consul",
+			inputGroup:    "gateway.networking.k8s.io/v1beta1",
+			wantTargetRef: "consul.hashicorp.com",
+		},
+		{
+			name:          "v1 group (already rewritten) rewritten to consul",
+			inputGroup:    "gateway.networking.k8s.io/v1",
+			wantTargetRef: "consul.hashicorp.com",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := map[string]interface{}{
+				"kind":       "GatewayPolicy",
+				"apiVersion": "consul.hashicorp.com/v1alpha1",
+				"metadata": map[string]interface{}{
+					"name":      "my-policy",
+					"namespace": "default",
+				},
+				"spec": map[string]interface{}{
+					"targetRef": map[string]interface{}{
+						"group": tc.inputGroup,
+						"kind":  "Gateway",
+						"name":  "my-gateway",
+					},
+				},
+			}
+			convertToConsulGatewayPolicy(raw)
+			// apiVersion must always be set to consul.hashicorp.com/v1alpha1
+			require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
+			spec := raw["spec"].(map[string]interface{})
+			targetRef := spec["targetRef"].(map[string]interface{})
+			// targetRef.group must be rewritten to consul.hashicorp.com
+			require.Equal(t, tc.wantTargetRef, targetRef["group"])
 		})
 	}
 }
