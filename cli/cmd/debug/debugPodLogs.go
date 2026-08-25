@@ -288,7 +288,7 @@ func (l *LogCapture) getWorkloadLogs() error {
 	l.pushWorkloadContainers()
 	close(l.containersChan)
 
-	// seperate goroutine to close resultsChan
+	// separate goroutine to close resultsChan
 	// as soon as all logCollector workers are done.
 	go func() {
 		wg.Wait()
