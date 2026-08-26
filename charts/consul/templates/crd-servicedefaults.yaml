@@ -190,6 +190,24 @@ spec:
                   recommend using "strict" mode whenever possible and enabling
                   "permissive" mode only when necessary.
                 type: string
+              portDefaults:
+                additionalProperties:
+                  description: ServicePortDefaults contains per-named-port service-default
+                    settings. Fields omitted here continue to use the service-wide
+                    values on the parent ServiceDefaults.
+                  properties:
+                    protocol:
+                      description: |-
+                        Protocol sets the protocol of the named port. Valid values are "tcp",
+                        "http", "http2", and "grpc". When set, this overrides the service-wide
+                        Protocol for traffic on this port, enabling mixed HTTP/TCP services.
+                      type: string
+                  type: object
+                description: |-
+                  PortDefaults allows per-named-port protocol overrides for multiport services.
+                  The map key is the name of the service port (e.g. "http", "admin"). Omitting
+                  this field preserves existing single-port behavior.
+                type: object
               protocol:
                 description: |-
                   Protocol sets the protocol of the service. This is used by Connect proxies for

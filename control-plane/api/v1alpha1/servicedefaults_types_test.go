@@ -354,6 +354,34 @@ func TestServiceDefaults_ToConsul(t *testing.T) {
 				},
 			},
 		},
+		"portDefaults set": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: ServiceDefaultsSpec{
+					Protocol: "tcp",
+					PortDefaults: map[string]ServicePortDefaults{
+						"http":  {Protocol: "http"},
+						"admin": {Protocol: "http2"},
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "foo",
+				Protocol: "tcp",
+				PortDefaults: map[string]capi.ServicePortDefaults{
+					"http":  {Protocol: "http"},
+					"admin": {Protocol: "http2"},
+				},
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
+			},
+		},
+
 	}
 
 	for name, testCase := range cases {
@@ -849,6 +877,51 @@ func TestServiceDefaults_MatchesConsul(t *testing.T) {
 			},
 			matches: true,
 		},
+		"portDefaults populated matches": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-test-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Protocol: "tcp",
+					PortDefaults: map[string]ServicePortDefaults{
+						"http":  {Protocol: "http"},
+						"admin": {Protocol: "http2"},
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind:     capi.ServiceDefaults,
+				Name:     "my-test-service",
+				Protocol: "tcp",
+				PortDefaults: map[string]capi.ServicePortDefaults{
+					"http":  {Protocol: "http"},
+					"admin": {Protocol: "http2"},
+				},
+			},
+			true,
+		},
+		"portDefaults mismatch": {
+			&ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-test-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					PortDefaults: map[string]ServicePortDefaults{
+						"http": {Protocol: "http"},
+					},
+				},
+			},
+			&capi.ServiceConfigEntry{
+				Kind: capi.ServiceDefaults,
+				Name: "my-test-service",
+				PortDefaults: map[string]capi.ServicePortDefaults{
+					"http": {Protocol: "grpc"},
+				},
+			},
+			false,
+		},
+
 	}
 
 	for name, testCase := range cases {
@@ -1543,6 +1616,48 @@ func TestServiceDefaults_Validate(t *testing.T) {
 			},
 			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: [spec.rateLimits.instanceLevel.routes[0].requestsPerSecond: Invalid value: 0: RequestsPerSecond must be greater than 0, spec.rateLimits.instanceLevel.requestsPerSecond: Invalid value: 0: At least one of top-level or route-level RequestsPerSecond must be set]`,
 		},
+		"valid portDefaults": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					Protocol: "tcp",
+					PortDefaults: map[string]ServicePortDefaults{
+						"http":  {Protocol: "http"},
+						"grpc":  {Protocol: "grpc"},
+					},
+				},
+			},
+			expectedErrMsg: "",
+		},
+		"portDefaults invalid protocol": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					PortDefaults: map[string]ServicePortDefaults{
+						"bad": {Protocol: "invalid"},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.portDefaults[bad].protocol: Invalid value: "invalid": must be one of "tcp", "http", "http2", "grpc"`,
+		},
+		"portDefaults empty port name": {
+			input: &ServiceDefaults{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service",
+				},
+				Spec: ServiceDefaultsSpec{
+					PortDefaults: map[string]ServicePortDefaults{
+						"": {Protocol: "http"},
+					},
+				},
+			},
+			expectedErrMsg: `servicedefaults.consul.hashicorp.com "my-service" is invalid: spec.portDefaults[]: Invalid value: "": port name must not be empty`,
+		},
+
 	}
 
 	for name, testCase := range cases {

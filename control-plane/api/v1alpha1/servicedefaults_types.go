@@ -63,6 +63,9 @@ type ServiceDefaultsSpec struct {
 	// things like observability features and to unlock usage of the
 	// service-splitter and service-router config entries for a service.
 	Protocol string `json:"protocol,omitempty"`
+	// PortDefaults contains defaults that apply to individual named service
+	// ports. Fields omitted for a port inherit the service-wide defaults.
+	PortDefaults map[string]ServicePortDefaults `json:"portDefaults,omitempty"`
 	// Mode can be one of "direct" or "transparent". "transparent" represents that inbound and outbound
 	// application traffic is being captured and redirected through the proxy. This mode does not
 	// enable the traffic redirection itself. Instead it signals Consul to configure Envoy as if
@@ -121,6 +124,13 @@ type ServiceDefaultsSpec struct {
 	RateLimits *RateLimits `json:"rateLimits,omitempty"`
 	// EnvoyExtensions are a list of extensions to modify Envoy proxy configuration.
 	EnvoyExtensions EnvoyExtensions `json:"envoyExtensions,omitempty"`
+}
+
+// ServicePortDefaults contains service-default settings for a named service port.
+type ServicePortDefaults struct {
+	// Protocol sets the protocol for this named service port. If empty, the
+	// service-wide protocol is used.
+	Protocol string `json:"protocol,omitempty"`
 }
 
 type Upstreams struct {
@@ -444,6 +454,7 @@ func (in *ServiceDefaults) ToConsul(datacenter string) capi.ConfigEntry {
 		Kind:                      in.ConsulKind(),
 		Name:                      in.ConsulName(),
 		Protocol:                  in.Spec.Protocol,
+		PortDefaults:              servicePortDefaultsToConsul(in.Spec.PortDefaults),
 		MeshGateway:               in.Spec.MeshGateway.toConsul(),
 		Expose:                    in.Spec.Expose.toConsul(),
 		ExternalSNI:               in.Spec.ExternalSNI,
@@ -470,6 +481,14 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	validProtocols := []string{"tcp", "http", "http2", "grpc"}
 	if in.Spec.Protocol != "" && !sliceContains(validProtocols, in.Spec.Protocol) {
 		allErrs = append(allErrs, field.Invalid(path.Child("protocol"), in.Spec.Protocol, notInSliceMessage(validProtocols)))
+	}
+	for name, defaults := range in.Spec.PortDefaults {
+		if name == "" {
+			allErrs = append(allErrs, field.Invalid(path.Child("portDefaults").Key(name), name, "port name must not be empty"))
+		}
+		if defaults.Protocol != "" && !sliceContains(validProtocols, defaults.Protocol) {
+			allErrs = append(allErrs, field.Invalid(path.Child("portDefaults").Key(name).Child("protocol"), defaults.Protocol, notInSliceMessage(validProtocols)))
+		}
 	}
 	if err := in.Spec.MeshGateway.validate(path.Child("meshGateway")); err != nil {
 		allErrs = append(allErrs, err)
@@ -515,6 +534,18 @@ func (in *ServiceDefaults) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	return nil
+}
+
+func servicePortDefaultsToConsul(in map[string]ServicePortDefaults) map[string]capi.ServicePortDefaults {
+	if in == nil {
+		return nil
+	}
+
+	out := make(map[string]capi.ServicePortDefaults, len(in))
+	for name, defaults := range in {
+		out[name] = capi.ServicePortDefaults{Protocol: defaults.Protocol}
+	}
+	return out
 }
 
 func (in *Upstreams) validate(path *field.Path, partitionsEnabled bool) field.ErrorList {
