@@ -529,11 +529,8 @@ func convertGatewayPolicyTargetRef(raw map[string]interface{}) {
 	targetRef["group"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
 }
 
-// convertToConsulGatewayPolicy updates the apiVersion to consul.hashicorp.com/v1alpha1
-// and updates the targetRef group to consul.hashicorp.com so the policy correctly
-// references the consul-managed Gateway in the consulapi snapshot path.
+// convertToConsulGatewayPolicy rewrites spec.targetRef.group to consul.hashicorp.com to reference the consul-managed Gateway.
 func convertToConsulGatewayPolicy(raw map[string]interface{}) {
-	raw["apiVersion"] = consulAPIGroup + "/" + "v1alpha1"
 	spec := getSpec(raw)
 	if spec == nil {
 		return

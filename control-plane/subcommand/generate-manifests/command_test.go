@@ -541,11 +541,7 @@ func TestConvertGatewayPolicyTargetRef(t *testing.T) {
 }
 
 func TestConvertToConsulGatewayPolicy(t *testing.T) {
-	// convertToConsulGatewayPolicy is called in the consulapi snapshot path.
-	// The GatewayPolicy may arrive with targetRef.group already at v1 (if the
-	// gatewayapi path ran first) or still at v1beta1 (raw cluster state).
-	// Either way, apiVersion must be set to consul.hashicorp.com/v1alpha1 and
-	// targetRef.group must be rewritten to consul.hashicorp.com.
+	// targetRef.group is rewritten regardless of whether it is v1beta1 or v1; apiVersion is left untouched.
 	cases := []struct {
 		name          string
 		inputGroup    string
@@ -581,7 +577,7 @@ func TestConvertToConsulGatewayPolicy(t *testing.T) {
 				},
 			}
 			convertToConsulGatewayPolicy(raw)
-			// apiVersion must always be set to consul.hashicorp.com/v1alpha1
+			// apiVersion must remain unchanged
 			require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
 			spec := raw["spec"].(map[string]interface{})
 			targetRef := spec["targetRef"].(map[string]interface{})
