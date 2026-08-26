@@ -153,7 +153,9 @@ spec:
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_LOGIN_AUTH_METHOD
-          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+          {{- if .Values.global.acls.authMethodName }}
+          value: {{ .Values.global.acls.authMethodName }}
+          {{- else if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
           value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
           {{- else }}
           value: {{ template "consul.fullname" . }}-k8s-component-auth-method
@@ -297,7 +299,9 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - -credential-type=login
         - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
-        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+        {{- if .Values.global.acls.authMethodName }}
+        - -login-auth-method={{ .Values.global.acls.authMethodName }}
+        {{- else if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
         - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
         - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
         {{- else }}

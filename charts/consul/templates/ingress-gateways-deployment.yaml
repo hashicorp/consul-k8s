@@ -207,7 +207,11 @@ spec:
         {{- end }}
         {{- if $root.Values.global.acls.manageSystemACLs }}
         - name: CONSUL_LOGIN_AUTH_METHOD
+          {{- if $root.Values.global.acls.authMethodName }}
+          value: {{ $root.Values.global.acls.authMethodName }}
+          {{- else }}
           value: {{ template "consul.fullname" $root }}-k8s-component-auth-method
+          {{- end }}
         - name: CONSUL_LOGIN_DATACENTER
           value: {{ $root.Values.global.datacenter }}
         - name: CONSUL_LOGIN_META

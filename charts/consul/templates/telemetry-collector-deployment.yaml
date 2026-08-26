@@ -102,7 +102,13 @@ spec:
           # acl login info
           {{- if .Values.global.acls.manageSystemACLs }}
           - name: CONSUL_LOGIN_AUTH_METHOD
+            {{- if .Values.telemetryCollector.overrideAuthMethodName }}
+            value: {{ .Values.telemetryCollector.overrideAuthMethodName }}
+            {{- else if .Values.global.acls.authMethodName }}
+            value: {{ .Values.global.acls.authMethodName }}
+            {{- else }}
             value: {{ template "consul.fullname" . }}-k8s-auth-method
+            {{- end }}
           - name: CONSUL_LOGIN_DATACENTER
             value: {{ .Values.global.datacenter }}
           - name: CONSUL_LOGIN_META
