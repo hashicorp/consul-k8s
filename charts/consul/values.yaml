@@ -423,6 +423,14 @@ global:
     # This requires Consul >= 1.4.
     manageSystemACLs: false
 
+    # If true, the server-acl-init job will create default Kubernetes auth methods
+    # during initialization. Set to false if you are supplying custom auth methods.
+    createDefaultAuthMethods: true
+
+    # The name of the Kubernetes auth method that Consul components should use to
+    # authenticate. If left empty, it will default to '<fullname>-k8s-component-auth-method'.
+    authMethodName: ""
+
     # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
     logLevel: ""
