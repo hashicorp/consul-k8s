@@ -16,6 +16,23 @@ as well as the global.name setting.
 {{- end -}}
 
 {{/*
+Resolves the name of the Kubernetes auth method that Consul components should use.
+If global.acls.authMethodName is provided, it is used. Otherwise it falls back to
+the default auth method name based on the release name and datacenter (if primary).
+*/}}
+{{- define "consul.loginAuthMethodName" -}}
+{{- if .Values.global.acls.authMethodName -}}
+{{- .Values.global.acls.authMethodName -}}
+{{- else -}}
+{{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter -}}
+{{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+{{- else -}}
+{{ template "consul.fullname" . }}-k8s-component-auth-method
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Resolve the Consul namespace that a terminating gateway service should be
 registered into. Resolution order:
   1. Per-gateway consulNamespace.

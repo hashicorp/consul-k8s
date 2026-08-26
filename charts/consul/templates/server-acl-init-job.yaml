@@ -185,6 +185,10 @@ spec:
           exec consul-k8s-control-plane server-acl-init \
             -log-level={{ default .Values.global.logLevel .Values.global.acls.logLevel}} \
             -log-json={{ .Values.global.logJSON }} \
+            -create-default-auth-methods={{ .Values.global.acls.createDefaultAuthMethods }} \
+            {{- if .Values.global.acls.authMethodName }}
+            -auth-method-name={{ .Values.global.acls.authMethodName }} \
+            {{- end }}
             -resource-prefix=${CONSUL_FULLNAME} \
             -k8s-namespace={{ .Release.Namespace }} \
             -set-server-tokens={{ $serverEnabled }} \

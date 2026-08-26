@@ -58,6 +58,7 @@ type Command struct {
 	flagConnectInject       bool
 	flagAuthMethodHost      string
 	flagBindingRuleSelector string
+	flagCreateDefaultAuthMethods bool
 
 	flagCreateEntLicenseToken bool
 	flagCreateDDAgentToken    bool
@@ -158,6 +159,8 @@ func (c *Command) init() {
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
+	c.flags.BoolVar(&c.flagCreateDefaultAuthMethods, "create-default-auth-methods", true,
+		"Toggle for creating default auth methods during initialization.")
 	c.flags.BoolVar(&c.flagSnapshotAgent, "snapshot-agent", false,
 		"[Enterprise Only] Toggle for configuring ACL login for the snapshot agent.")
 	c.flags.BoolVar(&c.flagMeshGateway, "mesh-gateway", false,
@@ -455,14 +458,22 @@ func (c *Command) Run(args []string) int {
 	// Create the component auth method, this is the auth method that Consul components will use
 	// to issue an `ACL().Login()` against at startup, for local tokens.
 	localComponentAuthMethodName := c.withPrefix("k8s-component-auth-method")
-	err = c.configureLocalComponentAuthMethod(dynamicClient, localComponentAuthMethodName)
-	if err != nil {
-		c.log.Error(err.Error())
-		return 1
+	if c.consulFlags.ConsulLogin.AuthMethod != "" {
+		localComponentAuthMethodName = c.consulFlags.ConsulLogin.AuthMethod
+	}
+	if c.flagCreateDefaultAuthMethods {
+		err = c.configureLocalComponentAuthMethod(dynamicClient, localComponentAuthMethodName)
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
 	}
 
-	globalComponentAuthMethodName := fmt.Sprintf("%s-%s", localComponentAuthMethodName, consulDC)
-	if !primary && c.flagAuthMethodHost != "" {
+	globalComponentAuthMethodName := fmt.Sprintf("%s-%s", c.withPrefix("k8s-component-auth-method"), consulDC)
+	if c.consulFlags.ConsulLogin.AuthMethod != "" {
+		globalComponentAuthMethodName = c.consulFlags.ConsulLogin.AuthMethod
+	}
+	if c.flagCreateDefaultAuthMethods && !primary && c.flagAuthMethodHost != "" {
 		err = c.configureGlobalComponentAuthMethod(dynamicClient, globalComponentAuthMethodName, primaryDC)
 		if err != nil {
 			c.log.Error(err.Error())
@@ -537,10 +548,15 @@ func (c *Command) Run(args []string) int {
 
 	if c.flagConnectInject {
 		connectAuthMethodName := c.withPrefix("k8s-auth-method")
-		err := c.configureConnectInjectAuthMethod(dynamicClient, connectAuthMethodName)
-		if err != nil {
-			c.log.Error(err.Error())
-			return 1
+		if c.consulFlags.ConsulLogin.AuthMethod != "" {
+			connectAuthMethodName = c.consulFlags.ConsulLogin.AuthMethod
+		}
+		if c.flagCreateDefaultAuthMethods {
+			err := c.configureConnectInjectAuthMethod(dynamicClient, connectAuthMethodName)
+			if err != nil {
+				c.log.Error(err.Error())
+				return 1
+			}
 		}
 
 		// The endpoints controller needs an ACL token always.

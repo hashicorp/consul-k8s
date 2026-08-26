@@ -2564,6 +2564,45 @@ func TestRun_PrimaryDatacenter_ComponentAuthMethod(t *testing.T) {
 	require.NotNil(t, authMethod)
 }
 
+// Test that the component auth method does not get created when disabled.
+func TestRun_PrimaryDatacenter_ComponentAuthMethod_NoDefault(t *testing.T) {
+	t.Parallel()
+
+	k8s, testClient := completeSetup(t)
+	setUpK8sServiceAccount(t, k8s, ns)
+
+	// Run the command.
+	ui := cli.NewMockUi()
+	cmd := Command{
+		UI:        ui,
+		clientset: k8s,
+	}
+	cmd.init()
+	cmdArgs := []string{
+		"-timeout=1m",
+		"-k8s-namespace=" + ns,
+		"-addresses", strings.Split(testClient.TestServer.HTTPAddr, ":")[0],
+		"-http-port", strings.Split(testClient.TestServer.HTTPAddr, ":")[1],
+		"-grpc-port", strings.Split(testClient.TestServer.GRPCAddr, ":")[1],
+		"-resource-prefix=" + resourcePrefix,
+		"-create-default-auth-methods=false",
+	}
+
+	responseCode := cmd.Run(cmdArgs)
+	require.Equal(t, 0, responseCode, ui.ErrorWriter.String())
+
+	// Check that the expected policy was not created.
+	bootToken := getBootToken(t, k8s, resourcePrefix, ns)
+	consulConfig := testClient.Cfg
+	consulConfig.APIClientConfig.Token = bootToken
+	consulClient, err := api.NewClient(consulConfig.APIClientConfig)
+	require.NoError(t, err)
+	authMethod, _, err := consulClient.ACL().AuthMethodRead(resourcePrefix+"-k8s-component-auth-method", &api.QueryOptions{})
+	require.Error(t, err)
+	require.Nil(t, authMethod)
+	require.Contains(t, err.Error(), "Unexpected response code: 404")
+}
+
 // Test that the local and global component auth methods gets created when run in the
 // secondary datacenter.
 func TestRun_SecondaryDatacenter_ComponentAuthMethod(t *testing.T) {
