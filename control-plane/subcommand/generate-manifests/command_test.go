@@ -194,6 +194,60 @@ func TestDumpedAPIObjectsv1beta(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDumpedAPIObjects_WithGatewayPolicy(t *testing.T) {
+	t.Parallel()
+
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, v1alpha1.AddToScheme(s))
+	require.NoError(t, gwv1.Install(s))
+	require.NoError(t, gwv1alpha2.Install(s))
+
+	// pre-seed a GatewayPolicy so extractItems iterates over actual items
+	policy := &v1alpha1.GatewayPolicy{}
+	policy.Name = "my-policy"
+	policy.Namespace = "default"
+	policy.Spec.TargetRef = v1alpha1.PolicyTargetReference{
+		Group: "gateway.networking.k8s.io/v1beta1",
+		Kind:  "Gateway",
+		Name:  "my-gateway",
+	}
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		k8sClient:                  fake.NewClientBuilder().WithScheme(s).WithObjects(policy).Build(),
+		flagManifestsGatewayAPIDir: t.TempDir(),
+		UI:                         ui,
+	}
+
+	err := cmd.dumpGatewayAPIObjects()
+	require.NoError(t, err)
+}
+
+func TestDumpedAPIObjects_GatewayPolicySkippedOnListError(t *testing.T) {
+	t.Parallel()
+
+	// omit v1alpha1 from scheme so GatewayPolicyList.List fails — covers the
+	// Skipping GatewayPolicy dump error-log branch
+	s := runtime.NewScheme()
+	require.NoError(t, gwv1beta1.Install(s))
+	require.NoError(t, gwv1.Install(s))
+	require.NoError(t, gwv1alpha2.Install(s))
+	// v1alpha1 intentionally NOT added
+
+	ui := cli.NewMockUi()
+	cmd := Command{
+		k8sClient:                  fake.NewClientBuilder().WithScheme(s).Build(),
+		flagManifestsGatewayAPIDir: t.TempDir(),
+		UI:                         ui,
+	}
+
+	// dumpGatewayAPIObjects should still succeed; the GatewayPolicy error is logged not returned
+	err := cmd.dumpGatewayAPIObjects()
+	require.NoError(t, err)
+	require.Contains(t, ui.OutputWriter.String(), "Skipping GatewayPolicy dump")
+}
+
 func TestEnforceGatewayAPIVersion(t *testing.T) {
 
 	cases := []struct {
