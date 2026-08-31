@@ -282,16 +282,19 @@ func TestEnforceGatewayAPIVersion(t *testing.T) {
 			raw := map[string]interface{}{
 				"kind":       tc.kind,
 				"apiVersion": tc.APIGroup,
-				"spec": map[string]interface{}{
+			}
+			// GatewayPolicy carries targetRef — other kinds do not
+			if tc.kind == kindGatewayPolicy {
+				raw["spec"] = map[string]interface{}{
 					"targetRef": map[string]interface{}{
 						"group": "gateway.networking.k8s.io/v1beta1",
 					},
-				},
+				}
 			}
 			enforceGatewayAPIVersion(raw)
 			got, _ := raw["apiVersion"].(string)
 			require.Equal(t, tc.wantGroup, got)
-			// For GatewayPolicy, also assert the targetRef.group was rewritten
+			// For GatewayPolicy, also assert targetRef.group was rewritten
 			if tc.wantTargetGroup != "" {
 				spec := raw["spec"].(map[string]interface{})
 				targetRef := spec["targetRef"].(map[string]interface{})
