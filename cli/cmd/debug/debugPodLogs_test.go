@@ -37,7 +37,7 @@ func TestCapturePodLogs(t *testing.T) {
 				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
 				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
 			},
-			expectedOutputBuffer: []string{"Capturing pods logs....."},
+			expectedOutputBuffer: []string{"Capturing pod logs....."},
 			errorExpected:        false,
 		},
 		"test another namespace": {
@@ -47,7 +47,7 @@ func TestCapturePodLogs(t *testing.T) {
 				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
 				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
 			},
-			expectedOutputBuffer: []string{"Capturing pods logs....."},
+			expectedOutputBuffer: []string{"Capturing pod logs....."},
 			errorExpected:        false,
 		},
 		"test log collection with since": {
@@ -57,7 +57,7 @@ func TestCapturePodLogs(t *testing.T) {
 				logContent := fmt.Sprintf("Logs for pod %s in namespace %s\n", podName, ns)
 				return io.NopCloser(bytes.NewReader([]byte(logContent))), nil
 			},
-			expectedOutputBuffer: []string{"Capturing pods logs....."},
+			expectedOutputBuffer: []string{"Capturing pod logs....."},
 			errorExpected:        false,
 		},
 		"log capture failure": {
@@ -123,7 +123,7 @@ func TestCapturePodLogs(t *testing.T) {
 
 			require.NoError(t, err, "did not expect error capturing pod logs")
 			actual := buf.String()
-			require.Contains(t, actual, "Capturing pods logs.....")
+			require.Contains(t, actual, "Capturing pod logs.....")
 
 			// verify log files
 			expectedContainers := []string{"init-container", "nginx-container"}
