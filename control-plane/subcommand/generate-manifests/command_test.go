@@ -210,12 +210,21 @@ func TestEnforceGatewayAPIVersion(t *testing.T) {
 		{"UDPRoute", "UDPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2"},
 		{"TLSRoute", "TLSRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2"},
 		{"TCPRoute", "TCPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2"},
+		{"GatewayPolicy", "GatewayPolicy", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1beta1"},
 
 		{"EmptyKind", "", "", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			raw := map[string]interface{}{"kind": tc.kind}
+			raw := map[string]interface{}{
+				"kind":       tc.kind,
+				"apiVersion": tc.APIGroup,
+				"spec": map[string]interface{}{
+					"targetRef": map[string]interface{}{
+						"group": tc.APIGroup,
+					},
+				},
+			}
 			enforceGatewayAPIVersion(raw)
 			got, _ := raw["apiVersion"].(string)
 			require.Equal(t, tc.wantGroup, got)
@@ -307,6 +316,12 @@ func TestEnforceConsulAPIVersion(t *testing.T) {
 			wantGroup:    "consul.hashicorp.com/v1beta1", // your intentional logic
 			// but you don't consider this consul controlled
 		},
+		{
+			name:               "GatewayPolicy - targetRef group rewritten to consul",
+			kind:               "GatewayPolicy",
+			isConsulControlled: true,
+			wantGroup:          "consul.hashicorp.com/v1beta1",
+		},
 
 		{
 			name:      "EmptyKind",
@@ -363,12 +378,30 @@ func TestEnforceConsulAPIVersion(t *testing.T) {
 				}
 			}
 
+			// Special case for GatewayPolicy
+			if tc.kind == "GatewayPolicy" {
+				raw["spec"] = map[string]interface{}{
+					"targetRef": map[string]interface{}{
+						"group": "gateway.networking.k8s.io/v1beta1",
+						"kind":  "Gateway",
+						"name":  "test",
+					},
+				}
+			}
+
 			enforceConsulApiVersion(raw)
 
 			got, _ := raw["apiVersion"].(string)
 			t.Logf("Resulting apiVersion: %s", got)
 			if tc.isConsulControlled || tc.kind == "ReferenceGrant" {
-				require.Equal(t, tc.wantGroup, got)
+				if tc.kind == "GatewayPolicy" {
+					// GatewayPolicy: check targetRef.group, not apiVersion
+					spec := raw["spec"].(map[string]interface{})
+					targetRef := spec["targetRef"].(map[string]interface{})
+					require.Equal(t, tc.wantGroup, targetRef["group"])
+				} else {
+					require.Equal(t, tc.wantGroup, got)
+				}
 			} else {
 				require.Equal(t, "gateway.networking.k8s.io/v1beta1", got) // no change expected
 			}
@@ -396,7 +429,7 @@ func TestWriteObjects(t *testing.T) {
 		UI:                         &cli.MockUi{},
 	}
 
-	// ✅ test object
+	// test object
 	gw := &gwv1.Gateway{}
 	gw.APIVersion = "gateway.networking.k8s.io/v1beta1"
 	gw.Kind = "Gateway"
@@ -425,7 +458,7 @@ func TestWriteObjects(t *testing.T) {
 	err := cmd.writeObjects("gateway", objs)
 	require.NoError(t, err)
 
-	// ✅ check gateway file
+	// check gateway file
 	gatewayDir := filepath.Join(tmpDir, "gateway", "gateway")
 
 	files, err := os.ReadDir(gatewayDir)
@@ -441,10 +474,10 @@ func TestWriteObjects(t *testing.T) {
 	err = yaml.Unmarshal(content, &gatewayObj)
 	require.NoError(t, err)
 
-	// ✅ validate gateway mutation
+	// validate gateway mutation
 	require.Equal(t, "gateway.networking.k8s.io/v1", gatewayObj["apiVersion"])
 
-	// ✅ check consul file
+	// check consul file
 	consulDir := filepath.Join(tmpDir, "consul", "gateway")
 
 	files, err = os.ReadDir(consulDir)
@@ -586,3 +619,50 @@ func TestConvertToConsulGatewayPolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestConvertGatewayPolicyTargetRef_Guards(t *testing.T) {
+	t.Run("nil spec — no panic", func(t *testing.T) {
+		raw := map[string]interface{}{
+			"kind":       "GatewayPolicy",
+			"apiVersion": "consul.hashicorp.com/v1alpha1",
+		}
+		// must not panic
+		convertGatewayPolicyTargetRef(raw)
+		require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
+	})
+
+	t.Run("missing targetRef — no panic", func(t *testing.T) {
+		raw := map[string]interface{}{
+			"kind":       "GatewayPolicy",
+			"apiVersion": "consul.hashicorp.com/v1alpha1",
+			"spec":       map[string]interface{}{},
+		}
+		// must not panic
+		convertGatewayPolicyTargetRef(raw)
+		require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
+	})
+}
+
+func TestConvertToConsulGatewayPolicy_Guards(t *testing.T) {
+	t.Run("nil spec — no panic", func(t *testing.T) {
+		raw := map[string]interface{}{
+			"kind":       "GatewayPolicy",
+			"apiVersion": "consul.hashicorp.com/v1alpha1",
+		}
+		// must not panic
+		convertToConsulGatewayPolicy(raw)
+		require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
+	})
+
+	t.Run("missing targetRef — no panic", func(t *testing.T) {
+		raw := map[string]interface{}{
+			"kind":       "GatewayPolicy",
+			"apiVersion": "consul.hashicorp.com/v1alpha1",
+			"spec":       map[string]interface{}{},
+		}
+		// must not panic
+		convertToConsulGatewayPolicy(raw)
+		require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
+	})
+}
+
