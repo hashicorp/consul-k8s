@@ -550,12 +550,12 @@ func TestConvertToConsulGatewayPolicy(t *testing.T) {
 		{
 			name:          "v1beta1 group rewritten to consul",
 			inputGroup:    "gateway.networking.k8s.io/v1beta1",
-			wantTargetRef: "consul.hashicorp.com/v1alpha1",
+			wantTargetRef: "consul.hashicorp.com/v1beta1",
 		},
 		{
 			name:          "v1 group (already rewritten) rewritten to consul",
 			inputGroup:    "gateway.networking.k8s.io/v1",
-			wantTargetRef: "consul.hashicorp.com/v1alpha1",
+			wantTargetRef: "consul.hashicorp.com/v1beta1",
 		},
 	}
 
@@ -581,7 +581,7 @@ func TestConvertToConsulGatewayPolicy(t *testing.T) {
 			require.Equal(t, "consul.hashicorp.com/v1alpha1", raw["apiVersion"])
 			spec := raw["spec"].(map[string]interface{})
 			targetRef := spec["targetRef"].(map[string]interface{})
-			// targetRef.group must be rewritten to consul.hashicorp.com/v1alpha1
+			// targetRef.group must be rewritten to consul.hashicorp.com/v1beta1
 			require.Equal(t, tc.wantTargetRef, targetRef["group"])
 		})
 	}

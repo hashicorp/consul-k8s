@@ -54,7 +54,6 @@ const (
 	kindUDPRoute                     = "UDPRoute"
 	kindGatewayPolicy                = "GatewayPolicy"
 	consulAPIGroup                   = "consul.hashicorp.com"
-	consulAPIVersionV1Alpha1         = "v1alpha1"
 	consulAPIVersionV1Beta1          = "v1beta1"
 	consulAPIVersionV1Alpha2         = "v1alpha2"
 	K8sGatewayAPIGroup               = "gateway.networking.k8s.io"
@@ -530,7 +529,7 @@ func convertGatewayPolicyTargetRef(raw map[string]interface{}) {
 	targetRef["group"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1
 }
 
-// convertToConsulGatewayPolicy rewrites spec.targetRef.group to consul.hashicorp.com/v1alpha1 to reference the consul-managed Gateway.
+// convertToConsulGatewayPolicy rewrites spec.targetRef.group to consul.hashicorp.com/v1beta1 to reference the consul-managed Gateway.
 func convertToConsulGatewayPolicy(raw map[string]interface{}) {
 	spec := getSpec(raw)
 	if spec == nil {
@@ -542,7 +541,7 @@ func convertToConsulGatewayPolicy(raw map[string]interface{}) {
 	}
 	if targetRef["group"] == K8sGatewayAPIGroup+"/"+K8sGatewayAPIVersionV1Beta1 ||
 		targetRef["group"] == K8sGatewayAPIGroup+"/"+K8sGatewayAPIVersionV1 {
-		targetRef["group"] = consulAPIGroup + "/" + consulAPIVersionV1Alpha1
+		targetRef["group"] = consulAPIGroup + "/" + consulAPIVersionV1Beta1
 	}
 }
 
