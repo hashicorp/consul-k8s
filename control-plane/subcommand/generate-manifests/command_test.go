@@ -251,22 +251,31 @@ func TestDumpedAPIObjects_GatewayPolicySkippedOnListError(t *testing.T) {
 func TestEnforceGatewayAPIVersion(t *testing.T) {
 
 	cases := []struct {
-		name      string
-		kind      string
-		APIGroup  string
-		wantGroup string
+		name            string
+		kind            string
+		APIGroup        string
+		wantGroup       string
+		wantTargetGroup string // only checked for GatewayPolicy
 	}{
 
-		{"Gateway", "Gateway", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1"},
-		{"HTTPRoute", "HTTPRoute", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1"},
-		{"GRPCRoute", "GRPCRoute", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1"},
-		{"ReferenceGrant", "ReferenceGrant", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1beta1"},
-		{"UDPRoute", "UDPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2"},
-		{"TLSRoute", "TLSRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2"},
-		{"TCPRoute", "TCPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2"},
-		{"GatewayPolicy", "GatewayPolicy", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1beta1"},
+		{"Gateway", "Gateway", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1", ""},
+		{"HTTPRoute", "HTTPRoute", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1", ""},
+		{"GRPCRoute", "GRPCRoute", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1", ""},
+		{"ReferenceGrant", "ReferenceGrant", "gateway.networking.k8s.io/v1beta1", "gateway.networking.k8s.io/v1beta1", ""},
+		{"UDPRoute", "UDPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2", ""},
+		{"TLSRoute", "TLSRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2", ""},
+		{"TCPRoute", "TCPRoute", "gateway.networking.k8s.io/v1alpha2", "gateway.networking.k8s.io/v1alpha2", ""},
+		// GatewayPolicy is a Consul CRD — apiVersion stays consul.hashicorp.com/v1alpha1;
+		// only targetRef.group is rewritten from v1beta1 to v1.
+		{
+			name:            "GatewayPolicy",
+			kind:            "GatewayPolicy",
+			APIGroup:        "consul.hashicorp.com/v1alpha1",
+			wantGroup:       "consul.hashicorp.com/v1alpha1",      // apiVersion unchanged
+			wantTargetGroup: "gateway.networking.k8s.io/v1",       // targetRef.group rewritten
+		},
 
-		{"EmptyKind", "", "", ""},
+		{"EmptyKind", "", "", "", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -275,13 +284,19 @@ func TestEnforceGatewayAPIVersion(t *testing.T) {
 				"apiVersion": tc.APIGroup,
 				"spec": map[string]interface{}{
 					"targetRef": map[string]interface{}{
-						"group": tc.APIGroup,
+						"group": "gateway.networking.k8s.io/v1beta1",
 					},
 				},
 			}
 			enforceGatewayAPIVersion(raw)
 			got, _ := raw["apiVersion"].(string)
 			require.Equal(t, tc.wantGroup, got)
+			// For GatewayPolicy, also assert the targetRef.group was rewritten
+			if tc.wantTargetGroup != "" {
+				spec := raw["spec"].(map[string]interface{})
+				targetRef := spec["targetRef"].(map[string]interface{})
+				require.Equal(t, tc.wantTargetGroup, targetRef["group"])
+			}
 		})
 	}
 }
