@@ -465,16 +465,15 @@ func TestEnforceConsulAPIVersion(t *testing.T) {
 
 			got, _ := raw["apiVersion"].(string)
 			t.Logf("Resulting apiVersion: %s", got)
-			if tc.isConsulControlled || tc.kind == "ReferenceGrant" {
-				if tc.kind == "GatewayPolicy" {
-					// GatewayPolicy: check targetRef.group, not apiVersion
-					spec := raw["spec"].(map[string]interface{})
-					targetRef := spec["targetRef"].(map[string]interface{})
-					require.Equal(t, tc.wantGroup, targetRef["group"])
-				} else {
-					require.Equal(t, tc.wantGroup, got)
-				}
-			} else {
+			switch {
+			case tc.kind == "GatewayPolicy":
+				// GatewayPolicy does not change apiVersion; only targetRef.group is rewritten
+				spec := raw["spec"].(map[string]interface{})
+				targetRef := spec["targetRef"].(map[string]interface{})
+				require.Equal(t, tc.wantGroup, targetRef["group"])
+			case tc.isConsulControlled || tc.kind == "ReferenceGrant":
+				require.Equal(t, tc.wantGroup, got)
+			default:
 				require.Equal(t, "gateway.networking.k8s.io/v1beta1", got) // no change expected
 			}
 		})
