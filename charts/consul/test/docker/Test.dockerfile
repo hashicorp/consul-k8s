@@ -34,7 +34,7 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
   curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
   apt-get update -y && \
   apt-get install google-cloud-cli -y && \
-  apt-get install google-cloud-cli-gke-gcloud-auth-plugin -y
+  apt-get install google-cloud-cli-gke-gcloud-auth-plugin
 
 # terraform
 RUN curl -sSL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o /tmp/tf.zip \
