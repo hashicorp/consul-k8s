@@ -395,6 +395,7 @@ func enforceGatewayAPIVersion(raw map[string]interface{}) {
 	case kindUDPRoute, kindTLSRoute, kindTCPRoute:
 		raw["apiVersion"] = K8sGatewayAPIGroup + "/" + K8sGatewayAPIVersionV1Alpha2
 	}
+
 }
 
 // TODO code: Creating the manifests for CustomGatewayclass but not using it at the moment.

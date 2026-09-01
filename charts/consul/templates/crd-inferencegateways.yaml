@@ -88,6 +88,21 @@ spec:
                 required:
                   - name
                 type: object
+              image:
+                description: >-
+                  image is the container image to run for the gateway Deployment.
+                  When set, this overrides the default image configured on the
+                  controller. Must be a fully-qualified image reference, e.g.
+                  "hashicorp/consul-ai-gateway:1.0.0".
+                minLength: 1
+                type: string
+              replicas:
+                description: >-
+                  replicas is the desired number of gateway Deployment replicas.
+                  Defaults to 1 when not set.
+                format: int32
+                minimum: 0
+                type: integer
             required:
               - poolRef
             type: object

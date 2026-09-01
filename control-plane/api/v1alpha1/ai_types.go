@@ -926,6 +926,19 @@ type InferenceGatewaySpec struct {
 	// The referenced pool must exist in the same namespace.
 	// +required
 	PoolRef InferencePoolRef `json:"poolRef"`
+
+	// image is the container image to run for the gateway Deployment.
+	// When set, this overrides the default image configured on the controller.
+	// Must be a fully-qualified image reference, e.g. "hashicorp/consul-ai-gateway:1.0.0".
+	// +optional
+	// +kubebuilder:validation:MinLength=1
+	Image string `json:"image,omitempty"`
+
+	// replicas is the desired number of gateway Deployment replicas.
+	// Defaults to 1 when not set.
+	// +optional
+	// +kubebuilder:validation:Minimum=0
+	Replicas *int32 `json:"replicas,omitempty"`
 }
 
 // InferencePoolRef is a reference to an InferencePoolConfig in the same

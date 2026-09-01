@@ -3,9 +3,11 @@
 
 // Package aicleanup implements the "ai-cleanup" subcommand.
 // It is invoked by a pre-upgrade/pre-delete Helm hook when ai.enabled is
-// flipped to false. It strips finalizers from all InferenceModelConfig,
-// McpServerConfig, AgentConfig, and InferencePoolConfig CRs so that Helm can
-// subsequently delete the CRDs cleanly. If none of the CRDs exist in the
+// flipped to false. It deletes all InferenceGateway, InferenceModelConfig,
+// McpServerConfig, AgentConfig, and InferencePoolConfig CRs and waits for
+// each controller to finish its finalizer-based cleanup (Consul config entry
+// deletion, catalog deregistration, owned-resource GC) before returning.
+// Helm can then remove the CRDs cleanly. If none of the CRDs exist in the
 // cluster the command exits successfully — it is safe to run multiple times
 // (idempotent).
 package aicleanup
@@ -85,6 +87,15 @@ func (c *Command) Run(args []string) int {
 		}
 	}
 
+	// InferenceGateways own a Deployment and Service via ownerReferences, and
+	// their controller deletes the Consul config entry + catalog registrations
+	// during the finalizer path. Delete them first so the controller can run
+	// its full cleanup before the pool configs are removed.
+	if err := c.cleanupInferenceGateways(); err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+
 	if err := c.cleanupInferenceModelConfigs(); err != nil {
 		c.UI.Error(err.Error())
 		return 1
@@ -109,9 +120,35 @@ func (c *Command) Run(args []string) int {
 	return 0
 }
 
-// cleanupInferenceModelConfigs strips finalizers from all InferenceModelConfig
-// CRs and deletes them so the CRD can be removed. If the CRD is not registered
-// (IsNotFound / NoKindMatchError) the function returns nil immediately.
+// cleanupInferenceGateways deletes all InferenceGateway CRs and waits for each
+// one to be fully removed. The InferenceGatewayController handles its own
+// finalizer: it deletes the Consul AIGateway config entry and deregisters pods
+// from the catalog before removing the finalizer and allowing K8s to GC the
+// owned Deployment and Service. We must not strip the finalizer manually —
+// doing so would bypass that cleanup and leave stale state in Consul.
+func (c *Command) cleanupInferenceGateways() error {
+	list := &v1alpha1.InferenceGatewayList{}
+	if err := c.k8sClient.List(c.ctx, list); err != nil {
+		if isCRDAbsent(err) {
+			c.UI.Info("InferenceGateway CRD not found, skipping.")
+			return nil
+		}
+		return fmt.Errorf("list InferenceGateways: %w", err)
+	}
+
+	c.UI.Info(fmt.Sprintf("Found %d InferenceGateway(s), deleting and waiting for controller cleanup.", len(list.Items)))
+	for i := range list.Items {
+		obj := &list.Items[i]
+		if err := c.deleteAndWait(obj); err != nil {
+			return fmt.Errorf("cleanup InferenceGateway %q in namespace %q: %w", obj.Name, obj.Namespace, err)
+		}
+	}
+	return nil
+}
+
+// cleanupInferenceModelConfigs deletes all InferenceModelConfig CRs and waits
+// for each one to be fully removed. If the CRD is not registered the function
+// returns nil immediately.
 func (c *Command) cleanupInferenceModelConfigs() error {
 	list := &v1alpha1.InferenceModelConfigList{}
 	if err := c.k8sClient.List(c.ctx, list); err != nil {
@@ -122,19 +159,19 @@ func (c *Command) cleanupInferenceModelConfigs() error {
 		return fmt.Errorf("list InferenceModelConfigs: %w", err)
 	}
 
-	c.UI.Info(fmt.Sprintf("Found %d InferenceModelConfig(s), stripping finalizers and deleting.", len(list.Items)))
+	c.UI.Info(fmt.Sprintf("Found %d InferenceModelConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.stripFinalizersAndDelete(obj); err != nil {
+		if err := c.deleteAndWait(obj); err != nil {
 			return fmt.Errorf("cleanup InferenceModelConfig %q: %w", obj.Name, err)
 		}
 	}
 	return nil
 }
 
-// cleanupMcpServerConfigs strips finalizers from all McpServerConfig CRs and
-// deletes them so the CRD can be removed. If the CRD is not registered the
-// function returns nil immediately.
+// cleanupMcpServerConfigs deletes all McpServerConfig CRs and waits for each
+// one to be fully removed. If the CRD is not registered the function returns
+// nil immediately.
 func (c *Command) cleanupMcpServerConfigs() error {
 	list := &v1alpha1.McpServerConfigList{}
 	if err := c.k8sClient.List(c.ctx, list); err != nil {
@@ -145,16 +182,19 @@ func (c *Command) cleanupMcpServerConfigs() error {
 		return fmt.Errorf("list McpServerConfigs: %w", err)
 	}
 
-	c.UI.Info(fmt.Sprintf("Found %d McpServerConfig(s), stripping finalizers and deleting.", len(list.Items)))
+	c.UI.Info(fmt.Sprintf("Found %d McpServerConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.stripFinalizersAndDelete(obj); err != nil {
+		if err := c.deleteAndWait(obj); err != nil {
 			return fmt.Errorf("cleanup McpServerConfig %q: %w", obj.Name, err)
 		}
 	}
 	return nil
 }
 
+// cleanupAgentConfigs deletes all AgentConfig CRs and waits for each one to be
+// fully removed. If the CRD is not registered the function returns nil
+// immediately.
 func (c *Command) cleanupAgentConfigs() error {
 	list := &v1alpha1.AgentConfigList{}
 	if err := c.k8sClient.List(c.ctx, list); err != nil {
@@ -165,19 +205,19 @@ func (c *Command) cleanupAgentConfigs() error {
 		return fmt.Errorf("list AgentConfigs: %w", err)
 	}
 
-	c.UI.Info(fmt.Sprintf("Found %d AgentConfig(s), stripping finalizers and deleting.", len(list.Items)))
+	c.UI.Info(fmt.Sprintf("Found %d AgentConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.stripFinalizersAndDelete(obj); err != nil {
+		if err := c.deleteAndWait(obj); err != nil {
 			return fmt.Errorf("cleanup AgentConfig %q: %w", obj.Name, err)
 		}
 	}
 	return nil
 }
 
-// cleanupInferencePoolConfigs strips finalizers from all InferencePoolConfig
-// CRs and deletes them so the CRD can be removed. If the CRD is not registered
-// the function returns nil immediately.
+// cleanupInferencePoolConfigs deletes all InferencePoolConfig CRs and waits
+// for each one to be fully removed. If the CRD is not registered the function
+// returns nil immediately.
 func (c *Command) cleanupInferencePoolConfigs() error {
 	list := &v1alpha1.InferencePoolConfigList{}
 	if err := c.k8sClient.List(c.ctx, list); err != nil {
@@ -188,34 +228,29 @@ func (c *Command) cleanupInferencePoolConfigs() error {
 		return fmt.Errorf("list InferencePoolConfigs: %w", err)
 	}
 
-	c.UI.Info(fmt.Sprintf("Found %d InferencePoolConfig(s), stripping finalizers and deleting.", len(list.Items)))
+	c.UI.Info(fmt.Sprintf("Found %d InferencePoolConfig(s), deleting and waiting for controller cleanup.", len(list.Items)))
 	for i := range list.Items {
 		obj := &list.Items[i]
-		if err := c.stripFinalizersAndDelete(obj); err != nil {
+		if err := c.deleteAndWait(obj); err != nil {
 			return fmt.Errorf("cleanup InferencePoolConfig %q in namespace %q: %w", obj.Name, obj.Namespace, err)
 		}
 	}
 	return nil
 }
 
-// stripFinalizersAndDelete removes all finalizers from obj (so Kubernetes
-// unblocks the delete) then issues a Delete. It retries with backoff until
-// the object is confirmed gone.
-func (c *Command) stripFinalizersAndDelete(obj client.Object) error {
-	c.UI.Info(fmt.Sprintf("  stripping finalizers from %s", obj.GetName()))
+// deleteAndWait issues a Delete for obj and polls until the object is fully
+// gone from the API server. It does NOT touch finalizers — the owning
+// controller is responsible for removing them after completing its cleanup
+// (e.g. deleting the Consul config entry). The backoff gives the controller
+// enough time to finish before we give up.
+func (c *Command) deleteAndWait(obj client.Object) error {
+	c.UI.Info(fmt.Sprintf("  deleting %s/%s", obj.GetNamespace(), obj.GetName()))
 
-	patch := client.MergeFrom(obj.DeepCopyObject().(client.Object))
-	obj.SetFinalizers([]string{})
-	if err := c.k8sClient.Patch(c.ctx, obj, patch); err != nil && !k8serrors.IsNotFound(err) {
-		return fmt.Errorf("patch finalizers: %w", err)
-	}
-
-	c.UI.Info(fmt.Sprintf("  deleting %s", obj.GetName()))
 	if err := c.k8sClient.Delete(c.ctx, obj); err != nil && !k8serrors.IsNotFound(err) {
 		return fmt.Errorf("delete: %w", err)
 	}
 
-	// Wait until the object is fully gone.
+	// Poll until the object is fully gone (finalizer removed by the controller).
 	key := client.ObjectKeyFromObject(obj)
 	return backoff.Retry(func() error {
 		if err := c.k8sClient.Get(c.ctx, key, obj); err != nil {
@@ -224,7 +259,7 @@ func (c *Command) stripFinalizersAndDelete(obj client.Object) error {
 			}
 			return err
 		}
-		return errors.New("object still exists")
+		return errors.New("object still exists, waiting for controller to finish cleanup")
 	}, exponentialBackoff())
 }
 
@@ -263,14 +298,16 @@ func (c *Command) Help() string {
 	return c.help
 }
 
-const synopsis = "Strip finalizers and delete AI CRs prior to CRD removal."
+const synopsis = "Delete AI CRs and wait for controller-driven cleanup prior to CRD removal."
 const help = `
 Usage: consul-k8s-control-plane ai-cleanup [options]
 
-  Strips finalizers from all InferenceModelConfig, McpServerConfig, AgentConfig,
-  and InferencePoolConfig custom resources then deletes them, allowing Helm to
-  cleanly remove the CRDs when ai.enabled is set to false. If none of the CRDs
-  exist the command exits successfully. This command is idempotent and safe to
-  run multiple times.
+  Deletes all InferenceGateway, InferenceModelConfig, McpServerConfig,
+  AgentConfig, and InferencePoolConfig custom resources and waits for each
+  controller to finish its finalizer-based cleanup (Consul config entry
+  deletion, catalog deregistration, owned-resource GC) before returning.
+  Helm can then cleanly remove the CRDs when ai.enabled is set to false.
+  If none of the CRDs exist the command exits successfully. This command is
+  idempotent and safe to run multiple times.
 
 `

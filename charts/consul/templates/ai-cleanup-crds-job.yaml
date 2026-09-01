@@ -41,7 +41,7 @@ metadata:
     {{- if and .Values.ai .Values.ai.enabled }}
     "helm.sh/hook": pre-delete
     {{- else }}
-    "helm.sh/hook": pre-delete,pre-upgrade
+    "helm.sh/hook": pre-delete
     {{- end }}
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
