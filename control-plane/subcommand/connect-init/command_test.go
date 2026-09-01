@@ -743,12 +743,12 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		proxyConfig           map[string]interface{}
 		tproxyConfig          api.TransparentProxyConfig
 		registerProxyDefaults bool
-		expIptablesParamsFunc func(actual nftables.Config) (bool, string)
+		expNftCfgParamsFunc func(actual nftables.Config) (bool, string)
 	}{
 		"no extra proxy config provided": {},
 		"envoy bind port is provided in service proxy config": {
 			proxyConfig: map[string]interface{}{"bind_port": "21000"},
-			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
@@ -761,7 +761,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		"envoy bind port is provided in a config entry": {
 			proxyConfig:           map[string]interface{}{"bind_port": "21000"},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
@@ -771,7 +771,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		},
 		"tproxy outbound listener port is provided in service proxy config": {
 			tproxyConfig: api.TransparentProxyConfig{OutboundListenerPort: 16000},
-			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
@@ -782,7 +782,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		"tproxy outbound listener port is provided in a config entry": {
 			tproxyConfig:          api.TransparentProxyConfig{OutboundListenerPort: 16000},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
@@ -792,7 +792,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		},
 		"envoy stats addr is provided in service proxy config": {
 			proxyConfig: map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
-			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
@@ -803,7 +803,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		"envoy stats addr is provided in a config entry": {
 			proxyConfig:           map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual nftables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
@@ -884,9 +884,9 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			code := cmd.Run(flags)
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
 			require.Truef(t, nftablesProvider.applyCalled, "redirect traffic rules were not applied")
-			if c.expIptablesParamsFunc != nil {
-				actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.nftCfg)
-				require.Truef(t, actualIptablesConfigParamsEqualExpected, errMsg)
+			if c.expNftCfgParamsFunc != nil {
+				actualNftCfgParamsEqualExpected, errMsg := c.expNftCfgParamsFunc(cmd.nftCfg)
+				require.Truef(t, actualNftCfgParamsEqualExpected, errMsg)
 			}
 		})
 	}

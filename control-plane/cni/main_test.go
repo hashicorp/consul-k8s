@@ -172,7 +172,7 @@ func Test_cmdAdd(t *testing.T) {
 			},
 			cmdArgs: &skel.CmdArgs{ContainerID: "some-container-id",
 				IfName: "eth0",
-				Args:   fmt.Sprintf("CONSUL_IPTABLES_CONFIG=%s", minimalIPTablesJSON(t)),
+				Args:   fmt.Sprintf("CONSUL_IPTABLES_CONFIG=%s", minimalNftCfgJSON(t)),
 				Path:   "/some/bin/path",
 			},
 			stdInData:     nomadStdinData,
@@ -721,7 +721,7 @@ const nomadStdinData = `{
 }
 `
 
-func minimalIPTablesJSON(t *testing.T) string {
+func minimalNftCfgJSON(t *testing.T) string {
 	cfg := nftables.Config{
 		ConsulDNSIP:          "127.0.0.1",
 		ConsulDNSPort:        8600,
