@@ -2429,6 +2429,13 @@ connectInject:
   # to explicitly opt-out of injection.
   default: false
 
+  # Controls whether Kubernetes Services with multiple ports are registered in
+  # Consul with their complete port set. When disabled, only the selected
+  # default port is registered, using the legacy single-port representation.
+  # @type: boolean
+  multiportRegistration:
+    enabled: true
+
   # Configures Transparent Proxy for Consul Service mesh services.
   # Using this feature requires Consul 1.10.0-beta1+.
   transparentProxy:

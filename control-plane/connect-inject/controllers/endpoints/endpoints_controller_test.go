@@ -1272,6 +1272,62 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_EnterpriseSetsMultipl
 	require.Zero(t, proxyServiceRegistration.Service.Proxy.LocalServicePort)
 }
 
+func TestCreateServiceRegistrations_SingleServiceMultiPort_RegistrationDisabled(t *testing.T) {
+	t.Parallel()
+
+	pod := createServicePod("pod1", "1.2.3.4", true, true)
+	pod.Spec.Containers = []corev1.Container{
+		{
+			Name: "app",
+			Ports: []corev1.ContainerPort{
+				{Name: "http", ContainerPort: 5050},
+				{Name: "metrics", ContainerPort: 5051},
+			},
+		},
+	}
+	pod.Annotations[constants.AnnotationPort] = "http,metrics"
+	pod.Annotations[constants.AnnotationService] = "service-response"
+	pod.Annotations[constants.AnnotationDefaultPort] = "metrics"
+
+	serviceEndpoints := &corev1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-response",
+			Namespace: "default",
+		},
+		Subsets: []corev1.EndpointSubset{
+			{
+				Ports: []corev1.EndpointPort{
+					{Name: "http", Port: 5050},
+					{Name: "metrics", Port: 5051},
+				},
+			},
+		},
+	}
+
+	namespace := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	fakeClient := fake.NewClientBuilder().WithRuntimeObjects(pod, serviceEndpoints, namespace).Build()
+
+	epCtrl := Controller{
+		Client:                       fakeClient,
+		Log:                          logrtest.New(t),
+		IsEnterpriseDistribution:     true,
+		DisableMultiportRegistration: true,
+	}
+
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *serviceEndpoints, api.HealthPassing)
+	require.NoError(t, err)
+
+	require.Equal(t, 5051, serviceRegistration.Service.Port)
+	require.Nil(t, serviceRegistration.Service.Ports)
+	require.NotContains(t, serviceRegistration.Service.Meta, "ports")
+	require.NotContains(t, serviceRegistration.Service.Meta, "port-http")
+	require.NotContains(t, serviceRegistration.Service.Meta, "port-metrics")
+
+	require.Nil(t, proxyServiceRegistration.Service.Ports)
+	require.Equal(t, "127.0.0.1", proxyServiceRegistration.Service.Proxy.LocalServiceAddress)
+	require.Equal(t, 5051, proxyServiceRegistration.Service.Proxy.LocalServicePort)
+}
+
 func TestCreateServiceRegistrations_SingleServiceMultiPort_FromEndpointsFallback(t *testing.T) {
 	t.Parallel()
 
