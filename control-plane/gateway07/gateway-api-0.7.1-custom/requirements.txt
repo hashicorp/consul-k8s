@@ -26,4 +26,4 @@ six==1.16.0
 # tornado 6.5.7 fixes GHSA-mgf9-4vpg-hj56 (CVE-2026-49855) gzip-bomb,
 # GHSA-3x9g-8vmp-wqvf cross-origin Authorization/Cookie leak, and
 # GHSA-pw6j-qg29-8w7f CurlAsyncHTTPClient credential leak on handle reuse.
-tornado==6.5.7
+tornado==6.5.8
