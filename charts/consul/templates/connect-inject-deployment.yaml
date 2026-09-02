@@ -147,6 +147,7 @@ spec:
                 -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }} \
                 -log-json={{ .Values.global.logJSON }} \
                 -default-inject={{ .Values.connectInject.default }} \
+                -enable-multiport-registration={{ .Values.connectInject.multiportRegistration.enabled }} \
                 -consul-image="{{ default .Values.global.image .Values.connectInject.imageConsul }}" \
                 -consul-dataplane-image="{{ .Values.global.imageConsulDataplane }}" \
                 -consul-k8s-image="{{ default .Values.global.imageK8S .Values.connectInject.image }}" \

@@ -1,0 +1,3 @@
+```release-note:improvement
+helm: add a connect-inject setting to register multi-port Kubernetes Services as legacy single-port Consul services
+```

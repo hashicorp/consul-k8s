@@ -178,6 +178,7 @@ func TestRun_FlagValidation(t *testing.T) {
 func TestRun_ResourceLimitDefaults(t *testing.T) {
 	cmd := Command{}
 	cmd.init()
+	require.True(t, cmd.flagEnableMultiportRegistration)
 
 	// Init container defaults
 	require.Equal(t, cmd.flagInitContainerCPURequest, "50m")
