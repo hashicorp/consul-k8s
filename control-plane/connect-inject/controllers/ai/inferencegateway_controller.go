@@ -6,8 +6,6 @@ package ai
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +26,6 @@ import (
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/common"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
-	injectcommon "github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	igwcache "github.com/hashicorp/consul-k8s/control-plane/connect-inject/controllers/ai/cache"
 	"github.com/hashicorp/consul-k8s/control-plane/consul"
@@ -55,7 +52,6 @@ const (
 
 	// labelManagedBy is stamped on every K8s resource owned by this controller.
 	labelManagedBy = "consul.hashicorp.com/managed-by"
-
 )
 
 // InferenceGatewayController reconciles InferenceGateway objects.
@@ -251,18 +247,7 @@ func (r *InferenceGatewayController) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
 	}
 
-	// ── 6. Register each running pod as a Consul service instance ─────────────
-	// Mirrors api-gateway/binding/registration.go:registrationsForPods.
-	// Each pod gets its own entry in the Consul catalog under a virtual node
-	// so Consul's control plane can route traffic to it.
-	if err := r.reconcileRegistrations(ctx, consulClient, igw, log); err != nil {
-		log.Error(err, "failed to reconcile Consul registrations")
-		r.Recorder.Eventf(igw, corev1.EventTypeWarning, eventReasonSyncFailed,
-			"failed to reconcile Consul registrations: %v", err)
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, err
-	}
-
-	// ── 7. Upsert the Consul AIGateway config entry ───────────────────────────
+	// ── 6. Upsert the Consul AIGateway config entry ───────────────────────────
 	// Uses ConfigEntries().Set() following the same pattern as
 	// ConfigEntryController.ReconcileEntry — not the catalog API.
 	if err := r.upsertConfigEntry(ctx, consulClient, igw, pool, log); err != nil {
@@ -741,149 +726,12 @@ func (r *InferenceGatewayController) reconcileService(
 	return nil
 }
 
-// reconcileRegistrations registers each running pod as a Consul service instance
-// via the Catalog API — exactly the pattern used by api-gateway/binding/registration.go.
-// Each pod gets its own entry (ID = pod name) under a virtual node
-// (<nodeName>-virtual) so that Consul's control plane can route to each replica
-// independently. Pods that are no longer running are deregistered.
-func (r *InferenceGatewayController) reconcileRegistrations(
-	ctx context.Context,
-	consulClient *capi.Client,
-	igw *v1alpha1.InferenceGateway,
-	log logr.Logger,
-) error {
-	// List all pods owned by this gateway's Deployment.
-	podList := &corev1.PodList{}
-	if err := r.Client.List(ctx, podList,
-		client.InNamespace(igw.Namespace),
-		client.MatchingLabels(gatewayLabels(igw)),
-	); err != nil {
-		return fmt.Errorf("listing pods for %q: %w", igw.Name, err)
-	}
-
-	writeOpts := &capi.WriteOptions{}
-	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-		writeOpts.Namespace = r.ConsulNamespace
-	}
-
-	// Track which pod IDs we register so we can deregister stale ones.
-	registered := make(map[string]string) // podName → nodeName
-
-	for _, pod := range podList.Items {
-		// Skip pods that are being deleted or don't have an IP yet.
-		if !pod.DeletionTimestamp.IsZero() || pod.Status.PodIP == "" || pod.Spec.NodeName == "" {
-			continue
-		}
-
-		healthStatus := capi.HealthCritical
-		if isPodReady(pod) {
-			healthStatus = capi.HealthPassing
-		}
-
-		nodeName := injectcommon.ConsulNodeNameFromK8sNode(pod.Spec.NodeName)
-
-		reg := capi.CatalogRegistration{
-			Node:    nodeName,
-			Address: pod.Status.HostIP,
-			NodeMeta: map[string]string{
-				"synthetic-node": "true",
-			},
-			Service: &capi.AgentService{
-				Kind:    capi.ServiceKindAPIGateway,
-				ID:      pod.Name,
-				Service: igw.Name,
-				Address: pod.Status.PodIP,
-				Port:    int(inferenceGatewayPort),
-				Proxy: &capi.AgentServiceConnectProxyConfig{
-					Config: map[string]interface{}{
-						"envoy_prometheus_bind_addr": net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(int(inferenceGatewayMetricsPort))),
-					},
-				},
-				Meta: map[string]string{
-					constants.MetaKeyPodName:         pod.Name,
-					constants.MetaKeyKubeNS:          pod.Namespace,
-					constants.MetaKeyKubeServiceName: igw.Name,
-					"datacenter":                     r.Datacenter,
-					"external-source":                "consul-inference-gateway",
-				},
-			},
-			Check: &capi.AgentCheck{
-				CheckID:   fmt.Sprintf("%s/%s", pod.Namespace, pod.Name),
-				Name:      "Kubernetes Readiness Check",
-				Type:      "kubernetes-readiness",
-				Status:    healthStatus,
-				ServiceID: pod.Name,
-				Output:    healthCheckOutput(healthStatus, pod.Name, pod.Namespace),
-			},
-			SkipNodeUpdate: true,
-		}
-		if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-			reg.Service.Namespace = r.ConsulNamespace
-			reg.Check.Namespace = r.ConsulNamespace
-		}
-
-		if _, err := consulClient.Catalog().Register(&reg, writeOpts); err != nil {
-			return fmt.Errorf("registering pod %q: %w", pod.Name, err)
-		}
-		registered[pod.Name] = nodeName
-		log.Info("registered pod in Consul", "pod", pod.Name, "node", nodeName, "health", healthStatus)
-	}
-
-	// Deregister any service instances not in the current pod set.
-	queryOpts := &capi.QueryOptions{}
-	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-		queryOpts.Namespace = r.ConsulNamespace
-	}
-	existing, _, err := consulClient.Catalog().Service(igw.Name, "", queryOpts)
-	if err != nil && !isConsulNotFoundErr(err) {
-		return fmt.Errorf("querying Consul services for %q: %w", igw.Name, err)
-	}
-	for _, svc := range existing {
-		if _, ok := registered[svc.ServiceID]; !ok {
-			dereg := capi.CatalogDeregistration{
-				Node:      svc.Node,
-				ServiceID: svc.ServiceID,
-			}
-			if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
-				dereg.Namespace = r.ConsulNamespace
-			}
-			if _, err := consulClient.Catalog().Deregister(&dereg, writeOpts); err != nil {
-				return fmt.Errorf("deregistering stale pod %q: %w", svc.ServiceID, err)
-			}
-			log.Info("deregistered stale pod from Consul", "pod", svc.ServiceID, "node", svc.Node)
-		}
-	}
-	return nil
-}
-
-// isPodReady returns true when the pod is Running and its Ready condition is True.
-func isPodReady(pod corev1.Pod) bool {
-	if pod.Status.Phase != corev1.PodRunning {
-		return false
-	}
-	for _, c := range pod.Status.Conditions {
-		if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-	return false
-}
-
-// healthCheckOutput returns a human-readable reason string for a Consul health check.
-func healthCheckOutput(status, podName, podNamespace string) string {
-	if status == capi.HealthPassing {
-		return "Kubernetes health checks passing"
-	}
-	return fmt.Sprintf("Pod \"%s/%s\" is not ready", podNamespace, podName)
-}
-
 // ── Resource builder functions ────────────────────────────────────────────────
 
 // deploymentFor returns the desired Deployment for an InferenceGateway.
-// The inference-gateway is a pure Envoy ext_proc gRPC server — it does NOT
-// need consul-dataplane, an init container, or any Consul client code.
-// Envoy (in a separate pod) calls it over the ClusterIP Service.
-// The webhook is explicitly disabled to prevent the deadlock we observed.
+// The connect-inject webhook annotation is set to "true" so that the mesh webhook
+// automatically injects the consul-dataplane sidecar and connect-init container,
+// exactly as it does for any other mesh-enabled workload.
 func deploymentFor(
 	igw *v1alpha1.InferenceGateway,
 	pool *v1alpha1.InferencePoolConfig,
@@ -909,9 +757,10 @@ func deploymentFor(
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 					Annotations: map[string]string{
-						// Explicitly opt out of the connect-inject webhook.
-						// This is a pure ext_proc server — no Envoy sidecar needed.
-						constants.AnnotationInject: "false",
+						// Opt in to the connect-inject webhook so that the mesh
+						// webhook automatically injects the consul-dataplane
+						// sidecar and the consul-connect-inject-init init container.
+						constants.AnnotationInject: "true",
 					},
 				},
 				Spec: corev1.PodSpec{

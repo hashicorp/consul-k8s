@@ -67,7 +67,7 @@ global:
   # image: "hashicorp/consul-enterprise:1.10.0-ent"
   # ```
   # @default: hashicorp/consul:<latest version>
-  image: docker.mirror.hashicorp.services/hashicorppreview/consul:2.1.0-dev
+  image: docker.io/library/consul:ai1
 
   # Array of objects containing image pull secret names that will be applied to each service account.
   # This can be used to reference image pull secrets if using a custom consul or consul-k8s-control-plane Docker image.
@@ -87,7 +87,7 @@ global:
   # image that is used for functionality such as catalog sync.
   # This can be overridden per component.
   # @default: hashicorp/consul-k8s-control-plane:<latest version>
-  imageK8S: docker.io/library/consul-k8s-control-plane:local
+  imageK8S: localhost/consul-k8s-control-plane:localMCP33
 
   # The image pull policy used globally for images controlled by Consul (consul, consul-dataplane, consul-k8s, consul-telemetry-collector).
   # One of "IfNotPresent", "Always", "Never", and "". Refer to https://kubernetes.io/docs/concepts/containers/images/#image-pull-policy
@@ -3790,7 +3790,7 @@ ai:
   #     are not created.
   #   - The connect-inject controller does NOT start the InferenceModelConfig watcher.
   # @type: boolean
-  enabled: false
+  enabled: true
 
   inferenceModel:
     defaults:
@@ -3820,6 +3820,13 @@ ai:
           cpu: "1000m"
 
   mcpServer:
+    # The container image for the MCP server sidecar injected by the webhook
+    # into pods annotated with consul.hashicorp.com/ai-role: "mcp-server".
+    #
+    # @default: ""
+    # @type: string
+    image: hashicorp/consul-dataplane:2.0.2
+
     defaults:
       # The port the MCP server container listens on inside the pod.
       # Must not conflict with application ports or the Envoy proxy port (20000).
@@ -3863,7 +3870,7 @@ ai:
     # ```
     # @default: hashicorp/consul-inference-gateway:<latest version>
     # @type: string
-    image: "hashicorp/consul-inference-gateway:0.1.0"
+    image: "hashicorp/consul-inference-gateway:0.1.0-dev"
 
     # Resource requests and limits for the InferenceGateway Deployment containers.
     # @recurse: false

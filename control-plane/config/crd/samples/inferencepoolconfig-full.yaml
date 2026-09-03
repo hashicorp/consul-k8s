@@ -80,7 +80,7 @@ spec:
   # ---------------------------------------------------------------------------
   parentRefs:
     - kind: InferenceGateway
-      name: my-inference-gateway   # must exist in namespace below
+      name: my-inference-gateway-full  # must exist in namespace below
       namespace: default
 
   # ---------------------------------------------------------------------------

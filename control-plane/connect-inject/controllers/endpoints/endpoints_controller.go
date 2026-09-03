@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -351,7 +353,24 @@ func (r *Controller) Logger(name types.NamespacedName) logr.Logger {
 
 func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&discoveryv1.EndpointSlice{}).
+		Named("endpointslice").
+		// Watch EndpointSlices but map each event to the service name (via the
+		// kubernetes.io/service-name label) so that req.Name in Reconcile is
+		// always the Service name, not the generated EndpointSlice name.
+		Watches(&discoveryv1.EndpointSlice{}, handler.EnqueueRequestsFromMapFunc(
+			func(_ context.Context, obj client.Object) []reconcile.Request {
+				svcName, ok := obj.GetLabels()[discoveryv1.LabelServiceName]
+				if !ok || svcName == "" {
+					return nil
+				}
+				return []reconcile.Request{{
+					NamespacedName: types.NamespacedName{
+						Name:      svcName,
+						Namespace: obj.GetNamespace(),
+					},
+				}}
+			},
+		)).
 		Complete(r)
 }
 

@@ -225,6 +225,26 @@ const (
 	// This is only meant to be used by Deployment/consul-telemetry-collector.
 	LabelTelemetryCollector = "consul.hashicorp.com/telemetry-collector"
 
+	// AnnotationAIRole is the key of the annotation that identifies the AI role of a pod.
+	// When set to "mcp-server", the webhook injects the MCP server sidecar container.
+	AnnotationAIRole = "consul.hashicorp.com/ai-role"
+
+	// AnnotationAIMCPServerPort overrides the MCP interceptor port for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerPort = "consul.hashicorp.com/ai-mcp-server-interceptor-port"
+
+	// AnnotationAIMCPServerTransport overrides the MCP wire transport for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerTransport = "consul.hashicorp.com/ai-mcp-server-transport"
+
+	// AnnotationAIMCPServerPath overrides the MCP HTTP path for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerPath = "consul.hashicorp.com/ai-mcp-server-path"
+
+	// AnnotationAIMCPServerProtocolVersion overrides the MCP protocol version for a specific pod.
+	// Falls back to McpServerConfig CRD defaults when not set.
+	AnnotationAIMCPServerProtocolVersion = "consul.hashicorp.com/ai-mcp-server-protocol-version"
+
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	Injected = "injected"
 

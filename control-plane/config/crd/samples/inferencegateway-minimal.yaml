@@ -10,11 +10,25 @@
 #   kubectl get igw my-inference-gateway -n default -w
 # Describe:
 #   kubectl describe igw my-inference-gateway -n default
+# apiVersion: consul.hashicorp.com/v1alpha1
+# kind: InferenceGateway
+# metadata:
+#   name: my-inference-gateway
+#   namespace: default
+# spec:
+#   poolRef:
+#     name: test-pool-full   # must match an InferencePoolConfig in the same namespace
+---
+# Full InferenceGateway — all optional fields shown.
+# spec.image overrides the controller-level default image for this gateway only.
+# spec.replicas sets the number of Deployment replicas (default: 1).
 apiVersion: consul.hashicorp.com/v1alpha1
 kind: InferenceGateway
 metadata:
-  name: my-inference-gateway
+  name: my-inference-gateway-full
   namespace: default
 spec:
   poolRef:
-    name: test-pool-full   # must match an InferencePoolConfig in the same namespace
+    name: test-pool-full
+  image:  localhost/consul-inference-gateway:0.1.0-dev # optional: pin a specific image
+  replicas: 3                                 # optional: scale out the gateway

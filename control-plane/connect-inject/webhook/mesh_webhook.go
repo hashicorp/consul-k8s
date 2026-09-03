@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
@@ -75,6 +76,11 @@ type MeshWebhook struct {
 	// ImageConsulK8S is the container image for consul-k8s to use.
 	// This image is used for the consul-sidecar container.
 	ImageConsulK8S string
+
+	// ImageMCPServer is the container image for the MCP server sidecar.
+	// When set and a pod carries the consul.hashicorp.com/ai-role: "mcp-server"
+	// annotation, the webhook injects this image as an additional sidecar.
+	ImageMCPServer string
 
 	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	GlobalImagePullPolicy string
@@ -441,6 +447,14 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
+	// Inject the MCP server sidecar when the pod requests it via annotation and
+	// the webhook has an image configured.
+	if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == "mcp-server" && w.ImageMCPServer != "" {
+		mcpDefaults := v1alpha1.McpServerDefaults{}
+		mcpContainer := w.mcpServerSidecar(pod, mcpDefaults)
+		pod.Spec.Containers = append(pod.Spec.Containers, mcpContainer)
+	}
+
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
 	// and does not need to be checked for being a nil value.
 	pod.Annotations[constants.KeyInjectStatus] = constants.Injected
@@ -638,6 +652,13 @@ func (w *MeshWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, erro
 	// all other checks.
 	if raw, ok := pod.Annotations[constants.AnnotationInject]; ok {
 		return strconv.ParseBool(raw)
+	}
+
+	// A pod annotated with ai-role: mcp-server implicitly opts in to injection
+	// so that a single annotation is sufficient to get consul-dataplane +
+	// the mcp-server sidecar — no need to also set connect-inject: "true".
+	if role, ok := pod.Annotations[constants.AnnotationAIRole]; ok && role == "mcp-server" {
+		return true, nil
 	}
 
 	return !w.RequireAnnotation, nil

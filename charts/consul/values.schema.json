@@ -57,6 +57,10 @@
         "mcpServer": {
           "type": "object",
           "properties": {
+            "image": {
+              "type": "string",
+              "description": "Container image for the MCP server sidecar injected into pods with consul.hashicorp.com/ai-role: mcp-server."
+            },
             "defaults": {
               "type": "object",
               "properties": {

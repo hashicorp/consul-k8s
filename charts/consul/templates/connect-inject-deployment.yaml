@@ -320,6 +320,9 @@ spec:
                 {{- if and .Values.ai .Values.ai.enabled }}
                 -enable-ai=true \
                 -ai-inference-gateway-image="{{ .Values.ai.inferenceGateway.image }}" \
+                {{- if .Values.ai.mcpServer.image }}
+                -ai-mcp-server-image="{{ .Values.ai.mcpServer.image }}" \
+                {{- end }}
                 {{- end }}
 
 
