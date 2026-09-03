@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
 	corev1 "k8s.io/api/core/v1"
-	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const (
@@ -30,7 +30,7 @@ const (
 	metricsConfiguration = "envoy_prometheus_bind_addr"
 )
 
-func registrationsForPods(metrics gatewaycommon.MetricsConfig, namespace string, gateway gwv1beta1.Gateway, pods []corev1.Pod) []api.CatalogRegistration {
+func registrationsForPods(metrics gatewaycommon.MetricsConfig, namespace string, gateway gwv1.Gateway, pods []corev1.Pod) []api.CatalogRegistration {
 	registrations := []api.CatalogRegistration{}
 	for _, pod := range pods {
 		// Skip registration if pod doesn't have complete node information yet
@@ -42,7 +42,7 @@ func registrationsForPods(metrics gatewaycommon.MetricsConfig, namespace string,
 	return registrations
 }
 
-func registrationForPod(metrics gatewaycommon.MetricsConfig, namespace string, gateway gwv1beta1.Gateway, pod corev1.Pod) api.CatalogRegistration {
+func registrationForPod(metrics gatewaycommon.MetricsConfig, namespace string, gateway gwv1.Gateway, pod corev1.Pod) api.CatalogRegistration {
 	healthStatus := api.HealthCritical
 	if isPodReady(pod) {
 		healthStatus = api.HealthPassing

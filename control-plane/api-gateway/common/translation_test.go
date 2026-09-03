@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
-	gwv1alpha2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 
 	logrtest "github.com/go-logr/logr/testing"
 
@@ -45,7 +44,7 @@ func (v fakeReferenceValidator) HTTPRouteCanReferenceBackend(httproute gwv1.HTTP
 	return true
 }
 
-func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1alpha2.TCPRoute, backendRef gwv1.BackendRef) bool {
+func (v fakeReferenceValidator) TCPRouteCanReferenceBackend(tcpRoute gwv1.TCPRoute, backendRef gwv1.BackendRef) bool {
 	return true
 }
 
@@ -1593,7 +1592,7 @@ func TestTranslator_ToHTTPRoute(t *testing.T) {
 func TestTranslator_ToTCPRoute(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		k8sRoute     gwv1alpha2.TCPRoute
+		k8sRoute     gwv1.TCPRoute
 		services     []types.NamespacedName
 		meshServices []v1alpha1.MeshService
 	}
@@ -1603,39 +1602,39 @@ func TestTranslator_ToTCPRoute(t *testing.T) {
 	}{
 		"base test": {
 			args: args{
-				k8sRoute: gwv1alpha2.TCPRoute{
+				k8sRoute: gwv1.TCPRoute{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "tcp-route",
 						Namespace: "k8s-ns",
 					},
-					Spec: gwv1alpha2.TCPRouteSpec{
-						Rules: []gwv1alpha2.TCPRouteRule{
+					Spec: gwv1.TCPRouteSpec{
+						Rules: []gwv1.TCPRouteRule{
 							{
-								BackendRefs: []gwv1alpha2.BackendRef{
+								BackendRefs: []gwv1.BackendRef{
 									{
-										BackendObjectReference: gwv1alpha2.BackendObjectReference{
+										BackendObjectReference: gwv1.BackendObjectReference{
 											Name:      "some-service",
-											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
 								},
 							},
 							{
-								BackendRefs: []gwv1alpha2.BackendRef{
+								BackendRefs: []gwv1.BackendRef{
 									{
-										BackendObjectReference: gwv1alpha2.BackendObjectReference{
+										BackendObjectReference: gwv1.BackendObjectReference{
 											Name:      "some-service-part-two",
-											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
 									{
-										BackendObjectReference: gwv1alpha2.BackendObjectReference{
-											Group:     PointerTo(gwv1alpha2.Group(v1alpha1.ConsulHashicorpGroup)),
-											Kind:      PointerTo(gwv1alpha2.Kind(v1alpha1.MeshServiceKind)),
+										BackendObjectReference: gwv1.BackendObjectReference{
+											Group:     PointerTo(gwv1.Group(v1alpha1.ConsulHashicorpGroup)),
+											Kind:      PointerTo(gwv1.Kind(v1alpha1.MeshServiceKind)),
 											Name:      "some-service-part-three",
-											Namespace: PointerTo(gwv1alpha2.Namespace("svc-ns")),
+											Namespace: PointerTo(gwv1.Namespace("svc-ns")),
 										},
 										Weight: new(int32),
 									},
