@@ -5,26 +5,22 @@
 
 package version
 
-// This validates during compilation that we are being built with a FIPS enabled go toolchain
+// The in-tree Go Cryptographic Module is selected at build time with GOFIPS140
+// and activated at run time via //go:debug fips140=on (baked into the main
+// packages). In FIPS mode the module constrains crypto/tls to FIPS-approved
+// settings, so a separate crypto/tls/fipsonly import (boringcrypto-only) is not
+// used here.
 import (
-	_ "crypto/tls/fipsonly"
-	"runtime"
-	"strings"
+	"crypto/fips140"
 )
 
-// IsFIPS returns true if consul-k8s is operating in FIPS-140-2 mode.
+// IsFIPS returns true if consul-k8s is operating in FIPS-140-3 mode.
 func IsFIPS() bool {
 	return true
 }
 
 func GetFIPSInfo() string {
-	str := "Enabled"
-	// Try to get the crypto module name
-	gover := strings.Split(runtime.Version(), "X:")
-	if len(gover) >= 2 {
-		gover_last := gover[len(gover)-1]
-		// Able to find crypto module name; add that to status string.
-		str = "FIPS 140-2 Enabled, crypto module " + gover_last
-	}
-	return str
+	// The in-tree Go Cryptographic Module reports its validated version via
+	// crypto/fips140.Version() (e.g. "v1.0.0", CMVP Certificate #5247).
+	return "FIPS 140-3 Enabled, crypto module " + fips140.Version()
 }
