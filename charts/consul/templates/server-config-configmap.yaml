@@ -225,4 +225,21 @@ data:
       }
     }
   {{- end }}
+  {{- if .Values.global.globalRegistry.enabled }}
+  global-registry-config.json: |-
+    {
+      "global_registry": {
+        "enabled": true,
+        {{- if .Values.global.globalRegistry.address }}
+        "address": "{{ .Values.global.globalRegistry.address }}",
+        {{- end }}
+        {{- if (and .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}
+        "token_file": "/consul/global-registry-token/{{ .Values.global.globalRegistry.tokenSecretKey }}",
+        {{- end }}
+        {{- if .Values.global.globalRegistry.clusterId }}
+        "cluster_id": "{{ .Values.global.globalRegistry.clusterId }}"
+        {{- end }}
+      }
+    }
+  {{- end }}
 {{- end }}

@@ -1591,3 +1591,70 @@ load _helpers
 
   [ "${actual}" = "3" ]
 }
+
+#--------------------------------------------------------------------
+# global.globalRegistry
+
+@test "server/ConfigMap: globalRegistry config not rendered when disabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.globalRegistry.enabled=false' \
+      . | tee /dev/stderr |
+      yq 'has("data") and (.data | has("global-registry-config.json"))' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
+
+@test "server/ConfigMap: globalRegistry config rendered when enabled" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["global-registry-config.json"]' | tee /dev/stderr)
+  [ "${actual}" != "null" ]
+}
+
+@test "server/ConfigMap: globalRegistry address is set when provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      --set 'global.globalRegistry.address=http://host.docker.internal:8080' \
+      . | tee /dev/stderr |
+      yq '.data["global-registry-config.json"]' | yq -r '.global_registry.address' | tee /dev/stderr)
+  [ "${actual}" = "http://host.docker.internal:8080" ]
+}
+
+@test "server/ConfigMap: globalRegistry cluster_id is set when provided" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      --set 'global.globalRegistry.clusterId=4f2a1aa8-ccc2-cc11-9f4c-94c78075f5db' \
+      . | tee /dev/stderr |
+      yq '.data["global-registry-config.json"]' | yq -r '.global_registry.cluster_id' | tee /dev/stderr)
+  [ "${actual}" = "4f2a1aa8-ccc2-cc11-9f4c-94c78075f5db" ]
+}
+
+@test "server/ConfigMap: globalRegistry token_file uses secret mount path when tokenSecretName and tokenSecretKey are set" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      --set 'global.globalRegistry.tokenSecretName=my-registry-secret' \
+      --set 'global.globalRegistry.tokenSecretKey=token.txt' \
+      . | tee /dev/stderr |
+      yq '.data["global-registry-config.json"]' | yq -r '.global_registry.token_file' | tee /dev/stderr)
+  [ "${actual}" = "/consul/global-registry-token/token.txt" ]
+}
+
+@test "server/ConfigMap: globalRegistry token_file not set when tokenSecretName/Key are absent" {
+  cd `chart_dir`
+  local actual=$(helm template \
+      -s templates/server-config-configmap.yaml  \
+      --set 'global.globalRegistry.enabled=true' \
+      . | tee /dev/stderr |
+      yq '.data["global-registry-config.json"]' | yq '.global_registry | has("token_file")' | tee /dev/stderr)
+  [ "${actual}" = "false" ]
+}
