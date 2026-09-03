@@ -796,6 +796,12 @@ global:
   # @default: hashicorp/consul-dataplane:<latest supported version>
   imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev
 
+  # The name (and tag) of the consul-ai-mcp-interceptor Docker image used for
+  # the consul-mcp-gateway sidecar injected into AI agent pods. This image
+  # contains the consul binary with the `consul connect mcp-gateway` subcommand.
+  # @default: hashicorp/consul-ai-mcp-interceptor:<latest supported version>
+  imageConsulAIMCPInterceptor: docker.mirror.hashicorp.services/hashicorppreview/consul-ai-mcp-interceptor:2.1.0-dev
+
   # Disable this once the manifests are generated and subsequent helm upgrades
   
   generateManifests: false
@@ -2809,6 +2815,12 @@ connectInject:
   # Defaults to global.image.
   # @type: string
   imageConsul: null
+
+  # The Docker image for consul-ai-mcp-interceptor to use when injecting the
+  # consul-mcp-gateway sidecar into AI agent pods.
+  # Defaults to global.imageConsulAIMCPInterceptor.
+  # @type: string
+  imageConsulAIMCPInterceptor: null
 
   # Sets the `logLevel` for the `consul-dataplane` sidecar and the `consul-connect-inject-init` container. When set, this value overrides the global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string

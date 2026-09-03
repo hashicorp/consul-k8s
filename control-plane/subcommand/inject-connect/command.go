@@ -58,6 +58,7 @@ type Command struct {
 	flagConsulImage                    string // Docker image for Consul
 	flagConsulDataplaneImage           string // Docker image for Envoy
 	flagConsulK8sImage                 string // Docker image for consul-k8s
+	flagConsulAIMCPInterceptorImage    string // Docker image for consul-ai-mcp-interceptor (AI agent sidecar)
 	flagGlobalImagePullPolicy          string // Pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	flagACLAuthMethod                  string // Auth Method to use for ACLs, if enabled
 	flagGlobalConfigACLToken           string // Optional ACL token used for global config entry reconciliations
@@ -145,6 +146,8 @@ type Command struct {
 
 	flagEnableOpenShift bool
 
+	flagGatewayBinary string // Path to consul-mcp-gateway binary for AI agent pods
+
 	flagSet *flag.FlagSet
 	consul  *flags.ConsulFlags
 
@@ -216,6 +219,10 @@ func (c *Command) init() {
 	c.flagSet.BoolVar(&c.flagEnableFederation, "enable-federation", false, "Enable Consul WAN Federation.")
 	c.flagSet.StringVar(&c.flagEnvoyExtraArgs, "envoy-extra-args", "",
 		"Extra envoy command line args to be set when starting envoy (e.g \"--log-level debug --disable-hot-restart\").")
+	c.flagSet.StringVar(&c.flagGatewayBinary, "gateway-binary", constants.DefaultGatewayBinary,
+		"Path to the consul-mcp-gateway binary inside the consul-k8s image. Used for AI agent pods.")
+	c.flagSet.StringVar(&c.flagConsulAIMCPInterceptorImage, "consul-ai-mcp-interceptor-image", "",
+		"Docker image for the consul-ai-mcp-interceptor. Used as the container image for the consul-mcp-gateway sidecar in AI agent pods.")
 	c.flagSet.StringVar(&c.flagACLAuthMethod, "acl-auth-method", "",
 		"The name of the Kubernetes Auth Method to use for connectInjection if ACLs are enabled.")
 	c.flagSet.StringVar(&c.flagGlobalConfigACLToken, "global-config-acl-token", "",
