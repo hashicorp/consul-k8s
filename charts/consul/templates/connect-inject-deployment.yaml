@@ -114,7 +114,9 @@ spec:
             {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 12 }}
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: CONSUL_LOGIN_AUTH_METHOD
-              {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+              {{- if .Values.global.acls.authMethodName }}
+              value: {{ .Values.global.acls.authMethodName }}
+              {{- else if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
               value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
               {{- else }}
               value: {{ template "consul.fullname" . }}-k8s-component-auth-method
@@ -196,6 +198,8 @@ spec:
                 {{- end }}
                 {{- if .Values.connectInject.overrideAuthMethodName }}
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
+                {{- else if .Values.global.acls.authMethodName }}
+                -acl-auth-method="{{ .Values.global.acls.authMethodName }}" \
                 {{- else if .Values.global.acls.manageSystemACLs }}
                 -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
                 {{- end }}
