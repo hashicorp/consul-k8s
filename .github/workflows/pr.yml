@@ -12,7 +12,7 @@ permissions:
   pull-requests: write
   id-token: write
 
-
+  
 # these should be the only settings that you will ever need to change
 env:
   BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -23,10 +23,48 @@ jobs:
   conditional-skip:
     uses: ./.github/workflows/reusable-conditional-skip.yml
 
+  # Detect PRs whose changes are limited to the .release/ directory (CRT release
+  # orchestration). These files don't affect acceptance tests or coverage, so we
+  # skip both for them (see the `test` and `coverage` jobs below). This is scoped
+  # to this workflow only, so build.yml is unaffected.
+  check-release-only:
+    runs-on: ubuntu-latest
+    name: Check whether only .release files changed
+    outputs:
+      release-only: ${{ steps.changed-files.outputs.only_changed }}
+    steps:
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+        with:
+          fetch-depth: 0
+      - name: Check for changes outside .release
+        id: changed-files
+        uses: tj-actions/changed-files@2f7c5bfce28377bc069a65ba478de0a74aa0ca32 # v46.0.1
+        with:
+          files: |
+            .release/**
+
+  get-go-version:
+    needs: [conditional-skip]
+    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    uses: ./.github/workflows/reusable-get-go-version.yml
+
+  coverage:
+    needs:
+      - conditional-skip
+      - check-release-only
+      - get-go-version
+    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.check-release-only.outputs.release-only != 'true'
+    uses: ./.github/workflows/coverage.yml
+    with:
+      go-version: ${{ needs.get-go-version.outputs.go-version }}
+      pr-number: ${{ github.event_name == 'pull_request' && toJson(github.event.pull_request.number) || '' }}
+
   test:
     name: test
-    needs: [ conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci != 'true'
+    needs: [ conditional-skip, check-release-only ]
+    # Skip when only skippable files changed (skip-ci) or when the PR only
+    # touches .release/ files (release-only).
+    if: needs.conditional-skip.outputs.skip-ci != 'true' && needs.check-release-only.outputs.release-only != 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: benc-uk/workflow-dispatch@25b02cc069be46d637e8fe2f1e8484008e9e9609 # v1.2.3
@@ -39,8 +77,14 @@ jobs:
         inputs: '{ "context":"${{ env.CONTEXT }}-${{ github.event.pull_request.number }}", "actor":"${{ github.actor }}", "repository":"${{ github.repository }}", "branch":"${{ env.BRANCH }}", "sha":"${{ env.SHA }}" }'
 
   pass-required-checks-on-skip:
-    needs: [ conditional-skip ]
-    if: needs.conditional-skip.outputs.skip-ci == 'true'
+    needs: [ conditional-skip, check-release-only ]
+    # Fire when CI is skipped (skip-ci) or when the PR only touched .release/
+    # files and the test dispatch above was skipped. always() ensures the
+    # skip-ci safety net still runs even if check-release-only fails.
+    if: >-
+      always() &&
+      (needs.conditional-skip.outputs.skip-ci == 'true' ||
+      needs.check-release-only.outputs.release-only == 'true')
     runs-on: ubuntu-latest
     strategy:
       matrix:
