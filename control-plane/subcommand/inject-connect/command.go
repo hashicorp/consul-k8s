@@ -81,8 +81,9 @@ type Command struct {
 	flagCrossNamespaceACLPolicy    string // The name of the ACL policy to add to every created namespace if ACLs are enabled
 
 	// Flags for endpoints controller.
-	flagReleaseName      string
-	flagReleaseNamespace string
+	flagReleaseName                 string
+	flagReleaseNamespace            string
+	flagEnableMultiportRegistration bool
 
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
@@ -230,6 +231,7 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
+	c.flagSet.BoolVar(&c.flagEnableMultiportRegistration, "enable-multiport-registration", true, "Register all ports for multi-port Kubernetes Services. When false, register only the selected default port.")
 	c.flagSet.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
 		"[Enterprise Only] Enables Admin Partitions.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,

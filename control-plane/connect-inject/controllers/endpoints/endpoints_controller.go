@@ -134,6 +134,9 @@ type Controller struct {
 	// reports a valid enterprise license. Multi-port service registrations are
 	// only supported on Consul Enterprise.
 	IsEnterpriseDistribution bool
+	// DisableMultiportRegistration makes multi-port Kubernetes Services use the
+	// selected default port as a legacy single-port Consul registration.
+	DisableMultiportRegistration bool
 
 	MetricsConfig metrics.Config
 	Log           logr.Logger
@@ -482,9 +485,10 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		return nil, nil, err
 	}
 
-	// Multi-port registrations are only supported on Consul Enterprise.
-	// On CE, fall back to single port registration using the default port.
-	if !r.IsEnterpriseDistribution && len(consulServicePorts) > 0 {
+	// Multi-port registrations are only supported on Consul Enterprise and can
+	// be disabled explicitly. In either case, fall back to a single-port
+	// registration using the default port selected above.
+	if (!r.IsEnterpriseDistribution || r.DisableMultiportRegistration) && len(consulServicePorts) > 0 {
 		consulServicePorts = nil
 	}
 
