@@ -3934,6 +3934,13 @@ func (in *ServiceDefaultsSpec) DeepCopyInto(out *ServiceDefaultsSpec) {
 	}
 	out.MeshGateway = in.MeshGateway
 	in.Expose.DeepCopyInto(&out.Expose)
+	if in.PortDefaults != nil {
+		in, out := &in.PortDefaults, &out.PortDefaults
+		*out = make(map[string]ServicePortDefaults, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.UpstreamConfig != nil {
 		in, out := &in.UpstreamConfig, &out.UpstreamConfig
 		*out = new(Upstreams)

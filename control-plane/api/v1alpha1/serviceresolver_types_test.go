@@ -234,6 +234,49 @@ func TestServiceResolver_MatchesConsul(t *testing.T) {
 				CreateIndex: 1,
 				ModifyIndex: 2,
 			},
+		Matches: false,
+		},
+		"subset with destinationPort matches": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Subsets: map[string]ServiceResolverSubset{
+						"admin": {DestinationPort: "admin"},
+						"web":   {Filter: "Service.Meta.version == v1"},
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name:      "name",
+				Kind:      capi.ServiceResolver,
+				Namespace: "foobar",
+				Subsets: map[string]capi.ServiceResolverSubset{
+					"admin": {DestinationPort: "admin"},
+					"web":   {Filter: "Service.Meta.version == v1"},
+				},
+			},
+			Matches: true,
+		},
+		"subset destinationPort mismatch": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Subsets: map[string]ServiceResolverSubset{
+						"admin": {DestinationPort: "admin"},
+					},
+				},
+			},
+			Theirs: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Subsets: map[string]capi.ServiceResolverSubset{
+					"admin": {DestinationPort: "metrics"},
+				},
+			},
 			Matches: false,
 		},
 	}
@@ -442,6 +485,32 @@ func TestServiceResolver_ToConsul(t *testing.T) {
 				},
 			},
 		},
+		"subset with destinationPort": {
+			Ours: ServiceResolver{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: ServiceResolverSpec{
+					Subsets: map[string]ServiceResolverSubset{
+						"admin": {DestinationPort: "admin"},
+						"web":   {Filter: "Service.Meta.version == v1", OnlyPassing: true},
+					},
+				},
+			},
+			Exp: &capi.ServiceResolverConfigEntry{
+				Name: "name",
+				Kind: capi.ServiceResolver,
+				Subsets: map[string]capi.ServiceResolverSubset{
+					"admin": {DestinationPort: "admin"},
+					"web":   {Filter: "Service.Meta.version == v1", OnlyPassing: true},
+				},
+				Meta: map[string]string{
+					common.SourceKey:     common.SourceValue,
+					common.DatacenterKey: "datacenter",
+				},
+			},
+		},
+
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

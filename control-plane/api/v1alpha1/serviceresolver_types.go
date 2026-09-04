@@ -126,6 +126,9 @@ type ServiceResolverSubset struct {
 	// is set to true, only instances with checks in the passing state will be
 	// considered healthy.
 	OnlyPassing bool `json:"onlyPassing,omitempty"`
+	// DestinationPort is the named port on the destination service that this
+	// subset selects. If empty, the requested or default service port is used.
+	DestinationPort string `json:"destinationPort,omitempty"`
 }
 
 type ServiceResolverFailover struct {
@@ -419,8 +422,9 @@ func (in ServiceResolverSubsetMap) validate(path *field.Path) field.ErrorList {
 
 func (in ServiceResolverSubset) toConsul() capi.ServiceResolverSubset {
 	return capi.ServiceResolverSubset{
-		Filter:      in.Filter,
-		OnlyPassing: in.OnlyPassing,
+		Filter:          in.Filter,
+		OnlyPassing:     in.OnlyPassing,
+		DestinationPort: in.DestinationPort,
 	}
 }
 
