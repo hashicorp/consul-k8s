@@ -119,6 +119,76 @@ Please see the many options supported in the `values.yaml`
 file. These are also fully documented directly on the
 [Consul website](https://developer.hashicorp.com/consul/docs/k8s/helm).
 
+### upgrade manifests steps from 0.6.2 to 1.2.1 version of the package gateway.networking.k8s.io
+
+1. Verify the storage versions:
+  ``` bash
+  k1 get crd referencegrants.gateway.networking.k8s.io \
+  -o jsonpath='{range .spec.versions[*]}{.name}{" storage="}{.storage}{"\n"}{end}'
+  ```
+  sample response:
+  ``` bash
+  v1alpha2 storage=true
+  v1beta1 storage=false
+  ```
+
+2. patch the referenceGrants CRD to set v1beta1 stored version
+  ``` bash
+  k1 get crd referencegrants.gateway.networking.k8s.io -o json |
+  jq '
+  .spec.versions
+  | to_entries
+  | map(
+      if .value.name == "v1alpha2"
+      then {"op":"replace","path":("/spec/versions/" + (.key|tostring) + "/storage"),"value":false}
+      elif .value.name == "v1beta1"
+      then {"op":"replace","path":("/spec/versions/" + (.key|tostring) + "/storage"),"value":true}
+      else empty
+      end
+    )
+  ' > /tmp/referencegrant-storage-patch.json
+
+
+  k1 patch crd referencegrants.gateway.networking.k8s.io \
+  --type=json \
+  --patch-file=/tmp/referencegrant-storage-patch.json
+  ```
+3. Re-apply all the objs of refGrants
+  ``` bash
+  k1 get referencegrant.gateway.networking.k8s.io -A -o json |
+  jq -r '.items[] | [.metadata.namespace, .metadata.name] | @tsv' |
+  while IFS=$'\t' read -r ns name; do
+      echo "Migrating $ns/$name"
+      k1 get referencegrant.gateway.networking.k8s.io "$name" -n "$ns" -o yaml |
+        k1 replace -f -
+  done
+  ```
+
+4. Patch the storage Version in status
+
+  ``` bash
+
+  k1 patch crd referencegrants.gateway.networking.k8s.io \
+    --subresource=status \
+    --type=merge \
+    -p '{"status":{"storedVersions":["v1beta1"]}}'
+  ```
+
+5. 
+  ``` bash
+  idx=$(k1 get crd referencegrants.gateway.networking.k8s.io -o json |
+    jq -r '.spec.versions
+      | to_entries[]
+      | select(.value.name == "v1alpha2")
+      | .key')
+
+  k1 patch crd referencegrants.gateway.networking.k8s.io \
+    --type=json \
+    -p="[{\"op\":\"remove\",\"path\":\"/spec/versions/$idx\"}]"
+  ```
+6. perform helm upgrade.
+
+
 ## Tutorials
 
 You can find examples and complete tutorials on how to deploy Consul on 
