@@ -26,6 +26,7 @@ const ipv6RegEx = `([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){
 // Combine both regexes with an OR operator.
 const ipRegEx = `(` + ipv4RegEx + `|` + ipv6RegEx + `)`
 
+// Dummy comment
 // TestInstall tests that we can install consul service mesh with the CLI
 // and see that services can connect.
 func TestInstall(t *testing.T) {
