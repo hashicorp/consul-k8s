@@ -1,0 +1,3 @@
+```release-note:bug
+sync-catalog: Add missing health checks to NodePort service registrations to match ClusterIP behavior from #3874
+```
