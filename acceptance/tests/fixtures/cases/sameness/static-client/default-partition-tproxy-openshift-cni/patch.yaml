@@ -1,0 +1,16 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# OpenShift + CNI overlay for the sameness static-client (tproxy) fixture.
+# Adds the Multus consul-cni network annotation so the consul-cni plugin runs for
+# this pod and installs the transparent-proxy iptables (including the Consul DNS
+# redirect) required to resolve .consul virtual addresses in transparent proxy mode.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: static-client
+spec:
+  template:
+    metadata:
+      annotations:
+        "k8s.v1.cni.cncf.io/networks": '[{ "name":"consul-cni" }]'

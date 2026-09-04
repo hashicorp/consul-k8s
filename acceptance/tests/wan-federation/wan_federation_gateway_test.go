@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	terratestK8s "github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
@@ -37,6 +38,13 @@ func TestWANFederation_Gateway(t *testing.T) {
 
 	primaryContext := env.DefaultContext(t)
 	secondaryContext := env.Context(t, 1)
+
+	cleanupWANTestDeployments(t, cfg, primaryContext)
+	cleanupWANTestDeployments(t, cfg, secondaryContext)
+	cleanupWANTestDeploymentsInNamespace(t, primaryContext, "ns1")
+	cleanupWANTestDeploymentsInNamespace(t, primaryContext, "ns2")
+	cleanupWANTestDeploymentsInNamespace(t, secondaryContext, "ns1")
+	cleanupWANTestDeploymentsInNamespace(t, secondaryContext, "ns2")
 
 	primaryHelmValues := map[string]string{
 		"global.datacenter": "dc1",
@@ -160,11 +168,11 @@ func TestWANFederation_Gateway(t *testing.T) {
 		})
 
 		// Wait for the httproute to exist before patching, with delete/recreate fallback
-		helpers.WaitForHTTPRouteWithRetry(t, primaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+		helpers.WaitForHTTPRouteWithRetry(t, primaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
-		k8s.RunKubectl(t, primaryContext.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		patchHTTPRouteBackendToMeshService(t, primaryContext.KubectlOptions(t), "http-route")
 
 		checkConnectivity(t, primaryContext, primaryClient)
 	})
@@ -193,18 +201,34 @@ func TestWANFederation_Gateway(t *testing.T) {
 		})
 
 		// Wait for the httproute to exist before patching, with delete/recreate fallback
-		helpers.WaitForHTTPRouteWithRetry(t, secondaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+		helpers.WaitForHTTPRouteWithRetry(t, secondaryContext.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 		// patching the route to target a MeshService since we don't have the corresponding Kubernetes service in this
 		// cluster.
-		k8s.RunKubectl(t, secondaryContext.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+		patchHTTPRouteBackendToMeshService(t, secondaryContext.KubectlOptions(t), "http-route")
 
 		checkConnectivity(t, secondaryContext, primaryClient)
 	})
 }
 
+func patchHTTPRouteBackendToMeshService(t *testing.T, options *terratestK8s.KubectlOptions, routeName string) {
+	t.Helper()
+
+	logger.Logf(t, "patching httproute %s to target MeshService mesh-service:80", routeName)
+	k8s.RunKubectl(t, options, "patch", "httproutes.gateway.networking.k8s.io", routeName, "-p", `{"spec":{"rules":[{"backendRefs":[{"group":"consul.hashicorp.com","kind":"MeshService","name":"mesh-service","port":80}]}]}}`, "--type=merge")
+
+	retrier := &retry.Counter{Count: 30, Wait: 2 * time.Second}
+	retry.RunWith(retrier, t, func(r *retry.R) {
+		output, err := k8s.RunKubectlAndGetOutputE(t, options, "get", "httproutes.gateway.networking.k8s.io", routeName, "-o", `jsonpath={.spec.rules[0].backendRefs[0].group}|{.spec.rules[0].backendRefs[0].kind}|{.spec.rules[0].backendRefs[0].name}|{.spec.rules[0].backendRefs[0].port}`)
+		require.NoError(r, err)
+		require.Equal(r, "consul.hashicorp.com|MeshService|mesh-service|80", output)
+	})
+	logger.Logf(t, "httproute %s successfully patched to MeshService backend", routeName)
+}
+
 func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Client) {
 	k8sClient := ctx.ControllerRuntimeClient(t)
+	gatewayNamespace := ctx.KubectlOptions(t).Namespace
 
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
@@ -213,7 +237,7 @@ func checkConnectivity(t *testing.T, ctx environment.TestContext, client *api.Cl
 	counter := &retry.Counter{Count: 600, Wait: 2 * time.Second}
 	retry.RunWith(counter, t, func(r *retry.R) {
 		var gateway gwv1beta1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: gatewayNamespace}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use

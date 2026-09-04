@@ -140,6 +140,17 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 	c.SetupAppNamespace(t)
 
 	opts := c.KubectlOptsForApp(t)
+
+	// Delete any leftover static-server/static-client deployments before
+	// deploying. On re-runs that reuse a cluster (e.g. with
+	// -no-cleanup-on-failure) these deployments can survive a Consul reinstall.
+	// Their existing sidecars still hold ACL tokens from the previous Consul
+	// installation and can no longer authenticate, and because "kubectl apply" is
+	// a no-op for an unchanged spec the stale pods are never replaced, so the mesh
+	// connectivity checks never converge. Deleting first guarantees fresh pods that
+	// log in against the current Consul. This is a no-op on a clean cluster.
+	k8s.RunKubectl(t, opts, "delete", "deployment", "static-server", "static-client", "--ignore-not-found")
+
 	if c.Cfg.EnableCNI && c.Cfg.EnableOpenshift {
 		// On OpenShift with the CNI, we need to create a network attachment definition in the namespace
 		// where the applications are running, and the app deployment configs need to reference that network
@@ -151,6 +162,22 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 			k8s.KubectlDelete(t, opts, "../fixtures/bases/openshift/")
 		})
 
+		// Use the CNI fixture variants which carry the
+		// k8s.v1.cni.cncf.io/networks: consul-cni Multus annotation. In Multus
+		// mode (consul-cni installed with -multus=true) the consul-cni plugin only
+		// runs for pods that request the consul-cni network, and without it the
+		// transparent proxy iptables redirection is never applied (traffic bypasses
+		// the Envoy sidecar, so intentions are not enforced).
+		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift-cni")
+		if c.Cfg.EnableTransparentProxy {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy-cni")
+		} else {
+			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-inject-cni")
+		}
+	} else if c.Cfg.EnableOpenshift {
+		// On OpenShift without CNI, use OCP-specific fixtures.
+		// The webhook rewrites httpGet probes when transparent proxy is active,
+		// so probe rewriting is intentionally left enabled (no overwrite-probes annotation).
 		k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-server-openshift")
 		if c.Cfg.EnableTransparentProxy {
 			k8s.DeployKustomize(t, opts, c.Cfg.NoCleanupOnFailure, c.Cfg.NoCleanup, c.Cfg.DebugDirectory, "../fixtures/cases/static-client-openshift-tproxy")
@@ -186,8 +213,8 @@ func (c *ConnectHelper) DeployClientAndServer(t *testing.T) {
 
 func (c *ConnectHelper) CreateNamespace(t *testing.T, namespace string) {
 	opts := c.Ctx.KubectlOptions(t)
-	_, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
-	if err != nil && strings.Contains(err.Error(), "AlreadyExists") {
+	output, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", namespace)
+	if err != nil && (strings.Contains(err.Error(), "AlreadyExists") || strings.Contains(output, "AlreadyExists")) {
 		return
 	}
 	require.NoError(t, err)
@@ -353,22 +380,47 @@ func (c *ConnectHelper) CreateIntention(t *testing.T, opts IntentionOpts) {
 		destinationNamespace = opts.DestinationNamespace
 	}
 
-	retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
-	retry.RunWith(retrier, t, func(r *retry.R) {
-		_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
-			Kind:      api.ServiceIntentions,
-			Name:      StaticServerName,
-			Namespace: destinationNamespace,
-			Sources: []*api.SourceIntention{
-				{
-					Namespace: sourceNamespace,
-					Name:      client,
-					Action:    api.IntentionActionAllow,
+	if c.Cfg.EnableOpenshift || c.Cfg.UseOpenshift {
+		retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+		retry.RunWith(retrier, t, func(r *retry.R) {
+			intention := &api.ServiceIntentionsConfigEntry{
+				Kind: api.ServiceIntentions,
+				Name: StaticServerName,
+				Sources: []*api.SourceIntention{
+					{
+						Name:   client,
+						Action: api.IntentionActionAllow,
+					},
 				},
-			},
-		}, nil)
-		require.NoError(r, err)
-	})
+			}
+
+			// Only set namespace fields if Consul namespaces are enabled
+			if c.HelmValues["global.enableConsulNamespaces"] == "true" {
+				intention.Namespace = destinationNamespace
+				intention.Sources[0].Namespace = sourceNamespace
+			}
+
+			_, _, err := c.ConsulClient.ConfigEntries().Set(intention, nil)
+			require.NoError(r, err)
+		})
+	} else {
+		retrier := &retry.Timer{Timeout: retryTimeout, Wait: 100 * time.Millisecond}
+		retry.RunWith(retrier, t, func(r *retry.R) {
+			_, _, err := c.ConsulClient.ConfigEntries().Set(&api.ServiceIntentionsConfigEntry{
+				Kind:      api.ServiceIntentions,
+				Name:      StaticServerName,
+				Namespace: destinationNamespace,
+				Sources: []*api.SourceIntention{
+					{
+						Namespace: sourceNamespace,
+						Name:      client,
+						Action:    api.IntentionActionAllow,
+					},
+				},
+			}, nil)
+			require.NoError(r, err)
+		})
+	}
 }
 
 // TestConnectionSuccess ensures the static-server pod can connect to the

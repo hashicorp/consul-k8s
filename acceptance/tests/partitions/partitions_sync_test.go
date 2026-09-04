@@ -6,6 +6,7 @@ package partitions
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,8 +103,14 @@ func TestPartitions_Sync(t *testing.T) {
 				"dns.enableRedirection": strconv.FormatBool(cfg.EnableTransparentProxy),
 			}
 
-			serverHelmValues := map[string]string{
-				"server.exposeGossipAndRPCPorts": "true",
+			serverHelmValues := map[string]string{}
+
+			// OpenShift SCCs do not allow host ports by default, and
+			// server.exposeGossipAndRPCPorts configures hostPort bindings.
+			if !(cfg.UseOpenshift || cfg.EnableOpenshift) {
+				serverHelmValues["server.exposeGossipAndRPCPorts"] = "true"
+			} else {
+				serverHelmValues["server.exposeGossipAndRPCPorts"] = "false"
 			}
 
 			// On Kind, there are no load balancers but since all clusters
@@ -193,17 +200,33 @@ func TestPartitions_Sync(t *testing.T) {
 				Namespace:   staticServerNamespace,
 			}
 
+			createNamespaceIfMissing := func(clusterName string, options *terratestk8s.KubectlOptions, namespace string) bool {
+				out, err := k8s.RunKubectlAndGetOutputE(t, options, "create", "ns", namespace)
+				if err != nil {
+					if strings.Contains(out, "AlreadyExists") {
+						logger.Logf(t, "namespace %s already exists in %s cluster, reusing it", namespace, clusterName)
+						return false
+					}
+					require.NoError(t, err, out)
+				}
+				return true
+			}
+
 			logger.Logf(t, "creating namespaces %s in servers cluster", staticServerNamespace)
-			k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
-			})
+			createdPrimaryNamespace := createNamespaceIfMissing("servers", primaryClusterContext.KubectlOptions(t), staticServerNamespace)
+			if createdPrimaryNamespace {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.RunKubectl(t, primaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+				})
+			}
 
 			logger.Logf(t, "creating namespaces %s in clients cluster", staticServerNamespace)
-			k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "create", "ns", staticServerNamespace)
-			helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
-				k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
-			})
+			createdSecondaryNamespace := createNamespaceIfMissing("clients", secondaryClusterContext.KubectlOptions(t), staticServerNamespace)
+			if createdSecondaryNamespace {
+				helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+					k8s.RunKubectl(t, secondaryClusterContext.KubectlOptions(t), "delete", "ns", staticServerNamespace)
+				})
+			}
 
 			consulClient, _ := primaryConsulCluster.SetupConsulClient(t, c.ACLsEnabled)
 

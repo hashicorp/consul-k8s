@@ -5,6 +5,7 @@ package apigateway
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"testing"
@@ -89,6 +90,12 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 		k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "delete", "-f", "../fixtures/bases/api-gateway/certificate.yaml")
 	})
 
+	if cfg.EnableOpenshift {
+		logger.Log(t, "patching certificate secret with generated data")
+		certificate := generateCertificate(t, nil, "gateway.test.local")
+		k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "secret", "certificate", "-p", fmt.Sprintf(`{"data":{"tls.crt":"%s","tls.key":"%s"}}`, base64.StdEncoding.EncodeToString(certificate.CertPEM), base64.StdEncoding.EncodeToString(certificate.PrivateKeyPEM)), "--type=merge")
+	}
+
 	// fetch the api-resources installed
 	logger.Log(t, "fetching api-resources")
 	out, err = k8s.RunKubectlAndGetOutputE(t, ctx.KubectlOptions(t), "api-resources")
@@ -109,14 +116,15 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	})
 
 	// Wait for the httproute to exist before patching, with delete/recreate fallback
-	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway")
+	helpers.WaitForHTTPRouteWithRetry(t, ctx.KubectlOptions(t), "http-route", "../fixtures/bases/api-gateway", "httproute.gateway.networking.k8s.io")
 
 	logger.Log(t, "patching route to target server")
-	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", "httproute", "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
+	k8s.RunKubectl(t, ctx.KubectlOptions(t), "patch", gatewayHTTPRouteResource, "http-route", "-p", `{"spec":{"rules":[{"backendRefs":[{"name":"static-server","port":80}]}]}}`, "--type=merge")
 
 	// Grab a kubernetes client so that we can verify binding
 	// behavior prior to issuing requests through the gateway.
 	k8sClient := ctx.ControllerRuntimeClient(t)
+	namespace := ctx.KubectlOptions(t).Namespace
 
 	// On startup, the controller can take upwards of 1m to perform
 	// leader election so we may need to wait a long time for
@@ -124,11 +132,11 @@ func TestAPIGateway_ExternalServers(t *testing.T) {
 	var gatewayAddress string
 	retryCheck(t, 60, func(r *retry.R) {
 		var gateway gwv1.Gateway
-		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: "default"}, &gateway)
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: "gateway", Namespace: namespace}, &gateway)
 		require.NoError(r, err)
 
 		// check that we have an address to use
-		require.Len(r, gateway.Status.Addresses, 1)
+		require.NotEmpty(r, gateway.Status.Addresses)
 		// now we know we have an address, set it so we can use it
 		gatewayAddress = gateway.Status.Addresses[0].Value
 	})

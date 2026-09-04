@@ -10,6 +10,8 @@ import (
 	"github.com/gruntwork-io/terratest/modules/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
+	customgwv1alpha2 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1alpha2"
+	customgwv1beta1 "github.com/hashicorp/consul-k8s/control-plane/gateway07/gateway-api-0.7.1-custom/apis/v1beta1"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -188,6 +190,8 @@ func (k kubernetesContext) ControllerRuntimeClient(t testutil.TestingTB) client.
 	require.NoError(t, gwv1alpha2.Install(s))
 	require.NoError(t, gwv1beta1.Install(s))
 	require.NoError(t, gwv1.Install(s))
+	require.NoError(t, customgwv1beta1.Install(s))
+	require.NoError(t, customgwv1alpha2.Install(s))
 	require.NoError(t, v1alpha1.AddToScheme(s))
 
 	client, err := client.New(config, client.Options{Scheme: s})

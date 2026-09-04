@@ -121,6 +121,13 @@ func UpgradeHelmRelease(options *UpgradeOptions) error {
 	upgrade.Wait = options.Wait
 	upgrade.Timeout = options.Timeout
 
+	// See skipOpenAPIValidation: optionally skip the OpenAPI schema download Helm
+	// otherwise performs to validate the manifest, which flakes on large clusters.
+	// The API server still validates resources server-side on apply.
+	if skipOpenAPIValidation() {
+		upgrade.DisableOpenAPIValidation = true
+	}
+
 	// Run the upgrade. Note that the dry run config is passed into the upgrade action, so upgrade.Run is called even during a dry run.
 	_, err = options.HelmActionsRunner.Upgrade(upgrade, options.ReleaseName, chart, options.Values)
 	if err != nil {
