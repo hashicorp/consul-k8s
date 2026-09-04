@@ -118,7 +118,12 @@ func (e entryComparator) apiGatewaysEqual(a, b api.APIGatewayConfigEntry) bool {
 		e.namespaceA == e.namespaceB &&
 		e.partitionA == e.partitionB &&
 		maps.Equal(a.Meta, b.Meta) &&
-		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual)
+		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual) &&
+		bothNilOrEqualFunc(a.ExtAuthz, b.ExtAuthz, gatewayExtAuthzEqual)
+}
+
+func gatewayExtAuthzEqual(a, b api.APIGatewayExtAuthz) bool {
+	return a.Enabled == b.Enabled
 }
 
 func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) bool {
