@@ -58,7 +58,11 @@ type Command struct {
 	flagConnectInject       bool
 	flagAuthMethodHost      string
 	flagBindingRuleSelector string
-	flagCreateDefaultAuthMethods bool
+
+	// flagAuthMethodNamePrefix is the base name auth methods derive from, defaulting to
+	// flagResourcePrefix.
+	flagAuthMethodNamePrefix string
+	flagCreateAuthMethods    bool
 
 	flagCreateEntLicenseToken bool
 	flagCreateDDAgentToken    bool
@@ -156,11 +160,16 @@ func (c *Command) init() {
 			"If not provided, the default cluster Kubernetes service will be used.")
 	c.flags.StringVar(&c.flagBindingRuleSelector, "acl-binding-rule-selector", "",
 		"Selector string for connectInject ACL Binding Rule.")
+	c.flags.StringVar(&c.flagAuthMethodNamePrefix, "auth-method-name-prefix", "",
+		"Base name that the Kubernetes auth methods are derived from. Defaults to -resource-prefix. "+
+			"Set this to a value that is unique per Kubernetes cluster when multiple Kubernetes clusters "+
+			"share a single Consul control plane.")
+	c.flags.BoolVar(&c.flagCreateAuthMethods, "create-auth-methods", true,
+		"Toggle for creating the Kubernetes auth methods. When false, the auth methods must already "+
+			"exist; only the ACL policies, roles and binding rules are managed.")
 
 	c.flags.BoolVar(&c.flagCreateEntLicenseToken, "create-enterprise-license-token", false,
 		"Toggle for creating a token for the enterprise license job.")
-	c.flags.BoolVar(&c.flagCreateDefaultAuthMethods, "create-default-auth-methods", true,
-		"Toggle for creating default auth methods during initialization.")
 	c.flags.BoolVar(&c.flagSnapshotAgent, "snapshot-agent", false,
 		"[Enterprise Only] Toggle for configuring ACL login for the snapshot agent.")
 	c.flags.BoolVar(&c.flagMeshGateway, "mesh-gateway", false,
@@ -457,24 +466,24 @@ func (c *Command) Run(args []string) int {
 
 	// Create the component auth method, this is the auth method that Consul components will use
 	// to issue an `ACL().Login()` against at startup, for local tokens.
-	localComponentAuthMethodName := c.withPrefix("k8s-component-auth-method")
-	if c.consulFlags.ConsulLogin.AuthMethod != "" {
-		localComponentAuthMethodName = c.consulFlags.ConsulLogin.AuthMethod
-	}
-	if c.flagCreateDefaultAuthMethods {
+	localComponentAuthMethodName := c.withAuthMethodPrefix("k8s-component-auth-method")
+	if c.flagCreateAuthMethods {
 		err = c.configureLocalComponentAuthMethod(dynamicClient, localComponentAuthMethodName)
-		if err != nil {
-			c.log.Error(err.Error())
-			return 1
-		}
+	} else {
+		err = c.checkAuthMethodExists(dynamicClient, localComponentAuthMethodName, &api.QueryOptions{})
+	}
+	if err != nil {
+		c.log.Error(err.Error())
+		return 1
 	}
 
-	globalComponentAuthMethodName := fmt.Sprintf("%s-%s", c.withPrefix("k8s-component-auth-method"), consulDC)
-	if c.consulFlags.ConsulLogin.AuthMethod != "" {
-		globalComponentAuthMethodName = c.consulFlags.ConsulLogin.AuthMethod
-	}
-	if c.flagCreateDefaultAuthMethods && !primary && c.flagAuthMethodHost != "" {
-		err = c.configureGlobalComponentAuthMethod(dynamicClient, globalComponentAuthMethodName, primaryDC)
+	globalComponentAuthMethodName := fmt.Sprintf("%s-%s", localComponentAuthMethodName, consulDC)
+	if !primary && c.flagAuthMethodHost != "" {
+		if c.flagCreateAuthMethods {
+			err = c.configureGlobalComponentAuthMethod(dynamicClient, globalComponentAuthMethodName, primaryDC)
+		} else {
+			err = c.checkAuthMethodExists(dynamicClient, globalComponentAuthMethodName, &api.QueryOptions{Datacenter: primaryDC})
+		}
 		if err != nil {
 			c.log.Error(err.Error())
 			return 1
@@ -547,16 +556,24 @@ func (c *Command) Run(args []string) int {
 	}
 
 	if c.flagConnectInject {
-		connectAuthMethodName := c.withPrefix("k8s-auth-method")
-		if c.consulFlags.ConsulLogin.AuthMethod != "" {
-			connectAuthMethodName = c.consulFlags.ConsulLogin.AuthMethod
+		connectAuthMethodName := c.withAuthMethodPrefix("k8s-auth-method")
+		var err error
+		if c.flagCreateAuthMethods {
+			err = c.configureConnectInjectAuthMethod(dynamicClient, connectAuthMethodName)
+		} else {
+			err = c.checkAuthMethodExists(dynamicClient, connectAuthMethodName, c.connectInjectQueryOptions())
 		}
-		if c.flagCreateDefaultAuthMethods {
-			err := c.configureConnectInjectAuthMethod(dynamicClient, connectAuthMethodName)
-			if err != nil {
-				c.log.Error(err.Error())
-				return 1
-			}
+		if err != nil {
+			c.log.Error(err.Error())
+			return 1
+		}
+
+		// The binding rule is always managed by this command, even when the auth
+		// method itself is pre-configured, because it maps workload service
+		// accounts to Consul service identities.
+		if err := c.createConnectInjectBindingRule(dynamicClient, connectAuthMethodName); err != nil {
+			c.log.Error(err.Error())
+			return 1
 		}
 
 		// The endpoints controller needs an ACL token always.
@@ -775,6 +792,45 @@ func (c *Command) createAuthMethod(client *consul.DynamicClient, authMethod *api
 		})
 }
 
+// checkAuthMethodExists verifies that an auth method this command does not manage
+// has already been created. Binding rules can only be written against an existing
+// auth method, so failing here produces an actionable error instead of retrying
+// binding rule creation until the command times out.
+func (c *Command) checkAuthMethodExists(client *consul.DynamicClient, authMethodName string, queryOptions *api.QueryOptions) error {
+	var authMethod *api.ACLAuthMethod
+	err := c.untilSucceeds(fmt.Sprintf("reading auth method %s", authMethodName),
+		func() error {
+			var err error
+			err = client.RefreshClient()
+			if err != nil {
+				c.log.Error("could not refresh client", err)
+			}
+			authMethod, _, err = client.ConsulClient.ACL().AuthMethodRead(authMethodName, queryOptions)
+			return err
+		})
+	if err != nil {
+		return err
+	}
+	if authMethod == nil {
+		return fmt.Errorf("auth method %q not found: it must be created before installing this Helm release "+
+			"because global.acls.authMethod.create is false. Either create the auth method or set "+
+			"global.acls.authMethod.create to true", authMethodName)
+	}
+	return nil
+}
+
+// connectInjectQueryOptions returns the query options used to look up the connect
+// inject auth method. It must match the write options used by
+// configureConnectInjectAuthMethod, which creates the auth method in a specific
+// Consul namespace when namespaces are enabled without mirroring.
+func (c *Command) connectInjectQueryOptions() *api.QueryOptions {
+	queryOptions := &api.QueryOptions{}
+	if c.flagEnableNamespaces && !c.flagEnableInjectK8SNSMirroring {
+		queryOptions.Namespace = c.flagConsulInjectDestinationNamespace
+	}
+	return queryOptions
+}
+
 type gatewayRulesGenerator func(name, namespace string) (string, error)
 
 // ConfigureGatewayParams are parameters used to configure Ingress and Terminating Gateways.
@@ -951,6 +1007,16 @@ func (c *Command) untilSucceeds(opName string, op func() error) error {
 // on the -resource-prefix flag.
 func (c *Command) withPrefix(resource string) string {
 	return fmt.Sprintf("%s-%s", c.flagResourcePrefix, resource)
+}
+
+// withAuthMethodPrefix returns the name of an auth method based on the
+// -auth-method-name-prefix flag, falling back to -resource-prefix so that
+// installations that don't set it keep their existing auth method names.
+func (c *Command) withAuthMethodPrefix(resource string) string {
+	if c.flagAuthMethodNamePrefix != "" {
+		return fmt.Sprintf("%s-%s", c.flagAuthMethodNamePrefix, resource)
+	}
+	return c.withPrefix(resource)
 }
 
 // consulDatacenterList returns the current datacenter name and the primary datacenter using the

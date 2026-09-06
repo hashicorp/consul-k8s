@@ -102,13 +102,7 @@ spec:
           # acl login info
           {{- if .Values.global.acls.manageSystemACLs }}
           - name: CONSUL_LOGIN_AUTH_METHOD
-            {{- if .Values.telemetryCollector.overrideAuthMethodName }}
-            value: {{ .Values.telemetryCollector.overrideAuthMethodName }}
-            {{- else if .Values.global.acls.authMethodName }}
-            value: {{ .Values.global.acls.authMethodName }}
-            {{- else }}
-            value: {{ template "consul.fullname" . }}-k8s-auth-method
-            {{- end }}
+            value: {{ template "consul.connectInjectAuthMethodName" . }}
           - name: CONSUL_LOGIN_DATACENTER
             value: {{ .Values.global.datacenter }}
           - name: CONSUL_LOGIN_META
@@ -294,7 +288,7 @@ spec:
           {{- if .Values.global.acls.manageSystemACLs }}
           - -credential-type=login
           - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
-          - -login-auth-method={{ template "consul.fullname" . }}-k8s-auth-method
+          - -login-auth-method={{ template "consul.connectInjectAuthMethodName" . }}
           {{- end }}
           # service and login namespace
           {{- if .Values.global.enableConsulNamespaces }}

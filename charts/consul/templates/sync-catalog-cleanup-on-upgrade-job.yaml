@@ -75,12 +75,10 @@ spec:
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_LOGIN_AUTH_METHOD
-          {{- if .Values.global.acls.authMethodName }}
-          value: {{ .Values.global.acls.authMethodName }}
-          {{- else if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
-          value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
+          value: {{ template "consul.globalComponentAuthMethodName" . }}
           {{- else }}
-          value: {{ template "consul.fullname" . }}-k8s-component-auth-method
+          value: {{ template "consul.localComponentAuthMethodName" . }}
           {{- end }}
         - name: CONSUL_LOGIN_DATACENTER
           {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter .Values.global.enableConsulNamespaces }}
