@@ -153,12 +153,10 @@ spec:
         {{- include "consul.consulK8sConsulServerEnvVars" . | nindent 8 }}
         {{- if .Values.global.acls.manageSystemACLs }}
         - name: CONSUL_LOGIN_AUTH_METHOD
-          {{- if .Values.global.acls.authMethodName }}
-          value: {{ .Values.global.acls.authMethodName }}
-          {{- else if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-          value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+          {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+          value: {{ template "consul.globalComponentAuthMethodName" . }}
           {{- else }}
-          value: {{ template "consul.fullname" . }}-k8s-component-auth-method
+          value: {{ template "consul.localComponentAuthMethodName" . }}
           {{- end }}
         - name: CONSUL_LOGIN_DATACENTER
           {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
@@ -299,13 +297,11 @@ spec:
         {{- if .Values.global.acls.manageSystemACLs }}
         - -credential-type=login
         - -login-bearer-token-path=/var/run/secrets/kubernetes.io/serviceaccount/token
-        {{- if .Values.global.acls.authMethodName }}
-        - -login-auth-method={{ .Values.global.acls.authMethodName }}
-        {{- else if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-        - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+        {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
+        - -login-auth-method={{ template "consul.globalComponentAuthMethodName" . }}
         - -login-datacenter={{ .Values.global.federation.primaryDatacenter }}
         {{- else }}
-        - -login-auth-method={{ template "consul.fullname" . }}-k8s-component-auth-method
+        - -login-auth-method={{ template "consul.localComponentAuthMethodName" . }}
         {{- end }}
         {{- if .Values.global.adminPartitions.enabled }}
         - -login-partition={{ .Values.global.adminPartitions.name }}

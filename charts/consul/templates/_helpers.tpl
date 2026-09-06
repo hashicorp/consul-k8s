@@ -16,20 +16,37 @@ as well as the global.name setting.
 {{- end -}}
 
 {{/*
-Resolves the name of the Kubernetes auth method that Consul components should use.
-If global.acls.authMethodName is provided, it is used. Otherwise it falls back to
-the default auth method name based on the release name and datacenter (if primary).
+Base name that all Kubernetes auth methods managed by this chart are derived from.
+Defaults to the release fullname so that existing installations keep their auth
+method names. Set global.acls.authMethod.name to a value that is unique per
+Kubernetes cluster when several clusters share a single Consul control plane,
+otherwise the clusters overwrite each other's auth methods.
 */}}
-{{- define "consul.loginAuthMethodName" -}}
-{{- if .Values.global.acls.authMethodName -}}
-{{- .Values.global.acls.authMethodName -}}
-{{- else -}}
-{{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter -}}
-{{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
-{{- else -}}
-{{ template "consul.fullname" . }}-k8s-component-auth-method
+{{- define "consul.authMethodPrefix" -}}
+{{- default (include "consul.fullname" .) .Values.global.acls.authMethod.name -}}
 {{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for local tokens.
+*/}}
+{{- define "consul.localComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method
 {{- end -}}
+
+{{/*
+Auth method that Consul components use to issue a `consul login` for global tokens.
+Only created in secondary datacenters when federation is enabled, which is why it
+is suffixed with the datacenter name to keep it distinct from the local one.
+*/}}
+{{- define "consul.globalComponentAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+{{- end -}}
+
+{{/*
+Auth method that service mesh workloads use to issue a `consul login`.
+*/}}
+{{- define "consul.connectInjectAuthMethodName" -}}
+{{ include "consul.authMethodPrefix" . }}-k8s-auth-method
 {{- end -}}
 
 {{/*

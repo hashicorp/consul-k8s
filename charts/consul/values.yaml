@@ -423,13 +423,40 @@ global:
     # This requires Consul >= 1.4.
     manageSystemACLs: false
 
-    # If true, the server-acl-init job will create default Kubernetes auth methods
-    # during initialization. Set to false if you are supplying custom auth methods.
-    createDefaultAuthMethods: true
+    # Configures the Kubernetes auth methods that Consul components and service mesh
+    # workloads use to authenticate with Consul.
+    authMethod:
+      # The base name used to derive the Kubernetes auth methods managed by this chart.
+      # If empty, it defaults to the Helm release fullname, which preserves the
+      # auth method names used by existing installations.
+      #
+      # Two auth methods are derived from this value:
+      # `<name>-k8s-component-auth-method` for Consul components and
+      # `<name>-k8s-auth-method` for service mesh workloads. When federation is
+      # enabled, secondary datacenters additionally derive
+      # `<name>-k8s-component-auth-method-<global.datacenter>` for global tokens.
+      #
+      # Set this to a value that is unique per Kubernetes cluster when multiple
+      # Kubernetes clusters share a single Consul control plane within the same
+      # admin partition. Otherwise each cluster overwrites the other's auth methods,
+      # because auth method names are not namespaced by cluster.
+      #
+      # Note that ACL policies and roles are still derived from `global.name`, so
+      # clusters that share a control plane should also use a unique `global.name`.
+      # @type: string
+      name: ""
 
-    # The name of the Kubernetes auth method that Consul components should use to
-    # authenticate. If left empty, it will default to '<fullname>-k8s-component-auth-method'.
-    authMethodName: ""
+      # If true, the `server-acl-init` job creates and manages the Kubernetes auth
+      # methods described by `name`. Set this to false if you provision the auth
+      # methods yourself, for example because the Consul servers are managed
+      # separately from this Helm release.
+      #
+      # When false, the auth methods must already exist before this chart is
+      # installed, and they must use the names derived from `name`. The
+      # `server-acl-init` job still creates the ACL policies, roles and binding
+      # rules that Consul components require on those auth methods.
+      # @type: boolean
+      create: true
 
     # Override global log verbosity level. One of "trace", "debug", "info", "warn", or "error".
     # @type: string
@@ -2995,6 +3022,12 @@ connectInject:
 
   # If you are not using global.acls.manageSystemACLs and instead manually setting up an
   # auth method for Connect inject, set this to the name of your auth method.
+  #
+  # Note that binding rules for this auth method are not managed by Consul, so you must
+  # create them yourself. When `global.acls.manageSystemACLs` is true, prefer
+  # `global.acls.authMethod.name` instead: the service mesh auth method is derived from it
+  # and its binding rules are managed for you. Setting both at the same time while
+  # `global.acls.manageSystemACLs` is true is rejected.
   overrideAuthMethodName: ""
 
   # Refers to a Kubernetes secret that you have created that contains

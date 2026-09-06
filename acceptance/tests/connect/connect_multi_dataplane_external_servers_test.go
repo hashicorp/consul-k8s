@@ -116,9 +116,11 @@ func TestConnectInject_MultiDataplane_ExternalServers(t *testing.T) {
 				dp2HelmValues["global.acls.bootstrapToken.secretName"] = fmt.Sprintf("%s-consul-bootstrap-acl-token", serverReleaseName)
 				dp2HelmValues["global.acls.bootstrapToken.secretKey"] = "token"
 
-				// Use the new multi-dataplane authentication values only when ACLs are enabled
-				dp2HelmValues["global.acls.authMethodName"] = "auth-method-dc2"
-				dp2HelmValues["connectInject.overrideAuthMethodName"] = "auth-method-dc2"
+				// Give the second Kubernetes cluster its own auth methods so that it
+				// does not overwrite the auth methods created by the server cluster.
+				// connectInject.overrideAuthMethodName is deliberately not set: the
+				// connect inject auth method name is derived from this value too.
+				dp2HelmValues["global.acls.authMethod.name"] = "auth-method-dc2"
 
 				// Copy Secrets from ctx1 to ctx2
 				logger.Log(t, "Copying CA Cert and Bootstrap token to ctx2")
