@@ -5,6 +5,7 @@ package webhook
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -41,7 +42,7 @@ type initContainerCommandData struct {
 
 // containerInit returns the init container spec for connect-init that polls for the service and the connect proxy service to be registered
 // so that it can save the proxy service id to the shared volume and boostrap Envoy with the proxy-id.
-func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
+func (w *MeshWebhook) containerInit(ctx context.Context, namespace corev1.Namespace, pod corev1.Pod, mpi multiPortInfo) (corev1.Container, error) {
 	// Check if tproxy is enabled on this pod.
 	tproxyEnabled, err := common.TransparentProxyEnabled(namespace, pod, w.EnableTransparentProxy)
 	if err != nil {
@@ -275,7 +276,7 @@ func (w *MeshWebhook) containerInit(namespace corev1.Namespace, pod corev1.Pod, 
 			}
 		} else {
 			// Set redirect traffic config for the container so that we can apply iptables rules.
-			redirectTrafficConfig, err := w.iptablesConfigJSON(pod, namespace)
+			redirectTrafficConfig, err := w.iptablesConfigJSON(ctx, pod, namespace)
 			if err != nil {
 				return corev1.Container{}, err
 			}

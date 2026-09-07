@@ -296,14 +296,16 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	}
 
 	// If this is an AI agent pod, mount the MCP config ConfigMap as a volume.
-	if isAIAgent(pod) {
-		cmName := aiAgentMCPConfigName(pod)
+	if common.IsAIAgent(pod) {
+		cmName := common.AIAgentMCPConfigName(pod)
 		if cmName == "" {
 			return admission.Errored(http.StatusBadRequest,
 				fmt.Errorf("annotation %s is required when %s is %s",
 					constants.AnnotationAIAgentMCPConfig,
 					constants.AnnotationAIRole,
-					constants.AIAgentRole))
+					constants.AIAgentRole,
+				),
+			)
 		}
 		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
 			Name: aiAgentConfigVolumeName,
@@ -360,7 +362,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
-		initContainer, err := w.containerInit(*ns, pod, multiPortInfo{})
+		initContainer, err := w.containerInit(ctx, *ns, pod, multiPortInfo{})
 		if err != nil {
 			w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -384,7 +386,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 
 		// Inject the AI agent mcp-gateway sidecar when the pod carries the AI role annotation.
-		if isAIAgent(pod) {
+		if common.IsAIAgent(pod) {
 			aiSidecar, err := w.aiAgentSidecar(pod)
 			if err != nil {
 				w.Log.Error(err, "error configuring ai agent mcp-gateway container", "request name", req.Name)
@@ -454,7 +456,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 
 			// Add the init container that registers the service and sets up the Envoy configuration.
-			initContainer, err := w.containerInit(*ns, pod, mpi)
+			initContainer, err := w.containerInit(ctx, *ns, pod, mpi)
 			if err != nil {
 				w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -544,7 +546,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
-		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+		if err = w.addRedirectTrafficConfigAnnotation(ctx, &pod, *ns); err != nil {
 			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
 		}
@@ -814,7 +816,7 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
 	}
-	if isAIAgent(pod) {
+	if common.IsAIAgent(pod) {
 		return fmt.Errorf("ai-agent role is not supported on multi-port pods")
 	}
 	if tproxyEnabled {

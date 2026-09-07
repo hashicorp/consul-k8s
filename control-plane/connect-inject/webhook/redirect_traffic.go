@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -26,7 +27,7 @@ import (
 //	ExcludeOutboundPorts: pod annotations
 //	ExcludeOutboundCIDRs: pod annotations
 //	ExcludeUIDs: pod annotations
-func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
+func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns corev1.Namespace) (string, error) {
 	cfg := iptables.Config{}
 
 	if !w.EnableOpenShift {
@@ -103,19 +104,19 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		}
 	}
 
-	// When the pod is an AI agent, exclude the MCP outbound gateway port, the HITL
-	// approval callback port, and the interceptor port from inbound traffic
-	// redirection so those loopback listeners are not captured by iptables.
-	// Also exclude the MCP outbound port from outbound redirection so the
-	// mcp-gateway container can dial MCP tool servers without re-interception.
-	if isAIAgent(pod) {
+	if common.IsAIAgent(pod) {
+
+		aiCfg, err := common.AIConfigFromPodIF(ctx, w.Clientset, pod)
+		if err != nil {
+			return "", err
+		}
 		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
-			strconv.Itoa(constants.DefaultAIMCPOutboundPort),
-			strconv.Itoa(constants.DefaultAIHITLPort),
-			strconv.Itoa(constants.DefaultAIInterceptorPort),
+			strconv.Itoa(aiCfg.Agent.MCP.Port),
+			strconv.Itoa(aiCfg.Agent.MCP.HITL.Port),
+			strconv.Itoa(aiCfg.Agent.Interceptor.Port),
 		)
 		cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts,
-			strconv.Itoa(constants.DefaultAIMCPOutboundPort),
+			strconv.Itoa(aiCfg.Agent.MCP.Port),
 		)
 	}
 
@@ -157,8 +158,8 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 }
 
 // addRedirectTrafficConfigAnnotation add the created iptables JSON config as an annotation on the provided pod.
-func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
-	iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(ctx context.Context, pod *corev1.Pod, ns corev1.Namespace) error {
+	iptablesConfig, err := w.iptablesConfigJSON(ctx, *pod, ns)
 	if err != nil {
 		return err
 	}

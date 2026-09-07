@@ -22,17 +22,7 @@ const (
 	aiAgentConfigMountPath = "/consul/ai-agent-config"
 )
 
-// isAIAgent returns true when the pod carries the AI agent role annotation with
-// the expected "ai-agent" value.
-func isAIAgent(pod corev1.Pod) bool {
-	return pod.Annotations[constants.AnnotationAIRole] == constants.AIAgentRole
-}
 
-// aiAgentMCPConfigName returns the ConfigMap name from the MCP config annotation,
-// or an empty string if the annotation is absent.
-func aiAgentMCPConfigName(pod corev1.Pod) string {
-	return pod.Annotations[constants.AnnotationAIAgentMCPConfig]
-}
 
 // aiAgentSidecar builds and returns the consul-mcp-gateway sidecar container
 // that runs alongside the standard consul-dataplane sidecar for AI agent pods.

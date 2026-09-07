@@ -4,7 +4,6 @@
 package webhook
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/common"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/lifecycle"
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/metrics"
@@ -89,7 +89,7 @@ func TestIsAIAgent(t *testing.T) {
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Annotations: tc.annotations},
 			}
-			require.Equal(t, tc.expected, isAIAgent(pod))
+			require.Equal(t, tc.expected, common.IsAIAgent(pod))
 		})
 	}
 }
@@ -115,7 +115,7 @@ func TestAIAgentMCPConfigName(t *testing.T) {
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Annotations: tc.annotations},
 			}
-			require.Equal(t, tc.expected, aiAgentMCPConfigName(pod))
+			require.Equal(t, tc.expected, common.AIAgentMCPConfigName(pod))
 		})
 	}
 }
@@ -149,20 +149,28 @@ func TestAIAgentSidecar(t *testing.T) {
 		}
 	}
 
-	// Command contains expected flags.
-	require.Len(t, container.Command, 3)
-	cmdStr := container.Command[2]
-	require.Contains(t, cmdStr, "consul connect mcp-gateway")
-	require.Contains(t, cmdStr, "-service")
-	require.Contains(t, cmdStr, "-gateway-binary")
-	require.Contains(t, cmdStr, w.GatewayBinary)
-	require.Contains(t, cmdStr, "-addr")
-	require.Contains(t, cmdStr, "-http-addr")
-	require.Contains(t, cmdStr, "-token")
-	require.Contains(t, cmdStr, "-log-level")
+	// Command is [consulBinary]; sub-command and flags live in Args.
+	require.Len(t, container.Command, 1)
+	require.Equal(t, constants.ConsulBinarypath, container.Command[0])
 
-	// Interceptor port in -addr flag.
-	require.Contains(t, cmdStr, "21101")
+	// Args must contain the sub-command and all expected flags.
+	args := container.Args
+	require.Contains(t, args, "connect")
+	require.Contains(t, args, "mcp-gateway")
+	require.Contains(t, args, "-gateway-binary")
+	require.Contains(t, args, w.GatewayBinary)
+	require.Contains(t, args, "-addr")
+
+	// Interceptor port must appear in the -addr value.
+	addrIdx := -1
+	for i, v := range args {
+		if v == "-addr" {
+			addrIdx = i
+			break
+		}
+	}
+	require.Greater(t, addrIdx, -1)
+	require.Contains(t, args[addrIdx+1], "21101")
 
 	// Security context: non-root, no privilege escalation, read-only filesystem.
 	require.NotNil(t, container.SecurityContext)
@@ -202,7 +210,7 @@ func TestAIAgentSidecarDefaultGatewayBinary(t *testing.T) {
 	container, err := w.aiAgentSidecar(pod)
 	require.NoError(t, err)
 
-	require.True(t, strings.Contains(container.Command[2], constants.DefaultGatewayBinary))
+	require.Contains(t, container.Args, constants.DefaultGatewayBinary)
 }
 
 // TestAIAgentSidecarServiceNameFallback verifies that when AnnotationService is

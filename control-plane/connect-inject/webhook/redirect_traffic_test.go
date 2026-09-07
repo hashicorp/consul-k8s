@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
@@ -390,7 +392,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
+			err := c.webhook.addRedirectTrafficConfigAnnotation(context.Background(), c.pod, c.namespace)
 
 			// Only compare annotation and iptables config on successful runs
 			if c.expErr == nil {
@@ -464,7 +466,7 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 
 			ns := testNS
 			ns.Labels = c.namespaceLabel
-			iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+			iptablesConfig, err := w.iptablesConfigJSON(context.Background(), *pod, ns)
 			require.NoError(t, err)
 
 			actualConfig := iptables.Config{}
@@ -475,6 +477,143 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 				require.Equal(t, 8600, actualConfig.ConsulDNSPort)
 			} else {
 				require.Empty(t, actualConfig.ConsulDNSIP)
+			}
+		})
+	}
+}
+
+func TestAddRedirectTrafficConfig_AIAgent(t *testing.T) {
+	s := runtime.NewScheme()
+	s.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &corev1.Pod{})
+	decoder := admission.NewDecoder(s)
+
+	cases := []struct {
+		name              string
+		pod               *corev1.Pod
+		configMap         *corev1.ConfigMap
+		expInboundPorts   []string
+		expOutboundPorts  []string
+		expErrContains    string
+	}{
+		{
+			name: "ai agent with ConfigMap uses custom ports",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "my-mcp", Namespace: defaultNamespace},
+				Data: map[string]string{
+					"ai.json": `{
+						"Role": "ai-agent",
+						"Agent": {
+							"MCP": {"Port": 15201, "HITL": {"Port": 16201}},
+							"Interceptor": {"Port": 21201}
+						}
+					}`,
+				},
+			},
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: defaultNamespace,
+					Name:      defaultPodName,
+					Annotations: map[string]string{
+						constants.AnnotationAIRole:           constants.AIAgentRole,
+						constants.AnnotationAIAgentMCPConfig: "my-mcp",
+					},
+				},
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+			},
+			expInboundPorts:  []string{"15201", "16201", "21201"},
+			expOutboundPorts: []string{"15201"},
+		},
+		{
+			name: "ai agent without ConfigMap annotation uses defaults",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: defaultNamespace,
+					Name:      defaultPodName,
+					Annotations: map[string]string{
+						constants.AnnotationAIRole: constants.AIAgentRole,
+						// no AnnotationAIAgentMCPConfig
+					},
+				},
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+			},
+			expInboundPorts: []string{
+				strconv.Itoa(constants.DefaultAIMCPOutboundPort),
+				strconv.Itoa(constants.DefaultAIHITLPort),
+				strconv.Itoa(constants.DefaultAIInterceptorPort),
+			},
+			expOutboundPorts: []string{strconv.Itoa(constants.DefaultAIMCPOutboundPort)},
+		},
+		{
+			name: "ai agent with missing ConfigMap returns error",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: defaultNamespace,
+					Name:      defaultPodName,
+					Annotations: map[string]string{
+						constants.AnnotationAIRole:           constants.AIAgentRole,
+						constants.AnnotationAIAgentMCPConfig: "nonexistent-mcp",
+					},
+				},
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+			},
+			expErrContains: "failed to get AI agent MCP ConfigMap",
+		},
+		{
+			name: "non-ai pod has no AI ports excluded",
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:   defaultNamespace,
+					Name:        defaultPodName,
+					Annotations: map[string]string{},
+				},
+				Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+			},
+			expInboundPorts:  nil,
+			expOutboundPorts: nil,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var clientset = k8sfake.NewSimpleClientset()
+			if c.configMap != nil {
+				clientset = k8sfake.NewSimpleClientset(c.configMap)
+			}
+			w := MeshWebhook{
+				Log:                   logrtest.New(t),
+				AllowK8sNamespacesSet: mapset.NewSetWith("*"),
+				DenyK8sNamespacesSet:  mapset.NewSet(),
+				decoder:               decoder,
+				Clientset:             clientset,
+			}
+
+			err := w.addRedirectTrafficConfigAnnotation(context.Background(), c.pod, corev1.Namespace{})
+
+			if c.expErrContains != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), c.expErrContains)
+				return
+			}
+
+			require.NoError(t, err)
+			anno, ok := c.pod.Annotations[constants.AnnotationRedirectTraffic]
+			require.True(t, ok)
+
+			var cfg iptables.Config
+			require.NoError(t, json.Unmarshal([]byte(anno), &cfg))
+
+			for _, p := range c.expInboundPorts {
+				assert.Contains(t, cfg.ExcludeInboundPorts, p, "expected inbound port %s to be excluded", p)
+			}
+			for _, p := range c.expOutboundPorts {
+				assert.Contains(t, cfg.ExcludeOutboundPorts, p, "expected outbound port %s to be excluded", p)
+			}
+
+			// Non-AI pod: confirm no AI default ports leaked in
+			if c.expInboundPorts == nil {
+				assert.NotContains(t, cfg.ExcludeInboundPorts, strconv.Itoa(constants.DefaultAIMCPOutboundPort))
+				assert.NotContains(t, cfg.ExcludeInboundPorts, strconv.Itoa(constants.DefaultAIHITLPort))
+				assert.NotContains(t, cfg.ExcludeInboundPorts, strconv.Itoa(constants.DefaultAIInterceptorPort))
 			}
 		})
 	}
