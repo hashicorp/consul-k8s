@@ -23,13 +23,25 @@ import (
 // TestConnectInject_MultiDataplane_ExternalServers tests that connect works when using multiple dataplanes
 // authenticating to the same control plane via custom k8s auth methods.
 func TestConnectInject_MultiDataplane_ExternalServers(t *testing.T) {
+	cfg := suite.Config()
+
+	// This test drives a second dataplane (ctx2) against the control plane in
+	// ctx1, so it needs at least two Kubernetes clusters. The connect package's
+	// TestMain does not require multi-cluster because it also holds single-cluster
+	// tests, so guard here instead. Without this, suite.Environment().Context(t, 1)
+	// would fail the test rather than skip it when only one cluster is configured.
+	const expectedClusters = 2
+	if !cfg.EnableMultiCluster || !cfg.IsExpectedClusterCount(expectedClusters) {
+		t.Skipf("skipping this test because it requires %d Kubernetes clusters; "+
+			"set -enable-multi-cluster and provide at least %d clusters to run it", expectedClusters, expectedClusters)
+	}
+
 	for _, secure := range []bool{
 		false,
 		true,
 	} {
 		caseName := fmt.Sprintf("secure: %t", secure)
 		t.Run(caseName, func(t *testing.T) {
-			cfg := suite.Config()
 			cfg.SkipWhenOpenshiftAndCNI(t)
 
 			// ctx1 represents the Control Plane and Dataplane 1
@@ -85,22 +97,19 @@ func TestConnectInject_MultiDataplane_ExternalServers(t *testing.T) {
 				"externalServers.hosts[0]": serverSvcAddress,
 			}
 
-			if cfg.UseKind {
+			// The control plane's Kubernetes auth method runs on the Consul servers in
+			// ctx1, but it validates dataplane-2 service-account JWTs by issuing a
+			// TokenReview against the ctx2 Kubernetes API. Point k8sAuthMethodHost at an
+			// externally reachable ctx2 API endpoint, which must be reachable from the
+			// Consul servers as documented for externalServers.k8sAuthMethodHost. Using
+			// the in-cluster kubernetes.default.svc address would resolve to ctx1 from the
+			// Consul servers and send the JWTs to the wrong TokenReview endpoint.
+			dp2HelmValues["externalServers.k8sAuthMethodHost"] = k8s.KubernetesAPIServerHost(t, cfg, ctx2)
 
-				// Set k8sAuthMethodHost to the ctx2 API server IP so the Consul server in ctx1 can verify tokens
-				dp2NodeList, err := ctx2.KubernetesClient(t).CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-				require.NoError(t, err)
-				if len(dp2NodeList.Items) > 0 && len(dp2NodeList.Items[0].Status.Addresses) > 0 {
-					dp2HelmValues["externalServers.k8sAuthMethodHost"] = fmt.Sprintf("https://%s:6443", dp2NodeList.Items[0].Status.Addresses[0].Address)
-				}
+			if cfg.UseKind {
 				dp2HelmValues["externalServers.httpsPort"] = "32500"
 				dp2HelmValues["externalServers.grpcPort"] = "32502"
 			} else {
-				// We need k8sAuthMethodHost so that the control plane auth method can reach ctx2 API server
-				// Using standard kubernetes endpoint in a kind multi-cluster setup this typically requires NodePort
-				// For this specific test, we can just point it to the local cluster API since we are just proving
-				// the authMethod logic is respected by the components.
-				dp2HelmValues["externalServers.k8sAuthMethodHost"] = "https://kubernetes.default.svc"
 				dp2HelmValues["externalServers.httpsPort"] = "8500"
 				dp2HelmValues["externalServers.grpcPort"] = "8502"
 			}
