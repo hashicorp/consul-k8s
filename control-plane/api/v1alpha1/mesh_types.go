@@ -126,6 +126,11 @@ type MeshDirectionalTLSConfig struct {
 	// Future releases of Envoy may remove currently-supported but insecure cipher suites,
 	// and future releases of Consul may add new supported cipher suites if any are added to Envoy.
 	CipherSuites []string `json:"cipherSuites,omitempty"`
+	// ECDHCurves specifies the list of ECDH/KEM curves to offer during the TLS
+	// handshake. Values must match Envoy TlsParameters.ecdh_curves identifiers.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:items:Enum=X25519MLKEM768;X25519;P-256;P-384;P-521
+	ECDHCurves []string `json:"ecdhCurves,omitempty"`
 }
 
 // RequestNormalizationMeshConfig contains options pertaining to the
@@ -373,6 +378,19 @@ func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
 	if !sliceContains(versions, in.TLSMinVersion) {
 		errs = append(errs, field.Invalid(path.Child("tlsMinVersion"), in.TLSMinVersion, notInSliceMessage(versions)))
 	}
+
+	validCurves := []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
+	if len(in.ECDHCurves) > 0 {
+		if in.TLSMinVersion != "TLSv1_3" {
+			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves, "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'"))
+		}
+		for i, curve := range in.ECDHCurves {
+			if !sliceContains(validCurves, curve) {
+				errs = append(errs, field.Invalid(path.Child("ecdhCurves").Index(i), curve, notInSliceMessage(validCurves)))
+			}
+		}
+	}
+
 	return errs
 }
 
@@ -384,6 +402,7 @@ func (in *MeshDirectionalTLSConfig) toConsul() *capi.MeshDirectionalTLSConfig {
 		TLSMinVersion: in.TLSMinVersion,
 		TLSMaxVersion: in.TLSMaxVersion,
 		CipherSuites:  in.CipherSuites,
+		ECDHCurves:    in.ECDHCurves,
 	}
 }
 

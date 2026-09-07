@@ -143,6 +143,19 @@ spec:
                         items:
                           type: string
                         type: array
+                      ecdhCurves:
+                        description: |-
+                          ECDHCurves specifies the list of ECDH/KEM curves to offer during the TLS
+                          handshake. Values must match Envoy TlsParameters.ecdh_curves identifiers.
+                        items:
+                          enum:
+                          - X25519MLKEM768
+                          - X25519
+                          - P-256
+                          - P-384
+                          - P-521
+                          type: string
+                        type: array
                       tlsMaxVersion:
                         description: |-
                           TLSMaxVersion sets the default maximum TLS version supported. Must be greater than or equal to `TLSMinVersion`.
@@ -170,6 +183,19 @@ spec:
                           Future releases of Envoy may remove currently-supported but insecure cipher suites,
                           and future releases of Consul may add new supported cipher suites if any are added to Envoy.
                         items:
+                          type: string
+                        type: array
+                      ecdhCurves:
+                        description: |-
+                          ECDHCurves specifies the list of ECDH/KEM curves to offer during the TLS
+                          handshake. Values must match Envoy TlsParameters.ecdh_curves identifiers.
+                        items:
+                          enum:
+                          - X25519MLKEM768
+                          - X25519
+                          - P-256
+                          - P-384
+                          - P-521
                           type: string
                         type: array
                       tlsMaxVersion:
