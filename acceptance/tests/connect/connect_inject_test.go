@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/consul-k8s/acceptance/framework/config"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/connhelper"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
+	"github.com/hashicorp/consul-k8s/acceptance/framework/environment"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
@@ -22,7 +24,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // TestConnectInject tests that Connect works in a default and a secure installation using Helm CLI.
@@ -278,13 +279,25 @@ func TestConnectInject_MultiportRegistrationGate(t *testing.T) {
 			portCounts: []int{2},
 			wantError:  "couldn't check if transparent proxy is enabled",
 		},
+		// No connect-service-port annotation: defaultAnnotations derives it from
+		// the first container only, so the second container's extra port is not
+		// part of the selection and the gate must not fire.
 		"later multi-port container does not trigger gate": {
+			annotations: map[string]string{
+				"consul.hashicorp.com/connect-inject": "true",
+			},
+			portCounts:   []int{1, 2},
+			wantInjected: true,
+		},
+		// Explicitly selecting two ports is rejected wherever the ports are
+		// declared, including when a later container is single-port.
+		"explicit two-port selection across containers triggers gate": {
 			annotations: map[string]string{
 				"consul.hashicorp.com/connect-inject":       "true",
 				"consul.hashicorp.com/connect-service-port": "http,c1-p1",
 			},
-			portCounts:   []int{1, 2},
-			wantInjected: true,
+			portCounts: []int{1, 2},
+			wantError:  "multi-port Consul service registration is disabled",
 		},
 		"multi-port first container triggers gate": {
 			annotations: map[string]string{
@@ -373,7 +386,7 @@ func TestConnectInject_MultiportConversionStrategies(t *testing.T) {
 
 	client := ctx.KubernetesClient(t)
 	prefix := helpers.RandomName()
-	appNamespace := multiportGateTestAppNamespace(t, client, prefix+"-apps")
+	appNamespace := multiportGateTestAppNamespace(t, cfg, ctx)
 	deployments := client.AppsV1().Deployments(appNamespace)
 	statefulSets := client.AppsV1().StatefulSets(appNamespace)
 	daemonSets := client.AppsV1().DaemonSets(appNamespace)
@@ -477,7 +490,9 @@ func TestConnectInject_MultiportConversionStrategies(t *testing.T) {
 		"connectInject.multiportServiceRegistration.conversionStrategy": "TRANSLATE",
 	})
 	require.Equal(t, "metrics", getAnnotation(prefix+"-translate", portAnnotation))
-	require.Equal(t, "http,c1-p1", getAnnotation(prefix+"-later-container", portAnnotation))
+	// Two selected ports are narrowed to one wherever the ports are declared.
+	// With no default-port annotation the first token wins.
+	require.Equal(t, "http", getAnnotation(prefix+"-later-container", portAnnotation))
 	require.Equal(t, "http", getAnnotation(prefix+"-single", portAnnotation))
 	require.Equal(t, "http,metrics", getAnnotation(prefix+"-opted-out", portAnnotation))
 	require.Equal(t, "http", getAnnotation(prefix+"-scanned", portAnnotation))
@@ -514,7 +529,7 @@ func TestConnectInject_MultiportConversionReportsStrandedWorkloads(t *testing.T)
 
 	releaseNamespace := ctx.KubectlOptions(t).Namespace
 	client := ctx.KubernetesClient(t)
-	appNamespace := multiportGateTestAppNamespace(t, client, helpers.RandomName()+"-apps")
+	appNamespace := multiportGateTestAppNamespace(t, cfg, ctx)
 	pods := client.CoreV1().Pods(appNamespace)
 
 	// A bare Pod has no controlling owner, so the Job can name it but cannot
@@ -565,22 +580,32 @@ func TestConnectInject_MultiportConversionReportsStrandedWorkloads(t *testing.T)
 		"the failure must say how to fix it")
 }
 
-// multiportGateTestAppNamespace creates a namespace for the workloads a
-// conversion test operates on.
+// multiportGateTestAppNamespace creates the namespace the conversion tests
+// deploy their workloads into, following the framework's "<consul-ns>-apps"
+// convention.
 //
 // The workloads must not live in the Consul release namespace. The conversion
 // Job is passed -release-namespace and deliberately skips it, so that
 // DECOMMISSION cannot roll out the Consul control plane itself. Creating test
 // workloads there would mean the Job silently ignores every one of them, and
 // the test would assert nothing.
-func multiportGateTestAppNamespace(t *testing.T, client kubernetes.Interface, name string) string {
+func multiportGateTestAppNamespace(t *testing.T, cfg *config.TestConfig, ctx environment.TestContext) string {
 	t.Helper()
-	_, err := client.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-	}, metav1.CreateOptions{})
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = client.CoreV1().Namespaces().Delete(context.Background(), name, metav1.DeleteOptions{})
+	opts := ctx.KubectlOptions(t)
+	name := opts.Namespace + "-apps"
+
+	if _, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", name); err != nil {
+		require.Contains(t, err.Error(), "AlreadyExists")
+	}
+	if cfg.EnableRestrictedPSAEnforcement {
+		// The fixtures run as root, which a restricted namespace rejects.
+		k8s.RunKubectl(t, opts, "label", "--overwrite", "ns", name,
+			"pod-security.kubernetes.io/enforce=privileged",
+			"pod-security.kubernetes.io/enforce-version=v1.24",
+		)
+	}
+	helpers.Cleanup(t, cfg.NoCleanupOnFailure, cfg.NoCleanup, func() {
+		k8s.RunKubectl(t, opts, "delete", "ns", name)
 	})
 	return name
 }
