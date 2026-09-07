@@ -18,12 +18,15 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/helpers"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/k8s"
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
+	"github.com/hashicorp/consul-k8s/control-plane/connect-inject/constants"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // TestConnectInject tests that Connect works in a default and a secure installation using Helm CLI.
@@ -580,6 +583,218 @@ func TestConnectInject_MultiportConversionReportsStrandedWorkloads(t *testing.T)
 		"the failure must say how to fix it")
 }
 
+// multiportPriorReleaseChartVersion is the last published release that predates
+// the multiport registration gate. A cluster on this version registers a
+// multi-port container as a multi-port Consul service unconditionally, because
+// connectInject.multiportServiceRegistration does not exist in its chart.
+const multiportPriorReleaseChartVersion = "2.0.3"
+
+// TestConnectInject_MultiportConversionFromPriorRelease upgrades a real prior
+// release into this chart with the gate switched off.
+//
+// This is the only test that starts from a cluster an operator could actually
+// have today. The other conversion tests install this chart with the gate
+// explicitly enabled, which tests a flag flip rather than a version upgrade:
+// on 2.0.3 the value does not exist at all, the workloads carry no
+// connect-service-port annotation, and the CRDs and injector arguments are the
+// old ones. A conversion that works on a same-chart upgrade but fails against
+// the release people are upgrading from is a conversion that does not work.
+func TestConnectInject_MultiportConversionFromPriorRelease(t *testing.T) {
+	cfg := suite.Config()
+	cfg.SkipWhenOpenshiftAndCNI(t)
+	if cfg.HelmChartVersion != config.HelmChartPath {
+		t.Skipf("skipping because -helm-chart-version is set: this test pins its own starting chart version")
+	}
+
+	ctx := suite.Environment().DefaultContext(t)
+	releaseName := helpers.RandomName()
+	consulCluster := consul.NewHelmClusterFromReleasedChart(t, map[string]string{
+		"connectInject.enabled": "true",
+	}, ctx, cfg, releaseName, multiportPriorReleaseChartVersion)
+	consulCluster.Create(t)
+
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+
+	// Guard against the test silently degrading into a same-chart upgrade. If
+	// the framework ever falls back to the local chart, or stops dropping the
+	// image overrides, everything below would still pass while proving nothing
+	// about upgrading from a real release.
+	injectorImage, injectorArgs := multiportInjectorSpec(t, ctx, releaseName)
+	require.NotEqual(t, cfg.ConsulK8SImage, injectorImage,
+		"the starting cluster must run the released image, not the locally built one")
+	require.NotContains(t, injectorArgs, "-disable-multiport-registration",
+		"the starting chart must predate the gate")
+
+	appNamespace := multiportGateTestAppNamespace(t, cfg, ctx)
+	appOpts := ctx.KubectlOptionsForNamespace(appNamespace)
+	client := ctx.KubernetesClient(t)
+	deployments := client.AppsV1().Deployments(appNamespace)
+
+	logger.Logf(t, "creating a multi-port mesh service on chart %s", multiportPriorReleaseChartVersion)
+	k8s.DeployKustomize(t, appOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+		"../fixtures/bases/multiport-single-service-app")
+
+	// The workload predates the gate, so it registers every container port and
+	// its Deployment carries no port annotation for the conversion to narrow.
+	// The Job has to derive the ports from the pod template itself.
+	pod := multiportRunningPod(t, client, appNamespace)
+	require.Equal(t, "api-port,metrics,admin-port", pod.Annotations[constants.AnnotationPort])
+	deployment, err := deployments.Get(context.Background(), multiport, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.NotContains(t, deployment.Spec.Template.Annotations, constants.AnnotationPort,
+		"the fixture must reach the conversion without a port annotation")
+	requireMultiportServiceInstances(t, consulClient, 1)
+
+	logger.Log(t, "upgrading to the local chart with multiport registration disabled")
+	consulCluster.UpgradeToLocalChart(t, map[string]string{
+		"connectInject.multiportServiceRegistration.enabled":            "false",
+		"connectInject.multiportServiceRegistration.conversionStrategy": "TRANSLATE",
+	})
+
+	deployment, err = deployments.Get(context.Background(), multiport, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, "api-port", deployment.Spec.Template.Annotations[constants.AnnotationPort],
+		"TRANSLATE must add the annotation the prior release never wrote")
+
+	injectorImage, injectorArgs = multiportInjectorSpec(t, ctx, releaseName)
+	require.Equal(t, cfg.ConsulK8SImage, injectorImage)
+	require.Contains(t, injectorArgs, "-disable-multiport-registration=true",
+		"the upgrade must leave the gate switched on")
+
+	k8s.RunKubectl(t, appOpts, "rollout", "status", "deploy/"+multiport, "--timeout=3m")
+	pod = multiportRunningPod(t, client, appNamespace)
+	require.Equal(t, "api-port", pod.Annotations[constants.AnnotationPort])
+	require.Len(t, pod.Spec.Containers, 2, "the workload must stay in the mesh across the upgrade")
+	requireMultiportServiceInstances(t, consulClient, 1)
+}
+
+// TestConnectInject_MultiportConversionOnRunningMeshServices runs the
+// conversion against a real multi-port service that is registered in the mesh
+// and serving traffic, rather than against pod templates alone.
+//
+// TestConnectInject_MultiportConversionStrategies proves the Job rewrites the
+// right fields. It deliberately uses scaled-to-zero workloads so that it stays
+// fast and deterministic, which means it cannot show what an operator actually
+// cares about: that flipping the gate off on a live cluster rolls the workload,
+// keeps it in the mesh under TRANSLATE with a single registered port, and takes
+// it out of the mesh under DECOMMISSION. Those are properties of the injector
+// and the endpoints controller reacting to the Job's edit, not of the Job, so
+// no unit test and no template test can cover them.
+func TestConnectInject_MultiportConversionOnRunningMeshServices(t *testing.T) {
+	cfg := suite.Config()
+	cfg.SkipWhenOpenshiftAndCNI(t)
+
+	ctx := suite.Environment().DefaultContext(t)
+	releaseName := helpers.RandomName()
+	consulCluster := consul.NewHelmCluster(t, map[string]string{
+		"connectInject.enabled":                              "true",
+		"connectInject.multiportServiceRegistration.enabled": "true",
+	}, ctx, cfg, releaseName)
+	consulCluster.Create(t)
+
+	consulClient, _ := consulCluster.SetupConsulClient(t, false)
+
+	// The workload cannot live in the release namespace: the conversion Job is
+	// passed -release-namespace and skips it, so it would silently ignore the
+	// fixture and the test would assert nothing.
+	appNamespace := multiportGateTestAppNamespace(t, cfg, ctx)
+	appOpts := ctx.KubectlOptionsForNamespace(appNamespace)
+	client := ctx.KubernetesClient(t)
+	deployments := client.AppsV1().Deployments(appNamespace)
+
+	logger.Log(t, "creating the multi-port mesh service")
+	k8s.DeployKustomize(t, appOpts, cfg.NoCleanupOnFailure, cfg.NoCleanup, cfg.DebugDirectory,
+		"../fixtures/bases/multiport-single-service-app")
+
+	// The fixture sets no connect-service-port, so the webhook defaults it to
+	// every declared container port. That is the shape the gate targets.
+	pod := multiportRunningPod(t, client, appNamespace)
+	require.Equal(t, "api-port,metrics,admin-port", pod.Annotations[constants.AnnotationPort])
+	require.Len(t, pod.Spec.Containers, 2, "expected the application container plus consul-dataplane")
+	requireMultiportServiceInstances(t, consulClient, 1)
+
+	consulCluster.Upgrade(t, map[string]string{
+		"connectInject.multiportServiceRegistration.enabled":            "false",
+		"connectInject.multiportServiceRegistration.conversionStrategy": "TRANSLATE",
+	})
+
+	deployment, err := deployments.Get(context.Background(), multiport, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, "api-port", deployment.Spec.Template.Annotations[constants.AnnotationPort])
+
+	// The template edit rolls the Deployment. The replacement Pod has to pass
+	// the admission gate that is now switched on, which is the whole point of
+	// running the conversion before the gate takes effect for this workload.
+	k8s.RunKubectl(t, appOpts, "rollout", "status", "deploy/"+multiport, "--timeout=3m")
+	pod = multiportRunningPod(t, client, appNamespace)
+	require.Equal(t, "api-port", pod.Annotations[constants.AnnotationPort])
+	require.Len(t, pod.Spec.Containers, 2, "the workload must stay in the mesh after TRANSLATE")
+	requireMultiportServiceInstances(t, consulClient, 1)
+
+	consulCluster.Upgrade(t, map[string]string{
+		"connectInject.multiportServiceRegistration.conversionStrategy": "DECOMMISSION",
+	})
+
+	deployment, err = deployments.Get(context.Background(), multiport, metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Equal(t, "false", deployment.Spec.Template.Annotations[constants.AnnotationInject])
+
+	k8s.RunKubectl(t, appOpts, "rollout", "status", "deploy/"+multiport, "--timeout=3m")
+	pod = multiportRunningPod(t, client, appNamespace)
+	require.Len(t, pod.Spec.Containers, 1, "DECOMMISSION must leave the Pod uninjected")
+	// Deregistration is what makes DECOMMISSION safe to run: a workload that is
+	// opted out but still in the catalog would keep receiving mesh traffic it
+	// can no longer terminate.
+	requireMultiportServiceInstances(t, consulClient, 0)
+}
+
+// multiportInjectorSpec returns the connect-injector's image and its command
+// line, joined so that callers can look for a flag regardless of how the chart
+// splits it across arguments.
+func multiportInjectorSpec(t *testing.T, ctx environment.TestContext, releaseName string) (string, string) {
+	t.Helper()
+	opts := ctx.KubectlOptions(t)
+	deployment, err := ctx.KubernetesClient(t).AppsV1().Deployments(opts.Namespace).
+		Get(context.Background(), releaseName+"-consul-connect-injector", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.NotEmpty(t, deployment.Spec.Template.Spec.Containers)
+	container := deployment.Spec.Template.Spec.Containers[0]
+	parts := append(append([]string{}, container.Command...), container.Args...)
+	return container.Image, strings.Join(parts, " ")
+}
+
+// multiportRunningPod returns the single running Pod of the multiport fixture.
+// The rollouts in this test leave a terminating Pod behind for a moment, so the
+// lookup retries until exactly one Pod is running.
+func multiportRunningPod(t *testing.T, client kubernetes.Interface, namespace string) corev1.Pod {
+	t.Helper()
+	var found corev1.Pod
+	retry.RunWith(&retry.Timer{Timeout: 3 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+			LabelSelector: "app=" + multiport,
+		})
+		require.NoError(r, err)
+		running := make([]corev1.Pod, 0, len(pods.Items))
+		for _, pod := range pods.Items {
+			if pod.DeletionTimestamp == nil && pod.Status.Phase == corev1.PodRunning {
+				running = append(running, pod)
+			}
+		}
+		require.Len(r, running, 1, "expected exactly one running multiport Pod")
+		found = running[0]
+	})
+	return found
+}
+
+func requireMultiportServiceInstances(t *testing.T, consulClient *api.Client, count int) {
+	t.Helper()
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		instances, _, err := consulClient.Catalog().Service(multiport, "", nil)
+		require.NoError(r, err)
+		require.Len(r, instances, count)
+	})
+}
+
 // multiportGateTestAppNamespace creates the namespace the conversion tests
 // deploy their workloads into, following the framework's "<consul-ns>-apps"
 // convention.
@@ -594,9 +809,24 @@ func multiportGateTestAppNamespace(t *testing.T, cfg *config.TestConfig, ctx env
 	opts := ctx.KubectlOptions(t)
 	name := opts.Namespace + "-apps"
 
-	if _, err := k8s.RunKubectlAndGetOutputE(t, opts, "create", "ns", name); err != nil {
-		require.Contains(t, err.Error(), "AlreadyExists")
-	}
+	// Namespace deletion is asynchronous, so a run started soon after a previous
+	// one can find this namespace still Terminating. Creating it then "succeeds"
+	// with AlreadyExists and every later apply into it fails, which reads as an
+	// unrelated failure. Wait for the namespace to be usable instead.
+	namespaces := ctx.KubernetesClient(t).CoreV1().Namespaces()
+	retry.RunWith(&retry.Timer{Timeout: 2 * time.Minute, Wait: 2 * time.Second}, t, func(r *retry.R) {
+		existing, err := namespaces.Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			require.True(r, apierrors.IsNotFound(err), "unexpected error reading namespace %s: %v", name, err)
+			_, err = namespaces.Create(context.Background(),
+				&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
+			require.NoError(r, err)
+			return
+		}
+		require.Equal(r, corev1.NamespaceActive, existing.Status.Phase,
+			"namespace %s is still terminating from a previous run", name)
+	})
+
 	if cfg.EnableRestrictedPSAEnforcement {
 		// The fixtures run as root, which a restricted namespace rejects.
 		k8s.RunKubectl(t, opts, "label", "--overwrite", "ns", name,

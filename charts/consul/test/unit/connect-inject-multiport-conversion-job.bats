@@ -27,7 +27,8 @@ load _helpers
     --set 'connectInject.multiportServiceRegistration.conversionStrategy=TRANSLATE' \
     --set 'connectInject.k8sAllowNamespaces={team-a,team-b}' \
     --set 'connectInject.k8sDenyNamespaces={blocked}' \
-    --set 'connectInject.namespaceSelector=environment: production' \
+    --set 'connectInject.namespaceSelector=matchLabels:
+  environment: production' \
     .)
 
   [ "$(echo "$object" | yq -r '.kind')" = "Job" ]
@@ -135,13 +136,12 @@ load _helpers
   cd `chart_dir`
   local object=$(helm template -s templates/connect-inject-clusterrole.yaml .)
 
-  local json=$(echo "$object" | yq -o=json)
-  [ "$(echo "$json" | jq '[.rules[] | select(.apiGroups == [""] and (.resources | index("namespaces")) and (.verbs | index("list")))] | length')" -gt 0 ]
+  [ "$(echo "$object" | yq '[.rules[] | select(.apiGroups == [""] and (.resources | index("namespaces")) and (.verbs | index("list")))] | length')" -gt 0 ]
   for resource in deployments statefulsets daemonsets; do
-    [ "$(echo "$json" | jq --arg r "$resource" '[.rules[] | select(.apiGroups == ["apps"] and (.resources | index($r)) and (.verbs | index("get")) and (.verbs | index("list")) and (.verbs | index("update")))] | length')" -gt 0 ]
+    [ "$(echo "$object" | yq "[.rules[] | select(.apiGroups == [\"apps\"] and (.resources | index(\"$resource\")) and (.verbs | index(\"get\")) and (.verbs | index(\"list\")) and (.verbs | index(\"update\")))] | length")" -gt 0 ]
   done
 
   # The stranded-workload scan reads Pods and follows ReplicaSets one hop.
-  [ "$(echo "$json" | jq '[.rules[] | select(.apiGroups == [""] and (.resources | index("pods")) and (.verbs | index("list")))] | length')" -gt 0 ]
-  [ "$(echo "$json" | jq '[.rules[] | select(.apiGroups == ["apps"] and (.resources | index("replicasets")) and (.verbs | index("get")))] | length')" -gt 0 ]
+  [ "$(echo "$object" | yq '[.rules[] | select(.apiGroups == [""] and (.resources | index("pods")) and (.verbs | index("list")))] | length')" -gt 0 ]
+  [ "$(echo "$object" | yq '[.rules[] | select(.apiGroups == ["apps"] and (.resources | index("replicasets")) and (.verbs | index("get")))] | length')" -gt 0 ]
 }

@@ -52,6 +52,7 @@ type HelmCluster struct {
 	ChartPath string
 
 	ctx                environment.TestContext
+	cfg                *config.TestConfig
 	helmOptions        *helm.Options
 	releaseName        string
 	runtimeClient      client.Client
@@ -114,6 +115,7 @@ func NewHelmCluster(
 	}
 	return &HelmCluster{
 		ctx:                ctx,
+		cfg:                cfg,
 		helmOptions:        opts,
 		releaseName:        releaseName,
 		runtimeClient:      ctx.ControllerRuntimeClient(t),
@@ -123,6 +125,64 @@ func NewHelmCluster(
 		debugDirectory:     cfg.DebugDirectory,
 		logger:             logger,
 	}
+}
+
+// NewHelmClusterFromReleasedChart returns a cluster that installs a published
+// consul-k8s chart from the HashiCorp Helm repository instead of the chart in
+// this working tree.
+//
+// It exists for upgrade tests, which must start on a real prior release and
+// then move to the local chart via UpgradeToLocalChart. The image overrides the
+// test flags normally inject are dropped so that the released chart's own
+// pinned image versions are used: an install that ran the locally built
+// control-plane image against an old chart would not be the prior release, and
+// would hide exactly the migration problems an upgrade test is meant to find.
+//
+// The enterprise Consul image is the one override that is kept, because the
+// released chart defaults to the CE image and an enterprise run would otherwise
+// silently install CE and leave its license secret unused.
+func NewHelmClusterFromReleasedChart(
+	t *testing.T,
+	helmValues map[string]string,
+	ctx environment.TestContext,
+	cfg *config.TestConfig,
+	releaseName string,
+	chartVersion string,
+) *HelmCluster {
+	cluster := NewHelmCluster(t, helmValues, ctx, cfg, releaseName)
+	for _, key := range []string{"global.image", "global.imageK8S", "global.imageEnvoy", "global.imageConsulDataplane"} {
+		delete(cluster.helmOptions.SetValues, key)
+	}
+	if cfg.EnableEnterprise {
+		entImage, err := cfg.HelmValuesFromConfig()
+		require.NoError(t, err)
+		if image, ok := entImage["global.image"]; ok {
+			cluster.helmOptions.SetValues["global.image"] = image
+		}
+	}
+	cluster.helmOptions.Version = chartVersion
+	return cluster
+}
+
+// UpgradeToLocalChart upgrades a release installed from a published chart to
+// the chart in this working tree, restoring the image overrides from the test
+// flags.
+//
+// Restoring global.imageK8S is what makes the upgrade meaningful: hooks and
+// controllers added by the local chart run subcommands that only exist in the
+// locally built control-plane image.
+func (h *HelmCluster) UpgradeToLocalChart(t *testing.T, helmValues map[string]string) {
+	t.Helper()
+
+	valuesFromConfig, err := h.cfg.HelmValuesFromConfig()
+	require.NoError(t, err)
+	for _, key := range []string{"global.image", "global.imageK8S", "global.imageEnvoy", "global.imageConsulDataplane"} {
+		if value, ok := valuesFromConfig[key]; ok {
+			h.helmOptions.SetValues[key] = value
+		}
+	}
+	h.helmOptions.Version = config.HelmChartPath
+	h.Upgrade(t, helmValues)
 }
 
 func (h *HelmCluster) Create(t *testing.T) {
