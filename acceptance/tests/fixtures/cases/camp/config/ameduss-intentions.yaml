@@ -1,0 +1,54 @@
+# ServiceIntentions for ameduss — L7 policy (default-deny).
+#
+# Consul CRD equivalent of ameduss-intentions.hcl.
+#
+# Destination: ameduss (the MCP server for flight & hotel booking).
+# Source:      ai-app.
+#
+# The interceptor (consul-mcp-gateway) stamps the x-mcp-* headers on every
+# outbound MCP call from ai-app:
+#   x-mcp-method  — the MCP JSON-RPC method (tools/call, tools/list, …)
+#   x-mcp-tool    — the tool name (hotel.search, flight.search, …)
+#   x-mcp-hitl    — present when the call was approved by the HITL approver
+#
+# Policy:
+#   ALLOW  tools/call + hotel.search or flight.search (read tools, HITL approved)
+#   ALLOW  tools/list, initialize, ping (MCP discovery/lifecycle)
+#   DENY   everything else from ai-app (booking tools fall through to catch-all)
+#   DENY   all other sources outright
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceIntentions
+metadata:
+  name: ameduss
+  namespace: default
+spec:
+  destination:
+    name: ameduss
+  sources:
+    - name: ai-app
+      permissions:
+        # Allow curated read tools (hotel.search, flight.search) — HITL required.
+        - action: allow
+          http:
+            pathExact: /mcp
+            header:
+              - name: x-mcp-method
+                exact: tools/call
+              - name: x-mcp-tool
+                regex: "^(hotel\\.search|flight\\.search)$"
+              - name: x-mcp-hitl
+                present: true
+        # Allow MCP discovery / lifecycle methods.
+        - action: allow
+          http:
+            pathExact: /mcp
+            header:
+              - name: x-mcp-method
+                regex: "^(tools/list|initialize|ping)$"
+        # Catch-all: deny anything else from ai-app (e.g. booking tools).
+        - action: deny
+          http:
+            pathExact: /mcp
+    # Any other source is denied outright.
+    - name: "*"
+      action: deny

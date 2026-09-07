@@ -19,3 +19,4 @@
 - {runner: 15, test-packages: "config-entries"}
 - {runner: 16, test-packages: "terminating-gateway"}
 - {runner: 17, test-packages: "basic"}
+- {runner: 18, test-packages: "camp"}

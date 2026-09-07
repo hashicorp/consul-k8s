@@ -1,0 +1,93 @@
+# weatherly — MCP server (weather information).
+#
+# Single-container Deployment + ClusterIP Service.
+# Consul connect-inject injects an Envoy sidecar + transparent proxy.
+# weatherly only receives calls from ai-app; no upstream block needed.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: weatherly
+  namespace: default
+  labels:
+    app: weatherly
+    camp-role: mcp-server
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weatherly
+  namespace: default
+  labels:
+    app: weatherly
+    camp-role: mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: weatherly
+  template:
+    metadata:
+      labels:
+        app: weatherly
+        camp-role: mcp-server
+      annotations:
+        # Opt this pod into the Consul connect-inject sidecar.
+        consul.hashicorp.com/connect-inject: "true"
+        # Transparent proxy: iptables redirect captures all inbound traffic
+        # into the Envoy sidecar so weatherly is reachable only through the mesh.
+        consul.hashicorp.com/transparent-proxy: "true"
+        # Exclude the app port from the inbound redirect so k8s probes work.
+        consul.hashicorp.com/transparent-proxy-exclude-inbound-ports: "8080"
+    spec:
+      serviceAccountName: weatherly
+      containers:
+        - name: weatherly
+          # Uses the same image built from mcp-servers/weatherly/Dockerfile.mesh.
+          # Replace with your registry path after building + pushing.
+          image: camp-weatherly:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: mcp
+          env:
+            - name: MCP_TRANSPORT
+              value: "http"
+            - name: MCP_ADDR
+              value: ":8080"
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+# ClusterIP Service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: weatherly
+  namespace: default
+  labels:
+    app: weatherly
+spec:
+  selector:
+    app: weatherly
+  ports:
+    - name: mcp
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

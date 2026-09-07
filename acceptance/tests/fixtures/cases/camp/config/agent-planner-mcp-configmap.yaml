@@ -1,0 +1,21 @@
+# agent-planner-mcp ConfigMap — consumed by the Consul connect-inject controller
+# when it processes the ai-app pod annotated with:
+#   consul.hashicorp.com/ai-agent-mcp-config: "agent-planner-mcp"
+#
+# The controller reads ai.json to configure the MCP gateway (consul-mcp-gateway)
+# it co-locates in the pod: interceptor port, MCP egress port, HITL port +
+# approval timeout, inference specializations, and rate limits.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-planner-mcp
+  namespace: default
+data:
+  ai.json: |
+    {
+      "Role": "ai-agent",
+      "Agent": {
+        "MCP": { "Port": 15101, "HITL": { "Port": 16101, "ApprovalTimeout": "60s" } },
+        "Interceptor": { "Port": 21101 }
+      }
+    }

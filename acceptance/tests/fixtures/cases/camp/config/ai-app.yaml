@@ -1,0 +1,183 @@
+# ai-app + HITL — single Deployment, two containers, one pod.
+#
+# ai-app  (:8080)  — Go AI agent entrypoint; calls MCP tools via 127.0.0.1:15101/mcp
+# hitl    (:16101) — Python HITL approver (ext_proc http_service verdict endpoint)
+#
+# Both containers share the pod network namespace, so ai-app can reach the HITL
+# service as localhost:16101, exactly like the Docker Compose setup.
+#
+# The connect-inject controller reads the annotations below and:
+#   1. Injects an Envoy sidecar proxy.
+#   2. Reads the ai-role + mcp-config annotations to wire the consul-mcp-gateway
+#      (interceptor on :21101) and the HITL http_service path (:16101).
+#   3. Configures transparent proxy so all app egress is captured by the sidecar.
+#
+# HITL env vars:
+#   HITL_DECISION=approve|reject   headless verdict (default: approve)
+#   HITL_FAIL_RATE=0.0-1.0         fraction of approvals to randomly deny
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ai-app
+  namespace: default
+  labels:
+    app: ai-app
+    camp-role: ai-agent
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-app
+  namespace: default
+  labels:
+    app: ai-app
+    camp-role: ai-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-app
+  template:
+    metadata:
+      labels:
+        app: ai-app
+        camp-role: ai-agent
+      annotations:
+        # --- Required connect-inject annotations ---
+        # Opt this pod into the Consul Envoy sidecar.
+        consul.hashicorp.com/connect-inject: "true"
+        # Declare the ai-agent role so the controller wires consul-mcp-gateway.
+        consul.hashicorp.com/ai-role: "ai-agent"
+        # Reference the ConfigMap that carries the MCP/HITL/interceptor config.
+        consul.hashicorp.com/ai-agent-mcp-config: "agent-planner-mcp"
+        # Transparent proxy: all pod egress is captured by the sidecar Envoy.
+        consul.hashicorp.com/transparent-proxy: "true"
+        # Exclude the ai-app HTTP port (8080) and HITL port (16101) and the
+        # interceptor ext_proc gRPC port (21101) from the inbound iptables
+        # redirect so k8s probes and loopback traffic bypass the sidecar.
+        consul.hashicorp.com/transparent-proxy-exclude-inbound-ports: "8080,16101,21101"
+    spec:
+      serviceAccountName: ai-app
+      # Share the process namespace across all containers in the pod so that
+      # kubectl debug / kubectl exec can see all PIDs (ai-app, hitl, consul-dataplane,
+      # consul-mcp-gateway) from any container.
+      shareProcessNamespace: true
+      # Both containers share the pod network so they reach each other on localhost.
+      containers:
+        # ------------------------------------------------------------------ #
+        #  ai-app — Mock AI agent; calls one random MCP tool per request      #
+        # ------------------------------------------------------------------ #
+        - name: ai-app
+          # Uses the image built from camp-apps/Dockerfile.
+          # Replace with your registry path after building + pushing.
+          image: camp-apps:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: AIAPP_ADDR
+              value: ":8080"
+            # consul-mcp-gateway binds :15101 (its actual MCP aggregation port).
+            # The xDS listener at :15101 is pushed by the control plane in future
+            # builds; for now dial the gateway directly on :15101.
+            - name: AIAPP_UPSTREAM
+              value: "http://127.0.0.1:15101/mcp"
+            # consul-mcp-gateway is launched by the connect-inject controller
+            # (not by ai-agent.sh), so only ai-app needs to start here.
+            # Override the entrypoint to run only ai-app (not the full supervisor).
+            - name: AI_AGENT_LOG_LEVEL
+              value: "debug"
+            - name: HITL_PORT
+              value: "16101"
+            - name: HITL_DECISION
+              value: "approve"
+            - name: HITL_FAIL_RATE
+              value: "0.0"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+        # ------------------------------------------------------------------ #
+        #  hitl — Python HITL approver (ext_proc http_service on :16101)      #
+        #                                                                      #
+        #  Envoy's HITL ext_proc filter POSTs to 127.0.0.1:16101/.            #
+        #  HTTP 200 = APPROVE, non-200 = REJECT (fail-closed).                #
+        # ------------------------------------------------------------------ #
+        - name: hitl
+          # Uses the same camp-apps image (hitl_service.py is bundled in /app/hitl).
+          image: camp-apps:latest
+          imagePullPolicy: IfNotPresent
+          # Run only the HITL Python service, not the full entrypoint supervisor.
+          command: ["python3", "/app/hitl/hitl_service.py"]
+          ports:
+            - containerPort: 16101
+              name: hitl
+          env:
+            - name: HITL_PORT
+              value: "16101"
+            # Bind on all interfaces so the loopback AND pod-local addresses work.
+            - name: HITL_HOST
+              value: "0.0.0.0"
+            # headless verdict: approve | reject
+            - name: HITL_DECISION
+              value: "approve"
+            # Fraction of approvals to randomly deny (0.0 = never deny).
+            - name: HITL_FAIL_RATE
+              value: "0.0"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 16101
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 16101
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+
+---
+# ClusterIP Service: exposes ai-app's HTTP port to the mesh and to external
+# tools (port-forward / NodePort if needed).
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-app
+  namespace: default
+  labels:
+    app: ai-app
+spec:
+  selector:
+    app: ai-app
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
