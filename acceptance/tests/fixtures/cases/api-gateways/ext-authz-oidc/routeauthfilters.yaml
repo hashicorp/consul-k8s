@@ -1,0 +1,23 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# These two RouteAuthFilter CRDs are used by the filter-update step of
+# TestAPIGateway_ExtAuthz_OIDC to verify that swapping an HTTPRoute's
+# ExtensionRef.name is propagated to the Consul config entry (the diff-layer
+# regression fix). They are created alongside the other fixtures and are never
+# modified by the test.
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteAuthFilter
+metadata:
+  name: ext-authz-enabled
+spec:
+  extAuthz:
+    enabled: true
+---
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: RouteAuthFilter
+metadata:
+  name: ext-authz-disabled
+spec:
+  extAuthz:
+    enabled: false

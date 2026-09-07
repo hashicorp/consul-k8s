@@ -1,0 +1,363 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# Backends shared by the single- and two-ext-proc gateway scenarios.
+#
+#   service-a/b/c : gateway ext-proc HTTP targets (plain http-echo).
+#   service-f/g   : connect-proxy ext-proc HTTP fan-out targets (plain http-echo).
+#   service-d1    : pure forwarder; receives /dd1 from the gateway and proxies to
+#                   service-e1 over the mesh.
+#   service-e1    : receives the request; its inbound connect-proxy runs the HTTP
+#                   ext-proc sidecar (127.0.0.1:9000), then the app reads
+#                   x-route-target and proxies to service-f/service-g.
+#
+# All in-mesh services use transparent-proxy + Consul DNS so they reach each
+# other (and their cross-cluster failover targets) at <name>.virtual.consul.
+#
+# NOTE: service-d1, service-e1 and the ext-proc-http-connect-proxy sidecar use
+# the images built from ../apps (local/*). Build them and load them into BOTH
+# kind clusters before running this test (see ../apps/README.md).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-a
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-a
+  labels:
+    app: service-a
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-a
+  template:
+    metadata:
+      labels:
+        app: service-a
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/transparent-proxy: "true"
+        consul.hashicorp.com/consul-dns: "true"
+    spec:
+      serviceAccountName: service-a
+      containers:
+        - name: service-a
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:8080", "-text=hello from service-a"]
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-a
+spec:
+  selector:
+    app: service-a
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-b
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-b
+  labels:
+    app: service-b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-b
+  template:
+    metadata:
+      labels:
+        app: service-b
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/transparent-proxy: "true"
+        consul.hashicorp.com/consul-dns: "true"
+    spec:
+      serviceAccountName: service-b
+      containers:
+        - name: service-b
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:8080", "-text=hello from service-b"]
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-b
+spec:
+  selector:
+    app: service-b
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-c
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-c
+  labels:
+    app: service-c
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-c
+  template:
+    metadata:
+      labels:
+        app: service-c
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/transparent-proxy: "true"
+        consul.hashicorp.com/consul-dns: "true"
+    spec:
+      serviceAccountName: service-c
+      containers:
+        - name: service-c
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:8080", "-text=hello from service-c"]
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-c
+spec:
+  selector:
+    app: service-c
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-f
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-f
+  labels:
+    app: service-f
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-f
+  template:
+    metadata:
+      labels:
+        app: service-f
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/transparent-proxy: "true"
+        consul.hashicorp.com/consul-dns: "true"
+    spec:
+      serviceAccountName: service-f
+      containers:
+        - name: service-f
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:8080", "-text=hello from service-f"]
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-f
+spec:
+  selector:
+    app: service-f
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-g
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-g
+  labels:
+    app: service-g
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-g
+  template:
+    metadata:
+      labels:
+        app: service-g
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/transparent-proxy: "true"
+        consul.hashicorp.com/consul-dns: "true"
+    spec:
+      serviceAccountName: service-g
+      containers:
+        - name: service-g
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:8080", "-text=hello from service-g"]
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-g
+spec:
+  selector:
+    app: service-g
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+# ── connect-proxy ext-proc chain: service-d1 -> service-e1 -> service-f/g ─────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-d1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-d1
+  labels:
+    app: service-d1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-d1
+  template:
+    metadata:
+      labels:
+        app: service-d1
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/transparent-proxy: "true"
+        consul.hashicorp.com/consul-dns: "true"
+    spec:
+      serviceAccountName: service-d1
+      containers:
+        - name: service-d
+          image: local/service-d:0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: UPSTREAM_E
+              value: http://service-e1.virtual.consul:8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-d1
+spec:
+  selector:
+    app: service-d1
+  ports:
+    - name: http
+      appProtocol: http
+      port: 8080
+      targetPort: 8080
+---
+# service-e1 runs the HTTP connect-proxy ext-proc as a SIDECAR (127.0.0.1:9000).
+# Its ServiceDefaults points the inbound ext-proc filter at that localhost URI.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: service-e1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-e1
+  labels:
+    app: service-e1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: service-e1
+  template:
+    metadata:
+      labels:
+        app: service-e1
+      annotations:
+        consul.hashicorp.com/connect-inject: "true"
+        consul.hashicorp.com/transparent-proxy: "true"
+        consul.hashicorp.com/consul-dns: "true"
+    spec:
+      serviceAccountName: service-e1
+      containers:
+        # service-e1 app container.
+        - name: service-e
+          image: local/service-e:0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: UPSTREAM_F
+              value: http://service-f.virtual.consul:8080
+            - name: UPSTREAM_G
+              value: http://service-g.virtual.consul:8080
+            - name: UPSTREAM_A
+              value: http://service-a.virtual.consul:8080
+        # HTTP ext-proc sidecar. Envoy's inbound listener calls this over
+        # localhost (127.0.0.1:9000); it then consults http-decider-connect-proxy
+        # over the mesh (as service-e1's identity) to pick service-f/service-g.
+        - name: ext-proc-http-connect-proxy
+          image: local/ext-proc-http-connect-proxy:0.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ROUTER_URL
+              value: http://http-decider-connect-proxy.virtual.consul:9500/decide
+            - name: ROUTER_TIMEOUT_MS
+              value: "5000"
+          ports:
+            - name: ext-proc
+              containerPort: 9000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-e1
+spec:
+  selector:
+    app: service-e1
+  ports:
+    - name: http
+      appProtocol: http
+      port: 8080
+      targetPort: 8080

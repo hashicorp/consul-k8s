@@ -1,0 +1,11 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: GatewayClassConfig
+metadata:
+  name: gateway-class-config
+spec:
+  # In order for Gateways to work whether or not we're enforcing the
+  # "restricted" pod security policy, they must not use privileged ports.
+  mapPrivilegedContainerPorts: 8000

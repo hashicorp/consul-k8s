@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
+	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
 	"github.com/hashicorp/consul-k8s/acceptance/framework/consul"
@@ -47,6 +48,16 @@ var idTokenRegexp = regexp.MustCompile(`"id_token"\s*:\s*"([^"]+)"`)
 //   - GET / with a valid Dex token  -> 200, and the authenticated identity is
 //     surfaced to the client as the x-auth-request-email response header
 //     (AllowedClientHeadersOnSuccess).
+//
+// After the initial traffic assertions pass, the test adds a second step that
+// exercises the customer-reported diff-layer regression (NET-XXXX): patching an
+// HTTPRoute's ExtensionRef.name (RouteAuthFilter reference) in-place should be
+// propagated to the Consul config entry without rebuilding the cluster.
+//
+//   - Patch route: add ExtensionRef → ext-authz-disabled  (disables check for this route)
+//     Expected: Consul ExtAuthz.Enabled=false, traffic passes without a token (200)
+//   - Patch route: swap ExtensionRef → ext-authz-enabled  (re-enables check for this route)
+//     Expected: Consul ExtAuthz.Enabled=true, traffic without a token is denied again (302)
 //
 // The api-gateway ext_authz feature (ProxyType api-gateway) is Consul Enterprise
 // only, so this test is skipped unless an enterprise license is configured.
@@ -168,6 +179,80 @@ func TestAPIGateway_ExtAuthz_OIDC(t *testing.T) {
 
 		logger.Log(t, "GET / with a valid Dex token should be allowed (200) and surface the identity")
 		requireGatewayAllowed(r, k8sOptions, gatewayURL, token)
+	})
+
+	// ── Filter-update regression (customer bug) ───────────────────────────────
+	// Patch the HTTPRoute's ExtensionRef.name in-place — without touching the
+	// RouteAuthFilter CRDs — and verify the Consul config entry tracks the change.
+	//
+	// Before the diff-layer fix, httpRouteRulesEqual() ignored ExtAuthz, so
+	// EntriesEqual returned true for a changed route and cache.Write() silently
+	// skipped the Consul write. The assertions below would time-out on the
+	// unfixed binary and pass on the fixed one.
+
+	var route gwv1.HTTPRoute
+	err = k8sClient.Get(context.Background(), types.NamespacedName{Name: "static-server-route", Namespace: k8sNamespace}, &route)
+	require.NoError(t, err)
+
+	consulGroup := gwv1.Group("consul.hashicorp.com")
+	consulKind := gwv1.Kind("RouteAuthFilter")
+
+	// Step A: add ExtensionRef → ext-authz-disabled (override: bypass the check)
+	logger.Log(t, "filter-update step A: patching route to ext-authz-disabled")
+	updateKubernetes(t, k8sClient, &route, func(r *gwv1.HTTPRoute) {
+		r.Spec.Rules[0].Filters = []gwv1.HTTPRouteFilter{{
+			Type: gwv1.HTTPRouteFilterExtensionRef,
+			ExtensionRef: &gwv1.LocalObjectReference{
+				Group: consulGroup,
+				Kind:  consulKind,
+				Name:  "ext-authz-disabled",
+			},
+		}}
+	})
+
+	// Consul config entry must reflect ExtAuthz.Enabled=false.
+	logger.Log(t, "filter-update step A: asserting Consul config entry has ExtAuthz.Enabled=false")
+	retryCheckWithWait(t, 60, 2*time.Second, func(r *retry.R) {
+		entry, _, consulErr := consulClient.ConfigEntries().Get(api.HTTPRoute, "static-server-route", &api.QueryOptions{Namespace: "default"})
+		require.NoError(r, consulErr)
+		httpRoute := entry.(*api.HTTPRouteConfigEntry)
+		require.NotEmpty(r, httpRoute.Rules)
+		require.NotNilf(r, httpRoute.Rules[0].Filters.ExtAuthz,
+			"expected Rules[0].Filters.ExtAuthz to be set after adding ext-authz-disabled filter")
+		require.Falsef(r, httpRoute.Rules[0].Filters.ExtAuthz.Enabled,
+			"expected ExtAuthz.Enabled=false after ext-authz-disabled patch, got true")
+	})
+
+	// With ext_authz disabled for this route, traffic should now pass without a token.
+	logger.Log(t, "filter-update step A: verifying unauthenticated traffic is now allowed (200)")
+	retryCheckWithWait(t, 60, 5*time.Second, func(r *retry.R) {
+		requireGatewayStatus(r, k8sOptions, gatewayURL, "200")
+	})
+
+	// Step B: swap ExtensionRef → ext-authz-enabled (re-enable the check)
+	// The RouteAuthFilter CRDs are NOT modified — only the HTTPRoute changes.
+	logger.Log(t, "filter-update step B: patching route to ext-authz-enabled (RouteAuthFilter CRDs unchanged)")
+	updateKubernetes(t, k8sClient, &route, func(r *gwv1.HTTPRoute) {
+		r.Spec.Rules[0].Filters[0].ExtensionRef.Name = "ext-authz-enabled"
+	})
+
+	// Consul config entry must flip back to ExtAuthz.Enabled=true.
+	logger.Log(t, "filter-update step B: asserting Consul config entry has ExtAuthz.Enabled=true")
+	retryCheckWithWait(t, 60, 2*time.Second, func(r *retry.R) {
+		entry, _, consulErr := consulClient.ConfigEntries().Get(api.HTTPRoute, "static-server-route", &api.QueryOptions{Namespace: "default"})
+		require.NoError(r, consulErr)
+		httpRoute := entry.(*api.HTTPRouteConfigEntry)
+		require.NotEmpty(r, httpRoute.Rules)
+		require.NotNilf(r, httpRoute.Rules[0].Filters.ExtAuthz,
+			"expected Rules[0].Filters.ExtAuthz to be set after adding ext-authz-enabled filter")
+		require.Truef(r, httpRoute.Rules[0].Filters.ExtAuthz.Enabled,
+			"expected ExtAuthz.Enabled=true after ext-authz-enabled patch, got false")
+	})
+
+	// Traffic without a token must be denied again.
+	logger.Log(t, "filter-update step B: verifying unauthenticated traffic is denied again (302)")
+	retryCheckWithWait(t, 60, 5*time.Second, func(r *retry.R) {
+		requireGatewayStatus(r, k8sOptions, gatewayURL, "302")
 	})
 }
 

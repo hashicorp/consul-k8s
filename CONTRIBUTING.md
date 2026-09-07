@@ -22,6 +22,7 @@
     1. [Running the tests](#running-the-tests)
     1. [Writing Unit tests](#writing-unit-tests)
     1. [Writing Acceptance tests](#writing-acceptance-tests)
+    1. [Testing a dependent Consul change in CI](#testing-a-dependent-consul-change-in-ci)
 1. [Using the Acceptance Test Framework to Debug](#using-acceptance-test-framework-to-debug)
 1. [Helm Reference Docs](#helm-reference-docs)
 1. [Managing External CRD Dependencies](#managing-external-crd-dependencies)
@@ -686,6 +687,15 @@ that can be used to quickly bring up a GKE cluster and configure
 `kubectl` and `helm` locally. This can be used to quickly spin up a test
 cluster for acceptance tests. Unit tests _do not_ require a running Kubernetes
 cluster.
+
+##### Testing a dependent Consul change in CI
+
+Normal pull requests use the Consul images selected by the acceptance
+workflows. If a consul-k8s pull request depends on an unreleased Consul change,
+run the `PR Acceptance with Consul Override` workflow manually. Select the
+consul-k8s pull request branch, provide its pull request number, and set the
+exact Consul CE image, Consul Enterprise image, or both. An omitted image keeps
+the acceptance workflow's normal default for that edition.
 
 ### Writing Unit Tests
 

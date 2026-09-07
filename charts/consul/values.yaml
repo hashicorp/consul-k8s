@@ -2552,18 +2552,18 @@ connectInject:
 
       # DEPRECATED: These values are deprecated and will be removed in a future release.
       # Use Gateway annotations instead for per-gateway scaling configuration.
-      # See: https://developer.hashicorp.com/consul/docs/k8s/api-gateway/scaling
+      # See: [API Gateway Scaling](https://developer.hashicorp.com/consul/docs/north-south/api-gateway/k8s/scale)
       #
-      # For static replica count, use: consul.hashicorp.com/default-replicas: "<N>"
-      # For HPA, use: consul.hashicorp.com/hpa-enabled: "true" with min/max replicas annotations
+      # For static replica count, use: `consul.hashicorp.com/default-replicas: "<N>"`.
+      # For HPA, use: `consul.hashicorp.com/hpa-enabled: "true"` with min/max replicas annotations.
       deployment:
-        # Default number of gateway instances
+        # Default number of gateway instances.
         # DEPRECATED: Use consul.hashicorp.com/default-replicas annotation on Gateway resource
         defaultInstances: 1
-        # Maximum number of gateway instances
+        # Maximum number of gateway instances.
         # DEPRECATED: No longer enforced. Use HPA maxReplicas via annotations instead
         maxInstances: 1
-        # Minimum number of gateway instances
+        # Minimum number of gateway instances.
         # DEPRECATED: Use HPA minReplicas via annotations instead
         minInstances: 1
 
@@ -2700,6 +2700,24 @@ connectInject:
       runAsNonRoot: false
       runAsGroup: 0
       runAsUser: 0
+
+    # Toleration settings for the CNI installer DaemonSet pods.
+    # This should be a multi-line string matching the Tolerations
+    # array in a Pod spec. If not set, defaults to tolerating
+    # CriticalAddonsOnly and NoExecute taints.
+    # 
+    # Example:
+    #
+    # ```yaml
+    # tolerations: |
+    #   - key: dd
+    #     operator: Exists
+    #   - effect: bb
+    #     operator: Exists
+    # ```
+    # 
+    # @type: string
+    tolerations: null
 
   consulNode:
     # meta specifies an arbitrary metadata key/value pair to associate with the node.

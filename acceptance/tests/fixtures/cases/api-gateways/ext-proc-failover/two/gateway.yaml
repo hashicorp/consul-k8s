@@ -1,0 +1,21 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+# api-gateway: the TWO-ext-proc gateway. Its Consul service name matches the
+# ServiceDefaults that wires TWO builtin/ext-proc instances (statPrefix base +
+# path) onto its inbound listener (see servicedefaults.yaml).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: api-gateway
+  labels:
+    component: api-gateway
+spec:
+  gatewayClassName: gateway-class
+  listeners:
+    - protocol: HTTP
+      port: 80
+      name: http
+      allowedRoutes:
+        namespaces:
+          from: "All"
