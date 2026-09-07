@@ -541,7 +541,9 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 	var serviceAI *api.AgentServiceAI
 	if common.IsAIAgent(pod) {
 		serviceAI, err = common.AIConfigFromPod(ctx, r.Client, pod)
-
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	tags := consulTags(pod)
