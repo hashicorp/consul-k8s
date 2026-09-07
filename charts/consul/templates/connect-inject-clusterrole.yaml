@@ -233,6 +233,27 @@ rules:
     - update
     - watch
     - delete
+# The multi-port conversion post-upgrade Job rewrites the Pod template of every
+# workload kind the connect-inject webhook admits Pods for. StatefulSets and
+# DaemonSets are read and updated only; nothing creates or deletes them.
+- apiGroups:
+    - apps
+  resources:
+    - statefulsets
+    - daemonsets
+  verbs:
+    - get
+    - list
+    - update
+# The same Job scans Pods for workloads it cannot rewrite and follows a Pod's
+# ReplicaSet one hop to name the Deployment that owns it. Read-only.
+- apiGroups:
+    - apps
+  resources:
+    - replicasets
+  verbs:
+    - get
+    - list
 - apiGroups:
     - autoscaling
   resources:

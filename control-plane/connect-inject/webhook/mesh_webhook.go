@@ -87,6 +87,11 @@ type MeshWebhook struct {
 	// If this is false, injection is default.
 	RequireAnnotation bool
 
+	// DisableMultiportRegistration rejects new single-service registrations
+	// that select more than one application port. A multi-port workload can
+	// still opt down to an ordinary single-port registration.
+	DisableMultiportRegistration bool
+
 	// AuthMethod is the name of the Kubernetes Auth Method to
 	// use for identity with connectInjection if ACLs are enabled.
 	AuthMethod string
@@ -266,6 +271,22 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Allowed(fmt.Sprintf("%s %s does not require injection", pod.Kind, pod.Name))
 	}
 
+	// Resolve transparent proxy before validating service ports so malformed
+	// transparent-proxy configuration retains its existing error precedence.
+	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
+	if err != nil {
+		w.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
+		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
+	}
+	if _, err := common.TransparentProxyEnabled(*ns, pod, w.EnableTransparentProxy); err != nil {
+		w.Log.Error(err, "invalid transparent proxy configuration", "request name", req.Name)
+		return admission.Errored(http.StatusBadRequest, fmt.Errorf("couldn't check if transparent proxy is enabled: %w", err))
+	}
+	if err := w.validateMultiportRegistration(pod); err != nil {
+		w.Log.Error(err, "invalid multi-port service registration", "request name", req.Name)
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
 	w.Log.Info("received pod", "name", req.Name, "ns", req.Namespace)
 
 	// Add our volume that will be shared by the init container and
@@ -301,13 +322,6 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 
 	for i := range pod.Spec.Containers {
 		pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, containerEnvVars...)
-	}
-
-	// A user can enable/disable tproxy for an entire namespace via a label.
-	ns, err := w.Clientset.CoreV1().Namespaces().Get(ctx, req.Namespace, metav1.GetOptions{})
-	if err != nil {
-		w.Log.Error(err, "error fetching namespace metadata for container", "request name", req.Name)
-		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error getting namespace metadata for container: %s", err))
 	}
 
 	// Get service names from the annotation. If theres 0-1 service names, it's a single port pod, otherwise it's multi
@@ -682,6 +696,74 @@ func defaultConnectServicePortsAnnotation(pod corev1.Pod) string {
 	}
 
 	return strings.Join(defaultPorts, ",")
+}
+
+// validateMultiportRegistration rejects a Pod that would produce a single Consul
+// service registration containing more than one named port.
+//
+// It must run after defaultAnnotations, so the annotation it inspects is the
+// value the endpoints controller will act on rather than the raw user input.
+func (w *MeshWebhook) validateMultiportRegistration(pod corev1.Pod) error {
+	// The legacy consul.hashicorp.com/connect-service=a,b model produces one
+	// Consul registration per service rather than one registration with several
+	// named ports, so it is outside the scope of this gate.
+	if !w.DisableMultiportRegistration || hasMultipleConnectServices(pod) {
+		return nil
+	}
+	if !selectsMultipleServicePorts(pod) {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"multi-port Consul service registration is disabled; set %q to exactly one application port",
+		constants.AnnotationPort,
+	)
+}
+
+// selectsMultipleServicePorts reports whether the Pod will register more than one
+// Consul service port.
+//
+// The port selection is read from the annotation rather than from the first
+// container's port count, because a port token may name a port declared on any
+// container in the Pod. common.PortValue resolves tokens the same way.
+func selectsMultipleServicePorts(pod corev1.Pod) bool {
+	if raw, ok := pod.Annotations[constants.AnnotationPort]; ok {
+		return countNonEmptyCommaSeparatedValues(raw) > 1
+	}
+
+	// defaultAnnotations only sets the annotation from the first container, so an
+	// absent annotation means the first container declares no usable port. The
+	// endpoints controller then derives the port set from the Endpoints object,
+	// which can register every port the Kubernetes Service exposes. Those ports
+	// are not visible at admission time, so fall back to the ports declared
+	// anywhere in the Pod as the closest available approximation.
+	return usablePortCount(pod.Spec.Containers) > 1
+}
+
+func usablePortCount(containers []corev1.Container) int {
+	usable := 0
+	for _, container := range containers {
+		for _, port := range container.Ports {
+			if port.Name != "" || port.ContainerPort > 0 {
+				usable++
+			}
+		}
+	}
+	return usable
+}
+
+func hasMultipleConnectServices(pod corev1.Pod) bool {
+	return countNonEmptyCommaSeparatedValues(pod.Annotations[constants.AnnotationService]) > 1
+}
+
+func countNonEmptyCommaSeparatedValues(value string) int {
+	count := 0
+	for _, token := range strings.Split(value, ",") {
+		if strings.TrimSpace(token) != "" {
+			count++
+		}
+	}
+	return count
 }
 
 // prometheusAnnotations sets the Prometheus scraping configuration
