@@ -138,3 +138,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
+
+replace github.com/hashicorp/consul/api => github.com/hashicorp/consul/api v1.32.2-0.20260907065344-63f837076ab0
