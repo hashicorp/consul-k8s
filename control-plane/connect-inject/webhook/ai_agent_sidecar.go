@@ -6,6 +6,7 @@ package webhook
 import (
 	"fmt"
 	"net"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/ptr"
 
@@ -22,8 +23,6 @@ const (
 	aiAgentConfigMountPath = "/consul/ai-agent-config"
 )
 
-
-
 // aiAgentSidecar builds and returns the consul-mcp-gateway sidecar container
 // that runs alongside the standard consul-dataplane sidecar for AI agent pods.
 // It expects the ConfigMap volume (aiAgentConfigVolumeName) to already have been
@@ -32,16 +31,6 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 	gatewayBinary := w.GatewayBinary
 	if gatewayBinary == "" {
 		gatewayBinary = constants.DefaultGatewayBinary
-	}
-
-	// Resolve the service name the same way the rest of the webhook does:
-	// prefer the explicit annotation, fall back to the pod's ServiceAccountName
-	// (which by convention matches the Consul service name for connect-injected
-	// pods), and finally fall back to the pod's GenerateName prefix if both are
-	// absent (e.g. during early webhook admission before a name is assigned).
-	serviceName := pod.Annotations[constants.AnnotationService]
-	if serviceName == "" {
-		serviceName = pod.Spec.ServiceAccountName
 	}
 
 	// The consul-mcp-gateway container runs from the dedicated
@@ -72,14 +61,6 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
 				},
 			},
-			{
-				Name:  "AI_AGENT_SERVICE",
-				Value: serviceName,
-			},
-			{
-				Name:  "AI_AGENT_LOG_LEVEL",
-				Value: w.LogLevel,
-			},
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
@@ -99,12 +80,12 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 		},
 		Command: []string{constants.ConsulBinarypath},
 		Args: []string{
-		"connect",
-		"mcp-gateway",
-		"-gateway-binary",
-		gatewayBinary,
-  		"-addr",
-		net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultAIInterceptorPort)),
+			"connect",
+			"mcp-gateway",
+			"-gateway-binary",
+			gatewayBinary,
+			"-addr",
+			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultAIInterceptorPort)),
 		},
 		SecurityContext: &corev1.SecurityContext{
 			RunAsNonRoot:             ptr.To(true),
