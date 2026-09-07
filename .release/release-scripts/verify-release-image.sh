@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) HashiCorp, Inc.
+# Copyright IBM Corp. 2018, 2026
 # SPDX-License-Identifier: MPL-2.0
 #
 # Verifies that the released consul-k8s-control-plane Docker image is available
