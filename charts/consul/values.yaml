@@ -2429,12 +2429,19 @@ connectInject:
   # to explicitly opt-out of injection.
   default: false
 
-  # Controls whether Kubernetes Services with multiple ports are registered in
-  # Consul with their complete port set. When disabled, only the selected
-  # default port is registered, using the legacy single-port representation.
-  # @type: boolean
-  multiportRegistration:
-    enabled: true
+  # Controls whether one Consul service registration may contain multiple
+  # named ports. When disabled, a multi-port workload must select exactly one
+  # port with consul.hashicorp.com/connect-service-port.
+  multiportServiceRegistration:
+    # @type: boolean
+    enabled: false
+    # Controls how existing mesh-injected Deployments, StatefulSets, and
+    # DaemonSets are handled during a Helm upgrade while multi-port
+    # registration is disabled. NONE leaves existing workload specifications
+    # untouched. TRANSLATE selects one service port. DECOMMISSION removes
+    # eligible workloads from the mesh.
+    # @type: string
+    conversionStrategy: "NONE"
 
   # Configures Transparent Proxy for Consul Service mesh services.
   # Using this feature requires Consul 1.10.0-beta1+.

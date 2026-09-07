@@ -40,24 +40,24 @@ load _helpers
       .
 }
 
-@test "connectInject/Deployment: enables multiport registration by default" {
+@test "connectInject/Deployment: disables multiport registration by default" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
       . |
-      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-multiport-registration=true")')
+      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-disable-multiport-registration=true")')
   [ "${actual}" = "true" ]
 }
 
-@test "connectInject/Deployment: can disable multiport registration" {
+@test "connectInject/Deployment: can enable multiport registration" {
   cd `chart_dir`
   local actual=$(helm template \
       -s templates/connect-inject-deployment.yaml \
       --set 'connectInject.enabled=true' \
-      --set 'connectInject.multiportRegistration.enabled=false' \
+      --set 'connectInject.multiportServiceRegistration.enabled=true' \
       . |
-      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-enable-multiport-registration=false")')
+      yq -r '.spec.template.spec.containers[0].command | join(" ") | contains("-disable-multiport-registration=false")')
   [ "${actual}" = "true" ]
 }
 

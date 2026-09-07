@@ -1,3 +1,6 @@
+```release-note:breaking-change
+helm: multi-port Consul service registration is now disabled by default via `connectInject.multiportServiceRegistration.enabled=false`. A Connect-injected Pod that selects more than one application port is rejected at admission. Set `connectInject.multiportServiceRegistration.enabled=true` to retain the previous behavior, or select a single port with `consul.hashicorp.com/connect-service-port`.
+```
 ```release-note:improvement
-helm: add a connect-inject setting to register multi-port Kubernetes Services as legacy single-port Consul services
+helm: add `connectInject.multiportServiceRegistration.conversionStrategy` (`NONE`, `TRANSLATE`, `DECOMMISSION`) to control how existing Deployments, StatefulSets, and DaemonSets are treated by a post-upgrade Job when multi-port registration is disabled. `NONE` is the default and leaves existing workload specifications untouched. The Job also scans Pods and fails the upgrade with an explicit list of any multi-port workload it cannot rewrite, such as an Argo Rollout or a bare Pod, instead of letting it fail admission at its next Pod recreation.
 ```

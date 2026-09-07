@@ -23,6 +23,7 @@ import (
 	cmdGossipEncryptionAutogenerate "github.com/hashicorp/consul-k8s/control-plane/subcommand/gossip-encryption-autogenerate"
 	cmdInjectConnect "github.com/hashicorp/consul-k8s/control-plane/subcommand/inject-connect"
 	cmdInstallCNI "github.com/hashicorp/consul-k8s/control-plane/subcommand/install-cni"
+	cmdConvertMultiportServices "github.com/hashicorp/consul-k8s/control-plane/subcommand/convert-multiport-services"
 	cmdPartitionInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/partition-init"
 	cmdServerACLInit "github.com/hashicorp/consul-k8s/control-plane/subcommand/server-acl-init"
 	cmdSyncCatalog "github.com/hashicorp/consul-k8s/control-plane/subcommand/sync-catalog"
@@ -115,6 +116,9 @@ func init() {
 		"install-cni": func() (cli.Command, error) {
 			return &cmdInstallCNI.Command{UI: ui}, nil
 		},
+		"convert-multiport-services": func() (cli.Command, error) {
+			return &cmdConvertMultiportServices.Command{UI: ui}, nil
+		},
 		"fetch-server-region": func() (cli.Command, error) {
 			return &cmdFetchServerRegion.Command{UI: ui}, nil
 		},
@@ -127,7 +131,8 @@ func helpFunc() cli.HelpFunc {
 	// aren't shown in any help output. We use this for prerelease functionality
 	// or advanced features.
 	hidden := map[string]struct{}{
-		"inject-connect": {},
+		"inject-connect":             {},
+		"convert-multiport-services": {},
 	}
 
 	var include []string

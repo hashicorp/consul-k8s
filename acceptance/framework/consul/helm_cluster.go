@@ -470,6 +470,23 @@ func (h *HelmCluster) Upgrade(t *testing.T, helmValues map[string]string) {
 	k8s.WaitForAllPodsToBeReady(t, h.kubernetesClient, h.helmOptions.KubectlOptions.Namespace, fmt.Sprintf("release=%s", h.releaseName))
 }
 
+// UpgradeE runs a Helm upgrade and returns its error instead of failing the
+// test. It is intended for tests that assert an upgrade is rejected, for
+// example when a post-upgrade hook Job is expected to fail.
+//
+// Unlike Upgrade it does not wait for Pods to become ready, because a rejected
+// upgrade may leave the release partially rolled out.
+func (h *HelmCluster) UpgradeE(t *testing.T, helmValues map[string]string) error {
+	t.Helper()
+
+	helpers.MergeMaps(h.helmOptions.SetValues, helmValues)
+	chartName := "hashicorp/consul"
+	if h.helmOptions.Version == config.HelmChartPath {
+		chartName = config.HelmChartPath
+	}
+	return helm.UpgradeE(t, h.helmOptions, chartName, h.releaseName)
+}
+
 // CreatePortForwardTunnel returns the local address:port of a tunnel to the consul server pod in the given release.
 func (h *HelmCluster) CreatePortForwardTunnel(t *testing.T, remotePort int, release ...string) string {
 	releaseName := h.releaseName
