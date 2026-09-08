@@ -19,7 +19,7 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/go-hclog"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/mapstructure"
@@ -69,8 +69,8 @@ type Command struct {
 	nonRetryableError error
 
 	// Only used in tests.
-	iptablesProvider iptables.Provider
-	iptablesConfig   iptables.Config
+	nftablesProvider nftables.Provider
+	nftCfg           nftables.Config
 }
 
 func (c *Command) init() {
@@ -83,7 +83,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "File name where proxy's Consul service ID should be saved.")
 	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
 	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of gateway that is being registered: ingress-gateway, terminating-gateway, or mesh-gateway.")
-	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure iptables for this pod.")
+	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure nftables traffic redirection for this pod.")
 	c.flagSet.StringVar(&c.flagLogLevel, "log-level", "info",
 		"Log verbosity level. Supported values (in order of detail) are \"trace\", "+
 			"\"debug\", \"info\", \"warn\", and \"error\".")
@@ -386,26 +386,26 @@ type trafficRedirectProxyConfig struct {
 }
 
 func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack bool) error {
-	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.iptablesConfig)
+	err := json.Unmarshal([]byte(c.flagRedirectTrafficConfig), &c.nftCfg)
 	if err != nil {
 		return err
 	}
-	if c.iptablesProvider != nil {
-		c.iptablesConfig.IptablesProvider = c.iptablesProvider
+	if c.nftablesProvider != nil {
+		c.nftCfg.NftablesProvider = c.nftablesProvider
 	}
 
 	if svc.Proxy.TransparentProxy != nil && svc.Proxy.TransparentProxy.OutboundListenerPort != 0 {
-		c.iptablesConfig.ProxyOutboundPort = svc.Proxy.TransparentProxy.OutboundListenerPort
+		c.nftCfg.ProxyOutboundPort = svc.Proxy.TransparentProxy.OutboundListenerPort
 	}
 
 	// Decode proxy's opaque config so that we can use it later to configure
-	// traffic redirection with iptables.
+	// traffic redirection with nft.
 	var trCfg trafficRedirectProxyConfig
 	if err = mapstructure.WeakDecode(svc.Proxy.Config, &trCfg); err != nil {
 		return fmt.Errorf("failed parsing Proxy.Config: %s", err)
 	}
 	if trCfg.BindPort != 0 {
-		c.iptablesConfig.ProxyInboundPort = trCfg.BindPort
+		c.nftCfg.ProxyInboundPort = trCfg.BindPort
 	}
 
 	if trCfg.StatsBindAddr != "" {
@@ -414,11 +414,11 @@ func (c *Command) applyTrafficRedirectionRules(svc *api.AgentService, dualStack 
 			return fmt.Errorf("failed parsing host and port from envoy_stats_bind_addr: %s", err)
 		}
 
-		c.iptablesConfig.ExcludeInboundPorts = append(c.iptablesConfig.ExcludeInboundPorts, port)
+		c.nftCfg.ExcludeInboundPorts = append(c.nftCfg.ExcludeInboundPorts, port)
 	}
 
 	// Configure any relevant information from the proxy service
-	err = iptables.Setup(c.iptablesConfig, dualStack)
+	err = nftables.Setup(c.nftCfg, dualStack)
 	if err != nil {
 		return err
 	}

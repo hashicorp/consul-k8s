@@ -15,7 +15,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	logrtest "github.com/go-logr/logr/testr"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/stretchr/testify/require"
 	"gomodules.xyz/jsonpatch/v2"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -1265,7 +1265,7 @@ func TestHandlerHandle(t *testing.T) {
 	}
 }
 
-// This test validates that overwrite probes match the iptables configuration fromiptablesConfigJSON()
+// This test validates that overwrite probes match the nft configuration from nftablesConfigJSON()
 // Because they happen at different points in the injection, the port numbers can get out of sync.
 func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 	t.Parallel()
@@ -1436,13 +1436,13 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 				return
 			}
 
-			var iptablesCfg iptables.Config
+			var nftCfg nftables.Config
 			var overwritePorts []string
 			actual := resp.Patches
 			if len(actual) > 0 {
 				for i := range actual {
 
-					// We want to grab the iptables configuration from the connect-init container's
+					// We want to grab the nft configuration from the connect-init container's
 					// environment.
 					if actual[i].Path == "/spec/initContainers" {
 						value := actual[i].Value.([]any)
@@ -1450,14 +1450,14 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 						envs := valueMap["env"].([]any)
 						redirectEnv := envs[9].(map[string]any)
 						require.Equal(t, redirectEnv["name"].(string), "CONSUL_REDIRECT_TRAFFIC_CONFIG")
-						iptablesJson := redirectEnv["value"].(string)
+						nftCfgJSON := redirectEnv["value"].(string)
 
-						err := json.Unmarshal([]byte(iptablesJson), &iptablesCfg)
+						err := json.Unmarshal([]byte(nftCfgJSON), &nftCfg)
 						require.NoError(t, err)
 					}
 
 					// We want to accumulate the httpGet Probes from the application container to
-					// compare them to the iptables rules. This is now the second container in the spec
+					// compare them to the nft rules. This is now the second container in the spec
 					if strings.Contains(actual[i].Path, "/spec/containers/1") {
 						valueMap, ok := actual[i].Value.(map[string]any)
 						require.True(t, ok)
@@ -1486,8 +1486,8 @@ func TestHandlerHandle_ValidateOverwriteProbes(t *testing.T) {
 					actual[i].Value = nil
 				}
 			}
-			// Make sure the iptables excluded ports match the ports on the container
-			require.ElementsMatch(t, iptablesCfg.ExcludeInboundPorts, overwritePorts)
+			// Make sure the nft excluded ports match the ports on the container
+			require.ElementsMatch(t, nftCfg.ExcludeInboundPorts, overwritePorts)
 			require.ElementsMatch(t, tt.Patches, actual)
 		})
 	}

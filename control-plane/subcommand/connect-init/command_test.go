@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/sdk/iptables"
+	"github.com/hashicorp/consul/sdk/nftables"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
@@ -743,16 +743,16 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		proxyConfig           map[string]interface{}
 		tproxyConfig          api.TransparentProxyConfig
 		registerProxyDefaults bool
-		expIptablesParamsFunc func(actual iptables.Config) (bool, string)
+		expNftCfgParamsFunc func(actual nftables.Config) (bool, string)
 	}{
 		"no extra proxy config provided": {},
 		"envoy bind port is provided in service proxy config": {
 			proxyConfig: map[string]interface{}{"bind_port": "21000"},
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+					return false, fmt.Sprintf("ProxyInboundPort in nftables.Config was %d, but should be 21000", actual.ProxyInboundPort)
 				}
 			},
 		},
@@ -761,53 +761,53 @@ func TestRun_TrafficRedirection(t *testing.T) {
 		"envoy bind port is provided in a config entry": {
 			proxyConfig:           map[string]interface{}{"bind_port": "21000"},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyInboundPort == 21000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyInboundPort in iptables.Config was %d, but should be 21000", actual.ProxyInboundPort)
+					return false, fmt.Sprintf("ProxyInboundPort in nftables.Config was %d, but should be 21000", actual.ProxyInboundPort)
 				}
 			},
 		},
 		"tproxy outbound listener port is provided in service proxy config": {
 			tproxyConfig: api.TransparentProxyConfig{OutboundListenerPort: 16000},
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+					return false, fmt.Sprintf("ProxyOutboundPort in nftables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
 				}
 			},
 		},
 		"tproxy outbound listener port is provided in a config entry": {
 			tproxyConfig:          api.TransparentProxyConfig{OutboundListenerPort: 16000},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if actual.ProxyOutboundPort == 16000 {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ProxyOutboundPort in iptables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
+					return false, fmt.Sprintf("ProxyOutboundPort in nftables.Config was %d, but should be 16000", actual.ProxyOutboundPort)
 				}
 			},
 		},
 		"envoy stats addr is provided in service proxy config": {
 			proxyConfig: map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+					return false, fmt.Sprintf("ExcludeInboundPorts in nftables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
 				}
 			},
 		},
 		"envoy stats addr is provided in a config entry": {
 			proxyConfig:           map[string]interface{}{"envoy_stats_bind_addr": "0.0.0.0:9090"},
 			registerProxyDefaults: true,
-			expIptablesParamsFunc: func(actual iptables.Config) (bool, string) {
+			expNftCfgParamsFunc: func(actual nftables.Config) (bool, string) {
 				if len(actual.ExcludeInboundPorts) == 1 && actual.ExcludeInboundPorts[0] == "9090" {
 					return true, ""
 				} else {
-					return false, fmt.Sprintf("ExcludeInboundPorts in iptables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
+					return false, fmt.Sprintf("ExcludeInboundPorts in nftables.Config was %v, but should be [9090]", actual.ExcludeInboundPorts)
 				}
 			},
 		},
@@ -859,17 +859,17 @@ func TestRun_TrafficRedirection(t *testing.T) {
 			}
 			ui := cli.NewMockUi()
 
-			iptablesProvider := &fakeIptablesProvider{}
-			iptablesCfg := iptables.Config{
+			nftablesProvider := &fakeNftablesProvider{}
+			nftCfg := nftables.Config{
 				ProxyUserID:      "5995",
 				ProxyInboundPort: 20000,
 			}
 			cmd := Command{
 				UI:                                 ui,
 				serviceRegistrationPollingAttempts: 3,
-				iptablesProvider:                   iptablesProvider,
+				nftablesProvider:                   nftablesProvider,
 			}
-			iptablesCfgJSON, err := json.Marshal(iptablesCfg)
+			nftCfgJSON, err := json.Marshal(nftCfg)
 			require.NoError(t, err)
 			flags := []string{
 				"-pod-name", testPodName,
@@ -879,14 +879,14 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
-				"-redirect-traffic-config", string(iptablesCfgJSON),
+				"-redirect-traffic-config", string(nftCfgJSON),
 			}
 			code := cmd.Run(flags)
 			require.Equal(t, 0, code, ui.ErrorWriter.String())
-			require.Truef(t, iptablesProvider.applyCalled, "redirect traffic rules were not applied")
-			if c.expIptablesParamsFunc != nil {
-				actualIptablesConfigParamsEqualExpected, errMsg := c.expIptablesParamsFunc(cmd.iptablesConfig)
-				require.Truef(t, actualIptablesConfigParamsEqualExpected, errMsg)
+			require.Truef(t, nftablesProvider.applyCalled, "redirect traffic rules were not applied")
+			if c.expNftCfgParamsFunc != nil {
+				actualNftCfgParamsEqualExpected, errMsg := c.expNftCfgParamsFunc(cmd.nftCfg)
+				require.Truef(t, actualNftCfgParamsEqualExpected, errMsg)
 			}
 		})
 	}
@@ -956,24 +956,24 @@ var (
 	}
 )
 
-type fakeIptablesProvider struct {
+type fakeNftablesProvider struct {
 	applyCalled bool
 	rules       []string
 }
 
-func (f *fakeIptablesProvider) AddRule(_ string, args ...string) {
+func (f *fakeNftablesProvider) AddRule(_ string, args ...string) {
 	f.rules = append(f.rules, strings.Join(args, " "))
 }
 
-func (f *fakeIptablesProvider) ApplyRules(command string) error {
+func (f *fakeNftablesProvider) ApplyRules(command string) error {
 	f.applyCalled = true
 	return nil
 }
 
-func (f *fakeIptablesProvider) Rules() []string {
+func (f *fakeNftablesProvider) Rules() []string {
 	return f.rules
 }
 
-func (f *fakeIptablesProvider) ClearAllRules() {
+func (f *fakeNftablesProvider) ClearAllRules() {
 	f.rules = nil
 }
