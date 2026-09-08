@@ -148,6 +148,22 @@ func (b *Binder) Snapshot() *Snapshot {
 		// calculate the status for the gateway
 		gatewayValidation = validateGateway(b.config.Gateway, registrationPods, b.config.ConsulGateway)
 		listenerValidation = validateListeners(b.config.Gateway, b.config.Gateway.Spec.Listeners, b.config.Resources, gatewayClassConfig)
+
+		// Warn about any listener-protocol annotations whose embedded section name
+		// does not match any listener in spec.listeners. These annotations are silently
+		// ignored by resolveListenerProtocol, so a typo produces no Consul protocol
+		// override and no other visible feedback. The warning makes the
+		// misconfiguration discoverable in controller logs.
+		if orphans := orphanedProtocolAnnotations(b.config.Gateway); len(orphans) > 0 {
+			b.config.Logger.Info(
+				"gateway has listener-protocol annotations that do not match any listener name "+
+					"and will be ignored; check that the annotation key contains the exact listener sectionName",
+				"gateway", b.config.Gateway.Name,
+				"namespace", b.config.Gateway.Namespace,
+				"orphanedAnnotationKeys", orphans,
+			)
+		}
+
 		policyValidation = validateGatewayPolicies(b.config.Gateway, b.config.Policies, b.config.Resources)
 		authFilterValidation = validateAuthFilters(authFilters, b.config.Resources)
 		extProcFilterValidation = validateExtProcFilters(extProcFilters)
