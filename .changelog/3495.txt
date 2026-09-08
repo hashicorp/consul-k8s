@@ -1,0 +1,3 @@
+```release-note:bug
+helm: do not expose NodePort 8502 in consul-client while gRPC is disabled.
+```
