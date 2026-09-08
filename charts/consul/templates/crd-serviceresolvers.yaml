@@ -302,6 +302,14 @@ spec:
               subsets:
                 additionalProperties:
                   properties:
+                    destinationPort:
+                      description: |-
+                        DestinationPort is the name of the port to route traffic to for this
+                        subset. Only one of Filter and DestinationPort may be set. When set,
+                        the subset selects the given named port on every healthy instance
+                        registered for this service, enabling per-port protocol routing within
+                        a multiport service.
+                      type: string
                     filter:
                       description: |-
                         Filter is the filter expression to be used for selecting instances of the
