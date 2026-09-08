@@ -1,0 +1,3 @@
+```release-note:bug
+helm: Respect the Clients GRPC configuration when configuring ports of the client containers.
+```
