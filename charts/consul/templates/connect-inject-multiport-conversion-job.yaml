@@ -1,0 +1,87 @@
+{{- $connectInjectEnabled := or (and (ne (.Values.connectInject.enabled | toString) "-") .Values.connectInject.enabled) (and (eq (.Values.connectInject.enabled | toString) "-") .Values.global.enabled) -}}
+{{- $multiportEnabled := .Values.connectInject.multiportServiceRegistration.enabled -}}
+{{- $strategy := .Values.connectInject.multiportServiceRegistration.conversionStrategy -}}
+{{- $supportedStrategies := list "NONE" "TRANSLATE" "DECOMMISSION" -}}
+{{- if not (has $strategy $supportedStrategies) -}}
+{{- fail "connectInject.multiportServiceRegistration.conversionStrategy must be one of NONE, TRANSLATE, or DECOMMISSION" -}}
+{{- end -}}
+{{- if and $multiportEnabled (ne $strategy "NONE") -}}
+{{- fail "connectInject.multiportServiceRegistration.conversionStrategy must be NONE when multiport service registration is enabled" -}}
+{{- end -}}
+{{- if and .Release.IsUpgrade $connectInjectEnabled (not $multiportEnabled) (ne $strategy "NONE") }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "consul.fullname" . }}-connect-inject-multiport-conversion
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "consul.name" . }}
+    chart: {{ template "consul.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    component: connect-inject-multiport-conversion
+    {{- if .Values.global.extraLabels }}
+      {{- toYaml .Values.global.extraLabels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: {{ template "consul.name" . }}
+        chart: {{ template "consul.chart" . }}
+        release: {{ .Release.Name }}
+        component: connect-inject-multiport-conversion
+      annotations:
+        "consul.hashicorp.com/connect-inject": "false"
+        "consul.hashicorp.com/mesh-inject": "false"
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ template "consul.fullname" . }}-connect-injector
+      {{- include "consul.podSecurityContext" . | nindent 6 }}
+      containers:
+        - name: convert-multiport-services
+          image: "{{ default .Values.global.imageK8S .Values.connectInject.image }}"
+          {{ template "consul.imagePullPolicy" . }}
+          {{- include "consul.restrictedSecurityContext" . | nindent 10 }}
+          command:
+            - consul-k8s-control-plane
+          args:
+            - convert-multiport-services
+            - -strategy={{ $strategy }}
+            - -default-inject={{ .Values.connectInject.default }}
+            - -release-namespace={{ .Release.Namespace }}
+            - {{ printf "-namespace-selector=%s" (.Values.connectInject.namespaceSelector | fromYaml | toJson) | quote }}
+            {{- if eq (len .Values.connectInject.k8sAllowNamespaces) 0 }}
+            - -allow-k8s-namespace=
+            {{- else }}
+            {{- range $value := .Values.connectInject.k8sAllowNamespaces }}
+            - {{ printf "-allow-k8s-namespace=%s" $value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- range $value := .Values.connectInject.k8sDenyNamespaces }}
+            - {{ printf "-deny-k8s-namespace=%s" $value | quote }}
+            {{- end }}
+            - -log-level={{ default .Values.global.logLevel .Values.connectInject.logLevel }}
+            - -log-json={{ .Values.global.logJSON }}
+          {{- with .Values.connectInject.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if .Values.connectInject.nodeSelector }}
+      nodeSelector:
+        {{ tpl .Values.connectInject.nodeSelector . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.connectInject.affinity }}
+      affinity:
+        {{ tpl .Values.connectInject.affinity . | indent 8 | trim }}
+      {{- end }}
+      {{- if .Values.connectInject.tolerations }}
+      tolerations:
+        {{ tpl .Values.connectInject.tolerations . | indent 8 | trim }}
+      {{- end }}
+{{- end }}
