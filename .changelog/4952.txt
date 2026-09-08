@@ -1,0 +1,3 @@
+```release-note:bug
+api-gateway: Fixed isuue when gateway controller processes non-consul gateways & deletes resources without provenance validation
+```
