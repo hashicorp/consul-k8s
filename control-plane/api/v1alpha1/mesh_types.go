@@ -110,6 +110,7 @@ type PeeringMeshConfig struct {
 	PeerThroughMeshGateways bool `json:"peerThroughMeshGateways,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == 'TLSv1_3')",message="ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'"
 type MeshDirectionalTLSConfig struct {
 	// TLSMinVersion sets the default minimum TLS version supported.
 	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
@@ -379,6 +380,9 @@ func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
 		errs = append(errs, field.Invalid(path.Child("tlsMinVersion"), in.TLSMinVersion, notInSliceMessage(versions)))
 	}
 
+	// validCurves defines the supported ECDH/KEM curves for TLS 1.3.
+	// NOTE: If this list is updated, ensure the corresponding validEnvoyECDHCurves
+	// map in github.com/hashicorp/consul/agent/structs/config_entry_mesh.go is also updated.
 	validCurves := []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
 	if len(in.ECDHCurves) > 0 {
 		if in.TLSMinVersion != "TLSv1_3" {

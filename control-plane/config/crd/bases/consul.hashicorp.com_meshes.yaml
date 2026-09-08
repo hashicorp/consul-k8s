@@ -170,6 +170,9 @@ spec:
                           while older releases of Envoy default to TLS 1.0.
                         type: string
                     type: object
+                    x-kubernetes-validations:
+                    - message: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'
+                      rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == '''TLSv1_3''')'
                   outgoing:
                     description: |-
                       Outgoing defines the TLS configuration for outbound mTLS connections dialing upstreams
@@ -212,6 +215,9 @@ spec:
                           while older releases of Envoy default to TLS 1.0.
                         type: string
                     type: object
+                    x-kubernetes-validations:
+                    - message: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'
+                      rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == '''TLSv1_3''')'
                 type: object
               transparentProxy:
                 description: TransparentProxy controls the configuration specific
