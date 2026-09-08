@@ -375,6 +375,60 @@ func TestMesh_Validate(t *testing.T) {
 				},
 			},
 		},
+		"tls.incoming.ecdhCurves with TLSv1_1 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_1",
+							ECDHCurves:    []string{"X25519"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["X25519"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher`,
+			},
+		},
+		"tls.incoming.ecdhCurves with TLSv1_0 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_0",
+							ECDHCurves:    []string{"P-256"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["P-256"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher`,
+			},
+		},
+		"tls.incoming.ecdhCurves with unspecified TLS version invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "",
+							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["X25519MLKEM768"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher`,
+			},
+		},
 		"tls.incoming.ecdhCurves without TLSv1_3 invalid": {
 			input: &Mesh{
 				ObjectMeta: metav1.ObjectMeta{
@@ -390,7 +444,7 @@ func TestMesh_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.tls.incoming.ecdhCurves: Invalid value: ["X25519MLKEM768"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'`,
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["X25519MLKEM768"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher`,
 			},
 		},
 		"tls.incoming.ecdhCurves invalid curve": {
@@ -426,7 +480,7 @@ func TestMesh_Validate(t *testing.T) {
 				},
 			},
 			expectedErrMsgs: []string{
-				`spec.tls.outgoing.ecdhCurves: Invalid value: ["X25519"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'`,
+				`spec.tls.outgoing.ecdhCurves: Invalid value: ["X25519"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher`,
 			},
 		},
 		"tls.outgoing.ecdhCurves invalid curve": {

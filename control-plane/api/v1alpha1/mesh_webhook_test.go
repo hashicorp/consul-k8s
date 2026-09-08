@@ -100,7 +100,7 @@ func TestValidateMesh(t *testing.T) {
 				},
 			},
 			expAllow:      false,
-			expErrMessage: "mesh.consul.hashicorp.com \"mesh\" is invalid: spec.tls.incoming.ecdhCurves: Invalid value: [\"X25519MLKEM768\"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'",
+			expErrMessage: "mesh.consul.hashicorp.com \"mesh\" is invalid: spec.tls.incoming.ecdhCurves: Invalid value: [\"X25519MLKEM768\"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher",
 		},
 	}
 	for name, c := range cases {

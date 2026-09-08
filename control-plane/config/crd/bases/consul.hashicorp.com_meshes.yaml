@@ -171,8 +171,8 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-validations:
-                    - message: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'
-                      rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == '''TLSv1_3''')'
+                    - message: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher
+                      rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && !(self.tlsMinVersion in ['''TLSv1_0''', '''TLSv1_1''', '''TLSv1_2''', '''TLS_AUTO''', '''''']))'
                   outgoing:
                     description: |-
                       Outgoing defines the TLS configuration for outbound mTLS connections dialing upstreams
@@ -216,8 +216,8 @@ spec:
                         type: string
                     type: object
                     x-kubernetes-validations:
-                    - message: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3'
-                      rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && self.tlsMinVersion == '''TLSv1_3''')'
+                    - message: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher
+                      rule: '!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && !(self.tlsMinVersion in ['''TLSv1_0''', '''TLSv1_1''', '''TLSv1_2''', '''TLS_AUTO''', '''''']))'
                 type: object
               transparentProxy:
                 description: TransparentProxy controls the configuration specific
