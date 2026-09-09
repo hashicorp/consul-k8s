@@ -190,8 +190,7 @@ RUN microdnf update -y && \
 # will not matter since the container is run as a random user and group
 # but this is kept for consistency with our other images.
 RUN groupadd --gid 1000 ${BIN_NAME} && \
-    adduser --uid 100 --system -g ${BIN_NAME} ${BIN_NAME} && \
-    usermod -a -G root ${BIN_NAME}
+    adduser --uid 100 --system -g ${BIN_NAME} ${BIN_NAME}
 
 COPY --from=go-discover /go/bin/discover /bin/
 COPY dist/${TARGETOS}/${TARGETARCH}/${BIN_NAME} /bin/
