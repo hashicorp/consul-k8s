@@ -19,12 +19,12 @@
 ARG GOLANG_VERSION
 FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
 # Build go-discover in a synthetic module so we can pin patched versions of
-# golang.org/x/crypto (>=v0.52.0) and golang.org/x/net (>=v0.55.0) via MVS,
+# golang.org/x/crypto (>=v0.57.0) and golang.org/x/net (>=v0.59.0) via MVS,
 # overriding the older versions bundled with go-discover v1.2.0.
 RUN mkdir /build && cd /build && \
     go mod init godisc_builder && \
     go get github.com/hashicorp/go-discover/cmd/discover@v1.2.0 && \
-    go get golang.org/x/crypto@v0.55.0 golang.org/x/net@v0.58.0 google.golang.org/grpc@v1.83.0 && \
+    go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.59.0 google.golang.org/grpc@v1.83.2 && \
     CGO_ENABLED=0 GOFLAGS=-mod=mod go build -o /go/bin/discover github.com/hashicorp/go-discover/cmd/discover
 
 # dev copies the binary from a local build
