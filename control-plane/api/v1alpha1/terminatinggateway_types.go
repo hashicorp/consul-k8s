@@ -5,7 +5,10 @@ package v1alpha1
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"reflect"
+	"strings"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -129,6 +132,84 @@ type TerminatingGatewayDeploymentSpec struct {
 
 	// LogJSON enables JSON formatted logging
 	LogJSON *bool `json:"logJSON,omitempty"`
+
+	// CredentialInjection configures optional non-secret credential-processor and
+	// Vault Agent sidecars that inject external-model credentials for linked
+	// services. This is a Kubernetes deployment concern only: it does not change
+	// the Consul terminating-gateway config entry produced by ToConsul.
+	// +kubebuilder:validation:Optional
+	CredentialInjection *TerminatingGatewayCredentialInjection `json:"credentialInjection,omitempty"`
+}
+
+// TerminatingGatewayCredentialInjection configures the optional credential-processor
+// and Vault Agent sidecars added to a terminating gateway's deployment. All fields
+// here are non-secret: ConfigMaps referenced by name must carry only non-secret
+// binding/template/auth configuration, never token values or arbitrary environment
+// credential sources. Image fields are shapes only; production deployments must
+// pin an immutable image digest.
+type TerminatingGatewayCredentialInjection struct {
+	// Enabled controls whether the credential processor and Vault Agent sidecars
+	// are added to the gateway deployment.
+	// +kubebuilder:validation:Optional
+	Enabled bool `json:"enabled,omitempty"`
+
+	// ProcessorImage is the container image reference for the credential processor sidecar.
+	// +kubebuilder:validation:Optional
+	ProcessorImage string `json:"processorImage,omitempty"`
+
+	// VaultAgentImage is the container image reference for the Vault Agent sidecar.
+	// +kubebuilder:validation:Optional
+	VaultAgentImage string `json:"vaultAgentImage,omitempty"`
+
+	// ProcessorConfigMap names the ConfigMap, in the gateway's namespace, carrying
+	// non-secret credential processor binding/template configuration.
+	// +kubebuilder:validation:Optional
+	ProcessorConfigMap string `json:"processorConfigMap,omitempty"`
+
+	// VaultAgentConfigMap names the ConfigMap, in the gateway's namespace, carrying
+	// non-secret Vault Agent configuration.
+	// +kubebuilder:validation:Optional
+	VaultAgentConfigMap string `json:"vaultAgentConfigMap,omitempty"`
+
+	// VaultAddress is the address of the Vault server the sidecar authenticates against.
+	// It must be an absolute https:// URL.
+	// +kubebuilder:validation:Optional
+	VaultAddress string `json:"vaultAddress,omitempty"`
+
+	// VaultNamespace is the optional Vault Enterprise namespace.
+	// +kubebuilder:validation:Optional
+	VaultNamespace string `json:"vaultNamespace,omitempty"`
+
+	// VaultAuthRole is the Vault Kubernetes auth role assumed by the sidecar.
+	// +kubebuilder:validation:Optional
+	VaultAuthRole string `json:"vaultAuthRole,omitempty"`
+
+	// VaultAuthMount is the mount path of the Vault Kubernetes auth method.
+	// +kubebuilder:validation:Optional
+	VaultAuthMount string `json:"vaultAuthMount,omitempty"`
+
+	// VaultCAConfigMap optionally names a ConfigMap, in the gateway's namespace, carrying
+	// the CA bundle used to validate the Vault server's TLS certificate.
+	// +kubebuilder:validation:Optional
+	VaultCAConfigMap string `json:"vaultCAConfigMap,omitempty"`
+
+	// TokenAudience is the audience requested for the projected Kubernetes service
+	// account token presented to Vault.
+	// +kubebuilder:validation:Optional
+	TokenAudience string `json:"tokenAudience,omitempty"`
+
+	// TokenExpirationSeconds is the requested expiration, in seconds, of the
+	// projected service account token.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=600
+	// +kubebuilder:validation:Maximum=43200
+	TokenExpirationSeconds *int64 `json:"tokenExpirationSeconds,omitempty"`
+
+	// DrainSeconds bounds how long the sidecars wait to finish in-flight credential
+	// refresh work before terminating during a rolling update.
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=0
+	DrainSeconds *int64 `json:"drainSeconds,omitempty"`
 }
 
 // ExtraVolume defines a volume to be mounted in the pod.
@@ -386,6 +467,7 @@ func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {
 	}
 
 	errs = append(errs, in.validateNamespaces(consulMeta.NamespacesEnabled)...)
+	errs = append(errs, in.Spec.Deployment.validateCredentialInjection(path.Child("deployment"))...)
 
 	if len(errs) > 0 {
 		return apierrors.NewInvalid(
@@ -393,6 +475,136 @@ func (in *TerminatingGateway) Validate(consulMeta common.ConsulMeta) error {
 			in.KubernetesName(), errs)
 	}
 	return nil
+}
+
+// validateCredentialInjection validates spec.deployment.credentialInjection. Validation
+// is skipped entirely when the block is nil or not enabled, preserving legacy behavior
+// for resources that don't use this feature.
+func (in TerminatingGatewayDeploymentSpec) validateCredentialInjection(path *field.Path) field.ErrorList {
+	ci := in.CredentialInjection
+	if ci == nil || !ci.Enabled {
+		return nil
+	}
+	return ci.validate(in.EnableDeployment, path.Child("credentialInjection"))
+}
+
+const (
+	// minTokenExpirationSeconds mirrors Kubernetes' documented floor for
+	// projected service account tokens (10 minutes).
+	minTokenExpirationSeconds int64 = 600
+	// maxTokenExpirationSeconds is a conservative ceiling (12 hours) to keep
+	// the projected token lifetime bounded.
+	maxTokenExpirationSeconds int64 = 43200
+)
+
+func (in *TerminatingGatewayCredentialInjection) validate(enableDeployment *bool, path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	// Feature/deployment mismatch: sidecars can only be injected into a Deployment
+	// that will actually be created, so enabledDeployment must be explicitly true.
+	if enableDeployment == nil || !*enableDeployment {
+		errs = append(errs, field.Invalid(path.Child("enabled"), in.Enabled,
+			"credentialInjection.enabled requires spec.deployment.enabledDeployment to be true"))
+	}
+
+	// Missing image/config maps.
+	if in.ProcessorImage == "" {
+		errs = append(errs, field.Required(path.Child("processorImage"), "processorImage is required when credentialInjection is enabled"))
+	}
+	if in.VaultAgentImage == "" {
+		errs = append(errs, field.Required(path.Child("vaultAgentImage"), "vaultAgentImage is required when credentialInjection is enabled"))
+	}
+	if in.ProcessorConfigMap == "" {
+		errs = append(errs, field.Required(path.Child("processorConfigMap"), "processorConfigMap is required when credentialInjection is enabled"))
+	}
+	if in.VaultAgentConfigMap == "" {
+		errs = append(errs, field.Required(path.Child("vaultAgentConfigMap"), "vaultAgentConfigMap is required when credentialInjection is enabled"))
+	}
+
+	errs = append(errs, in.validateVaultAddress(path.Child("vaultAddress"))...)
+	errs = append(errs, in.validateProjectedToken(path)...)
+	errs = append(errs, in.validateWildcardAndModeCombinations(path)...)
+
+	return errs
+}
+
+// validateVaultAddress enforces "invalid Vault URL/TLS": the address must be an
+// absolute URL with a host, and must use the https scheme (plaintext Vault
+// connections are forbidden for this feature).
+func (in *TerminatingGatewayCredentialInjection) validateVaultAddress(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in.VaultAddress == "" {
+		return append(errs, field.Required(path, "vaultAddress is required when credentialInjection is enabled"))
+	}
+	u, err := url.Parse(in.VaultAddress)
+	if err != nil || u.Host == "" || u.Scheme == "" {
+		return append(errs, field.Invalid(path, in.VaultAddress, "vaultAddress must be a valid absolute URL"))
+	}
+	if u.Scheme != "https" {
+		errs = append(errs, field.Invalid(path, in.VaultAddress,
+			`vaultAddress must use the "https" scheme; plaintext Vault connections are not permitted`))
+	}
+	return errs
+}
+
+// validateProjectedToken enforces "invalid projected-token fields": tokenAudience
+// is required, tokenExpirationSeconds must fall within the supported range, and
+// drainSeconds must be non-negative and not exceed tokenExpirationSeconds.
+func (in *TerminatingGatewayCredentialInjection) validateProjectedToken(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if in.TokenAudience == "" {
+		errs = append(errs, field.Required(path.Child("tokenAudience"), "tokenAudience is required when credentialInjection is enabled"))
+	}
+	if in.TokenExpirationSeconds != nil {
+		v := *in.TokenExpirationSeconds
+		if v < minTokenExpirationSeconds || v > maxTokenExpirationSeconds {
+			errs = append(errs, field.Invalid(path.Child("tokenExpirationSeconds"), v,
+				fmt.Sprintf("tokenExpirationSeconds must be between %d and %d seconds", minTokenExpirationSeconds, maxTokenExpirationSeconds)))
+		}
+	}
+	if in.DrainSeconds != nil {
+		switch {
+		case *in.DrainSeconds < 0:
+			errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not be negative"))
+		case in.TokenExpirationSeconds != nil && *in.DrainSeconds > *in.TokenExpirationSeconds:
+			errs = append(errs, field.Invalid(path.Child("drainSeconds"), *in.DrainSeconds, "drainSeconds must not exceed tokenExpirationSeconds"))
+		}
+	}
+	return errs
+}
+
+// validateWildcardAndModeCombinations enforces "forbidden wildcard/mode
+// combinations": Vault/ConfigMap identifiers must not contain the wildcard
+// specifier, and the processor/Vault Agent ConfigMaps (which carry different,
+// non-interchangeable configuration shapes) must not reference the same
+// ConfigMap.
+func (in *TerminatingGatewayCredentialInjection) validateWildcardAndModeCombinations(path *field.Path) field.ErrorList {
+	var errs field.ErrorList
+
+	wildcardFields := []struct {
+		name  string
+		value string
+	}{
+		{"vaultNamespace", in.VaultNamespace},
+		{"vaultAuthRole", in.VaultAuthRole},
+		{"vaultAuthMount", in.VaultAuthMount},
+		{"vaultCAConfigMap", in.VaultCAConfigMap},
+		{"processorConfigMap", in.ProcessorConfigMap},
+		{"vaultAgentConfigMap", in.VaultAgentConfigMap},
+		{"tokenAudience", in.TokenAudience},
+	}
+	for _, f := range wildcardFields {
+		if strings.Contains(f.value, WildcardSpecifier) {
+			errs = append(errs, field.Invalid(path.Child(f.name), f.value, `must not contain the wildcard character "*"`))
+		}
+	}
+
+	if in.ProcessorConfigMap != "" && in.ProcessorConfigMap == in.VaultAgentConfigMap {
+		errs = append(errs, field.Invalid(path.Child("vaultAgentConfigMap"), in.VaultAgentConfigMap,
+			"vaultAgentConfigMap must reference a different ConfigMap than processorConfigMap"))
+	}
+
+	return errs
 }
 
 // DefaultNamespaceFields sets the namespace field on spec.services to their default values if namespaces are enabled.
