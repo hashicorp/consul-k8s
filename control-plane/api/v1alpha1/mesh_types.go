@@ -385,7 +385,7 @@ func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
 	// map in github.com/hashicorp/consul/agent/structs/config_entry_mesh.go is also updated.
 	validCurves := []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
 	if len(in.ECDHCurves) > 0 {
-		if in.TLSMinVersion != "TLSv1_3" {
+		if isTLSVersionLessThanTLS13(in.TLSMinVersion) {
 			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves, "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher"))
 		}
 		for i, curve := range in.ECDHCurves {
@@ -464,4 +464,19 @@ func (in *RequestNormalizationMeshConfig) validate(path *field.Path) field.Error
 
 // DefaultNamespaceFields has no behaviour here as meshes have no namespace specific fields.
 func (in *Mesh) DefaultNamespaceFields(_ common.ConsulMeta) {
+}
+
+var tlsVersionComparison = map[string]uint{
+	"TLSv1_0": 1,
+	"TLSv1_1": 2,
+	"TLSv1_2": 3,
+	"TLSv1_3": 4,
+}
+
+func isTLSVersionLessThanTLS13(v string) bool {
+	rank, ok := tlsVersionComparison[v]
+	if !ok {
+		return true
+	}
+	return rank < tlsVersionComparison["TLSv1_3"]
 }
