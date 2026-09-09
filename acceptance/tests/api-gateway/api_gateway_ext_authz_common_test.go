@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
+// dummy comment
 // waitForConsulServiceRegistered blocks until the named service has at least one
 // instance registered in the Consul catalog.
 //
