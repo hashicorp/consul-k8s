@@ -1,0 +1,3 @@
+```release-note:feature
+crd: Add `ECDHCurves` field and OpenAPI validation to `MeshDirectionalTLSConfig` in `Mesh` CRD for post-quantum hybrid key exchange (`X25519MLKEM768`).
+```

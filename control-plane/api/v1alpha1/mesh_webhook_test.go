@@ -84,6 +84,41 @@ func TestValidateMesh(t *testing.T) {
 			expAllow:      false,
 			expErrMessage: "mesh.consul.hashicorp.com \"mesh\" is invalid: spec.tls.incoming.tlsMinVersion: Invalid value: \"foo\": must be one of \"TLS_AUTO\", \"TLSv1_0\", \"TLSv1_1\", \"TLSv1_2\", \"TLSv1_3\", \"\"",
 		},
+		"validation rejects invalid ecdhCurves": {
+			existingResources: nil,
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Mesh,
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_1",
+							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+			expAllow:      false,
+			expErrMessage: "mesh.consul.hashicorp.com \"mesh\" is invalid: spec.tls.incoming.ecdhCurves: Invalid value: [\"X25519MLKEM768\"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher",
+		},
+		"validation accepts ecdhCurves with TLSv1_2": {
+			existingResources: nil,
+			newResource: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: common.Mesh,
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_2",
+							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+			expAllow: true,
+		},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {

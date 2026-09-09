@@ -55,11 +55,13 @@ func TestMesh_MatchesConsul(t *testing.T) {
 							TLSMinVersion: "TLSv1_0",
 							TLSMaxVersion: "TLSv1_1",
 							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 						},
 						Outgoing: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_0",
 							TLSMaxVersion: "TLSv1_1",
 							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 						},
 					},
 					HTTP: &MeshHTTPConfig{
@@ -89,11 +91,13 @@ func TestMesh_MatchesConsul(t *testing.T) {
 						TLSMinVersion: "TLSv1_0",
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 					},
 					Outgoing: &capi.MeshDirectionalTLSConfig{
 						TLSMinVersion: "TLSv1_0",
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 					},
 				},
 				HTTP: &capi.MeshHTTPConfig{
@@ -175,11 +179,13 @@ func TestMesh_ToConsul(t *testing.T) {
 							TLSMinVersion: "TLSv1_0",
 							TLSMaxVersion: "TLSv1_1",
 							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 						},
 						Outgoing: &MeshDirectionalTLSConfig{
 							TLSMinVersion: "TLSv1_0",
 							TLSMaxVersion: "TLSv1_1",
 							CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 						},
 					},
 					HTTP: &MeshHTTPConfig{
@@ -209,11 +215,13 @@ func TestMesh_ToConsul(t *testing.T) {
 						TLSMinVersion: "TLSv1_0",
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 					},
 					Outgoing: &capi.MeshDirectionalTLSConfig{
 						TLSMinVersion: "TLSv1_0",
 						TLSMaxVersion: "TLSv1_1",
 						CipherSuites:  []string{"ECDHE-ECDSA-AES128-GCM-SHA256", "AES128-SHA"},
+						ECDHCurves:    []string{"X25519MLKEM768", "X25519"},
 					},
 				},
 				HTTP: &capi.MeshHTTPConfig{
@@ -350,6 +358,156 @@ func TestMesh_Validate(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		"tls.incoming.ecdhCurves valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_3",
+							ECDHCurves:    []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"},
+						},
+					},
+				},
+			},
+		},
+		"tls.incoming.ecdhCurves with TLSv1_1 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_1",
+							ECDHCurves:    []string{"X25519"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["X25519"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher`,
+			},
+		},
+		"tls.incoming.ecdhCurves with TLSv1_0 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_0",
+							ECDHCurves:    []string{"P-256"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves: Invalid value: ["P-256"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher`,
+			},
+		},
+		"tls.incoming.ecdhCurves with unspecified TLS version valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "",
+							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+		},
+		"tls.incoming.ecdhCurves with TLSv1_2 valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_2",
+							ECDHCurves:    []string{"X25519MLKEM768"},
+						},
+					},
+				},
+			},
+		},
+		"tls.incoming.ecdhCurves invalid curve": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Incoming: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_3",
+							ECDHCurves:    []string{"foo"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.incoming.ecdhCurves[0]: Invalid value: "foo": must be one of "X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"`,
+			},
+		},
+		"tls.outgoing.ecdhCurves with TLS_AUTO valid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLS_AUTO",
+							ECDHCurves:    []string{"X25519"},
+						},
+					},
+				},
+			},
+		},
+		"tls.outgoing.ecdhCurves with TLSv1_1 invalid": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_1",
+							ECDHCurves:    []string{"X25519"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.outgoing.ecdhCurves: Invalid value: ["X25519"]: ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher`,
+			},
+		},
+		"tls.outgoing.ecdhCurves invalid curve": {
+			input: &Mesh{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "name",
+				},
+				Spec: MeshSpec{
+					TLS: &MeshTLSConfig{
+						Outgoing: &MeshDirectionalTLSConfig{
+							TLSMinVersion: "TLSv1_3",
+							ECDHCurves:    []string{"secp256k1"},
+						},
+					},
+				},
+			},
+			expectedErrMsgs: []string{
+				`spec.tls.outgoing.ecdhCurves[0]: Invalid value: "secp256k1": must be one of "X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"`,
 			},
 		},
 		"peering.peerThroughMeshGateways in invalid partition": {
