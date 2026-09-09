@@ -110,7 +110,7 @@ type PeeringMeshConfig struct {
 	PeerThroughMeshGateways bool `json:"peerThroughMeshGateways,omitempty"`
 }
 
-// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || (has(self.tlsMinVersion) && !(self.tlsMinVersion in ['TLSv1_0', 'TLSv1_1', 'TLSv1_2', 'TLS_AUTO', '']))",message="ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher"
+// +kubebuilder:validation:XValidation:rule="!has(self.ecdhCurves) || size(self.ecdhCurves) == 0 || !(self.tlsMinVersion in ['TLSv1_0', 'TLSv1_1'])",message="ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"
 type MeshDirectionalTLSConfig struct {
 	// TLSMinVersion sets the default minimum TLS version supported.
 	// One of `TLS_AUTO`, `TLSv1_0`, `TLSv1_1`, `TLSv1_2`, or `TLSv1_3`.
@@ -385,8 +385,8 @@ func (in *MeshDirectionalTLSConfig) validate(path *field.Path) field.ErrorList {
 	// map in github.com/hashicorp/consul/agent/structs/config_entry_mesh.go is also updated.
 	validCurves := []string{"X25519MLKEM768", "X25519", "P-256", "P-384", "P-521"}
 	if len(in.ECDHCurves) > 0 {
-		if isTLSVersionLessThanTLS13(in.TLSMinVersion) {
-			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves, "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_3' or higher"))
+		if isTLSVersionLessThanTLS12(in.TLSMinVersion) {
+			errs = append(errs, field.Invalid(path.Child("ecdhCurves"), in.ECDHCurves, "ecdhCurves can only be configured when tlsMinVersion is 'TLSv1_2' or higher"))
 		}
 		for i, curve := range in.ECDHCurves {
 			if !sliceContains(validCurves, curve) {
@@ -473,10 +473,10 @@ var tlsVersionComparison = map[string]uint{
 	"TLSv1_3": 4,
 }
 
-func isTLSVersionLessThanTLS13(v string) bool {
+func isTLSVersionLessThanTLS12(v string) bool {
 	rank, ok := tlsVersionComparison[v]
 	if !ok {
-		return true
+		return false
 	}
-	return rank < tlsVersionComparison["TLSv1_3"]
+	return rank < tlsVersionComparison["TLSv1_2"]
 }
