@@ -24,7 +24,7 @@ FROM golang:${GOLANG_VERSION}-alpine3.23 AS go-discover
 RUN mkdir /build && cd /build && \
     go mod init godisc_builder && \
     go get github.com/hashicorp/go-discover/cmd/discover@v1.2.0 && \
-    go get golang.org/x/crypto@v0.54.0 golang.org/x/net@v0.57.0 google.golang.org/grpc@v1.83.0 && \
+    go get golang.org/x/crypto@v0.56.0 golang.org/x/net@v0.58.0 google.golang.org/grpc@v1.83.2 && \
     CGO_ENABLED=0 GOFLAGS=-mod=mod go build -o /go/bin/discover github.com/hashicorp/go-discover/cmd/discover
 
 # dev copies the binary from a local build
