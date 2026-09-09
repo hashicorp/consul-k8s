@@ -20,7 +20,7 @@ import (
 	"github.com/hashicorp/consul-k8s/acceptance/framework/logger"
 )
 
-// dummy comment
+// dummy comment again
 // TestAPIGateway_ExternalServers tests that connect works when using external servers.
 // It sets up an external Consul server in the same cluster but a different Helm installation
 // and then treats this server as external.
