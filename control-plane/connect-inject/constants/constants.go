@@ -86,6 +86,34 @@ const (
 	CACertPEMEnvVar       = "CONSUL_CACERT_PEM"
 	TLSServerNameEnvVar   = "CONSUL_TLS_SERVER_NAME"
 	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
+
+	// AI agent role and container name constants.
+
+	// AIAgentRole is the expected value of AnnotationAIRole for an AI agent workload.
+	AIAgentRole = "ai-agent"
+
+	// AIContainerName is the injected container name for the consul-mcp-gateway sidecar.
+	AIContainerName = "consul-mcp-gateway"
+
+	// DefaultAIMCPOutboundPort is the loopback port the mcp-gateway dedicated outbound
+	// listener binds to (maps to ai.agent.mcp.port in the service definition).
+	DefaultAIMCPOutboundPort = 15101
+
+	// DefaultAIHITLPort is the loopback port the agent HTTP server listens on for
+	// human-in-the-loop approval callbacks (ai.agent.mcp.hitl.port).
+	DefaultAIHITLPort = 16101
+
+	// DefaultAIInterceptorPort is the loopback port the mcp-gateway interceptor proxy
+	// binds to (ai.agent.interceptor.port).
+	DefaultAIInterceptorPort = 21101
+
+	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the
+	// consul-mcp-gateway image, used as the -gateway-binary argument.
+	DefaultGatewayBinary = "/app/consul-mcp-gateway"
+	// ConsulBinarypath is the path to the consulbinary inside the
+	// consul-mcp-gateway image.
+	ConsulBinarypath = "/app/consul"
+
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

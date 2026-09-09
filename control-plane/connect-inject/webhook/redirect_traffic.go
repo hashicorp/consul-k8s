@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -26,7 +27,7 @@ import (
 //	ExcludeOutboundPorts: pod annotations
 //	ExcludeOutboundCIDRs: pod annotations
 //	ExcludeUIDs: pod annotations
-func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (string, error) {
+func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns corev1.Namespace) (string, error) {
 	cfg := iptables.Config{}
 
 	if !w.EnableOpenShift {
@@ -103,6 +104,22 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 		}
 	}
 
+	if common.IsAIAgent(pod) {
+
+		aiCfg, err := common.AIConfigFromPodIF(ctx, w.Clientset, pod)
+		if err != nil {
+			return "", err
+		}
+		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
+			strconv.Itoa(aiCfg.Agent.MCP.Port),
+			strconv.Itoa(aiCfg.Agent.MCP.HITL.Port),
+			strconv.Itoa(aiCfg.Agent.Interceptor.Port),
+		)
+		cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts,
+			strconv.Itoa(aiCfg.Agent.MCP.Port),
+		)
+	}
+
 	// Inbound ports
 	excludeInboundPorts := splitCommaSeparatedItemsFromAnnotation(constants.AnnotationTProxyExcludeInboundPorts, pod)
 	cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts, excludeInboundPorts...)
@@ -141,8 +158,8 @@ func (w *MeshWebhook) iptablesConfigJSON(pod corev1.Pod, ns corev1.Namespace) (s
 }
 
 // addRedirectTrafficConfigAnnotation add the created iptables JSON config as an annotation on the provided pod.
-func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(pod *corev1.Pod, ns corev1.Namespace) error {
-	iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+func (w *MeshWebhook) addRedirectTrafficConfigAnnotation(ctx context.Context, pod *corev1.Pod, ns corev1.Namespace) error {
+	iptablesConfig, err := w.iptablesConfigJSON(ctx, *pod, ns)
 	if err != nil {
 		return err
 	}

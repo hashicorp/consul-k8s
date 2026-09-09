@@ -262,7 +262,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 				if hasBeenInjected(pod) {
 					if isConsulDataplaneSupported(pod) {
-						if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+						if err = r.registerServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
 							r.Log.Error(err, "failed to register services or health check", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 							errs = multierror.Append(errs, err)
 						}
@@ -334,7 +334,7 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
+func (r *Controller) registerServicesAndHealthCheck(ctx context.Context, apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	var managedByEndpointsController bool
 	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
@@ -342,7 +342,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	// For pods managed by this controller, create and register the service instance.
 	if managedByEndpointsController {
 		// Get information from the pod to create service instance registrations.
-		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, podIP, serviceEndpoints, healthStatus)
+		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(ctx, pod, podIP, serviceEndpoints, healthStatus)
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
@@ -473,7 +473,7 @@ func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
 
 	// Determine the default service port and optional multi-port definitions.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
@@ -534,6 +534,18 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 			}
 		}
 	}
+
+	// If this pod is an AI agent, fetch the MCP config ConfigMap, parse it into
+	// an api.AgentServiceAI struct, and attach it to the service registration so
+	// Consul receives the full ai {} block.
+	var serviceAI *api.AgentServiceAI
+	if common.IsAIAgent(pod) {
+		serviceAI, err = common.AIConfigFromPod(ctx, r.Client, pod)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
 	tags := consulTags(pod)
 
 	consulNS := r.consulNamespace(pod.Namespace)
@@ -552,6 +564,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		Namespace: consulNS,
 		Tags:      tags,
 		Locality:  locality,
+		AI:        serviceAI,
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
@@ -638,6 +651,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		Tags:      tags,
 		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
 		Locality: locality,
+		AI:       serviceAI,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.

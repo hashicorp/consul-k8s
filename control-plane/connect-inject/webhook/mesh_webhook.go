@@ -213,6 +213,19 @@ type MeshWebhook struct {
 	// for situations where Consul servers are behind a load balancer.
 	SkipServerWatch bool
 
+	// GatewayBinary is the path to the consul-mcp-gateway binary inside the
+	// consul-ai-mcp-interceptor image. Passed as -gateway-binary to
+	// consul connect mcp-gateway for AI agent pods.
+	// Defaults to constants.DefaultGatewayBinary if empty.
+	GatewayBinary string
+
+	// ImageConsulAIMCPInterceptor is the container image used for the
+	// consul-mcp-gateway sidecar injected into AI agent pods. It must contain
+	// the consul binary with the `consul connect mcp-gateway` subcommand.
+	// Maps to global.imageConsulAIMCPInterceptor / connectInject.imageConsulAIMCPInterceptor
+	// in the Helm values.
+	ImageConsulAIMCPInterceptor string
+
 	// ReleaseNamespace is the Kubernetes namespace where this webhook is running.
 	ReleaseNamespace string
 
@@ -303,6 +316,28 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		return admission.Errored(http.StatusInternalServerError, fmt.Errorf("unable to mount additional access log volume: %s", err))
 	}
 
+	// If this is an AI agent pod, mount the MCP config ConfigMap as a volume.
+	if common.IsAIAgent(pod) {
+		cmName := common.AIAgentMCPConfigName(pod)
+		if cmName == "" {
+			return admission.Errored(http.StatusBadRequest,
+				fmt.Errorf("annotation %s is required when %s is %s",
+					constants.AnnotationAIAgentMCPConfig,
+					constants.AnnotationAIRole,
+					constants.AIAgentRole,
+				),
+			)
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+			Name: aiAgentConfigVolumeName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
+				},
+			},
+		})
+	}
+
 	// Optionally add any volumes that are to be used by the envoy sidecar.
 	if _, ok := pod.Annotations[constants.AnnotationConsulSidecarUserVolume]; ok {
 		var userVolumes []corev1.Volume
@@ -341,7 +376,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
-		initContainer, err := w.containerInit(*ns, pod, multiPortInfo{})
+		initContainer, err := w.containerInit(ctx, *ns, pod, multiPortInfo{})
 		if err != nil {
 			w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -362,6 +397,17 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, envoySidecar)
 		} else {
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
+		}
+
+		// Inject the AI agent mcp-gateway sidecar when the pod carries the AI role annotation.
+		if common.IsAIAgent(pod) {
+			aiSidecar, err := w.aiAgentSidecar(pod)
+			if err != nil {
+				w.Log.Error(err, "error configuring ai agent mcp-gateway container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("error configuring ai agent mcp-gateway container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, aiSidecar)
 		}
 
 	} else {
@@ -424,7 +470,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 
 			// Add the init container that registers the service and sets up the Envoy configuration.
-			initContainer, err := w.containerInit(*ns, pod, mpi)
+			initContainer, err := w.containerInit(ctx, *ns, pod, mpi)
 			if err != nil {
 				w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -514,7 +560,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
-		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+		if err = w.addRedirectTrafficConfigAnnotation(ctx, &pod, *ns); err != nil {
 			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
 		}
@@ -851,6 +897,9 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 	metricsMergingEnabled, err := w.MetricsConfig.EnableMetricsMerging(pod)
 	if err != nil {
 		return fmt.Errorf("couldn't check if metrics merging is enabled: %s", err)
+	}
+	if common.IsAIAgent(pod) {
+		return fmt.Errorf("ai-agent role is not supported on multi-port pods")
 	}
 	if tproxyEnabled {
 		return fmt.Errorf("multi protocol multi port services are not compatible with transparent proxy")
