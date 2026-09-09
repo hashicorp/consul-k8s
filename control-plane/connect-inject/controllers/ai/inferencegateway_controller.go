@@ -435,6 +435,11 @@ func (r *InferenceGatewayController) toConsulConfigEntry(
 		entry.RateLimit = toConsulRateLimit(rl)
 	}
 
+	// Map pool.Spec.Policy → capi.AIGatewayPolicy.
+	if p := pool.Spec.Policy; p != nil {
+		entry.Policy = toConsulPolicy(p)
+	}
+
 	return entry
 }
 
@@ -559,6 +564,37 @@ func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.AIGatewayRateL
 	}
 
 	return crl
+}
+
+// toConsulPolicy converts an InferencePoolPolicy to *capi.AIGatewayPolicy.
+func toConsulPolicy(p *v1alpha1.InferencePoolPolicy) *capi.AIGatewayPolicy {
+	if p == nil {
+		return nil
+	}
+	cp := &capi.AIGatewayPolicy{
+		AuditLevel: p.AuditLevel,
+	}
+	if p.PII != nil {
+		cp.PII = &capi.AIGatewayPII{
+			Scope:               p.PII.Scope,
+			DefaultAction:       p.PII.DefaultAction,
+			StreamHoldbackBytes: p.PII.StreamHoldbackBytes,
+		}
+		if p.PII.Mask != nil {
+			cp.PII.Mask = &capi.AIGatewayPIIMask{
+				Char:     p.PII.Mask.Char,
+				KeepLast: p.PII.Mask.KeepLast,
+			}
+		}
+		for _, d := range p.PII.Detectors {
+			cp.PII.Detectors = append(cp.PII.Detectors, capi.AIGatewayPIIDetector{
+				Name:   d.Name,
+				Regex:  d.Regex,
+				Action: d.Action,
+			})
+		}
+	}
+	return cp
 }
 
 func toConsulLimitPair(p *v1alpha1.InferencePoolLimitPair) *capi.AIGatewayLimitPair {

@@ -416,6 +416,13 @@ type InferencePoolConfigSpec struct {
 	// rules for this pool. When omitted, Consul applies its built-in defaults.
 	// +optional
 	Routing *InferencePoolRouting `json:"routing,omitempty"`
+
+	// Policy holds cross-cutting request/response policy (PII detection,
+	// redaction, audit) that the co-located policy processor enforces. Consul
+	// carries it verbatim to the processor. When omitted, no policy processing
+	// is applied.
+	// +optional
+	Policy *InferencePoolPolicy `json:"policy,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -880,6 +887,105 @@ type InferencePoolWeightedTarget struct {
 
 	// Weight is the relative traffic weight assigned to this cluster.
 	Weight int `json:"weight"`
+}
+
+// ---------------------------------------------------------------------------
+// InferencePoolPolicy and supporting types
+// ---------------------------------------------------------------------------
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolPolicy holds cross-cutting request/response policy (PII
+// detection, redaction, and audit) that the co-located policy processor
+// enforces. Consul carries it verbatim to the processor. When omitted, no
+// policy processing is applied.
+type InferencePoolPolicy struct {
+	// PII configures per-detector PII detection and redaction.
+	// +optional
+	PII *InferencePoolPII `json:"pii,omitempty"`
+
+	// AuditLevel sets the verbosity of the audit log emitted by the processor.
+	//   none    — no audit log entries.
+	//   request — log request metadata only.
+	//   full    — log request and response metadata.
+	// +kubebuilder:validation:Enum=none;request;full
+	// +optional
+	AuditLevel string `json:"auditLevel,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolPII configures PII detection and redaction for requests and
+// responses passing through the policy processor.
+type InferencePoolPII struct {
+	// Scope controls which parts of the conversation are scanned.
+	//   request  — scan the user prompt only.
+	//   response — scan the model completion only.
+	//   both     — scan prompt and completion. Default.
+	// +kubebuilder:validation:Enum=request;response;both
+	// +optional
+	Scope string `json:"scope,omitempty"`
+
+	// DefaultAction is the fallback action applied when a detector fires and
+	// no per-detector action is set.
+	//   block  — reject the request/response (HTTP 422).
+	//   mask   — replace the detected span with the Mask pattern.
+	//   redact — remove the detected span entirely.
+	//   log    — emit an audit log entry and pass through unchanged.
+	// +kubebuilder:validation:Enum=block;mask;redact;log
+	// +optional
+	DefaultAction string `json:"defaultAction,omitempty"`
+
+	// StreamHoldbackBytes is the number of bytes buffered from a streaming
+	// response before PII scanning begins. Higher values increase detection
+	// accuracy at the cost of latency.
+	// +optional
+	StreamHoldbackBytes int `json:"streamHoldbackBytes,omitempty"`
+
+	// Mask parameterizes the "mask" redaction action.
+	// +optional
+	Mask *InferencePoolPIIMask `json:"mask,omitempty"`
+
+	// Detectors is the ordered list of PII detection rules. Each entry names
+	// a built-in detector or provides a custom Regex, with an optional per-rule
+	// Action that overrides DefaultAction.
+	// +optional
+	Detectors []InferencePoolPIIDetector `json:"detectors,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolPIIMask parameterizes the "mask" redaction action.
+type InferencePoolPIIMask struct {
+	// Char is the character used to replace each masked rune (default "*").
+	// +optional
+	Char string `json:"char,omitempty"`
+
+	// KeepLast is the number of characters at the end of a detected span that
+	// are left unmasked (e.g. 4 to show the last four digits of a credit-card
+	// number).
+	// +optional
+	KeepLast int `json:"keepLast,omitempty"`
+}
+
+// +k8s:deepcopy-gen=true
+
+// InferencePoolPIIDetector is one PII detection rule.
+type InferencePoolPIIDetector struct {
+	// Name is the identifier of a built-in detector
+	// (e.g. "credit-card", "ssn", "email", "phone").
+	// Mutually exclusive with Regex.
+	// +optional
+	Name string `json:"name,omitempty"`
+
+	// Regex is a custom regular expression pattern. When set, Name is ignored.
+	// +optional
+	Regex string `json:"regex,omitempty"`
+
+	// Action overrides the policy DefaultAction for this specific detector.
+	// +kubebuilder:validation:Enum=block;mask;redact;log
+	// +optional
+	Action string `json:"action,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

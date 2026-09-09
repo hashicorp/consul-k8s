@@ -517,6 +517,86 @@ spec:
                         ConfigValidation sets the strictness of config validation at
                         admission time (e.g. "strict", "warn", "off").
                       type: string
+                policy:
+                  description: >-
+                    Policy holds cross-cutting request/response policy (PII detection,
+                    redaction, and audit) that the co-located policy processor enforces.
+                    Consul carries it verbatim to the processor. When omitted, no policy
+                    processing is applied.
+                  type: object
+                  properties:
+                    auditLevel:
+                      description: >-
+                        AuditLevel sets the verbosity of the audit log emitted by the
+                        processor. Allowed values: none, request, full.
+                      type: string
+                      enum: [none, request, full]
+                    pii:
+                      description: >-
+                        PII configures per-detector PII detection and redaction for
+                        requests and responses passing through the policy processor.
+                      type: object
+                      properties:
+                        scope:
+                          description: >-
+                            Scope controls which parts of the conversation are scanned.
+                            Allowed values: request, response, both.
+                          type: string
+                          enum: [request, response, both]
+                        defaultAction:
+                          description: >-
+                            DefaultAction is the fallback action applied when a detector
+                            fires and no per-detector action is set.
+                            Allowed values: block, mask, redact, log.
+                          type: string
+                          enum: [block, mask, redact, log]
+                        streamHoldbackBytes:
+                          description: >-
+                            StreamHoldbackBytes is the number of bytes buffered from a
+                            streaming response before PII scanning begins.
+                          type: integer
+                        mask:
+                          description: Mask parameterizes the "mask" redaction action.
+                          type: object
+                          properties:
+                            char:
+                              description: >-
+                                Char is the character used to replace each masked rune
+                                (default "*").
+                              type: string
+                            keepLast:
+                              description: >-
+                                KeepLast is the number of characters at the end of a
+                                detected span that are left unmasked.
+                              type: integer
+                        detectors:
+                          description: >-
+                            Detectors is the ordered list of PII detection rules. Each
+                            entry names a built-in detector or provides a custom Regex,
+                            with an optional per-rule Action that overrides DefaultAction.
+                          type: array
+                          items:
+                            description: InferencePoolPIIDetector is one PII detection rule.
+                            type: object
+                            properties:
+                              name:
+                                description: >-
+                                  Name is the identifier of a built-in detector
+                                  (e.g. "credit-card", "ssn", "email", "phone").
+                                  Mutually exclusive with regex.
+                                type: string
+                              regex:
+                                description: >-
+                                  Regex is a custom regular expression pattern. When set,
+                                  name is ignored.
+                                type: string
+                              action:
+                                description: >-
+                                  Action overrides the policy defaultAction for this
+                                  specific detector.
+                                  Allowed values: block, mask, redact, log.
+                                type: string
+                                enum: [block, mask, redact, log]
             status:
               description: InferencePoolConfigStatus records the observed state set by the controller.
               type: object
