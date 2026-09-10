@@ -104,7 +104,8 @@ func (e entryComparator) apiGatewaysEqual(a, b api.APIGatewayConfigEntry) bool {
 		e.namespaceA == e.namespaceB &&
 		e.partitionA == e.partitionB &&
 		maps.Equal(a.Meta, b.Meta) &&
-		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual)
+		slices.EqualFunc(a.Listeners, b.Listeners, e.apiGatewayListenersEqual) &&
+		a.TLS.Enabled == b.TLS.Enabled
 }
 
 func (e entryComparator) apiGatewayListenersEqual(a, b api.APIGatewayListener) bool {
