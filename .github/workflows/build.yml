@@ -95,9 +95,9 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s" , gotags: "hashicorpmetrics" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: "+fips1402", pkg_suffix: "-fips" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: "+fips1402", pkg_suffix: "-fips" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "cli", pkg_name: "consul-k8s", "bin_name": "consul-k8s.exe", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403" }
 
           # control-plane
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "freebsd", goarch: "386", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
@@ -113,9 +113,9 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "darwin", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", "skip_packaging": "true" , gotags: "hashicorpmetrics" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: "+fips1402", pkg_suffix: "-fips", "skip_packaging": "true" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: "+fips1402", pkg_suffix: "-fips", "skip_packaging": "true" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=cngcrypto", fips: "+fips1402", "skip_packaging": "true"  }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips", "skip_packaging": "true" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "windows", goarch: "amd64", component: "control-plane", pkg_name: "consul-k8s-control-plane", "bin_name": "consul-k8s-control-plane.exe", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", "skip_packaging": "true"  }
 
           # consul-cni
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "386", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  , gotags: "hashicorpmetrics" }
@@ -123,8 +123,8 @@ jobs:
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true"  , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni" , gotags: "hashicorpmetrics" }
           - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "s390x", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", "skip_packaging": "true", gotags: "hashicorpmetrics" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto", fips: "+fips1402", pkg_suffix: "-fips" }
-          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=1 GOEXPERIMENT=boringcrypto CC=aarch64-linux-gnu-gcc", fips: "+fips1402", pkg_suffix: "-fips" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "amd64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips" }
+          - {go: "${{ needs.get-go-version.outputs.go-version }}", goos: "linux", goarch: "arm64", component: "control-plane/cni", pkg_name: "consul-cni", "bin_name": "consul-cni", gotags: "hashicorpmetrics,fips", env: "CGO_ENABLED=0 GOFIPS140=v1.0.0", fips: "+fips1403", pkg_suffix: "-fips" }
 
       fail-fast: true
 
@@ -136,25 +136,6 @@ jobs:
         uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version: ${{ matrix.go }}
-
-      - name: Replace Go for Windows FIPS with Microsoft Go
-        if: ${{ matrix.fips == '+fips1402' && matrix.goos == 'windows' }}
-        run: |
-          # Uninstall standard Go and use microsoft/go instead
-          rm -rf /home/runner/actions-runner/_work/_tool/go
-          curl https://aka.ms/golang/release/latest/go${{ matrix.go }}-1.linux-amd64.tar.gz -Lo go${{ matrix.go }}.linux-amd64.tar.gz
-          tar -C $HOME -xf go${{ matrix.go }}.linux-amd64.tar.gz
-          chmod +x $HOME/go/bin
-          export PATH=$HOME/go/bin:$PATH
-          if [ $(which go) != "$HOME/go/bin/go" ]; then
-            echo "Unable to verify microsoft/go toolchain"
-            exit 1
-          fi
-
-      - name: Install cross-compiler for FIPS on arm64
-        if: ${{ matrix.fips == '+fips1402' && matrix.goarch == 'arm64' }}
-        run: |
-          sudo apt-get update --allow-releaseinfo-change-suite --allow-releaseinfo-change-version && sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build
         env:
@@ -293,8 +274,8 @@ jobs:
           - { goos: "linux", goarch: "s390x" }
           - { goos: "linux", goarch: "386" }
           - { goos: "linux", goarch: "amd64" }
-          - { goos: "linux", goarch: "amd64", fips: "+fips1402" }
-          - { goos: "linux", goarch: "arm64", fips: "+fips1402" }
+          - { goos: "linux", goarch: "amd64", fips: "+fips1403" }
+          - { goos: "linux", goarch: "arm64", fips: "+fips1403" }
     env:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}
@@ -383,7 +364,7 @@ jobs:
       matrix:
         include:
           - { arch: "amd64" }
-          - { arch: "amd64", fips: "+fips1402" }
+          - { arch: "amd64", fips: "+fips1403" }
     env:
       repo: ${{ github.event.repository.name }}
       version: ${{ needs.get-product-version.outputs.product-version }}${{ matrix.fips }}

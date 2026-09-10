@@ -80,6 +80,7 @@ func TestPartitions_Connect_MultiportServices(t *testing.T) {
 					"global.acls.manageSystemACLs": strconv.FormatBool(c.aclsEnabled),
 
 					"connectInject.enabled":                                     "true",
+					"connectInject.multiportServiceRegistration.enabled":        "true",
 					"connectInject.transparentProxy.defaultEnabled":             strconv.FormatBool(cfg.EnableTransparentProxy),
 					"connectInject.consulNamespaces.consulDestinationNamespace": "default",
 					"connectInject.consulNamespaces.mirroringK8S":               "false",

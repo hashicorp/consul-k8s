@@ -84,6 +84,9 @@ type Command struct {
 	flagReleaseName      string
 	flagReleaseNamespace string
 
+	// Flags for the admission webhook.
+	flagDisableMultiportRegistration bool
+
 	// Proxy resource settings.
 	flagDefaultSidecarProxyCPULimit      string
 	flagDefaultSidecarProxyCPURequest    string
@@ -230,6 +233,8 @@ func (c *Command) init() {
 		"K8s namespaces to explicitly deny. Takes precedence over allow. May be specified multiple times.")
 	c.flagSet.StringVar(&c.flagReleaseName, "release-name", "consul", "The Consul Helm installation release name, e.g 'helm install <RELEASE-NAME>'")
 	c.flagSet.StringVar(&c.flagReleaseNamespace, "release-namespace", "default", "The Consul Helm installation namespace, e.g 'helm install <RELEASE-NAME> --namespace <RELEASE-NAMESPACE>'")
+	c.flagSet.BoolVar(&c.flagDisableMultiportRegistration, "disable-multiport-registration", false,
+		"Reject new multi-port Consul service registrations unless exactly one application port is selected.")
 	c.flagSet.BoolVar(&c.flagEnablePartitions, "enable-partitions", false,
 		"[Enterprise Only] Enables Admin Partitions.")
 	c.flagSet.BoolVar(&c.flagEnableNamespaces, "enable-namespaces", false,

@@ -98,7 +98,7 @@ function main {
             ;;
          --fips )
             GOTAGS="fips"
-            GOEXPERIMENT="boringcrypto"
+            GOFIPS140="v1.0.0"
             shift 1
             ;;
          * )
