@@ -1,3 +1,25 @@
+## 2.0.4 (September 10, 2026)
+BREAKING CHANGES:
+
+* helm: multi-port Consul service registration is now disabled by default via `connectInject.multiportServiceRegistration.enabled=false`. A Connect-injected Pod that selects more than one application port is rejected at admission. Set `connectInject.multiportServiceRegistration.enabled=true` to retain the previous behavior, or select a single port with `consul.hashicorp.com/connect-service-port`. [[GH-5625](https://github.com/hashicorp/consul-k8s/issues/5625)]
+
+SECURITY:
+
+* Upgrade `pymdown-extensions` from `10.0` to `11.0.1` to resolve [GHSA-gm37-52c6-37mw](https://github.com/advisories/GHSA-gm37-52c6-37mw): exponential backtracking ReDoS in the `caret`, `tilde`, `betterem`, and `magiclink` inline processors, where a crafted Markdown input under 50 bytes can pin the rendering thread at 100% CPU indefinitely (CWE-1333, CVSS 7.5 High). [[GH-5609](https://github.com/hashicorp/consul-k8s/issues/5609)]
+* Upgrade go version to 1.26.7 to address security vulnerabilities. [[GH-5627](https://github.com/hashicorp/consul-k8s/issues/5627)]
+* dockerfile: Remove unnecessary `root` group membership for the user in ubi-based consul-k8s-control-plane image. [[GH-5640](https://github.com/hashicorp/consul-k8s/issues/5640)]
+* security: upgrade `golang.org/x/crypto` to v0.57.0, `golang.org/x/net` to v0.59.0, and `google.golang.org/grpc` to v1.83.2 across the control-plane, CLI, acceptance, CNI, and custom gateway-api modules to resolve security vulnerabilities. [[GH-5648](https://github.com/hashicorp/consul-k8s/issues/5648)]
+
+IMPROVEMENTS:
+
+* Helm: Expose `connectInject.cni.tolerations` as a configurable Helm value to allow operators to override CNI DaemonSet tolerations. Defaults to tolerating `CriticalAddonsOnly` and `NoExecute` taints when not set. [[GH-5562](https://github.com/hashicorp/consul-k8s/issues/5562)]
+* helm: add `connectInject.multiportServiceRegistration.conversionStrategy` (`NONE`, `TRANSLATE`, `DECOMMISSION`) to control how existing Deployments, StatefulSets, and DaemonSets are treated by a post-upgrade Job when multi-port registration is disabled. `NONE` is the default and leaves existing workload specifications untouched. The Job also scans Pods and fails the upgrade with an explicit list of any multi-port workload it cannot rewrite, such as an Argo Rollout or a bare Pod, instead of letting it fail admission at its next Pod recreation. [[GH-5625](https://github.com/hashicorp/consul-k8s/issues/5625)]
+* security: build FIPS artifacts against the in-tree Go Cryptographic Module (FIPS 140-3, `GOFIPS140=v1.0.0`, CMVP Certificate #5247) instead of BoringCrypto/CNG. FIPS binaries now run in FIPS mode via a baked-in `//go:debug fips140=on`, are pure Go (no cgo), and the artifact/version label changes from `fips1402` to `fips1403`. [[GH-5492](https://github.com/hashicorp/consul-k8s/issues/5492)]
+
+BUG FIXES:
+
+* api-gateway: Fix generate-manifest to correctly generate GatewayPolicy manifests. [[GH-5604](https://github.com/hashicorp/consul-k8s/issues/5604)]
+
 ## 2.0.3 (August 11, 2026)
 
 SECURITY:
