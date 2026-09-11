@@ -226,6 +226,23 @@ type MeshWebhook struct {
 	// in the Helm values.
 	ImageConsulAIMCPInterceptor string
 
+	// ImageConsulOBOInbound is the container image used for the consul-obo-inbound
+	// sidecar injected into ALL connect-injected pods that have oauth_client = true.
+	// It handles the INBOUND OBO plane: strips forged identity headers, performs
+	// RFC 8693 token exchange, and projects x-user-role / x-user-aud / x-claim-*
+	// before jwt_authn evaluates the request.
+	// Falls back to ImageConsulK8S when empty (for dev environments without a
+	// dedicated image).
+	ImageConsulOBOInbound string
+
+	// ImageConsulOBOOutbound is the container image used for the consul-obo-outbound
+	// sidecar injected into ALL connect-injected pods that have oauth_client = true.
+	// It handles the OUTBOUND OBO plane for all outbound calls (A2A, A2REST, A2MCP,
+	// A2LLM): performs RFC 8693 token exchange and replaces the Authorization
+	// header with an audience-bound JWT before the request leaves the mesh.
+	// Falls back to ImageConsulK8S when empty.
+	ImageConsulOBOOutbound string
+
 	// ReleaseNamespace is the Kubernetes namespace where this webhook is running.
 	ReleaseNamespace string
 
@@ -399,7 +416,11 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			pod.Spec.Containers = append(pod.Spec.Containers, envoySidecar)
 		}
 
-		// Inject the AI agent mcp-gateway sidecar when the pod carries the AI role annotation.
+		// ── MCP gateway (AI agents only) ────────────────────────────────────────
+		// Inject the consul-mcp-gateway sidecar only when the pod carries the AI
+		// agent role annotation.  This sidecar owns MCP-specific concerns:
+		// protocol routing, tool RBAC, HITL, and delegating MCP-path RFC 8693
+		// exchange to consul-obo-outbound.
 		if common.IsAIAgent(pod) {
 			aiSidecar, err := w.aiAgentSidecar(pod)
 			if err != nil {
@@ -408,6 +429,33 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 					fmt.Errorf("error configuring ai agent mcp-gateway container: %s", err))
 			}
 			pod.Spec.Containers = append(pod.Spec.Containers, aiSidecar)
+		}
+
+		// ── OBO identity plane (all oauth-client services) ───────────────────────
+		// Inject consul-obo-inbound and consul-obo-outbound whenever the pod has
+		// opted into the OBO identity plane — either via the explicit
+		// consul.hashicorp.com/oauth-client: "true" annotation or because it is an
+		// AI agent (which is always an OAuth client by definition).
+		//
+		// These sidecars are plane-agnostic: they handle header stripping, token
+		// exchange, and claim projection for A2A, A2MCP, A2LLM, and A2REST paths.
+		// They are NOT tied to the MCP gateway or to the AI agent role.
+		if common.IsOAuthClient(pod) {
+			oboInbound, err := w.oboInboundSidecar(pod)
+			if err != nil {
+				w.Log.Error(err, "error configuring consul-obo-inbound container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("error configuring consul-obo-inbound container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
+
+			oboOutbound, err := w.oboOutboundSidecar(pod)
+			if err != nil {
+				w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
+				return admission.Errored(http.StatusInternalServerError,
+					fmt.Errorf("error configuring consul-obo-outbound container: %s", err))
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, oboOutbound)
 		}
 
 	} else {

@@ -271,3 +271,55 @@ func TestAIConfigFromPod_ConfigMapNotFound_ReturnsError(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "failed to get AI agent MCP ConfigMap")
 }
+
+// TestIsOAuthClient verifies that IsOAuthClient returns true for AI agents,
+// for pods with the explicit annotation, and false for all others.
+func TestIsOAuthClient(t *testing.T) {
+	cases := map[string]struct {
+		annotations map[string]string
+		expected    bool
+	}{
+		"ai-agent annotation": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: constants.AIAgentRole,
+			},
+			expected: true,
+		},
+		"explicit oauth-client annotation true": {
+			annotations: map[string]string{
+				constants.AnnotationOAuthClient: "true",
+			},
+			expected: true,
+		},
+		"both ai-agent and oauth-client": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole:      constants.AIAgentRole,
+				constants.AnnotationOAuthClient: "true",
+			},
+			expected: true,
+		},
+		"oauth-client annotation false": {
+			annotations: map[string]string{
+				constants.AnnotationOAuthClient: "false",
+			},
+			expected: false,
+		},
+		"no annotations": {
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		"unrelated ai-role value": {
+			annotations: map[string]string{
+				constants.AnnotationAIRole: "inference-model",
+			},
+			expected: false,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			pod := corev1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: tc.annotations}}
+			require.Equal(t, tc.expected, IsOAuthClient(pod))
+		})
+	}
+}

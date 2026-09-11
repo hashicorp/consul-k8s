@@ -102,3 +102,163 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 
 	return container, nil
 }
+
+// oboInboundSidecar builds and returns the consul-obo-inbound sidecar container
+// that handles INBOUND OBO for AI agent pods (and any pod with oauth_client=true).
+//
+// It listens on loopback :21102 (DefaultOBOInboundPort) and is wired by the
+// Consul xDS generator as an ext_proc filter on the inbound Envoy listener.
+// Its responsibilities are:
+//
+//  1. Strip any forged x-user-* / x-claim-* headers from the caller (INV-8).
+//  2. Perform RFC 8693 OBO token exchange: swap the inbound bearer token for
+//     an audience-bound JWT signed with the service's EC P-256 key.
+//  3. Project x-user-role (pipe-separated UPPER CASE groups), x-user-aud,
+//     x-claim-sub, x-claim-email so that the downstream jwt_authn / RBAC
+//     filters can evaluate role-based intentions.
+//
+// The OAuth private key is delivered via xDS (x-consul-oauth-config gRPC
+// stream metadata) — never via file, env var, or Kubernetes Secret.
+//
+// This sidecar is injected alongside the consul-mcp-gateway sidecar for all
+// AI agent pods. In a future iteration it will also be injected on non-AI
+// pods that have oauth_client = true, once a dedicated annotation is added.
+func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) {
+	image := w.ImageConsulOBOInbound
+	if image == "" {
+		// Fall back to the consul-k8s image so the webhook still works in
+		// environments where the dedicated image has not been configured yet.
+		image = w.ImageConsulK8S
+	}
+
+	container := corev1.Container{
+		Name:            constants.ConsulOBOInboundContainerName,
+		Image:           image,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       w.DefaultConsulSidecarResources,
+		Env: []corev1.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				// Shared data volume written by consul-connect-inject-init;
+				// the obo-inbound sidecar reads the Consul HTTP address and
+				// token files from here.
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+				ReadOnly:  true,
+			},
+		},
+		// The consul-obo-inbound binary is invoked directly — it does not need
+		// the consul connect mcp-gateway wrapper.
+		Command: []string{constants.DefaultOBOInboundBinary},
+		Args: []string{
+			"--addr",
+			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOInboundPort)),
+			"--obo=true",
+			"--log-level=info",
+		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsNonRoot:             ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}
+
+	return container, nil
+}
+
+// oboOutboundSidecar builds and returns the consul-obo-outbound sidecar
+// container that handles OUTBOUND OBO for ALL outbound calls from any service
+// with oauth_client=true.  It is not specific to MCP — it covers A2A, A2REST,
+// A2MCP, and A2LLM outbound paths.
+//
+// It listens on loopback :21103 (DefaultOBOOutboundPort) and is wired by the
+// Consul xDS generator as an ext_proc filter on the outbound Envoy listener
+// for every oauth_client=true service.  Its responsibilities are:
+//
+//  1. Detect that the outbound request carries a user-context bearer token.
+//  2. Perform RFC 8693 OBO exchange for the target service audience.
+//  3. Replace the Authorization header with the audience-bound JWT before the
+//     request leaves the agent's Envoy sidecar over mTLS.
+//
+// The OAuth private key is delivered via xDS (x-consul-oauth-config gRPC
+// stream metadata) — never via file, env var, or Kubernetes Secret.
+func (w *MeshWebhook) oboOutboundSidecar(_ corev1.Pod) (corev1.Container, error) {
+	image := w.ImageConsulOBOOutbound
+	if image == "" {
+		// Fall back to the consul-k8s image so the webhook still works in
+		// environments where the dedicated image has not been configured yet.
+		image = w.ImageConsulK8S
+	}
+
+	container := corev1.Container{
+		Name:            constants.ConsulOBOOutboundContainerName,
+		Image:           image,
+		ImagePullPolicy: corev1.PullPolicy(w.GlobalImagePullPolicy),
+		Resources:       w.DefaultConsulSidecarResources,
+		Env: []corev1.EnvVar{
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.name"},
+				},
+			},
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{FieldPath: "metadata.namespace"},
+				},
+			},
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				// Shared data volume written by consul-connect-inject-init;
+				// the obo-outbound sidecar reads the Consul HTTP address and
+				// token files from here.
+				Name:      volumeName,
+				MountPath: "/consul/connect-inject",
+				ReadOnly:  true,
+			},
+		},
+		// The consul-obo-outbound binary is invoked directly — it does not need
+		// the consul connect mcp-gateway wrapper.
+		Command: []string{constants.DefaultOBOOutboundBinary},
+		Args: []string{
+			"--addr",
+			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOOutboundPort)),
+			"--mode=outbound",
+			"--log-level=info",
+		},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsNonRoot:             ptr.To(true),
+			AllowPrivilegeEscalation: ptr.To(false),
+			ReadOnlyRootFilesystem:   ptr.To(true),
+			SeccompProfile: &corev1.SeccompProfile{
+				Type: corev1.SeccompProfileTypeRuntimeDefault,
+			},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+	}
+
+	return container, nil
+}

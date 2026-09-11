@@ -105,11 +105,13 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 	}
 
 	if common.IsAIAgent(pod) {
-
 		aiCfg, err := common.AIConfigFromPodIF(ctx, w.Clientset, pod)
 		if err != nil {
 			return "", err
 		}
+		// Exclude all MCP-specific loopback ports from tproxy interception so
+		// consul-mcp-gateway, the HITL server, and the MCP ext_proc listener
+		// communicate directly without going through Envoy's redirect iptables.
 		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
 			strconv.Itoa(aiCfg.Agent.MCP.Port),
 			strconv.Itoa(aiCfg.Agent.MCP.HITL.Port),
@@ -117,6 +119,20 @@ func (w *MeshWebhook) iptablesConfigJSON(ctx context.Context, pod corev1.Pod, ns
 		)
 		cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts,
 			strconv.Itoa(aiCfg.Agent.MCP.Port),
+		)
+	}
+
+	// Exclude OBO sidecar ports from tproxy interception for all oauth-client
+	// pods. Both OBO processes bind on loopback and are invoked by Envoy via
+	// ext_proc gRPC — they must never be redirected through the iptables rules.
+	//   :21102 — consul-obo-inbound   (inbound ext_proc)
+	//   :21103 — consul-obo-outbound  (outbound ext_proc)
+	if common.IsOAuthClient(pod) {
+		cfg.ExcludeInboundPorts = append(cfg.ExcludeInboundPorts,
+			strconv.Itoa(constants.DefaultOBOInboundPort),
+		)
+		cfg.ExcludeOutboundPorts = append(cfg.ExcludeOutboundPorts,
+			strconv.Itoa(constants.DefaultOBOOutboundPort),
 		)
 	}
 
