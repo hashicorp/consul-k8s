@@ -120,9 +120,9 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 // The OAuth private key is delivered via xDS (x-consul-oauth-config gRPC
 // stream metadata) — never via file, env var, or Kubernetes Secret.
 //
-// This sidecar is injected alongside the consul-mcp-gateway sidecar for all
-// AI agent pods. In a future iteration it will also be injected on non-AI
-// pods that have oauth_client = true, once a dedicated annotation is added.
+// This sidecar is injected for all pods that have opted into the OBO identity
+// plane: AI agent pods (AnnotationAIRole=ai-agent) and any pod annotated with
+// consul.hashicorp.com/oauth-client: "true".
 func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) {
 	image := w.ImageConsulOBOInbound
 	if image == "" {
@@ -166,7 +166,6 @@ func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) 
 		Args: []string{
 			"--addr",
 			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOInboundPort)),
-			"--obo=true",
 			"--log-level=info",
 		},
 		SecurityContext: &corev1.SecurityContext{

@@ -287,7 +287,9 @@ func TestOBOInboundSidecar(t *testing.T) {
 	}
 	require.Greater(t, addrIdx, -1)
 	require.Contains(t, args[addrIdx+1], "21102")
-	require.Contains(t, args, "--obo=true")
+	require.Contains(t, args, "--log-level=info")
+	require.NotContains(t, args, "--obo=true",
+		"--obo flag removed: consul-obo-inbound is always inbound-only; no flag needed")
 
 	// Security context: non-root, no privilege escalation, read-only filesystem.
 	require.NotNil(t, container.SecurityContext)
