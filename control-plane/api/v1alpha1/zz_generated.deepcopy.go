@@ -540,6 +540,11 @@ func (in *GatewayClassConfigSpec) DeepCopyInto(out *GatewayClassConfigSpec) {
 		*out = new(v1.ServiceType)
 		**out = **in
 	}
+	if in.ExternalTrafficPolicy != nil {
+		in, out := &in.ExternalTrafficPolicy, &out.ExternalTrafficPolicy
+		*out = new(v1.ServiceExternalTrafficPolicy)
+		**out = **in
+	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = make(map[string]string, len(*in))
