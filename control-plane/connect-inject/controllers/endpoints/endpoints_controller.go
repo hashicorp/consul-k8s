@@ -535,6 +535,12 @@ func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.
 		}
 	}
 
+	// Ensure oauth_client meta is set when the pod is an OAuth client so that
+	// catalog registrations and reconciliations preserve the OAuth client lifecycle.
+	if common.IsOAuthClient(pod) {
+		meta["oauth_client"] = "true"
+	}
+
 	// If this pod is an AI agent, fetch the MCP config ConfigMap, parse it into
 	// an api.AgentServiceAI struct, and attach it to the service registration so
 	// Consul receives the full ai {} block.

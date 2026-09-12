@@ -334,6 +334,10 @@ func (w *MeshWebhook) getContainerSidecarArgs(namespace corev1.Namespace, mpi mu
 		"-envoy-admin-bind-address=" + envoyAdminBindAddress,
 		"-consul-dns-bind-addr=" + consulDNSBindAddress,
 		"-xds-bind-addr=" + xdsBindAddress,
+		// Fix the xDS ADS port to a known value so consul-obo-outbound can
+		// subscribe to the GenericSecret SDS resource without requiring
+		// dynamic port discovery.
+		"-xds-bind-port=" + strconv.Itoa(constants.DefaultDataplaneXDSPort),
 		"-grpc-port=" + strconv.Itoa(w.ConsulConfig.GRPCPort),
 		"-proxy-service-id-path=" + proxyIDFileName,
 		"-log-level=" + w.LogLevel,

@@ -149,6 +149,20 @@ const (
 	// consul-mcp-gateway image.
 	ConsulBinarypath = "/app/consul"
 
+	// DefaultDataplaneXDSPort is the fixed loopback port on which consul-dataplane
+	// exposes the xDS ADS server to co-located containers.  consul-obo-outbound
+	// subscribes to this endpoint as an SDS client to receive the GenericSecret
+	// containing the OAuthClientConfig (oauth/<svcName>).
+	// Must not collide with any Envoy admin port, OBO ports, or MCP ports.
+	DefaultDataplaneXDSPort = 19500
+
+	// DefaultEnvoyAdminPort is the loopback port on which Envoy's admin HTTP
+	// server is bound by consul-dataplane (via -envoy-admin-bind-port=19000).
+	// The /ready endpoint on this port returns HTTP 200 + "LIVE" only after all
+	// clusters are initialised and the ADS stream to the Consul server is active.
+	// consul-obo-outbound polls this endpoint before opening its SDS subscription
+	// to ensure the proxy snapshot is ready to be served.
+	DefaultEnvoyAdminPort = 19000
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

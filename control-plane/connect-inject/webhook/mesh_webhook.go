@@ -323,6 +323,22 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// the sidecar for passing data in the pod.
 	pod.Spec.Volumes = append(pod.Spec.Volumes, w.containerVolume())
 
+	// Add a hostPath volume exposing the kind node's /usr/sbin so the init
+	// container can copy xtables-legacy-multi when iptables-nft is unavailable
+	// (Podman Desktop / Apple Silicon Fedora aarch64 kernel).
+	// The volume is always added but the init container script only uses it
+	// when the file is present — harmless on Docker Desktop / Linux nodes.
+	hostUSrSbin := corev1.HostPathDirectoryOrCreate
+	pod.Spec.Volumes = append(pod.Spec.Volumes, corev1.Volume{
+		Name: hostXtablesLegacyVolumeName,
+		VolumeSource: corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: "/usr/sbin",
+				Type: &hostUSrSbin,
+			},
+		},
+	})
+
 	// Optionally mount data volume to other containers
 	w.injectVolumeMount(pod)
 
