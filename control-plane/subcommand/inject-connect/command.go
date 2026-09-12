@@ -179,6 +179,7 @@ type Command struct {
 	flagEnableAI                  bool
 	flagAIInferenceGatewayImage   string // Docker image for the InferenceGateway Deployment
 	flagAIMCPServerImage          string // Docker image for the MCP server sidecar
+	flagAIAgentImage              string // Docker image for the AI agent sidecar
 }
 
 var (
@@ -283,6 +284,9 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagAIMCPServerImage, "ai-mcp-server-image", "",
 		"Docker image for the MCP server sidecar injected into pods with "+
 			"consul.hashicorp.com/ai-role: mcp-server. Mirrors ai.mcpServer.image from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIAgentImage, "ai-agent-image", "",
+		"Docker image for the AI agent sidecar injected into pods with "+
+			"consul.hashicorp.com/ai-role: ai-agent. Mirrors ai.agent.image from values.yaml.")
 
 	// custom controller flags
 	c.flagSet.BoolVar(&c.flagEnableCustomGatewayCRDController, "enable-custom-gateway-crd-controller", false, "Enable custom controller for Gateway API CRDs. This is required when using non-standard CRDs or when running on OpenShift.")

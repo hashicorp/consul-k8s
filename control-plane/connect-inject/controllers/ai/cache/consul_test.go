@@ -16,8 +16,8 @@ import (
 	"time"
 
 	logrtest "github.com/go-logr/logr/testing"
-	capi "github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
+	capi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -29,9 +29,9 @@ import (
 
 // aiGatewayEntry returns a minimal AIGatewayConfigEntry stamped with the
 // standard k8s metadata used by toConsulConfigEntry.
-func aiGatewayEntry(name, kubeNS, datacenter string, modifyIndex uint64) *capi.AIGatewayConfigEntry {
-	return &capi.AIGatewayConfigEntry{
-		Kind:        capi.AIGateway,
+func aiGatewayEntry(name, kubeNS, datacenter string, modifyIndex uint64) *capi.InferenceGatewayConfigEntry {
+	return &capi.InferenceGatewayConfigEntry{
+		Kind:        capi.InferenceGateway,
 		Name:        name,
 		ModifyIndex: modifyIndex,
 		Meta: map[string]string{
@@ -230,8 +230,8 @@ func TestCache_NoKubeName_Filtered(t *testing.T) {
 	t.Parallel()
 
 	// Entry with no k8s-name meta — not managed by us, should be filtered.
-	entry := &capi.AIGatewayConfigEntry{
-		Kind:        capi.AIGateway,
+	entry := &capi.InferenceGatewayConfigEntry{
+		Kind:        capi.InferenceGateway,
 		Name:        "user-created",
 		ModifyIndex: 1,
 		Meta:        map[string]string{datacenterMetaKey: "dc1"},

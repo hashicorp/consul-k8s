@@ -228,103 +228,103 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					healthStatus = api.HealthCritical
 				}
 				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
-				var pod corev1.Pod
-				objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
-				if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
-					// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
-					if k8serrors.IsNotFound(err) {
-						deregisterEndpointAddress[address.IP] = true
-						r.Log.Info("pod not found", "name", address.TargetRef.Name)
-					} else {
-						// If there was a different error fetching the pod, then log the error but don't deregister it
-						// since this could be a K8s API blip and we don't want to prematurely deregister.
-						deregisterEndpointAddress[address.IP] = false
-						r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
-						errs = multierror.Append(errs, err)
-					}
-					continue
-				}
-
-				svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
-				if ok && serviceName != svcName {
-					r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceName, "ns", serviceNamespace)
-					// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
-					deregisterEndpointAddress[address.IP] = true
-					continue
-				}
-
-				// Skip registration if node information is incomplete to prevent duplicate registrations.
-				if pod.Spec.NodeName == "" || address.IP == "" || pod.Status.HostIP == "" {
-					// If the Endpoints address IP is empty but the Pod already has a valid IP,
-					// this is a transient startup race where the Endpoints object is lagging
-					// behind Pod IP assignment. Requeue so we retry once Endpoints catches up,
-					// instead of treating this as a terminal skip.
-					if address.IP == "" && pod.Status.PodIP != "" {
-						requeueForEndpointsLag = true
-						r.Log.Info("EndpointSlice address not yet populated for pod with valid IP; will requeue",
-							"pod", pod.Name, "namespace", pod.Namespace,
-							"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
+					var pod corev1.Pod
+					objectKey := types.NamespacedName{Name: address.TargetRef.Name, Namespace: address.TargetRef.Namespace}
+					if err = r.Client.Get(ctx, objectKey, &pod); err != nil {
+						// If the pod doesn't exist anymore, set up the deregisterEndpointAddress map to deregister it.
+						if k8serrors.IsNotFound(err) {
+							deregisterEndpointAddress[address.IP] = true
+							r.Log.Info("pod not found", "name", address.TargetRef.Name)
+						} else {
+							// If there was a different error fetching the pod, then log the error but don't deregister it
+							// since this could be a K8s API blip and we don't want to prematurely deregister.
+							deregisterEndpointAddress[address.IP] = false
+							r.Log.Error(err, "failed to get pod", "name", address.TargetRef.Name)
+							errs = multierror.Append(errs, err)
+						}
 						continue
 					}
 
-					r.Log.Info("skipping pod registration due to incomplete node information",
-						"pod", pod.Name, "namespace", pod.Namespace,
-						"nodeName", pod.Spec.NodeName, "podIP", address.IP, "hostIP", pod.Status.HostIP)
-					// Don't set up for deregistration since we're not registering it
-					continue
-				}
-
-				if isTelemetryCollector(pod) {
-					if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
-						r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
-						errs = multierror.Append(errs, err)
+					svcName, ok := pod.Annotations[constants.AnnotationKubernetesService]
+					if ok && serviceName != svcName {
+						r.Log.Info("ignoring endpoint because it doesn't match explicit service annotation", "name", serviceName, "ns", serviceNamespace)
+						// Set up the deregisterEndpointAddress to deregister service instances that don't match the annotation.
+						deregisterEndpointAddress[address.IP] = true
+						continue
 					}
-				}
 
-				if hasBeenInjected(pod) {
-					if isConsulDataplaneSupported(pod) {
+					// Skip registration if node information is incomplete to prevent duplicate registrations.
+					if pod.Spec.NodeName == "" || address.IP == "" || pod.Status.HostIP == "" {
+						// If the Endpoints address IP is empty but the Pod already has a valid IP,
+						// this is a transient startup race where the Endpoints object is lagging
+						// behind Pod IP assignment. Requeue so we retry once Endpoints catches up,
+						// instead of treating this as a terminal skip.
+						if address.IP == "" && pod.Status.PodIP != "" {
+							requeueForEndpointsLag = true
+							r.Log.Info("EndpointSlice address not yet populated for pod with valid IP; will requeue",
+								"pod", pod.Name, "namespace", pod.Namespace,
+								"nodeName", pod.Spec.NodeName, "podIP", pod.Status.PodIP, "hostIP", pod.Status.HostIP)
+							continue
+						}
+
+						r.Log.Info("skipping pod registration due to incomplete node information",
+							"pod", pod.Name, "namespace", pod.Namespace,
+							"nodeName", pod.Spec.NodeName, "podIP", address.IP, "hostIP", pod.Status.HostIP)
+						// Don't set up for deregistration since we're not registering it
+						continue
+					}
+
+					if isTelemetryCollector(pod) {
+						if err = r.ensureNamespaceExists(apiClient, pod); err != nil {
+							r.Log.Error(err, "failed to ensure a namespace exists for Consul Telemetry Collector")
+							errs = multierror.Append(errs, err)
+						}
+					}
+
+					if hasBeenInjected(pod) {
+						if isConsulDataplaneSupported(pod) {
+							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+							if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+								r.Log.Error(err, "failed to register services or health check", "name", serviceName, "ns", serviceNamespace)
+								errs = multierror.Append(errs, err)
+							}
+							// Build the deregisterEndpointAddress map up for deregistering service instances later.
+							deregisterEndpointAddress[address.IP] = false
+						} else {
+							r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceName, "ns", serviceNamespace)
+							nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
+							if err != nil {
+								r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceName, "ns", serviceNamespace)
+								errs = multierror.Append(errs, err)
+								continue
+							}
+							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
+							r.Log.Info("updating health check on the Consul client", "name", serviceName, "ns", serviceNamespace)
+							if err = r.updateHealthCheckOnConsulClient(nodeAgentClientCfg, pod, serviceEndpoints, healthStatus); err != nil {
+								r.Log.Error(err, "failed to update health check on Consul client", "name", serviceName, "ns", serviceNamespace, "consul-client-ip", pod.Status.HostIP)
+								errs = multierror.Append(errs, err)
+							}
+							// We want to skip the rest of the reconciliation because we only care about updating health checks for existing services
+							// in the case when Consul clients are running in the cluster. If endpoints are deleted, consul clients
+							// will detect that they are unhealthy, and we don't need to worry about keeping them up-to-date.
+							// This is so that health checks are still updated during an upgrade to consul-dataplane.
+							continue
+						}
+					}
+
+					if isGateway(pod) {
 						serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
-						if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
-							r.Log.Error(err, "failed to register services or health check", "name", serviceName, "ns", serviceNamespace)
+						if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+							r.Log.Error(err, "failed to register gateway or health check", "name", serviceName, "ns", serviceNamespace)
 							errs = multierror.Append(errs, err)
 						}
 						// Build the deregisterEndpointAddress map up for deregistering service instances later.
 						deregisterEndpointAddress[address.IP] = false
-					} else {
-						r.Log.Info("detected an update to pre-consul-dataplane service", "name", serviceName, "ns", serviceNamespace)
-						nodeAgentClientCfg, err := r.consulClientCfgForNodeAgent(apiClient, pod, serverState)
-						if err != nil {
-							r.Log.Error(err, "failed to create node-local Consul API client", "name", serviceName, "ns", serviceNamespace)
-							errs = multierror.Append(errs, err)
-							continue
-						}
-						serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
-						r.Log.Info("updating health check on the Consul client", "name", serviceName, "ns", serviceNamespace)
-						if err = r.updateHealthCheckOnConsulClient(nodeAgentClientCfg, pod, serviceEndpoints, healthStatus); err != nil {
-							r.Log.Error(err, "failed to update health check on Consul client", "name", serviceName, "ns", serviceNamespace, "consul-client-ip", pod.Status.HostIP)
-							errs = multierror.Append(errs, err)
-						}
-						// We want to skip the rest of the reconciliation because we only care about updating health checks for existing services
-						// in the case when Consul clients are running in the cluster. If endpoints are deleted, consul clients
-						// will detect that they are unhealthy, and we don't need to worry about keeping them up-to-date.
-						// This is so that health checks are still updated during an upgrade to consul-dataplane.
-						continue
 					}
-				}
-
-				if isGateway(pod) {
-					serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
-					if err = r.registerGateway(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
-						r.Log.Error(err, "failed to register gateway or health check", "name", serviceName, "ns", serviceNamespace)
-						errs = multierror.Append(errs, err)
-					}
-					// Build the deregisterEndpointAddress map up for deregistering service instances later.
-					deregisterEndpointAddress[address.IP] = false
-				}
 				} // end if address.TargetRef != nil
 			} // end for _, addressIP
-			} // end for _, endpoint
-		} // end for _, endpointSlice
+		} // end for _, endpoint
+	} // end for _, endpointSlice
 
 	// Compare service instances in Consul with addresses in EndpointSlices. If an address is not in EndpointSlices, deregister
 	// from Consul. This uses deregisterEndpointAddress which is populated with the addresses in the EndpointSlice objects to

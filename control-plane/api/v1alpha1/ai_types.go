@@ -996,6 +996,7 @@ type InferencePoolPIIDetector struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Namespaced,shortName=igw,categories=all
 // +kubebuilder:subresource:status
+// +kubebuilder:subresource:scale:specpath=.spec.replicas,statuspath=.status.readyReplicas
 // +kubebuilder:printcolumn:name="Ready",type=integer,JSONPath=`.status.readyReplicas`,description="Number of gateway Deployment replicas that are ready."
 // +kubebuilder:printcolumn:name="Synced",type=string,JSONPath=`.status.conditions[?(@.type=='Ready')].status`,description="Whether the controller has successfully reconciled this resource."
 // +kubebuilder:printcolumn:name="Pool",type=string,JSONPath=`.spec.poolRef.name`,description="The InferencePoolConfig this gateway references."

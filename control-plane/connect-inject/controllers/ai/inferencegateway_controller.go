@@ -348,7 +348,7 @@ func (r *InferenceGatewayController) deleteConfigEntry(
 		queryOpts.Namespace = r.ConsulNamespace
 	}
 
-	entry, _, err := consulClient.ConfigEntries().Get(capi.AIGateway, igw.Name, queryOpts)
+	entry, _, err := consulClient.ConfigEntries().Get(capi.InferenceGateway, igw.Name, queryOpts)
 	if err != nil {
 		if isConsulNotFoundErr(err) {
 			// Already gone — desired state, not an error.
@@ -377,25 +377,28 @@ func (r *InferenceGatewayController) deleteConfigEntry(
 	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
 		writeOpts.Namespace = r.ConsulNamespace
 	}
-	if _, err := consulClient.ConfigEntries().Delete(capi.AIGateway, igw.Name, writeOpts); err != nil {
+	if _, err := consulClient.ConfigEntries().Delete(capi.InferenceGateway, igw.Name, writeOpts); err != nil {
 		return fmt.Errorf("ConfigEntries().Delete for %q: %w", igw.Name, err)
 	}
 
-	log.Info("deleted AIGateway config entry from Consul", "name", igw.Name)
+	log.Info("deleted InferenceGateway config entry from Consul", "name", igw.Name)
 	return nil
 }
 
-// toConsulConfigEntry builds a capi.AIGatewayConfigEntry from the InferenceGateway
-// and its resolved InferencePoolConfig. It maps pool.Spec.Routing → AIGatewayRouting
-// and pool.Spec.RateLimit → AIGatewayRateLimit, and stamps standard
-// datacenter/kubernetes provenance metadata so deleteConfigEntry can assert
-// ownership at delete time.
+// toConsulConfigEntry builds a capi.InferenceGatewayConfigEntry from the InferenceGateway
+// and its resolved InferencePoolConfig. Fields mapped:
+//
+//   - Processor.UDSPath — the shared Unix socket the consul-inference-gateway
+//     ext_proc server listens on (same path used by consul-dataplane/Envoy).
+//   - Failover — from pool.Spec.Routing.Fallback only; all other routing
+//     (MatchRules, Scoring, Retry, Timeout) lives in the Consul catalog, not here.
+//   - StateStore, RateLimit, PII, AuditLevel — verbatim from pool.Spec.
 func (r *InferenceGatewayController) toConsulConfigEntry(
 	igw *v1alpha1.InferenceGateway,
 	pool *v1alpha1.InferencePoolConfig,
 ) capi.ConfigEntry {
-	entry := &capi.AIGatewayConfigEntry{
-		Kind:      capi.AIGateway,
+	entry := &capi.InferenceGatewayConfigEntry{
+		Kind:      capi.InferenceGateway,
 		Name:      igw.Name,
 		Partition: r.ConsulPartition,
 		Meta: map[string]string{
@@ -403,125 +406,82 @@ func (r *InferenceGatewayController) toConsulConfigEntry(
 			constants.MetaKeyKubeNS:   igw.Namespace,
 			constants.MetaKeyKubeName: igw.Name,
 		},
-		// ApplyTo binds this policy to the inference-gateway service whose name
-		// matches the InferenceGateway resource.
-		ApplyTo: []string{igw.Name},
+		// Processor binds Envoy's ext_proc filter to the co-located
+		// consul-inference-gateway process over a shared Unix socket.
+		// The path /run/consul/ext_proc.sock matches what consul-enterprise
+		// XDS renders into the Envoy local_ext_proc cluster — both sides must
+		// agree on this path. The binary reads it back from the config entry
+		// at startup (main.go: socketPath = entry.Processor.UDSPath).
+		Processor: capi.InferenceGatewayProcessor{
+			UDSPath:     "/run/consul/ext_proc.sock",
+			FailureMode: "open",
+		},
 	}
 
 	// Only set Namespace on Consul Enterprise — OSS Consul rejects the ?ns=
 	// query parameter (HTTP 400 "Namespaces are a Consul Enterprise feature").
-	// Mirrors ConfigEntryController.EnableConsulNamespaces guard.
 	if r.EnableConsulNamespaces && r.ConsulNamespace != "" {
 		entry.Namespace = r.ConsulNamespace
 	}
 
-	// Map pool.Spec.StateStore → capi.AIGatewayStateStore.
-	// Required when RateLimit.Enabled=true; Consul rejects the config entry
-	// with HTTP 500 if rateLimit is enabled but StateStore.Service is empty.
+	// Map pool.Spec.StateStore → capi.InferenceGatewayStateStore.
+	// Required when RateLimit.Enabled=true.
 	if ss := pool.Spec.StateStore; ss != nil {
-		entry.StateStore = &capi.AIGatewayStateStore{
+		entry.StateStore = &capi.InferenceGatewayStateStore{
 			Service:       ss.Service,
 			LocalBindPort: ss.LocalBindPort,
 		}
 	}
 
-	// Map pool.Spec.Routing → capi.AIGatewayRouting.
-	if r := pool.Spec.Routing; r != nil {
-		entry.Routing = toConsulRouting(r)
-	}
-
-	// Map pool.Spec.RateLimit → capi.AIGatewayRateLimit.
+	// Map pool.Spec.RateLimit → capi.InferenceGatewayRateLimit.
 	if rl := pool.Spec.RateLimit; rl != nil {
 		entry.RateLimit = toConsulRateLimit(rl)
 	}
 
-	// Map pool.Spec.Policy → capi.AIGatewayPolicy.
+	// Map pool.Spec.Routing.Fallback → capi.InferenceGatewayFailover.
+	// NOTE: Routing MatchRules, Scoring, Retry, Timeout are NOT on the config
+	// entry — they are resolved from the Consul catalog at runtime.
+	if routing := pool.Spec.Routing; routing != nil && routing.Fallback != nil {
+		entry.Failover = &capi.InferenceGatewayFailover{
+			RetryOn:       routing.Fallback.RetryOn,
+			MaxTiers:      routing.Fallback.MaxTiers,
+			PerTryTimeout: routing.Fallback.PerTryTimeout,
+		}
+	}
+
+	// Map pool.Spec.Policy → PII + AuditLevel directly on the entry.
+	// The enterprise schema replaced the nested Policy object with top-level
+	// PII and AuditLevel fields on InferenceGatewayConfigEntry.
 	if p := pool.Spec.Policy; p != nil {
-		entry.Policy = toConsulPolicy(p)
+		entry.AuditLevel = p.AuditLevel
+		if p.PII != nil {
+			entry.PII = &capi.InferenceGatewayPII{
+				Scope:               p.PII.Scope,
+				DefaultAction:       p.PII.DefaultAction,
+				StreamHoldbackBytes: p.PII.StreamHoldbackBytes,
+			}
+			if p.PII.Mask != nil {
+				entry.PII.Mask = &capi.InferenceGatewayPIIMask{
+					Char:     p.PII.Mask.Char,
+					KeepLast: p.PII.Mask.KeepLast,
+				}
+			}
+			for _, d := range p.PII.Detectors {
+				entry.PII.Detectors = append(entry.PII.Detectors, capi.InferenceGatewayPIIDetector{
+					Name:   d.Name,
+					Regex:  d.Regex,
+					Action: d.Action,
+				})
+			}
+		}
 	}
 
 	return entry
 }
 
-// toConsulRouting converts an InferencePoolRouting to capi.AIGatewayRouting.
-func toConsulRouting(r *v1alpha1.InferencePoolRouting) capi.AIGatewayRouting {
-	routing := capi.AIGatewayRouting{
-		FallbackChain:    r.FallbackChain,
-		ConfigValidation: r.ConfigValidation,
-	}
-
-	for _, rule := range r.MatchRules {
-		cr := capi.AIGatewayMatchRule{
-			RequireCapabilities: rule.RequireCapabilities,
-			Candidates:          rule.Candidates,
-			FallbackChain:       rule.FallbackChain,
-			When: capi.AIGatewayMatch{
-				Path:    rule.When.Path,
-				BodyHas: rule.When.BodyHas,
-			},
-		}
-		if id := rule.When.Identity; id != nil {
-			cr.When.Identity = &capi.AIGatewayIdentityMatch{
-				Service:   id.Service,
-				Partition: id.Partition,
-				Namespace: id.Namespace,
-			}
-		}
-		routing.MatchRules = append(routing.MatchRules, cr)
-	}
-
-	if len(r.ComplianceMap) > 0 {
-		routing.ComplianceMap = make(map[string]capi.AIGatewayCompliance, len(r.ComplianceMap))
-		for k, v := range r.ComplianceMap {
-			routing.ComplianceMap[k] = capi.AIGatewayCompliance{
-				AllowedRegions: v.AllowedRegions,
-				// Note: InferencePoolCompliance.DenyModels has no direct
-				// counterpart in capi.AIGatewayCompliance; it uses AllowedClusters.
-			}
-		}
-	}
-
-	if fb := r.Fallback; fb != nil {
-		routing.Fallback = &capi.AIGatewayFallback{
-			RetryOn:       fb.RetryOn,
-			MaxTiers:      fb.MaxTiers,
-			PerTryTimeout: fb.PerTryTimeout,
-		}
-	}
-
-	if rt := r.Retry; rt != nil {
-		routing.Retry = &capi.AIGatewayRetry{
-			MaxAttempts: rt.MaxAttempts,
-			RetryOn:     rt.RetryOn,
-		}
-	}
-
-	if to := r.Timeout; to != nil {
-		routing.Timeout = &capi.AIGatewayTimeout{
-			Connect: to.Connect,
-			Request: to.Request,
-		}
-	}
-
-	if sc := r.Scoring; sc != nil {
-		cs := &capi.AIGatewayScoring{
-			Scorers: sc.Scorers,
-		}
-		for _, wt := range sc.WeightedSplit {
-			cs.WeightedSplit = append(cs.WeightedSplit, capi.AIGatewayWeightedTarget{
-				Cluster: wt.Cluster,
-				Weight:  wt.Weight,
-			})
-		}
-		routing.Scoring = cs
-	}
-
-	return routing
-}
-
-// toConsulRateLimit converts an InferencePoolRateLimit to *capi.AIGatewayRateLimit.
-func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.AIGatewayRateLimit {
-	crl := &capi.AIGatewayRateLimit{
+// toConsulRateLimit converts an InferencePoolRateLimit to *capi.InferenceGatewayRateLimit.
+func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.InferenceGatewayRateLimit {
+	crl := &capi.InferenceGatewayRateLimit{
 		Enabled:     rl.Enabled,
 		Enforcement: rl.Enforcement,
 		Mode:        rl.Mode,
@@ -538,7 +498,7 @@ func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.AIGatewayRateL
 	}
 
 	for _, tl := range rl.TierLimits {
-		crl.TierLimits = append(crl.TierLimits, capi.AIGatewayTierLimit{
+		crl.TierLimits = append(crl.TierLimits, capi.InferenceGatewayTierLimit{
 			Tier:                   tl.Tier,
 			MaxCompletionTokensCap: tl.MaxCompletionTokensCap,
 			Requests:               toConsulLimit(tl.Requests),
@@ -547,7 +507,7 @@ func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.AIGatewayRateL
 	}
 
 	for _, ml := range rl.ModelLimits {
-		crl.ModelLimits = append(crl.ModelLimits, capi.AIGatewayModelLimit{
+		crl.ModelLimits = append(crl.ModelLimits, capi.InferenceGatewayModelLimit{
 			Model:    ml.Model,
 			Requests: toConsulLimit(ml.Requests),
 			Tokens:   toConsulLimit(ml.Tokens),
@@ -555,7 +515,7 @@ func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.AIGatewayRateL
 	}
 
 	for _, tb := range rl.TierBindings {
-		crl.TierBindings = append(crl.TierBindings, capi.AIGatewayTierBinding{
+		crl.TierBindings = append(crl.TierBindings, capi.InferenceGatewayTierBinding{
 			Tier:      tb.Tier,
 			SPIFFEIDs: tb.SPIFFEIDs,
 			Partition: tb.Partition,
@@ -566,52 +526,21 @@ func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.AIGatewayRateL
 	return crl
 }
 
-// toConsulPolicy converts an InferencePoolPolicy to *capi.AIGatewayPolicy.
-func toConsulPolicy(p *v1alpha1.InferencePoolPolicy) *capi.AIGatewayPolicy {
+func toConsulLimitPair(p *v1alpha1.InferencePoolLimitPair) *capi.InferenceGatewayLimitPair {
 	if p == nil {
 		return nil
 	}
-	cp := &capi.AIGatewayPolicy{
-		AuditLevel: p.AuditLevel,
-	}
-	if p.PII != nil {
-		cp.PII = &capi.AIGatewayPII{
-			Scope:               p.PII.Scope,
-			DefaultAction:       p.PII.DefaultAction,
-			StreamHoldbackBytes: p.PII.StreamHoldbackBytes,
-		}
-		if p.PII.Mask != nil {
-			cp.PII.Mask = &capi.AIGatewayPIIMask{
-				Char:     p.PII.Mask.Char,
-				KeepLast: p.PII.Mask.KeepLast,
-			}
-		}
-		for _, d := range p.PII.Detectors {
-			cp.PII.Detectors = append(cp.PII.Detectors, capi.AIGatewayPIIDetector{
-				Name:   d.Name,
-				Regex:  d.Regex,
-				Action: d.Action,
-			})
-		}
-	}
-	return cp
-}
-
-func toConsulLimitPair(p *v1alpha1.InferencePoolLimitPair) *capi.AIGatewayLimitPair {
-	if p == nil {
-		return nil
-	}
-	return &capi.AIGatewayLimitPair{
+	return &capi.InferenceGatewayLimitPair{
 		Requests: toConsulLimit(p.Requests),
 		Tokens:   toConsulLimit(p.Tokens),
 	}
 }
 
-func toConsulLimit(l *v1alpha1.InferencePoolLimit) *capi.AIGatewayLimit {
+func toConsulLimit(l *v1alpha1.InferencePoolLimit) *capi.InferenceGatewayLimit {
 	if l == nil {
 		return nil
 	}
-	return &capi.AIGatewayLimit{
+	return &capi.InferenceGatewayLimit{
 		Count: int(l.Count),
 		Unit:  normaliseWindow(l.Window),
 	}
@@ -793,10 +722,12 @@ func deploymentFor(
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 					Annotations: map[string]string{
-						// Opt in to the connect-inject webhook so that the mesh
-						// webhook automatically injects the consul-dataplane
-						// sidecar and the consul-connect-inject-init init container.
-						constants.AnnotationInject: "true",
+						// Opt in to the connect-inject webhook via the AI role
+						// annotation. shouldInject() treats "inference-gateway" as
+						// an implicit true so that consul-dataplane and the
+						// consul-connect-inject-init init container are injected
+						// automatically — no separate connect-inject: "true" needed.
+						constants.AnnotationAIRole: "inference-gateway",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -804,34 +735,32 @@ func deploymentFor(
 						Name:  "inference-gateway",
 						Image: image,
 						Args: []string{
-							fmt.Sprintf("-addr=:%d", inferenceGatewayPort),
-							fmt.Sprintf("-metrics-addr=:%d", inferenceGatewayMetricsPort),
-							"-registry-file=/app/configs/inference-registry.yaml",
+							// Listen on the UDS shared with Envoy.
+							// Must match Processor.UDSPath in the config entry above.
+							"-uds-path=/run/consul/ext_proc.sock",
+							// Read Failover, RateLimit, PII config from the Consul
+							// config entry at startup and hot-reload via blocking query.
+							"-config-entry=" + igw.Name,
 						},
+						// Named port for Prometheus scraping.
 						Ports: []corev1.ContainerPort{
-							{Name: "grpc", ContainerPort: inferenceGatewayPort, Protocol: corev1.ProtocolTCP},
 							{Name: "metrics", ContainerPort: inferenceGatewayMetricsPort, Protocol: corev1.ProtocolTCP},
 						},
 						Env: []corev1.EnvVar{
 							{Name: "POOL_NAME", Value: pool.Name},
 							{Name: "POOL_NAMESPACE", Value: pool.Namespace},
-							{Name: "POOL_ENABLED", Value: fmt.Sprintf("%t", pool.Spec.Enabled)},
 						},
 						VolumeMounts: []corev1.VolumeMount{{
-							Name:      "inference-registry",
-							MountPath: "/app/configs/inference-registry.yaml",
-							SubPath:   "inference-registry.yaml",
-							ReadOnly:  true,
+							// emptyDir so /run/consul/ exists before the binary
+							// tries to create the ext_proc Unix socket there.
+							Name:      "run-consul",
+							MountPath: "/run/consul",
 						}},
 					}},
 					Volumes: []corev1.Volume{{
-						Name: "inference-registry",
+						Name: "run-consul",
 						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "inference-registry",
-								},
-							},
+							EmptyDir: &corev1.EmptyDirVolumeSource{},
 						},
 					}},
 				},

@@ -229,6 +229,10 @@ const (
 	// When set to "mcp-server", the webhook injects the MCP server sidecar container.
 	AnnotationAIRole = "consul.hashicorp.com/ai-role"
 
+	// AnnotationAIAgentConfig selects the AgentConfig resource used for pod defaults.
+	// The resource is resolved in the pod's namespace.
+	AnnotationAIAgentConfig = "consul.hashicorp.com/ai-agent-config"
+
 	// AnnotationAIMCPServerPort overrides the MCP interceptor port for a specific pod.
 	// Falls back to McpServerConfig CRD defaults when not set.
 	AnnotationAIMCPServerPort = "consul.hashicorp.com/ai-mcp-server-interceptor-port"
@@ -244,6 +248,22 @@ const (
 	// AnnotationAIMCPServerProtocolVersion overrides the MCP protocol version for a specific pod.
 	// Falls back to McpServerConfig CRD defaults when not set.
 	AnnotationAIMCPServerProtocolVersion = "consul.hashicorp.com/ai-mcp-server-protocol-version"
+
+	// AnnotationAIAgentInterceptorPort overrides the agent interceptor port for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentInterceptorPort = "consul.hashicorp.com/ai-agent-interceptor-port"
+
+	// AnnotationAIAgentMCPPort overrides the agent MCP connectivity port for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentMCPPort = "consul.hashicorp.com/ai-agent-mcp-port"
+
+	// AnnotationAIAgentHITLPort overrides the HITL approval server port for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentHITLPort = "consul.hashicorp.com/ai-agent-hitl-port"
+
+	// AnnotationAIAgentHITLApprovalTimeout overrides the HITL approval timeout for a specific pod.
+	// Falls back to AgentConfig CRD defaults when not set.
+	AnnotationAIAgentHITLApprovalTimeout = "consul.hashicorp.com/ai-agent-hitl-approval-timeout"
 
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	Injected = "injected"

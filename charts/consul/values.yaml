@@ -3884,6 +3884,21 @@ ai:
         cpu: "500m"
 
   agent:
+    # The container image used by the AI agent sidecar.
+    # When set and a pod carries consul.hashicorp.com/ai-role: "ai-agent", the
+    # webhook injects this image as an additional sidecar container alongside
+    # consul-dataplane.
+    #
+    # Examples:
+    #
+    # ```yaml
+    # image: "hashicorp/consul-ai-agent:0.1.0"
+    # image: "myregistry/my-ai-agent:latest"
+    # ```
+    # @default: ""
+    # @type: string
+    image: ""
+
     defaults:
       # The port the agent interceptor listens on inside the pod.
       # Must not conflict with application ports or the Envoy proxy port (20000).

@@ -140,7 +140,7 @@ func (c *Cache) subscribeToConsul(ctx context.Context) {
 			continue
 		}
 
-		entries, meta, err := consulClient.ConfigEntries().List(capi.AIGateway, opts.WithContext(ctx))
+		entries, meta, err := consulClient.ConfigEntries().List(capi.InferenceGateway, opts.WithContext(ctx))
 		if err != nil {
 			if !isLongPollErr(err) {
 				c.logger.Error(err, "error listing ai-gateway config entries")
@@ -286,7 +286,7 @@ func (c *Cache) Delete(ctx context.Context, name, namespace, partition string) e
 	}
 
 	opts := &capi.WriteOptions{Namespace: namespace, Partition: partition}
-	_, err = consulClient.ConfigEntries().Delete(capi.AIGateway, name, opts.WithContext(ctx))
+	_, err = consulClient.ConfigEntries().Delete(capi.InferenceGateway, name, opts.WithContext(ctx))
 	return err
 }
 

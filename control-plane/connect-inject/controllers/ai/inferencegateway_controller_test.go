@@ -383,7 +383,9 @@ func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
 		require.Equal(t, "gw", dep.Name)
 		require.Equal(t, "default", dep.Namespace)
 		require.Equal(t, "test-gateway-image:latest", dep.Spec.Template.Spec.Containers[0].Image)
-		require.Equal(t, inferenceGatewayPort, dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
+		// Only the metrics port is exposed as a named container port now;
+		// the ext_proc gRPC listener uses a Unix socket (-uds-path).
+		require.Equal(t, inferenceGatewayMetricsPort, dep.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort)
 
 		// Deployment must carry pool env vars.
 		envMap := make(map[string]string)
@@ -392,7 +394,6 @@ func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
 		}
 		require.Equal(t, "pool", envMap["POOL_NAME"])
 		require.Equal(t, "default", envMap["POOL_NAMESPACE"])
-		require.Equal(t, "true", envMap["POOL_ENABLED"])
 
 		// Service must exist.
 		svc := &corev1.Service{}
@@ -770,7 +771,7 @@ func enabledPool(name, namespace string) *v1alpha1.InferencePoolConfig {
 func TestToConsulConfigEntry(t *testing.T) {
 	t.Parallel()
 
-	t.Run("pool with stateStore maps to capi.AIGatewayStateStore", func(t *testing.T) {
+	t.Run("pool with stateStore maps to capi.InferenceGatewayStateStore", func(t *testing.T) {
 		igw := minimalIGW("gw", "default", "pool")
 		pool := enabledPool("pool", "default")
 		pool.Spec.StateStore = &v1alpha1.InferencePoolStateStore{
@@ -781,7 +782,7 @@ func TestToConsulConfigEntry(t *testing.T) {
 		r := &InferenceGatewayController{Datacenter: "dc1"}
 		entry := r.toConsulConfigEntry(igw, pool)
 
-		aige := entry.(*capi.AIGatewayConfigEntry)
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
 		require.NotNil(t, aige.StateStore,
 			"StateStore must be mapped when pool.Spec.StateStore is set")
 		require.Equal(t, "valkey", aige.StateStore.Service)
@@ -795,12 +796,12 @@ func TestToConsulConfigEntry(t *testing.T) {
 		r := &InferenceGatewayController{Datacenter: "dc1"}
 		entry := r.toConsulConfigEntry(igw, pool)
 
-		aige := entry.(*capi.AIGatewayConfigEntry)
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
 		require.Nil(t, aige.StateStore,
 			"StateStore must be nil when pool.Spec.StateStore is not set")
 	})
 
-	t.Run("minimal pool produces AIGatewayConfigEntry with correct kind and name", func(t *testing.T) {
+	t.Run("minimal pool produces InferenceGatewayConfigEntry with correct kind and name", func(t *testing.T) {
 		igw := minimalIGW("my-gw", "default", "my-pool")
 		pool := enabledPool("my-pool", "default")
 
@@ -811,61 +812,52 @@ func TestToConsulConfigEntry(t *testing.T) {
 		}
 		entry := r.toConsulConfigEntry(igw, pool)
 
-		require.Equal(t, capi.AIGateway, entry.GetKind())
+		require.Equal(t, capi.InferenceGateway, entry.GetKind())
 		require.Equal(t, "my-gw", entry.GetName())
 		require.Equal(t, "dc1", entry.GetMeta()["consul.hashicorp.com/source-datacenter"])
 
-		aige, ok := entry.(*capi.AIGatewayConfigEntry)
-		require.True(t, ok, "entry must be *capi.AIGatewayConfigEntry")
-		require.Equal(t, []string{"my-gw"}, aige.ApplyTo)
-		// No routing or rate-limit on a minimal pool.
+		aige, ok := entry.(*capi.InferenceGatewayConfigEntry)
+		require.True(t, ok, "entry must be *capi.InferenceGatewayConfigEntry")
+		// No failover or rate-limit on a minimal pool.
+		require.Nil(t, aige.Failover)
 		require.Nil(t, aige.RateLimit)
 	})
 
-	t.Run("pool with routing maps MatchRules and Fallback", func(t *testing.T) {
+	t.Run("pool with routing.Fallback maps to InferenceGatewayFailover", func(t *testing.T) {
 		igw := minimalIGW("gw", "default", "pool")
 		pool := enabledPool("pool", "default")
 		pool.Spec.Routing = &v1alpha1.InferencePoolRouting{
-			MatchRules: []v1alpha1.InferencePoolMatchRule{
-				{
-					When:       v1alpha1.InferencePoolMatch{Path: "/v1/chat/completions"},
-					Candidates: []string{"gpt-4o", "gpt-4"},
-				},
-			},
 			Fallback: &v1alpha1.InferencePoolFallback{
 				RetryOn:       []string{"5xx", "reset"},
 				MaxTiers:      3,
 				PerTryTimeout: "30s",
-			},
-			Retry: &v1alpha1.InferencePoolRetry{
-				MaxAttempts: 2,
-				RetryOn:     []string{"5xx"},
-			},
-			Timeout: &v1alpha1.InferencePoolTimeout{
-				Connect: "5s",
-				Request: "120s",
 			},
 		}
 
 		r := &InferenceGatewayController{Datacenter: "dc1"}
 		entry := r.toConsulConfigEntry(igw, pool)
 
-		aige := entry.(*capi.AIGatewayConfigEntry)
-		require.Len(t, aige.Routing.MatchRules, 1)
-		require.Equal(t, "/v1/chat/completions", aige.Routing.MatchRules[0].When.Path)
-		require.Equal(t, []string{"gpt-4o", "gpt-4"}, aige.Routing.MatchRules[0].Candidates)
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.NotNil(t, aige.Failover)
+		require.Equal(t, []string{"5xx", "reset"}, aige.Failover.RetryOn)
+		require.Equal(t, 3, aige.Failover.MaxTiers)
+		require.Equal(t, "30s", aige.Failover.PerTryTimeout)
+	})
 
-		require.NotNil(t, aige.Routing.Fallback)
-		require.Equal(t, []string{"5xx", "reset"}, aige.Routing.Fallback.RetryOn)
-		require.Equal(t, 3, aige.Routing.Fallback.MaxTiers)
-		require.Equal(t, "30s", aige.Routing.Fallback.PerTryTimeout)
+	t.Run("pool with routing but no Fallback leaves Failover nil", func(t *testing.T) {
+		igw := minimalIGW("gw", "default", "pool")
+		pool := enabledPool("pool", "default")
+		pool.Spec.Routing = &v1alpha1.InferencePoolRouting{
+			// MatchRules etc. are not surfaced on the config entry in the
+			// enterprise schema — routing lives in the catalog.
+		}
 
-		require.NotNil(t, aige.Routing.Retry)
-		require.Equal(t, 2, aige.Routing.Retry.MaxAttempts)
+		r := &InferenceGatewayController{Datacenter: "dc1"}
+		entry := r.toConsulConfigEntry(igw, pool)
 
-		require.NotNil(t, aige.Routing.Timeout)
-		require.Equal(t, "5s", aige.Routing.Timeout.Connect)
-		require.Equal(t, "120s", aige.Routing.Timeout.Request)
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
+		require.Nil(t, aige.Failover,
+			"Failover must be nil when Routing.Fallback is not set")
 	})
 
 	t.Run("pool with rate-limit maps all RateLimit fields", func(t *testing.T) {
@@ -900,7 +892,7 @@ func TestToConsulConfigEntry(t *testing.T) {
 		r := &InferenceGatewayController{Datacenter: "dc1"}
 		entry := r.toConsulConfigEntry(igw, pool)
 
-		aige := entry.(*capi.AIGatewayConfigEntry)
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
 		require.NotNil(t, aige.RateLimit)
 		require.True(t, aige.RateLimit.Enabled)
 		require.Equal(t, "deny", aige.RateLimit.Enforcement)
@@ -921,36 +913,6 @@ func TestToConsulConfigEntry(t *testing.T) {
 		require.Equal(t, []string{"spiffe://dc1/ns/default/dc/dc1/svc/my-app"}, aige.RateLimit.TierBindings[0].SPIFFEIDs)
 	})
 
-	t.Run("pool with identity match rule maps identity fields", func(t *testing.T) {
-		igw := minimalIGW("gw", "default", "pool")
-		pool := enabledPool("pool", "default")
-		pool.Spec.Routing = &v1alpha1.InferencePoolRouting{
-			MatchRules: []v1alpha1.InferencePoolMatchRule{
-				{
-					When: v1alpha1.InferencePoolMatch{
-						Identity: &v1alpha1.InferencePoolIdentityMatch{
-							Service:   "my-app",
-							Partition: "default",
-							Namespace: "default",
-						},
-					},
-					Candidates: []string{"claude-3-5-sonnet"},
-				},
-			},
-		}
-
-		r := &InferenceGatewayController{Datacenter: "dc1"}
-		entry := r.toConsulConfigEntry(igw, pool)
-
-		aige := entry.(*capi.AIGatewayConfigEntry)
-		require.Len(t, aige.Routing.MatchRules, 1)
-		id := aige.Routing.MatchRules[0].When.Identity
-		require.NotNil(t, id)
-		require.Equal(t, "my-app", id.Service)
-		require.Equal(t, "default", id.Partition)
-		require.Equal(t, "default", id.Namespace)
-	})
-
 	t.Run("EnableConsulNamespaces=false does not set Namespace on entry", func(t *testing.T) {
 		igw := minimalIGW("gw", "default", "pool")
 		pool := enabledPool("pool", "default")
@@ -962,7 +924,7 @@ func TestToConsulConfigEntry(t *testing.T) {
 		}
 		entry := r.toConsulConfigEntry(igw, pool)
 
-		aige := entry.(*capi.AIGatewayConfigEntry)
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
 		require.Equal(t, "", aige.Namespace,
 			"OSS mode: entry.Namespace must be empty when EnableConsulNamespaces=false")
 	})
@@ -978,7 +940,7 @@ func TestToConsulConfigEntry(t *testing.T) {
 		}
 		entry := r.toConsulConfigEntry(igw, pool)
 
-		aige := entry.(*capi.AIGatewayConfigEntry)
+		aige := entry.(*capi.InferenceGatewayConfigEntry)
 		require.Equal(t, "my-ns", aige.Namespace,
 			"Enterprise mode: entry.Namespace must be set when EnableConsulNamespaces=true")
 	})

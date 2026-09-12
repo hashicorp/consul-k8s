@@ -323,6 +323,9 @@ spec:
                 {{- if .Values.ai.mcpServer.image }}
                 -ai-mcp-server-image="{{ .Values.ai.mcpServer.image }}" \
                 {{- end }}
+                {{- if .Values.ai.agent.image }}
+                -ai-agent-image="{{ .Values.ai.agent.image }}" \
+                {{- end }}
                 {{- end }}
 
 

@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/hashicorp/consul-k8s/control-plane/api/v1alpha1"
@@ -58,6 +59,10 @@ var kubeSystemNamespaces = mapset.NewSetWith(metav1.NamespaceSystem, metav1.Name
 
 // MeshWebhook is the HTTP meshWebhook for admission webhooks.
 type MeshWebhook struct {
+	// Client is the controller-runtime client used to look up AI config CRDs
+	// (AgentConfig, McpServerConfig) at admission time.
+	client.Client
+
 	Clientset kubernetes.Interface
 
 	// ConsulConfig is the config to create a Consul API client.
@@ -81,6 +86,11 @@ type MeshWebhook struct {
 	// When set and a pod carries the consul.hashicorp.com/ai-role: "mcp-server"
 	// annotation, the webhook injects this image as an additional sidecar.
 	ImageMCPServer string
+
+	// ImageAIAgent is the container image for the AI agent sidecar.
+	// When set and a pod carries the consul.hashicorp.com/ai-role: "ai-agent"
+	// annotation, the webhook injects this image as an additional sidecar.
+	ImageAIAgent string
 
 	// GlobalImagePullPolicy is the pull policy for all Consul images (consul, consul-dataplane, consul-k8s)
 	GlobalImagePullPolicy string
@@ -447,12 +457,43 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 		}
 	}
 
-	// Inject the MCP server sidecar when the pod requests it via annotation and
+	// NOTE: The mcp-server ai-role only needs consul-dataplane; no additional
+	// sidecar is injected for now. The mcpServerSidecar() implementation is
+	// retained in mcp_server_sidecar.go but the injection is disabled here.
+	//
+	// if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == "mcp-server" && w.ImageMCPServer != "" {
+	// 	mcpDefaults := v1alpha1.McpServerDefaults{}
+	// 	if w.Client != nil {
+	// 		var mcpCfg v1alpha1.McpServerConfig
+	// 		if err := w.Client.Get(ctx, client.ObjectKey{Name: "consul-mcp-server"}, &mcpCfg); err == nil {
+	// 			mcpDefaults = mcpCfg.Spec.Defaults
+	// 		} else {
+	// 			w.Log.Info("McpServerConfig not found, using built-in defaults", "name", "consul-mcp-server")
+	// 		}
+	// 	}
+	// 	mcpContainer := w.mcpServerSidecar(pod, mcpDefaults)
+	// 	pod.Spec.Containers = append(pod.Spec.Containers, mcpContainer)
+	// }
+
+	// Inject the AI agent sidecar when the pod requests it via annotation and
 	// the webhook has an image configured.
-	if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == "mcp-server" && w.ImageMCPServer != "" {
-		mcpDefaults := v1alpha1.McpServerDefaults{}
-		mcpContainer := w.mcpServerSidecar(pod, mcpDefaults)
-		pod.Spec.Containers = append(pod.Spec.Containers, mcpContainer)
+	if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == "ai-agent" && w.ImageAIAgent != "" {
+		agentDefaults := v1alpha1.AgentDefaults{}
+		if w.Client != nil {
+			configName := "consul-ai-agent"
+			if annotationName := pod.Annotations[constants.AnnotationAIAgentConfig]; annotationName != "" {
+				configName = annotationName
+			}
+
+			var agentCfg v1alpha1.AgentConfig
+			if err := w.Client.Get(ctx, client.ObjectKey{Name: configName}, &agentCfg); err == nil {
+				agentDefaults = agentCfg.Spec.Defaults
+			} else {
+				w.Log.Info("AgentConfig not found, using built-in defaults", "name", configName)
+			}
+		}
+		agentContainer := w.aiAgentSidecar(pod, agentDefaults)
+		pod.Spec.Containers = append(pod.Spec.Containers, agentContainer)
 	}
 
 	// pod.Annotations has already been initialized by h.defaultAnnotations()
@@ -654,11 +695,14 @@ func (w *MeshWebhook) shouldInject(pod corev1.Pod, namespace string) (bool, erro
 		return strconv.ParseBool(raw)
 	}
 
-	// A pod annotated with ai-role: mcp-server implicitly opts in to injection
-	// so that a single annotation is sufficient to get consul-dataplane +
-	// the mcp-server sidecar — no need to also set connect-inject: "true".
-	if role, ok := pod.Annotations[constants.AnnotationAIRole]; ok && role == "mcp-server" {
-		return true, nil
+	// A pod annotated with an ai-role implicitly opts in to injection so that a
+	// single annotation is sufficient to get consul-dataplane + the role sidecar
+	// — no need to also set connect-inject: "true".
+	if role, ok := pod.Annotations[constants.AnnotationAIRole]; ok {
+		switch role {
+		case "mcp-server", "ai-agent", "inference-gateway":
+			return true, nil
+		}
 	}
 
 	return !w.RequireAnnotation, nil
@@ -804,6 +848,7 @@ func (w *MeshWebhook) checkUnsupportedMultiPortCases(ns corev1.Namespace, pod co
 }
 
 func (w *MeshWebhook) SetupWithManager(mgr ctrl.Manager) {
+	w.Client = mgr.GetClient()
 	w.decoder = admission.NewDecoder(mgr.GetScheme())
 	mgr.GetWebhookServer().Register("/mutate", &admission.Webhook{Handler: w})
 }

@@ -109,6 +109,10 @@
         "agent": {
           "type": "object",
           "properties": {
+            "image": {
+              "type": "string",
+              "description": "Container image for the AI agent sidecar injected into pods with consul.hashicorp.com/ai-role: ai-agent."
+            },
             "defaults": {
               "type": "object",
               "properties": {
