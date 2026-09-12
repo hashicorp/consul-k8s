@@ -93,7 +93,14 @@ const (
 	AIAgentRole = "ai-agent"
 
 	// AIContainerName is the injected container name for the consul-mcp-gateway sidecar.
+	// This container handles MCP body parsing: stamps x-mcp-method/tool/hitl headers.
 	AIContainerName = "consul-mcp-gateway"
+
+	// ConsulOBOInboundContainerName is the injected container name for the
+	// consul-obo-inbound sidecar (previously consul-identity-processor).
+	// This container handles INBOUND OBO: validates the user token on all incoming
+	// requests and projects x-user-role / x-user-aud / x-claim-* before jwt_authn.
+	ConsulOBOInboundContainerName = "consul-obo-inbound"
 
 	// DefaultAIMCPOutboundPort is the loopback port the mcp-gateway dedicated outbound
 	// listener binds to (maps to ai.agent.mcp.port in the service definition).
@@ -103,17 +110,62 @@ const (
 	// human-in-the-loop approval callbacks (ai.agent.mcp.hitl.port).
 	DefaultAIHITLPort = 16101
 
-	// DefaultAIInterceptorPort is the loopback port the mcp-gateway interceptor proxy
-	// binds to (ai.agent.interceptor.port).
+	// DefaultAIInterceptorPort is the loopback port the consul-mcp-gateway ext_proc
+	// server binds to (ai.agent.interceptor.port).
 	DefaultAIInterceptorPort = 21101
 
+	// DefaultOBOInboundPort is the loopback port the consul-obo-inbound ext_proc
+	// server binds to for INBOUND OBO.
+	// Matches identityProcessorDefaultPort in consul-enterprise/agent/xds/egress_mcp_endpoint.go.
+	DefaultOBOInboundPort = 21102
+
+	// DefaultOBOOutboundPort is the loopback port the consul-obo-outbound ext_proc
+	// server binds to for OUTBOUND OBO on all outbound calls (A2A, A2REST, A2MCP,
+	// A2LLM). The corresponding Envoy outbound listener ext_proc filter points
+	// here.  Must not collide with DefaultAIInterceptorPort (21101) or
+	// DefaultOBOInboundPort (21102).
+	DefaultOBOOutboundPort = 21103
+
+	// ConsulOBOOutboundContainerName is the injected container name for the
+	// consul-obo-outbound sidecar.
+	// This container handles OUTBOUND OBO for all outbound calls from any service
+	// with oauth_client=true: performs RFC 8693 token exchange and injects the
+	// audience-bound JWT before the request leaves the mesh.
+	ConsulOBOOutboundContainerName = "consul-obo-outbound"
+
 	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the
-	// consul-mcp-gateway image, used as the -gateway-binary argument.
-	DefaultGatewayBinary = "/app/consul-mcp-gateway"
-	// ConsulBinarypath is the path to the consulbinary inside the
+	// consul-mcp-gateway image.  The AI Apps Dockerfile installs it at
+	// /usr/local/bin/consul-mcp-gateway (COPY dist/…/consul-mcp-gateway /usr/local/bin/).
+	DefaultGatewayBinary = "/usr/local/bin/consul-mcp-gateway"
+
+	// DefaultOBOInboundBinary is the path to the consul-obo-inbound binary inside
+	// the OBO inbound sidecar image.  The AI Apps Dockerfile installs it at
+	// /usr/local/bin/consul-obo-inbound.
+	DefaultOBOInboundBinary = "/usr/local/bin/consul-obo-inbound"
+
+	// DefaultOBOOutboundBinary is the path to the consul-obo-outbound binary inside
+	// the OBO outbound sidecar image.  The AI Apps Dockerfile installs it at
+	// /usr/local/bin/consul-obo-outbound.
+	DefaultOBOOutboundBinary = "/usr/local/bin/consul-obo-outbound"
+
+	// ConsulBinarypath is the path to the consul binary inside the
 	// consul-mcp-gateway image.
 	ConsulBinarypath = "/app/consul"
 
+	// DefaultDataplaneXDSPort is the fixed loopback port on which consul-dataplane
+	// exposes the xDS ADS server to co-located containers.  consul-obo-outbound
+	// subscribes to this endpoint as an SDS client to receive the GenericSecret
+	// containing the OAuthClientConfig (oauth/<svcName>).
+	// Must not collide with any Envoy admin port, OBO ports, or MCP ports.
+	DefaultDataplaneXDSPort = 19500
+
+	// DefaultEnvoyAdminPort is the loopback port on which Envoy's admin HTTP
+	// server is bound by consul-dataplane (via -envoy-admin-bind-port=19000).
+	// The /ready endpoint on this port returns HTTP 200 + "LIVE" only after all
+	// clusters are initialised and the ADS stream to the Consul server is active.
+	// consul-obo-outbound polls this endpoint before opening its SDS subscription
+	// to ensure the proxy snapshot is ready to be served.
+	DefaultEnvoyAdminPort = 19000
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

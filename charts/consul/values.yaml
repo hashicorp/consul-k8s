@@ -797,10 +797,26 @@ global:
   imageConsulDataplane: docker.mirror.hashicorp.services/hashicorppreview/consul-dataplane:2.1.0-dev
 
   # The name (and tag) of the consul-ai-mcp-interceptor Docker image used for
-  # the consul-mcp-gateway sidecar injected into AI agent pods. This image
-  # contains the consul binary with the `consul connect mcp-gateway` subcommand.
+  # the consul-mcp-gateway sidecar injected into AI agent pods.
+  # Binary source: consul-ai-apps/gateways/mcp-gateway (ext_proc MCP header stamping, :21101)
   # @default: hashicorp/consul-ai-mcp-interceptor:<latest supported version>
   imageConsulAIMCPInterceptor: docker.mirror.hashicorp.services/hashicorppreview/consul-ai-mcp-interceptor:2.1.0-dev
+
+  # The Docker image for the consul-obo-inbound sidecar injected into all
+  # oauth_client=true pods. Runs the inbound OBO JWT validation ext_proc on
+  # loopback :21102 (DefaultOBOInboundPort).
+  # Binary source: consul-ai-apps/gateways/obo-inbound
+  # Falls back to global.imageK8S when empty.
+  # @type: string
+  imageConsulOBOInbound: ""
+
+  # The Docker image for the consul-obo-outbound sidecar injected into all
+  # oauth_client=true pods. Runs the RFC 8693 egress OBO token exchange ext_proc
+  # on loopback :21103 (DefaultOBOOutboundPort).
+  # Binary source: consul-ai-apps/gateways/obo-outbound
+  # Falls back to global.imageK8S when empty.
+  # @type: string
+  imageConsulOBOOutbound: ""
 
   # Disable this once the manifests are generated and subsequent helm upgrades
   
@@ -2835,6 +2851,16 @@ connectInject:
   # Defaults to global.imageConsulAIMCPInterceptor.
   # @type: string
   imageConsulAIMCPInterceptor: null
+
+  # Per-connectInject override for the consul-obo-inbound sidecar image.
+  # Defaults to global.imageConsulOBOInbound.
+  # @type: string
+  imageConsulOBOInbound: null
+
+  # Per-connectInject override for the consul-obo-outbound sidecar image.
+  # Defaults to global.imageConsulOBOOutbound.
+  # @type: string
+  imageConsulOBOOutbound: null
 
   # Sets the `logLevel` for the `consul-dataplane` sidecar and the `consul-connect-inject-init` container. When set, this value overrides the global log verbosity level. One of "debug", "info", "warn", or "error".
   # @type: string

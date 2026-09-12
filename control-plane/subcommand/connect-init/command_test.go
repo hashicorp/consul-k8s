@@ -123,8 +123,10 @@ func TestRun_ConnectServices(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tokenFile := fmt.Sprintf("/tmp/%d1", rand.Int())
 			proxyFile := fmt.Sprintf("/tmp/%d2", rand.Int())
+			nodeNameFile := proxyFile + "_nodename"
 			t.Cleanup(func() {
 				_ = os.RemoveAll(proxyFile)
+				_ = os.RemoveAll(nodeNameFile)
 				_ = os.RemoveAll(tokenFile)
 			})
 
@@ -173,6 +175,7 @@ func TestRun_ConnectServices(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
+				"-node-name-file", nodeNameFile,
 				"-multiport=" + strconv.FormatBool(tt.multiport),
 				"-consul-node-name", nodeName,
 			}
@@ -281,10 +284,12 @@ func TestRun_Gateways(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			proxyFile := fmt.Sprintf("/tmp/%d2", rand.Int())
+			nodeNameFile := proxyFile + "_nodename"
 			t.Cleanup(func() {
 				_ = os.RemoveAll(proxyFile)
+				_ = os.RemoveAll(nodeNameFile)
 			})
-
+	
 			// Start Consul server with ACLs enabled and default deny policy.
 			var serverCfg *testutil.TestServerConfig
 			server, err := testutil.NewTestServerConfigT(t, func(c *testutil.TestServerConfig) {
@@ -327,6 +332,7 @@ func TestRun_Gateways(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
+				"-node-name-file", nodeNameFile,
 				"-consul-node-name", nodeName,
 			}
 
@@ -631,6 +637,8 @@ func TestRun_Gateways_Errors(t *testing.T) {
 func TestRun_RetryServicePolling(t *testing.T) {
 	t.Parallel()
 	proxyFile := common.WriteTempFile(t, "")
+	nodeNameFile := proxyFile + "_nodename"
+	t.Cleanup(func() { _ = os.RemoveAll(nodeNameFile) })
 
 	// Start Consul server.
 	var serverCfg *testutil.TestServerConfig
@@ -677,6 +685,7 @@ func TestRun_RetryServicePolling(t *testing.T) {
 		"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 		"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 		"-proxy-id-file", proxyFile,
+		"-node-name-file", nodeNameFile,
 		"-consul-node-name", nodeName,
 	}
 	code := cmd.Run(flags)
@@ -816,8 +825,10 @@ func TestRun_TrafficRedirection(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			proxyFile := fmt.Sprintf("/tmp/%d", rand.Int())
+			nodeNameFile := proxyFile + "_nodename"
 			t.Cleanup(func() {
 				_ = os.RemoveAll(proxyFile)
+				_ = os.RemoveAll(nodeNameFile)
 			})
 
 			// Start Consul server.
@@ -879,6 +890,7 @@ func TestRun_TrafficRedirection(t *testing.T) {
 				"-http-port", strconv.Itoa(serverCfg.Ports.HTTP),
 				"-grpc-port", strconv.Itoa(serverCfg.Ports.GRPC),
 				"-proxy-id-file", proxyFile,
+				"-node-name-file", nodeNameFile,
 				"-redirect-traffic-config", string(iptablesCfgJSON),
 			}
 			code := cmd.Run(flags)
