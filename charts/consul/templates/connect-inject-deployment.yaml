@@ -7,6 +7,7 @@
 {{- template "consul.reservedNamesFailer" (list .Values.connectInject.consulNamespaces.consulDestinationNamespace "connectInject.consulNamespaces.consulDestinationNamespace") }}
 {{- if and .Values.externalServers.enabled (not .Values.externalServers.hosts) }}{{ fail "externalServers.hosts must be set if externalServers.enabled is true" }}{{ end -}}
 {{- if and .Values.externalServers.skipServerWatch (not .Values.externalServers.enabled) }}{{ fail "externalServers.enabled must be set if externalServers.skipServerWatch is true" }}{{ end -}}
+{{- if and .Values.global.acls.manageSystemACLs .Values.global.acls.authMethod.name .Values.connectInject.overrideAuthMethodName }}{{ fail "connectInject.overrideAuthMethodName cannot be set at the same time as global.acls.authMethod.name when global.acls.manageSystemACLs is true. When Consul manages ACLs, set only global.acls.authMethod.name: the service mesh auth method is derived from it as \"<global.acls.authMethod.name>-k8s-auth-method\" and its binding rules are managed for you. connectInject.overrideAuthMethodName points workloads at an auth method that server-acl-init does not manage, so no binding rules would be created for it." }}{{ end -}}
 {{- $dnsEnabled := (or (and (ne (.Values.dns.enabled | toString) "-") .Values.dns.enabled) (and (eq (.Values.dns.enabled | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
 {{- $dnsRedirectionEnabled := (or (and (ne (.Values.dns.enableRedirection | toString) "-") .Values.dns.enableRedirection) (and (eq (.Values.dns.enableRedirection | toString) "-") .Values.connectInject.transparentProxy.defaultEnabled)) -}}
 {{ template "consul.validateRequiredCloudSecretsExist" . }}
@@ -115,9 +116,9 @@ spec:
             {{- if .Values.global.acls.manageSystemACLs }}
             - name: CONSUL_LOGIN_AUTH_METHOD
               {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
-              value: {{ template "consul.fullname" . }}-k8s-component-auth-method-{{ .Values.global.datacenter }}
+              value: {{ template "consul.globalComponentAuthMethodName" . }}
               {{- else }}
-              value: {{ template "consul.fullname" . }}-k8s-component-auth-method
+              value: {{ template "consul.localComponentAuthMethodName" . }}
               {{- end }}
             - name: CONSUL_LOGIN_DATACENTER
               {{- if and .Values.global.federation.enabled .Values.global.federation.primaryDatacenter }}
@@ -198,7 +199,7 @@ spec:
                 {{- if .Values.connectInject.overrideAuthMethodName }}
                 -acl-auth-method="{{ .Values.connectInject.overrideAuthMethodName }}" \
                 {{- else if .Values.global.acls.manageSystemACLs }}
-                -acl-auth-method="{{ template "consul.fullname" . }}-k8s-auth-method" \
+                -acl-auth-method="{{ template "consul.connectInjectAuthMethodName" . }}" \
                 {{- end }}
                 {{- if (and .Values.connectInject.globalConfigACLToken.secretName .Values.connectInject.globalConfigACLToken.secretKey) }}
                 -global-config-acl-token-secret-name={{ .Values.connectInject.globalConfigACLToken.secretName }} \
