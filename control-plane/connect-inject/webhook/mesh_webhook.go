@@ -465,7 +465,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 			pod.Spec.Containers = append(pod.Spec.Containers, oboInbound)
 
-			oboOutbound, err := w.oboOutboundSidecar(pod)
+			oboOutbound, err := w.oboOutboundSidecar(*ns, pod)
 			if err != nil {
 				w.Log.Error(err, "error configuring consul-obo-outbound container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError,

@@ -134,16 +134,19 @@ const (
 	ConsulOBOOutboundContainerName = "consul-obo-outbound"
 
 	// DefaultGatewayBinary is the path to the consul-mcp-gateway binary inside the
-	// consul-mcp-gateway image, used as the -gateway-binary argument.
-	DefaultGatewayBinary = "/app/consul-mcp-gateway"
+	// consul-mcp-gateway image.  The AI Apps Dockerfile installs it at
+	// /usr/local/bin/consul-mcp-gateway (COPY dist/…/consul-mcp-gateway /usr/local/bin/).
+	DefaultGatewayBinary = "/usr/local/bin/consul-mcp-gateway"
 
 	// DefaultOBOInboundBinary is the path to the consul-obo-inbound binary inside
-	// the OBO inbound sidecar image.
-	DefaultOBOInboundBinary = "/app/consul-obo-inbound"
+	// the OBO inbound sidecar image.  The AI Apps Dockerfile installs it at
+	// /usr/local/bin/consul-obo-inbound.
+	DefaultOBOInboundBinary = "/usr/local/bin/consul-obo-inbound"
 
 	// DefaultOBOOutboundBinary is the path to the consul-obo-outbound binary inside
-	// the OBO outbound sidecar image.
-	DefaultOBOOutboundBinary = "/app/consul-obo-outbound"
+	// the OBO outbound sidecar image.  The AI Apps Dockerfile installs it at
+	// /usr/local/bin/consul-obo-outbound.
+	DefaultOBOOutboundBinary = "/usr/local/bin/consul-obo-outbound"
 
 	// ConsulBinarypath is the path to the consul binary inside the
 	// consul-mcp-gateway image.

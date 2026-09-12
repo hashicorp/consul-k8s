@@ -150,22 +150,17 @@ func TestAIAgentSidecar(t *testing.T) {
 		}
 	}
 
-	// Command is [consulBinary]; sub-command and flags live in Args.
+	// Command is the standalone gateway binary; Args carry the flags.
 	require.Len(t, container.Command, 1)
-	require.Equal(t, constants.ConsulBinarypath, container.Command[0])
+	require.Equal(t, constants.DefaultGatewayBinary, container.Command[0])
 
-	// Args must contain the sub-command and all expected flags.
+	// Args must contain the --addr flag pointing at the MCP interceptor port.
 	args := container.Args
-	require.Contains(t, args, "connect")
-	require.Contains(t, args, "mcp-gateway")
-	require.Contains(t, args, "-gateway-binary")
-	require.Contains(t, args, w.GatewayBinary)
-	require.Contains(t, args, "-addr")
+	require.Contains(t, args, "--addr")
 
-	// Interceptor port must appear in the -addr value.
 	addrIdx := -1
 	for i, v := range args {
-		if v == "-addr" {
+		if v == "--addr" {
 			addrIdx = i
 			break
 		}
@@ -201,17 +196,18 @@ func TestAIAgentSidecarUsesAIMCPInterceptorImage(t *testing.T) {
 	})
 }
 
-// TestAIAgentSidecarDefaultGatewayBinary verifies that if GatewayBinary is
-// empty the default path is used.
+// TestAIAgentSidecarDefaultGatewayBinary verifies that the standalone binary
+// path from constants.DefaultGatewayBinary is used as the container Command.
 func TestAIAgentSidecarDefaultGatewayBinary(t *testing.T) {
 	w := baseAIWebhook(t)
-	w.GatewayBinary = "" // clear to force default
 	pod := aiPod("my-ai-app", "my-mcp-config")
 
 	container, err := w.aiAgentSidecar(pod)
 	require.NoError(t, err)
 
-	require.Contains(t, container.Args, constants.DefaultGatewayBinary)
+	// The standalone binary must appear as Command[0], not in Args.
+	require.Len(t, container.Command, 1)
+	require.Equal(t, constants.DefaultGatewayBinary, container.Command[0])
 }
 
 // TestAIAgentSidecarServiceNameFallback verifies that the sidecar is built
@@ -299,16 +295,18 @@ func TestOBOInboundSidecar(t *testing.T) {
 	require.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)
 }
 
-// TestOBOInboundSidecarImageFallback verifies that the container falls back to
-// ImageConsulK8S when ImageConsulOBOInbound is empty.
-func TestOBOInboundSidecarImageFallback(t *testing.T) {
+// TestOBOInboundSidecarImageRequired verifies that oboInboundSidecar returns an
+// error when ImageConsulOBOInbound is empty.  The consul-k8s image does not
+// contain the consul-obo-inbound binary, so a silent fallback would produce a
+// container that crashes at startup.
+func TestOBOInboundSidecarImageRequired(t *testing.T) {
 	w := baseAIWebhook(t)
-	w.ImageConsulOBOInbound = "" // not configured
+	w.ImageConsulOBOInbound = "" // deliberately missing
 	pod := aiPod("svc", "cm")
 
-	container, err := w.oboInboundSidecar(pod)
-	require.NoError(t, err)
-	require.Equal(t, "hashicorp/consul-k8s:test", container.Image)
+	_, err := w.oboInboundSidecar(pod)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ImageConsulOBOInbound must be set")
 }
 
 
@@ -319,7 +317,7 @@ func TestOBOOutboundSidecar(t *testing.T) {
 	w.ImageConsulOBOOutbound = "hashicorp/consul-obo-outbound:test"
 	pod := aiPod("my-ai-app", "my-mcp-config")
 
-	container, err := w.oboOutboundSidecar(pod)
+	container, err := w.oboOutboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
 	require.NoError(t, err)
 
 	require.Equal(t, constants.ConsulOBOOutboundContainerName, container.Name)
@@ -391,15 +389,18 @@ func TestOBOOutboundSidecar(t *testing.T) {
 	require.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)
 }
 
-// TestOBOOutboundSidecarImageFallback verifies fallback to ImageConsulK8S.
-func TestOBOOutboundSidecarImageFallback(t *testing.T) {
+// TestOBOOutboundSidecarImageRequired verifies that oboOutboundSidecar returns
+// an error when ImageConsulOBOOutbound is empty.  The consul-k8s image does not
+// contain the consul-obo-outbound binary, so a silent fallback would produce a
+// container that crashes at startup.
+func TestOBOOutboundSidecarImageRequired(t *testing.T) {
 	w := baseAIWebhook(t)
-	w.ImageConsulOBOOutbound = "" // not configured
+	w.ImageConsulOBOOutbound = "" // deliberately missing
 	pod := aiPod("svc", "cm")
 
-	container, err := w.oboOutboundSidecar(pod)
-	require.NoError(t, err)
-	require.Equal(t, "hashicorp/consul-k8s:test", container.Image)
+	_, err := w.oboOutboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "ImageConsulOBOOutbound must be set")
 }
 
 // oboPod returns a plain (non-AI) Pod annotated as an oauth-client for use in
@@ -433,7 +434,7 @@ func TestOBOSidecarsInjectedForNonAIPod(t *testing.T) {
 
 	inbound, err := w.oboInboundSidecar(pod)
 	require.NoError(t, err)
-	outbound, err := w.oboOutboundSidecar(pod)
+	outbound, err := w.oboOutboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
 	require.NoError(t, err)
 
 	// Should have OBO containers.
@@ -461,7 +462,7 @@ func TestAIAgentPodGetsAllThreeSidecars(t *testing.T) {
 	require.NoError(t, err)
 	oboIn, err := w.oboInboundSidecar(pod)
 	require.NoError(t, err)
-	oboOut, err := w.oboOutboundSidecar(pod)
+	oboOut, err := w.oboOutboundSidecar(corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}, pod)
 	require.NoError(t, err)
 
 	require.Equal(t, constants.AIContainerName, mcpGW.Name)
