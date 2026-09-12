@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -334,7 +335,7 @@ func TestOBOOutboundSidecar(t *testing.T) {
 	require.Len(t, container.Command, 1)
 	require.Equal(t, constants.DefaultOBOOutboundBinary, container.Command[0])
 
-	// Args must contain --addr with the OBO outbound port and --mode=outbound.
+	// Args must contain --addr with the OBO outbound port plus the SDS flags.
 	args := container.Args
 	require.Contains(t, args, "--addr")
 	addrIdx := -1
@@ -346,10 +347,45 @@ func TestOBOOutboundSidecar(t *testing.T) {
 	}
 	require.Greater(t, addrIdx, -1)
 	require.Contains(t, args[addrIdx+1], "21103")
-	require.Contains(t, args, "--mode=outbound")
+	// SDS client flags must be present so consul-obo-outbound subscribes to the
+	// GenericSecret for this service's OAuthClientConfig.
+	require.Contains(t, args, "--xds-addr=127.0.0.1:19500")
+	require.Contains(t, args, "--sds-resource=oauth/my-ai-app")
+	// proxy-id-file tells the SDS client which node.Id to send in the first
+	// DeltaDiscoveryRequest so the Consul server starts watching the right proxy.
+	require.Contains(t, args, "--proxy-id-file=/consul/connect-inject/proxyid")
+	// node-name-file supplies node.metadata.node_name so the Consul server resolves
+	// the same proxycfg identity that Envoy uses.  Without it the server falls back
+	// to s.NodeName which may differ, silently watching the wrong snapshot and never
+	// pushing the oauth/<svcName> GenericSecret.
+	require.Contains(t, args, "--node-name-file=/consul/connect-inject/nodename")
+	// dataplane-ready-url must be set to the Envoy admin /ready endpoint so the
+	// SDS subscription waits for Envoy to fully initialise (ADS stream active)
+	// before opening the stream.  Do NOT use graceful_startup (:20600) — with
+	// startupGracePeriodSeconds=0 it returns 200 immediately, before the Consul
+	// server has built the proxy snapshot.
+	dataplaneReadyFound := false
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--dataplane-ready-url=") {
+			dataplaneReadyFound = true
+			require.Contains(t, arg, ":19000/ready",
+				"--dataplane-ready-url must point to the Envoy admin /ready endpoint (:19000/ready), not graceful_startup")
+			break
+		}
+	}
+	require.True(t, dataplaneReadyFound,
+		"--dataplane-ready-url must be present so SDS subscription waits for Envoy to be ready")
 
 	// Security context.
 	require.NotNil(t, container.SecurityContext)
+	// RunAsUser MUST be sidecarUserAndGroupID (5995) so iptables transparent proxy
+	// excludes the container's outbound traffic (CONSUL_PROXY_OUTPUT RETURN rule
+	// "owner UID match 5995"). Without this the HTTPS calls to IBM Verify are
+	// captured by TP, Envoy's original-destination cluster returns zero bytes, and
+	// every token exchange fails with SSL_EOF.
+	require.NotNil(t, container.SecurityContext.RunAsUser,
+		"RunAsUser must be set to sidecarUserAndGroupID to bypass TP iptables capture")
+	require.Equal(t, int64(sidecarUserAndGroupID), *container.SecurityContext.RunAsUser)
 	require.True(t, *container.SecurityContext.RunAsNonRoot)
 	require.False(t, *container.SecurityContext.AllowPrivilegeEscalation)
 	require.True(t, *container.SecurityContext.ReadOnlyRootFilesystem)

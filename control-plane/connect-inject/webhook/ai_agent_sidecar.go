@@ -28,14 +28,10 @@ const (
 // It expects the ConfigMap volume (aiAgentConfigVolumeName) to already have been
 // appended to pod.Spec.Volumes by Handle().
 func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
-	gatewayBinary := w.GatewayBinary
-	if gatewayBinary == "" {
-		gatewayBinary = constants.DefaultGatewayBinary
-	}
-
 	// The consul-mcp-gateway container runs from the dedicated
-	// consul-ai-mcp-interceptor image which ships the consul binary with the
-	// `consul connect mcp-gateway` subcommand.
+	// consul-ai-mcp-interceptor image which ships the standalone
+	// consul-mcp-gateway binary at /app/consul-mcp-gateway.
+	// It is invoked directly — there is no `consul connect mcp-gateway` wrapper.
 	image := w.ImageConsulAIMCPInterceptor
 	if image == "" {
 		// Fall back to the consul-k8s image so that the webhook still works in
@@ -78,13 +74,10 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod) (corev1.Container, error) {
 				ReadOnly:  true,
 			},
 		},
-		Command: []string{constants.ConsulBinarypath},
+		// Invoke the standalone binary directly.
+		Command: []string{constants.DefaultGatewayBinary},
 		Args: []string{
-			"connect",
-			"mcp-gateway",
-			"-gateway-binary",
-			gatewayBinary,
-			"-addr",
+			"--addr",
 			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultAIInterceptorPort)),
 		},
 		SecurityContext: &corev1.SecurityContext{
@@ -200,13 +193,22 @@ func (w *MeshWebhook) oboInboundSidecar(_ corev1.Pod) (corev1.Container, error) 
 //
 // The OAuth private key is delivered via xDS (x-consul-oauth-config gRPC
 // stream metadata) — never via file, env var, or Kubernetes Secret.
-func (w *MeshWebhook) oboOutboundSidecar(_ corev1.Pod) (corev1.Container, error) {
+func (w *MeshWebhook) oboOutboundSidecar(pod corev1.Pod) (corev1.Container, error) {
 	image := w.ImageConsulOBOOutbound
 	if image == "" {
 		// Fall back to the consul-k8s image so the webhook still works in
 		// environments where the dedicated image has not been configured yet.
 		image = w.ImageConsulK8S
 	}
+
+	// Derive the Consul service name from the connect-service annotation.
+	// This is the value written as cfgSnap.Service in proxycfg, and therefore
+	// the suffix of the SDS resource name "oauth/<svcName>" emitted by
+	// secretsFromSnapshotConnectProxy in consul-enterprise/agent/xds/secrets.go.
+	svcName := pod.Annotations[constants.AnnotationService]
+
+	xdsAddr := net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultDataplaneXDSPort))
+	sdsResource := "oauth/" + svcName
 
 	container := corev1.Container{
 		Name:            constants.ConsulOBOOutboundContainerName,
@@ -243,10 +245,49 @@ func (w *MeshWebhook) oboOutboundSidecar(_ corev1.Pod) (corev1.Container, error)
 		Args: []string{
 			"--addr",
 			net.JoinHostPort("127.0.0.1", fmt.Sprint(constants.DefaultOBOOutboundPort)),
-			"--mode=outbound",
 			"--log-level=info",
+			// SDS client: subscribe to the GenericSecret carrying the
+			// OAuthClientConfig (EC private key + client-id + token endpoint).
+			// consul-dataplane binds xDS on a fixed port (DefaultDataplaneXDSPort)
+			// so this address is stable across pod restarts.
+			"--xds-addr=" + xdsAddr,
+			"--sds-resource=" + sdsResource,
+			// consul-connect-inject-init writes the sidecar proxy service-ID to
+			// this file.  The SDS client sends it as node.Id in the first
+			// DeltaDiscoveryRequest so the Consul server can locate the correct
+			// proxy snapshot and push the GenericSecret (oauth/<svcName>).
+			"--proxy-id-file=/consul/connect-inject/proxyid",
+			// consul-connect-inject-init also writes the Consul node name to this
+			// file (value: $(NODE_NAME)-virtual, same source as DP_SERVICE_NODE_NAME).
+			// The SDS client sends it as node.metadata.node_name so the Consul server
+			// resolves the same proxycfg identity that Envoy uses.  Without it the
+			// server falls back to s.NodeName which may differ, causing the SDS stream
+			// to watch the wrong snapshot and never push the oauth/<svcName> secret.
+			"--node-name-file=/consul/connect-inject/nodename",
+			// Wait for Envoy to be fully ready before opening the SDS subscription.
+			// consul-obo-outbound starts at pod init, before consul-dataplane has
+			// established its ADS stream to the Consul server.  If the SDS stream
+			// opens while consul-dataplane is still bootstrapping, the Consul server
+			// has not yet built the proxy snapshot and will never push the GenericSecret.
+			//
+			// We poll Envoy admin :19000/ready (returns "LIVE" + HTTP 200 only after
+			// all clusters are initialised and the ADS stream is active) — NOT the
+			// graceful_startup endpoint (:20600) which with startupGracePeriodSeconds=0
+			// returns HTTP 200 immediately, before consul-dataplane has set up its ADS
+			// stream or the Consul server has built the proxy snapshot.
+			fmt.Sprintf("--dataplane-ready-url=http://127.0.0.1:%d/ready",
+				constants.DefaultEnvoyAdminPort),
 		},
 		SecurityContext: &corev1.SecurityContext{
+			// RunAsUser MUST match sidecarUserAndGroupID (5995) — the same UID
+			// that consul-connect-inject-init adds to the iptables RETURN rule
+			// (CONSUL_PROXY_OUTPUT chain, "owner UID match 5995"). Without this,
+			// the obo-outbound container's outbound HTTPS calls to IBM Verify
+			// are captured by transparent proxy → redirected to :15001 → Envoy's
+			// original-destination cluster returns zero bytes (SO_ORIGINAL_DST
+			// loop on loopback-redirected connections in kind+Podman), causing
+			// SSL_EOF on every token exchange attempt.
+			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
 			RunAsNonRoot:             ptr.To(true),
 			AllowPrivilegeEscalation: ptr.To(false),
 			ReadOnlyRootFilesystem:   ptr.To(true),

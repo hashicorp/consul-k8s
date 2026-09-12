@@ -33,7 +33,8 @@ import (
 )
 
 const (
-	defaultProxyIDFile = "/consul/connect-inject/proxyid"
+	defaultProxyIDFile   = "/consul/connect-inject/proxyid"
+	defaultNodeNameFile  = "/consul/connect-inject/nodename"
 
 	// The number of times to attempt to read this service (120s).
 	defaultServicePollingRetries = 120
@@ -52,8 +53,9 @@ type Command struct {
 	flagLogLevel              string
 	flagLogJSON               bool
 
-	flagProxyIDFile string // Location to write the output proxyID. Default is defaultProxyIDFile.
-	flagMultiPort   bool
+	flagProxyIDFile  string // Location to write the output proxyID. Default is defaultProxyIDFile.
+	flagNodeNameFile string // Location to write the Consul node name. Default is defaultNodeNameFile.
+	flagMultiPort    bool
 
 	serviceRegistrationPollingAttempts uint64 // Number of times to poll for this service to be registered.
 
@@ -81,6 +83,7 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagServiceAccountName, "service-account-name", "", "Service account name on the pod.")
 	c.flagSet.StringVar(&c.flagServiceName, "service-name", "", "Service name as specified via the pod annotation.")
 	c.flagSet.StringVar(&c.flagProxyIDFile, "proxy-id-file", defaultProxyIDFile, "File name where proxy's Consul service ID should be saved.")
+	c.flagSet.StringVar(&c.flagNodeNameFile, "node-name-file", defaultNodeNameFile, "File name where the Consul node name should be saved.")
 	c.flagSet.BoolVar(&c.flagMultiPort, "multiport", false, "If the pod is a multi port pod.")
 	c.flagSet.StringVar(&c.flagGatewayKind, "gateway-kind", "", "Kind of gateway that is being registered: ingress-gateway, terminating-gateway, or mesh-gateway.")
 	c.flagSet.StringVar(&c.flagRedirectTrafficConfig, "redirect-traffic-config", os.Getenv("CONSUL_REDIRECT_TRAFFIC_CONFIG"), "Config (in JSON format) to configure iptables for this pod.")
@@ -288,6 +291,15 @@ func (c *Command) getConnectServiceRegistrations(consulClient *api.Client, proxy
 			return nil
 		}
 
+		// Write the Consul node name so consul-obo-outbound can send the correct
+		// node.metadata.node_name in its SDS DeltaDiscoveryRequest.  Without this
+		// the Consul server resolves the stream to the wrong proxycfg snapshot and
+		// never pushes the oauth/<svcName> GenericSecret.
+		if err = common.WriteFileWithPerms(c.flagNodeNameFile, c.flagConsulNodeName, os.FileMode(0444)); err != nil {
+			c.nonRetryableError = err
+			return nil
+		}
+
 		return nil
 	}
 }
@@ -343,6 +355,13 @@ func (c *Command) getGatewayRegistration(client *api.Client) backoff.Operation {
 		// Write the proxy ID to the shared volume so the consul-dataplane can use it for bootstrapping.
 		if err := common.WriteFileWithPerms(c.flagProxyIDFile, proxyID, os.FileMode(0444)); err != nil {
 			// Save an error but return nil so that we don't retry this step.
+			c.nonRetryableError = err
+			return nil
+		}
+
+		// Write the Consul node name so consul-obo-outbound can send the correct
+		// node.metadata.node_name in its SDS DeltaDiscoveryRequest.
+		if err := common.WriteFileWithPerms(c.flagNodeNameFile, c.flagConsulNodeName, os.FileMode(0444)); err != nil {
 			c.nonRetryableError = err
 			return nil
 		}
