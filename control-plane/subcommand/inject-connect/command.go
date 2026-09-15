@@ -180,6 +180,13 @@ type Command struct {
 	flagAIInferenceGatewayImage   string // Docker image for the InferenceGateway Deployment
 	flagAIMCPServerImage          string // Docker image for the MCP server sidecar
 	flagAIAgentImage              string // Docker image for the AI agent sidecar
+	// InferenceGateway defaults sourced from ai.inferenceGateway.defaults in values.yaml
+	flagAIInferenceGatewayDefaultServiceType  string // default Service type (ClusterIP/NodePort/LoadBalancer)
+	flagAIInferenceGatewayDefaultServicePort  int    // default Service port
+	flagAIInferenceGatewayDefaultCPURequest   string // default container CPU request
+	flagAIInferenceGatewayDefaultCPULimit     string // default container CPU limit
+	flagAIInferenceGatewayDefaultMemRequest   string // default container memory request
+	flagAIInferenceGatewayDefaultMemLimit     string // default container memory limit
 }
 
 var (
@@ -281,6 +288,24 @@ func (c *Command) init() {
 	c.flagSet.StringVar(&c.flagAIInferenceGatewayImage, "ai-inference-gateway-image", "",
 		"Docker image for the InferenceGateway Deployment created by the AI controller. "+
 			"Mirrors ai.inferenceGateway.image from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultServiceType, "ai-inference-gateway-default-service-type", "ClusterIP",
+		"Default Kubernetes Service type for InferenceGateway instances. "+
+			"Mirrors ai.inferenceGateway.defaults.service.type from values.yaml.")
+	c.flagSet.IntVar(&c.flagAIInferenceGatewayDefaultServicePort, "ai-inference-gateway-default-service-port", 8443,
+		"Default Service port for InferenceGateway instances. "+
+			"Mirrors the first entry of ai.inferenceGateway.defaults.service.ports from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultCPURequest, "ai-inference-gateway-default-cpu-request", "",
+		"Default CPU request for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.requests.cpu from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultCPULimit, "ai-inference-gateway-default-cpu-limit", "",
+		"Default CPU limit for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.limits.cpu from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultMemRequest, "ai-inference-gateway-default-mem-request", "",
+		"Default memory request for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.requests.memory from values.yaml.")
+	c.flagSet.StringVar(&c.flagAIInferenceGatewayDefaultMemLimit, "ai-inference-gateway-default-mem-limit", "",
+		"Default memory limit for the InferenceGateway container. "+
+			"Mirrors ai.inferenceGateway.defaults.resources.limits.memory from values.yaml.")
 	c.flagSet.StringVar(&c.flagAIMCPServerImage, "ai-mcp-server-image", "",
 		"Docker image for the MCP server sidecar injected into pods with "+
 			"consul.hashicorp.com/ai-role: mcp-server. Mirrors ai.mcpServer.image from values.yaml.")

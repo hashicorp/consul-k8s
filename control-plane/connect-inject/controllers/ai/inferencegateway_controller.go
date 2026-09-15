@@ -81,6 +81,16 @@ type InferenceGatewayController struct {
 	// Injected at startup via v1controllers.go.
 	GatewayImage string
 
+	// DefaultResources is the fallback resource requests/limits for the
+	// gateway container, sourced from ai.inferenceGateway.defaults.resources
+	// in values.yaml. Applied when spec.resources is nil on the CRD object.
+	DefaultResources corev1.ResourceRequirements
+
+	// DefaultService is the fallback Service configuration sourced from
+	// ai.inferenceGateway.defaults.service in values.yaml.
+	// Applied when spec.service is nil on the CRD object.
+	DefaultService v1alpha1.InferenceGatewayService
+
 	// ConsulClientConfig is the Consul API client configuration.
 	ConsulClientConfig *consul.Config
 
@@ -622,7 +632,13 @@ func (r *InferenceGatewayController) reconcileDeployment(
 		image = igw.Spec.Image
 	}
 
-	desired := deploymentFor(igw, pool, image)
+	// Resolve effective resources: spec-level overrides controller default.
+	resources := r.DefaultResources
+	if igw.Spec.Resources != nil {
+		resources = *igw.Spec.Resources
+	}
+
+	desired := deploymentFor(igw, pool, image, resources)
 	if err := controllerutil.SetControllerReference(igw, desired, r.Client.Scheme()); err != nil {
 		return fmt.Errorf("setting owner reference on Deployment: %w", err)
 	}
@@ -662,7 +678,20 @@ func (r *InferenceGatewayController) reconcileService(
 ) error {
 	log := r.Log.WithValues("inferenceGateway", igw.Name, "namespace", igw.Namespace)
 
-	desired := serviceFor(igw)
+	// Resolve effective service config: spec-level overrides controller default.
+	svc := r.DefaultService
+	if igw.Spec.Service != nil {
+		svc = *igw.Spec.Service
+	}
+	// If neither spec nor default provided a port, fall back to the hardcoded constant.
+	if len(svc.Ports) == 0 {
+		svc.Ports = []v1alpha1.InferenceGatewayServicePort{{Port: inferenceGatewayPort}}
+	}
+	if svc.Type == "" {
+		svc.Type = corev1.ServiceTypeClusterIP
+	}
+
+	desired := serviceFor(igw, svc)
 	if err := controllerutil.SetControllerReference(igw, desired, r.Client.Scheme()); err != nil {
 		return fmt.Errorf("setting owner reference on Service: %w", err)
 	}
@@ -701,6 +730,7 @@ func deploymentFor(
 	igw *v1alpha1.InferenceGateway,
 	pool *v1alpha1.InferencePoolConfig,
 	image string,
+	resources corev1.ResourceRequirements,
 ) *appsv1.Deployment {
 	labels := gatewayLabels(igw)
 
@@ -750,6 +780,7 @@ func deploymentFor(
 							{Name: "POOL_NAME", Value: pool.Name},
 							{Name: "POOL_NAMESPACE", Value: pool.Namespace},
 						},
+						Resources: resources,
 						VolumeMounts: []corev1.VolumeMount{{
 							// emptyDir so /run/consul/ exists before the binary
 							// tries to create the ext_proc Unix socket there.
@@ -769,9 +800,24 @@ func deploymentFor(
 	}
 }
 
-// serviceFor returns the desired ClusterIP Service for an InferenceGateway.
-func serviceFor(igw *v1alpha1.InferenceGateway) *corev1.Service {
+// serviceFor returns the desired Service for an InferenceGateway.
+func serviceFor(igw *v1alpha1.InferenceGateway, svc v1alpha1.InferenceGatewayService) *corev1.Service {
 	labels := gatewayLabels(igw)
+
+	ports := make([]corev1.ServicePort, 0, len(svc.Ports))
+	for i, p := range svc.Ports {
+		name := "grpc"
+		if i > 0 {
+			name = fmt.Sprintf("grpc-%d", i)
+		}
+		ports = append(ports, corev1.ServicePort{
+			Name:       name,
+			Port:       p.Port,
+			TargetPort: intstr.FromInt32(p.Port),
+			Protocol:   corev1.ProtocolTCP,
+		})
+	}
+
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      igw.Name,
@@ -779,14 +825,9 @@ func serviceFor(igw *v1alpha1.InferenceGateway) *corev1.Service {
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
+			Type:     svc.Type,
 			Selector: labels,
-			Ports: []corev1.ServicePort{{
-				Name:       "grpc",
-				Port:       inferenceGatewayPort,
-				TargetPort: intstr.FromInt32(inferenceGatewayPort),
-				Protocol:   corev1.ProtocolTCP,
-			}},
+			Ports:    ports,
 		},
 	}
 }
@@ -904,6 +945,35 @@ func transformConsulAIGateway(entry capi.ConfigEntry) []types.NamespacedName {
 	}}
 }
 
+// gatewaysForPool maps an InferencePoolConfig change to the InferenceGateway
+// objects that reference it via spec.poolRef.name, so that updating a pool
+// triggers reconciliation of every gateway that depends on it.
+func (r *InferenceGatewayController) gatewaysForPool(ctx context.Context, obj client.Object) []ctrl.Request {
+	pool, ok := obj.(*v1alpha1.InferencePoolConfig)
+	if !ok {
+		return nil
+	}
+
+	var list v1alpha1.InferenceGatewayList
+	if err := r.Client.List(ctx, &list, client.InNamespace(pool.Namespace)); err != nil {
+		r.Log.Error(err, "failed to list InferenceGateways for pool", "pool", pool.Name)
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for _, igw := range list.Items {
+		if igw.Spec.PoolRef.Name == pool.Name {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      igw.Name,
+					Namespace: igw.Namespace,
+				},
+			})
+		}
+	}
+	return requests
+}
+
 // SetupWithManager registers InferenceGatewayController with the controller-runtime
 // manager and starts the background Consul long-poll cache.
 //
@@ -933,6 +1003,12 @@ func (r *InferenceGatewayController) SetupWithManager(ctx context.Context, mgr c
 		// Owned K8s resources re-trigger reconciliation when mutated externally.
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
+		// Re-reconcile any InferenceGateway whose spec.poolRef points to a
+		// pool that just changed — e.g. enabled toggled, rate-limit updated.
+		Watches(
+			&v1alpha1.InferencePoolConfig{},
+			handler.EnqueueRequestsFromMapFunc(r.gatewaysForPool),
+		).
 		// Re-reconcile when an ai-gateway config entry is mutated or deleted in
 		// Consul out-of-band — same mechanism as api-gateway/controllers/
 		// gateway_controller.go:536 with c.Subscribe(ctx, api.APIGateway, ...).

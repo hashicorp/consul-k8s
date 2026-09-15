@@ -3857,6 +3857,12 @@ ai:
           cpu: "500m"
 
   inferenceGateway:
+    # Enable the InferenceGateway feature. When false, the CRD is not installed
+    # and no InferenceGateway objects are rendered regardless of the gateways list.
+    # Requires ai.enabled=true and connectInject.enabled=true.
+    # @type: boolean
+    enabled: false
+
     # The container image used by the InferenceGateway Deployment.
     # The controller creates one Deployment per InferenceGateway resource in the
     # cluster; this image is the process that receives inference traffic and
@@ -3872,16 +3878,63 @@ ai:
     # @type: string
     image: "hashicorp/consul-inference-gateway:0.1.0-dev"
 
-    # Resource requests and limits for the InferenceGateway Deployment containers.
-    # @recurse: false
-    # @type: map
-    resources:
-      requests:
-        memory: "128Mi"
-        cpu: "250m"
-      limits:
-        memory: "256Mi"
-        cpu: "500m"
+    # Default values applied to every gateway in the gateways list below unless
+    # overridden on the individual gateway entry.
+    defaults:
+      # Number of replicas for each InferenceGateway Deployment.
+      # @type: integer
+      replicas: 2
+
+      # Service configuration for the ClusterIP Service fronting each gateway.
+      service:
+        # Kubernetes Service type.
+        # @type: string
+        type: ClusterIP
+
+        # Ports exposed by the Service.
+        # @type: array<map>
+        ports:
+          - port: 8443
+
+      # Resource requests and limits for the InferenceGateway Deployment containers.
+      # @recurse: false
+      # @type: map
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "250m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+    # List of InferenceGateway instances to create. Each entry must have a
+    # unique `name` and may override any field from `defaults` above.
+    # The Helm chart renders one InferenceGateway CRD object per entry.
+    # The controller then reconciles each into a Deployment, Service, and
+    # Consul ai-gateway config entry.
+    #
+    # Example:
+    #
+    # ```yaml
+    # gateways:
+    #   - name: travel-inference-pool
+    #     poolRef:
+    #       name: travel-inference-pool  # optional: defaults to .name
+    #     replicas: 3
+    #     service:
+    #       type: ClusterIP
+    #       ports:
+    #         - port: 8443
+    #     resources:
+    #       requests:
+    #         memory: "256Mi"
+    #         cpu: "500m"
+    #       limits:
+    #         memory: "512Mi"
+    #         cpu: "1000m"
+    # ```
+    # @type: array<map>
+    gateways: []
 
   agent:
     # The container image used by the AI agent sidecar.

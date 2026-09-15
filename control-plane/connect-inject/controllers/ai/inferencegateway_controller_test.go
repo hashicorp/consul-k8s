@@ -21,6 +21,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -395,11 +396,12 @@ func TestInferenceGatewayReconcile_ChildResources(t *testing.T) {
 		require.Equal(t, "pool", envMap["POOL_NAME"])
 		require.Equal(t, "default", envMap["POOL_NAMESPACE"])
 
-		// Service must exist.
+		// Service must exist with the controller's DefaultService values.
 		svc := &corev1.Service{}
 		require.NoError(t, fakeClient.Get(context.Background(),
 			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
 		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+		// DefaultService is zero — falls back to inferenceGatewayPort constant.
 		require.Equal(t, inferenceGatewayPort, svc.Spec.Ports[0].Port)
 	})
 
@@ -560,7 +562,7 @@ func TestInferenceGatewayReconcile_ReadyReplicas(t *testing.T) {
 		// Pre-create a Deployment with ReadyReplicas=1 in the fake store.
 		// The controller reads Deployment.Status.ReadyReplicas after reconcileDeployment,
 		// so seeding it here simulates a running pod.
-		existingDep := deploymentFor(igw, pool, "test-gateway-image:latest")
+		existingDep := deploymentFor(igw, pool, "test-gateway-image:latest", corev1.ResourceRequirements{})
 		existingDep.Status.ReadyReplicas = 1
 
 		fakeClient := fake.NewClientBuilder().
@@ -1024,4 +1026,336 @@ func TestToConsulLimit_NormaliseIntegration(t *testing.T) {
 				tc.poolLimit.Window, tc.wantUnit, got.Unit)
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// TestGatewaysForPool — pool → gateway mapper used by the Watches clause
+// ---------------------------------------------------------------------------
+
+func TestGatewaysForPool(t *testing.T) {
+	t.Parallel()
+
+	s := igwScheme(t)
+
+	t.Run("returns matching gateway in same namespace", func(t *testing.T) {
+		pool := enabledPool("my-pool", "default")
+		igw := minimalIGW("gw1", "default", "my-pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Len(t, requests, 1)
+		require.Equal(t, types.NamespacedName{Name: "gw1", Namespace: "default"}, requests[0].NamespacedName)
+	})
+
+	t.Run("returns multiple gateways that share the same pool", func(t *testing.T) {
+		pool := enabledPool("shared-pool", "default")
+		igw1 := minimalIGW("gw1", "default", "shared-pool")
+		igw2 := minimalIGW("gw2", "default", "shared-pool")
+		igw3 := minimalIGW("gw3", "default", "other-pool") // should NOT be returned
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw1, igw2, igw3).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Len(t, requests, 2)
+		names := []string{requests[0].Name, requests[1].Name}
+		require.ElementsMatch(t, []string{"gw1", "gw2"}, names)
+	})
+
+	t.Run("returns nothing when no gateway references the pool", func(t *testing.T) {
+		pool := enabledPool("pool-x", "default")
+		igw := minimalIGW("gw1", "default", "pool-y")
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Empty(t, requests)
+	})
+
+	t.Run("ignores gateways in a different namespace", func(t *testing.T) {
+		pool := enabledPool("pool", "ns-a")
+		igw := minimalIGW("gw1", "ns-b", "pool") // same pool name, different namespace
+
+		fakeClient := fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(igw).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		requests := r.gatewaysForPool(context.Background(), pool)
+
+		require.Empty(t, requests)
+	})
+
+	t.Run("wrong object type returns nil", func(t *testing.T) {
+		fakeClient := fake.NewClientBuilder().WithScheme(s).Build()
+		r := &InferenceGatewayController{Client: fakeClient, Log: logrtest.New(t)}
+
+		// Pass a non-InferencePoolConfig object — mapper must return nil safely.
+		requests := r.gatewaysForPool(context.Background(), &v1alpha1.InferenceGateway{})
+
+		require.Nil(t, requests)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_Resources — container resource resolution
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_Resources(t *testing.T) {
+	t.Parallel()
+
+	parseQty := func(s string) resource.Quantity {
+		q, err := resource.ParseQuantity(s)
+		if err != nil {
+			t.Fatalf("invalid quantity %q: %v", s, err)
+		}
+		return q
+	}
+
+	t.Run("DefaultResources applied when spec.resources is nil", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultResources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    parseQty("250m"),
+				corev1.ResourceMemory: parseQty("128Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    parseQty("500m"),
+				corev1.ResourceMemory: parseQty("256Mi"),
+			},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		res := dep.Spec.Template.Spec.Containers[0].Resources
+		require.Equal(t, parseQty("250m"), res.Requests[corev1.ResourceCPU])
+		require.Equal(t, parseQty("128Mi"), res.Requests[corev1.ResourceMemory])
+		require.Equal(t, parseQty("500m"), res.Limits[corev1.ResourceCPU])
+		require.Equal(t, parseQty("256Mi"), res.Limits[corev1.ResourceMemory])
+	})
+
+	t.Run("spec.resources overrides DefaultResources", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Resources = &corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: parseQty("512Mi"),
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultResources = corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceMemory: parseQty("128Mi"),
+			},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		res := dep.Spec.Template.Spec.Containers[0].Resources
+		require.Equal(t, parseQty("512Mi"), res.Requests[corev1.ResourceMemory],
+			"spec.resources must win over DefaultResources")
+	})
+
+	t.Run("zero DefaultResources leaves container resources empty", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		// DefaultResources left as zero value.
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		dep := &appsv1.Deployment{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, dep))
+
+		res := dep.Spec.Template.Spec.Containers[0].Resources
+		require.Empty(t, res.Requests, "no requests when both DefaultResources and spec.resources are zero")
+		require.Empty(t, res.Limits, "no limits when both DefaultResources and spec.resources are zero")
+	})
+}
+
+// ---------------------------------------------------------------------------
+// TestInferenceGatewayReconcile_Service — Service port/type resolution
+// ---------------------------------------------------------------------------
+
+func TestInferenceGatewayReconcile_Service(t *testing.T) {
+	t.Parallel()
+
+	t.Run("DefaultService applied when spec.service is nil", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultService = v1alpha1.InferenceGatewayService{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 8443}},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+		require.Equal(t, int32(8443), svc.Spec.Ports[0].Port)
+	})
+
+	t.Run("spec.service overrides DefaultService", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Service = &v1alpha1.InferenceGatewayService{
+			Type:  corev1.ServiceTypeLoadBalancer,
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 9443}},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		controller.DefaultService = v1alpha1.InferenceGatewayService{
+			Type:  corev1.ServiceTypeClusterIP,
+			Ports: []v1alpha1.InferenceGatewayServicePort{{Port: 8443}},
+		}
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Equal(t, corev1.ServiceTypeLoadBalancer, svc.Spec.Type,
+			"spec.service.type must win over DefaultService")
+		require.Equal(t, int32(9443), svc.Spec.Ports[0].Port,
+			"spec.service.ports must win over DefaultService")
+	})
+
+	t.Run("zero DefaultService falls back to inferenceGatewayPort constant", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		controller := igwController(t, fakeClient, consulCfg, watcher)
+		// DefaultService left as zero value (no ports, no type).
+
+		_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Equal(t, corev1.ServiceTypeClusterIP, svc.Spec.Type)
+		require.Equal(t, inferenceGatewayPort, svc.Spec.Ports[0].Port)
+	})
+
+	t.Run("multiple ports in spec.service are all rendered on the Service", func(t *testing.T) {
+		consulCfg, watcher := consulMockServer(t)
+		s := igwScheme(t)
+
+		pool := enabledPool("pool", "default")
+		igw := minimalIGW("gw", "default", "pool")
+		igw.Finalizers = []string{inferenceGatewayFinalizer}
+		igw.Spec.Service = &v1alpha1.InferenceGatewayService{
+			Type: corev1.ServiceTypeClusterIP,
+			Ports: []v1alpha1.InferenceGatewayServicePort{
+				{Port: 9000},
+				{Port: 9001},
+			},
+		}
+
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(s).WithRuntimeObjects(igw, pool).
+			WithStatusSubresource(&v1alpha1.InferenceGateway{}).Build()
+
+		_, err := igwController(t, fakeClient, consulCfg, watcher).Reconcile(context.Background(), ctrl.Request{
+			NamespacedName: types.NamespacedName{Name: "gw", Namespace: "default"},
+		})
+		require.NoError(t, err)
+
+		svc := &corev1.Service{}
+		require.NoError(t, fakeClient.Get(context.Background(),
+			types.NamespacedName{Name: "gw", Namespace: "default"}, svc))
+		require.Len(t, svc.Spec.Ports, 2)
+		require.Equal(t, int32(9000), svc.Spec.Ports[0].Port)
+		require.Equal(t, int32(9001), svc.Spec.Ports[1].Port)
+		require.Equal(t, "grpc", svc.Spec.Ports[0].Name)
+		require.Equal(t, "grpc-1", svc.Spec.Ports[1].Name)
+	})
 }

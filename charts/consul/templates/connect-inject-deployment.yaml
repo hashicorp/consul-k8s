@@ -320,6 +320,34 @@ spec:
                 {{- if and .Values.ai .Values.ai.enabled }}
                 -enable-ai=true \
                 -ai-inference-gateway-image="{{ .Values.ai.inferenceGateway.image }}" \
+                {{- if and .Values.ai.inferenceGateway.enabled .Values.ai.inferenceGateway.defaults }}
+                {{- with .Values.ai.inferenceGateway.defaults }}
+                {{- if .service }}
+                -ai-inference-gateway-default-service-type="{{ default "ClusterIP" .service.type }}" \
+                {{- if .service.ports }}
+                -ai-inference-gateway-default-service-port="{{ (index .service.ports 0).port }}" \
+                {{- end }}
+                {{- end }}
+                {{- if .resources }}
+                {{- if .resources.requests }}
+                {{- if .resources.requests.cpu }}
+                -ai-inference-gateway-default-cpu-request="{{ .resources.requests.cpu }}" \
+                {{- end }}
+                {{- if .resources.requests.memory }}
+                -ai-inference-gateway-default-mem-request="{{ .resources.requests.memory }}" \
+                {{- end }}
+                {{- end }}
+                {{- if .resources.limits }}
+                {{- if .resources.limits.cpu }}
+                -ai-inference-gateway-default-cpu-limit="{{ .resources.limits.cpu }}" \
+                {{- end }}
+                {{- if .resources.limits.memory }}
+                -ai-inference-gateway-default-mem-limit="{{ .resources.limits.memory }}" \
+                {{- end }}
+                {{- end }}
+                {{- end }}
+                {{- end }}
+                {{- end }}
                 {{- if .Values.ai.mcpServer.image }}
                 -ai-mcp-server-image="{{ .Values.ai.mcpServer.image }}" \
                 {{- end }}

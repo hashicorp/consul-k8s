@@ -165,25 +165,129 @@
         },
         "inferenceGateway": {
           "type": "object",
-          "description": "InferenceGateway feature configuration. Controls the container image and resources for Deployments created by the InferenceGatewayController.",
+          "description": "InferenceGateway feature configuration. Controls the container image, defaults, and the list of gateway instances.",
           "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable the InferenceGateway feature. When false, the CRD is not installed and no objects are rendered."
+            },
             "image": {
               "type": "string",
               "minLength": 1,
               "description": "Container image used by the InferenceGateway Deployment."
             },
-            "resources": {
+            "defaults": {
               "type": "object",
-              "description": "Resource requests and limits for the InferenceGateway Deployment containers.",
+              "description": "Default values applied to every gateway in the gateways list unless overridden per-gateway.",
               "properties": {
-                "requests": {
-                  "$ref": "#/definitions/resourceList"
+                "replicas": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Default number of Deployment replicas."
                 },
-                "limits": {
-                  "$ref": "#/definitions/resourceList"
+                "service": {
+                  "type": "object",
+                  "description": "Default Service configuration for gateway instances.",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+                      "description": "Kubernetes Service type."
+                    },
+                    "ports": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["port"],
+                        "properties": {
+                          "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "resources": {
+                  "type": "object",
+                  "description": "Default resource requests and limits for the gateway container.",
+                  "properties": {
+                    "requests": { "$ref": "#/definitions/resourceList" },
+                    "limits":   { "$ref": "#/definitions/resourceList" }
+                  },
+                  "additionalProperties": false
                 }
               },
               "additionalProperties": false
+            },
+            "gateways": {
+              "type": "array",
+              "description": "List of InferenceGateway instances to create. Each entry is rendered as a InferenceGateway CRD object.",
+              "items": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Unique name for this InferenceGateway instance."
+                  },
+                  "poolRef": {
+                    "type": "object",
+                    "description": "Reference to the InferencePoolConfig this gateway fronts. Defaults to the gateway name when not set.",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Name of the InferencePoolConfig to attach to."
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "image": {
+                    "type": "string",
+                    "description": "Per-gateway image override."
+                  },
+                  "replicas": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Per-gateway replica count override."
+                  },
+                  "service": {
+                    "type": "object",
+                    "description": "Per-gateway Service configuration override.",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+                        "description": "Kubernetes Service type."
+                      },
+                      "ports": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["port"],
+                          "properties": {
+                            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "resources": {
+                    "type": "object",
+                    "description": "Per-gateway resource requests/limits override.",
+                    "properties": {
+                      "requests": { "$ref": "#/definitions/resourceList" },
+                      "limits":   { "$ref": "#/definitions/resourceList" }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
             }
           },
           "additionalProperties": false

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/hashicorp/consul-server-connection-manager/discovery"
 	v1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -260,6 +262,8 @@ func (c *Command) configureControllers(ctx context.Context, mgr manager.Manager,
 			Log:                    ctrl.Log.WithName("controller").WithName("inference-gateway"),
 			Recorder:               mgr.GetEventRecorderFor("inferencegateway-controller"),
 			GatewayImage:           c.flagAIInferenceGatewayImage,
+			DefaultService:         c.inferenceGatewayDefaultService(),
+			DefaultResources:       c.inferenceGatewayDefaultResources(),
 			ConsulClientConfig:     consulConfig,
 			ConsulServerConnMgr:    watcher,
 			ConsulPartition:        c.consul.Partition,
@@ -739,4 +743,53 @@ func (c *Command) updateWebhookCABundle(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+// inferenceGatewayDefaultService builds the DefaultService value for the
+// InferenceGatewayController from the CLI flags that mirror
+// ai.inferenceGateway.defaults.service in values.yaml.
+func (c *Command) inferenceGatewayDefaultService() v1alpha1.InferenceGatewayService {
+	svcType := v1.ServiceTypeClusterIP
+	if c.flagAIInferenceGatewayDefaultServiceType != "" {
+		svcType = v1.ServiceType(c.flagAIInferenceGatewayDefaultServiceType)
+	}
+	port := int32(c.flagAIInferenceGatewayDefaultServicePort)
+	if port <= 0 {
+		port = 8443
+	}
+	return v1alpha1.InferenceGatewayService{
+		Type:  svcType,
+		Ports: []v1alpha1.InferenceGatewayServicePort{{Port: port}},
+	}
+}
+
+// inferenceGatewayDefaultResources builds the DefaultResources value for the
+// InferenceGatewayController from the CLI flags that mirror
+// ai.inferenceGateway.defaults.resources in values.yaml.
+// Any flag left empty is omitted from the resource list.
+func (c *Command) inferenceGatewayDefaultResources() v1.ResourceRequirements {
+	req := v1.ResourceList{}
+	lim := v1.ResourceList{}
+
+	if c.flagAIInferenceGatewayDefaultCPURequest != "" {
+		req[v1.ResourceCPU] = resource.MustParse(c.flagAIInferenceGatewayDefaultCPURequest)
+	}
+	if c.flagAIInferenceGatewayDefaultMemRequest != "" {
+		req[v1.ResourceMemory] = resource.MustParse(c.flagAIInferenceGatewayDefaultMemRequest)
+	}
+	if c.flagAIInferenceGatewayDefaultCPULimit != "" {
+		lim[v1.ResourceCPU] = resource.MustParse(c.flagAIInferenceGatewayDefaultCPULimit)
+	}
+	if c.flagAIInferenceGatewayDefaultMemLimit != "" {
+		lim[v1.ResourceMemory] = resource.MustParse(c.flagAIInferenceGatewayDefaultMemLimit)
+	}
+
+	res := v1.ResourceRequirements{}
+	if len(req) > 0 {
+		res.Requests = req
+	}
+	if len(lim) > 0 {
+		res.Limits = lim
+	}
+	return res
 }

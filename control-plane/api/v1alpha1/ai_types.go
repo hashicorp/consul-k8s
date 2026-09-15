@@ -1046,6 +1046,42 @@ type InferenceGatewaySpec struct {
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// resources sets the compute resource requests and limits for the gateway
+	// container. When not set the controller uses the cluster-level defaults
+	// configured via Helm (ai.inferenceGateway.resources).
+	// +optional
+	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// service configures the ClusterIP Service fronting the gateway Deployment.
+	// When not set the controller uses the cluster-level defaults configured
+	// via Helm (ai.inferenceGateway.defaults.service).
+	// +optional
+	Service *InferenceGatewayService `json:"service,omitempty"`
+}
+
+// InferenceGatewayService describes the ClusterIP Service created for an
+// InferenceGateway.
+type InferenceGatewayService struct {
+	// type is the Kubernetes Service type.
+	// Defaults to ClusterIP.
+	// +optional
+	// +kubebuilder:validation:Enum=ClusterIP;NodePort;LoadBalancer
+	Type corev1.ServiceType `json:"type,omitempty"`
+
+	// ports is the list of ports exposed by the Service.
+	// The first entry is used as the primary inference traffic port.
+	// +optional
+	Ports []InferenceGatewayServicePort `json:"ports,omitempty"`
+}
+
+// InferenceGatewayServicePort defines a single port on the InferenceGateway Service.
+type InferenceGatewayServicePort struct {
+	// port is the port number exposed on the Service.
+	// +required
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port"`
 }
 
 // InferencePoolRef is a reference to an InferencePoolConfig in the same
