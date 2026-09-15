@@ -23,7 +23,9 @@ Pygments==2.15.1
 pymdown-extensions==11.0.1
 PyYAML==6.0
 six==1.16.0
-# tornado 6.5.7 fixes GHSA-mgf9-4vpg-hj56 (CVE-2026-49855) gzip-bomb,
-# GHSA-3x9g-8vmp-wqvf cross-origin Authorization/Cookie leak, and
-# GHSA-pw6j-qg29-8w7f CurlAsyncHTTPClient credential leak on handle reuse.
-tornado==6.5.7
+# tornado 6.5.8 fixes GHSA-mgf9-4vpg-hj56 (CVE-2026-49855) gzip-bomb,
+# GHSA-3x9g-8vmp-wqvf cross-origin Authorization/Cookie leak,
+# GHSA-pw6j-qg29-8w7f CurlAsyncHTTPClient credential leak on handle reuse, and
+# GHSA-mpf4-983q-p7j4 (CVE-2026-82397): urlencoded body DoS via unbounded
+# field count (max_num_fields not passed to parse_qs).
+tornado==6.5.8
