@@ -490,8 +490,14 @@ func fetchGatewayCert(t *testing.T, opts *terratestk8s.KubectlOptions, host, por
 	t.Helper()
 	var pemOut string
 	retryCheckWithWait(t, 30, 3*time.Second, func(r *retry.R) {
+		// Use </dev/null to close stdin immediately so openssl s_client does not
+		// wait for interactive input. Redirect stderr to stdout so TLS handshake
+		// errors appear in the retry output instead of being silently discarded.
+		// Pipe with || true so that a non-zero exit from s_client (e.g. verify
+		// warnings) does not prevent openssl x509 from extracting the cert —
+		// the require.Contains below is the real guard for cert presence.
 		cmd := fmt.Sprintf(
-			"echo | openssl s_client -connect %s:%s -showcerts 2>/dev/null | "+
+			"{ openssl s_client -connect %s:%s -showcerts 2>&1 </dev/null; true; } | "+
 				"openssl x509 -outform PEM 2>/dev/null",
 			host, port,
 		)
@@ -499,9 +505,9 @@ func fetchGatewayCert(t *testing.T, opts *terratestk8s.KubectlOptions, host, por
 			"exec", "deploy/"+StaticClientName, "-c", StaticClientName, "--",
 			"sh", "-c", cmd,
 		)
-		require.NoError(r, err, "openssl s_client failed")
-		require.Contains(r, out, "-----BEGIN CERTIFICATE-----",
-			"expected PEM cert block; got: %s", out)
+		require.NoErrorf(r, err, "openssl pipeline failed: %s", out)
+		require.Containsf(r, out, "-----BEGIN CERTIFICATE-----",
+			"expected PEM cert block in openssl output; got: %s", out)
 		pemOut = out
 	})
 	return pemOut
