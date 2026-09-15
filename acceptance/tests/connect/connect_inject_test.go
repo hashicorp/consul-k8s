@@ -583,11 +583,11 @@ func TestConnectInject_MultiportConversionReportsStrandedWorkloads(t *testing.T)
 		"the failure must say how to fix it")
 }
 
-// multiportPriorReleaseChartVersion is the last published release that predates
-// the multiport registration gate. A cluster on this version registers a
-// multi-port container as a multi-port Consul service unconditionally, because
+// multiportPriorReleaseChartVersion is a published release that predates the
+// multiport registration gate. A cluster on this version registers a multi-port
+// container as a multi-port Consul service unconditionally, because
 // connectInject.multiportServiceRegistration does not exist in its chart.
-const multiportPriorReleaseChartVersion = "2.0.3"
+const multiportPriorReleaseChartVersion = "2.0.2"
 
 // TestConnectInject_MultiportConversionFromPriorRelease upgrades a real prior
 // release into this chart with the gate switched off.
