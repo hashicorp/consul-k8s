@@ -93,13 +93,25 @@ func verifyCESANs(t require.TestingT, cert *x509.Certificate) {
 		"CE: expected *.api-gateway.<dc>.consul SAN; cert DNS SANs: %v", cert.DNSNames)
 }
 
-// verifyEntSANs asserts the two expected Enterprise SANs are present when
-// namespace mirroring is enabled and the gateway lives in consulNS.
-// Expected patterns:
+// verifyEntSANs asserts the expected Enterprise SANs are present when namespace
+// mirroring is enabled and the gateway lives in consulNS.
+//
+// The Consul server mirrors the ingress-gateway behaviour: the "default"
+// namespace is a special case in DNS resolution and is omitted from the
+// wildcard SAN — identical to CE. For any non-default namespace the expected
+// patterns are:
 //
 //	*.api-gateway.<ns>.consul
 //	*.api-gateway.<ns>.<dc>.consul
 func verifyEntSANs(t require.TestingT, cert *x509.Certificate, consulNS string) {
+	// "default" namespace is omitted from the wildcard SAN (same as CE and
+	// the ingress gateway). Delegate to the CE checker so the two code paths
+	// stay in sync.
+	if consulNS == "default" {
+		verifyCESANs(t, cert)
+		return
+	}
+
 	nsPrefix := fmt.Sprintf("*.api-gateway.%s.", consulNS)
 	var foundNS bool
 	var foundNSDC bool
@@ -251,7 +263,9 @@ func TestAPIGateway_AutoTLS(t *testing.T) {
 
 	// ── 7. Verify DNS SANs — CE vs Enterprise ─────────────────────────────────
 	// CE:  *.api-gateway.consul  +  *.api-gateway.<dc>.consul
-	// Ent: *.api-gateway.<ns>.consul  +  *.api-gateway.<ns>.<dc>.consul
+	// Ent (default ns): same bare SANs as CE — "default" is omitted, matching
+	//      ingress-gateway behaviour.
+	// Ent (non-default ns): *.api-gateway.<ns>.consul  +  *.api-gateway.<ns>.<dc>.consul
 	//      (namespace mirroring maps K8s namespace → Consul namespace)
 	logger.Log(t, "verifying leaf cert DNS SANs")
 	if cfg.EnableEnterprise {
