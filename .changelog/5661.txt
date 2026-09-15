@@ -1,0 +1,3 @@
+```release-note:security
+security: upgrade tornado 6.5.7 -> 6.5.8 in the custom gateway-api 0.7.1 module to fix GHSA-mpf4-983q-p7j4 (CVE-2026-82397) where urlencoded POST body parsing without a field count limit allowed a single request to stall the event loop, enabling denial of service
+```
