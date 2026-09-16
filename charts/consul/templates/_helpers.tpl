@@ -759,3 +759,62 @@ Usage: {{ template "consul.validateAIConfig" . }}
 
 {{- end -}}
 {{- end -}}
+
+{{- /*
+consul.terminatingGatewayCredentialVaultAgent renders a Vault Agent container
+(init or sidecar) for terminating-gateway credential injection. It authenticates
+to Vault with the projected Kubernetes service-account token, verifies the Vault
+server via VAULT_CAPATH (when a CA ConfigMap is configured), keeps its token sink
+private, and renders external-model credentials into the shared memory volume.
+It carries no secret material. Input dict: name, exitAfterAuth (bool), ci, root.
+*/ -}}
+{{- define "consul.terminatingGatewayCredentialVaultAgent" -}}
+- name: {{ .name }}
+  image: {{ .ci.vaultAgentImage | quote }}
+  command:
+  - "vault"
+  args:
+  - "agent"
+  - "-config=/consul/vault-agent-config"
+  {{- if .exitAfterAuth }}
+  - "-exit-after-auth"
+  {{- end }}
+  env:
+  - name: VAULT_ADDR
+    value: {{ .ci.vaultAddress | quote }}
+  {{- if .ci.vaultNamespace }}
+  - name: VAULT_NAMESPACE
+    value: {{ .ci.vaultNamespace | quote }}
+  {{- end }}
+  {{- if .ci.vaultCAConfigMap }}
+  - name: VAULT_CAPATH
+    value: /consul/vault-ca
+  {{- end }}
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  volumeMounts:
+  - name: camp-vault-token
+    mountPath: /consul/vault-token
+    readOnly: true
+  - name: camp-vault-agent-config
+    mountPath: /consul/vault-agent-config
+    readOnly: true
+  - name: camp-vault-rendered
+    mountPath: /consul/vault-rendered
+  - name: camp-vault-agent-private
+    mountPath: /consul/vault-agent-private
+  {{- if .ci.vaultCAConfigMap }}
+  - name: camp-vault-ca
+    mountPath: /consul/vault-ca
+    readOnly: true
+  {{- end }}
+{{- end -}}

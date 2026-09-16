@@ -1510,3 +1510,65 @@ key2: value2' \
   [[ "$vols" == *"camp-auth-socket"* ]]
   [[ "$vols" == *"camp-vault-token"* ]]
 }
+
+#--------------------------------------------------------------------
+# credentialInjection Vault Agent containers (T8 Task 3)
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no vault agent containers" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers | map(.name) | contains(["camp-vault-agent-init"])')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers | map(.name) | contains(["camp-vault-agent"])')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection vault agent init container is hardened and exits after auth" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.vaultCAConfigMap=camp-ca \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.initContainers[] | select(.name=="camp-vault-agent-init")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.image')" = "hashicorp/vault:1.15" ]
+  [ "$(echo "$c" | yq -r '.args | contains(["-exit-after-auth"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "10001" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsGroup')" = "10001" ]
+  [ "$(echo "$c" | yq -r '.securityContext.readOnlyRootFilesystem')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.allowPrivilegeEscalation')" = "false" ]
+  [ "$(echo "$c" | yq -r '.env | map(.name) | contains(["VAULT_ADDR"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.env | map(.name) | contains(["VAULT_CAPATH"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts[] | select(.name=="camp-vault-token").readOnly')" = "true" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-rendered"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-vault-agent-private"])')" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection vault agent sidecar runs continuously" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentImage=hashicorp/vault:1.15 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAddress=https://vault:8200 \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.containers[] | select(.name=="camp-vault-agent")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.image')" = "hashicorp/vault:1.15" ]
+  [ "$(echo "$c" | yq -r '.args | contains(["-exit-after-auth"])')" = "false" ]
+  [ "$(echo "$c" | yq -r '.securityContext.runAsUser')" = "10001" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection adds private token-sink and config volumes" {
+  cd `chart_dir`
+  local vols=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      --set terminatingGateways.defaults.credentialInjection.vaultCAConfigMap=camp-ca \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.volumes' | tee /dev/stderr)
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-agent-private").emptyDir.medium')" = "Memory" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-agent-config").configMap.name')" = "camp-agent" ]
+  [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-vault-ca").configMap.name')" = "camp-ca" ]
+}
