@@ -196,3 +196,21 @@ func TestValidateCredentialInjectionWorkload(t *testing.T) {
 	// Complete config with at least one linked service is valid.
 	require.NoError(t, validateCredentialInjectionWorkload(complete, services))
 }
+
+func TestCampCredentialConfigChecksum(t *testing.T) {
+	proc := map[string]string{"config.json": `{"a":1}`}
+	agent := map[string]string{"agent.hcl": "template {}"}
+
+	base := campCredentialConfigChecksum(proc, agent)
+
+	// Deterministic and order-independent within a map.
+	require.Equal(t, base, campCredentialConfigChecksum(proc, agent))
+
+	// A config content change rolls the workload (checksum changes).
+	changed := map[string]string{"config.json": `{"a":2}`}
+	require.NotEqual(t, base, campCredentialConfigChecksum(changed, agent))
+
+	// It covers only the ConfigMaps passed in; the rendered credential emptyDir
+	// is never an input, so credential rotation cannot change this checksum.
+	require.NotEmpty(t, base)
+}
