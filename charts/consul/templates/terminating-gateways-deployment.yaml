@@ -165,6 +165,9 @@ spec:
       - name: camp-vault-agent-config
         configMap:
           name: {{ $ci.vaultAgentConfigMap | quote }}
+      - name: camp-auth-processor-config
+        configMap:
+          name: {{ $ci.processorConfigMap | quote }}
       {{- if $ci.vaultCAConfigMap }}
       - name: camp-vault-ca
         configMap:
@@ -398,6 +401,7 @@ spec:
               containerPort: 8443
         {{- if and $ci $ci.enabled }}
         {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent" "exitAfterAuth" false "ci" $ci "root" $root) | nindent 8 }}
+        {{- include "consul.terminatingGatewayCredentialAuthProcessor" (dict "ci" $ci "logLevel" (default $root.Values.global.logLevel $root.Values.terminatingGateways.logLevel) "drainSeconds" (default 30 $ci.drainSeconds)) | nindent 8 }}
         {{- end }}
       {{- if (default $defaults.priorityClassName .priorityClassName) }}
       priorityClassName: {{ (default $defaults.priorityClassName .priorityClassName) | quote }}
