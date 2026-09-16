@@ -490,15 +490,17 @@ func fetchGatewayCert(t *testing.T, opts *terratestk8s.KubectlOptions, host, por
 	t.Helper()
 	var pemOut string
 	retryCheckWithWait(t, 30, 3*time.Second, func(r *retry.R) {
-		// Use </dev/null to close stdin immediately so openssl s_client does not
-		// wait for interactive input. Redirect stderr to stdout so TLS handshake
-		// errors appear in the retry output instead of being silently discarded.
-		// Pipe with || true so that a non-zero exit from s_client (e.g. verify
-		// warnings) does not prevent openssl x509 from extracting the cert —
-		// the require.Contains below is the real guard for cert presence.
+		// Close stdin immediately so s_client does not wait for interactive
+		// input. Keep its stderr separate from the certificate stream; otherwise
+		// diagnostics such as CONNECTED are passed to openssl x509 and can make
+		// certificate parsing fail. The s_client exit status is intentionally not
+		// used because certificate verification is not configured here.
 		cmd := fmt.Sprintf(
-			"{ openssl s_client -connect %s:%s -showcerts 2>&1 </dev/null; true; } | "+
-				"openssl x509 -outform PEM 2>/dev/null",
+			"tmp=$(mktemp); "+
+				"openssl s_client -connect %s:%s -showcerts </dev/null >$tmp 2>$tmp.err; "+
+				"openssl x509 -in $tmp -outform PEM 2>$tmp.x509; status=$?; "+
+				"if [ $status -ne 0 ]; then cat $tmp.err $tmp.x509 >&2; fi; "+
+				"rm -f $tmp $tmp.err $tmp.x509; exit $status",
 			host, port,
 		)
 		out, err := k8s.RunKubectlAndGetOutputE(r, opts,
@@ -512,4 +514,3 @@ func fetchGatewayCert(t *testing.T, opts *terratestk8s.KubectlOptions, host, por
 	})
 	return pemOut
 }
-
