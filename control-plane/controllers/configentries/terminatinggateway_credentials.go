@@ -263,3 +263,44 @@ func campBoundedResources(mem, cpu string) corev1.ResourceRequirements {
 		},
 	}
 }
+
+// validateCredentialInjectionWorkload is the controller-side guard applied before
+// a credential-injection workload is created. It rejects an enabled config that
+// is missing any required non-secret binding metadata and refuses to inject
+// credentials for a gateway that routes to no linked service. It never infers a
+// default credential: an incomplete config is an error, not a silent fallback.
+// (Admission webhook validation is the first line of defense; this guards the
+// reconcile path even if a resource reaches it unvalidated.)
+func validateCredentialInjectionWorkload(
+	ci *consulv1alpha1.TerminatingGatewayCredentialInjection,
+	services []consulv1alpha1.LinkedService,
+) error {
+	if ci == nil || !ci.Enabled {
+		return nil
+	}
+
+	var missing []string
+	for _, f := range []struct {
+		name  string
+		value string
+	}{
+		{"processorImage", ci.ProcessorImage},
+		{"vaultAgentImage", ci.VaultAgentImage},
+		{"processorConfigMap", ci.ProcessorConfigMap},
+		{"vaultAgentConfigMap", ci.VaultAgentConfigMap},
+		{"vaultAddress", ci.VaultAddress},
+	} {
+		if f.value == "" {
+			missing = append(missing, f.name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("credentialInjection is enabled but missing required fields: %v", missing)
+	}
+
+	if len(services) == 0 {
+		return fmt.Errorf("credentialInjection is enabled but the terminating gateway has no linked services to route to")
+	}
+
+	return nil
+}

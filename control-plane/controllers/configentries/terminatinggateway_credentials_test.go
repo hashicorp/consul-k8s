@@ -157,3 +157,34 @@ func volumeByName(t *testing.T, volumes []corev1.Volume, name string) corev1.Vol
 	t.Fatalf("volume %q not found", name)
 	return corev1.Volume{}
 }
+
+func TestValidateCredentialInjectionWorkload(t *testing.T) {
+	complete := &consulv1alpha1.TerminatingGatewayCredentialInjection{
+		Enabled:             true,
+		ProcessorImage:      "camp-auth-processor:test",
+		VaultAgentImage:     "hashicorp/vault:test",
+		ProcessorConfigMap:  "camp-proc",
+		VaultAgentConfigMap: "camp-agent",
+		VaultAddress:        "https://vault:8200",
+	}
+	services := []consulv1alpha1.LinkedService{{Name: "external-api"}}
+
+	// nil / disabled are always valid no-ops.
+	require.NoError(t, validateCredentialInjectionWorkload(nil, nil))
+	require.NoError(t, validateCredentialInjectionWorkload(&consulv1alpha1.TerminatingGatewayCredentialInjection{Enabled: false}, nil))
+
+	// Missing required field is rejected (no default inferred).
+	missing := *complete
+	missing.ProcessorImage = ""
+	err := validateCredentialInjectionWorkload(&missing, services)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "processorImage")
+
+	// Enabled but no linked services to route to is rejected.
+	err = validateCredentialInjectionWorkload(complete, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no linked services")
+
+	// Complete config with at least one linked service is valid.
+	require.NoError(t, validateCredentialInjectionWorkload(complete, services))
+}
