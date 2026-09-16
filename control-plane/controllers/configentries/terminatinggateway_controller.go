@@ -1012,6 +1012,12 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		Containers:                    []corev1.Container{mainContainer},
 	}
 
+	// Reject an incomplete credential-injection config before creating the
+	// workload; never infer a default credential.
+	if err := validateCredentialInjectionWorkload(termGW.Spec.Deployment.CredentialInjection, termGW.Spec.Services); err != nil {
+		return nil, err
+	}
+
 	// Add the Vault-only credential-injection sidecars/volumes when enabled.
 	// This mirrors the Helm chart projection so both deployment paths agree.
 	applyTerminatingGatewayCredentialInjection(
