@@ -36,6 +36,8 @@
 {{ end -}}
 {{- /* Add the gateway name to the $names dict to ensure uniqueness */ -}}
 {{- $_ := set $names .name .name }}
+{{- /* Effective credential-injection config: per-gateway overrides the default (whole-object). */ -}}
+{{- $ci := default $defaults.credentialInjection .credentialInjection }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -135,6 +137,27 @@ spec:
       - name: consul-service
         emptyDir:
           medium: "Memory"
+      {{- if and $ci $ci.enabled }}
+      # Credential injection (T8): private, memory-backed working volumes and a
+      # projected SA token for the Vault Agent. No secret material at rest;
+      # credentials are rendered by the Vault Agent at runtime and must NOT be
+      # mounted into Envoy.
+      - name: camp-vault-rendered
+        emptyDir:
+          medium: "Memory"
+      - name: camp-auth-socket
+        emptyDir:
+          medium: "Memory"
+      - name: camp-vault-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+              audience: {{ $ci.tokenAudience | default "vault" | quote }}
+              {{- if $ci.tokenExpirationSeconds }}
+              expirationSeconds: {{ $ci.tokenExpirationSeconds }}
+              {{- end }}
+      {{- end }}
       {{- range (default $defaults.extraVolumes .extraVolumes) }}
       - name: userconfig-{{ .name }}
         {{ .type }}:
