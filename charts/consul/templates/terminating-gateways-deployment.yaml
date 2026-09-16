@@ -128,6 +128,13 @@ spec:
       topologySpreadConstraints:
         {{ tpl (default $defaults.topologySpreadConstraints .topologySpreadConstraints) $root | nindent 8 | trim }}
       {{- end }}
+      {{- if and $ci $ci.enabled }}
+      # Shared supplemental group so Envoy (non-10001) can reach the credential
+      # processor's ext_proc socket in the group-owned socket directory.
+      securityContext:
+        supplementalGroups:
+        - 10001
+      {{- end }}
       terminationGracePeriodSeconds: 10
       serviceAccountName: {{ template "consul.fullname" $root }}-{{ .name }}
       volumes:
@@ -268,6 +275,42 @@ spec:
               memory: "50Mi"
               cpu: "50m"
         {{- if and $ci $ci.enabled }}
+        # camp-auth-socket-init prepares the shared ext_proc socket directory so
+        # the processor (uid 10001) owns it and Envoy (a member of the shared
+        # supplemental group) can reach the socket. Runs with the narrowest
+        # capabilities needed (CHOWN/FOWNER) and mounts only the socket volume.
+        - name: camp-auth-socket-init
+          image: {{ $root.Values.global.imageK8S | quote }}
+          {{ template "consul.imagePullPolicy" $root }}
+          command:
+          - "/bin/sh"
+          - "-ec"
+          - |
+            chown 10001:10001 /consul/auth-socket
+            chmod 2770 /consul/auth-socket
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+              - ALL
+              add:
+              - CHOWN
+              - FOWNER
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+          - name: camp-auth-socket
+            mountPath: /consul/auth-socket
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "16Mi"
+              cpu: "10m"
         {{- include "consul.terminatingGatewayCredentialVaultAgent" (dict "name" "camp-vault-agent-init" "exitAfterAuth" true "ci" $ci "root" $root) | nindent 8 }}
         {{- end }}
       containers:
@@ -292,6 +335,12 @@ spec:
             - name: userconfig-{{ .name }}
               readOnly: true
               mountPath: /consul/userconfig/{{ .name }}
+            {{- end }}
+            {{- if and $ci $ci.enabled }}
+            # Envoy reaches the credential processor over this UDS only. It must
+            # never mount the rendered credentials or the Vault token volumes.
+            - name: camp-auth-socket
+              mountPath: /consul/auth-socket
             {{- end }}
           {{- if (default $defaults.resources .resources) }}
           resources: {{ toYaml (default $defaults.resources .resources) | nindent 12 }}

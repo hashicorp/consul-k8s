@@ -1622,3 +1622,54 @@ key2: value2' \
       . | tee /dev/stderr | yq -s '.[0].spec.template.spec.volumes' | tee /dev/stderr)
   [ "$(echo "$vols" | yq -r '.[] | select(.name=="camp-auth-processor-config").configMap.name')" = "camp-proc" ]
 }
+
+#--------------------------------------------------------------------
+# credentialInjection Envoy socket-only mount + socket-dir init (T8 Task 5)
+
+@test "terminatingGateways/Deployment: credentialInjection Envoy mounts only the socket, never credentials or token" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.volumeMounts | map(.name) | contains(["camp-auth-socket"])')" = "true" ]
+  for v in camp-vault-rendered camp-vault-token camp-vault-agent-private camp-vault-agent-config camp-auth-processor-config camp-vault-ca; do
+    [ "$(echo "$c" | yq -r ".volumeMounts | map(.name) | contains([\"$v\"])")" = "false" ]
+  done
+}
+
+@test "terminatingGateways/Deployment: credentialInjection socket-init is minimal-capability and mounts only the socket" {
+  cd `chart_dir`
+  local c=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.initContainers[] | select(.name=="camp-auth-socket-init")' | tee /dev/stderr)
+  [ "$(echo "$c" | yq -r '.volumeMounts | length')" = "1" ]
+  [ "$(echo "$c" | yq -r '.volumeMounts[0].name')" = "camp-auth-socket" ]
+  [ "$(echo "$c" | yq -r '.securityContext.capabilities.drop | contains(["ALL"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.capabilities.add | contains(["CHOWN"])')" = "true" ]
+  [ "$(echo "$c" | yq -r '.securityContext.allowPrivilegeEscalation')" = "false" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection sets shared supplemental group for the socket" {
+  cd `chart_dir`
+  local sc=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.enabled=true \
+      --set terminatingGateways.defaults.credentialInjection.processorConfigMap=camp-proc \
+      --set terminatingGateways.defaults.credentialInjection.vaultAgentConfigMap=camp-agent \
+      . | tee /dev/stderr | yq -s '.[0].spec.template.spec.securityContext' | tee /dev/stderr)
+  [ "$(echo "$sc" | yq -r '.supplementalGroups | contains([10001])')" = "true" ]
+}
+
+@test "terminatingGateways/Deployment: credentialInjection disabled has no socket-init and no Envoy socket mount" {
+  cd `chart_dir`
+  local out=$(helm template -s templates/terminating-gateways-deployment.yaml \
+      --set connectInject.enabled=true --set terminatingGateways.enabled=true . | tee /dev/stderr)
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.initContainers | map(.name) | contains(["camp-auth-socket-init"])')" = "false" ]
+  [ "$(echo "$out" | yq -s -r '.[0].spec.template.spec.containers[] | select(.name=="terminating-gateway") | .volumeMounts | map(.name) | contains(["camp-auth-socket"])')" = "false" ]
+}
