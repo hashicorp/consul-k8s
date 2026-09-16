@@ -402,7 +402,10 @@ func (r *InferenceGatewayController) deleteConfigEntry(
 //     ext_proc server listens on (same path used by consul-dataplane/Envoy).
 //   - Failover — from pool.Spec.Routing.Fallback only; all other routing
 //     (MatchRules, Scoring, Retry, Timeout) lives in the Consul catalog, not here.
-//   - StateStore, RateLimit, PII, AuditLevel — verbatim from pool.Spec.
+//   - PII, AuditLevel — verbatim from pool.Spec.Policy.
+//
+// NOTE: StateStore and RateLimit mappings are commented out below pending the
+// Consul API adding those fields back to InferenceGatewayConfigEntry.
 func (r *InferenceGatewayController) toConsulConfigEntry(
 	igw *v1alpha1.InferenceGateway,
 	pool *v1alpha1.InferencePoolConfig,
@@ -434,19 +437,24 @@ func (r *InferenceGatewayController) toConsulConfigEntry(
 		entry.Namespace = r.ConsulNamespace
 	}
 
+	// TODO: Uncomment when capi.InferenceGatewayConfigEntry re-adds StateStore and RateLimit.
+	// These fields were removed from the Consul API schema; the CRD-side types
+	// (InferencePoolStateStore, InferencePoolRateLimit) are retained so no pool
+	// manifests need to change when the API fields return.
+	//
 	// Map pool.Spec.StateStore → capi.InferenceGatewayStateStore.
 	// Required when RateLimit.Enabled=true.
-	if ss := pool.Spec.StateStore; ss != nil {
-		entry.StateStore = &capi.InferenceGatewayStateStore{
-			Service:       ss.Service,
-			LocalBindPort: ss.LocalBindPort,
-		}
-	}
-
+	// if ss := pool.Spec.StateStore; ss != nil {
+	// 	entry.StateStore = &capi.InferenceGatewayStateStore{
+	// 		Service:       ss.Service,
+	// 		LocalBindPort: ss.LocalBindPort,
+	// 	}
+	// }
+	//
 	// Map pool.Spec.RateLimit → capi.InferenceGatewayRateLimit.
-	if rl := pool.Spec.RateLimit; rl != nil {
-		entry.RateLimit = toConsulRateLimit(rl)
-	}
+	// if rl := pool.Spec.RateLimit; rl != nil {
+	// 	entry.RateLimit = toConsulRateLimit(rl)
+	// }
 
 	// Map pool.Spec.Routing.Fallback → capi.InferenceGatewayFailover.
 	// NOTE: Routing MatchRules, Scoring, Retry, Timeout are NOT on the config
@@ -489,72 +497,74 @@ func (r *InferenceGatewayController) toConsulConfigEntry(
 	return entry
 }
 
+// TODO: Uncomment when capi.InferenceGatewayConfigEntry re-adds StateStore and RateLimit.
+//
 // toConsulRateLimit converts an InferencePoolRateLimit to *capi.InferenceGatewayRateLimit.
-func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.InferenceGatewayRateLimit {
-	crl := &capi.InferenceGatewayRateLimit{
-		Enabled:     rl.Enabled,
-		Enforcement: rl.Enforcement,
-		Mode:        rl.Mode,
-		CountMode:   rl.CountMode,
-		Dimensions:  rl.Dimensions,
-		DegradeMode: rl.DegradeMode,
-	}
-
-	if rl.Default != nil {
-		crl.Default = toConsulLimitPair(rl.Default)
-	}
-	if rl.Global != nil {
-		crl.Global = toConsulLimitPair(rl.Global)
-	}
-
-	for _, tl := range rl.TierLimits {
-		crl.TierLimits = append(crl.TierLimits, capi.InferenceGatewayTierLimit{
-			Tier:                   tl.Tier,
-			MaxCompletionTokensCap: tl.MaxCompletionTokensCap,
-			Requests:               toConsulLimit(tl.Requests),
-			Tokens:                 toConsulLimit(tl.Tokens),
-		})
-	}
-
-	for _, ml := range rl.ModelLimits {
-		crl.ModelLimits = append(crl.ModelLimits, capi.InferenceGatewayModelLimit{
-			Model:    ml.Model,
-			Requests: toConsulLimit(ml.Requests),
-			Tokens:   toConsulLimit(ml.Tokens),
-		})
-	}
-
-	for _, tb := range rl.TierBindings {
-		crl.TierBindings = append(crl.TierBindings, capi.InferenceGatewayTierBinding{
-			Tier:      tb.Tier,
-			SPIFFEIDs: tb.SPIFFEIDs,
-			Partition: tb.Partition,
-			Namespace: tb.Namespace,
-		})
-	}
-
-	return crl
-}
-
-func toConsulLimitPair(p *v1alpha1.InferencePoolLimitPair) *capi.InferenceGatewayLimitPair {
-	if p == nil {
-		return nil
-	}
-	return &capi.InferenceGatewayLimitPair{
-		Requests: toConsulLimit(p.Requests),
-		Tokens:   toConsulLimit(p.Tokens),
-	}
-}
-
-func toConsulLimit(l *v1alpha1.InferencePoolLimit) *capi.InferenceGatewayLimit {
-	if l == nil {
-		return nil
-	}
-	return &capi.InferenceGatewayLimit{
-		Count: int(l.Count),
-		Unit:  normaliseWindow(l.Window),
-	}
-}
+// func toConsulRateLimit(rl *v1alpha1.InferencePoolRateLimit) *capi.InferenceGatewayRateLimit {
+// 	crl := &capi.InferenceGatewayRateLimit{
+// 		Enabled:     rl.Enabled,
+// 		Enforcement: rl.Enforcement,
+// 		Mode:        rl.Mode,
+// 		CountMode:   rl.CountMode,
+// 		Dimensions:  rl.Dimensions,
+// 		DegradeMode: rl.DegradeMode,
+// 	}
+//
+// 	if rl.Default != nil {
+// 		crl.Default = toConsulLimitPair(rl.Default)
+// 	}
+// 	if rl.Global != nil {
+// 		crl.Global = toConsulLimitPair(rl.Global)
+// 	}
+//
+// 	for _, tl := range rl.TierLimits {
+// 		crl.TierLimits = append(crl.TierLimits, capi.InferenceGatewayTierLimit{
+// 			Tier:                   tl.Tier,
+// 			MaxCompletionTokensCap: tl.MaxCompletionTokensCap,
+// 			Requests:               toConsulLimit(tl.Requests),
+// 			Tokens:                 toConsulLimit(tl.Tokens),
+// 		})
+// 	}
+//
+// 	for _, ml := range rl.ModelLimits {
+// 		crl.ModelLimits = append(crl.ModelLimits, capi.InferenceGatewayModelLimit{
+// 			Model:    ml.Model,
+// 			Requests: toConsulLimit(ml.Requests),
+// 			Tokens:   toConsulLimit(ml.Tokens),
+// 		})
+// 	}
+//
+// 	for _, tb := range rl.TierBindings {
+// 		crl.TierBindings = append(crl.TierBindings, capi.InferenceGatewayTierBinding{
+// 			Tier:      tb.Tier,
+// 			SPIFFEIDs: tb.SPIFFEIDs,
+// 			Partition: tb.Partition,
+// 			Namespace: tb.Namespace,
+// 		})
+// 	}
+//
+// 	return crl
+// }
+//
+// func toConsulLimitPair(p *v1alpha1.InferencePoolLimitPair) *capi.InferenceGatewayLimitPair {
+// 	if p == nil {
+// 		return nil
+// 	}
+// 	return &capi.InferenceGatewayLimitPair{
+// 		Requests: toConsulLimit(p.Requests),
+// 		Tokens:   toConsulLimit(p.Tokens),
+// 	}
+// }
+//
+// func toConsulLimit(l *v1alpha1.InferencePoolLimit) *capi.InferenceGatewayLimit {
+// 	if l == nil {
+// 		return nil
+// 	}
+// 	return &capi.InferenceGatewayLimit{
+// 		Count: int(l.Count),
+// 		Unit:  normaliseWindow(l.Window),
+// 	}
+// }
 
 // normaliseWindow converts the window field to the exact string the Consul
 // AI Gateway rate-limit processor accepts: second | minute | hour | day.

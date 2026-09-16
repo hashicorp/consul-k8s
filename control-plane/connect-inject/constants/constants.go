@@ -86,6 +86,25 @@ const (
 	CACertPEMEnvVar       = "CONSUL_CACERT_PEM"
 	TLSServerNameEnvVar   = "CONSUL_TLS_SERVER_NAME"
 	ConsulDualStackEnvVar = "CONSUL_DUAL_STACK"
+
+	// AI agent role and port constants.
+
+	// AIAgentRole is the expected value of AnnotationAIRole for an AI agent workload.
+	// The webhook injects the mcp-gateway sidecar and the endpoints controller stamps
+	// the AI block on the Consul catalog registration for pods with this role.
+	AIAgentRole = "ai-agent"
+
+	// DefaultAIMCPPort is the loopback port the mcp-gateway outbound listener binds
+	// to inside the pod (ai.agent.mcp.port in the Consul service registration).
+	DefaultAIMCPPort = 15101
+
+	// DefaultAIHITLPort is the loopback port the mcp-gateway HTTP server listens on
+	// for human-in-the-loop approval callbacks (ai.agent.mcp.hitl.port).
+	DefaultAIHITLPort = 16101
+
+	// DefaultAIInterceptorPort is the loopback port the governance interceptor proxy
+	// binds to for inbound MCP traffic inspection (ai.agent.interceptor.port).
+	DefaultAIInterceptorPort = 21101
 )
 
 // GetNormalizedConsulNamespace returns the default namespace if the passed namespace

@@ -343,7 +343,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// For single port pods, add the single init container and envoy sidecar.
 	if !multiPort {
 		// Add the init container that registers the service and sets up the Envoy configuration.
-		initContainer, err := w.containerInit(*ns, pod, multiPortInfo{})
+		initContainer, err := w.containerInit(ctx, *ns, pod, multiPortInfo{})
 		if err != nil {
 			w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -426,7 +426,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 			}
 
 			// Add the init container that registers the service and sets up the Envoy configuration.
-			initContainer, err := w.containerInit(*ns, pod, mpi)
+			initContainer, err := w.containerInit(ctx, *ns, pod, mpi)
 			if err != nil {
 				w.Log.Error(err, "error configuring injection init container", "request name", req.Name)
 				return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring injection init container: %s", err))
@@ -475,21 +475,34 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// 	pod.Spec.Containers = append(pod.Spec.Containers, mcpContainer)
 	// }
 
-	// Inject the AI agent sidecar when the pod requests it via annotation and
+	// Inject the mcp-gateway sidecar when the pod requests it via annotation and
 	// the webhook has an image configured.
-	if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == "ai-agent" && w.ImageAIAgent != "" {
+	//
+	// Port and resource defaults are resolved with a 3-level precedence:
+	//   1. consul.hashicorp.com/ai-agent-config annotation — names a custom
+	//      AgentConfig object in the pod's namespace; use when a team needs
+	//      settings that differ from the cluster default.
+	//   2. "consul-ai-agent" AgentConfig object — the cluster-wide default
+	//      installed by Helm; always present when ai.enabled=true.
+	//   3. Per-pod annotations (e.g. consul.hashicorp.com/ai-agent-hitl-port)
+	//      override individual ports after the CRD defaults are resolved.
+	if aiRole, ok := pod.Annotations[constants.AnnotationAIRole]; ok && aiRole == constants.AIAgentRole && w.ImageAIAgent != "" {
 		agentDefaults := v1alpha1.AgentDefaults{}
 		if w.Client != nil {
+			// Determine which AgentConfig object to read.
+			// Falls back to the Helm-installed "consul-ai-agent" when the
+			// per-pod annotation is absent.
 			configName := "consul-ai-agent"
 			if annotationName := pod.Annotations[constants.AnnotationAIAgentConfig]; annotationName != "" {
 				configName = annotationName
 			}
 
 			var agentCfg v1alpha1.AgentConfig
-			if err := w.Client.Get(ctx, client.ObjectKey{Name: configName}, &agentCfg); err == nil {
+			if err := w.Client.Get(ctx, client.ObjectKey{Name: configName, Namespace: req.Namespace}, &agentCfg); err == nil {
 				agentDefaults = agentCfg.Spec.Defaults
 			} else {
-				w.Log.Info("AgentConfig not found, using built-in defaults", "name", configName)
+				w.Log.Info("AgentConfig not found, continuing with zero defaults; per-pod annotations or built-in constants will apply",
+					"name", configName, "namespace", req.Namespace)
 			}
 		}
 		agentContainer := w.aiAgentSidecar(pod, agentDefaults)
@@ -555,7 +568,7 @@ func (w *MeshWebhook) Handle(ctx context.Context, req admission.Request) admissi
 	// When CNI and tproxy are enabled, we add an annotation to the pod that contains the iptables config so that the CNI
 	// plugin can apply redirect traffic rules on the pod.
 	if w.EnableCNI && tproxyEnabled {
-		if err = w.addRedirectTrafficConfigAnnotation(&pod, *ns); err != nil {
+		if err = w.addRedirectTrafficConfigAnnotation(ctx, &pod, *ns); err != nil {
 			w.Log.Error(err, "error configuring annotation for CNI traffic redirection", "request name", req.Name)
 			return admission.Errored(http.StatusInternalServerError, fmt.Errorf("error configuring annotation for CNI traffic redirection: %s", err))
 		}

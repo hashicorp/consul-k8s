@@ -48,12 +48,46 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 	}
 
 	// consul-mcp-gateway flags:
-	//   --socket   unix domain socket for ext_proc (shared with Envoy/consul-dataplane)
+	//   --socket     unix domain socket for ext_proc (shared with Envoy/consul-dataplane)
+	//   --addr       TCP fallback address when --socket is not set (default: :21101)
 	//   --log-level  maps to the webhook-wide log level
-	args := []string{
-		"--socket=" + mcpGatewayUDSPath,
-		"--log-level=" + w.LogLevel,
+	//   --child      optional: path to child binary to co-supervise (from pod annotation)
+	//   --child-args optional: args for the child binary (from pod annotation)
+	//
+	// Transport selection:
+	//   The custom Consul build's mcp_ext_proc_interceptor cluster dials
+	//   127.0.0.1:21101 (TCP). The binary's listen() opens either UDS or TCP —
+	//   never both. When the ai-agent-addr annotation is set we use TCP only
+	//   (no --socket) so the Consul ext_proc cluster can connect. Otherwise
+	//   we use UDS (production default, shared with consul-dataplane Envoy).
+	var args []string
+	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
+		// TCP mode: Consul's mcp_ext_proc_interceptor cluster dials this address.
+		// Do NOT pass --socket — listen() only opens one transport.
+		args = []string{
+			"--addr=" + addr,
+			"--log-level=" + w.LogLevel,
+		}
+	} else {
+		// UDS mode: default production transport shared with consul-dataplane.
+		args = []string{
+			"--socket=" + mcpGatewayUDSPath,
+			"--log-level=" + w.LogLevel,
+		}
 	}
+
+	childBin, hasChild := pod.Annotations[constants.AnnotationAIAgentChildBinary]
+	if hasChild && childBin != "" {
+		args = append(args, "--child="+childBin)
+		if childArgs, ok := pod.Annotations[constants.AnnotationAIAgentChildArgs]; ok && childArgs != "" {
+			args = append(args, "--child-args="+childArgs)
+		}
+	}
+
+	// ReadOnlyRootFilesystem is safe when consul-mcp-gateway runs alone.
+	// When --child is set the child binary runs in the same container and may
+	// need to write temp files, so we allow a writable root in that case.
+	readOnlyRootFS := ptr.To(!hasChild || childBin == "")
 
 	container := corev1.Container{
 		Name:            mcpGatewayContainer,
@@ -76,17 +110,7 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 				MountPath: "/consul/connect-inject",
 			},
 		},
-		ReadinessProbe: &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				// The socket file appears once mcp-gateway is ready to accept
-				// connections. Use a TCP socket probe on the HITL port as a
-				// lightweight liveness signal until UDS probes are supported.
-				TCPSocket: &corev1.TCPSocketAction{
-					Port: intstr.FromInt(int(hitlPort)),
-				},
-			},
-			InitialDelaySeconds: 1,
-		},
+		ReadinessProbe: w.mcpGatewayReadinessProbe(pod, hitlPort),
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser:                ptr.To(int64(sidecarUserAndGroupID)),
 			RunAsGroup:               ptr.To(int64(sidecarUserAndGroupID)),
@@ -98,9 +122,51 @@ func (w *MeshWebhook) aiAgentSidecar(pod corev1.Pod, defaults v1alpha1.AgentDefa
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},
-			ReadOnlyRootFilesystem: ptr.To(true),
+			ReadOnlyRootFilesystem: readOnlyRootFS,
 		},
 	}
 
 	return container
+}
+
+// mcpGatewayReadinessProbe returns the correct readiness probe depending on
+// whether the mcp-gateway is running in TCP mode (ai-agent-addr annotation set)
+// or UDS mode (default).
+//
+//   - TCP mode: TCPSocket probe on the configured addr port — the binary binds
+//     TCP and no socket file is created.
+//   - UDS mode: exec "test -S <socket>" — Kubernetes does not support UDS probes
+//     natively so we stat the socket file instead.
+func (w *MeshWebhook) mcpGatewayReadinessProbe(pod corev1.Pod, hitlPort int32) *corev1.Probe {
+	if addr, ok := pod.Annotations[constants.AnnotationAIAgentAddr]; ok && addr != "" {
+		// Parse the port from the addr string e.g. ":21101" → 21101.
+		// Fall back to hitlPort if the addr is malformed.
+		port := hitlPort
+		if len(addr) > 1 {
+			if p, err := strconv.ParseInt(addr[1:], 10, 32); err == nil {
+				port = int32(p)
+			}
+		}
+		return &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				TCPSocket: &corev1.TCPSocketAction{
+					Port: intstr.FromInt(int(port)),
+				},
+			},
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       5,
+			FailureThreshold:    12,
+		}
+	}
+	// UDS mode: probe the socket file.
+	return &corev1.Probe{
+		ProbeHandler: corev1.ProbeHandler{
+			Exec: &corev1.ExecAction{
+				Command: []string{"test", "-S", mcpGatewayUDSPath},
+			},
+		},
+		InitialDelaySeconds: 1,
+		PeriodSeconds:       5,
+		FailureThreshold:    12,
+	}
 }

@@ -265,6 +265,36 @@ const (
 	// Falls back to AgentConfig CRD defaults when not set.
 	AnnotationAIAgentHITLApprovalTimeout = "consul.hashicorp.com/ai-agent-hitl-approval-timeout"
 
+	// AnnotationAIAgentAddr overrides the TCP address consul-mcp-gateway listens on when
+	// --socket is not used. Defaults to :21101 per the binary's built-in default.
+	// Only useful in local development or environments where a shared UDS volume is unavailable.
+	// Maps to the --addr flag on consul-mcp-gateway.
+	// e.g. consul.hashicorp.com/ai-agent-addr: ":21200"
+	AnnotationAIAgentAddr = "consul.hashicorp.com/ai-agent-addr"
+
+	// AnnotationAIAgentChildBinary sets the path to a child binary supervised by consul-mcp-gateway.
+	// When set, the mcp-gateway container launches this binary alongside the ext_proc server
+	// with a shared lifecycle. Maps to the --child flag on consul-mcp-gateway.
+	// e.g. consul.hashicorp.com/ai-agent-child-binary: "/app/consul-ai-agent"
+	AnnotationAIAgentChildBinary = "consul.hashicorp.com/ai-agent-child-binary"
+
+	// AnnotationAIAgentChildArgs passes space-separated arguments to the child binary.
+	// Only used when AnnotationAIAgentChildBinary is also set.
+	// Maps to the --child-args flag on consul-mcp-gateway.
+	// e.g. consul.hashicorp.com/ai-agent-child-args: "--port=8080 --log-level=debug"
+	AnnotationAIAgentChildArgs = "consul.hashicorp.com/ai-agent-child-args"
+
+	// AnnotationAIInferenceModelProtocol sets the wire protocol for an inference-model
+	// service registration. Valid values: openai | anthropic | passthrough.
+	// Stamped on the Consul service's AI.InferenceModel.Protocol field.
+	// e.g. consul.hashicorp.com/ai-inference-model-protocol: "openai"
+	AnnotationAIInferenceModelProtocol = "consul.hashicorp.com/ai-inference-model-protocol"
+
+	// AnnotationAIInferenceModelPath sets the base URL path for an inference-model
+	// service registration (e.g. "/v1"). Stamped on AI.InferenceModel.Path.
+	// e.g. consul.hashicorp.com/ai-inference-model-path: "/v1"
+	AnnotationAIInferenceModelPath = "consul.hashicorp.com/ai-inference-model-path"
+
 	// Injected is used as the annotation value for keyInjectStatus and annotationInjected.
 	Injected = "injected"
 

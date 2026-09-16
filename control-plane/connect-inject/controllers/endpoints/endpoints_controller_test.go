@@ -1064,7 +1064,7 @@ func TestCreateServiceRegistrations_LegacyMultiServiceFlow_WithSinglePortToken(t
 		Log:    logrtest.New(t),
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	require.Equal(t, "web-admin", serviceRegistration.Service.Service)
@@ -1122,7 +1122,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort(t *testing.T) {
 		IsEnterpriseDistribution: true,
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	require.Equal(t, 0, serviceRegistration.Service.Port)
@@ -1188,7 +1188,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_CEFallback(t *testing
 		IsEnterpriseDistribution: false, // Consul CE
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	// On CE, Ports should be nil and Port should be the default port value.
@@ -1251,7 +1251,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_EnterpriseSetsMultipl
 		IsEnterpriseDistribution: true, // Consul Enterprise
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	// On Enterprise, Ports should be set and Port should be 0 (multi-port mode).
@@ -1318,7 +1318,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_FromEndpointsFallback
 		IsEnterpriseDistribution: true,
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	require.Equal(t, 0, serviceRegistration.Service.Port)
@@ -1382,7 +1382,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation
 		IsEnterpriseDistribution: true,
 	}
 
-	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, _, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	require.Equal(t, api.ServicePorts{
@@ -1438,7 +1438,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation
 		IsEnterpriseDistribution: true,
 	}
 
-	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, _, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	require.Equal(t, api.ServicePorts{
@@ -1494,7 +1494,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_DefaultPortAnnotation
 		IsEnterpriseDistribution: true,
 	}
 
-	serviceRegistration, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, _, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 
 	require.Equal(t, api.ServicePorts{
@@ -1549,7 +1549,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_MixedProtocolsFromAnn
 		IsEnterpriseDistribution: true,
 	}
 
-	_, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	_, _, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.EqualError(t, err, "multi-port service registration requires all ports to use the same protocol, found \"TCP\" and \"UDP\"")
 }
 
@@ -1599,7 +1599,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_MixedProtocolsFromEnd
 		IsEnterpriseDistribution: true,
 	}
 
-	_, _, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	_, _, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.EqualError(t, err, "multi-port service registration requires all ports to use the same protocol, found \"TCP\" and \"UDP\"")
 }
 
@@ -1648,7 +1648,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_InvalidPortToken_IsIg
 		Log:    logrtest.New(t),
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 	require.Equal(t, 5050, serviceRegistration.Service.Port)
 	require.Nil(t, serviceRegistration.Service.Ports)
@@ -1700,7 +1700,7 @@ func TestCreateServiceRegistrations_SingleServiceMultiPort_EmptyPortToken_IsIgno
 		Log:    logrtest.New(t),
 	}
 
-	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+	serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 	require.NoError(t, err)
 	require.Equal(t, 5050, serviceRegistration.Service.Port)
 	require.Nil(t, serviceRegistration.Service.Ports)
@@ -7288,7 +7288,7 @@ func TestCreateServiceRegistrations_withTransparentProxy(t *testing.T) {
 				Log:                    logrtest.New(t),
 			}
 
-			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(*pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
+			serviceRegistration, proxyServiceRegistration, err := epCtrl.createServiceRegistrations(context.Background(), *pod, pod.Status.PodIP, *endpoints, api.HealthPassing)
 			if c.expErr != "" {
 				require.EqualError(t, err, c.expErr)
 			} else {

@@ -284,7 +284,7 @@ func (r *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 					if hasBeenInjected(pod) {
 						if isConsulDataplaneSupported(pod) {
 							serviceEndpoints := corev1.Endpoints{ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: serviceNamespace}}
-							if err = r.registerServicesAndHealthCheck(apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
+							if err = r.registerServicesAndHealthCheck(ctx, apiClient, pod, address.IP, serviceEndpoints, healthStatus); err != nil {
 								r.Log.Error(err, "failed to register services or health check", "name", serviceName, "ns", serviceNamespace)
 								errs = multierror.Append(errs, err)
 							}
@@ -376,7 +376,7 @@ func (r *Controller) SetupWithManager(mgr ctrl.Manager) error {
 
 // registerServicesAndHealthCheck creates Consul registrations for the service and proxy and registers them with Consul.
 // It also upserts a Kubernetes health check for the service based on whether the endpoint address is ready.
-func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
+func (r *Controller) registerServicesAndHealthCheck(ctx context.Context, apiClient *api.Client, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) error {
 	var managedByEndpointsController bool
 	if raw, ok := pod.Labels[constants.KeyManagedBy]; ok && raw == constants.ManagedByValue {
 		managedByEndpointsController = true
@@ -384,7 +384,7 @@ func (r *Controller) registerServicesAndHealthCheck(apiClient *api.Client, pod c
 	// For pods managed by this controller, create and register the service instance.
 	if managedByEndpointsController {
 		// Get information from the pod to create service instance registrations.
-		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(pod, podIP, serviceEndpoints, healthStatus)
+		serviceRegistration, proxyServiceRegistration, err := r.createServiceRegistrations(ctx, pod, podIP, serviceEndpoints, healthStatus)
 		if err != nil {
 			r.Log.Error(err, "failed to create service registrations for endpoints", "name", serviceEndpoints.Name, "ns", serviceEndpoints.Namespace)
 			return err
@@ -515,7 +515,7 @@ func annotationProxyConfigMap(pod corev1.Pod) (map[string]any, error) {
 
 // createServiceRegistrations creates the service and proxy service instance registrations with the information from the
 // Pod.
-func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
+func (r *Controller) createServiceRegistrations(ctx context.Context, pod corev1.Pod, podIP string, serviceEndpoints corev1.Endpoints, healthStatus string) (*api.CatalogRegistration, *api.CatalogRegistration, error) {
 
 	// Determine the default service port and optional multi-port definitions.
 	// The meshWebhook will always set the port annotation if one is not provided on the pod.
@@ -578,6 +578,31 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 	}
 	tags := consulTags(pod)
 
+	// If this pod is an AI agent, fetch the AgentConfig CRD and build the
+	// api.AgentServiceAI block so Consul receives the full ai{} block in the
+	// catalog registration (mcp port, interceptor port, HITL config).
+	// Port resolution follows the same 3-level precedence as the mesh webhook:
+	//   1. AgentConfig named by consul.hashicorp.com/ai-agent-config annotation
+	//   2. AgentConfig named "consul-ai-agent" (Helm-installed cluster default)
+	//   3. Built-in port constants as safety-net for zero values
+	var serviceAI *api.AgentServiceAI
+	switch {
+	case common.IsAIAgent(pod):
+		var aiErr error
+		serviceAI, aiErr = common.AIConfigFromAgentCRD(ctx, r.Client, pod)
+		if aiErr != nil {
+			r.Log.Error(aiErr, "failed to build AI service block from AgentConfig CRD; omitting ai{} from registration",
+				"pod", pod.Name, "namespace", pod.Namespace)
+			// Non-fatal: proceed without the AI block rather than blocking registration.
+			serviceAI = nil
+		}
+	case common.IsInferenceModel(pod):
+		// Build the AI.InferenceModel block from pod annotations so the
+		// InferenceGateway proxycfg discovers this service as a model upstream
+		// and renders an ollama cluster with consul.inference FilterMetadata.
+		serviceAI = common.AIServiceFromInferenceModelPod(pod)
+	}
+
 	consulNS := r.consulNamespace(pod.Namespace)
 	registrationPort := consulServicePort
 	if len(consulServicePorts) > 0 {
@@ -594,6 +619,7 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		Namespace: consulNS,
 		Tags:      tags,
 		Locality:  locality,
+		AI:        serviceAI,
 	}
 	serviceRegistration := &api.CatalogRegistration{
 		Node:    common.ConsulNodeNameFromK8sNode(pod.Spec.NodeName),
@@ -680,6 +706,9 @@ func (r *Controller) createServiceRegistrations(pod corev1.Pod, podIP string, se
 		Tags:      tags,
 		// Sidecar locality (not proxied service locality) is used for locality-aware routing.
 		Locality: locality,
+		// AI carries the same block as the service registration so Consul can
+		// associate the proxy with the agent's MCP/interceptor/HITL ports.
+		AI: serviceAI,
 	}
 
 	// A user can enable/disable tproxy for an entire namespace.

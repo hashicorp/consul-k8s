@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -390,7 +391,7 @@ func TestAddRedirectTrafficConfig(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			err := c.webhook.addRedirectTrafficConfigAnnotation(c.pod, c.namespace)
+			err := c.webhook.addRedirectTrafficConfigAnnotation(context.Background(), c.pod, c.namespace)
 
 			// Only compare annotation and iptables config on successful runs
 			if c.expErr == nil {
@@ -464,7 +465,7 @@ func TestRedirectTraffic_consulDNS(t *testing.T) {
 
 			ns := testNS
 			ns.Labels = c.namespaceLabel
-			iptablesConfig, err := w.iptablesConfigJSON(*pod, ns)
+			iptablesConfig, err := w.iptablesConfigJSON(context.Background(), *pod, ns)
 			require.NoError(t, err)
 
 			actualConfig := iptables.Config{}
