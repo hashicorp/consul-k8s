@@ -963,6 +963,79 @@ spec:
                     description: ConsulNamespace is the Consul namespace where the
                       gateway is registered
                     type: string
+                  credentialInjection:
+                    description: |-
+                      CredentialInjection configures optional non-secret credential-processor and
+                      Vault Agent sidecars that inject external-model credentials for linked
+                      services. This is a Kubernetes deployment concern only: it does not change
+                      the Consul terminating-gateway config entry produced by ToConsul.
+                    properties:
+                      drainSeconds:
+                        description: |-
+                          DrainSeconds bounds how long the sidecars wait to finish in-flight credential
+                          refresh work before terminating during a rolling update.
+                        format: int64
+                        minimum: 0
+                        type: integer
+                      enabled:
+                        description: |-
+                          Enabled controls whether the credential processor and Vault Agent sidecars
+                          are added to the gateway deployment.
+                        type: boolean
+                      processorConfigMap:
+                        description: |-
+                          ProcessorConfigMap names the ConfigMap, in the gateway's namespace, carrying
+                          non-secret credential processor binding/template configuration.
+                        type: string
+                      processorImage:
+                        description: ProcessorImage is the container image reference
+                          for the credential processor sidecar.
+                        type: string
+                      tokenAudience:
+                        description: |-
+                          TokenAudience is the audience requested for the projected Kubernetes service
+                          account token presented to Vault.
+                        type: string
+                      tokenExpirationSeconds:
+                        description: |-
+                          TokenExpirationSeconds is the requested expiration, in seconds, of the
+                          projected service account token.
+                        format: int64
+                        maximum: 43200
+                        minimum: 600
+                        type: integer
+                      vaultAddress:
+                        description: |-
+                          VaultAddress is the address of the Vault server the sidecar authenticates against.
+                          It must be an absolute https:// URL.
+                        type: string
+                      vaultAgentConfigMap:
+                        description: |-
+                          VaultAgentConfigMap names the ConfigMap, in the gateway's namespace, carrying
+                          non-secret Vault Agent configuration.
+                        type: string
+                      vaultAgentImage:
+                        description: VaultAgentImage is the container image reference
+                          for the Vault Agent sidecar.
+                        type: string
+                      vaultAuthMount:
+                        description: VaultAuthMount is the mount path of the Vault
+                          Kubernetes auth method.
+                        type: string
+                      vaultAuthRole:
+                        description: VaultAuthRole is the Vault Kubernetes auth role
+                          assumed by the sidecar.
+                        type: string
+                      vaultCAConfigMap:
+                        description: |-
+                          VaultCAConfigMap optionally names a ConfigMap, in the gateway's namespace, carrying
+                          the CA bundle used to validate the Vault server's TLS certificate.
+                        type: string
+                      vaultNamespace:
+                        description: VaultNamespace is the optional Vault Enterprise
+                          namespace.
+                        type: string
+                    type: object
                   enabledDeployment:
                     description: Enabled controls whether to create a Deployment for
                       this gateway
