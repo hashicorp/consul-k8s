@@ -1012,6 +1012,16 @@ func (r *TerminatingGatewayController) constructDeploymentFromCRD(
 		Containers:                    []corev1.Container{mainContainer},
 	}
 
+	// Add the Vault-only credential-injection sidecars/volumes when enabled.
+	// This mirrors the Helm chart projection so both deployment paths agree.
+	applyTerminatingGatewayCredentialInjection(
+		&podSpec,
+		termGW.Spec.Deployment.CredentialInjection,
+		helmConfigValues.Global.ImageK8S,
+		imagePullPolicy,
+		logLevel,
+	)
+
 	annotations := map[string]string{
 		"consul.hashicorp.com/connect-inject":              "false",
 		"consul.hashicorp.com/mesh-inject":                 "false",
