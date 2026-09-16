@@ -262,7 +262,7 @@ spec:
           secret:
             secretName: {{ .Values.global.enterpriseLicense.secretName }}
         {{- end }}
-        {{- if (and .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}
+        {{- if (and .Values.global.globalRegistry.enabled .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}
         - name: consul-global-registry-token
           secret:
             secretName: {{ .Values.global.globalRegistry.tokenSecretName }}
@@ -520,7 +520,7 @@ spec:
               mountPath: /consul/license
               readOnly: true
             {{- end }}
-            {{- if (and .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}
+            {{- if (and .Values.global.globalRegistry.enabled .Values.global.globalRegistry.tokenSecretName .Values.global.globalRegistry.tokenSecretKey) }}
             - name: consul-global-registry-token
               mountPath: /consul/global-registry-token
               readOnly: true
